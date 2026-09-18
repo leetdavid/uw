@@ -1,0 +1,62 @@
+name: Chromium macOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobs:
+        description: Parallel build jobs
+        type: choice
+        options: ['2', '4', '8', '16']
+        default: '2'
+  push:
+    branches: [main]
+    paths:
+      - chromium/**
+      - scripts/**
+      - .node-version
+      - package.json
+      - package-lock.json
+      - .github/workflows/chromium-macos.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uw-chromium-macos
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, macOS, ARM64, uw-chromium]
+    timeout-minutes: 720
+    env:
+      UW_CHROMIUM_ROOT: ${{ vars.UW_CHROMIUM_ROOT }}
+      BUILD_JOBS: ${{ inputs.jobs || '2' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - name: Resolve checkout root
+        run: |
+          export UW_CHROMIUM_ROOT="${UW_CHROMIUM_ROOT:-$HOME/uw-chromium}"
+          root="$(node scripts/chromium.ts root)"
+          printf 'UW_CHROMIUM_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
+      - name: Check build host
+        run: node scripts/chromium.ts doctor
+      - name: Sync pinned source
+        run: node scripts/chromium.ts sync --jobs "$BUILD_JOBS"
+      - name: Compile Chromium
+        run: caffeinate -i node scripts/chromium.ts build --jobs "$BUILD_JOBS"
+      - name: Smoke-test browser
+        run: node scripts/chromium.ts smoke
+      - name: Package application
+        run: ditto -c -k --sequesterRsrc --keepParent "$UW_CHROMIUM_ROOT/src/out/uw/Chromium.app" "$RUNNER_TEMP/Chromium-macos.zip"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chromium-macos-native
+          path: ${{ runner.temp }}/Chromium-macos.zip
+          if-no-files-found: error
+          retention-days: 7

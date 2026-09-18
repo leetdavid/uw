@@ -1,0 +1,6 @@
+{
+  "version": "153.0.8010.53",
+  "chromium_revision": "792bf6722e73a45aa9e47c163b9901bdc17f3230",
+  "depot_tools_revision": "b026e66c799d113ef18aa7921559e77dd5167aa4",
+  "macos_sdk_min": "26.5"
+}

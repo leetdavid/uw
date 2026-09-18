@@ -1,0 +1,9 @@
+# Native, unbranded development baseline. Uses public build dependencies.
+is_debug = false
+is_official_build = false
+is_chrome_branded = false
+is_component_build = false
+symbol_level = 0
+use_system_xcode = true
+use_remoteexec = false
+use_siso = true
