@@ -253,7 +253,7 @@ export class Chromium {
     } catch { report("macOS SDK", false, "xcrun could not locate a usable macOS SDK"); }
     const existing = nearestExisting(this.layout.root);
     const free = this.runtime.freeBytes(existing) / GIB;
-    const required = existsSync(join(this.layout.source, "DEPS")) ? 50 : 200;
+    const required = existsSync(join(this.layout.source, "DEPS")) ? 50 : 100;
     report("Free disk", free >= required, `${free.toFixed(1)} GiB at ${existing}; required >= ${required} GiB`);
     try {
       const device = this.capture(["df", "-P", existing]).split("\n").at(-1)?.split(/\s+/)[0];

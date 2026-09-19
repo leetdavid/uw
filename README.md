@@ -14,9 +14,9 @@ uw browser is a planned Chromium-based browser. The current implementation is a 
 - Git and working `curl` on PATH.
 - Full Xcode, with first-launch setup completed and macOS SDK 26.5 or newer.
 - An APFS build volume and a checkout path without spaces.
-- 200 GiB free for a fresh checkout, or 50 GiB free for an existing checkout's sync/build.
+- 100 GiB free for a fresh checkout, or 50 GiB free for an existing checkout's sync/build.
 
-The disk thresholds are conservative project budgets. Start with two build jobs on a 16 GiB Mac; more memory permits greater parallelism.
+These are project guardrails, not upstream Chromium requirements. They cover the source checkout, dependencies, generated files, and release-build output with headroom. Start with two build jobs on a 16 GiB Mac; more memory permits greater parallelism.
 
 Chromium's browser core is C++. Our build helper and tests are TypeScript. Chromium's upstream bootstrap requires `python3` on PATH, and `depot_tools` manages its pinned runtime for build hooks and tools. We do not write project-owned Python code.
 
