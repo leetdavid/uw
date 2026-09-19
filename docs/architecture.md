@@ -10,7 +10,7 @@ The integration approach is undecided. Compare a Chromium fork with an embedding
 
 ## Build foundation
 
-The initial implementation compiles pinned upstream Chromium source into `Chromium.app` using Chromium's build tools. Establish a working source build before changing browser behavior. Commands and verification status live in [Building Chromium](building.md).
+The initial implementation compiles pinned upstream Chromium source into `Chromium.app` using Chromium's build tools. Establish a working source build before changing browser behavior. Commands and verification status live in the [root README](../README.md#building).
 
 ## Proposed responsibilities
 

@@ -2,6 +2,7 @@
   "name": "uw-browser",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.31.0",
   "engines": {
     "node": ">=24.13.0"
   },
@@ -13,7 +14,7 @@
     "smoke": "node scripts/chromium.ts smoke",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
-    "check": "npm run typecheck && npm test"
+    "check": "pnpm run typecheck && pnpm test"
   },
   "devDependencies": {
     "@types/node": "24.13.5",

@@ -6,7 +6,8 @@ uw browser means "ur web, ur way". It is a planned Chromium-based browser with A
 - The current implementation scope is the Chromium build foundation. Product features remain planned.
 - Never write project-owned Python code, including build helpers and tests. Use TypeScript for repository tooling and C++ for Chromium changes.
 - Chromium's upstream build tools require Python. Make that dependency explicit; do not claim the entire build chain is Python-free.
-- Use [docs/building.md](docs/building.md) for setup, verification, and build-host requirements.
+- Use pnpm for dependencies and package scripts. Keep `pnpm-lock.yaml` as the package lockfile.
+- Use [README.md](README.md) for build-host requirements, setup, building, running, and verification.
 - Keep decisions and requirements in `docs/`. Put implementation plans in `docs/plans/`.
 - Distinguish agreed requirements from proposals and open questions. Do not present planned features as working software.
 - Include implementability scores out of 10 in feature discussions. Use the [roadmap's scoring convention](docs/plans/roadmap.md#implementability-estimates) and update its estimates when scope changes.

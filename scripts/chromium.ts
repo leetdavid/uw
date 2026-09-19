@@ -267,7 +267,7 @@ export class Chromium {
   }
 
   requireHost(): void {
-    if (!this.doctor()) throw new BuildError("Preflight failed. See docs/building.md before retrying.");
+    if (!this.doctor()) throw new BuildError("Preflight failed. See README.md#build-host-requirements before retrying.");
   }
 
   verifyRepo(path: string, url: string, revision?: string): void {

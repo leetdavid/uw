@@ -15,7 +15,7 @@ on:
       - scripts/**
       - .node-version
       - package.json
-      - package-lock.json
+      - pnpm-lock.yaml
       - .github/workflows/chromium-macos.yml
 
 permissions:
@@ -36,22 +36,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          run_install: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
+          cache: pnpm
+      - name: Install tooling dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Resolve checkout root
         run: |
           export UW_CHROMIUM_ROOT="${UW_CHROMIUM_ROOT:-$HOME/uw-chromium}"
-          root="$(node scripts/chromium.ts root)"
+          root="$(pnpm --silent run chromium root)"
           printf 'UW_CHROMIUM_ROOT=%s\n' "$root" >> "$GITHUB_ENV"
       - name: Check build host
-        run: node scripts/chromium.ts doctor
+        run: pnpm run doctor
       - name: Sync pinned source
-        run: node scripts/chromium.ts sync --jobs "$BUILD_JOBS"
+        run: pnpm run sync --jobs "$BUILD_JOBS"
       - name: Compile Chromium
-        run: caffeinate -i node scripts/chromium.ts build --jobs "$BUILD_JOBS"
+        run: caffeinate -i pnpm run build --jobs "$BUILD_JOBS"
       - name: Smoke-test browser
-        run: node scripts/chromium.ts smoke
+        run: pnpm run smoke
       - name: Package application
         run: ditto -c -k --sequesterRsrc --keepParent "$UW_CHROMIUM_ROOT/src/out/uw/Chromium.app" "$RUNNER_TEMP/Chromium-macos.zip"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

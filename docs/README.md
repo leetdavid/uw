@@ -8,7 +8,7 @@ uw browser is a planned Chromium-based browser with vertical tabs and AI automat
 
 - [Product](product.md): experience, headline features, and expected behavior.
 - [Glossary](CONTEXT.md): product terminology.
-- [Building Chromium](building.md): local commands, CI, prerequisites, and verification status.
+- [Building and using Chromium](../README.md#build-host-requirements): setup, build and run commands, CI, and verification status.
 - [Architecture](architecture.md): technical direction and decisions still to make.
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, and implementability estimates.
 
