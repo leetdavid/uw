@@ -1,4 +1,4 @@
-# Native, unbranded development baseline. Uses public build dependencies.
+# Native development build with uw patches. Uses public Chromium dependencies.
 is_debug = false
 is_official_build = false
 is_chrome_branded = false

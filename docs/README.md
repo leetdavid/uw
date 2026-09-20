@@ -10,10 +10,11 @@ uw browser is a planned Chromium-based browser with vertical tabs and AI automat
 - [Glossary](CONTEXT.md): product terminology.
 - [Building and using Chromium](../README.md#build-host-requirements): setup, build and run commands, CI, and verification status.
 - [Architecture](architecture.md): technical direction and decisions still to make.
+- [Chromium code organization research](chromium-organization-research.md): Brave and Helium source layouts, patch workflows, and maintenance tradeoffs.
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, and implementability estimates.
 
 ## Status
 
-The upstream Chromium build and headless smoke test pass on Apple Silicon. See the [verified host and results](../README.md#verification-status). Product features remain planned.
+The upstream Chromium build and headless smoke test passed on Apple Silicon. The wrapper now prepares minimal uw branding and native vertical tabs by default. These patches have passed source-level checks; the customized app's build and UI checks are pending. See [verification status](../README.md#verification-status). Later product features remain planned.
 
-The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The Chromium integration approach and local model runtime remain open.
+The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The current approach uses Chromium source customizations; the update process and local model runtime still need validation or selection.

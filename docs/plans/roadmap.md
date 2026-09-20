@@ -4,11 +4,11 @@ The [minimum usable version](../product.md#minimum-usable-version) and [next fea
 
 ## 1. Choose the browser foundation
 
-The [Chromium source-build pipeline](../../README.md#building) now produces a native Apple Silicon build that passes the headless smoke test. See the [verified host and results](../../README.md#verification-status).
+The [upstream Chromium baseline](../../README.md#upstream-baseline) built and passed headless smoke testing on Apple Silicon. The wrapper now prepares the [first uw customizations](../../README.md#customizing-chromium); their full build and UI checks are pending.
 
-Evaluate Chromium integration options for the [initial platform](../product.md#minimum-usable-version). Establish the security-update path and performance baseline. Check compatibility with the [required extensions](../product.md#required-extensions), ad blocking, download hooks, and session persistence.
+Validate the source-customization approach for the [initial platform](../product.md#minimum-usable-version). Establish the security-update path with a patch-update trial and measure a performance baseline. Check compatibility with the [required extensions](../product.md#required-extensions), ad blocking, download hooks, and session persistence.
 
-Done when a short decision record names the approach, its tradeoffs, and measured evidence that it supports the headline features.
+Done when the [architecture](../architecture.md#code-organization) has measured evidence that the approach supports the headline features and manageable Chromium updates.
 
 ## 2. Make the browser usable daily
 
@@ -51,6 +51,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | Feature | Score | Main consideration |
 | --- | --- | --- |
 | [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
+| [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. Source-level checks pass; the customized build and UI remain unverified. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Required Chrome-extension compatibility](../product.md#required-extensions) | 7/10 | Browser integration and interactions between the named extensions need validation on macOS. |
 | [Explicit AI setup](../product.md#ai-connections) | 9/10 | A bounded connection-selection flow. |

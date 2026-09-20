@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Build the pinned Chromium baseline with upstream tools. */
+/** Build uw from pinned Chromium source with upstream tools. */
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -11,6 +11,7 @@ import { homedir, tmpdir, totalmem } from "node:os";
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { PatchSet } from "./patches.ts";
 
 export const REPO = fileURLToPath(new URL("../", import.meta.url));
 export const CHROMIUM_URL = "https://chromium.googlesource.com/chromium/src.git";
@@ -44,6 +45,7 @@ export interface CommandOptions {
   timeout?: number;
   input?: string;
   inherit?: boolean;
+  rawOutput?: boolean;
 }
 
 export type Runner = (command: readonly string[], options?: CommandOptions) => string;
@@ -88,7 +90,7 @@ export function execute(command: readonly string[], options: CommandOptions = {}
       result.signal === "SIGINT" ? 130 : 1,
     );
   }
-  return result.stdout?.trim() ?? "";
+  return options.rawOutput ? result.stdout ?? "" : result.stdout?.trim() ?? "";
 }
 
 export function nativeRuntime(): Runtime {
@@ -117,7 +119,7 @@ export function layoutAt(root: string): Layout {
   const normalized = checkoutPath(root);
   return {
     root: normalized, tools: join(normalized, "depot_tools"), source: join(normalized, "src"),
-    binary: join(normalized, "src", OUTPUT, "Chromium.app/Contents/MacOS/Chromium"),
+    binary: join(normalized, "src", OUTPUT, "uw.app/Contents/MacOS/uw"),
   };
 }
 
@@ -172,7 +174,9 @@ export function requireOwnedRoot(layout: Layout, create = false): void {
   throw new BuildError(`${layout.root} is not a managed uw checkout. Choose a dedicated empty --checkout-dir and run sync.`);
 }
 
-export function requireCleanWorktrees(layout: Layout, run: Runner = execute, extraRoots: string[] = []): void {
+export function requireCleanWorktrees(
+  layout: Layout, run: Runner = execute, extraRoots: string[] = [], checkSource?: () => void,
+): void {
   const pending = [layout.source, layout.tools, ...extraRoots];
   const checked = new Set<string>();
   while (pending.length) {
@@ -185,7 +189,8 @@ export function requireCleanWorktrees(layout: Layout, run: Runner = execute, ext
     // separately and still reject staged gitlink edits.
     const work = run([...git, "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=all"], { timeout: 300_000 });
     const staged = run([...git, "diff", "--cached", "--name-only", "--ignore-submodules=none"]);
-    if (work || staged) throw new BuildError(`${path} has local changes. Preserve them before running sync.`);
+    if (path === layout.source && checkSource) checkSource();
+    else if (work || staged) throw new BuildError(`${path} has local changes. Preserve them before running sync.`);
     for (const entry of run([...git, "ls-files", "--stage", "-z"], { timeout: 300_000 }).split("\0")) {
       if (entry.startsWith("160000 ")) {
         const separator = entry.indexOf("\t");
@@ -200,11 +205,14 @@ export class Chromium {
   readonly layout: Layout;
   readonly pins: Pins;
   readonly runtime: Runtime;
+  readonly patches: PatchSet;
 
   constructor(layout: Layout, pins: Pins, runtime = nativeRuntime()) {
     this.layout = layout;
     this.pins = pins;
     this.runtime = runtime;
+    this.patches = new PatchSet(layout.source, join(REPO, "chromium/patches"),
+      join(layout.root, ".uw-patches.json"), this.capture.bind(this), runtime.env);
   }
 
   environment(): NodeJS.ProcessEnv {
@@ -362,8 +370,10 @@ export class Chromium {
     if (existsSync(this.layout.source)) this.verifyRepo(this.layout.source, CHROMIUM_URL);
     if (existsSync(this.layout.tools)) this.verifyRepo(this.layout.tools, DEPOT_TOOLS_URL);
     const previousRoots = this.recordedRoots();
-    const check = (roots: string[] = []): void => requireCleanWorktrees(this.layout, this.capture.bind(this), roots);
+    const check = (roots: string[] = []): void => requireCleanWorktrees(
+      this.layout, this.capture.bind(this), roots, () => { this.patches.check(); });
     check(previousRoots);
+    if (existsSync(this.layout.source)) this.patches.unapply();
     if (!existsSync(this.layout.tools)) {
       this.run(["git", "clone", "--depth", "1", DEPOT_TOOLS_URL, this.layout.tools], this.layout.root);
     }
@@ -389,13 +399,20 @@ export class Chromium {
       "--revision", `src@${this.pins.chromium_revision}`, "--jobs", String(jobs)], this.layout.root);
     this.verifyCheckout(false);
     this.rememberRoots([...knownRoots, ...this.dependencyRoots()]);
+    this.patches.apply();
     writeFileSync(join(this.layout.root, SYNC_STAMP), JSON.stringify(this.pins));
     this.runtime.log(`Synced Chromium ${this.pins.version} at ${this.pins.chromium_revision}`);
   }
 
+  prepare(): void {
+    this.verifyCheckout();
+    this.patches.apply();
+    this.runtime.log("Prepared uw customizations from chromium/patches/series");
+  }
+
   build(jobs: number): void {
     this.requireHost();
-    this.verifyCheckout();
+    this.prepare();
     const args = readFileSync(join(REPO, "chromium/args.gn"), "utf8") +
       (this.runtime.arch === "arm64" ? "\nuse_lld = false\n" : "");
     this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args}`, "--fail-on-unused-args"], this.layout.source);
@@ -406,10 +423,11 @@ export class Chromium {
 
   smoke(timeout: number): void {
     this.verifyCheckout();
+    this.patches.verify();
     if (!existsSync(this.layout.binary)) throw new BuildError(`${this.layout.binary} is missing. Run build first.`);
     const version = this.capture([this.layout.binary, "--version"], { timeout });
-    if (!version.split(/\s+/).includes(this.pins.version)) {
-      throw new BuildError(`Built browser reported ${version}; expected version ${this.pins.version}`);
+    if (version !== `uw ${this.pins.version}`) {
+      throw new BuildError(`Built browser reported ${version}; expected uw ${this.pins.version}`);
     }
     const html = "<html><body><script>document.body.setAttribute('data-uw-smoke', 'passed');" +
       "document.title = 'uw Chromium smoke';</script></body></html>";
@@ -431,14 +449,15 @@ export class Chromium {
 const descriptions = {
   root: "Print the resolved checkout path without creating it.",
   doctor: "Check the macOS host without creating a checkout or downloading sources.",
-  sync: "Download the pinned Chromium source and dependencies; refuse local source edits.",
-  build: "Generate build files and compile the chrome target from the pinned checkout.",
+  sync: "Download pinned Chromium and dependencies, then apply uw patches; refuse local source edits.",
+  prepare: "Apply the ordered uw patches to a synced checkout without downloading or compiling.",
+  build: "Prepare uw customizations, generate build files, and compile the chrome target.",
   smoke: "Verify the built version and run an isolated headless JavaScript/DOM check.",
 } as const;
 
 function help(command?: keyof typeof descriptions): string {
-  const usage = command ?? "<root|doctor|sync|build|smoke>";
-  return `${command ? descriptions[command] : "Build the pinned Chromium baseline with upstream tools."}\n\n` +
+  const usage = command ?? "<root|doctor|sync|prepare|build|smoke>";
+  return `${command ? descriptions[command] : "Build uw from pinned Chromium source with upstream tools."}\n\n` +
     `Usage: node scripts/chromium.ts ${usage} [options]\n` +
     "  --checkout-dir PATH  Dedicated root; defaults to UW_CHROMIUM_ROOT or .chromium/\n" +
     (command === "sync" || command === "build" ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
@@ -460,7 +479,7 @@ export function main(argv = process.argv.slice(2)): number {
   try {
     if (!argv.length || argv[0] === "--help" || argv[0] === "-h") { console.log(help()); return 0; }
     const command = argv[0];
-    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, build, or smoke. Use --help for examples.", 2);
+    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, prepare, build, or smoke. Use --help for examples.", 2);
     const name = command as keyof typeof descriptions;
     const { values, positionals } = parseArgs({
       args: argv.slice(1), strict: true, allowPositionals: false,
@@ -479,6 +498,7 @@ export function main(argv = process.argv.slice(2)): number {
     const chromium = new Chromium(layout, loadPins());
     if (name === "doctor") return chromium.doctor() ? 0 : 1;
     if (name === "sync") chromium.sync(jobs);
+    if (name === "prepare") chromium.prepare();
     if (name === "build") chromium.build(jobs);
     if (name === "smoke") chromium.smoke(timeout);
     return 0;

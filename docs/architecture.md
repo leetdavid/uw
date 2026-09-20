@@ -1,16 +1,38 @@
 # Architecture
 
-Technical details below are proposals except for the fixed direction.
+The fixed direction and current implementation are distinguished from proposed feature organization below.
 
 ## Fixed direction
 
 Chromium is the browser engine. The product needs control over the browser interface, tabs, downloads, privacy, and automation.
 
-The integration approach is undecided. Compare a Chromium fork with an embedding approach before choosing a UI framework or committing to a large implementation. Evaluate extension support, built-in filtering, browser APIs, resource use, and the work needed to ship Chromium security updates.
+The current implementation customizes Chromium source through a small, reviewed patch set. It uses Chromium's browser interface and native Views tabs. Validate extension support, filtering hooks, resource use, and the security-update workload before expanding the changes.
 
 ## Build foundation
 
-The initial implementation compiles pinned upstream Chromium source into `Chromium.app` using Chromium's build tools. Establish a working source build before changing browser behavior. Commands and verification status live in the [root README](../README.md#building).
+The initial upstream build passed on Apple Silicon. The wrapper now applies uw customizations before compiling `uw.app` with Chromium's build tools. Commands, current scope, and verification status live in the [root README](../README.md#customizing-chromium).
+
+## Code organization
+
+Use one product repository and an ignored Chromium checkout. Keep the first customizations in `chromium/patches/`, with pins and GN arguments alongside them. `scripts/` owns TypeScript build orchestration; `tests/` tests that tooling. The [preparation workflow](../README.md#customizing-chromium) defines how the checkout is assembled.
+
+This combines Brave's use of ordinary product source with Helium's explicit patch ordering. [The source comparison](chromium-organization-research.md#main-comparison) records their actual mechanisms and maintenance costs. uw currently needs only the ordered patches.
+
+As substantial product code arrives, add directories for real implementations:
+
+| Proposed directory | What belongs there |
+| --- | --- |
+| `browser/<feature>/` | Profile lifetime, preference registration, and integration with browser tabs, downloads, or windows. Native Views code belongs under `browser/ui/views/<feature>/`. |
+| `components/<feature>/` | Feature logic behind a small interface, with its own GN target and colocated tests. Use Chromium types where useful; avoid dependencies on `//chrome/browser`. |
+| `resources/<feature>/` | Product-owned WebUI TypeScript, HTML, and styles when a feature needs WebUI. |
+
+Keep substantial new C++ in ordinary files. A future preparation step can expose those files at Chromium's `src/uw`, with narrow GN patches wiring explicit targets into the browser. That source mapping is not implemented yet. Add it with the first module that needs it.
+
+Organize by feature within those directories. For example, page-watch scheduling, comparison, and history should sit behind one module interface; browser integration supplies the profile and page access. Put tests beside that implementation. Keep `//chrome/browser` dependencies in the browser integration code so feature targets can be tested independently.
+
+Avoid whole-file Chromium replacements, macro-based source interception, and a general rewrite engine until a concrete integration requires them. Keep platform conditions and packaging in this repository while macOS is the only target.
+
+Implementability: **7/10** for this organization including ongoing Chromium updates, using the [roadmap convention](plans/roadmap.md#implementability-estimates). A successful version-bump trial is still needed to measure maintenance cost.
 
 ## Proposed responsibilities
 
@@ -45,7 +67,7 @@ Ad blocking needs integration-level evaluation. Do not assume a particular exten
 
 | Decision | What must be resolved |
 | --- | --- |
-| Chromium integration | Fork or embedding approach, extension compatibility, maintenance cost, and update path. |
+| Chromium updates | Patch repair cost across a version bump, extension compatibility, and time to ship security updates. |
 | Platform support | Hardware requirements and packaging for the [initial platform](product.md#minimum-usable-version), plus support for later platforms. |
 | Managed local AI | Runtime, model licenses, hardware fit, download source, integrity checks, and model updates. |
 | Background scheduling | Scheduler integration with the [agreed app lifecycle and catch-up behavior](product.md#scheduled-page-watches), plus daylight-saving handling. |

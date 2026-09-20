@@ -54,15 +54,15 @@ jobs:
         run: pnpm run doctor
       - name: Sync pinned source
         run: pnpm run sync --jobs "$BUILD_JOBS"
-      - name: Compile Chromium
+      - name: Compile uw
         run: caffeinate -i pnpm run build --jobs "$BUILD_JOBS"
       - name: Smoke-test browser
         run: pnpm run smoke
       - name: Package application
-        run: ditto -c -k --sequesterRsrc --keepParent "$UW_CHROMIUM_ROOT/src/out/uw/Chromium.app" "$RUNNER_TEMP/Chromium-macos.zip"
+        run: ditto -c -k --sequesterRsrc --keepParent "$UW_CHROMIUM_ROOT/src/out/uw/uw.app" "$RUNNER_TEMP/uw-macos.zip"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: chromium-macos-native
-          path: ${{ runner.temp }}/Chromium-macos.zip
+          name: uw-macos-native
+          path: ${{ runner.temp }}/uw-macos.zip
           if-no-files-found: error
           retention-days: 7

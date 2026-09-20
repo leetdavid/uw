@@ -95,7 +95,8 @@ class Fixture {
       if (args.join(" ") === "remote get-url origin") return this.origins.get(path) ?? "";
       if (args.join(" ") === "rev-parse HEAD") return this.heads.get(path) ?? "";
       if (args[0] === "status") return this.dirty.has(path) ? " M changed.cc" : "";
-      if (args[0] === "diff" || args[0] === "ls-files") return "";
+      if (args[0] === "diff") return this.dirty.has(path) ? "local source edits" : "";
+      if (args[0] === "ls-files" || args[0] === "read-tree" || args[0] === "apply") return "";
     }
     if (program === "git" && operation === "clone") {
       this.makeRepo(this.layout.tools, DEPOT_TOOLS_URL, "c".repeat(40)); return "";
@@ -139,7 +140,7 @@ class Fixture {
     if (basename(program) === "autoninja") {
       mkdirSync(dirname(this.layout.binary), { recursive: true }); writeFileSync(this.layout.binary, "browser fixture"); return "";
     }
-    if (program === this.layout.binary) return operation === "--version" ? `Chromium ${pins.version}` : this.dom;
+    if (program === this.layout.binary) return operation === "--version" ? `uw ${pins.version}` : this.dom;
     throw new Error(`Unexpected command: ${JSON.stringify(command)}`);
   }
 }
@@ -303,7 +304,7 @@ function invoke(...args: string[]) {
 }
 
 test("every command's help has examples", () => {
-  for (const command of [[], ["root"], ["doctor"], ["sync"], ["build"], ["smoke"]]) {
+  for (const command of [[], ["root"], ["doctor"], ["sync"], ["prepare"], ["build"], ["smoke"]]) {
     const result = invoke(...command, "--help");
     assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /Examples:/);
   }

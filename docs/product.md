@@ -14,6 +14,8 @@ Agreed: build for the project owner's daily browsing first. A broader target aud
 
 Agreed: the first version targets macOS desktop. Chrome-like everyday browsing with vertical tabs is enough to start daily use. Other planned features can follow.
 
+Agreed: keep uw branding minimal and use native vertical tabs by default. Preserve the user's explicit choice to use horizontal tabs.
+
 Agreed: manual setup is acceptable for the first usable version. Automatic browser-data import is not required for that version.
 
 Agreed: performance and stability are basic usability requirements. Crashes, disruptive slowdowns, and broken daily workflows block acceptance. Later features must preserve that baseline.

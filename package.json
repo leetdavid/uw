@@ -10,6 +10,7 @@
     "chromium": "node scripts/chromium.ts",
     "doctor": "node scripts/chromium.ts doctor",
     "sync": "node scripts/chromium.ts sync",
+    "prepare:chromium": "node scripts/chromium.ts prepare",
     "build": "node scripts/chromium.ts build",
     "smoke": "node scripts/chromium.ts smoke",
     "typecheck": "tsc --noEmit",
