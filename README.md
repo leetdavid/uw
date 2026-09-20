@@ -12,15 +12,28 @@ uw browser is a planned Chromium-based browser. The current implementation is a 
 - Node.js 24.13+; the CI version is pinned in [`.node-version`](.node-version).
 - [pnpm](https://pnpm.io/installation), at the version pinned in [`package.json`](package.json).
 - Git and working `curl` on PATH.
-- Full Xcode, with first-launch setup completed and macOS SDK 26.5 or newer.
+- Full Xcode, macOS SDK 26.5 or newer, and the Metal Toolchain.
 - An APFS build volume and a checkout path without spaces.
 - 100 GiB free for a fresh checkout, or 50 GiB free for an existing checkout's sync/build.
 
-These are project guardrails, not upstream Chromium requirements. They cover the source checkout, dependencies, generated files, and release-build output with headroom. Start with two build jobs on a 16 GiB Mac; more memory permits greater parallelism.
+The disk thresholds are project preflight checks.
 
-Chromium's browser core is C++. Our build helper and tests are TypeScript. Chromium's upstream bootstrap requires `python3` on PATH, and `depot_tools` manages its pinned runtime for build hooks and tools. We do not write project-owned Python code.
+The browser core is C++; repository tooling is TypeScript. Chromium's upstream tools require `python3` on PATH, then `depot_tools` installs its pinned Python runtime.
 
 ## Setup
+
+### 1. Finish Xcode setup
+
+Install full Xcode, select it, then complete its license and first-launch setup:
+
+```sh
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license
+sudo xcodebuild -runFirstLaunch
+xcodebuild -downloadComponent MetalToolchain
+```
+
+### 2. Install tooling
 
 From the repository root:
 
@@ -28,43 +41,43 @@ From the repository root:
 pnpm install --frozen-lockfile --ignore-scripts
 ```
 
-If needed, select full Xcode for the current shell:
-
-```sh
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-```
-
-The default Chromium checkout is `.chromium/`, outside version control. To use another build volume, set its location before running the commands below:
+Sources and build output go in `.chromium/`, which Git ignores. To use another APFS volume, set the checkout path first:
 
 ```sh
 export UW_CHROMIUM_ROOT=/Volumes/Build/uw-chromium
 ```
 
-Use a dedicated, initially empty directory. Keep the same `UW_CHROMIUM_ROOT` setting when building, testing, and running.
+Use a dedicated, empty directory. Keep the same setting for every build command.
 
-Check the host:
+### 3. Check the host
 
 ```sh
 pnpm run doctor
 ```
 
-`doctor` is read-only. Resolve its failures before fetching Chromium. If `curl` reports that it is a Homebrew-internal shim, use a normal terminal PATH without Homebrew's internal shim directories. macOS provides `/usr/bin/curl`.
+`doctor` is read-only. Fix any failures before downloading Chromium.
+
+If `curl` fails because it is a Homebrew-internal shim, remove those shim directories from PATH. macOS provides `/usr/bin/curl`.
 
 ## Building
 
+These are the commands used on the verified 64 GiB Mac:
+
 ```sh
-pnpm run sync
-caffeinate -i pnpm run build --jobs 2
+caffeinate -i pnpm run sync --jobs 8
+caffeinate -i pnpm run build --jobs 8
 pnpm run smoke
 ```
 
 - `sync` downloads the pinned Chromium source, dependencies, and upstream tools.
-- `build` generates the build files and compiles the `chrome` target. `caffeinate` prevents idle sleep during compilation.
-- `smoke` checks the built version and runs a headless JavaScript/DOM test in a temporary profile, with the sandbox enabled.
+- `build` generates the build files and compiles the `chrome` target.
+- `smoke` checks the version and runs a headless JavaScript/DOM test in a temporary incognito profile, with the sandbox enabled.
 
-Sync and build both run preflight checks. Sync refuses local source edits and unrelated checkout directories. It also checks dependency worktrees, including previously synced dependencies that have left the current graph.
+Start with `--jobs 2` on a 16 GiB Mac. `caffeinate` prevents idle sleep during the download and build. Rerun `build` to reuse completed work after an interruption.
 
-Commands accept `--checkout-dir` as an alternative to the environment variable. For command-specific help, use, for example:
+Sync and build repeat the host checks. Sync refuses unrelated directories and local edits in Chromium, its tools, or tracked dependencies.
+
+Use `--checkout-dir PATH` instead of `UW_CHROMIUM_ROOT` if preferred. Each command has help:
 
 ```sh
 pnpm run build --help
@@ -80,9 +93,7 @@ open -n "$checkout/src/out/uw/Chromium.app" --args \
   --user-data-dir="$HOME/Library/Application Support/uw-dev"
 ```
 
-The profile persists at `~/Library/Application Support/uw-dev`, independently of the source checkout. Reuse this launch command to retain its settings and installed extensions. To restore tabs automatically, open `chrome://settings/onStartup` and choose "Continue where you left off". Quit this browser build before rebuilding it.
-
-The application is currently upstream Chromium. The planned uw interface and AI features are described in the [product docs](docs/product.md).
+Reuse this command to keep your development profile's settings and extensions. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it.
 
 ## Tooling checks
 
@@ -98,7 +109,11 @@ This runs strict TypeScript checking and the Node.js test suite. These checks do
 - [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build with debug symbols disabled.
 - [`pnpm-lock.yaml`](pnpm-lock.yaml) locks the TypeScript tooling dependencies.
 
-The wrapper bootstraps the pinned `depot_tools` with auto-update disabled. Chromium's pinned `DEPS` supplies its compiler and other dependencies. System Xcode remains a host prerequisite, so matching source pins alone does not guarantee byte-identical binaries.
+The wrapper disables `depot_tools` auto-update. Chromium's pinned `DEPS` supplies its compiler and dependencies.
+
+On Apple Silicon, the wrapper selects Apple's linker with `use_lld = false`. The pinned LLVM linker cannot read SDK 27's `arm64e.x1` targets. Intel keeps Chromium's default linker and remains unverified.
+
+Xcode is a host dependency. Matching source pins alone does not guarantee identical binaries.
 
 To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Mac&num=1), verify its upstream tag and commit, and update the pins. Check that revision's SDK requirement, then rerun sync, build, and smoke.
 
@@ -113,12 +128,27 @@ Full builds share a concurrency group. Use a separate checkout for local builds 
 
 ## Verification status
 
-Full Chromium compilation and the browser smoke test remain unverified. Local preflight is blocked by missing full Xcode and approximately 12 GiB free disk space.
+Chromium 153.0.8010.53 built and passed the headless smoke test on 2026-09-20.
 
-Verified tooling includes 25 tests, strict TypeScript checking, and workflow lint. The pinned upstream release and tool revisions were checked; upstream tools were bootstrapped before the helper moved to TypeScript. These results do not establish that Chromium itself compiles yet.
+| Host | Value |
+| --- | --- |
+| Hardware | Apple M1 Max, 64 GiB RAM |
+| macOS | 27.0, build 26A428 |
+| Xcode / SDK | Xcode 27.0, build 27A266a / SDK 27.0 |
+| Tooling | Node.js 26.8.2, pnpm 10.31.0 |
+| Parallel jobs | 8 |
+
+- Source sync took 19 minutes. The successful build command took 5 hours 44 minutes.
+- The checkout uses 43 GiB, including 12 GiB of build output. `Chromium.app` is 773 MiB.
+- The sandboxed smoke test passed twice. TypeScript checking and all 25 tooling tests pass.
+
+Timings include other applications running and partial build output reused after setup retries.
+
+The smoke test uses incognito because normal-profile `--dump-dom` loaded the page but did not exit on this host. Daily-use stability remains unverified.
 
 ## Upstream references
 
 - [macOS build instructions](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/docs/mac_build_instructions.md)
 - [Apple Silicon builds](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/docs/mac_arm64.md)
 - [SDK configuration for the pinned revision](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/build/config/mac/mac_sdk.gni)
+- [Apple linker support](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/docs/apple_platform_linkers.md)

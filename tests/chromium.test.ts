@@ -33,6 +33,7 @@ class Fixture {
   readonly runtime: Runtime;
   free = 250 * GIB;
   xcodeReady = true;
+  metalReady = true;
   curlReady = true;
   sdk = "26.5";
   filesystem = "apfs";
@@ -76,7 +77,13 @@ class Fixture {
       if (!this.xcodeReady) throw new BuildError("Xcode unavailable");
       return operation === "-version" ? "Xcode 26.5" : "";
     }
-    if (program === "xcrun") return this.sdk;
+    if (program === "xcrun") {
+      if (operation === "metal") {
+        if (!this.metalReady) throw new BuildError("Metal Toolchain unavailable");
+        return "Apple metal fixture version";
+      }
+      return this.sdk;
+    }
     if (program === "df") return "Filesystem blocks used available capacity Mounted on\n/dev/test 1 1 1 1% /test";
     if (program === "diskutil") return "upstream plist fixture";
     if (program === "plutil") { assert.equal(options.input, "upstream plist fixture"); return this.filesystem; }
@@ -167,9 +174,9 @@ test("managed roots can be reused without replacing files", (t) => {
 test("host checks are read-only and report all blockers", (t) => {
   const f = new Fixture(t);
   assert.equal(f.browser.doctor(), true);
-  f.xcodeReady = false; f.free = 13 * GIB; f.sdk = "15.0"; f.filesystem = "exfat"; f.curlReady = false;
+  f.xcodeReady = false; f.metalReady = false; f.free = 13 * GIB; f.sdk = "15.0"; f.filesystem = "exfat"; f.curlReady = false;
   assert.equal(f.browser.doctor(), false);
-  for (const label of ["Xcode", "Free disk", "macOS SDK", "Filesystem", "curl"]) {
+  for (const label of ["Xcode", "Metal compiler", "Free disk", "macOS SDK", "Filesystem", "curl"]) {
     assert.ok(f.messages.some((line) => line.startsWith(`FAIL ${label}:`)));
   }
   assert.equal(existsSync(f.layout.root), false);
@@ -277,7 +284,8 @@ test("build and smoke use an isolated profile and keep the sandbox enabled", (t)
   const command = f.calls.findLast(({ command }) => command[0] === f.layout.binary)!.command;
   const profile = command.find((arg) => arg.startsWith("--user-data-dir="))!.slice("--user-data-dir=".length);
   assert.equal(existsSync(profile), false);
-  assert.ok(command.includes("--headless")); assert.equal(command.includes("--no-sandbox"), false);
+  assert.ok(command.includes("--headless")); assert.ok(command.includes("--incognito"));
+  assert.equal(command.includes("--no-sandbox"), false);
 });
 
 test("smoke requires the executed JavaScript result and cleans up on failure", (t) => {

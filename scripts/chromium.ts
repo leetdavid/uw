@@ -251,6 +251,8 @@ export class Chromium {
       const sdk = this.capture(["xcrun", "--sdk", "macosx", "--show-sdk-version"]);
       report("macOS SDK", atLeast(sdk, this.pins.macos_sdk_min), `${sdk}; required >= ${this.pins.macos_sdk_min}`);
     } catch { report("macOS SDK", false, "xcrun could not locate a usable macOS SDK"); }
+    probe("Metal compiler", () => this.capture(["xcrun", "metal", "--version"]).split("\n")[0] ?? "",
+      "install the Metal Toolchain with `xcodebuild -downloadComponent MetalToolchain`");
     const existing = nearestExisting(this.layout.root);
     const free = this.runtime.freeBytes(existing) / GIB;
     const required = existsSync(join(this.layout.source, "DEPS")) ? 50 : 100;
@@ -394,7 +396,8 @@ export class Chromium {
   build(jobs: number): void {
     this.requireHost();
     this.verifyCheckout();
-    const args = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
+    const args = readFileSync(join(REPO, "chromium/args.gn"), "utf8") +
+      (this.runtime.arch === "arm64" ? "\nuse_lld = false\n" : "");
     this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args}`, "--fail-on-unused-args"], this.layout.source);
     this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome"], this.layout.source);
     if (!existsSync(this.layout.binary)) throw new BuildError(`Build returned successfully but ${this.layout.binary} is missing`);
@@ -414,7 +417,7 @@ export class Chromium {
     let dom: string;
     try {
       dom = this.capture([
-        this.layout.binary, "--headless", "--no-first-run", "--no-default-browser-check",
+        this.layout.binary, "--headless", "--incognito", "--no-first-run", "--no-default-browser-check",
         "--disable-background-networking", "--disable-component-update", "--use-mock-keychain",
         "--disable-features=DialMediaRouteProvider", `--user-data-dir=${profile}`,
         "--dump-dom", `data:text/html,${encodeURIComponent(html)}`,

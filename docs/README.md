@@ -14,6 +14,6 @@ uw browser is a planned Chromium-based browser with vertical tabs and AI automat
 
 ## Status
 
-Build-foundation work has started. Chromium compilation has not yet been verified. Product features remain planned.
+The upstream Chromium build and headless smoke test pass on Apple Silicon. See the [verified host and results](../README.md#verification-status). Product features remain planned.
 
 The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The Chromium integration approach and local model runtime remain open.

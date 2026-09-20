@@ -4,7 +4,7 @@ The [minimum usable version](../product.md#minimum-usable-version) and [next fea
 
 ## 1. Choose the browser foundation
 
-Current work: establish the [Chromium source-build pipeline](../../README.md#building). Full compilation and a browser smoke test are pending a suitable build host.
+The [Chromium source-build pipeline](../../README.md#building) now produces a native Apple Silicon build that passes the headless smoke test. See the [verified host and results](../../README.md#verification-status).
 
 Evaluate Chromium integration options for the [initial platform](../product.md#minimum-usable-version). Establish the security-update path and performance baseline. Check compatibility with the [required extensions](../product.md#required-extensions), ad blocking, download hooks, and session persistence.
 
@@ -50,7 +50,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 
 | Feature | Score | Main consideration |
 | --- | --- | --- |
-| [Chromium build foundation](../../README.md#building) | 7/10 | Established upstream tools; a full Xcode installation and a large build volume are required. |
+| [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Required Chrome-extension compatibility](../product.md#required-extensions) | 7/10 | Browser integration and interactions between the named extensions need validation on macOS. |
 | [Explicit AI setup](../product.md#ai-connections) | 9/10 | A bounded connection-selection flow. |
