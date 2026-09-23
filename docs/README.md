@@ -11,7 +11,11 @@ uw browser is a planned Chromium-based browser with vertical tabs and AI automat
 - [Building and using Chromium](../README.md#build-host-requirements): setup, build and run commands, CI, and verification status.
 - [Architecture](architecture.md): technical direction and decisions still to make.
 - [Chromium code organization research](chromium-organization-research.md): Brave and Helium source layouts, patch workflows, and maintenance tradeoffs.
+- [Horse tab organization research](horse-tab-organization-research.md): documented tree behavior and open decisions for uw's nested organization.
+- [Arc pinned tabs research](arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, and implementability estimates.
+- [Approved native tab-tree slice](plans/native-tab-tree.md): implementation sequence, scope, and native acceptance checks.
+- [Chromium tab API research](chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
 
 ## Status
 

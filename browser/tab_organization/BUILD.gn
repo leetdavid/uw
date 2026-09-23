@@ -1,0 +1,19 @@
+source_set("tab_organization") {
+  sources = [ "tab_organization_controller.cc", "tab_organization_controller.h" ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tabs:public",
+    "//ui/base/unowned_user_data",
+    "//uw/components/tab_organization:tab_tree",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/browser_window",
+    "//chrome:strings",
+    "//components/sessions",
+    "//content/public/browser",
+    "//ui/base",
+  ]
+}

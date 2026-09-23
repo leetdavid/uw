@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<grit-part>
+  <message name="IDS_UW_SCRATCHPAD" desc="Section containing tabs not assigned to a task.">Scratchpad</message>
+  <message name="IDS_UW_ORGANIZE" desc="Tab sidebar menu button.">Organize</message>
+  <message name="IDS_UW_NEW_TASK" desc="Moves selected tab branches to a new task group.">Move to new task</message>
+  <message name="IDS_UW_TASK_NAME" desc="Label for the name of a browsing task.">Task name</message>
+  <message name="IDS_UW_UNTITLED_TASK" desc="Initial editable name for a manually created browsing task.">New task</message>
+  <message name="IDS_UW_RENAME_TASK" desc="Edits a browsing task group name.">Rename task</message>
+  <message name="IDS_UW_CLOSE_BRANCH" desc="Closes a tab or task and all descendant tabs.">Close branch</message>
+  <message name="IDS_UW_UNDO_ORGANIZATION" desc="Reverses one tab organization action.">Undo tab organization</message>
+  <message name="IDS_UW_MOVE_TO_SCRATCHPAD" desc="Removes selected branches from their task.">Move to Scratchpad</message>
+  <message name="IDS_UW_MOVE_UP" desc="Moves a branch before its previous sibling.">Move up</message>
+  <message name="IDS_UW_MOVE_DOWN" desc="Moves a branch after its next sibling.">Move down</message>
+  <message name="IDS_UW_NEST_BRANCH" desc="Makes a branch a child of its previous sibling.">Nest under previous</message>
+  <message name="IDS_UW_OUTDENT_BRANCH" desc="Moves a branch up one nesting level.">Move up one level</message>
+  <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the descendants of a collapsed tab branch.">Expand branch</message>
+  <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the descendants of a tab branch.">Collapse branch</message>
+  <message name="IDS_UW_TOGGLE_BRANCH" desc="Expands or collapses the selected tab branch.">Expand or collapse branch</message>
+</grit-part>

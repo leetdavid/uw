@@ -1,0 +1,11 @@
+source_set("tab_tree") {
+  sources = [ "tab_tree.cc", "tab_tree.h" ]
+  public_deps = [ "//base", "//components/undo", "//ui/base" ]
+  deps = [ "//components/strings:components_strings_grit" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "tab_tree_unittest.cc" ]
+  deps = [ ":tab_tree", "//base/test:test_support", "//testing/gtest" ]
+}

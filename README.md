@@ -172,7 +172,9 @@ The smoke test uses incognito because normal-profile `--dump-dom` loaded the pag
 
 The uw patches were checked against files retrieved from the exact pinned Chromium commit on 2026-09-20. Both apply together, verify, reverse, and reapply idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking, all 42 tooling tests, and workflow validation pass. The tests cover ordered patches, updates and removals, conflicts, interruption recovery, and preservation of local work.
 
-The current 16 GiB host has no Chromium checkout. `doctor` reports unavailable Xcode and Metal tooling, an unusable `curl` on PATH, and 58 GiB free against the 100 GiB fresh-checkout requirement. The earlier 64 GiB baseline result does not verify this customized application.
+The current 16 GiB host has no Chromium checkout. On 2026-09-23, `doctor` reports unavailable Xcode and Metal tooling, an unusable `curl` on PATH, and 43 GiB free against the 100 GiB fresh-checkout requirement. No self-hosted runner is registered for this repository. The earlier 64 GiB baseline result does not verify this customized application.
+
+The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation is complete; implementation and native verification require a configured Chromium build host.
 
 Pending on a build host:
 

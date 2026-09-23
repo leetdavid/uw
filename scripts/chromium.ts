@@ -12,6 +12,7 @@ import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "no
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { PatchSet } from "./patches.ts";
+import { SourceLinks } from "./source-links.ts";
 
 export const REPO = fileURLToPath(new URL("../", import.meta.url));
 export const CHROMIUM_URL = "https://chromium.googlesource.com/chromium/src.git";
@@ -206,6 +207,7 @@ export class Chromium {
   readonly pins: Pins;
   readonly runtime: Runtime;
   readonly patches: PatchSet;
+  readonly sources: SourceLinks;
 
   constructor(layout: Layout, pins: Pins, runtime = nativeRuntime()) {
     this.layout = layout;
@@ -213,6 +215,7 @@ export class Chromium {
     this.runtime = runtime;
     this.patches = new PatchSet(layout.source, join(REPO, "chromium/patches"),
       join(layout.root, ".uw-patches.json"), this.capture.bind(this), runtime.env);
+    this.sources = new SourceLinks(layout.source, REPO);
   }
 
   environment(): NodeJS.ProcessEnv {
@@ -371,8 +374,9 @@ export class Chromium {
     if (existsSync(this.layout.tools)) this.verifyRepo(this.layout.tools, DEPOT_TOOLS_URL);
     const previousRoots = this.recordedRoots();
     const check = (roots: string[] = []): void => requireCleanWorktrees(
-      this.layout, this.capture.bind(this), roots, () => { this.patches.check(); });
+      this.layout, this.capture.bind(this), roots, () => { this.sources.check(); this.patches.check(); });
     check(previousRoots);
+    this.sources.remove();
     if (existsSync(this.layout.source)) this.patches.unapply();
     if (!existsSync(this.layout.tools)) {
       this.run(["git", "clone", "--depth", "1", DEPOT_TOOLS_URL, this.layout.tools], this.layout.root);
@@ -400,13 +404,16 @@ export class Chromium {
     this.verifyCheckout(false);
     this.rememberRoots([...knownRoots, ...this.dependencyRoots()]);
     this.patches.apply();
+    this.sources.prepare();
     writeFileSync(join(this.layout.root, SYNC_STAMP), JSON.stringify(this.pins));
     this.runtime.log(`Synced Chromium ${this.pins.version} at ${this.pins.chromium_revision}`);
   }
 
   prepare(): void {
     this.verifyCheckout();
+    this.sources.check();
     this.patches.apply();
+    this.sources.prepare();
     this.runtime.log("Prepared uw customizations from chromium/patches/series");
   }
 
@@ -424,6 +431,7 @@ export class Chromium {
   smoke(timeout: number): void {
     this.verifyCheckout();
     this.patches.verify();
+    this.sources.verify();
     if (!existsSync(this.layout.binary)) throw new BuildError(`${this.layout.binary} is missing. Run build first.`);
     const version = this.capture([this.layout.binary, "--version"], { timeout });
     if (version !== `uw ${this.pins.version}`) {
