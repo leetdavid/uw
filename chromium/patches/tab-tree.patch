@@ -1,0 +1,534 @@
+diff --git a/.gitignore b/.gitignore
+index c763167..7bd4cd1 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -352,3 +352,5 @@ third_party/rust/target/
+ 
+ # Trace files created when using --trace-startup.
+ **/chrometrace.log
++# Product source links are managed by uw's preparation command.
++/uw/
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index 0cc3df5..3bb8048 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -277,6 +277,22 @@ are declared in tools/grit/grit_args.gni.
+   <release seq="1">
+     <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
+     <messages fallback_to_english="true">
++      <message name="IDS_UW_SCRATCHPAD" desc="Section containing tabs not assigned to a task.">Scratchpad</message>
++      <message name="IDS_UW_ORGANIZE" desc="Tab sidebar menu button.">Organize</message>
++      <message name="IDS_UW_NEW_TASK" desc="Moves selected tab branches to a new task group.">Move to new task</message>
++      <message name="IDS_UW_TASK_NAME" desc="Label for the name of a browsing task.">Task name</message>
++      <message name="IDS_UW_UNTITLED_TASK" desc="Initial editable name for a manually created browsing task.">New task</message>
++      <message name="IDS_UW_RENAME_TASK" desc="Edits a browsing task group name.">Rename task</message>
++      <message name="IDS_UW_CLOSE_BRANCH" desc="Closes a tab or task and all descendant tabs.">Close branch</message>
++      <message name="IDS_UW_UNDO_ORGANIZATION" desc="Reverses one tab organization action.">Undo tab organization</message>
++      <message name="IDS_UW_MOVE_TO_SCRATCHPAD" desc="Removes selected branches from their task.">Move to Scratchpad</message>
++      <message name="IDS_UW_MOVE_UP" desc="Moves a branch before its previous sibling.">Move up</message>
++      <message name="IDS_UW_MOVE_DOWN" desc="Moves a branch after its next sibling.">Move down</message>
++      <message name="IDS_UW_NEST_BRANCH" desc="Makes a branch a child of its previous sibling.">Nest under previous</message>
++      <message name="IDS_UW_OUTDENT_BRANCH" desc="Moves a branch up one nesting level.">Move up one level</message>
++      <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the descendants of a collapsed tab branch.">Expand branch</message>
++      <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the descendants of a tab branch.">Collapse branch</message>
++      <message name="IDS_UW_TOGGLE_BRANCH" desc="Expands or collapses the selected tab branch.">Expand or collapse branch</message>
+       <!-- Access Code Cast specific strings -->
+       <part file="access_code_cast_strings.grdp" />
+ 
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 2e7510e..54b0c39 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -1332,6 +1332,7 @@ static_library("ui") {
+ 
+     # Non-android deps for "ui" target.
+     deps += [
++      "//uw/browser/tab_organization",
+       ":accelerator_table",
+       ":browser_actions",
+       ":browser_select_file_dialog_controller",
+diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
+index c8e946c..307bd0f 100644
+--- a/chrome/browser/ui/browser_tabrestore.cc
++++ b/chrome/browser/ui/browser_tabrestore.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/browser_tabrestore.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #include <map>
+ #include <memory>
+@@ -291,9 +292,11 @@ WebContents* AddRestoredTab(
+       last_active_time_ticks, last_active_time, session_storage_namespace,
+       user_agent_override, extra_data, initially_hidden, from_session_restore);
+ 
+-  return AddRestoredTabImpl(std::move(web_contents), browser, tab_index, group,
+-                            select, pin, from_session_restore,
+-                            is_active_browser);
++  WebContents* restored =
++      AddRestoredTabImpl(std::move(web_contents), browser, tab_index, group,
++                         select, pin, from_session_restore, is_active_browser);
++  uw::TabOrganizationController::RestoreTab(browser, restored, extra_data);
++  return restored;
+ }
+ 
+ WebContents* ReplaceRestoredTab(
+@@ -319,6 +322,8 @@ WebContents* ReplaceRestoredTab(
+       insertion_index + 1, std::move(web_contents),
+       AddTabTypes::ADD_ACTIVE | AddTabTypes::ADD_INHERIT_OPENER,
+       tab_strip->GetTabGroupForTab(insertion_index));
++  uw::TabOrganizationController::RestoreTab(browser, raw_web_contents,
++                                            extra_data);
+ 
+   if (from_session_restore) {
+     // Indicate that the tab is created by session restore. This is used to hide
+diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
+index 03bffe2..6c12a57 100644
+--- a/chrome/browser/ui/browser_window/internal/BUILD.gn
++++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
+@@ -58,6 +58,7 @@ source_set("internal") {
+     public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+ 
+     deps += [
++      "//uw/browser/tab_organization",
+       "//chrome/browser:global_features",
+       "//chrome/browser/actor/ui",
+       "//chrome/browser/actor/ui/task_list_bubble:controller",
+diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
+index a2c0889..336b6a1 100644
+--- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
++++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
+@@ -6,6 +6,7 @@
+ 
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
+ 
+@@ -21,7 +22,10 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+ }
+ 
+ void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
+-  // Embedder implementation goes here.
++  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL) {
++    tab_organization_ =
++        std::make_unique<uw::TabOrganizationController>(browser);
++  }
+ }
+ 
+ void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
+diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
+index 67af5a4..5aed37d 100644
+--- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
++++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
+@@ -7,6 +7,12 @@
+ 
+ #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+ 
++#include <memory>
++
++namespace uw {
++class TabOrganizationController;
++}
++
+ class BrowserView;
+ class BrowserWindowInterface;
+ 
+@@ -44,6 +50,7 @@ class EmbedderBrowserWindowFeatures {
+ 
+  private:
+   // Embedder-specific feature members:
++  std::unique_ptr<uw::TabOrganizationController> tab_organization_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_
+diff --git a/chrome/browser/ui/navigator/BUILD.gn b/chrome/browser/ui/navigator/BUILD.gn
+index eb3a78a..7c047d3 100644
+--- a/chrome/browser/ui/navigator/BUILD.gn
++++ b/chrome/browser/ui/navigator/BUILD.gn
+@@ -89,6 +89,7 @@ source_set("impl") {
+     ]
+ 
+     deps += [
++      "//uw/browser/tab_organization",
+       "//chrome/browser/apps/app_service",
+       "//chrome/browser/apps/link_capturing",
+       "//chrome/browser/ui:status_bubble",
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index f8d51fa..9ae6552 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #include <algorithm>
+ #include <memory>
+@@ -990,6 +991,16 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+         std::move(tab_to_insert), params->tabstrip_index, params->transition,
+         params->tabstrip_add_types, group);
+ 
++    if (source_browser == params->browser &&
++        (params->disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB ||
++         params->disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB) &&
++        ui::PageTransitionCoreTypeIs(params->transition,
++                                     ui::PAGE_TRANSITION_LINK)) {
++      uw::TabOrganizationController::DidOpenLink(params->browser,
++                                                 contents_to_navigate_or_insert,
++                                                 params->source_contents);
++    }
++
+     // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
+     // "already split" case is handled in Browser::OpenURLFromTab().
+     if (params->disposition == WindowOpenDisposition::NEW_SPLIT_VIEW &&
+diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
+index 9354e0d..9b9739c 100644
+--- a/chrome/browser/ui/views/tabs/common/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
+@@ -77,6 +77,8 @@ source_set("impl") {
+   ]
+ 
+   deps = [
++    "//uw/browser/tab_organization",
++    "//uw/browser/ui/views/tab_organization:tab_tree_adapter",
+     "//chrome/browser:primitives",
+     "//chrome/browser/dictation",
+     "//chrome/browser/glic",
+diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
+index cdc7c0f..a260033 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #include <algorithm>
+ #include <memory>
+@@ -191,6 +192,12 @@ void TabDragHandlerImpl::InitializeDrag(
+     const ui::ListSelectionModel& original_selection_model,
+     const ui::LocatedEvent& event) {
+   ResetDragState();
++  if (node.orientation() == TabStripOrientation::kVertical) {
++    if (auto* organizer =
++            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++      organizer->BeginTabDrag();
++    }
++  }
+   drag_controller_ = std::make_unique<TabDragController>();
+ 
+   DragInitData drag_init_data;
+@@ -358,6 +365,12 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+ }
+ 
+ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
++  if (reason == EndDragReason::kComplete || reason == EndDragReason::kCancel) {
++    if (auto* organizer =
++            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++      organizer->EndTabDrag(reason == EndDragReason::kComplete);
++    }
++  }
+   // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture
+   // lost" because some window managers on Wayland don't send exit events to tab
+   // strips, which would cause this to incorrectly end the SystemDnD while the
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
+index 1ad01e4..cfb11f7 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #include <variant>
+ 
+@@ -452,6 +453,13 @@ void TabStripCollectionController::ShowTabContextMenu(
+       browser_view_->browser()->GetFeatures().tab_menu_model_delegate(), model_,
+       tab_index.value());
+ 
++  if (auto* organizer =
++          uw::TabOrganizationController::From(browser_view_->browser());
++      organizer && organizer->IdFor(tab)) {
++    model->AddSeparator(ui::NORMAL_SEPARATOR);
++    uw::TabOrganizationController::AppendCommands(model.get());
++  }
++
+   CHECK(browser_view_->tab_strip_view());
+   expand_on_hover_lock_ = browser_view_->tab_strip_view()->GetExpandOnHoverLock(
+       ExpandOnHoverLockType::kKeepCurrentState);
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
+index a96f4b8..ab709cb 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
+@@ -26,6 +26,7 @@
+ #include "ui/views/view_targeter.h"
+ #include "ui/views/view_targeter_delegate.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/tab_tree_adapter.h"
+ 
+ namespace {
+ 
+@@ -107,11 +108,15 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
+   node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
+       base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
+                      base::Unretained(this)));
++  if (collection_node_->orientation() == TabStripOrientation::kVertical) {
++    auto adapter = std::make_unique<uw::TabTreeAdapter>(this, collection_node_);
++    if (adapter->available())
++      uw_tree_ = std::move(adapter);
++  }
+ }
+ 
+ UnpinnedTabContainerView::~UnpinnedTabContainerView() = default;
+ 
+-
+ std::optional<BrowserRootView::DropIndex>
+ UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
+   if (!collection_node_) {
+@@ -120,6 +125,16 @@ UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
+   const bool is_horizontal =
+       collection_node_->orientation() == TabStripOrientation::kHorizontal;
+ 
++  if (uw_tree_) {
++    if (auto index = uw_tree_->LinkDropIndex(loc_in_container)) {
++      BrowserRootView::DropIndex drop;
++      drop.index = *index;
++      drop.relative_to_index =
++          BrowserRootView::DropIndex::RelativeToIndex::kInsertBeforeIndex;
++      return drop;
++    }
++  }
++
+   for (auto& child_node : collection_node_->children()) {
+     auto* view = child_node->view();
+     CHECK(view);
+@@ -222,6 +237,7 @@ gfx::Size UnpinnedTabContainerView::GetTargetPreferredSize() const {
+ }
+ 
+ void UnpinnedTabContainerView::ResetCollectionNode() {
++  uw_tree_.reset();
+   collection_node_ = nullptr;
+ }
+ 
+@@ -241,6 +257,8 @@ const views::ProposedLayout& UnpinnedTabContainerView::GetLayoutForDrag()
+ 
+ DraggedTabsContainer& UnpinnedTabContainerView::GetTabDragTarget(
+     const gfx::Point& point_in_screen) {
++  if (uw_tree_)
++    uw_tree_->TrackNativeDrop(point_in_screen);
+   if (GetDragHandler().IsDraggingGroups()) {
+     // Don't consider other tab group views as a drag target if we're dragging
+     // a group header already.
+@@ -362,3 +380,26 @@ const TabCollectionNode* UnpinnedTabContainerView::GetCollectionNodeFromView(
+ 
+ BEGIN_METADATA(UnpinnedTabContainerView)
+ END_METADATA
++
++bool UnpinnedTabContainerView::GetDropFormats(
++    int* formats,
++    std::set<ui::ClipboardFormatType>* types) {
++  if (!uw_tree_)
++    return false;
++  *formats = 0;
++  types->insert(uw::TabTreeAdapter::DragFormat());
++  return true;
++}
++
++bool UnpinnedTabContainerView::CanDrop(const ui::OSExchangeData& data) {
++  return uw_tree_ && uw_tree_->CanDrop(data);
++}
++
++int UnpinnedTabContainerView::OnDragUpdated(const ui::DropTargetEvent& event) {
++  return uw_tree_ ? uw_tree_->DragUpdated(event) : 0;
++}
++
++views::View::DropCallback UnpinnedTabContainerView::GetDropCallback(
++    const ui::DropTargetEvent& event) {
++  return uw_tree_ ? uw_tree_->DropCallback(event) : DropCallback();
++}
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
+index a7cf799..1349771 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
+@@ -5,11 +5,15 @@
+ #ifndef CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
+ #define CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
+ 
++#include <set>
++
+ #include "base/callback_list.h"
+ #include "base/memory/raw_ptr.h"
+ #include "chrome/browser/ui/views/frame/browser_root_view.h"
+ #include "chrome/browser/ui/views/tabs/common/dragged_tabs_container.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
++#include "ui/base/clipboard/clipboard_format_type.h"
++#include "ui/base/dragdrop/drop_target_event.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/views/view.h"
+ 
+@@ -17,6 +21,10 @@ class TabCollectionNode;
+ class TabGroupView;
+ class UnpinnedTabContainerViewLayout;
+ 
++namespace uw {
++class TabTreeAdapter;
++}
++
+ // The view class that represents the unpinned tab region for the
+ // tab strip. It hosts all the unpinned tabs and serves as the drag target
+ // for unpinned tabs which aren't grouped. Layout is managed by
+@@ -54,6 +62,14 @@ class UnpinnedTabContainerView
+   // occupy once current animations complete.
+   gfx::Size GetTargetPreferredSize() const;
+ 
++  uw::TabTreeAdapter* uw_tree() const { return uw_tree_.get(); }
++
++  bool GetDropFormats(int* formats,
++                      std::set<ui::ClipboardFormatType>* types) override;
++  bool CanDrop(const ui::OSExchangeData& data) override;
++  int OnDragUpdated(const ui::DropTargetEvent& event) override;
++  DropCallback GetDropCallback(const ui::DropTargetEvent& event) override;
++
+   // Sets the main-axis space allocated for this container during TabStripView
+   // layout passes.
+   void SetAvailableSpace(views::SizeBound space) { available_space_ = space; }
+@@ -83,6 +99,7 @@ class UnpinnedTabContainerView
+   const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
+ 
+   base::CallbackListSubscription node_destroyed_subscription_;
++  std::unique_ptr<uw::TabTreeAdapter> uw_tree_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
+index 6c4e35d..29d8039 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
+@@ -21,6 +21,7 @@
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/tab_tree_adapter.h"
+ 
+ namespace {
+ constexpr int kTabVerticalPadding = 2;
+@@ -147,6 +148,22 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateHorizontalLayout(
+ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+     const UnpinnedTabContainerView* tab_container_view,
+     const views::SizeBounds& size_bounds) const {
++  if (tab_container_view->uw_tree()) {
++    auto layout = tab_container_view->uw_tree()->CalculateLayout(size_bounds);
++    for (auto& child : layout.child_layouts) {
++      if (auto drag = tab_container_view->GetVisualDataForDraggedView(
++              *child.child_view)) {
++        child.bounds.set_y(drag->offset.y());
++        child.visible = child.visible && !drag->should_hide;
++      }
++    }
++    if (tab_container_view->IsHandlingDrag()) {
++      layout.host_size.set_height(
++          std::max(layout.host_size.height(),
++                   tab_container_view->GetDraggingViewsBounds().bottom()));
++    }
++    return layout;
++  }
+   views::ProposedLayout layouts;
+   if (!tab_container_view->collection_node_) {
+     return layouts;
+diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
+index 88df244..6de19f2 100644
+--- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/tab/BUILD.gn
+@@ -49,6 +49,7 @@ source_set("impl") {
+   ]
+ 
+   deps = [
++    "//uw/browser/tab_organization",
+     ":tab",
+     "//chrome/app/vector_icons",
+     "//chrome/browser:browser_process",
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+index a06ae50..a407ed7 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+@@ -8,6 +8,7 @@
+ #include "extensions/buildflags/buildflags.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/controls/menu/menu_runner.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #include "chrome/browser/extensions/context_menu_matcher.h"
+@@ -52,6 +53,8 @@ void TabContextMenuController::CloseMenu() {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
++  if (uw::TabOrganizationController::IsCommand(command_id))
++    return false;
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -65,6 +68,14 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
++  if (uw::TabOrganizationController::IsCommand(command_id)) {
++    auto* tab = tab_handle_.Get();
++    auto* organizer = tab ? uw::TabOrganizationController::From(
++                                tab->GetBrowserWindowInterface())
++                          : nullptr;
++    return organizer &&
++           organizer->CanExecute(command_id, organizer->SelectionFor(tab));
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -93,11 +104,22 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
+ }
+ 
+ bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
++  if (uw::TabOrganizationController::IsCommand(command_id))
++    return false;
+   return delegate_->IsContextMenuCommandAlerted(
+       static_cast<TabStripModel::ContextMenuCommand>(command_id));
+ }
+ 
+ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
++  if (uw::TabOrganizationController::IsCommand(command_id)) {
++    if (auto* tab = tab_handle_.Get()) {
++      if (auto* organizer = uw::TabOrganizationController::From(
++              tab->GetBrowserWindowInterface())) {
++        organizer->Execute(command_id, organizer->SelectionFor(tab));
++      }
++    }
++    return;
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -123,5 +145,7 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+ bool TabContextMenuController::GetAcceleratorForCommandId(
+     int command_id,
+     ui::Accelerator* accelerator) const {
++  if (uw::TabOrganizationController::IsCommand(command_id))
++    return false;
+   return delegate_->GetContextMenuAccelerator(command_id, accelerator);
+ }
+diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
+index 62e11c5..0865040 100644
+--- a/chrome/test/BUILD.gn
++++ b/chrome/test/BUILD.gn
+@@ -6462,6 +6462,7 @@ test("unit_tests") {
+       "//chrome/browser/ui/tabs:tab_strip",
+       "//chrome/browser/ui/tabs:test_support",
+       "//chrome/browser/ui/tabs:unit_tests",
++      "//uw/components/tab_organization:unit_tests",
+       "//chrome/browser/ui/tabs/alert:tab_alert",
+       "//chrome/browser/ui/tabs/organizer:unit_tests",
+       "//chrome/browser/ui/tabs/saved_tab_groups",

@@ -28,7 +28,8 @@ TEST_F(TabTreeTest, ClosingParentPromotesChildrenWithoutDiscardingSubtrees) {
   EXPECT_EQ(tree_.Find(child)->parent(), tree_.scratchpad());
   EXPECT_EQ(tree_.Find(grandchild)->parent(), tree_.Find(child));
   EXPECT_TRUE(tree_.Find(child)->value.collapsed);
-  EXPECT_EQ(tree_.PageOrder(), (std::vector<TreeId>{child, grandchild, sibling}));
+  EXPECT_EQ(tree_.PageOrder(),
+            (std::vector<TreeId>{child, grandchild, sibling}));
 }
 
 TEST_F(TabTreeTest, ExtractionNormalizesSelectionAndPreservesBranches) {
@@ -72,8 +73,8 @@ TEST_F(TabTreeTest, CyclesAndInvalidContainerTypesAreRejected) {
   auto task = tree_.MakeTask({a}, u"Task").value();
   EXPECT_FALSE(tree_.Move({task}, b));
   EXPECT_FALSE(tree_.Move({task}, tree_.scratchpad()->value.id));
-  EXPECT_FALSE(tree_.Move({task}, tree_.root()->value.id,
-                          tree_.scratchpad()->value.id));
+  EXPECT_FALSE(
+      tree_.Move({task}, tree_.root()->value.id, tree_.scratchpad()->value.id));
   EXPECT_EQ(tree_.root()->children()[0].get(), tree_.scratchpad());
 }
 
@@ -123,6 +124,16 @@ TEST_F(TabTreeTest, RenameIsAnIndependentUndoableAction) {
   tree_.Undo();
   EXPECT_FALSE(tree_.Find(task));
   EXPECT_TRUE(tree_.Find(a));
+}
+
+TEST_F(TabTreeTest, UndoingRenameThenCreationReturnsPageToScratchpad) {
+  auto page = tree_.AddPage(u"Page");
+  auto task = tree_.MakeTask({page}, u"Generated").value();
+  tree_.RenameTask(task, u"Manual");
+  tree_.Undo();
+  tree_.Undo();
+  EXPECT_FALSE(tree_.Find(task));
+  EXPECT_EQ(tree_.Find(page)->parent(), tree_.scratchpad());
 }
 
 TEST_F(TabTreeTest, SessionPathsRestoreNestedTasksAndLateParent) {

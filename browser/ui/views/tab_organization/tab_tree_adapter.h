@@ -7,12 +7,17 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/base/clipboard/clipboard_format_type.h"
-#include "ui/base/models/simple_menu_model.h"
+#include "ui/base/dragdrop/drop_target_event.h"
+#include "ui/compositor/layer_tree_owner.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/drag_controller.h"
 #include "ui/views/layout/proposed_layout.h"
@@ -25,8 +30,7 @@ class Label;
 class LabelButton;
 class MenuButton;
 class MenuRunner;
-class Widget;
-}
+}  // namespace views
 
 namespace uw {
 
@@ -50,8 +54,14 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   views::View::DropCallback DropCallback(const ui::DropTargetEvent& event);
 
  private:
-  struct Destination { TreeId parent; std::optional<TreeId> before; };
-  struct Row { TreeId id; gfx::Rect bounds; };
+  struct Destination {
+    TreeId parent;
+    std::optional<TreeId> before;
+  };
+  struct Row {
+    TreeId id;
+    gfx::Rect bounds;
+  };
   void Refresh();
   void SelectTask(TreeId id);
   void Toggle(TreeId id);
@@ -60,20 +70,25 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   std::vector<TreeId> Selection() const;
   std::optional<Destination> DropDestination(const gfx::Point& point) const;
   std::optional<TreeId> ReadDraggedTask(const ui::OSExchangeData& data) const;
-  void Drop(TreeId task, Destination destination,
+  void Drop(TreeId task,
+            Destination destination,
             const ui::DropTargetEvent& event,
             ui::mojom::DragOperation& operation,
             std::unique_ptr<ui::LayerTreeOwner> image);
 
   bool IsCommandIdEnabled(int command) const override;
   void ExecuteCommand(int command, int event_flags) override;
-  void ShowContextMenuForViewImpl(views::View* source, const gfx::Point& point,
-                                  ui::mojom::MenuSourceType source_type) override;
-  void WriteDragDataForView(views::View* sender, const gfx::Point& point,
+  void ShowContextMenuForViewImpl(
+      views::View* source,
+      const gfx::Point& point,
+      ui::mojom::MenuSourceType source_type) override;
+  void WriteDragDataForView(views::View* sender,
+                            const gfx::Point& point,
                             ui::OSExchangeData* data) override;
   int GetDragOperationsForView(views::View* sender, const gfx::Point&) override;
-  bool CanStartDragForView(views::View* sender, const gfx::Point& press,
-                            const gfx::Point& current) override;
+  bool CanStartDragForView(views::View* sender,
+                           const gfx::Point& press,
+                           const gfx::Point& current) override;
 
   const raw_ptr<views::View> host_;
   const raw_ptr<TabCollectionNode> collection_;
@@ -89,7 +104,6 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   base::CallbackListSubscription subscription_;
   std::unique_ptr<ui::SimpleMenuModel> menu_;
   std::unique_ptr<views::MenuRunner> runner_;
-  std::unique_ptr<views::Widget> name_dialog_;
   base::WeakPtrFactory<TabTreeAdapter> weak_factory_{this};
 };
 

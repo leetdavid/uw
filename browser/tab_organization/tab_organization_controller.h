@@ -6,6 +6,7 @@
 
 #include <map>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "base/callback_list.h"
@@ -18,9 +19,13 @@
 
 class BrowserWindowInterface;
 class TabStripModel;
-namespace ui { class SimpleMenuModel; }
+namespace ui {
+class SimpleMenuModel;
+}
 
-namespace content { class WebContents; }
+namespace content {
+class WebContents;
+}
 
 namespace uw {
 
@@ -30,9 +35,17 @@ class TabOrganizationController : public TabStripModelObserver {
   DECLARE_USER_DATA(TabOrganizationController);
   static constexpr char kSessionKey[] = "uw.tab_tree";
   enum Command {
-    kNewTask = 56000, kCloseBranch, kUndo, kScratchpad,
-    kMoveUp, kMoveDown, kNest, kOutdent, kToggleCollapsed,
-    kRenameTask, kLastCommand = kRenameTask,
+    kNewTask = 56000,
+    kCloseBranch,
+    kUndo,
+    kScratchpad,
+    kMoveUp,
+    kMoveDown,
+    kNest,
+    kOutdent,
+    kToggleCollapsed,
+    kRenameTask,
+    kLastCommand = kRenameTask,
   };
   static bool IsCommand(int command);
   static void AppendCommands(ui::SimpleMenuModel* menu);
@@ -42,19 +55,22 @@ class TabOrganizationController : public TabStripModelObserver {
   static TabOrganizationController* From(BrowserWindowInterface* window);
   static TabOrganizationController* From(TabStripModel* model);
   static void DidOpenLink(BrowserWindowInterface* window,
-                           content::WebContents* page,
-                           content::WebContents* source);
-  static void RestoreTab(BrowserWindowInterface* window,
                           content::WebContents* page,
-                          const std::map<std::string, std::string>& extra_data);
+                          content::WebContents* source);
+  static void RestoreTab(BrowserWindowInterface* window,
+                         content::WebContents* page,
+                         const std::map<std::string, std::string>& extra_data);
 
   TabTree& tree() { return tree_; }
   const TabTree& tree() const { return tree_; }
   std::optional<TreeId> IdFor(const tabs::TabInterface* tab) const;
   tabs::TabInterface* TabFor(const TreeId& id) const;
-  std::vector<TreeId> SelectionFor(const tabs::TabInterface* context = nullptr) const;
-  std::optional<TreeId> MakeTask(const std::vector<TreeId>& ids, std::u16string title);
-  bool Move(const std::vector<TreeId>& ids, const TreeId& parent,
+  std::vector<TreeId> SelectionFor(
+      const tabs::TabInterface* context = nullptr) const;
+  std::optional<TreeId> MakeTask(const std::vector<TreeId>& ids,
+                                 std::u16string title);
+  bool Move(const std::vector<TreeId>& ids,
+            const TreeId& parent,
             std::optional<TreeId> before = std::nullopt);
   void Rename(const TreeId& id, std::u16string title);
   void CloseBranch(const std::vector<TreeId>& ids);
@@ -71,15 +87,17 @@ class TabOrganizationController : public TabStripModelObserver {
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
 
  private:
-  void OnTabStripModelChanged(TabStripModel* model,
-                             const TabStripModelChange& change,
-                             const TabStripSelectionChange& selection) override;
+  void OnTabStripModelChanged(
+      TabStripModel* model,
+      const TabStripModelChange& change,
+      const TabStripSelectionChange& selection) override;
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
   void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
   void TabGroupedStateChanged(TabStripModel* model,
-                             std::optional<tab_groups::TabGroupId> old_group,
-                             std::optional<tab_groups::TabGroupId> new_group,
-                             tabs::TabInterface* tab, int index) override;
+                              std::optional<tab_groups::TabGroupId> old_group,
+                              std::optional<tab_groups::TabGroupId> new_group,
+                              tabs::TabInterface* tab,
+                              int index) override;
   void OnSplitTabChanged(const SplitTabChange& change) override;
 
   bool Eligible(tabs::TabInterface* tab) const;
@@ -88,7 +106,10 @@ class TabOrganizationController : public TabStripModelObserver {
   void ScheduleUpdate();
   void Update();
   void FinishTabDrag(bool completed);
-  struct MoveTarget { TreeId parent; std::optional<TreeId> before; };
+  struct MoveTarget {
+    TreeId parent;
+    std::optional<TreeId> before;
+  };
   std::optional<MoveTarget> GetMoveTarget(int command, const TreeId& id) const;
   std::vector<tabs::TabInterface*> ResolvePages(const std::vector<TreeId>& ids);
 

@@ -1,6 +1,6 @@
 # Native tab tree: approved first slice
 
-Status: the user approved this staged plan and implementation of the first slice after the product interview. The source/API investigation is complete; implementation and native verification are pending a usable Chromium build host.
+Status: the user approved this staged plan and implementation of the first slice after the product interview. The source/API investigation and source implementation are complete. Native compilation and verification are pending a usable Chromium build host.
 
 Implementability: **6/10** for the first slice. The [roadmap](roadmap.md#implementability-estimates) scores later automation and shared live pins separately. Scores include integration and maintenance, not progress.
 
@@ -23,7 +23,7 @@ Use the exact [source investigation](../chromium-tab-api-research.md) when imple
 
 - Keep `TabStripModel` responsible for real tabs and `WebContents` lifetime.
 - Reuse `TabView`, the existing selection controller, and native tab-drag infrastructure. They already supply favicons, page-state indicators, close buttons, multi-selection, and ordinary tab actions.
-- Use Chromium's tree-model and undo facilities for uw-owned hierarchy metadata and inverse organization actions.
+- Use Chromium's tree model for hierarchy metadata and a window-owned inverse-action history for organization undo. Keep it separate from page and text undo.
 - Chromium's collection model cannot directly represent nested tasks or page parents. Keep that hierarchy distinct from its collection ownership.
 - Stock `views::TreeView` supplies editing and expansion but lacks multi-selection and tree-specific dragging. Replacing tab rows with it would lose existing browser behavior.
 
@@ -31,7 +31,7 @@ Use the exact [source investigation](../chromium-tab-api-research.md) when imple
 
 ### 1. Establish a reproducible native test loop
 
-Prepare the pinned customized browser and build it on a host satisfying the [build requirements](../../README.md#build-host-requirements). Record a working baseline before adapting the tab views.
+Prepare the pinned customized browser and build it on a host satisfying the [build requirements](../../README.md#build-host-requirements). The current preparation links tracked product source into `src/uw/` after applying the patch series. Record a working baseline before adapting the tab views.
 
 The current host fails preflight and has no managed Chromium checkout. No self-hosted runner is currently registered for this repository. See the latest [verification status](../../README.md#customization-verification).
 

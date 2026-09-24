@@ -14,7 +14,7 @@ The initial upstream build passed on Apple Silicon. The wrapper now applies uw c
 
 ## Code organization
 
-Use one product repository and an ignored Chromium checkout. Keep the first customizations in `chromium/patches/`, with pins and GN arguments alongside them. `scripts/` owns TypeScript build orchestration; `tests/` tests that tooling. The [preparation workflow](../README.md#customizing-chromium) defines how the checkout is assembled.
+Use one product repository and an ignored Chromium checkout. Keep Chromium integration edits in `chromium/patches/`, with pins and GN arguments alongside them. Product C++ lives in tracked `browser/` and `components/` directories; preparation links those into `src/uw/` after applying the patch series. `scripts/` owns TypeScript build orchestration; `tests/` tests that tooling. The [preparation workflow](../README.md#customizing-chromium) defines how the checkout is assembled.
 
 This combines Brave's use of ordinary product source with Helium's explicit patch ordering. [The source comparison](chromium-organization-research.md#main-comparison) records their actual mechanisms and maintenance costs. uw currently needs only the ordered patches.
 
@@ -26,7 +26,7 @@ As substantial product code arrives, add directories for real implementations:
 | `components/<feature>/` | Feature logic behind a small interface, with its own GN target and colocated tests. Use Chromium types where useful; avoid dependencies on `//chrome/browser`. |
 | `resources/<feature>/` | Product-owned WebUI TypeScript, HTML, and styles when a feature needs WebUI. |
 
-Keep substantial new C++ in ordinary files. A future preparation step can expose those files at Chromium's `src/uw`, with narrow GN patches wiring explicit targets into the browser. That source mapping is not implemented yet. Add it with the first module that needs it.
+Keep substantial new C++ in ordinary files. Preparation exposes it at Chromium's `src/uw`, with narrow GN patches wiring explicit targets into the browser. The [manual tab-tree slice](plans/native-tab-tree.md) is the first consumer of this mapping. The links are a build-time view, not a second source of truth.
 
 Organize by feature within those directories. For example, page-watch scheduling, comparison, and history should sit behind one module interface; browser integration supplies the profile and page access. Put tests beside that implementation. Keep `//chrome/browser` dependencies in the browser integration code so feature targets can be tested independently.
 

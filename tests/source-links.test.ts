@@ -12,7 +12,7 @@ function fixture(t: TestContext) {
   const source = join(root, "src");
   const repository = join(root, "product");
   mkdirSync(source); mkdirSync(repository);
-  for (const name of ["browser", "components", "resources"]) mkdirSync(join(repository, name));
+  for (const name of ["browser", "components"]) mkdirSync(join(repository, name));
   const file = join(repository, "browser", "feature.cc");
   writeFileSync(file, "product source\n");
   return { source, repository, file, links: new SourceLinks(source, repository) };
@@ -53,7 +53,7 @@ test("unexpected files and changed link targets stop preparation and removal", (
 test("missing links from an interrupted preparation can be recreated", (t) => {
   const f = fixture(t);
   f.links.prepare();
-  unlinkSync(join(f.source, "uw/resources"));
+  unlinkSync(join(f.source, "uw/components"));
   assert.throws(() => f.links.verify(), /links are missing/);
   f.links.prepare(); f.links.verify();
 });

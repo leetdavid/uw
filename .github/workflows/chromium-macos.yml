@@ -12,6 +12,8 @@ on:
     branches: [main]
     paths:
       - chromium/**
+      - browser/**
+      - components/**
       - scripts/**
       - .node-version
       - package.json

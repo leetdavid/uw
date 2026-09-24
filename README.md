@@ -103,6 +103,9 @@ Launching `uw.app` normally uses `~/Library/Application Support/uw`. The command
 
 - `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. This first pass retains Chromium's icons and most secondary strings.
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
+- `tab-tree.patch` connects the approved manual tab-tree slice to Chromium's vertical tab controls. It expects the product source prepared below.
+
+Substantial Chromium product code lives in tracked `browser/` and `components/` directories. Preparation links them into the ignored Chromium checkout at `src/uw/`; it does not copy the files. The tab-tree patch ignores that generated source directory. This keeps product source reviewable while preserving an upstream-only checkout between prepare runs.
 
 After editing the tracked patches, prepare an existing synced checkout without downloading or compiling:
 
@@ -112,7 +115,7 @@ pnpm run prepare:chromium
 
 `build` also runs this step. The runner validates the whole series in a temporary Git index before changing source files. It applies with `git apply`, without fuzz or whitespace repair, and leaves the real index untouched. Repeating preparation with the same result is a no-op.
 
-The checkout's `.uw-patches.json` records the applied result and operation status so patch updates and sync can reverse it exactly. Interrupted operations can recover files already patched or removed during replacement. Other source edits, staged changes, and untracked files stop preparation. Preserve exploratory edits as patches before rerunning it; do not delete that record to bypass the check. The initial runner supports modifications to tracked Chromium files. New product modules should follow the [source-organization guidance](docs/architecture.md#code-organization).
+The checkout's `.uw-patches.json` records the applied result and operation status so patch updates and sync can reverse it exactly. Interrupted operations can recover files already patched or removed during replacement. Other source edits, staged changes, and untracked files stop preparation. Preserve exploratory edits as patches before rerunning it; do not delete that record to bypass the check. The runner applies patches only to tracked Chromium files, then links tracked product source beneath `src/uw/`. New modules follow the [source-organization guidance](docs/architecture.md#code-organization).
 
 ## Tooling checks
 
@@ -127,6 +130,7 @@ This runs strict TypeScript checking and the Node.js test suite. These checks do
 - [`chromium/pins.json`](chromium/pins.json) pins Chromium, `depot_tools`, and the SDK requirement.
 - [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build with debug symbols disabled.
 - [`chromium/patches/series`](chromium/patches/series) orders the reviewed uw changes on top of the pin.
+- [`browser/`](browser) and [`components/`](components) hold product-owned C++ source linked into the prepared checkout.
 - [`pnpm-lock.yaml`](pnpm-lock.yaml) locks the TypeScript tooling dependencies.
 
 The wrapper disables `depot_tools` auto-update. Chromium's pinned `DEPS` supplies its compiler and dependencies.
@@ -140,7 +144,7 @@ To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.a
 ## CI
 
 - [`checks.yml`](.github/workflows/checks.yml) installs dependencies with pnpm, runs the tooling checks, and validates workflows on a GitHub-hosted runner.
-- [`chromium-macos.yml`](.github/workflows/chromium-macos.yml) builds and smoke-tests uw on a self-hosted Mac, then uploads `uw.app` as a ZIP. It runs manually and on build-input changes pushed to `main`.
+- [`chromium-macos.yml`](.github/workflows/chromium-macos.yml) builds and smoke-tests uw on a self-hosted Mac, then uploads `uw.app` as a ZIP. It runs manually and on Chromium, product-source, or build-tool changes pushed to `main`.
 
 Register a current Actions runner with labels `self-hosted`, `macOS`, `ARM64`, and `uw-chromium`. It needs the build-host requirements above. Set repository variable `UW_CHROMIUM_ROOT` to a dedicated checkout on its build volume. The default is `$HOME/uw-chromium`, outside the Actions repository checkout so sources survive between jobs.
 
@@ -170,7 +174,7 @@ The smoke test uses incognito because normal-profile `--dump-dom` loaded the pag
 
 ### Customization verification
 
-The uw patches were checked against files retrieved from the exact pinned Chromium commit on 2026-09-20. Both apply together, verify, reverse, and reapply idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking, all 42 tooling tests, and workflow validation pass. The tests cover ordered patches, updates and removals, conflicts, interruption recovery, and preservation of local work.
+The uw patches, including the manual tab-tree integration, were checked against files retrieved from the exact pinned Chromium commit. The complete series applies, verifies, reverses, and reapplies idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking and all 46 tooling tests pass. The tests cover ordered patches, source links, updates and removals, conflicts, interruption recovery, and preservation of local work.
 
 The current 16 GiB host has no Chromium checkout. On 2026-09-23, `doctor` reports unavailable Xcode and Metal tooling, an unusable `curl` on PATH, and 43 GiB free against the 100 GiB fresh-checkout requirement. No self-hosted runner is registered for this repository. The earlier 64 GiB baseline result does not verify this customized application.
 
@@ -179,9 +183,10 @@ The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. I
 Pending on a build host:
 
 1. Run sync, build, and smoke. Confirm `uw.app` and `uw <pinned version>`.
-2. Build Chromium's `unit_tests` target and run `VerticalTabStripPrefsTest.*:VerticalTabStripStateControllerTest.*`. The patch adds a default-preference check and gives existing mode-transition tests an explicit horizontal starting state.
+2. Build Chromium's `unit_tests` target and run `TabTreeTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*`.
 3. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
-4. Switch to horizontal tabs, restart, and confirm the choice persists. Check session restoration and required extensions separately.
+4. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
+5. Switch to horizontal tabs, restart, and confirm the choice persists. Check required extensions separately.
 
 Headless smoke testing does not establish that the native browser interface works.
 

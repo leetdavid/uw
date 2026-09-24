@@ -12,8 +12,10 @@ source_set("tab_organization") {
     "//chrome/browser/sessions",
     "//chrome/browser/ui/browser_window",
     "//chrome:strings",
+    "//chrome:strings",
     "//components/sessions",
     "//content/public/browser",
     "//ui/base",
+    "//ui/menus",
   ]
 }

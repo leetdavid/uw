@@ -11,12 +11,13 @@ source_set("tab_tree_adapter") {
     "//chrome:strings",
     "//chrome/browser:browser_public_dependencies",
     "//chrome/browser/ui/browser_window",
-    "//chrome/browser/ui/views/frame",
+    "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/tabs/common:common",
     "//ui/accessibility:ax_base",
     "//ui/base/dragdrop",
     "//ui/base/dragdrop:types",
     "//ui/compositor",
     "//ui/gfx/geometry",
+    "//ui/menus",
   ]
 }

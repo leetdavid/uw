@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 const MARKER = ".uw-source-links";
 const MARKER_TEXT = "uw browser managed source links\n";
-const DIRECTORIES = ["browser", "components", "resources"] as const;
+const DIRECTORIES = ["browser", "components"] as const;
 
 export class SourceLinks {
   readonly root: string;
