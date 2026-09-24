@@ -2,7 +2,7 @@
   "name": "uw-browser",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.31.0",
+  "packageManager": "pnpm@12.6.0",
   "engines": {
     "node": ">=24.13.0"
   },
