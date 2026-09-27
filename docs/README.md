@@ -2,7 +2,7 @@
 
 **ur web, ur way**
 
-uw browser is a planned Chromium-based browser with vertical tabs and AI automation for everyday browsing. Planned features include automatic tab organization, page watches, and prompt-built website customizations.
+uw browser is a Chromium-based browser in development with vertical tabs and AI automation for everyday browsing. [Automatic tab organization](product.md#automatic-tab-organization) is part of the minimum usable version. Planned features include page watches and prompt-built website customizations.
 
 ## Docs
 
@@ -16,10 +16,12 @@ uw browser is a planned Chromium-based browser with vertical tabs and AI automat
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, implementability estimates, and a ticket board.
 - [Approved native tab-tree slice](plans/native-tab-tree.md): implementation sequence, scope, and native acceptance checks.
+- [Approved automatic organization MVP](plans/automatic-organization.md): the automatic tab-filing loop, its agreed scope, and acceptance checks.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
+- [ADR: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
 
 ## Status
 
-The upstream Chromium build and headless smoke test passed on Apple Silicon. The wrapper now prepares minimal uw branding, native vertical tabs by default, and the manual tab-tree slice. The customized app's full build and headless smoke test pass; native UI checks remain pending. See [verification status](../README.md#verification-status). Later automation and shared-pin features remain planned.
+The upstream Chromium build and headless smoke test passed on Apple Silicon. The wrapper now prepares minimal uw branding, native vertical tabs by default, and the manual tab-tree slice. The customized app's full build and headless smoke test pass; native UI checks remain pending. The [automatic organization MVP](plans/automatic-organization.md) is in implementation. See [verification status](../README.md#verification-status). Later automation and shared-pin features remain planned.
 
 The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The current approach uses Chromium source customizations; the update process and local model runtime still need validation or selection.

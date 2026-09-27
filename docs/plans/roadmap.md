@@ -9,6 +9,12 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | ID | Ticket | Status | Score | Notes |
 | --- | --- | --- | --- | --- |
 | T1 | Blank new tabs open below the current tab | backlog | 8/10 | Cmd+T and the tab strip "+" button create the new tab as a sibling below the selected tab's branch, in the same parent (task group, nested group, or Scratchpad). Inside a task group this overrides "new ungrouped tabs appear in Scratchpad" in [native-tab-tree.md](native-tab-tree.md), because user placement is intent. A selected pinned tab, inactive pinned view, or Peek preview falls back to Scratchpad. Link-opened tabs, duplicates, and restores keep upstream placement. |
+| T2 | Single-call classification protocol | backlog | 7/10 | One OpenAI-compatible chat-completions request per classification returning the placement decision, confidence, and task name, with strict response parsing. Covers the OpenAI-compatible and Ollama connection modes in [automatic-organization.md](automatic-organization.md). |
+| T3 | Continuous reclassification coordinator | backlog | 5/10 | Debounced requests on link opens and title/URL changes, revision and manual-adjustment tracking, stale-result discard, whole-branch moves to shallow destinations at confidence ≥ 0.90, one undoable action per automatic change. |
+| T4 | Readable-text excerpts in requests | backlog | 6/10 | Reuse upstream inner-text extraction for a short excerpt per classification request per [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). |
+| T5 | Connection setup and Keychain storage | backlog | 7/10 | Setup dialog for OpenAI-compatible and Ollama connections with validation and visible request scope; API keys in macOS Keychain, endpoints and model IDs in profile preferences. |
+| T6 | Automatic-action feedback and undo | backlog | 6/10 | Brief sidebar message with Undo after each automatic action; undo stays reachable through "Undo tab organization" and Cmd-Z after the message disappears. |
+| T7 | Organization pause controls | backlog | 8/10 | "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" in the sidebar Organize menu; pausing stops placements and pending results across all windows. |
 
 ## 1. Choose the browser foundation
 
@@ -20,13 +26,13 @@ Done when the [architecture](../architecture.md#code-organization) has measured 
 
 ## 2. Make the browser usable daily
 
-Deliver the minimum usable version. Identify the user's required everyday browser features before defining its acceptance checks.
+Deliver the minimum usable version, including the [automatic organization MVP](automatic-organization.md). Identify the user's required everyday browser features before defining its acceptance checks.
 
-Done when the user can complete their daily workflows in uw without blocking crashes or workflow regressions. Verify the [required extensions](../product.md#required-extensions), session restoration, and responsiveness during normal use.
+Done when the user can complete their daily workflows in uw without blocking crashes or workflow regressions, and automatic organization files tab branches reliably without fighting manual placement. Verify the [required extensions](../product.md#required-extensions), session restoration, and responsiveness during normal use.
 
 ## 3. Add task-based tab organization
 
-Start with the [approved manual native tab-tree slice](native-tab-tree.md). Jev automation and shared live pins follow measured prototypes and need separate implementation approval. The agreed behavior is in [Product](../product.md#automatic-tab-organization).
+Start with the [approved manual native tab-tree slice](native-tab-tree.md) and the [approved automatic organization MVP](automatic-organization.md); both are part of the minimum usable version. Jev fast automation and shared live pins follow measured prototypes and need separate implementation approval. The agreed behavior is in [Product](../product.md#automatic-tab-organization).
 
 Done when nested organization supports task regrouping and extraction into separate groups, manual adjustments affect future organization, and users can configure the agreed AI connection modes. Verify automatic and user-directed organization, session restoration, undo, page continuity during moves, and that local inference keeps page context on the device. Measure the [organization latency requirement](../product.md#organization-latency) and verify immediate application without a sidebar-interaction delay. Check that inference completion does not block browsing, take focus, or override intervening manual actions, following the [primary design rule](../product.md#principles).
 
@@ -73,7 +79,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Jev fast tab classification](../architecture.md#tab-organization-models) | 5/10 | Current fast-path choice, behind explicit user opt-in, with metadata first and a bounded excerpt later. No match without an LLM leaves the tab in Scratchpad. Jev is early access; provider access, data handling, task accuracy, and the full latency deadline need validation. |
 | [On-demand AI tab reorganization](../product.md#automatic-tab-organization) | 6/10 | Now needs tree-aware changes and restoration while preserving manual choices within the current window. |
 | [Automatic task-based tree organization](../product.md#automatic-tab-organization) | 5/10 | The initial title/URL/source fast path must meet the agreed latency budget, then a clearer excerpt-informed pass may correct it. Background LLM discovery handles unmatched Scratchpad branches, with stale-result cancellation. |
-| [Automatic organization first slice](../plans/automatic-organization.md) | 3/10 | Remote Jev classification plus separate LLM naming, continuous debounced reclassification, stale-result protection, manual-override preservation, atomic undo, Keychain secrets, and sidebar Undo feedback. |
+| [Automatic organization MVP](automatic-organization.md) | 5/10 | One classification call over an OpenAI-compatible or Ollama endpoint, continuous reclassification with stale-result and manual-override protection, page excerpts, Keychain secrets, undo, pause controls, and sidebar feedback. |
 | [Scratchpad](../product.md#scratchpad) | 8/10 | A window-local nested tree below pins and above task groups for ungrouped tabs and pending candidates. Confident placement moves a whole branch. |
 | [User-directed task proposals](../product.md#user-directed-mode) | 6/10 | Pending proposals remain inline without moving tabs. Accepted proposals create a root group at the earliest candidate; rejected proposals stay suppressed until activity changes. |
 | [Manual task extraction](../product.md#manual-task-extraction) | 8/10 | Once the tab tree exists, this deterministically moves selected branches into a sibling task group without waiting for inference. |

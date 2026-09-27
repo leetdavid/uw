@@ -20,6 +20,8 @@ Agreed: manual setup is acceptable for the first usable version. Automatic brows
 
 Agreed: performance and stability are basic usability requirements. Crashes, disruptive slowdowns, and broken daily workflows block acceptance. Later features must preserve that baseline.
 
+Agreed: the [automatic organization MVP](plans/automatic-organization.md) is part of the minimum usable version. It automatically files tab branches into task groups. Automatic tab closing and suspension remain deferred.
+
 ### Required extensions
 
 Agreed: the first usable version must support installing and using:
@@ -175,7 +177,7 @@ Other proposed privacy behavior:
 
 ## Automatic tab organization
 
-Agreed priority: this is the first major addition after the [minimum usable version](#minimum-usable-version).
+Agreed priority: the [automatic organization MVP](plans/automatic-organization.md) is part of the [minimum usable version](#minimum-usable-version). It classifies continuously into existing tasks and creates named new tasks. Jev fast classification, the separate naming call, user-directed proposals, and "Reorganize all tabs" land later.
 
 Agreed scope: the first tab-management release focuses on organization. Infer the user's browsing task, then decide how to organize the tabs. Preserve familiar Chromium behaviors where possible and expose tree-specific operations as explicit actions. Automatic tab closing and suspension are deferred.
 
@@ -276,6 +278,8 @@ Agreed: when the user selects a remote provider for tab organization, requests m
 Agreed: Jev receives no intent context until the user enables Jev tab classification.
 
 Agreed: after opt-in, Jev receives title, URL, and source-tab relationship for the initial pass, then a short readable-text excerpt for the later pass. Show this exact scope during enablement.
+
+Agreed for the [automatic organization MVP](plans/automatic-organization.md): each classification request contains titles, URLs, source-tab relationships, current task names, the user's manual placement when present, and a short readable-text excerpt. The setup dialog shows this exact scope before the user enables automatic organization.
 
 ## Download name suggestions
 
