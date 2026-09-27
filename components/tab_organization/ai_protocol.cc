@@ -3,6 +3,8 @@
 
 #include "uw/components/tab_organization/ai_protocol.h"
 
+#include <utility>
+
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_util.h"
@@ -11,124 +13,119 @@
 
 namespace uw {
 
-const char kJevDefaultEndpoint[] = "https://api.typesafe.ai/v1/systemone";
-const char kJevModel[] = "jev-latest";
-const char kJevNewTaskOption[] = "new_task";
-const char kJevScratchpadOption[] = "scratchpad";
+const char kNewTaskOption[] = "new_task";
+const char kScratchpadOption[] = "scratchpad";
 const char16_t kAutomaticTaskProvisionalTitle[] = u"New task";
 const size_t kMaxGeneratedTaskNameLength = 80;
+const size_t kMaxExcerptLength = 2000;
 
 namespace {
 
-bool ValidProbability(double value) {
+constexpr char kSystemPrompt[] =
+    "You organize browser tabs into browsing tasks. The user message "
+    "describes one tab branch with its title, URL, source-tab relationship, "
+    "an optional readable-text excerpt, and the current task list. Decide "
+    "where the branch belongs.\n"
+    "Respond with only a JSON object in this exact shape:\n"
+    "{\"decision\": \"move\" | \"new_task\" | \"leave\", "
+    "\"target\": \"<task key>\", \"confidence\": <number 0..1>, "
+    "\"name\": \"<short task name>\"}\n"
+    "- \"move\": the branch clearly continues one existing task. Set "
+    "\"target\" to that task's key.\n"
+    "- \"new_task\": the branch is clearly a separate browsing task. Set "
+    "\"name\" to a short action-oriented phrase of at most five words.\n"
+    "- \"leave\": keep the branch ungrouped in the Scratchpad.\n"
+    "Prefer \"leave\" when unsure. Only move or create at high confidence "
+    "(0.90 or higher). If the description says the user manually placed the "
+    "branch, move it only when its activity clearly changed.";
+
+bool ValidConfidence(double value) {
   return value >= 0.0 && value <= 1.0;
+}
+
+// Accepts the JSON object alone or inside a Markdown code fence.
+std::optional<base::DictValue> ReadAnswerDict(const std::string& content) {
+  std::string trimmed;
+  base::TrimWhitespaceASCII(content, base::TRIM_ALL, &trimmed);
+  if (trimmed.starts_with("```")) {
+    const size_t newline = trimmed.find('\n');
+    if (newline == std::string::npos) {
+      return std::nullopt;
+    }
+    trimmed = trimmed.substr(newline + 1);
+    const size_t fence = trimmed.rfind("```");
+    if (fence != std::string::npos) {
+      trimmed = trimmed.substr(0, fence);
+    }
+    base::TrimWhitespaceASCII(trimmed, base::TRIM_ALL, &trimmed);
+  }
+  return base::JSONReader::ReadDict(trimmed, base::JSON_PARSE_RFC);
+}
+
+std::optional<std::u16string> ValidTaskName(const std::string& name) {
+  std::string trimmed;
+  base::TrimWhitespaceASCII(name, base::TRIM_ALL, &trimmed);
+  if (trimmed.empty()) {
+    return std::nullopt;
+  }
+  std::u16string title = base::UTF8ToUTF16(trimmed);
+  if (title.size() > kMaxGeneratedTaskNameLength) {
+    title.resize(kMaxGeneratedTaskNameLength);
+    base::TrimWhitespace(title, base::TRIM_TRAILING, &title);
+  }
+  return title;
 }
 
 }  // namespace
 
-std::optional<std::string> BuildJevRequestBody(
-    const std::string& title,
-    const std::string& url,
-    const std::string& source_description,
-    const std::vector<std::pair<std::string, std::string>>& task_options) {
-  if (title.empty() || task_options.empty()) {
-    return std::nullopt;
-  }
-  base::DictValue state;
-  state.Set("title", title);
-  state.Set("url", url);
-  state.Set("source", source_description);
-  base::DictValue criteria;
-  for (const auto& [key, description] : task_options) {
-    if (key.empty()) {
-      return std::nullopt;
-    }
-    criteria.Set(key, description);
-  }
-  base::DictValue question;
-  question.Set("type", "choice");
-  question.Set("instructions",
-               "Which browsing task does this tab belong to? Choose the "
-               "existing task it continues, new_task to create a new task "
-               "group, or scratchpad to leave it ungrouped.");
-  question.Set("criteria", std::move(criteria));
-  base::DictValue questions;
-  questions.Set("destination", std::move(question));
-  base::DictValue body;
-  body.Set("state", std::move(state));
-  body.Set("model", kJevModel);
-  body.Set("questions", std::move(questions));
-  return base::WriteJson(body);
-}
-
-std::optional<JevChoiceAnswer> ParseJevChoiceResponse(
-    const std::string& body,
-    const std::string& question_id) {
-  if (question_id.empty()) {
-    return std::nullopt;
-  }
-  auto parsed = base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
-  if (!parsed) {
-    return std::nullopt;
-  }
-  const base::DictValue* answers = parsed->FindDict("answers");
-  if (!answers) {
-    return std::nullopt;
-  }
-  const base::DictValue* answer = answers->FindDict(question_id);
-  if (!answer) {
-    return std::nullopt;
-  }
-  const std::string* type = answer->FindString("type");
-  const std::string* choice = answer->FindString("choice");
-  const base::DictValue* probabilities = answer->FindDict("probabilities");
-  std::optional<double> confidence = answer->FindDouble("confidence");
-  if (!type || *type != "choice" || !choice || choice->empty() ||
-      !probabilities || !confidence || !ValidProbability(*confidence)) {
-    return std::nullopt;
-  }
-  JevChoiceAnswer result;
-  result.choice = *choice;
-  result.confidence = *confidence;
-  double total = 0.0;
-  for (const auto kv : *probabilities) {
-    const base::Value& value = kv.second;
-    if (!value.is_double() && !value.is_int()) {
-      return std::nullopt;
-    }
-    const double probability = value.GetDouble();
-    if (!ValidProbability(probability)) {
-      return std::nullopt;
-    }
-    result.probabilities.emplace(kv.first, probability);
-    total += probability;
-  }
-  if (result.probabilities.empty() || total < 0.99 || total > 1.01 ||
-      probabilities->Find(*choice) == nullptr) {
-    return std::nullopt;
-  }
-  return result;
-}
-
-std::optional<std::string> BuildNamingRequestBody(
+std::optional<std::string> BuildClassificationRequestBody(
     const std::string& model,
-    const std::string& prompt) {
-  if (model.empty() || prompt.empty()) {
+    const BranchContext& context,
+    const std::vector<std::pair<std::string, std::string>>& task_options) {
+  if (model.empty() || context.title.empty()) {
     return std::nullopt;
   }
-  base::DictValue message;
-  message.Set("role", "user");
-  message.Set("content", prompt);
+  base::DictValue description;
+  description.Set("title", context.title);
+  description.Set("url", context.url);
+  description.Set("source", context.source_description);
+  if (!context.excerpt.empty()) {
+    description.Set("excerpt", context.excerpt);
+  }
+  if (!context.manual_placement.empty()) {
+    description.Set("manual_placement", context.manual_placement);
+  }
+  base::ListValue tasks;
+  for (const auto& [key, name] : task_options) {
+    if (key.empty() || key == kNewTaskOption || key == kScratchpadOption) {
+      return std::nullopt;
+    }
+    base::DictValue task;
+    task.Set("key", key);
+    task.Set("name", name);
+    tasks.Append(std::move(task));
+  }
+  description.Set("tasks", std::move(tasks));
+
+  base::DictValue system_message;
+  system_message.Set("role", "system");
+  system_message.Set("content", kSystemPrompt);
+  base::DictValue user_message;
+  user_message.Set("role", "user");
+  user_message.Set("content", base::WriteJson(description).value_or("{}"));
   base::ListValue messages;
-  messages.Append(std::move(message));
+  messages.Append(std::move(system_message));
+  messages.Append(std::move(user_message));
   base::DictValue body;
   body.Set("model", model);
   body.Set("messages", std::move(messages));
-  body.Set("max_tokens", 32);
+  body.Set("max_tokens", 200);
+  body.Set("temperature", 0);
   return base::WriteJson(body);
 }
 
-std::optional<std::u16string> ParseNamingResponse(const std::string& body) {
+std::optional<ClassificationAnswer> ParseClassificationResponse(
+    const std::string& body) {
   auto parsed = base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
   if (!parsed) {
     return std::nullopt;
@@ -137,25 +134,63 @@ std::optional<std::u16string> ParseNamingResponse(const std::string& body) {
   if (!choices || choices->empty()) {
     return std::nullopt;
   }
-  const base::DictValue* message =
-      (*choices)[0].GetIfDict()
-          ? (*choices)[0].GetIfDict()->FindDict("message")
-          : nullptr;
-  const std::string* content =
-      message ? message->FindString("content") : nullptr;
+  const base::DictValue* choice = (*choices)[0].GetIfDict();
+  const base::DictValue* message = choice ? choice->FindDict("message") : nullptr;
+  const std::string* content = message ? message->FindString("content") : nullptr;
   if (!content) {
     return std::nullopt;
   }
-  std::string trimmed;
-  base::TrimWhitespaceASCII(*content, base::TRIM_ALL, &trimmed);
-  if (trimmed.empty()) {
+  auto answer_dict = ReadAnswerDict(*content);
+  if (!answer_dict) {
     return std::nullopt;
   }
-  if (trimmed.size() > kMaxGeneratedTaskNameLength) {
-    trimmed.resize(kMaxGeneratedTaskNameLength);
-    base::TrimWhitespaceASCII(trimmed, base::TRIM_TRAILING, &trimmed);
+  const std::string* decision = answer_dict->FindString("decision");
+  std::optional<double> confidence = answer_dict->FindDouble("confidence");
+  if (!decision || !confidence || !ValidConfidence(*confidence)) {
+    return std::nullopt;
   }
-  return base::UTF8ToUTF16(trimmed);
+  ClassificationAnswer answer;
+  answer.confidence = *confidence;
+  if (*decision == "leave") {
+    answer.choice = kScratchpadOption;
+  } else if (*decision == "new_task") {
+    answer.choice = kNewTaskOption;
+    if (const std::string* name = answer_dict->FindString("name")) {
+      answer.task_name = ValidTaskName(*name);
+    }
+  } else if (*decision == "move") {
+    const std::string* target = answer_dict->FindString("target");
+    if (!target || target->empty() || *target == kNewTaskOption ||
+        *target == kScratchpadOption) {
+      return std::nullopt;
+    }
+    answer.choice = *target;
+  } else {
+    return std::nullopt;
+  }
+  return answer;
+}
+
+std::optional<std::vector<std::u16string>> ParseModelList(
+    const std::string& body) {
+  auto parsed = base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  if (!parsed) {
+    return std::nullopt;
+  }
+  const base::ListValue* data = parsed->FindList("data");
+  if (!data) {
+    return std::nullopt;
+  }
+  std::vector<std::u16string> models;
+  for (const base::Value& item : *data) {
+    const base::DictValue* entry = item.GetIfDict();
+    const std::string* id = entry ? entry->FindString("id") : nullptr;
+    if (!id || id->empty()) {
+      return std::nullopt;
+    }
+    models.push_back(base::UTF8ToUTF16(*id));
+  }
+  return models;
 }
 
 }  // namespace uw

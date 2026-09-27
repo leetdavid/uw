@@ -25,16 +25,18 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         sender: "uw tab organizer"
         description:
           "Sends tab metadata (titles, URLs, source-tab relationships, task "
-          "names) to the user-configured organization provider, or a task- "
-          "naming prompt to the user-configured naming model."
+          "names, manual placements) and a short readable-page-text excerpt "
+          "to the user-configured OpenAI-compatible or Ollama endpoint for "
+          "classification. May also request the endpoint's model list."
         trigger: "A tab opens or changes after the user enables automatic "
-          "tab organization and configures both providers."
+          "tab organization and configures one connection."
         data:
-          "Tab titles, URLs, source-tab relationships, and task names. "
-          "API credentials in the Authorization header."
+          "Tab titles, URLs, source-tab relationships, task names, manual "
+          "placements, and a short readable-page-text excerpt. API "
+          "credentials in the Authorization header when configured."
         destination: OTHER
         destination_other:
-          "The user-configured Jev or OpenAI-compatible endpoint."
+          "The user-configured OpenAI-compatible or Ollama endpoint."
       }
       policy {
         cookies_allowed: NO
@@ -59,17 +61,30 @@ RemoteModelClient::RemoteModelClient(
 RemoteModelClient::~RemoteModelClient() = default;
 
 void RemoteModelClient::Send(ResultCallback callback) {
+  StartRequest(/*post=*/true, std::move(callback));
+}
+
+void RemoteModelClient::SendGet(ResultCallback callback) {
+  StartRequest(/*post=*/false, std::move(callback));
+}
+
+void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   auto resource = std::make_unique<network::ResourceRequest>();
   resource->url = endpoint_;
-  resource->method = "POST";
+  resource->method = post ? "POST" : "GET";
   resource->credentials_mode = network::mojom::CredentialsMode::kOmit;
-  resource->headers.SetHeader(net::HttpRequestHeaders::kContentType,
-                              "application/json");
-  resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
-                              "Bearer " + api_key_);
-  // Drop the secret from memory as soon as the header is set.
-  api_key_.assign(api_key_.size(), '\0');
-  api_key_.clear();
+  if (post) {
+    resource->headers.SetHeader(net::HttpRequestHeaders::kContentType,
+                                "application/json");
+  }
+  // Ollama connections carry no key and send no Authorization header.
+  if (!api_key_.empty()) {
+    resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
+                                "Bearer " + api_key_);
+    // Drop the secret from memory as soon as the header is set.
+    api_key_.assign(api_key_.size(), '\0');
+    api_key_.clear();
+  }
   loader_ = network::SimpleURLLoader::Create(std::move(resource),
                                              kTrafficAnnotation);
   loader_->SetAllowHttpErrorResults(true);
@@ -85,7 +100,9 @@ void RemoteModelClient::Send(ResultCallback callback) {
         }
       },
       weak_factory_.GetWeakPtr()));
-  loader_->AttachStringForUpload(request_body_, "application/json");
+  if (post) {
+    loader_->AttachStringForUpload(request_body_, "application/json");
+  }
   loader_->DownloadToString(
       loader_factory_.get(),
       base::BindOnce(&RemoteModelClient::OnComplete,

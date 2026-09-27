@@ -20,9 +20,11 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/content_extraction/content/browser/inner_text.h"
 #include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -57,30 +59,16 @@ TabOrganizationController::TabOrganizationController(
   tree_subscription_ = tree_.Observe(base::BindRepeating(
       &TabOrganizationController::ScheduleUpdate, weak_factory_.GetWeakPtr()));
   pref_registrar_.Init(window_->GetProfile()->GetPrefs());
-  pref_registrar_.Add(
-      kJevEndpointPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
-  pref_registrar_.Add(
-      kJevKeyAccountPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
-  pref_registrar_.Add(
-      kNamingEndpointPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
-  pref_registrar_.Add(
-      kNamingModelPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
-  pref_registrar_.Add(
-      kNamingKeyAccountPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
-  pref_registrar_.Add(
-      kOrganizationEnabledPref,
-      base::BindRepeating(&TabOrganizationController::OnConfigChanged,
-                          base::Unretained(this)));
+  for (const char* pref :
+       {kOrganizationModePref, kOrganizationEndpointPref,
+        kOrganizationModelPref, kOrganizationKeyAccountPref,
+        kOrganizationEnabledPref, kOrganizationPauseModePref,
+        kOrganizationPauseUntilPref}) {
+    pref_registrar_.Add(pref,
+                        base::BindRepeating(&TabOrganizationController::
+ OnConfigChanged,
+                                            base::Unretained(this)));
+  }
   tabs_->AddObserver(this);
   Sync();
 }
@@ -315,7 +303,8 @@ void TabOrganizationController::Undo() {
   AlignTabOrder();
 }
 
-std::optional<std::u16string> TabOrganizationController::TakeNotice() {
+std::optional<TabOrganizationController::Notice>
+TabOrganizationController::TakeNotice() {
   return std::exchange(notice_, std::nullopt);
 }
 
@@ -591,6 +580,7 @@ namespace {
 
 constexpr base::TimeDelta kClassifyDebounce = base::Milliseconds(750);
 constexpr base::TimeDelta kProviderTimeout = base::Seconds(10);
+constexpr base::TimeDelta kValidationTimeout = base::Seconds(15);
 
 }  // namespace
 
@@ -599,13 +589,25 @@ bool TabOrganizationController::AutomaticEnabled() {
   if (!profile || profile->IsOffTheRecord()) {
     return false;
   }
-  return CanOrganize(ReadAiConnectionConfig(profile->GetPrefs()));
+  return CanOrganize(ReadAiConnectionConfig(profile->GetPrefs())) &&
+         ReadPauseState(profile->GetPrefs()) == PauseMode::kOff;
+}
+
+void TabOrganizationController::SetPause(PauseMode mode,
+                                         base::TimeDelta duration) {
+  SetPauseState(window_->GetProfile()->GetPrefs(), mode, duration);
+  OnConfigChanged();
+}
+
+PauseMode TabOrganizationController::pause_mode() const {
+  return ReadPauseState(window_->GetProfile()->GetPrefs());
 }
 
 void TabOrganizationController::TrackActivityAndSchedule() {
   for (auto it = activity_.begin(); it != activity_.end();) {
     if (!tree_.Find(it->first)) {
       snapshots_.erase(it->first);
+      excerpts_.erase(it->first);
       dispatched_activity_.erase(it->first);
       it = activity_.erase(it);
     } else {
@@ -632,18 +634,22 @@ void TabOrganizationController::TrackActivityAndSchedule() {
         existing->second.url != snapshot.url) {
       snapshots_[*id] = std::move(snapshot);
       // A manual correction holds until activity changes; a new revision
-      // re-arms automatic classification for this branch.
+      // re-arms automatic classification for this branch and turns older
+      // outstanding responses into no-ops.
       ++activity_[*id];
+      coordinator_.Invalidate({*id});
+      RequestExcerpt(tab, *id, activity_[*id]);
     }
   }
   MaybeScheduleAutomatic();
 }
 
 void TabOrganizationController::MaybeScheduleAutomatic() {
-  if (!AutomaticEnabled() || !dragged_.empty()) {
-    if (!AutomaticEnabled()) {
-      CancelAutomatic();
-    }
+  if (!AutomaticEnabled()) {
+    CancelAutomatic();
+    return;
+  }
+  if (!dragged_.empty()) {
     return;
   }
   bool due = false;
@@ -681,6 +687,27 @@ std::string TabOrganizationController::BranchSourceDescription(
          base::UTF16ToUTF8(parent->GetTitle()) + "\"";
 }
 
+std::string TabOrganizationController::ManualPlacementDescription(
+    const TreeId& page) const {
+  bool manual = false;
+  for (const TabTree::Node* node = tree_.Find(page); node;
+       node = node->parent()) {
+    if (tree_.ManualVersion(node->value.id) != 0) {
+      manual = true;
+      break;
+    }
+  }
+  if (!manual) {
+    return std::string();
+  }
+  const TabTree::Node* task = tree_.TaskFor(page);
+  if (!task) {
+    return "the user left this branch ungrouped";
+  }
+  return "the user manually placed this branch in \"" +
+         base::UTF16ToUTF8(task->GetTitle()) + "\"";
+}
+
 std::vector<std::pair<std::string, std::string>>
 TabOrganizationController::TaskOptions() const {
   std::vector<std::pair<std::string, std::string>> options;
@@ -695,9 +722,38 @@ TabOrganizationController::TaskOptions() const {
         }
       };
   visit(tree_.root());
-  options.emplace_back(kJevNewTaskOption, "Create a new task group");
-  options.emplace_back(kJevScratchpadOption, "Leave ungrouped in Scratchpad");
   return options;
+}
+
+void TabOrganizationController::RequestExcerpt(tabs::TabInterface* tab,
+                                               const TreeId& id,
+                                               uint64_t revision) {
+  if (!AutomaticEnabled()) {
+    return;
+  }
+  auto* contents = tab ? tab->GetContents() : nullptr;
+  content::RenderFrameHost* frame =
+      contents ? contents->GetPrimaryMainFrame() : nullptr;
+  if (!frame) {
+    return;
+  }
+  content_extraction::GetInnerText(
+      *frame, std::nullopt,
+      base::BindOnce(
+          [](base::WeakPtr<TabOrganizationController> self, TreeId id,
+             uint64_t revision,
+             std::unique_ptr<content_extraction::InnerTextResult> result) {
+            if (self && result) {
+              self->StoreExcerpt(id, revision, std::move(result->inner_text));
+            }
+          },
+          weak_factory_.GetWeakPtr(), id, revision));
+}
+
+void TabOrganizationController::StoreExcerpt(TreeId id,
+                                             uint64_t revision,
+                                             std::string text) {
+  excerpts_[id] = {std::move(text), revision};
 }
 
 void TabOrganizationController::ClassifyNowForTesting() {
@@ -712,11 +768,14 @@ void TabOrganizationController::OnClassifyTimer() {
   Profile* profile = window_->GetProfile();
   const AiConnectionConfig config =
       ReadAiConnectionConfig(profile->GetPrefs());
-  ApiKeyStore keys;
-  std::optional<std::string> jev_key =
-      keys.GetKey(config.jev_key_account);
-  if (!jev_key || jev_key->empty()) {
-    return;
+  std::string api_key;
+  if (config.mode == ConnectionMode::kOpenAiCompatible) {
+    ApiKeyStore keys;
+    std::optional<std::string> key = keys.GetKey(config.key_account);
+    if (!key || key->empty()) {
+      return;
+    }
+    api_key = std::move(*key);
   }
   auto loader_factory = profile->GetDefaultStoragePartition()
                             ->GetURLLoaderFactoryForBrowserProcess();
@@ -750,15 +809,28 @@ void TabOrganizationController::OnClassifyTimer() {
     if (snapshot == snapshots_.end()) {
       continue;
     }
-    auto body = BuildJevRequestBody(
-        base::UTF16ToUTF8(snapshot->second.title), snapshot->second.url,
-        BranchSourceDescription(representative), options);
+    BranchContext context;
+    context.title = base::UTF16ToUTF8(snapshot->second.title);
+    context.url = snapshot->second.url;
+    context.source_description = BranchSourceDescription(representative);
+    context.manual_placement = ManualPlacementDescription(representative);
+    auto activity = activity_.find(representative);
+    const uint64_t revision =
+        activity == activity_.end() ? 0 : activity->second;
+    if (auto excerpt = excerpts_.find(representative);
+        excerpt != excerpts_.end() && excerpt->second.revision == revision) {
+      std::u16string text = base::UTF8ToUTF16(excerpt->second.text);
+      if (text.size() > kMaxExcerptLength) {
+        text.resize(kMaxExcerptLength);
+      }
+      context.excerpt = base::UTF16ToUTF8(text);
+    }
+    auto body =
+        BuildClassificationRequestBody(config.model, context, options);
     if (!body) {
       continue;
     }
-    auto activity = activity_.find(representative);
-    const uint64_t request_id = coordinator_.RequestClassification(
-        {root}, activity == activity_.end() ? 0 : activity->second);
+    const uint64_t request_id = coordinator_.RequestClassification({root});
     if (!request_id) {
       continue;
     }
@@ -766,134 +838,64 @@ void TabOrganizationController::OnClassifyTimer() {
       dispatched_activity_[page] = activity_[page];
     }
     auto client = std::make_unique<RemoteModelClient>(
-        loader_factory, GURL(config.jev_endpoint), *jev_key, *body,
+        loader_factory, ChatCompletionsUrl(config.endpoint), api_key, *body,
         kProviderTimeout);
-    PendingClassification pending;
-    pending.root = root;
-    // Keep the loader alive via the pending map; completion is bound to this.
-    pending.loader = std::move(client);
-    pending_[request_id] = std::move(pending);
-    pending_[request_id].loader->Send(
-        base::BindOnce(&TabOrganizationController::OnJevResponse,
+    pending_[request_id] = std::move(client);
+    pending_[request_id]->Send(
+        base::BindOnce(&TabOrganizationController::OnClassificationResponse,
                        weak_factory_.GetWeakPtr(), request_id));
   }
   // Drop the secret from this scope as soon as dispatch finishes.
-  jev_key->assign(jev_key->size(), '\0');
+  api_key.assign(api_key.size(), '\0');
 }
 
-void TabOrganizationController::OnJevResponse(
+void TabOrganizationController::OnClassificationResponse(
     uint64_t request_id,
     RemoteModelClient::Outcome outcome) {
   pending_.erase(request_id);
   if (!outcome.ok || !AutomaticEnabled()) {
     return;
   }
-  auto answer = ParseJevChoiceResponse(outcome.body, "destination");
+  auto answer = ParseClassificationResponse(outcome.body);
   if (!answer) {
     return;
   }
-  OrganizationCoordinator::Decision decision =
-      OrganizationCoordinator::Decision::kLeave;
-  TreeId destination{""};
-  if (answer->choice == kJevScratchpadOption) {
-    decision = OrganizationCoordinator::Decision::kLeave;
-  } else if (answer->choice == kJevNewTaskOption) {
-    decision = OrganizationCoordinator::Decision::kNewTask;
+  OrganizationCoordinator::Result result;
+  result.request_id = request_id;
+  result.confidence = answer->confidence;
+  if (answer->task_name) {
+    result.task_name = *answer->task_name;
+  }
+  if (answer->choice == kScratchpadOption) {
+    result.decision = OrganizationCoordinator::Decision::kLeave;
+  } else if (answer->choice == kNewTaskOption) {
+    result.decision = OrganizationCoordinator::Decision::kNewTask;
   } else {
     const TabTree::Node* node = tree_.Find(TreeId(answer->choice));
     if (!node || node->value.kind != TabTree::Kind::kTask) {
       return;
     }
-    decision = OrganizationCoordinator::Decision::kMoveToTask;
-    destination = node->value.id;
+    result.decision = OrganizationCoordinator::Decision::kMoveToTask;
+    result.destination_task = node->value.id;
   }
-  OrganizationCoordinator::Result result;
-  result.request_id = request_id;
-  result.decision = decision;
-  result.destination_task = destination;
-  result.confidence = answer->confidence;
-  std::optional<TreeId> created = coordinator_.ApplyResult(result);
-  if (created) {
-    const std::vector<TreeId> pages = tree_.PagesIn({*created});
-    notice_ = l10n_util::GetStringFUTF16(
-        IDS_UW_AUTO_CREATED_TASK,
-        {tree_.Find(*created) ? tree_.Find(*created)->GetTitle()
-                              : std::u16string()});
-    RequestTaskName(*created, pages);
-  } else if (decision == OrganizationCoordinator::Decision::kMoveToTask) {
-    const TabTree::Node* node = tree_.Find(destination);
-    if (node) {
-      notice_ = l10n_util::GetStringFUTF16(IDS_UW_AUTO_MOVED_TASK,
-                                           {node->GetTitle()});
-    }
-  }
-}
-
-void TabOrganizationController::RequestTaskName(
-    const TreeId& task,
-    const std::vector<TreeId>& branch_pages) {
-  Profile* profile = window_->GetProfile();
-  const AiConnectionConfig config =
-      ReadAiConnectionConfig(profile->GetPrefs());
-  ApiKeyStore keys;
-  std::optional<std::string> naming_key =
-      keys.GetKey(config.naming_key_account);
-  if (!CanOrganize(config) || !naming_key || naming_key->empty()) {
+  std::optional<TreeId> affected = coordinator_.ApplyResult(result);
+  if (!affected) {
     return;
   }
-  std::string prompt =
-      "Name this browsing task as a short action-oriented phrase of at most "
-      "five words. Tabs:\n";
-  for (const TreeId& page : branch_pages) {
-    auto snapshot = snapshots_.find(page);
-    if (snapshot == snapshots_.end()) {
-      continue;
-    }
-    prompt += "- " + base::UTF16ToUTF8(snapshot->second.title) + " (" +
-              snapshot->second.url + ")\n";
-  }
-  auto body = BuildNamingRequestBody(config.naming_model, prompt);
-  if (!body) {
-    return;
-  }
-  const uint64_t naming_version = tree_.ManualVersion(task);
-  auto client = std::make_unique<RemoteModelClient>(
-      profile->GetDefaultStoragePartition()
-          ->GetURLLoaderFactoryForBrowserProcess(),
-      GURL(config.naming_endpoint), *naming_key, *body, kProviderTimeout);
-  naming_key->assign(naming_key->size(), '\0');
-  PendingNaming pending;
-  pending.manual_version = naming_version;
-  pending.loader = std::move(client);
-  pending_naming_[task] = std::move(pending);
-  pending_naming_[task].loader->Send(
-      base::BindOnce(&TabOrganizationController::OnNamingResponse,
-                     weak_factory_.GetWeakPtr(), task, naming_version));
-}
-
-void TabOrganizationController::OnNamingResponse(
-    TreeId task,
-    uint64_t naming_version,
-    RemoteModelClient::Outcome outcome) {
-  pending_naming_.erase(task);
-  if (!outcome.ok) {
-    return;
-  }
-  auto name = ParseNamingResponse(outcome.body);
-  if (!name) {
-    return;
-  }
-  if (coordinator_.ApplyNaming(task, *name, naming_version)) {
-    notice_ = l10n_util::GetStringFUTF16(IDS_UW_AUTO_CREATED_TASK, {*name});
-  }
+  const TabTree::Node* node = tree_.Find(*affected);
+  notice_ =
+      Notice{l10n_util::GetStringFUTF16(
+                 result.decision == OrganizationCoordinator::Decision::kNewTask
+                     ? IDS_UW_AUTO_CREATED_TASK
+                     : IDS_UW_AUTO_MOVED_TASK,
+                 {node ? node->GetTitle() : std::u16string()}),
+             /*undoable=*/true};
 }
 
 void TabOrganizationController::CancelAutomatic() {
   classify_timer_.Stop();
   pending_.clear();
-  pending_naming_.clear();
-  jev_probe_.reset();
-  naming_probe_.reset();
+  probe_.reset();
   coordinator_.InvalidateAll();
 }
 
@@ -908,65 +910,52 @@ void TabOrganizationController::ValidateProviders() {
   if (!CanOrganize(config)) {
     return;
   }
-  ApiKeyStore keys;
-  std::optional<std::string> jev_key = keys.GetKey(config.jev_key_account);
-  std::optional<std::string> naming_key =
-      keys.GetKey(config.naming_key_account);
-  if (!jev_key || jev_key->empty() || !naming_key || naming_key->empty()) {
+  std::string api_key;
+  if (config.mode == ConnectionMode::kOpenAiCompatible) {
+    ApiKeyStore keys;
+    std::optional<std::string> key = keys.GetKey(config.key_account);
+    if (!key || key->empty()) {
+      notice_ = Notice{l10n_util::GetStringUTF16(IDS_UW_AUTO_SETUP_ERROR),
+                       /*undoable=*/false};
+      ScheduleUpdate();
+      return;
+    }
+    api_key = std::move(*key);
+  }
+  BranchContext context;
+  context.title = "Connectivity check";
+  context.url = "about:blank";
+  context.source_description = "setup validation";
+  auto body = BuildClassificationRequestBody(config.model, context, {});
+  if (!body) {
     return;
   }
-  auto jev_body = BuildJevRequestBody(
-      "Connectivity check", "about:blank", "setup validation",
-      {{kJevScratchpadOption, "Leave ungrouped in Scratchpad"}});
-  auto naming_body = BuildNamingRequestBody(config.naming_model,
-                                            "Reply with the single word: ok");
-  if (!jev_body || !naming_body) {
-    return;
-  }
-  auto loader_factory = profile->GetDefaultStoragePartition()
-                            ->GetURLLoaderFactoryForBrowserProcess();
-  jev_probe_ = std::make_unique<RemoteModelClient>(
-      loader_factory, GURL(config.jev_endpoint), *jev_key, *jev_body,
-      base::Seconds(15));
-  naming_probe_ = std::make_unique<RemoteModelClient>(
-      loader_factory, GURL(config.naming_endpoint), *naming_key,
-      *naming_body, base::Seconds(15));
-  jev_probe_ok_ = false;
-  naming_probe_ok_ = false;
-  jev_probe_->Send(base::BindOnce(
-      &TabOrganizationController::OnValidationResponse,
-      weak_factory_.GetWeakPtr(), /*is_jev=*/true));
-  naming_probe_->Send(base::BindOnce(
-      &TabOrganizationController::OnValidationResponse,
-      weak_factory_.GetWeakPtr(), /*is_jev=*/false));
+  probe_ = std::make_unique<RemoteModelClient>(
+      profile->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess(),
+      ChatCompletionsUrl(config.endpoint), std::move(api_key), *body,
+      kValidationTimeout);
+  probe_->Send(
+      base::BindOnce(&TabOrganizationController::OnValidationResponse,
+                     weak_factory_.GetWeakPtr()));
 }
 
 void TabOrganizationController::OnValidationResponse(
-    bool is_jev,
     RemoteModelClient::Outcome outcome) {
-  if (is_jev) {
-    jev_probe_.reset();
-    jev_probe_ok_ =
-        outcome.ok &&
-        ParseJevChoiceResponse(outcome.body, "destination").has_value();
-  } else {
-    naming_probe_.reset();
-    naming_probe_ok_ =
-        outcome.ok && ParseNamingResponse(outcome.body).has_value();
-  }
-  if (jev_probe_ || naming_probe_) {
-    return;
-  }
+  probe_.reset();
   Profile* profile = window_->GetProfile();
   if (!profile || profile->IsOffTheRecord()) {
     return;
   }
-  if (jev_probe_ok_ && naming_probe_ok_) {
+  if (outcome.ok && ParseClassificationResponse(outcome.body)) {
     profile->GetPrefs()->SetBoolean(kOrganizationEnabledPref, true);
-    notice_ = l10n_util::GetStringUTF16(IDS_UW_AUTO_ENABLED);
+    notice_ = Notice{l10n_util::GetStringUTF16(IDS_UW_AUTO_ENABLED),
+                     /*undoable=*/false};
   } else {
-    notice_ = l10n_util::GetStringUTF16(IDS_UW_AUTO_SETUP_ERROR);
+    notice_ = Notice{l10n_util::GetStringUTF16(IDS_UW_AUTO_SETUP_ERROR),
+                     /*undoable=*/false};
   }
+  ScheduleUpdate();
 }
 
 }  // namespace uw

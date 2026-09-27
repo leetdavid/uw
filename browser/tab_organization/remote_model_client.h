@@ -20,10 +20,11 @@ class SimpleURLLoader;
 
 namespace uw {
 
-// One-shot HTTPS JSON POST client for the two organization providers.
-// Responses are bounded (64 KiB) and timed out; redirects are rejected and
-// credentials are never sent. No retries: a failed request leaves the branch
-// where it is. Destroying the client cancels the in-flight request.
+// One-shot HTTPS JSON client for the classification provider. POST bodies go
+// through Send(); SendGet() covers model listing. Responses are bounded
+// (64 KiB) and timed out; redirects are rejected and credentials are never
+// sent. No retries: a failed request leaves the branch where it is.
+// Destroying the client cancels the in-flight request.
 class RemoteModelClient {
  public:
   struct Outcome {
@@ -44,8 +45,10 @@ class RemoteModelClient {
   RemoteModelClient& operator=(const RemoteModelClient&) = delete;
 
   void Send(ResultCallback callback);
+  void SendGet(ResultCallback callback);
 
  private:
+  void StartRequest(bool post, ResultCallback callback);
   void OnComplete(ResultCallback callback, std::optional<std::string> body);
 
   scoped_refptr<network::SharedURLLoaderFactory> loader_factory_;

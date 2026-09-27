@@ -53,6 +53,9 @@ class TabTree {
   Node* Find(const TreeId& id);
   const Node* Find(const TreeId& id) const;
   Node* TaskFor(const TreeId& id);
+  const Node* TaskFor(const TreeId& id) const {
+    return const_cast<TabTree*>(this)->TaskFor(id);
+  }
 
   TreeId AddPage(std::u16string title);
   void UpdatePageTitle(const TreeId& id, std::u16string title);
@@ -72,8 +75,8 @@ class TabTree {
   std::optional<TreeId> MakeTask(const std::vector<TreeId>& pages,
                                  std::u16string title);
   // Automatic placement. Behaves like Move/MakeTask for validation, ordering,
-  // and undo, but does not mark the branch as manually adjusted. Generated
-  // naming via SetAutomaticTaskTitle amends the same undo entry.
+  // and undo, but does not mark the branch as manually adjusted. The title is
+  // applied as part of the same undo entry as task creation.
   bool MoveAutomatic(const std::vector<TreeId>& ids,
                      const TreeId& parent,
                      std::optional<TreeId> before = std::nullopt);
@@ -94,7 +97,6 @@ class TabTree {
                                                    bool after) const;
   std::optional<TreeId> MakeTaskAutomatic(const std::vector<TreeId>& pages,
                                           std::u16string title);
-  void SetAutomaticTaskTitle(const TreeId& id, std::u16string title);
   uint64_t ManualVersion(const TreeId& id) const;
   void RenameTask(const TreeId& id, std::u16string title);
   void ToggleCollapsed(const TreeId& id);

@@ -5,6 +5,10 @@
 #define UW_BROWSER_TAB_ORGANIZATION_AI_CONNECTION_H_
 
 #include <string>
+#include <string_view>
+
+#include "base/time/time.h"
+#include "url/gurl.h"
 
 class PrefService;
 namespace user_prefs {
@@ -13,25 +17,39 @@ class PrefRegistrySyncable;
 
 namespace uw {
 
-// Profile preferences for the two remote providers behind automatic
+// Profile preferences for the classification connection behind automatic
 // organization. Secrets live in macOS Keychain under non-secret account ids;
-// only endpoints, model ids, and enablement live here.
-inline constexpr char kJevEndpointPref[] = "uw.ai.jev_endpoint";
-inline constexpr char kJevKeyAccountPref[] = "uw.ai.jev_key_account";
-inline constexpr char kNamingEndpointPref[] = "uw.ai.naming_endpoint";
-inline constexpr char kNamingModelPref[] = "uw.ai.naming_model";
-inline constexpr char kNamingKeyAccountPref[] = "uw.ai.naming_key_account";
-inline constexpr char kOrganizationEnabledPref[] =
-    "uw.ai.organization_enabled";
+// only the mode, endpoint, model id, and enablement live here.
+inline constexpr char kOrganizationModePref[] = "uw.organization.mode";
+inline constexpr char kOrganizationEndpointPref[] = "uw.organization.endpoint";
+inline constexpr char kOrganizationModelPref[] = "uw.organization.model";
+inline constexpr char kOrganizationKeyAccountPref[] =
+    "uw.organization.key_account";
+inline constexpr char kOrganizationEnabledPref[] = "uw.organization.enabled";
+inline constexpr char kOrganizationPauseModePref[] =
+    "uw.organization.pause_mode";
+inline constexpr char kOrganizationPauseUntilPref[] =
+    "uw.organization.pause_until";
+
+// Default Ollama base endpoint. Ollama needs no API key.
+inline constexpr char kOllamaDefaultEndpoint[] = "http://localhost:11434/v1";
+
+// The two connection shapes behind automatic organization. Both speak the
+// OpenAI-compatible chat-completions protocol.
+enum class ConnectionMode { kOllama = 0, kOpenAiCompatible = 1 };
 
 struct AiConnectionConfig {
-  std::string jev_endpoint;
-  std::string jev_key_account;
-  std::string naming_endpoint;
-  std::string naming_model;
-  std::string naming_key_account;
+  ConnectionMode mode = ConnectionMode::kOllama;
+  std::string endpoint;
+  std::string model;
+  // Keychain account id holding the API key; empty in Ollama mode.
+  std::string key_account;
   bool organization_enabled = false;
 };
+
+// Global suspension of automatic organization per the product pause choices.
+// "Until next launch" is process state: it resets when uw next starts.
+enum class PauseMode { kOff = 0, kTimed = 1, kUntilLaunch = 2, kIndefinite = 3 };
 
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry);
@@ -41,10 +59,20 @@ AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs);
 // credentials, fragments, and invalid URLs.
 bool IsValidProviderEndpoint(std::string_view endpoint);
 
-// True when automatic organization may dispatch: explicitly enabled with both
-// provider endpoints valid, both Keychain accounts present, and a naming
-// model selected.
+// Request URLs under a base endpoint like https://api.openai.com/v1.
+GURL ChatCompletionsUrl(std::string_view endpoint);
+GURL ModelsUrl(std::string_view endpoint);
+
+// True when automatic organization may dispatch: explicitly enabled with a
+// valid endpoint, a selected model, and (outside Ollama mode) a Keychain
+// account holding the API key.
 bool CanOrganize(const AiConnectionConfig& config);
+
+PauseMode ReadPauseState(const PrefService* prefs);
+// `duration` applies to PauseMode::kTimed.
+void SetPauseState(PrefService* prefs,
+                   PauseMode mode,
+                   base::TimeDelta duration = base::TimeDelta());
 
 }  // namespace uw
 

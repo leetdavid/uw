@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/pickle.h"
+#include "base/time/time.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
@@ -43,9 +44,13 @@ constexpr int kIndent = 16;
 constexpr int kPadding = 8;
 constexpr int kHeaderHeight = 32;
 constexpr int kDisclosureWidth = 20;
-// Organize-menu command for provider setup. Outside the controller's undoable
-// tree-command range.
+// Organize-menu commands for provider setup and automatic-organization pause
+// controls. Outside the controller's undoable tree-command range.
 constexpr int kSetupAutomatic = 57000;
+constexpr int kPause1Hour = 57001;
+constexpr int kPauseUntilLaunch = 57002;
+constexpr int kPauseIndefinite = 57003;
+constexpr int kResume = 57004;
 DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kTaskNameField);
 
 class TaskNameDelegate : public ui::DialogModelDelegate {
@@ -133,18 +138,29 @@ void TabTreeAdapter::RemoveOwnedView(views::View* view) {
   removing_.erase(view);
 }
 
-void TabTreeAdapter::ShowOrganizationNotice(std::u16string text) {
+void TabTreeAdapter::ShowOrganizationNotice(
+    TabOrganizationController::Notice notice) {
   ClearNotice();
-  if (text.empty() || !controller_) {
+  if (notice.text.empty() || !controller_) {
     return;
   }
-  auto button = std::make_unique<views::LabelButton>(
-      base::BindRepeating(&TabTreeAdapter::OnNoticeActivated,
-                          weak_factory_.GetWeakPtr()),
-      std::move(text));
-  button->SetTextSubpixelRenderingEnabled(false);
-  button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  notice_ = host_->AddChildView(std::move(button));
+  std::unique_ptr<views::View> view;
+  if (notice.undoable) {
+    auto button = std::make_unique<views::LabelButton>(
+        base::BindRepeating(&TabTreeAdapter::OnNoticeActivated,
+                            weak_factory_.GetWeakPtr()),
+        notice.text + u" \u2014 " +
+            l10n_util::GetStringUTF16(IDS_UW_AUTO_UNDO));
+    button->SetTextSubpixelRenderingEnabled(false);
+    button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    view = std::move(button);
+  } else {
+    auto label = std::make_unique<views::Label>(std::move(notice.text));
+    label->SetSubpixelRenderingEnabled(false);
+    label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    view = std::move(label);
+  }
+  notice_ = host_->AddChildView(std::move(view));
   notice_timer_.Start(FROM_HERE, base::Seconds(10),
                       base::BindOnce(&TabTreeAdapter::ClearNotice,
                                      base::Unretained(this)));
@@ -381,6 +397,14 @@ void TabTreeAdapter::OpenMenu(const gfx::Point& point,
   menu_->AddSeparator(ui::NORMAL_SEPARATOR);
   menu_->AddItem(kSetupAutomatic,
                  l10n_util::GetStringUTF16(IDS_UW_AUTO_SETUP));
+  menu_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_->AddItem(kPause1Hour,
+                 l10n_util::GetStringUTF16(IDS_UW_PAUSE_1HOUR));
+  menu_->AddItem(kPauseUntilLaunch,
+                 l10n_util::GetStringUTF16(IDS_UW_PAUSE_UNTIL_LAUNCH));
+  menu_->AddItem(kPauseIndefinite,
+                 l10n_util::GetStringUTF16(IDS_UW_PAUSE_INDEFINITE));
+  menu_->AddItem(kResume, l10n_util::GetStringUTF16(IDS_UW_PAUSE_RESUME));
   runner_ = std::make_unique<views::MenuRunner>(
       menu_.get(), views::MenuRunner::CONTEXT_MENU);
   runner_->RunMenuAt(host_->GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
@@ -388,8 +412,12 @@ void TabTreeAdapter::OpenMenu(const gfx::Point& point,
 }
 
 bool TabTreeAdapter::IsCommandIdEnabled(int command) const {
-  if (command == kSetupAutomatic) {
+  if (command == kSetupAutomatic || command == kPause1Hour ||
+      command == kPauseUntilLaunch || command == kPauseIndefinite) {
     return controller_ != nullptr;
+  }
+  if (command == kResume) {
+    return controller_ && controller_->pause_mode() != PauseMode::kOff;
   }
   return controller_ && controller_->CanExecute(command, menu_selection_);
 }
@@ -400,6 +428,22 @@ void TabTreeAdapter::ExecuteCommand(int command, int) {
   }
   if (command == kSetupAutomatic) {
     AiSetupDialog::Show(organize_, controller_->GetWeakPtr());
+    return;
+  }
+  if (command == kPause1Hour) {
+    controller_->SetPause(PauseMode::kTimed, base::Hours(1));
+    return;
+  }
+  if (command == kPauseUntilLaunch) {
+    controller_->SetPause(PauseMode::kUntilLaunch);
+    return;
+  }
+  if (command == kPauseIndefinite) {
+    controller_->SetPause(PauseMode::kIndefinite);
+    return;
+  }
+  if (command == kResume) {
+    controller_->SetPause(PauseMode::kOff);
     return;
   }
   if (!controller_->CanExecute(command, menu_selection_)) {

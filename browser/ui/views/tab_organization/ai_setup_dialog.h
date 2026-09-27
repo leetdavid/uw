@@ -14,10 +14,12 @@ namespace uw {
 
 class TabOrganizationController;
 
-// Modal setup bubble for the two automatic-organization providers. Save
-// writes endpoints and model choice to profile prefs, stores keys in
-// Keychain, and asks the controller to validate both providers before
-// enabling organization. Local validation failures save nothing.
+// Modal setup bubble for the automatic-organization connection. Save writes
+// the mode, endpoint, and model choice to profile preferences, stores the API
+// key in Keychain (OpenAI-compatible mode only), and asks the controller to
+// validate the connection before enabling organization. Local validation
+// failures save nothing. The dialog shows the exact request scope before the
+// user enables anything.
 class AiSetupDialog {
  public:
   static void Show(views::View* anchor,

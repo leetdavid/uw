@@ -11,11 +11,11 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 - A classification call contains tab title, URL, source-tab relationship, current task names, the user's manual placement when one exists, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
 - One call returns the placement decision — leave in Scratchpad, move the whole branch to an existing task's top level, or create a new root-level task — a confidence value, and the new task's name when creating one.
 - Automatic moves and task creation require confidence at or above `0.90`. Lower results do nothing.
-- A new task appears immediately with the [provisional name](../CONTEXT.md#language) `New task`. The call's name replaces it; a missing or invalid name leaves the provisional name. There is no later automatic renaming.
-- Continuous reclassification: link opens and title or URL changes trigger background requests, debounced 750 ms after the latest change. Each request captures branch identity, activity revision, and manual-adjustment generation. Late, stale, or overridden results are discarded; closing a branch or moving it to another window invalidates pending work.
+- A new task is created with the call's name. A missing or invalid name leaves the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
+- Continuous reclassification: link opens and title or URL changes trigger background requests, debounced 750 ms after the latest change. A change starts a new activity revision and invalidates the branch's outstanding requests, so late or overridden results are discarded; closing a branch or moving it to another window invalidates pending work too.
 - Manual moves and renames hold until that tab's next debounced title or URL change. While held, requests report the manual placement so the model moves the branch only on a clear activity change.
 - The move unit is a whole tab branch. Destinations are shallow: an existing task's top level or a new root-level task.
-- Every automatic action records one undoable organization action covering task creation, branch moves, and the generated name. It shows a brief sidebar message with Undo and never steals focus or blocks navigation. Undo stays available through the persistent "Undo tab organization" command and Cmd-Z after the message disappears. New tabs are preserved; closed pages are never resurrected.
+- Every automatic action records one undoable organization action covering task creation, branch moves, and the generated name. It shows a brief sidebar message with Undo and never steals focus or blocks navigation. After the message disappears, undo stays available through the persistent "Undo tab organization" command. New tabs are preserved; closed pages are never resurrected.
 - The sidebar Organize menu provides "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
 - API keys are stored in macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
 - The setup dialog shows the exact request scope before the user enables automatic organization.
@@ -48,7 +48,7 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 4. A manual move or rename blocks automatic results for that tab until its next debounced activity change; requests sent while held report the manual placement.
 5. A result with confidence below `0.90` does nothing and creates no task.
 6. Closing a branch or moving it to another window turns its pending responses into no-ops.
-7. One undo reverses task creation, branch moves, and generated naming together, and remains available after the sidebar message disappears. New tabs are preserved.
+7. One undo reverses task creation, branch moves, and generated naming together, and remains available after the sidebar message disappears through "Undo tab organization". New tabs are preserved.
 8. Pause stops automatic placements and application of pending results across all windows; resume restores them. Manual tree controls keep working while paused.
 9. Provider outage, malformed responses, and slow responses never block browsing.
 10. Each request contains the documented scope only. No API keys or request payloads appear in logs, preferences, session data, or crash reports. The setup dialog shows the scope before enabling.

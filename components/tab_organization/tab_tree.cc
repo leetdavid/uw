@@ -398,16 +398,6 @@ std::optional<TreeId> TabTree::MakeTaskAutomatic(
   return task_id;
 }
 
-void TabTree::SetAutomaticTaskTitle(const TreeId& id, std::u16string title) {
-  Node* node = Find(id);
-  if (!node || node->value.kind != Kind::kTask || title.empty() ||
-      node->GetTitle() == title)
-    return;
-  // Amends the creating automatic action: no version bump, no extra undo.
-  model_.SetTitle(node, title);
-  Changed();
-}
-
 uint64_t TabTree::ManualVersion(const TreeId& id) const {
   const Node* node = Find(id);
   return node ? node->value.manual_version : 0;

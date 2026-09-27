@@ -24,14 +24,14 @@ TEST_F(OrganizationCoordinatorTest, HighConfidenceMoveKeepsBranchHierarchy) {
   auto task = tree_.MakeTask({other}, u"Research").value();
 
   const uint64_t request =
-      coordinator_.RequestClassification({parent}, /*activity_version=*/1);
+      coordinator_.RequestClassification({parent});
   ASSERT_NE(request, 0u);
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kMoveToTask;
   result.destination_task = task;
   result.confidence = 0.95;
-  EXPECT_EQ(coordinator_.ApplyResult(result), std::nullopt);
+  EXPECT_EQ(coordinator_.ApplyResult(result), task);
   EXPECT_EQ(tree_.Find(parent)->parent(), tree_.Find(task));
   EXPECT_EQ(tree_.Find(child)->parent(), tree_.Find(parent));
 }
@@ -42,7 +42,7 @@ TEST_F(OrganizationCoordinatorTest, LowConfidenceLeavesBranchInScratchpad) {
   auto task = tree_.MakeTask({other}, u"Research").value();
 
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kMoveToTask;
@@ -53,22 +53,19 @@ TEST_F(OrganizationCoordinatorTest, LowConfidenceLeavesBranchInScratchpad) {
   EXPECT_EQ(tree_.PagesIn({task}), (std::vector<TreeId>{other}));
 }
 
-TEST_F(OrganizationCoordinatorTest, NewTaskCreationAndNamingShareOneUndo) {
+TEST_F(OrganizationCoordinatorTest, NewTaskUsesTheGeneratedNameInOneUndo) {
   auto page = tree_.AddPage(u"Page");
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kNewTask;
   result.confidence = 0.95;
+  result.task_name = u"Benchmark Jev";
   auto created = coordinator_.ApplyResult(result);
   ASSERT_TRUE(created);
-  EXPECT_EQ(tree_.Find(*created)->GetTitle(), u"New task");
-  EXPECT_EQ(tree_.Find(page)->parent(), tree_.Find(*created));
-
-  EXPECT_TRUE(coordinator_.ApplyNaming(*created, u"Benchmark Jev",
-                                       tree_.ManualVersion(*created)));
   EXPECT_EQ(tree_.Find(*created)->GetTitle(), u"Benchmark Jev");
+  EXPECT_EQ(tree_.Find(page)->parent(), tree_.Find(*created));
 
   tree_.Undo();
   EXPECT_FALSE(tree_.Find(*created));
@@ -76,22 +73,17 @@ TEST_F(OrganizationCoordinatorTest, NewTaskCreationAndNamingShareOneUndo) {
   EXPECT_FALSE(tree_.CanUndo());
 }
 
-TEST_F(OrganizationCoordinatorTest, ManualRenameWinsOverLateNaming) {
+TEST_F(OrganizationCoordinatorTest, NewTaskWithoutANameKeepsProvisionalTitle) {
   auto page = tree_.AddPage(u"Page");
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kNewTask;
   result.confidence = 0.95;
   auto created = coordinator_.ApplyResult(result);
   ASSERT_TRUE(created);
-  const uint64_t naming_version = tree_.ManualVersion(*created);
-
-  tree_.RenameTask(*created, u"Manual name");
-  EXPECT_FALSE(
-      coordinator_.ApplyNaming(*created, u"Generated", naming_version));
-  EXPECT_EQ(tree_.Find(*created)->GetTitle(), u"Manual name");
+  EXPECT_EQ(tree_.Find(*created)->GetTitle(), u"New task");
 }
 
 TEST_F(OrganizationCoordinatorTest, ManualMoveBlocksOutstandingResult) {
@@ -103,7 +95,7 @@ TEST_F(OrganizationCoordinatorTest, ManualMoveBlocksOutstandingResult) {
   // Fresh branch classified while sitting in the second task's parent.
   tree_.Move({page}, tree_.scratchpad()->value.id);
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   // Manual move before the result arrives.
   tree_.Move({page}, second);
   OrganizationCoordinator::Result result;
@@ -120,7 +112,7 @@ TEST_F(OrganizationCoordinatorTest, ClosedBranchIsANoOp) {
   auto other = tree_.AddPage(u"Other");
   auto task = tree_.MakeTask({other}, u"Research").value();
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   tree_.RemovePage(page);
   OrganizationCoordinator::Result result;
   result.request_id = request;
@@ -133,7 +125,7 @@ TEST_F(OrganizationCoordinatorTest, ClosedBranchIsANoOp) {
 TEST_F(OrganizationCoordinatorTest, UndoPreservesNewTabs) {
   auto page = tree_.AddPage(u"Page");
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kNewTask;
@@ -150,7 +142,7 @@ TEST_F(OrganizationCoordinatorTest, UndoPreservesNewTabs) {
 TEST_F(OrganizationCoordinatorTest, InvalidDestinationIsDiscarded) {
   auto page = tree_.AddPage(u"Page");
   const uint64_t request =
-      coordinator_.RequestClassification({page}, /*activity_version=*/1);
+      coordinator_.RequestClassification({page});
   OrganizationCoordinator::Result result;
   result.request_id = request;
   result.decision = OrganizationCoordinator::Decision::kMoveToTask;

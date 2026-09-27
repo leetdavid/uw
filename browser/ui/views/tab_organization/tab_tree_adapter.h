@@ -71,7 +71,7 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   // layout manager processes its synchronous removal notification, so it is
   // hidden from CalculateLayout until deletion completes.
   void RemoveOwnedView(views::View* view);
-  void ShowOrganizationNotice(std::u16string text);
+  void ShowOrganizationNotice(TabOrganizationController::Notice notice);
   void ClearNotice();
   void OnNoticeActivated();
   void SelectTask(TreeId id);
@@ -106,8 +106,9 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   base::WeakPtr<TabOrganizationController> controller_;
   raw_ptr<views::MenuButton> organize_ = nullptr;
   raw_ptr<views::Label> scratchpad_ = nullptr;
-  // Transient automatic-organization notice. Activating it undoes the action.
-  raw_ptr<views::LabelButton> notice_ = nullptr;
+  // Transient automatic-organization notice. Undoable notices show "Undo" and
+  // activating them reverses the reported action.
+  raw_ptr<views::View> notice_ = nullptr;
   base::OneShotTimer notice_timer_;
   std::map<TreeId, raw_ptr<views::LabelButton>> tasks_;
   std::map<TreeId, raw_ptr<views::LabelButton>> disclosures_;

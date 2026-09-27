@@ -1,22 +1,32 @@
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -309,4 +309,16 @@
+@@ -309,5 +309,27 @@
        <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the descendants of a collapsed tab branch.">Expand branch</message>
        <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the descendants of a tab branch.">Collapse branch</message>
        <message name="IDS_UW_TOGGLE_BRANCH" desc="Expands or collapses the selected tab branch.">Expand or collapse branch</message>
++      <message name="IDS_UW_AUTO_UNDO" desc="Sidebar notice action reversing an automatic organization change.">Undo</message>
 +      <message name="IDS_UW_AUTO_MOVED_TASK" desc="Sidebar notice after automatic organization moves a branch.">Moved to <ph name="TASK_NAME">$1<ex>Research</ex></ph></message>
-+      <message name="IDS_UW_AUTO_CREATED_TASK" desc="Sidebar notice after automatic organization creates a task.">Created task <ph name="TASK_NAME">$1<ex>Benchmark Jev</ex></ph></message>
++      <message name="IDS_UW_AUTO_CREATED_TASK" desc="Sidebar notice after automatic organization creates a task.">Created task <ph name="TASK_NAME">$1<ex>Benchmark GLiNER2.5</ex></ph></message>
 +      <message name="IDS_UW_AUTO_SETUP" desc="Organize menu item opening provider setup.">Set up automatic organization…</message>
 +      <message name="IDS_UW_AUTO_SETUP_TITLE" desc="Provider setup dialog title.">Set up automatic organization</message>
-+      <message name="IDS_UW_AUTO_SETUP_JEV_ENDPOINT" desc="Provider setup field label.">Jev endpoint</message>
-+      <message name="IDS_UW_AUTO_SETUP_JEV_KEY" desc="Provider setup field label.">Jev API key</message>
-+      <message name="IDS_UW_AUTO_SETUP_NAMING_ENDPOINT" desc="Provider setup field label.">Naming endpoint</message>
-+      <message name="IDS_UW_AUTO_SETUP_NAMING_MODEL" desc="Provider setup field label.">Naming model</message>
-+      <message name="IDS_UW_AUTO_SETUP_NAMING_KEY" desc="Provider setup field label.">Naming API key</message>
-+      <message name="IDS_UW_AUTO_SETUP_ERROR" desc="Provider setup validation failure.">Could not validate one or both providers. Check the endpoints, model, and keys.</message>
-+      <message name="IDS_UW_AUTO_SETUP_VALIDATING" desc="Provider setup progress.">Checking providers…</message>
-+      <message name="IDS_UW_AUTO_ENABLED" desc="Sidebar notice after both providers validate.">Automatic organization is on</message>
++      <message name="IDS_UW_AUTO_SETUP_MODE" desc="Provider setup field label for the connection mode.">Connection</message>
++      <message name="IDS_UW_AUTO_SETUP_MODE_OLLAMA" desc="Provider setup connection mode.">Ollama (no API key)</message>
++      <message name="IDS_UW_AUTO_SETUP_MODE_OPENAI" desc="Provider setup connection mode.">OpenAI-compatible</message>
++      <message name="IDS_UW_AUTO_SETUP_ENDPOINT" desc="Provider setup field label.">Endpoint</message>
++      <message name="IDS_UW_AUTO_SETUP_LOAD_MODELS" desc="Provider setup action fetching the endpoint's model list.">Load available models…</message>
++      <message name="IDS_UW_AUTO_SETUP_MODEL" desc="Provider setup field label.">Model</message>
++      <message name="IDS_UW_AUTO_SETUP_MODEL_EMPTY" desc="Provider setup model placeholder before loading.">No model selected</message>
++      <message name="IDS_UW_AUTO_SETUP_MODELS_ERROR" desc="Provider setup model-list failure.">Could not load models</message>
++      <message name="IDS_UW_AUTO_SETUP_MODELS_EMPTY" desc="Provider setup empty model list.">No models found</message>
++      <message name="IDS_UW_AUTO_SETUP_KEY" desc="Provider setup field label.">API key (leave empty for Ollama)</message>
++      <message name="IDS_UW_AUTO_SCOPE" desc="Provider setup explanation of the request scope.">Automatic organization sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the configured model. API keys stay in the macOS Keychain.</message>
++      <message name="IDS_UW_AUTO_SETUP_ERROR" desc="Provider setup validation failure.">Could not validate the connection. Check the endpoint, model, and key.</message>
++      <message name="IDS_UW_AUTO_ENABLED" desc="Sidebar notice after the connection validates.">Automatic organization is on</message>
++      <message name="IDS_UW_PAUSE_1HOUR" desc="Organize menu item pausing automatic organization for one hour.">Pause for 1 hour</message>
++      <message name="IDS_UW_PAUSE_UNTIL_LAUNCH" desc="Organize menu item pausing automatic organization until uw quits.">Pause until next launch</message>
++      <message name="IDS_UW_PAUSE_INDEFINITE" desc="Organize menu item pausing automatic organization indefinitely.">Pause indefinitely</message>
++      <message name="IDS_UW_PAUSE_RESUME" desc="Organize menu item resuming automatic organization.">Resume automatic organization</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
 diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn

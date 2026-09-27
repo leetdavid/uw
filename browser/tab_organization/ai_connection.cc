@@ -3,23 +3,42 @@
 
 #include "uw/browser/tab_organization/ai_connection.h"
 
-#include "base/strings/string_util.h"
+#include <string>
+
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_service.h"
 #include "net/base/url_util.h"
 #include "url/gurl.h"
-#include "uw/components/tab_organization/ai_protocol.h"
 
 namespace uw {
+namespace {
+
+// "Pause until next launch" must reset when uw next starts, so it lives in
+// process state rather than in a profile preference.
+bool g_paused_until_launch = false;
+
+GURL EndpointUrl(std::string_view endpoint, std::string_view suffix) {
+  std::string base(endpoint);
+  while (base.ends_with('/')) {
+    base.pop_back();
+  }
+  return GURL(base + std::string(suffix));
+}
+
+}  // namespace
 
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
-  registry->RegisterStringPref(kJevEndpointPref, kJevDefaultEndpoint);
-  registry->RegisterStringPref(kJevKeyAccountPref, std::string());
-  registry->RegisterStringPref(kNamingEndpointPref, std::string());
-  registry->RegisterStringPref(kNamingModelPref, std::string());
-  registry->RegisterStringPref(kNamingKeyAccountPref, std::string());
+  registry->RegisterIntegerPref(
+      kOrganizationModePref,
+      static_cast<int>(ConnectionMode::kOllama));
+  registry->RegisterStringPref(kOrganizationEndpointPref, std::string());
+  registry->RegisterStringPref(kOrganizationModelPref, std::string());
+  registry->RegisterStringPref(kOrganizationKeyAccountPref, std::string());
   registry->RegisterBooleanPref(kOrganizationEnabledPref, false);
+  registry->RegisterIntegerPref(kOrganizationPauseModePref,
+                                static_cast<int>(PauseMode::kOff));
+  registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);
 }
 
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
@@ -27,11 +46,13 @@ AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
   if (!prefs) {
     return config;
   }
-  config.jev_endpoint = prefs->GetString(kJevEndpointPref);
-  config.jev_key_account = prefs->GetString(kJevKeyAccountPref);
-  config.naming_endpoint = prefs->GetString(kNamingEndpointPref);
-  config.naming_model = prefs->GetString(kNamingModelPref);
-  config.naming_key_account = prefs->GetString(kNamingKeyAccountPref);
+  config.mode = prefs->GetInteger(kOrganizationModePref) ==
+                        static_cast<int>(ConnectionMode::kOpenAiCompatible)
+                    ? ConnectionMode::kOpenAiCompatible
+                    : ConnectionMode::kOllama;
+  config.endpoint = prefs->GetString(kOrganizationEndpointPref);
+  config.model = prefs->GetString(kOrganizationModelPref);
+  config.key_account = prefs->GetString(kOrganizationKeyAccountPref);
   config.organization_enabled = prefs->GetBoolean(kOrganizationEnabledPref);
   return config;
 }
@@ -48,12 +69,55 @@ bool IsValidProviderEndpoint(std::string_view endpoint) {
   return url.SchemeIs("http") && net::IsLocalhost(url);
 }
 
+GURL ChatCompletionsUrl(std::string_view endpoint) {
+  return EndpointUrl(endpoint, "/chat/completions");
+}
+
+GURL ModelsUrl(std::string_view endpoint) {
+  return EndpointUrl(endpoint, "/models");
+}
+
 bool CanOrganize(const AiConnectionConfig& config) {
   return config.organization_enabled &&
-         IsValidProviderEndpoint(config.jev_endpoint) &&
-         !config.jev_key_account.empty() &&
-         IsValidProviderEndpoint(config.naming_endpoint) &&
-         !config.naming_model.empty() && !config.naming_key_account.empty();
+         IsValidProviderEndpoint(config.endpoint) && !config.model.empty() &&
+         (config.mode == ConnectionMode::kOllama ||
+          !config.key_account.empty());
+}
+
+PauseMode ReadPauseState(const PrefService* prefs) {
+  if (g_paused_until_launch) {
+    return PauseMode::kUntilLaunch;
+  }
+  if (!prefs) {
+    return PauseMode::kOff;
+  }
+  switch (prefs->GetInteger(kOrganizationPauseModePref)) {
+    case static_cast<int>(PauseMode::kTimed): {
+      const base::Time until = base::Time::FromDeltaSinceWindowsEpoch(
+          base::Microseconds(static_cast<int64_t>(
+              prefs->GetDouble(kOrganizationPauseUntilPref))));
+      return base::Time::Now() < until ? PauseMode::kTimed : PauseMode::kOff;
+    }
+    case static_cast<int>(PauseMode::kIndefinite):
+      return PauseMode::kIndefinite;
+    default:
+      return PauseMode::kOff;
+  }
+}
+
+void SetPauseState(PrefService* prefs, PauseMode mode, base::TimeDelta duration) {
+  g_paused_until_launch = mode == PauseMode::kUntilLaunch;
+  if (!prefs) {
+    return;
+  }
+  prefs->SetInteger(kOrganizationPauseModePref, static_cast<int>(mode));
+  // The timed-pause deadline is stored in microseconds since the Windows
+  // epoch.
+  prefs->SetDouble(
+      kOrganizationPauseUntilPref,
+      mode == PauseMode::kTimed
+          ? (base::Time::Now() + duration).ToDeltaSinceWindowsEpoch().InMicroseconds()
+          : 0);
 }
 
 }  // namespace uw

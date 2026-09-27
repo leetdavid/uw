@@ -13,6 +13,7 @@ source_set("tab_organization") {
     "//chrome/browser/sessions",
     "//chrome/browser/ui/browser_window",
     "//chrome:strings",
+    "//components/content_extraction/content/browser",
     "//components/prefs",
     "//components/sessions",
     "//content/public/browser",
@@ -62,6 +63,5 @@ source_set("ai_connection") {
     "//services/network/public/cpp",
     "//services/network/public/mojom",
     "//url",
-    "//uw/components/tab_organization:tab_tree",
   ]
 }

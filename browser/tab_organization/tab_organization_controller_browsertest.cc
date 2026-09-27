@@ -4,6 +4,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
 #include "base/run_loop.h"
+#include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -116,15 +117,14 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        UnreachableProvidersLeaveTabsPut) {
   crypto::apple::ScopedFakeKeychainV2 fake_keychain("uw-test");
-  ASSERT_TRUE(ApiKeyStore().SetKey("jev", "test-key"));
-  ASSERT_TRUE(ApiKeyStore().SetKey("naming", "test-key"));
+  ASSERT_TRUE(ApiKeyStore().SetKey("organization", "test-key"));
   PrefService* prefs = browser()->GetProfile()->GetPrefs();
   // Refused connections fail fast without touching the network.
-  prefs->SetString(kJevEndpointPref, "http://127.0.0.1:9/");
-  prefs->SetString(kNamingEndpointPref, "http://127.0.0.1:9/");
-  prefs->SetString(kNamingModelPref, "test-model");
-  prefs->SetString(kJevKeyAccountPref, "jev");
-  prefs->SetString(kNamingKeyAccountPref, "naming");
+  prefs->SetInteger(kOrganizationModePref,
+                    static_cast<int>(ConnectionMode::kOpenAiCompatible));
+  prefs->SetString(kOrganizationEndpointPref, "http://127.0.0.1:9/");
+  prefs->SetString(kOrganizationModelPref, "test-model");
+  prefs->SetString(kOrganizationKeyAccountPref, "organization");
   prefs->SetBoolean(kOrganizationEnabledPref, true);
   auto* initial = browser()->tab_strip_model()->GetTabAtIndex(0);
   auto* tab = AddTab(GURL("about:blank"));
@@ -137,6 +137,41 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->tree().Find(PageId(tab))->parent(),
             controller()->tree().scratchpad());
   EXPECT_TRUE(controller()->tree().TaskFor(PageId(tab)) == nullptr);
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PauseStopsAutomaticOrganization) {
+  crypto::apple::ScopedFakeKeychainV2 fake_keychain("uw-test");
+  ASSERT_TRUE(ApiKeyStore().SetKey("organization", "test-key"));
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetInteger(kOrganizationModePref,
+                    static_cast<int>(ConnectionMode::kOpenAiCompatible));
+  prefs->SetString(kOrganizationEndpointPref, "http://127.0.0.1:9/");
+  prefs->SetString(kOrganizationModelPref, "test-model");
+  prefs->SetString(kOrganizationKeyAccountPref, "organization");
+  prefs->SetBoolean(kOrganizationEnabledPref, true);
+  auto* tab = AddTab(GURL("about:blank"));
+  ASSERT_TRUE(tab);
+
+  controller()->SetPause(PauseMode::kIndefinite);
+  EXPECT_EQ(controller()->pause_mode(), PauseMode::kIndefinite);
+  controller()->ClassifyNowForTesting();
+  base::RunLoop().RunUntilIdle();
+  // Paused: nothing organizes and no pending result is applied.
+  EXPECT_TRUE(controller()->tree().TaskFor(PageId(tab)) == nullptr);
+
+  controller()->SetPause(PauseMode::kOff);
+  EXPECT_EQ(controller()->pause_mode(), PauseMode::kOff);
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TimedPauseExpires) {
+  controller()->SetPause(PauseMode::kTimed, base::Seconds(0));
+  EXPECT_EQ(controller()->pause_mode(), PauseMode::kOff);
+  controller()->SetPause(PauseMode::kUntilLaunch);
+  EXPECT_EQ(controller()->pause_mode(), PauseMode::kUntilLaunch);
+  controller()->SetPause(PauseMode::kOff);
+  EXPECT_EQ(controller()->pause_mode(), PauseMode::kOff);
 }
 
 }  // namespace

@@ -17,6 +17,7 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
 #include "uw/components/tab_organization/organization_coordinator.h"
 #include "uw/components/tab_organization/tab_tree.h"
@@ -94,11 +95,21 @@ class TabOrganizationController : public TabStripModelObserver {
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
 
   // Takes a pending automatic-organization notice for the sidebar, if any.
-  std::optional<std::u16string> TakeNotice();
+  struct Notice {
+    std::u16string text;
+    // True when Undo reverses the action the notice reports.
+    bool undoable = false;
+  };
+  std::optional<Notice> TakeNotice();
 
-  // Validates both providers with live probe requests. Enables organization
-  // only when both succeed; otherwise leaves it disabled with a notice.
+  // Validates the configured connection with a live probe request. Enables
+  // organization only when it succeeds; otherwise leaves it disabled with a
+  // notice.
   void ValidateProviders();
+
+  // Global automatic-organization pause per the product pause choices.
+  void SetPause(PauseMode mode, base::TimeDelta duration = base::TimeDelta());
+  PauseMode pause_mode() const;
 
   // Fires the classification pass immediately, bypassing the debounce timer.
   void ClassifyNowForTesting();
@@ -136,18 +147,17 @@ class TabOrganizationController : public TabStripModelObserver {
   void TrackActivityAndSchedule();
   void MaybeScheduleAutomatic();
   void OnClassifyTimer();
-  void OnJevResponse(uint64_t request_id,
-                     RemoteModelClient::Outcome outcome);
-  void RequestTaskName(const TreeId& task,
-                       const std::vector<TreeId>& branch_pages);
-  void OnNamingResponse(TreeId task,
-                        uint64_t naming_version,
-                        RemoteModelClient::Outcome outcome);
-  void OnValidationResponse(bool is_jev,
-                            RemoteModelClient::Outcome outcome);
+  void OnClassificationResponse(uint64_t request_id,
+                                RemoteModelClient::Outcome outcome);
+  void OnValidationResponse(RemoteModelClient::Outcome outcome);
   void CancelAutomatic();
   std::string BranchSourceDescription(const TreeId& page) const;
+  std::string ManualPlacementDescription(const TreeId& page) const;
   std::vector<std::pair<std::string, std::string>> TaskOptions() const;
+  void RequestExcerpt(tabs::TabInterface* tab,
+                      const TreeId& id,
+                      uint64_t revision);
+  void StoreExcerpt(TreeId id, uint64_t revision, std::string text);
 
   const raw_ptr<BrowserWindowInterface> window_;
   const raw_ptr<TabStripModel> tabs_;
@@ -173,23 +183,17 @@ class TabOrganizationController : public TabStripModelObserver {
     std::string url;
   };
   std::map<TreeId, PageSnapshot> snapshots_;
+  struct Excerpt {
+    std::string text;
+    uint64_t revision = 0;
+  };
+  // Readable page text captured for the current activity revision.
+  std::map<TreeId, Excerpt> excerpts_;
   std::map<TreeId, uint64_t> dispatched_activity_;
-  struct PendingClassification {
-    std::unique_ptr<RemoteModelClient> loader;
-    TreeId root;
-  };
-  std::map<uint64_t, PendingClassification> pending_;
-  struct PendingNaming {
-    std::unique_ptr<RemoteModelClient> loader;
-    uint64_t manual_version = 0;
-  };
-  std::map<TreeId, PendingNaming> pending_naming_;
-  std::unique_ptr<RemoteModelClient> jev_probe_;
-  std::unique_ptr<RemoteModelClient> naming_probe_;
-  bool jev_probe_ok_ = false;
-  bool naming_probe_ok_ = false;
+  std::map<uint64_t, std::unique_ptr<RemoteModelClient>> pending_;
+  std::unique_ptr<RemoteModelClient> probe_;
   PrefChangeRegistrar pref_registrar_;
-  std::optional<std::u16string> notice_;
+  std::optional<Notice> notice_;
   base::WeakPtrFactory<TabOrganizationController> weak_factory_{this};
 };
 

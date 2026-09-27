@@ -63,7 +63,7 @@ The organizer's suggestion that a set of tabs represents a separate browsing tas
 One LLM request that decides a tab branch's placement — leave in Scratchpad, move to an existing task, or create a new task — with a confidence value, and supplies the name when it creates a task.
 
 **Provisional task name**:
-The `New task` title shown immediately when automatic organization creates a task. The classification call's name replaces it.
+The `New task` title a newly created task keeps when its classification call returns no valid name.
 
 **Jev classification**:
 A structured Jev decision about a tab's relationship to existing tasks or a new task, with a confidence value. It does not name new tasks. Part of the later Jev fast path.

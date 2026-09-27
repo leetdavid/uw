@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "uw/components/tab_organization/ai_protocol.h"
+
 namespace uw {
 
 OrganizationCoordinator::OrganizationCoordinator(TabTree* tree)
@@ -13,14 +15,12 @@ OrganizationCoordinator::OrganizationCoordinator(TabTree* tree)
 OrganizationCoordinator::~OrganizationCoordinator() = default;
 
 uint64_t OrganizationCoordinator::RequestClassification(
-    const std::vector<TreeId>& branch_roots,
-    uint64_t activity_version) {
+    const std::vector<TreeId>& branch_roots) {
   const std::vector<TreeId> roots = tree_->Normalize(branch_roots);
   if (roots.empty()) {
     return 0;
   }
   Pending pending;
-  pending.activity_version = activity_version;
   for (const auto& id : roots) {
     const TabTree::Node* node = tree_->Find(id);
     if (!node || !node->parent()) {
@@ -89,26 +89,14 @@ std::optional<TreeId> OrganizationCoordinator::ApplyResult(
     if (!tree_->MoveAutomatic(pending.roots, result.destination_task)) {
       return std::nullopt;
     }
-    return std::nullopt;
+    return result.destination_task;
   }
   if (result.decision == Decision::kNewTask) {
-    return tree_->MakeTaskAutomatic(pending.roots, u"New task");
+    return tree_->MakeTaskAutomatic(
+        pending.roots, result.task_name.empty() ? kAutomaticTaskProvisionalTitle
+                                                : result.task_name);
   }
   return std::nullopt;
-}
-
-bool OrganizationCoordinator::ApplyNaming(const TreeId& task,
-                                          std::u16string title,
-                                          uint64_t expected_manual_version) {
-  const TabTree::Node* node = tree_->Find(task);
-  if (!node || node->value.kind != TabTree::Kind::kTask || title.empty()) {
-    return false;
-  }
-  if (tree_->ManualVersion(task) != expected_manual_version) {
-    return false;
-  }
-  tree_->SetAutomaticTaskTitle(task, std::move(title));
-  return tree_->Find(task) != nullptr;
 }
 
 void OrganizationCoordinator::Invalidate(const std::vector<TreeId>& ids) {
@@ -139,10 +127,6 @@ void OrganizationCoordinator::Invalidate(const std::vector<TreeId>& ids) {
 
 void OrganizationCoordinator::InvalidateAll() {
   pending_.clear();
-}
-
-bool OrganizationCoordinator::HasPending(uint64_t request_id) const {
-  return pending_.contains(request_id);
 }
 
 std::vector<uint64_t> OrganizationCoordinator::ChainVersions(
