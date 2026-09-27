@@ -50,20 +50,46 @@ TEST_F(AiProtocolTest, ClassificationRequestRoundTripsContext) {
   ASSERT_TRUE(body);
   auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
   ASSERT_TRUE(parsed);
-  EXPECT_EQ(*parsed->FindString("model"), "test-model");
-  const std::string* user_content =
-      (*parsed->FindList("messages"))[1].GetDict().FindString("content");
+  const std::string* model_name = parsed->FindString("model");
+  ASSERT_TRUE(model_name);
+  EXPECT_EQ(*model_name, "test-model");
+  const base::ListValue* messages = parsed->FindList("messages");
+  ASSERT_TRUE(messages);
+  ASSERT_EQ(messages->size(), 2u);
+  const base::DictValue* user_message = (*messages)[1].GetIfDict();
+  ASSERT_TRUE(user_message);
+  const std::string* user_content = user_message->FindString("content");
   ASSERT_TRUE(user_content);
-  auto description = base::JSONReader::ReadDict(*user_content);
+  auto description = base::JSONReader::ReadDict(*user_content, base::JSON_PARSE_RFC);
   ASSERT_TRUE(description);
-  EXPECT_EQ(*description->FindString("title"), "Benchmark Jev");
-  EXPECT_EQ(*description->FindString("url"), "https://example.com/bench");
-  EXPECT_EQ(*description->FindString("source"), "opened from tab A");
-  EXPECT_EQ(*description->FindString("excerpt"), "A short readable excerpt.");
-  EXPECT_EQ(*description->FindString("manual_placement"),
-            "the user manually placed this branch in \"Other\"");
-  EXPECT_EQ(*description->FindStringByDottedPath("tasks.0.key"), "task-1");
-  EXPECT_EQ(*description->FindStringByDottedPath("tasks.1.name"), "Travel");
+  const std::string* title = description->FindString("title");
+  ASSERT_TRUE(title);
+  EXPECT_EQ(*title, "Benchmark Jev");
+  const std::string* url = description->FindString("url");
+  ASSERT_TRUE(url);
+  EXPECT_EQ(*url, "https://example.com/bench");
+  const std::string* source = description->FindString("source");
+  ASSERT_TRUE(source);
+  EXPECT_EQ(*source, "opened from tab A");
+  const std::string* excerpt = description->FindString("excerpt");
+  ASSERT_TRUE(excerpt);
+  EXPECT_EQ(*excerpt, "A short readable excerpt.");
+  const std::string* placement = description->FindString("manual_placement");
+  ASSERT_TRUE(placement);
+  EXPECT_EQ(*placement, "the user manually placed this branch in \"Other\"");
+  const base::ListValue* tasks = description->FindList("tasks");
+  ASSERT_TRUE(tasks);
+  ASSERT_EQ(tasks->size(), 2u);
+  const base::DictValue* first_task = (*tasks)[0].GetIfDict();
+  ASSERT_TRUE(first_task);
+  const std::string* first_key = first_task->FindString("key");
+  ASSERT_TRUE(first_key);
+  EXPECT_EQ(*first_key, "task-1");
+  const base::DictValue* second_task = (*tasks)[1].GetIfDict();
+  ASSERT_TRUE(second_task);
+  const std::string* second_name = second_task->FindString("name");
+  ASSERT_TRUE(second_name);
+  EXPECT_EQ(*second_name, "Travel");
 }
 
 TEST_F(AiProtocolTest, ClassificationRequestRejectsEmptyInput) {
@@ -73,20 +99,20 @@ TEST_F(AiProtocolTest, ClassificationRequestRejectsEmptyInput) {
 
 TEST_F(AiProtocolTest, ClassificationParsesAndValidates) {
   auto answer = ParseClassificationResponse(WrapContent(R"({
-    "decision": "move", "target": "task-1", "confidence": 0.93})")));
+    "decision": "move", "target": "task-1", "confidence": 0.93})"));
   ASSERT_TRUE(answer);
   EXPECT_EQ(answer->choice, "task-1");
   EXPECT_DOUBLE_EQ(answer->confidence, 0.93);
   EXPECT_FALSE(answer->task_name);
 
   answer = ParseClassificationResponse(WrapContent(
-      R"({"decision": "new_task", "confidence": 0.95, "name": "  Benchmark Jev  "})")));
+      R"({"decision": "new_task", "confidence": 0.95, "name": "  Benchmark Jev  "})"));
   ASSERT_TRUE(answer);
   EXPECT_EQ(answer->choice, kNewTaskOption);
   EXPECT_EQ(*answer->task_name, u"Benchmark Jev");
 
   answer = ParseClassificationResponse(
-      WrapContent(R"({"decision": "leave", "confidence": 0.4})")));
+      WrapContent(R"({"decision": "leave", "confidence": 0.4})"));
   ASSERT_TRUE(answer);
   EXPECT_EQ(answer->choice, kScratchpadOption);
 }
@@ -100,7 +126,7 @@ TEST_F(AiProtocolTest, ClassificationAcceptsCodeFencedContent) {
 
 TEST_F(AiProtocolTest, NewTaskNameIsCappedAndOptional) {
   auto answer = ParseClassificationResponse(WrapContent(R"({
-    "decision": "new_task", "confidence": 0.95, "name": "  "})")));
+    "decision": "new_task", "confidence": 0.95, "name": "  "})"));
   ASSERT_TRUE(answer);
   EXPECT_FALSE(answer->task_name);
 

@@ -2,7 +2,7 @@
 
 **ur web, ur way**
 
-uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. The customized application has passed a full build and headless smoke test; native UI verification remains pending. Later product features remain planned.
+uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. The customized application has passed a full build and headless smoke test, and the automatic organization MVP passes its focused Chromium tests; live-provider and native UI verification remain pending. Later product features remain planned.
 
 [Product docs and roadmap](docs/README.md)
 
@@ -178,13 +178,15 @@ The uw patches, including the manual tab-tree integration, were checked against 
 
 On 2026-09-24, the customized application built and passed the headless smoke test on a 64 GiB Apple Silicon Mac with Xcode 27.0 and macOS SDK 27.0. The smoke test reported `uw 153.0.8010.53` and passed its isolated-profile navigation and JavaScript check.
 
+On 2026-09-27, the [automatic organization MVP](docs/plans/automatic-organization.md) built on the same host and passed the headless smoke test. The focused Chromium suites pass: `TabTreeTest.*`, `OrganizationCoordinatorTest.*`, `AiProtocolTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*` in `browser_tests`. Live-provider behavior checks remain pending.
+
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
 Pending native verification:
 
-1. Build Chromium's `unit_tests` target and run `TabTreeTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*`.
-2. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
-3. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
+1. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
+2. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
+3. Run the [automatic organization acceptance checks](docs/plans/automatic-organization.md#acceptance-checks) with a configured provider, including classification, generated naming, manual holds, pause, and undo feedback.
 4. Switch to horizontal tabs, restart, and confirm the choice persists. Check required extensions separately.
 
 Headless smoke testing does not establish that the native browser interface works.
