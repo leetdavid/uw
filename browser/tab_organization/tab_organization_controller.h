@@ -12,12 +12,18 @@
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/timer/timer.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/components/tab_organization/organization_coordinator.h"
 #include "uw/components/tab_organization/tab_tree.h"
 
 class BrowserWindowInterface;
+class GURL;
+class Profile;
 class TabStripModel;
 namespace ui {
 class SimpleMenuModel;
@@ -63,6 +69,7 @@ class TabOrganizationController : public TabStripModelObserver {
 
   TabTree& tree() { return tree_; }
   const TabTree& tree() const { return tree_; }
+  Profile* profile() const;
   std::optional<TreeId> IdFor(const tabs::TabInterface* tab) const;
   tabs::TabInterface* TabFor(const TreeId& id) const;
   std::vector<TreeId> SelectionFor(
@@ -85,6 +92,16 @@ class TabOrganizationController : public TabStripModelObserver {
   void EndTabDrag(bool completed);
   base::WeakPtr<TabOrganizationController> GetWeakPtr();
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
+
+  // Takes a pending automatic-organization notice for the sidebar, if any.
+  std::optional<std::u16string> TakeNotice();
+
+  // Validates both providers with live probe requests. Enables organization
+  // only when both succeed; otherwise leaves it disabled with a notice.
+  void ValidateProviders();
+
+  // Fires the classification pass immediately, bypassing the debounce timer.
+  void ClassifyNowForTesting();
 
  private:
   void OnTabStripModelChanged(
@@ -113,10 +130,32 @@ class TabOrganizationController : public TabStripModelObserver {
   std::optional<MoveTarget> GetMoveTarget(int command, const TreeId& id) const;
   std::vector<tabs::TabInterface*> ResolvePages(const std::vector<TreeId>& ids);
 
+  // Automatic organization: debounced background classification.
+  void OnConfigChanged();
+  bool AutomaticEnabled();
+  void TrackActivityAndSchedule();
+  void MaybeScheduleAutomatic();
+  void OnClassifyTimer();
+  void OnJevResponse(uint64_t request_id,
+                     RemoteModelClient::Outcome outcome);
+  void RequestTaskName(const TreeId& task,
+                       const std::vector<TreeId>& branch_pages);
+  void OnNamingResponse(TreeId task,
+                        uint64_t naming_version,
+                        RemoteModelClient::Outcome outcome);
+  void OnValidationResponse(bool is_jev,
+                            RemoteModelClient::Outcome outcome);
+  void CancelAutomatic();
+  std::string BranchSourceDescription(const TreeId& page) const;
+  std::vector<std::pair<std::string, std::string>> TaskOptions() const;
+
   const raw_ptr<BrowserWindowInterface> window_;
   const raw_ptr<TabStripModel> tabs_;
   TabTree tree_;
+  OrganizationCoordinator coordinator_;
   std::map<tabs::TabHandle, TreeId> pages_;
+  // Previously active tab. A lone sourceless new tab nests under it.
+  std::optional<TreeId> last_active_;
   std::vector<TreeId> dragged_;
   std::optional<TreeId> drop_parent_;
   std::optional<TreeId> drop_before_;
@@ -125,6 +164,32 @@ class TabOrganizationController : public TabStripModelObserver {
   base::CallbackListSubscription tree_subscription_;
   base::RepeatingClosureList changed_;
   ui::ScopedUnownedUserData<TabOrganizationController> user_data_;
+  // Automatic classification state. Activity revisions bump on title/URL
+  // changes; a newer revision supersedes older pending requests.
+  base::OneShotTimer classify_timer_;
+  std::map<TreeId, uint64_t> activity_;
+  struct PageSnapshot {
+    std::u16string title;
+    std::string url;
+  };
+  std::map<TreeId, PageSnapshot> snapshots_;
+  std::map<TreeId, uint64_t> dispatched_activity_;
+  struct PendingClassification {
+    std::unique_ptr<RemoteModelClient> loader;
+    TreeId root;
+  };
+  std::map<uint64_t, PendingClassification> pending_;
+  struct PendingNaming {
+    std::unique_ptr<RemoteModelClient> loader;
+    uint64_t manual_version = 0;
+  };
+  std::map<TreeId, PendingNaming> pending_naming_;
+  std::unique_ptr<RemoteModelClient> jev_probe_;
+  std::unique_ptr<RemoteModelClient> naming_probe_;
+  bool jev_probe_ok_ = false;
+  bool naming_probe_ok_ = false;
+  PrefChangeRegistrar pref_registrar_;
+  std::optional<std::u16string> notice_;
   base::WeakPtrFactory<TabOrganizationController> weak_factory_{this};
 };
 

@@ -266,20 +266,34 @@ diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc 
 index a96f4b8..ab709cb 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-@@ -26,6 +26,7 @@
+@@ -7,4 +7,5 @@
+ #include "chrome/browser/ui/layout_constants.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+ #include "chrome/browser/ui/views/tabs/common/dragged_tabs_container.h"
+ #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
+@@ -26,6 +27,8 @@
  #include "ui/views/view_targeter.h"
  #include "ui/views/view_targeter_delegate.h"
  #include "ui/views/view_utils.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/tab_organization/tab_tree_adapter.h"
  
  namespace {
  
-@@ -107,11 +108,15 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
+@@ -107,11 +110,22 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
    node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
        base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
                       base::Unretained(this)));
 +  if (collection_node_->orientation() == TabStripOrientation::kVertical) {
-+    auto adapter = std::make_unique<uw::TabTreeAdapter>(this, collection_node_);
++    auto* tab_strip_controller = collection_node_->GetController();
++    auto* controller =
++        tab_strip_controller
++            ? uw::TabOrganizationController::From(
++                  tab_strip_controller->GetBrowserView()->browser())
++            : nullptr;
++    auto adapter = std::make_unique<uw::TabTreeAdapter>(
++        this, collection_node_, controller);
 +    if (adapter->available())
 +      uw_tree_ = std::move(adapter);
 +  }
@@ -398,14 +412,14 @@ index a7cf799..1349771 100644
    // Sets the main-axis space allocated for this container during TabStripView
    // layout passes.
    void SetAvailableSpace(views::SizeBound space) { available_space_ = space; }
-@@ -83,6 +99,7 @@ class UnpinnedTabContainerView
-   const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
+@@ -76,6 +92,7 @@ class UnpinnedTabContainerView
+   void ResetCollectionNode();
  
-   base::CallbackListSubscription node_destroyed_subscription_;
+   raw_ptr<TabCollectionNode> collection_node_;
 +  std::unique_ptr<uw::TabTreeAdapter> uw_tree_;
- };
  
- #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
+   // The available main-axis space allocated by TabStripViewLayout.
+   views::SizeBound available_space_;
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 index 6c4e35d..29d8039 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc

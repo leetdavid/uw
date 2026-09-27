@@ -38,7 +38,7 @@ These are questions for uw, not agreed requirements or additional Horse claims.
 3. May automatic regrouping move individual pages, whole subtrees, or both, including extracting a subtree into its own task group?
 4. How should uw make live tab moves easy to follow, including moves into collapsed branches?
 
-Updated [roadmap estimates](plans/roadmap.md#implementability-estimates) account for tree-aware changes. uw's [agreed organization behavior](product.md#automatic-tab-organization) now allows selected tabs to move when intent is clear; Horse's docs do not validate that implementation or its feedback behavior.
+Updated [roadmap estimates](../plans/roadmap.md#implementability-estimates) account for tree-aware changes. uw's [agreed organization behavior](../product.md#automatic-tab-organization) now allows selected tabs to move when intent is clear; Horse's docs do not validate that implementation or its feedback behavior.
 
 [home]: https://browser.horse/
 [overview]: https://browser.horse/manual/basics/how-does-horse-browser-work

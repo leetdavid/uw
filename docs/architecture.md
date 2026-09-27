@@ -36,9 +36,9 @@ Implementability: **7/10** for this organization including ongoing Chromium upda
 
 ## Native tab tree
 
-The user has approved the [manual native tab-tree slice](plans/native-tab-tree.md). The existing patch only enables Chromium's native vertical-tab default; custom nesting and intent-based regrouping are not implemented yet. The [pinned-source investigation](chromium-tab-api-research.md) identifies reusable controls and the required layout/input adaptations.
+The user has approved the [manual native tab-tree slice](plans/native-tab-tree.md). The patch enables Chromium's native vertical-tab default and connects the manual tab tree. The customized build and headless smoke test pass; native UI verification remains pending. The [pinned-source investigation](research/chromium-tab-api-research.md) identifies the reused controls and layout/input adaptations.
 
-[Horse's documented hierarchy](horse-tab-organization-research.md) includes parent pages and non-page containers. Its organizing behavior does not establish a compatible implementation for uw. Trial the [agreed tree structure](product.md#automatic-tab-organization) against Chromium tabs, native Views, and session restoration. Check keyboard navigation, drag-and-drop, parent-tab lifecycle, and page continuity when branches move.
+[Horse's documented hierarchy](research/horse-tab-organization-research.md) includes parent pages and non-page containers. Its organizing behavior does not establish a compatible implementation for uw. Trial the [agreed tree structure](product.md#automatic-tab-organization) against Chromium tabs, native Views, and session restoration. Check keyboard navigation, drag-and-drop, parent-tab lifecycle, and page continuity when branches move.
 
 Use the ordinary feature-source layout above for substantial hierarchy logic. Keep tree state separate from its view so regrouping can be tested without driving the interface. Updated [implementability estimates](plans/roadmap.md#implementability-estimates) include this additional work.
 
@@ -48,7 +48,7 @@ The organization pause is global. It supports one hour, until next launch, and i
 
 ## Shared pinned tabs
 
-The [pinned-tab requirements](product.md#pinned-tabs) include a continuing live page session across windows. Sharing icon order and saved URLs alone does not satisfy that requirement. Arc's [documentation](arc-pinned-tabs-research.md) does not establish the Chromium ownership or presentation mechanism to reuse.
+The [pinned-tab requirements](product.md#pinned-tabs) include a continuing live page session across windows. Sharing icon order and saved URLs alone does not satisfy that requirement. Arc's [documentation](research/arc-pinned-tabs-research.md) does not establish the Chromium ownership or presentation mechanism to reuse.
 
 Implement the [confirmed pin interactions](product.md#pinned-tabs). A live pin transfers to the window that selects it; the previous window renders an inactive pinned view. Closing its owning window detaches the live session without discarding it. Sessions remain alive when the final window closes while uw runs. Navigation within the pin's scheme and registrable domain stays in the pin; off-site links use temporary Peek previews. Home replacement and manual home editing have different navigation behavior. Unpinning removes the shared pin and makes the live page a regular tab in its current window. After quit, launch a new tab and offer restoration rather than automatically restoring the session. Accepting restoration recovers pins with the regular session; dismissing it leaves the pins available for normal opening. Trial transfer, detachment, retention without a window, focus, navigation, previews, in-progress forms, media, resetting, home edits, unpinning, and restoration in Chromium. The prototype must show continuity when a pin transfers between windows, its owning window closes, and a new window opens after all others close. The existing window-local tab-tree proposal does not establish those capabilities.
 
@@ -89,7 +89,7 @@ Proposed integration:
 
 The [confident-placement rule](product.md#automatic-tab-organization) allows classification results to take effect without an LLM response. A clearer excerpt-informed result corrects the initial placement unless the user acted in between. Confidence calibration and failure behavior still need decisions and measured trials. Apply model results asynchronously and check them against current tab state so inference completion does not override an intervening manual action or newer navigation.
 
-Verify Jev's access model, endpoint contract, input limits, and terms before implementation. Measure end-to-end latency and intent accuracy on the target Mac; model-level speed claims alone are insufficient. If Jev is remote, include network time in the [agreed latency budget](product.md#organization-latency). The [required explicit opt-in](product.md#ai-connections) precedes any intent-context request. The integration is unimplemented. Implementability: **5/10**, including provider dependency, latency, and intent quality, pending the trial.
+Jev's HTTP contract is recorded in the [approved first slice](plans/automatic-organization.md): `POST https://api.typesafe.ai/v1/systemone` with model `jev-latest`, a structured state, and a Choice question returning the selected option, probabilities, and confidence. Verify access model, input limits, and terms before implementation. Measure end-to-end latency and intent accuracy on the target Mac; model-level speed claims alone are insufficient. The first remote release treats Jev as background correction; the [200 ms budget](product.md#organization-latency) remains a future milestone. The [required explicit opt-in](product.md#ai-connections) precedes any intent-context request. The integration is unimplemented. Implementability for the approved slice: **3/10**.
 
 ## Data and execution
 

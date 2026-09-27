@@ -221,8 +221,22 @@ void TabTree::Reparent(Node* node, Node* parent, size_t index, bool manual) {
   auto owned = model_.Remove(old_parent, old_index);
   model_.Add(parent, std::move(owned),
              std::min(index, parent->children().size()));
-  if (manual)
+  if (manual) {
     ++node->value.move_version;
+    ++node->value.manual_version;
+  }
+}
+
+void TabTree::ReparentAutomatic(Node* node, Node* parent, size_t index) {
+  Node* old_parent = node->parent();
+  const size_t old_index = old_parent->GetIndexOf(node).value();
+  if (old_parent == parent && old_index < index)
+    --index;
+  auto owned = model_.Remove(old_parent, old_index);
+  model_.Add(parent, std::move(owned),
+             std::min(index, parent->children().size()));
+  // Keep undo working without claiming a manual adjustment.
+  ++node->value.move_version;
 }
 
 bool TabTree::Move(const std::vector<TreeId>& ids,
@@ -248,7 +262,36 @@ bool TabTree::Move(const std::vector<TreeId>& ids,
              true);
   }
   Record(base::BindOnce(&TabTree::UndoMove, weak_factory_.GetWeakPtr(),
-                        std::move(placements), std::nullopt));
+                        std::move(placements), std::nullopt,
+                        /*was_manual=*/true));
+  Changed();
+  return true;
+}
+
+bool TabTree::MoveAutomatic(const std::vector<TreeId>& ids,
+                            const TreeId& parent,
+                            std::optional<TreeId> before) {
+  if (!CanMove(ids, parent))
+    return false;
+  auto roots = Normalize(ids);
+  Node* destination = Find(parent);
+  Node* anchor = before ? Find(*before) : nullptr;
+  if (destination == root() && anchor == scratchpad())
+    return false;
+  if (before && (!anchor || anchor->parent() != destination ||
+                 std::ranges::find(roots, *before) != roots.end()))
+    return false;
+  std::vector<Placement> placements;
+  for (const auto& id : roots)
+    placements.push_back(Remember(Find(id)));
+  for (const auto& id : roots) {
+    ReparentAutomatic(Find(id), destination,
+                      anchor ? destination->GetIndexOf(anchor).value()
+                             : destination->children().size());
+  }
+  Record(base::BindOnce(&TabTree::UndoMove, weak_factory_.GetWeakPtr(),
+                        std::move(placements), std::nullopt,
+                        /*was_manual=*/false));
   Changed();
   return true;
 }
@@ -272,13 +315,107 @@ std::optional<TreeId> TabTree::MakeTask(const std::vector<TreeId>& pages,
   for (const auto& id : roots)
     Reparent(Find(id), task, task->children().size(), true);
   Record(base::BindOnce(&TabTree::UndoMove, weak_factory_.GetWeakPtr(),
-                        std::move(placements), task_id));
+                        std::move(placements), task_id,
+                        /*was_manual=*/true));
   Changed();
   return task_id;
 }
 
+bool TabTree::PlaceBeside(const TreeId& page, const TreeId& sibling) {
+  Node* node = Find(page);
+  Node* other = Find(sibling);
+  if (!node || !other || node == other) {
+    return false;
+  }
+  if (node->value.kind != Kind::kPage ||
+      other->value.kind != Kind::kPage) {
+    return false;
+  }
+  Node* parent = other->parent();
+  if (!parent || !Accepts(parent, Kind::kPage)) {
+    return false;
+  }
+  Reparent(node, parent, parent->GetIndexOf(other).value() + 1, false);
+  Changed();
+  return true;
+}
+
+std::optional<TabTree::SiblingTarget> TabTree::DropTargetForAnchor(
+    const TreeId& anchor_id,
+    int levels,
+    bool after) const {
+  const Node* anchor = Find(anchor_id);
+  if (!anchor || !anchor->parent() ||
+      anchor->value.kind == Kind::kRoot ||
+      anchor->value.kind == Kind::kScratchpad) {
+    return std::nullopt;
+  }
+  if (levels > 0) {
+    return SiblingTarget{anchor_id, std::nullopt};
+  }
+  const Node* container = anchor->parent();
+  const Node* after_node = anchor;
+  int up = -levels;
+  while (up > 0 && container != scratchpad() && container != root()) {
+    after_node = container;
+    container = container->parent();
+    --up;
+  }
+  const auto& siblings = container->children();
+  const size_t index = container->GetIndexOf(after_node).value();
+  std::optional<TreeId> before;
+  if (after && index + 1 < siblings.size()) {
+    before = siblings[index + 1]->value.id;
+  } else if (!after) {
+    before = after_node->value.id;
+  }
+  return SiblingTarget{container->value.id, before};
+}
+
+std::optional<TreeId> TabTree::MakeTaskAutomatic(
+    const std::vector<TreeId>& pages,
+    std::u16string title) {
+  const auto roots = Normalize(pages);
+  if (roots.empty() || std::ranges::any_of(roots, [this](const TreeId& id) {
+        return Find(id)->value.kind != Kind::kPage;
+      }))
+    return std::nullopt;
+  Node* source_task = TaskFor(roots.front());
+  Node* parent = source_task ? source_task->parent() : root();
+  const size_t index =
+      source_task ? parent->GetIndexOf(source_task).value() + 1 : 1;
+  std::vector<Placement> placements;
+  for (const auto& id : roots)
+    placements.push_back(Remember(Find(id)));
+  Node* task = Add(Kind::kTask, std::move(title), parent, index);
+  const TreeId task_id = task->value.id;
+  for (const auto& id : roots)
+    ReparentAutomatic(Find(id), task, task->children().size());
+  Record(base::BindOnce(&TabTree::UndoMove, weak_factory_.GetWeakPtr(),
+                        std::move(placements), task_id,
+                        /*was_manual=*/false));
+  Changed();
+  return task_id;
+}
+
+void TabTree::SetAutomaticTaskTitle(const TreeId& id, std::u16string title) {
+  Node* node = Find(id);
+  if (!node || node->value.kind != Kind::kTask || title.empty() ||
+      node->GetTitle() == title)
+    return;
+  // Amends the creating automatic action: no version bump, no extra undo.
+  model_.SetTitle(node, title);
+  Changed();
+}
+
+uint64_t TabTree::ManualVersion(const TreeId& id) const {
+  const Node* node = Find(id);
+  return node ? node->value.manual_version : 0;
+}
+
 void TabTree::UndoMove(std::vector<Placement> placements,
-                       std::optional<TreeId> created_task) {
+                       std::optional<TreeId> created_task,
+                       bool was_manual) {
   for (auto it = placements.rbegin(); it != placements.rend(); ++it) {
     Node* node = Find(it->id);
     if (!node || node->value.move_version != it->expected_version)
@@ -316,6 +453,9 @@ void TabTree::UndoMove(std::vector<Placement> placements,
       index = std::max<size_t>(1, index);
     Reparent(node, destination, index, false);
     --node->value.move_version;
+    if (was_manual) {
+      --node->value.manual_version;
+    }
   }
   if (created_task) {
     if (Node* node = Find(*created_task); node && node->value.move_version == 0)
@@ -331,6 +471,7 @@ void TabTree::RenameTask(const TreeId& id, std::u16string title) {
     return;
   const std::u16string old_title = node->GetTitle();
   model_.SetTitle(node, title);
+  ++node->value.manual_version;
   const uint64_t expected_version = ++node->value.move_version;
   Record(base::BindOnce(&TabTree::UndoRename, weak_factory_.GetWeakPtr(), id,
                         title, old_title, expected_version));
@@ -346,6 +487,7 @@ void TabTree::UndoRename(TreeId id,
       node->value.move_version == expected_version) {
     model_.SetTitle(node, previous);
     --node->value.move_version;
+    --node->value.manual_version;
     Changed();
   }
 }

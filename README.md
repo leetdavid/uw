@@ -2,7 +2,7 @@
 
 **ur web, ur way**
 
-uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. These customizations have passed source-level checks; the customized application still needs a full build and UI verification. Later product features remain planned.
+uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. The customized application has passed a full build and headless smoke test; native UI verification remains pending. Later product features remain planned.
 
 [Product docs and roadmap](docs/README.md)
 
@@ -88,14 +88,14 @@ pnpm run build --help
 After a successful build, launch the application with a separate development profile:
 
 ```sh
-checkout="$(pnpm --silent run chromium root)"
-open -n "$checkout/src/out/uw/uw.app" --args \
-  --user-data-dir="$HOME/Library/Application Support/uw-dev"
+pnpm run launch
 ```
 
-Reuse this command to keep your development profile's settings and extensions. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it.
+`launch` starts a new `uw.app` instance and returns without waiting for it to close. It uses `~/Library/Application Support/uw-dev` to keep development settings and extensions separate. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it.
 
-Launching `uw.app` normally uses `~/Library/Application Support/uw`. The command above keeps development browsing in `uw-dev`. Profiles without an explicit tab-orientation preference start with vertical tabs. The upstream tab context menu can switch back to horizontal tabs, and that choice persists.
+Launching `uw.app` normally uses `~/Library/Application Support/uw`. Profiles without an explicit tab-orientation preference start with vertical tabs. The upstream tab context menu can switch back to horizontal tabs, and that choice persists.
+
+For current manual test scenarios and known limits, see [Try the current build](docs/try-uw.md).
 
 ## Customizing Chromium
 
@@ -176,17 +176,16 @@ The smoke test uses incognito because normal-profile `--dump-dom` loaded the pag
 
 The uw patches, including the manual tab-tree integration, were checked against files retrieved from the exact pinned Chromium commit. The complete series applies, verifies, reverses, and reapplies idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking and all 46 tooling tests pass. The tests cover ordered patches, source links, updates and removals, conflicts, interruption recovery, and preservation of local work.
 
-The current 16 GiB host has no Chromium checkout. On 2026-09-23, `doctor` reports unavailable Xcode and Metal tooling, an unusable `curl` on PATH, and 43 GiB free against the 100 GiB fresh-checkout requirement. No self-hosted runner is registered for this repository. The earlier 64 GiB baseline result does not verify this customized application.
+On 2026-09-24, the customized application built and passed the headless smoke test on a 64 GiB Apple Silicon Mac with Xcode 27.0 and macOS SDK 27.0. The smoke test reported `uw 153.0.8010.53` and passed its isolated-profile navigation and JavaScript check.
 
-The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation is complete; implementation and native verification require a configured Chromium build host.
+The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
-Pending on a build host:
+Pending native verification:
 
-1. Run sync, build, and smoke. Confirm `uw.app` and `uw <pinned version>`.
-2. Build Chromium's `unit_tests` target and run `TabTreeTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*`.
-3. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
-4. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
-5. Switch to horizontal tabs, restart, and confirm the choice persists. Check required extensions separately.
+1. Build Chromium's `unit_tests` target and run `TabTreeTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*`.
+2. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
+3. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
+4. Switch to horizontal tabs, restart, and confirm the choice persists. Check required extensions separately.
 
 Headless smoke testing does not establish that the native browser interface works.
 

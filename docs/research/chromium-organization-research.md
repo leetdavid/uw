@@ -1,8 +1,8 @@
 # Chromium code organization research
 
 Researched 2026-09-20 using GitHub's API through `gh`. Findings describe the pinned upstream code, not features implemented in uw.
-Read alongside [architecture](architecture.md), the [docs index](README.md), and the [current build foundation](../README.md).
-uw keeps Chromium in an ignored checkout. This note supplies evidence for the [current source-organization guidance](architecture.md#code-organization).
+Read alongside [architecture](../architecture.md), the [docs index](../README.md), and the [current build foundation](../../README.md).
+uw keeps Chromium in an ignored checkout. This note supplies evidence for the [current source-organization guidance](../architecture.md#code-organization).
 
 ## Inspected snapshots
 
@@ -89,7 +89,7 @@ The points below are research judgments, conditional on uw choosing a source-for
 - Separate platform configuration from shared behavior first. Separate platform repositories add submodule-pin and release coordination; Helium demonstrates this arrangement, while Brave demonstrates platform-conditioned integration in one core repo. Repository splitting is an independent decision. [M1], [L1], [W1], [B17]
 - Both projects own Python tooling. Copying their build scripts wholesale would conflict with uw's TypeScript-tooling rule. Chromium's upstream Python dependency still remains, as documented in uw's [README](../README.md#build-host-requirements).
 
-Illustrative trial estimates use the [roadmap's convention](plans/roadmap.md#implementability-estimates), not measured results or new commitments: ordinary product files with a small ordered patch set **7/10**; shared/platform patch-series organization **7/10**; a Brave-style general override/rewrite system **4/10**. Ongoing Chromium updates dominate the uncertainty.
+Illustrative trial estimates use the [roadmap's convention](../plans/roadmap.md#implementability-estimates), not measured results or new commitments: ordinary product files with a small ordered patch set **7/10**; shared/platform patch-series organization **7/10**; a Brave-style general override/rewrite system **4/10**. Ongoing Chromium updates dominate the uncertainty.
 The missing evidence for uw is a completed customized build followed by a Chromium update, measuring patch repair and browser-test behavior. See [current verification status](../README.md#customization-verification).
 
 ## Primary sources

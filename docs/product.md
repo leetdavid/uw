@@ -181,8 +181,9 @@ Agreed scope: the first tab-management release focuses on organization. Infer th
 
 Agreed:
 
-- Use tree-style tabs with nested organization, inspired by [Horse Browser](horse-tab-organization-research.md). Task groups can contain tabs and nested task groups. Individual page tabs can have child tabs.
+- Use tree-style tabs with nested organization, inspired by [Horse Browser](research/horse-tab-organization-research.md). Task groups can contain tabs and nested task groups. Individual page tabs can have child tabs.
 - Preserve standard link navigation. Same-tab navigation stays in the current tab; a link opened as a new tab becomes a child of its source tab, including through Cmd-click or middle-click. Intent-based organization can later move it.
+- Agreed: a lone new tab without a source link, such as Cmd+T, opens directly beneath the previously active tab as its sibling. Restored sessions and bulk opens keep their saved placement.
 - Closing a regular tab closes only that page. Its children move up one level, preserving their order and remaining descendants. A separate "Close branch" action closes the selected branch and all its descendants.
 - Ordinary parent-tab navigation keeps its children attached. A clear change of browsing task is required before the organizer moves the parent and promotes children that still serve the original task.
 - When a parent tab changes activity and moves to another task, children that still serve the original task remain there. Promote those children one level in the old location, preserving their order and subtrees. This automatic reclassification moves the repurposed parent, unlike an explicit whole-branch extraction.
@@ -213,6 +214,8 @@ Agreed:
 ### Organization latency
 
 Agreed: the initial whole fast path must complete within **200 ms**, measured from title, URL, and source-tab relationship becoming available to visible placement. This includes preprocessing, queuing, classification, and applying an eligible result to the interface. Apply eligible moves immediately, without adding a delay for the user to finish interacting with the sidebar.
+
+Agreed for the first remote release in [Automatic organization](plans/automatic-organization.md): Jev runs as background correction. A valid late result may still organize its branch. The 200 ms visible-placement fast path remains a future performance milestone for that release, not a claim the remote integration makes.
 
 Reference hardware, representative input sizes and task counts, and cold-start expectations still need definition. The latency requirement is not yet benchmarked.
 

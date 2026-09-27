@@ -59,6 +59,18 @@ A set of related changes to the tab tree, such as creating a task group and movi
 **Task proposal**:
 The organizer's suggestion that a set of tabs represents a separate browsing task.
 
+**Classification call**:
+One LLM request that decides a tab branch's placement — leave in Scratchpad, move to an existing task, or create a new task — with a confidence value, and supplies the name when it creates a task.
+
+**Provisional task name**:
+The `New task` title shown immediately when automatic organization creates a task. The classification call's name replaces it.
+
+**Jev classification**:
+A structured Jev decision about a tab's relationship to existing tasks or a new task, with a confidence value. It does not name new tasks. Part of the later Jev fast path.
+
+**Task naming call**:
+A separate LLM request that creates the user-visible name for a newly created task after Jev has classified it as a new task. Part of the later Jev fast path.
+
 **User-directed mode**:
 An organization mode in which the user accepts or rejects task proposals while routine tab placement remains automatic.
 

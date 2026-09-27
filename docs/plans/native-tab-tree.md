@@ -1,6 +1,6 @@
 # Native tab tree: approved first slice
 
-Status: the user approved this staged plan and implementation of the first slice after the product interview. The source/API investigation and source implementation are complete. Native compilation and verification are pending a usable Chromium build host.
+Status: the user approved this staged plan and implementation of the first slice after the product interview. The source/API investigation, source implementation, customized build, and headless smoke test are complete. Native UI verification remains pending.
 
 Implementability: **6/10** for the first slice. The [roadmap](roadmap.md#implementability-estimates) scores later automation and shared live pins separately. Scores include integration and maintenance, not progress.
 
@@ -19,7 +19,7 @@ The approval defers Jev/LLM automation and shared live pins to measured prototyp
 
 ## Existing Chromium support
 
-Use the exact [source investigation](../chromium-tab-api-research.md) when implementing and refreshing the patches.
+Use the exact [source investigation](../research/chromium-tab-api-research.md) when implementing and refreshing the patches.
 
 - Keep `TabStripModel` responsible for real tabs and `WebContents` lifetime.
 - Reuse `TabView`, the existing selection controller, and native tab-drag infrastructure. They already supply favicons, page-state indicators, close buttons, multi-selection, and ordinary tab actions.
@@ -33,7 +33,7 @@ Use the exact [source investigation](../chromium-tab-api-research.md) when imple
 
 Prepare the pinned customized browser and build it on a host satisfying the [build requirements](../../README.md#build-host-requirements). The current preparation links tracked product source into `src/uw/` after applying the patch series. Record a working baseline before adapting the tab views.
 
-The current host fails preflight and has no managed Chromium checkout. No self-hosted runner is currently registered for this repository. See the latest [verification status](../../README.md#customization-verification).
+See the latest [verification status](../../README.md#customization-verification). The next work is native UI and focused Chromium-test verification, not another source bootstrap.
 
 ### 2. Add window-owned hierarchy and commands
 
@@ -71,7 +71,7 @@ Use native unit/browser tests for the model and integration. Run UI checks on th
 6. Collapse choices, task names, and sibling order survive view reconstruction. Existing pins, native groups/splits, ordinary shortcuts, and horizontal mode remain usable.
 7. A restored session recovers hierarchy and expansion metadata using the correct restored tabs.
 
-Run repository checks with `pnpm run check`. On the build host, run `gn check`, compile the browser and relevant test targets, then execute the focused suites identified in the [API research](../chromium-tab-api-research.md#gn-ownership-and-verification).
+Run repository checks with `pnpm run check`. On the build host, run `gn check`, compile the browser and relevant test targets, then execute the focused suites identified in the [API research](../research/chromium-tab-api-research.md#gn-ownership-and-verification).
 
 ## Later stages
 

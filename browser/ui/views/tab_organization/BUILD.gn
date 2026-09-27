@@ -8,16 +8,35 @@ source_set("tab_tree_adapter") {
     "//uw/browser/tab_organization",
   ]
   deps = [
+    ":ai_setup_dialog",
     "//chrome:strings",
     "//chrome/browser:browser_public_dependencies",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/browser/ui/views/tabs/common:common",
     "//ui/accessibility:ax_base",
-    "//ui/base/dragdrop",
     "//ui/base/dragdrop:types",
     "//ui/compositor",
     "//ui/gfx/geometry",
     "//ui/menus",
+  ]
+}
+
+source_set("ai_setup_dialog") {
+  sources = [ "ai_setup_dialog.cc", "ai_setup_dialog.h" ]
+  public_deps = [
+    "//base",
+    "//ui/views",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser/profiles:profile",
+    "//components/prefs",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/menus",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/components/tab_organization:tab_tree",
   ]
 }

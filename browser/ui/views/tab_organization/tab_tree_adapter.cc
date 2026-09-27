@@ -23,6 +23,7 @@
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/interaction/element_identifier.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/compositor/layer_tree_owner.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -33,6 +34,7 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/ui/views/tab_organization/ai_setup_dialog.h"
 
 namespace uw {
 namespace {
@@ -41,6 +43,9 @@ constexpr int kIndent = 16;
 constexpr int kPadding = 8;
 constexpr int kHeaderHeight = 32;
 constexpr int kDisclosureWidth = 20;
+// Organize-menu command for provider setup. Outside the controller's undoable
+// tree-command range.
+constexpr int kSetupAutomatic = 57000;
 DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kTaskNameField);
 
 class TaskNameDelegate : public ui::DialogModelDelegate {
@@ -61,19 +66,6 @@ class TaskNameDelegate : public ui::DialogModelDelegate {
 
 }  // namespace
 
-const tabs::TabInterface* FindFirstTab(const TabCollectionNode* node) {
-  if (node->type() == TabCollectionNode::Type::TAB) {
-    return std::get<tabs::ConstDanglingUntriagedTabInterface>(
-               node->GetNodeData())
-        .get();
-  }
-  for (const auto& child : node->children()) {
-    if (const auto* tab = FindFirstTab(child.get()))
-      return tab;
-  }
-  return nullptr;
-}
-
 const tabs::TabInterface* TabForNode(const TabCollectionNode* node) {
   return node->type() == TabCollectionNode::Type::TAB
              ? std::get<tabs::ConstDanglingUntriagedTabInterface>(
@@ -82,12 +74,10 @@ const tabs::TabInterface* TabForNode(const TabCollectionNode* node) {
              : nullptr;
 }
 
-TabTreeAdapter::TabTreeAdapter(views::View* host, TabCollectionNode* collection)
+TabTreeAdapter::TabTreeAdapter(views::View* host,
+                               TabCollectionNode* collection,
+                               TabOrganizationController* controller)
     : host_(host), collection_(collection) {
-  const auto* first_tab = FindFirstTab(collection);
-  auto* controller = first_tab ? TabOrganizationController::From(
-                                     first_tab->GetBrowserWindowInterface())
-                               : nullptr;
   if (!controller)
     return;
   controller_ = controller->GetWeakPtr();
@@ -98,10 +88,12 @@ TabTreeAdapter::TabTreeAdapter(views::View* host, TabCollectionNode* collection)
               self->OpenMenu(self->organize_->GetBoundsInScreen().bottom_left(),
                              ui::mojom::MenuSourceType::kNone);
           },
-          weak_factory_.GetWeakPtr()),
-      l10n_util::GetStringUTF16(IDS_UW_ORGANIZE)));
+           weak_factory_.GetWeakPtr()),
+       l10n_util::GetStringUTF16(IDS_UW_ORGANIZE)));
+  organize_->SetTextSubpixelRenderingEnabled(false);
   scratchpad_ = host_->AddChildView(std::make_unique<views::Label>(
       l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD)));
+  scratchpad_->SetSubpixelRenderingEnabled(false);
   scratchpad_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   subscription_ = controller->Observe(base::BindRepeating(
       &TabTreeAdapter::Refresh, weak_factory_.GetWeakPtr()));
@@ -110,19 +102,79 @@ TabTreeAdapter::TabTreeAdapter(views::View* host, TabCollectionNode* collection)
 
 TabTreeAdapter::~TabTreeAdapter() {
   runner_.reset();
+  notice_timer_.Stop();
+  std::vector<views::View*> owned;
+  owned.reserve(tasks_.size() + disclosures_.size() + 3);
   for (const auto& [id, view] : tasks_)
-    host_->RemoveChildViewT(view.get());
+    owned.push_back(view.get());
+  tasks_.clear();
   for (const auto& [id, view] : disclosures_)
-    host_->RemoveChildViewT(view.get());
-  if (organize_)
-    host_->RemoveChildViewT(organize_.get());
-  if (scratchpad_)
-    host_->RemoveChildViewT(scratchpad_.get());
+    owned.push_back(view.get());
+  disclosures_.clear();
+  if (organize_) {
+    owned.push_back(organize_.get());
+    organize_ = nullptr;
+  }
+  if (scratchpad_) {
+    owned.push_back(scratchpad_.get());
+    scratchpad_ = nullptr;
+  }
+  if (notice_) {
+    owned.push_back(notice_.get());
+    notice_ = nullptr;
+  }
+  for (auto* view : owned)
+    RemoveOwnedView(view);
+}
+
+void TabTreeAdapter::RemoveOwnedView(views::View* view) {
+  removing_.insert(view);
+  host_->RemoveChildViewT(view);
+  removing_.erase(view);
+}
+
+void TabTreeAdapter::ShowOrganizationNotice(std::u16string text) {
+  ClearNotice();
+  if (text.empty() || !controller_) {
+    return;
+  }
+  auto button = std::make_unique<views::LabelButton>(
+      base::BindRepeating(&TabTreeAdapter::OnNoticeActivated,
+                          weak_factory_.GetWeakPtr()),
+      std::move(text));
+  button->SetTextSubpixelRenderingEnabled(false);
+  button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  notice_ = host_->AddChildView(std::move(button));
+  notice_timer_.Start(FROM_HERE, base::Seconds(10),
+                      base::BindOnce(&TabTreeAdapter::ClearNotice,
+                                     base::Unretained(this)));
+  host_->InvalidateLayout();
+}
+
+void TabTreeAdapter::ClearNotice() {
+  notice_timer_.Stop();
+  if (!notice_) {
+    return;
+  }
+  auto* notice = notice_.get();
+  notice_ = nullptr;
+  RemoveOwnedView(notice);
+  host_->InvalidateLayout();
+}
+
+void TabTreeAdapter::OnNoticeActivated() {
+  if (controller_) {
+    controller_->Undo();
+  }
+  ClearNotice();
 }
 
 void TabTreeAdapter::Refresh() {
   if (!controller_)
     return;
+  if (auto notice = controller_->TakeNotice()) {
+    ShowOrganizationNotice(std::move(*notice));
+  }
   const auto selection = controller_->SelectionFor();
   if (selection != last_tab_selection_)
     selected_task_.reset();
@@ -139,6 +191,7 @@ void TabTreeAdapter::Refresh() {
             base::BindRepeating(&TabTreeAdapter::SelectTask,
                                 weak_factory_.GetWeakPtr(), id),
             node->GetTitle());
+        button->SetTextSubpixelRenderingEnabled(false);
         button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
         button->set_context_menu_controller(this);
         button->set_drag_controller(this);
@@ -163,6 +216,7 @@ void TabTreeAdapter::Refresh() {
                     u"")));
       }
       auto* button = disclosures_.at(id).get();
+      button->SetTextSubpixelRenderingEnabled(false);
       button->SetText(node->value.collapsed ? u"\u25b8" : u"\u25be");
       button->GetViewAccessibility().SetName(l10n_util::GetStringUTF16(
           node->value.collapsed ? IDS_UW_EXPAND_BRANCH
@@ -173,12 +227,19 @@ void TabTreeAdapter::Refresh() {
       visit(child.get());
   };
   visit(tree.root());
+  // Stale views are hidden, not destroyed: the host's animating layout
+  // manager retains raw pointers to laid-out children across animation
+  // frames, so freeing a view mid-life trips the dangling-pointer detector
+  // even after the recalculated target drops it. Hidden views stay alive
+  // (and invisible to events, layout, and accessibility) until adapter
+  // teardown, whose removal path the browser tests cover. Deletions only
+  // happen for discarded tasks, so the retained set stays small.
   for (auto it = tasks_.begin(); it != tasks_.end();) {
     if (tasks.contains(it->first)) {
       ++it;
       continue;
     }
-    host_->RemoveChildViewT(it->second.get());
+    it->second->SetVisible(false);
     it = tasks_.erase(it);
   }
   for (auto it = disclosures_.begin(); it != disclosures_.end();) {
@@ -186,11 +247,10 @@ void TabTreeAdapter::Refresh() {
       ++it;
       continue;
     }
-    host_->RemoveChildViewT(it->second.get());
+    it->second->SetVisible(false);
     it = disclosures_.erase(it);
   }
   host_->InvalidateLayout();
-  host_->PreferredSizeChanged();
 }
 
 views::ProposedLayout TabTreeAdapter::CalculateLayout(
@@ -211,6 +271,10 @@ views::ProposedLayout TabTreeAdapter::CalculateLayout(
   };
   place(organize_, true, kPadding, kHeaderHeight);
   y += kHeaderHeight;
+  if (notice_) {
+    place(notice_.get(), true, kPadding, kHeaderHeight);
+    y += kHeaderHeight;
+  }
   std::map<TreeId, views::View*> tab_views;
   for (const auto& child : collection_->children()) {
     if (const auto* tab = TabForNode(child.get()))
@@ -274,8 +338,11 @@ views::ProposedLayout TabTreeAdapter::CalculateLayout(
     place(child, true, kPadding, height);
     y += height + 2;
   }
-  for (auto* child : host_->children()) {
-    if (!placed.contains(child))
+  for (const auto& child : host_->children()) {
+    // Views mid-removal are still attached while the layout manager
+    // processes its synchronous removal notification. Omitting them keeps
+    // the recalculated target free of soon-destroyed views.
+    if (!placed.contains(child) && !removing_.contains(child))
       layout.child_layouts.emplace_back(child, false, gfx::Rect());
   }
   layout.host_size = gfx::Size(width, y);
@@ -311,6 +378,9 @@ void TabTreeAdapter::OpenMenu(const gfx::Point& point,
   menu_->AddItem(TabOrganizationController::kRenameTask,
                  l10n_util::GetStringUTF16(IDS_UW_RENAME_TASK));
   TabOrganizationController::AppendCommands(menu_.get());
+  menu_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_->AddItem(kSetupAutomatic,
+                 l10n_util::GetStringUTF16(IDS_UW_AUTO_SETUP));
   runner_ = std::make_unique<views::MenuRunner>(
       menu_.get(), views::MenuRunner::CONTEXT_MENU);
   runner_->RunMenuAt(host_->GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
@@ -318,12 +388,23 @@ void TabTreeAdapter::OpenMenu(const gfx::Point& point,
 }
 
 bool TabTreeAdapter::IsCommandIdEnabled(int command) const {
+  if (command == kSetupAutomatic) {
+    return controller_ != nullptr;
+  }
   return controller_ && controller_->CanExecute(command, menu_selection_);
 }
 
 void TabTreeAdapter::ExecuteCommand(int command, int) {
-  if (!controller_ || !controller_->CanExecute(command, menu_selection_))
+  if (!controller_) {
     return;
+  }
+  if (command == kSetupAutomatic) {
+    AiSetupDialog::Show(organize_, controller_->GetWeakPtr());
+    return;
+  }
+  if (!controller_->CanExecute(command, menu_selection_)) {
+    return;
+  }
   if (command == TabOrganizationController::kRenameTask) {
     EditName(menu_selection_.front());
     return;
@@ -388,11 +469,22 @@ std::optional<TabTreeAdapter::Destination> TabTreeAdapter::DropDestination(
       continue;
     if (node->value.kind == TabTree::Kind::kScratchpad)
       return Destination{node->value.id, std::nullopt};
+    // Horizontal displacement pulls the branch in or out of nesting levels:
+    // dragging right nests under the anchor row, dragging left outdents past
+    // ancestors (one level per indent width). Near the row's own indent the
+    // existing vertical behavior applies.
+    const int dx = point.x() - row.bounds.x();
+    const bool after = point.y() > row.bounds.CenterPoint().y();
+    if (dx >= kIndent / 2 || dx <= -kIndent / 2) {
+      const int levels = dx > 0 ? 1 : -std::max(1, -dx / kIndent);
+      if (auto target = tree.DropTargetForAnchor(row.id, levels, after))
+        return Destination{target->parent, target->before};
+    }
     // Middle third nests; edges insert before/after the target branch.
     if (point.y() > row.bounds.y() + row.bounds.height() / 3 &&
         point.y() < row.bounds.bottom() - row.bounds.height() / 3)
       return Destination{row.id, std::nullopt};
-    if (point.y() <= row.bounds.CenterPoint().y())
+    if (!after)
       return Destination{node->parent()->value.id, row.id};
     const size_t next = node->parent()->GetIndexOf(node).value() + 1;
     const auto& siblings = node->parent()->children();

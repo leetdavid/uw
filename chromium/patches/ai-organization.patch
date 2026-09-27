@@ -1,0 +1,66 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -309,4 +309,16 @@
+       <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the descendants of a collapsed tab branch.">Expand branch</message>
+       <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the descendants of a tab branch.">Collapse branch</message>
+       <message name="IDS_UW_TOGGLE_BRANCH" desc="Expands or collapses the selected tab branch.">Expand or collapse branch</message>
++      <message name="IDS_UW_AUTO_MOVED_TASK" desc="Sidebar notice after automatic organization moves a branch.">Moved to <ph name="TASK_NAME">$1<ex>Research</ex></ph></message>
++      <message name="IDS_UW_AUTO_CREATED_TASK" desc="Sidebar notice after automatic organization creates a task.">Created task <ph name="TASK_NAME">$1<ex>Benchmark Jev</ex></ph></message>
++      <message name="IDS_UW_AUTO_SETUP" desc="Organize menu item opening provider setup.">Set up automatic organization…</message>
++      <message name="IDS_UW_AUTO_SETUP_TITLE" desc="Provider setup dialog title.">Set up automatic organization</message>
++      <message name="IDS_UW_AUTO_SETUP_JEV_ENDPOINT" desc="Provider setup field label.">Jev endpoint</message>
++      <message name="IDS_UW_AUTO_SETUP_JEV_KEY" desc="Provider setup field label.">Jev API key</message>
++      <message name="IDS_UW_AUTO_SETUP_NAMING_ENDPOINT" desc="Provider setup field label.">Naming endpoint</message>
++      <message name="IDS_UW_AUTO_SETUP_NAMING_MODEL" desc="Provider setup field label.">Naming model</message>
++      <message name="IDS_UW_AUTO_SETUP_NAMING_KEY" desc="Provider setup field label.">Naming API key</message>
++      <message name="IDS_UW_AUTO_SETUP_ERROR" desc="Provider setup validation failure.">Could not validate one or both providers. Check the endpoints, model, and keys.</message>
++      <message name="IDS_UW_AUTO_SETUP_VALIDATING" desc="Provider setup progress.">Checking providers…</message>
++      <message name="IDS_UW_AUTO_ENABLED" desc="Sidebar notice after both providers validate.">Automatic organization is on</message>
+       <!-- Access Code Cast specific strings -->
+       <part file="access_code_cast_strings.grdp" />
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+index 3b46ea7613..5d2623c93e 100644
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -206,6 +206,7 @@ source_set("impl") {
+     "//services/preferences/tracked",
+     "//services/preferences/tracked:features",
+     "//ui/webui:buildflags",
++    "//uw/browser/tab_organization:ai_connection",
+   ]
+
+   if (enable_print_preview) {
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+index 6ccdf1e52f..60df06ad2f 100644
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -560,6 +560,8 @@
+ #include "chrome/browser/ui/side_search/side_search_prefs.h"
+ #endif
+
++#include "uw/browser/tab_organization/ai_connection.h"
++
+ #if BUILDFLAG(ENABLE_SESSION_SERVICE)
+ #include "chrome/browser/sessions/session_data_service.h"
+ #include "chrome/browser/sessions/session_service_log.h"
+@@ -1777,6 +1779,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+   contextual_search::ContextualSearchService::RegisterProfilePrefs(registry);
+   contextual_tasks::RegisterProfilePrefs(registry);
+   registry->RegisterIntegerPref(prefs::kContextualTasksNextPanelOpenCount, 0);
++  uw::RegisterAiConnectionProfilePrefs(registry);
+   registry->RegisterBooleanPref(prefs::kCtrlTabMru, false);
+   cross_device::RegisterProfilePrefs(registry);
+   enterprise::RegisterIdentifiersProfilePrefs(registry);
+diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
+index 62e11c5a7a..b65c74be2f 100644
+--- a/chrome/test/BUILD.gn
++++ b/chrome/test/BUILD.gn
+@@ -2799,6 +2799,7 @@ if (!is_android) {
+       "//ui/webui:buildflags",
+       "//ui/webui:test_support",
+       "//ui/webui/resources/cr_components/history_clusters:mojo_bindings",
++      "//uw/browser/tab_organization:browser_tests",
+     ]
+
+     # TODO(crbug.com/428666921): Remove this dependency when

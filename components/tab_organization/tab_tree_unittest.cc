@@ -182,5 +182,69 @@ TEST_F(TabTreeTest, InvalidRestorationDoesNotCreatePhantomTasks) {
   EXPECT_EQ(restored.Find(restored_page)->parent(), restored.scratchpad());
 }
 
+TEST_F(TabTreeTest, PlaceBesideInsertsAfterSiblingWithoutUndo) {
+  auto a = tree_.AddPage(u"A");
+  auto b = tree_.AddPage(u"B");
+  auto c = tree_.AddPage(u"C");
+  EXPECT_TRUE(tree_.PlaceBeside(c, a));
+  EXPECT_EQ(tree_.PageOrder(), (std::vector<TreeId>{a, c, b}));
+  EXPECT_EQ(tree_.Find(c)->parent(), tree_.scratchpad());
+  // Structural placement: no undo entry, no manual mark.
+  EXPECT_FALSE(tree_.CanUndo());
+  EXPECT_EQ(tree_.ManualVersion(c), 0u);
+}
+
+TEST_F(TabTreeTest, PlaceBesideRejectsInvalidPlacements) {
+  auto a = tree_.AddPage(u"A");
+  EXPECT_FALSE(tree_.PlaceBeside(a, a));
+  EXPECT_FALSE(tree_.PlaceBeside(TreeId("missing"), a));
+  EXPECT_FALSE(tree_.PlaceBeside(a, TreeId("missing")));
+  auto task = tree_.MakeTask({a}, u"Task").value();
+  EXPECT_FALSE(tree_.PlaceBeside(a, task));
+}
+
+TEST_F(TabTreeTest, DropTargetInsertsBeforeAndAfterAtAnchorLevel) {
+  auto a = tree_.AddPage(u"A");
+  auto b = tree_.AddPage(u"B");
+  auto before = tree_.DropTargetForAnchor(b, 0, /*after=*/false);
+  ASSERT_TRUE(before);
+  EXPECT_EQ(before->parent, tree_.scratchpad()->value.id);
+  EXPECT_EQ(before->before, b);
+  auto after = tree_.DropTargetForAnchor(a, 0, /*after=*/true);
+  ASSERT_TRUE(after);
+  EXPECT_EQ(after->parent, tree_.scratchpad()->value.id);
+  EXPECT_EQ(after->before, b);
+}
+
+TEST_F(TabTreeTest, DropTargetNestsAndOutdentsByLevel) {
+  auto a = tree_.AddPage(u"A");
+  auto b = tree_.AddPage(u"B");
+  auto task = tree_.MakeTask({a}, u"Task").value();
+  // Nest under the task.
+  auto nest = tree_.DropTargetForAnchor(task, 1, /*after=*/true);
+  ASSERT_TRUE(nest);
+  EXPECT_EQ(nest->parent, task);
+  EXPECT_FALSE(nest->before);
+  // Outdenting a nested page past its task reaches the root, which page
+  // callers map onto Scratchpad. Tasks may use the root directly.
+  auto out = tree_.DropTargetForAnchor(a, -1, /*after=*/true);
+  ASSERT_TRUE(out);
+  EXPECT_EQ(out->parent, tree_.root()->value.id);
+  EXPECT_FALSE(out->before);
+  auto task_out = tree_.DropTargetForAnchor(task, -1, /*after=*/true);
+  ASSERT_TRUE(task_out);
+  EXPECT_EQ(task_out->parent, tree_.root()->value.id);
+  // Outdenting past the top stays at the top level.
+  auto clamped = tree_.DropTargetForAnchor(b, -3, /*after=*/false);
+  ASSERT_TRUE(clamped);
+  EXPECT_EQ(clamped->parent, tree_.scratchpad()->value.id);
+  // Unknown anchors and section headers have no structural target.
+  EXPECT_FALSE(
+      tree_.DropTargetForAnchor(TreeId("missing"), 0, /*after=*/true));
+  EXPECT_FALSE(tree_.DropTargetForAnchor(tree_.scratchpad()->value.id, 0,
+                                         /*after=*/true));
+  (void)task;
+}
+
 }  // namespace
 }  // namespace uw

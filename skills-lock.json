@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "breadth-first": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "breadth-first/SKILL.md",
+      "computedHash": "e4e2d81a058a66fcf5b4ca63b6b720bb833b7a20e8544f397d4c22685904b620"
+    },
+    "bro": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "bro/SKILL.md",
+      "computedHash": "b651827a1c11465d79500780e53414fdccffd12ce3b640138dee2d04133a9a33"
+    },
+    "david-personal-profile": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "david-personal-profile/SKILL.md",
+      "computedHash": "714a0762195dbd24236f9ba2be8db2a8f9dba4357f3a24e789562ae81afb9193"
+    },
+    "linear-cli": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "linear-cli/SKILL.md",
+      "computedHash": "3d9e2e65cbecc70c70351659bdd61be1d51e543f62425f5cc9373242c8de9652"
+    },
+    "unslop": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "unslop/SKILL.md",
+      "computedHash": "3dfc2afeda677e12c6065497a40df7d895859de1c7d1cffb899b1559d129fe4f"
+    },
+    "wide-grilling": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "wide-grilling/SKILL.md",
+      "computedHash": "7787b8614a116969bd2ba6f566555b350c94231310983a97ee02f617f33c4b82"
+    },
+    "wide-grilling-with-docs": {
+      "source": "leetdavid/skills",
+      "sourceType": "github",
+      "skillPath": "wide-grilling-with-docs/SKILL.md",
+      "computedHash": "1127c90c8f044345e692a4ff90d2e792df063a381163874f4f906fb135c68c7a"
+    }
+  }
+}

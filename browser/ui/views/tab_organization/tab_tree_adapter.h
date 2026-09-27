@@ -7,11 +7,13 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/timer/timer.h"
 #include "ui/base/clipboard/clipboard_format_type.h"
 #include "ui/base/dragdrop/drop_target_event.h"
 #include "ui/compositor/layer_tree_owner.h"
@@ -41,7 +43,9 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
                        public views::ContextMenuController,
                        public views::DragController {
  public:
-  TabTreeAdapter(views::View* host, TabCollectionNode* collection);
+  TabTreeAdapter(views::View* host,
+                 TabCollectionNode* collection,
+                 TabOrganizationController* controller);
   ~TabTreeAdapter() override;
   bool available() const { return controller_ != nullptr; }
   views::ProposedLayout CalculateLayout(const views::SizeBounds& bounds) const;
@@ -63,6 +67,13 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
     gfx::Rect bounds;
   };
   void Refresh();
+  // Removes an adapter-owned child view. The view stays attached while the
+  // layout manager processes its synchronous removal notification, so it is
+  // hidden from CalculateLayout until deletion completes.
+  void RemoveOwnedView(views::View* view);
+  void ShowOrganizationNotice(std::u16string text);
+  void ClearNotice();
+  void OnNoticeActivated();
   void SelectTask(TreeId id);
   void Toggle(TreeId id);
   void OpenMenu(const gfx::Point& point, ui::mojom::MenuSourceType source);
@@ -95,12 +106,16 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
   base::WeakPtr<TabOrganizationController> controller_;
   raw_ptr<views::MenuButton> organize_ = nullptr;
   raw_ptr<views::Label> scratchpad_ = nullptr;
+  // Transient automatic-organization notice. Activating it undoes the action.
+  raw_ptr<views::LabelButton> notice_ = nullptr;
+  base::OneShotTimer notice_timer_;
   std::map<TreeId, raw_ptr<views::LabelButton>> tasks_;
   std::map<TreeId, raw_ptr<views::LabelButton>> disclosures_;
   std::optional<TreeId> selected_task_;
   std::vector<TreeId> last_tab_selection_;
   std::vector<TreeId> menu_selection_;
   mutable std::vector<Row> rows_;
+  mutable std::set<views::View*> removing_;
   base::CallbackListSubscription subscription_;
   std::unique_ptr<ui::SimpleMenuModel> menu_;
   std::unique_ptr<views::MenuRunner> runner_;

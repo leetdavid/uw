@@ -1,6 +1,14 @@
 # Roadmap
 
-The [minimum usable version](../product.md#minimum-usable-version) and [next feature priority](../product.md#automatic-tab-organization) are agreed. Other ordering and completion criteria remain proposed. Technical choices live in [Architecture](../architecture.md).
+The [minimum usable version](../product.md#minimum-usable-version) and [next feature priority](../product.md#automatic-tab-organization) are agreed. Other ordering and completion criteria remain proposed. Technical choices live in [Architecture](../architecture.md). Concrete work tickets are tracked on the [board](#board) below.
+
+## Board
+
+Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progress`, `in review`, `done`. Scores use the [implementability convention](#implementability-estimates) below. Ticket IDs are stable, so commits and patches can reference them.
+
+| ID | Ticket | Status | Score | Notes |
+| --- | --- | --- | --- | --- |
+| T1 | Blank new tabs open below the current tab | backlog | 8/10 | Cmd+T and the tab strip "+" button create the new tab as a sibling below the selected tab's branch, in the same parent (task group, nested group, or Scratchpad). Inside a task group this overrides "new ungrouped tabs appear in Scratchpad" in [native-tab-tree.md](native-tab-tree.md), because user placement is intent. A selected pinned tab, inactive pinned view, or Peek preview falls back to Scratchpad. Link-opened tabs, duplicates, and restores keep upstream placement. |
 
 ## 1. Choose the browser foundation
 
@@ -51,7 +59,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | Feature | Score | Main consideration |
 | --- | --- | --- |
 | [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
-| [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. Source-level checks pass; the customized build and UI remain unverified. |
+| [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. The customized build and headless smoke test pass; native UI behavior remains unverified. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Native tree-style tabs](../product.md#automatic-tab-organization) | 6/10 | Page parents and nested task groups require hierarchy integration, stable child branches through ordinary navigation, child promotion after task changes, and reliable session restoration. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
@@ -65,6 +73,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Jev fast tab classification](../architecture.md#tab-organization-models) | 5/10 | Current fast-path choice, behind explicit user opt-in, with metadata first and a bounded excerpt later. No match without an LLM leaves the tab in Scratchpad. Jev is early access; provider access, data handling, task accuracy, and the full latency deadline need validation. |
 | [On-demand AI tab reorganization](../product.md#automatic-tab-organization) | 6/10 | Now needs tree-aware changes and restoration while preserving manual choices within the current window. |
 | [Automatic task-based tree organization](../product.md#automatic-tab-organization) | 5/10 | The initial title/URL/source fast path must meet the agreed latency budget, then a clearer excerpt-informed pass may correct it. Background LLM discovery handles unmatched Scratchpad branches, with stale-result cancellation. |
+| [Automatic organization first slice](../plans/automatic-organization.md) | 3/10 | Remote Jev classification plus separate LLM naming, continuous debounced reclassification, stale-result protection, manual-override preservation, atomic undo, Keychain secrets, and sidebar Undo feedback. |
 | [Scratchpad](../product.md#scratchpad) | 8/10 | A window-local nested tree below pins and above task groups for ungrouped tabs and pending candidates. Confident placement moves a whole branch. |
 | [User-directed task proposals](../product.md#user-directed-mode) | 6/10 | Pending proposals remain inline without moving tabs. Accepted proposals create a root group at the earliest candidate; rejected proposals stay suppressed until activity changes. |
 | [Manual task extraction](../product.md#manual-task-extraction) | 8/10 | Once the tab tree exists, this deterministically moves selected branches into a sibling task group without waiting for inference. |

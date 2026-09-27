@@ -27,6 +27,13 @@ uw browser means "ur web, ur way". It is a planned Chromium-based browser with A
 - Distinguish agreed requirements from proposals and open questions. Do not present planned features as working software.
 - Include implementability scores out of 10 in feature discussions. Use the [roadmap's scoring convention](docs/plans/roadmap.md#implementability-estimates) and update its estimates when scope changes.
 
+## Managing the kanban
+
+The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Keep its status column current.
+
+- Set a ticket to `in progress` when work starts, `in review` when the change is ready to verify, and `done` once it is verified.
+- Update the status in the same change as the work it describes.
+
 ## Writing docs
 
 - Get to the point. Use short sentences, short sections, and plain language.

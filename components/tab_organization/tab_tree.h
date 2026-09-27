@@ -31,6 +31,11 @@ class TabTree {
     Kind kind;
     bool collapsed = false;
     uint64_t move_version = 0;
+    // Bumped only by manual moves, task creation, and renames. Automatic
+    // placements bump move_version (so undo keeps working) but never
+    // manual_version, letting the coordinator tell user corrections apart
+    // from its own earlier work.
+    uint64_t manual_version = 0;
   };
   using Node = ui::TreeNodeWithValue<Data>;
 
@@ -66,6 +71,31 @@ class TabTree {
             std::optional<TreeId> before = std::nullopt);
   std::optional<TreeId> MakeTask(const std::vector<TreeId>& pages,
                                  std::u16string title);
+  // Automatic placement. Behaves like Move/MakeTask for validation, ordering,
+  // and undo, but does not mark the branch as manually adjusted. Generated
+  // naming via SetAutomaticTaskTitle amends the same undo entry.
+  bool MoveAutomatic(const std::vector<TreeId>& ids,
+                     const TreeId& parent,
+                     std::optional<TreeId> before = std::nullopt);
+  // Structural placement for a fresh tab beside an existing page. No undo
+  // entry and not a manual adjustment, like link parentage.
+  bool PlaceBeside(const TreeId& page, const TreeId& sibling);
+  // Drag-drop destination relative to an anchor row. `levels` counts indent
+  // levels right of the anchor (nest under it, appending) or left (outdent
+  // past ancestors); 0 inserts at the anchor's level. `after` chooses below
+  // (true) or above. Outdenting past the top level returns the root, which
+  // accepts tasks; page callers map that onto Scratchpad instead.
+  struct SiblingTarget {
+    TreeId parent;
+    std::optional<TreeId> before;
+  };
+  std::optional<SiblingTarget> DropTargetForAnchor(const TreeId& anchor,
+                                                   int levels,
+                                                   bool after) const;
+  std::optional<TreeId> MakeTaskAutomatic(const std::vector<TreeId>& pages,
+                                          std::u16string title);
+  void SetAutomaticTaskTitle(const TreeId& id, std::u16string title);
+  uint64_t ManualVersion(const TreeId& id) const;
   void RenameTask(const TreeId& id, std::u16string title);
   void ToggleCollapsed(const TreeId& id);
   void RemoveEmptyTask(const TreeId& id);
@@ -101,9 +131,11 @@ class TabTree {
             std::optional<TreeId> id = std::nullopt);
   Placement Remember(Node* node) const;
   void Reparent(Node* node, Node* parent, size_t index, bool manual);
+  void ReparentAutomatic(Node* node, Node* parent, size_t index);
   void RemoveAndPromote(Node* node);
   void UndoMove(std::vector<Placement> placements,
-                std::optional<TreeId> created_task);
+                std::optional<TreeId> created_task,
+                bool was_manual);
   void UndoRename(TreeId id,
                   std::u16string expected,
                   std::u16string previous,

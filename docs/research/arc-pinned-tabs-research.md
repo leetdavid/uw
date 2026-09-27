@@ -37,7 +37,7 @@ Checked 2026-09-21. Official desktop documentation and release notes; no running
 
 ## User-confirmed behavior
 
-The user reports that Cmd-W does nothing on a pinned tab in Arc, and that double-clicking the pin or using its context menu returns it home. These are the agreed [uw interactions](product.md#pinned-tabs). They are user observations, not results of a local Arc runtime test.
+The user reports that Cmd-W does nothing on a pinned tab in Arc, and that double-clicking the pin or using its context menu returns it home. These are the agreed [uw interactions](../product.md#pinned-tabs). They are user observations, not results of a local Arc runtime test.
 
 The earlier assistant proposal that Cmd-W globally closes the shared session and resets home on next open was rejected.
 
