@@ -16,7 +16,7 @@ Agreed: the first version targets macOS desktop. Chrome-like everyday browsing w
 
 Agreed: keep uw branding minimal and use native vertical tabs by default. Preserve the user's explicit choice to use horizontal tabs.
 
-Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups.
+Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. The tint is a two-color gradient that the user can change, with a light and a dark default. Text on the tint turns white or near-black, whichever reads better. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups. The [plan](plans/arc-style-look.md) has the details.
 
 Agreed: manual setup is acceptable for the first usable version. Automatic browser-data import is not required for that version.
 

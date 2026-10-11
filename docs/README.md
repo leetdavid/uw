@@ -17,7 +17,7 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, implementability estimates, and a ticket board.
 - [Native tab tree plan](plans/native-tab-tree.md): tasks as native tab groups, page nesting, stages, and acceptance checks.
 - [Automatic organization plan](plans/automatic-organization.md): the tab-filing loop, the decision model and language model, and acceptance checks.
-- [Arc-style look plan](plans/arc-style-look.md): proposed, not approved. Tint, page card, tab rows, favorites tiles, and task folder rows.
+- [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
 - [ADR 0001: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
 - [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.
