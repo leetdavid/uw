@@ -6,9 +6,15 @@
 
 #include <string>
 
+#include "third_party/skia/include/core/SkBitmap.h"
+
 class Browser;
 
 namespace uw {
+
+// The whole window of `browser` at 1280 by 800, as it is drawn once its
+// animations have finished.
+SkBitmap CaptureWindow(Browser* browser);
 
 // Saves the whole window of `browser` as <name>.png in the folder that the
 // UW_SCREENSHOT_DIR environment variable names, so looks can be reviewed

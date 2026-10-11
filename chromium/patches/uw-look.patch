@@ -259,3 +259,28 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..4a8da993bfa8c432326ccf3a26757e5a
        }
        break;
      }
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..ba878621e005e762f6b7b6b82e34f2f9c8f8fae1 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -65,6 +65,7 @@
+ #include "ui/views/controls/label.h"
+ #include "ui/views/layout/layout_types.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/look/tint_painter.h"
+ 
+ namespace {
+ 
+@@ -506,7 +507,11 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+                                     : kBrowserFrameAlphaLight;
+     canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
+   } else {
+-    canvas->DrawColor(frame_color);
++    if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
++      uw::PaintTint(canvas, this, GetBrowserView(), frame_color);
++    } else {
++      canvas->DrawColor(frame_color);
++    }
+ 
+     auto* theme_service = ThemeServiceFactory::GetForProfile(
+         GetBrowserView()->browser()->GetProfile());

@@ -79,17 +79,21 @@ SkBitmap CaptureSettled(views::Widget* widget) {
 
 }  // namespace
 
+SkBitmap CaptureWindow(Browser* browser) {
+  views::Widget* widget =
+      BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
+  widget->SetBounds(kWindowBounds);
+  return CaptureSettled(widget);
+}
+
 void SaveWindowScreenshot(Browser* browser, const std::string& name) {
   const std::optional<std::string> folder =
       base::Environment::Create()->GetVar(kFolderVariable);
   if (!folder || folder->empty()) {
     return;
   }
-  views::Widget* widget =
-      BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
-  widget->SetBounds(kWindowBounds);
   const std::optional<std::vector<uint8_t>> png =
-      gfx::PNGCodec::EncodeBGRASkBitmap(CaptureSettled(widget),
+      gfx::PNGCodec::EncodeBGRASkBitmap(CaptureWindow(browser),
                                         /*discard_transparency=*/false);
   ASSERT_TRUE(png);
   base::ScopedAllowBlockingForTesting allow_blocking;
