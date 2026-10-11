@@ -22,6 +22,7 @@
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/model_test_server.h"
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 
 namespace uw {
 namespace {
@@ -187,6 +188,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON));
   EXPECT_EQ(TextOf("statusDetail"),
             "Jev decides where tabs go. llama3.2 names new tasks.");
+  SaveWindowScreenshot(browser(), "settings");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

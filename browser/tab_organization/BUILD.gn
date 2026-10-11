@@ -36,6 +36,7 @@ source_set("browser_tests") {
   sources = [
     "automatic_organizer_browsertest.cc",
     "tab_organization_controller_browsertest.cc",
+    "window_screenshot_browsertest.cc",
   ]
   deps = [
     ":ai_connection",
@@ -67,11 +68,22 @@ source_set("test_support") {
     "model_test_server.h",
     "scoped_memory_keychain.h",
     "scoped_memory_keychain.mm",
+    "window_screenshot.cc",
+    "window_screenshot.h",
   ]
   deps = [
     "//base",
+    "//base/test:test_support",
+    "//chrome/browser/ui",
+    "//components/viz/common",
     "//crypto",
     "//net:test_support",
+    "//skia",
+    "//testing/gtest",
+    "//ui/compositor",
+    "//ui/gfx",
+    "//ui/gfx/codec",
+    "//ui/views",
     "//url",
   ]
 }

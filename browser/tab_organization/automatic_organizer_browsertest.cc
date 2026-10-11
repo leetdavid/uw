@@ -38,6 +38,7 @@
 #include "uw/browser/tab_organization/model_test_server.h"
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 
 namespace uw {
@@ -218,6 +219,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(link), 0);
   ASSERT_TRUE(bar()->notice_visible());
   EXPECT_EQ(bar()->notice_text(), u"Moved to Plan Lisbon trip");
+  SaveWindowScreenshot(browser(), "automatic-move");
 
   const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 1u);
