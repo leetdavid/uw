@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/run_loop.h"
+#include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -19,7 +20,6 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/test/base/in_process_browser_test.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
@@ -33,7 +33,8 @@
 namespace uw {
 namespace {
 
-class TabOrganizationControllerBrowserTest : public InProcessBrowserTest {
+class TabOrganizationControllerBrowserTest
+    : public headless::HeadlessModeBrowserTest {
  protected:
   TabOrganizationController* controller() {
     return TabOrganizationController::From(browser());
@@ -135,8 +136,8 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(first), 1);
   EXPECT_EQ(controller()->DepthFor(second), 1);
   EXPECT_EQ(controller()->DepthFor(nested), 2);
-  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(page), Id(first), Id(nested),
-                                           Id(second)}));
+  EXPECT_EQ(Strip(),
+            (std::vector<PageId>{Id(page), Id(first), Id(nested), Id(second)}));
   ExpectStripMatchesTree();
 }
 
@@ -150,8 +151,8 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 
   tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
   tabs::TabInterface* sibling = NewTab();
-  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(page), Id(child), Id(sibling),
-                                           Id(blank)}));
+  EXPECT_EQ(Strip(),
+            (std::vector<PageId>{Id(page), Id(child), Id(sibling), Id(blank)}));
   ExpectStripMatchesTree();
 }
 
@@ -320,12 +321,12 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   tabs::TabInterface* child = OpenLinkFrom(page);
   const std::vector<PageId> selection = controller()->SelectionFor(child);
   EXPECT_EQ(selection, (std::vector<PageId>{Id(child)}));
-  EXPECT_TRUE(controller()->CanExecute(TabOrganizationController::kOutdent,
-                                       selection));
+  EXPECT_TRUE(
+      controller()->CanExecute(TabOrganizationController::kOutdent, selection));
   EXPECT_FALSE(
       controller()->CanExecute(TabOrganizationController::kNest, selection));
-  EXPECT_FALSE(controller()->CanExecute(
-      TabOrganizationController::kCloseBranch, selection));
+  EXPECT_FALSE(controller()->CanExecute(TabOrganizationController::kCloseBranch,
+                                        selection));
   EXPECT_FALSE(
       controller()->CanExecute(TabOrganizationController::kUndo, selection));
 

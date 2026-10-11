@@ -129,7 +129,9 @@ This runs strict TypeScript checking and the Node.js test suite. These checks do
 pnpm run check && pnpm run verify --jobs 8
 ```
 
-`verify` runs the crash-focused end to end: build, smoke, then the focused `unit_tests` and `browser_tests` suites that pin every fixed native crash. Use `--jobs 2` on a 16 GiB Mac.
+`verify` builds, runs the smoke test, then runs the focused `unit_tests` and `browser_tests` suites. Use `--jobs 2` on a 16 GiB Mac.
+
+The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
 ## Build inputs and updates
 
@@ -180,11 +182,11 @@ The smoke test uses incognito because normal-profile `--dump-dom` loaded the pag
 
 ### Customization verification
 
-The uw patches, including the manual tab-tree integration, were checked against files retrieved from the exact pinned Chromium commit. The complete series applies, verifies, reverses, and reapplies idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking and all 46 tooling tests pass. The tests cover ordered patches, source links, updates and removals, conflicts, interruption recovery, and preservation of local work.
+The uw patches, including the manual tab-tree integration, were checked against files retrieved from the exact pinned Chromium commit. The complete series applies, verifies, reverses, and reapplies idempotently. Patched GRIT XML and the macOS plist pass syntax checks. TypeScript checking and all 49 tooling tests pass. The tests cover ordered patches, source links, updates and removals, conflicts, interruption recovery, and preservation of local work.
 
 On 2026-09-24, the customized application built and passed the headless smoke test on a 64 GiB Apple Silicon Mac with Xcode 27.0 and macOS SDK 27.0. The smoke test reported `uw 153.0.8010.53` and passed its isolated-profile navigation and JavaScript check.
 
-On 2026-09-27, the [automatic organization MVP](docs/plans/automatic-organization.md) built on the same host and passed the headless smoke test. The focused Chromium suites pass: `TabTreeTest.*`, `OrganizationCoordinatorTest.*`, `AiProtocolTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*` in `browser_tests`. Live-provider behavior checks remain pending.
+On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*` and `AutomaticOrganizerBrowserTest.*` in `browser_tests`. The organizer tests use a local test server. No live provider has been called.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
