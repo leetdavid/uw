@@ -392,14 +392,19 @@ std::optional<std::vector<std::u16string>> ParseModelList(
   if (!parsed) {
     return std::nullopt;
   }
-  const base::ListValue* data = parsed->FindList("data");
-  if (!data) {
+  const base::ListValue* listed = parsed->FindList("data");
+  const char* id_key = "id";
+  if (!listed) {
+    listed = parsed->FindList("models");
+    id_key = "name";
+  }
+  if (!listed) {
     return std::nullopt;
   }
   std::vector<std::u16string> models;
-  for (const base::Value& item : *data) {
+  for (const base::Value& item : *listed) {
     const base::DictValue* entry = item.GetIfDict();
-    const std::string* id = entry ? entry->FindString("id") : nullptr;
+    const std::string* id = entry ? entry->FindString(id_key) : nullptr;
     if (!id || id->empty()) {
       return std::nullopt;
     }

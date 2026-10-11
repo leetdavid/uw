@@ -180,6 +180,36 @@ TEST_F(AiProtocolTest, ModelListParsesIds) {
   EXPECT_FALSE(ParseModelList("broken"));
 }
 
+// The body api.typesafe.ai returned for GET /v1/models on 2026-10-12.
+TEST_F(AiProtocolTest, ModelListParsesTypeSafeNames) {
+  const auto models = ParseModelList(
+      R"({"models":[{"name":"jev-latest","description":"The latest iteration )"
+      R"(of TypeSafe's System One Model: Jev","release_date":)"
+      R"("2026-09-10T18:38:01.391457+00:00"},{"name":"jev-preview",)"
+      R"("description":"A preview version of `jev-latest`: should be better )"
+      R"(in most ways","release_date":"2026-09-10T18:39:06.057655+00:00"}]})");
+  ASSERT_TRUE(models);
+  EXPECT_EQ(*models,
+            (std::vector<std::u16string>{u"jev-latest", u"jev-preview"}));
+
+  EXPECT_FALSE(ParseModelList(R"({"models": [{"id": "no-name"}]})"));
+}
+
+// The body api.typesafe.ai returned for uw's validation request on
+// 2026-10-12.
+TEST_F(AiProtocolTest, SystemOneParsesARecordedLiveAnswer) {
+  const auto answer = ParseDecisionResponse(
+      DecisionFormat::kSystemOne,
+      R"({"model":"jev-1.13.0","answers":{"destination":{"type":"choice",)"
+      R"("choice":"scratchpad","confidence":0.34,"probabilities":)"
+      R"({"new_task":0.33,"scratchpad":0.67}}},"usage":{"input_tokens":383,)"
+      R"("output_tokens":38}})");
+  ASSERT_TRUE(answer);
+  EXPECT_EQ(answer->choice, kScratchpadOption);
+  EXPECT_DOUBLE_EQ(answer->confidence, 0.34);
+  EXPECT_FALSE(answer->task_name);
+}
+
 BranchContext LisbonContext() {
   BranchContext context;
   context.title = "Lisbon in three days";

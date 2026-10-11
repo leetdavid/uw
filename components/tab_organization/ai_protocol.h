@@ -94,8 +94,9 @@ std::optional<std::string> BuildNamingRequestBody(const std::string& model,
 // Extracts the generated task name from a chat-completions response body.
 std::optional<std::u16string> ParseNamingResponse(const std::string& body);
 
-// Parses the model ids out of a chat-completions model-list response body.
-// An empty result means the endpoint lists no models.
+// Parses the model ids out of a model-list response body. OpenAI-compatible
+// endpoints list them as `data[].id`, TypeSafe as `models[].name`. An empty
+// result means the endpoint lists no models.
 std::optional<std::vector<std::u16string>> ParseModelList(
     const std::string& body);
 
