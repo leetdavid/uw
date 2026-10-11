@@ -11,6 +11,7 @@ source_set("tab_organization") {
     ":ai_connection",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
+    "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui/browser_window",
     "//chrome:strings",
     "//components/content_extraction/content/browser",
@@ -32,6 +33,7 @@ source_set("browser_tests") {
     ":tab_organization",
     "//base",
     "//chrome/browser",
+    "//chrome/common",
     "//chrome/test:test_support",
     "//components/prefs",
     "//content/public/browser",
@@ -53,6 +55,10 @@ source_set("ai_connection") {
   if (is_mac) {
     # macOS Keychain storage. The first release targets macOS desktop.
     sources += [ "api_key_store_mac.mm" ]
+  } else {
+    # In-memory fallback so non-macOS builds link. Secrets never leave the
+    # process and never touch disk.
+    sources += [ "api_key_store_stub.cc" ]
   }
   public_deps = [ "//base" ]
   deps = [

@@ -1,0 +1,11 @@
+# uw browser interface helpers shared across windows.
+source_set("ui") {
+  sources = [
+    "uw_url_rewrite.cc",
+    "uw_url_rewrite.h",
+  ]
+  public_deps = [
+    "//content/public/browser",
+    "//url",
+  ]
+}

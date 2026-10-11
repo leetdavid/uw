@@ -1,0 +1,30 @@
+# Mojo backend for the uw organization section of chrome://settings.
+# Profile-scoped (prefs plus the profile Keychain slot); it never touches
+# window state.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_organization.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_organization_handler") {
+  sources = [
+    "uw_organization_handler.cc",
+    "uw_organization_handler.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//base",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser/profiles:profile",
+    "//components/prefs",
+    "//url",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/components/tab_organization:tab_tree",
+  ]
+}

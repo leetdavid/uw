@@ -123,7 +123,13 @@ The checkout's `.uw-patches.json` records the applied result and operation statu
 pnpm run check
 ```
 
-This runs strict TypeScript checking and the Node.js test suite. These checks do not require Python or a Chromium checkout. Browser compilation and smoke testing are separate checks.
+This runs strict TypeScript checking and the Node.js test suite. This includes native lifetime checks that pin the fixed app crashes without building Chromium. These checks do not require Python or a Chromium checkout. Browser compilation and smoke testing are separate checks.
+
+```sh
+pnpm run check && pnpm run verify --jobs 8
+```
+
+`verify` runs the crash-focused end to end: build, smoke, then the focused `unit_tests` and `browser_tests` suites that pin every fixed native crash. Use `--jobs 2` on a 16 GiB Mac.
 
 ## Build inputs and updates
 

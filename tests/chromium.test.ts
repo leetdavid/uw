@@ -185,6 +185,14 @@ test("host checks are read-only and report all blockers", (t) => {
   assert.equal(f.calls.some(({ options }) => options.inherit), false);
 });
 
+test("high job counts fail fast on small hosts before mutation", (t) => {
+  const f = new Fixture(t);
+  assert.throws(() => f.browser.build(8), /--jobs 2/);
+  assert.throws(() => f.browser.sync(8), /--jobs 2/);
+  assert.equal(f.calls.some(({ options }) => options.inherit), false);
+  f.browser.sync(2); f.browser.build(2);
+});
+
 test("repeated sync reuses checkouts and keeps both revisions pinned", (t) => {
   const f = new Fixture(t);
   f.browser.sync(2);

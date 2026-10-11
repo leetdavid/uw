@@ -91,6 +91,26 @@ After creating and arranging a small tree, quit uw and launch it again with
 return with the restored tabs. This is an important trial, not a completed
 compatibility guarantee.
 
+### Crash regression checklist
+
+Run these after any native UI change. Each pins a fixed crash. The app must
+not quit unexpectedly during any of them. Each item names its automated
+regression test; `pnpm run verify` runs them all against the real browser:
+
+1. Open `Organize`, route to the organization settings, then close the
+   settings tab. (`OrganizationSettingsOpensAndCloses`)
+2. Open five tabs in quick succession with Cmd-T.
+   (`RapidTabInsertionKeepsTreeConsistent`)
+3. With two named tasks present, switch to horizontal tabs from the tab
+   context menu, then switch back to vertical tabs. The tasks and their tabs
+   must survive. (`OrientationTogglePreservesTree`)
+4. Create a task, move its tabs back to Scratchpad, and undo. Both tabs must
+   remain tracked. (`TaskTeardownAndUndoKeepsTreeConsistent`)
+5. With two named tasks present in vertical tabs, close the window. The app
+   must not quit unexpectedly. (`WindowCloseWithTasksKeepsTeardownClean`,
+   plus `SettingsOpenWindowCloseKeepsTeardownClean` for a window closed with
+   the settings page open.)
+
 ## Not available yet
 
 Automatic organization is implemented behind setup: open `Organize` and
@@ -113,6 +133,12 @@ Include the version reported by `pnpm run smoke`, your macOS version, whether
 the profile was new or existing, the exact steps, the expected result, and the
 actual result. A screenshot or a short screen recording is useful for layout,
 dragging, focus, and restoration problems.
+
+For a crash, also record the quit time, then attach the newest crash report:
+
+```sh
+ls -lt ~/Library/Logs/DiagnosticReports/uw*.ips | head -3
+```
 
 See the [native tab-tree acceptance checks](plans/native-tab-tree.md#acceptance-checks)
 for the complete engineering verification list.

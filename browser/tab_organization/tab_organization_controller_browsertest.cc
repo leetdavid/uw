@@ -8,6 +8,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/common/pref_names.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
@@ -172,6 +173,119 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->pause_mode(), PauseMode::kUntilLaunch);
   controller()->SetPause(PauseMode::kOff);
   EXPECT_EQ(controller()->pause_mode(), PauseMode::kOff);
+}
+
+// Opening tabs notifies the controller while TabStripModel holds its
+// reentrancy guard. Sync must not move tabs synchronously there; the deferred
+// reorder converges with the tree order instead of tripping the CHECK.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       RapidTabInsertionKeepsTreeConsistent) {
+  const int initial = browser()->tab_strip_model()->count();
+  for (int i = 0; i < 5; ++i) {
+    ASSERT_TRUE(AddTab(GURL("about:blank")));
+  }
+  base::RunLoop().RunUntilIdle();
+  const std::vector<TreeId> order = controller()->tree().PageOrder();
+  ASSERT_EQ(static_cast<int>(order.size()),
+            browser()->tab_strip_model()->count());
+  EXPECT_EQ(static_cast<int>(order.size()), initial + 5);
+  const int first = browser()->tab_strip_model()->IndexOfFirstNonPinnedTab();
+  for (size_t i = 0; i < order.size(); ++i) {
+    auto* tab = controller()->TabFor(order[i]);
+    ASSERT_TRUE(tab);
+    EXPECT_EQ(browser()->tab_strip_model()->GetIndexOfTab(tab),
+              first + static_cast<int>(i));
+  }
+}
+
+// Emptying a task destroys its sidebar views through the notified removal
+// path. Erasing the tracking entry first keeps the maps from holding a view
+// the host has deleted.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TaskTeardownAndUndoKeepsTreeConsistent) {
+  auto* first = AddTab(GURL("about:blank"));
+  auto* second = AddTab(GURL("about:blank"));
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  auto task =
+      controller()->MakeTask({PageId(first), PageId(second)}, u"Temp");
+  ASSERT_TRUE(task);
+  EXPECT_TRUE(controller()->Move(
+      {PageId(first), PageId(second)},
+      controller()->tree().scratchpad()->value.id));
+  controller()->tree().RemoveEmptyTask(*task);
+  controller()->Undo();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(controller()->tree().Find(PageId(first)) != nullptr);
+  EXPECT_TRUE(controller()->tree().Find(PageId(second)) != nullptr);
+  EXPECT_TRUE(controller()->tree().TaskFor(PageId(first)) == nullptr);
+}
+
+// Switching tab orientation tears down and rebuilds the sidebar. The
+// window-owned tree must survive the adapter's teardown and recreation.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       OrientationTogglePreservesTree) {
+  auto* tab = AddTab(GURL("about:blank"));
+  ASSERT_TRUE(tab);
+  auto task = controller()->MakeTask({PageId(tab)}, u"Keep");
+  ASSERT_TRUE(task);
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetBoolean(::prefs::kVerticalTabsEnabled, false);
+  base::RunLoop().RunUntilIdle();
+  prefs->SetBoolean(::prefs::kVerticalTabsEnabled, true);
+  base::RunLoop().RunUntilIdle();
+  const TabTree::Node* owner = controller()->tree().TaskFor(PageId(tab));
+  ASSERT_TRUE(owner);
+  EXPECT_EQ(owner->value.id, *task);
+}
+
+// The organization settings surface opens from the controller and closes
+// again without stranding state, replacing the former setup dialog. Settings
+// opens as a singleton tab, reusing the current tab when it can host it.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       OrganizationSettingsOpensAndCloses) {
+  const int before = browser()->tab_strip_model()->count();
+  controller()->OpenOrganizationSettings();
+  base::RunLoop().RunUntilIdle();
+  auto* settings = browser()->tab_strip_model()->GetActiveTab();
+  ASSERT_TRUE(settings);
+  EXPECT_TRUE(settings->GetContents()
+                  ->GetLastCommittedURL()
+                  .spec()
+                  .starts_with("chrome://settings"));
+  if (browser()->tab_strip_model()->count() == before + 1) {
+    browser()->tab_strip_model()->CloseWebContentsAt(
+        browser()->tab_strip_model()->active_index(),
+        TabCloseTypes::CLOSE_NONE);
+    base::RunLoop().RunUntilIdle();
+    EXPECT_EQ(browser()->tab_strip_model()->count(), before);
+  }
+}
+
+// Closing the window with named tasks present must tear down cleanly. The
+// adapter dies in ResetCollectionNode while its detached views are still
+// attached to the host; any surviving back-pointer or cached layout entry
+// trips the dangling-pointer detector instead of exiting quietly.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       WindowCloseWithTasksKeepsTeardownClean) {
+  auto* first = AddTab(GURL("about:blank"));
+  auto* second = AddTab(GURL("about:blank"));
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  auto task = controller()->MakeTask({PageId(first), PageId(second)}, u"Keep");
+  ASSERT_TRUE(task);
+  base::RunLoop().RunUntilIdle();
+  CloseAllBrowsers();
+}
+
+// Closing the window while the organization settings page is open must
+// tear down cleanly. The profile-scoped settings handler must not touch
+// dying window state.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       SettingsOpenWindowCloseKeepsTeardownClean) {
+  controller()->OpenOrganizationSettings();
+  base::RunLoop().RunUntilIdle();
+  CloseAllBrowsers();
 }
 
 }  // namespace

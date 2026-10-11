@@ -279,7 +279,7 @@ Agreed: Jev receives no intent context until the user enables Jev tab classifica
 
 Agreed: after opt-in, Jev receives title, URL, and source-tab relationship for the initial pass, then a short readable-text excerpt for the later pass. Show this exact scope during enablement.
 
-Agreed for the [automatic organization MVP](plans/automatic-organization.md): each classification request contains titles, URLs, source-tab relationships, current task names, the user's manual placement when present, and a short readable-text excerpt. The setup dialog shows this exact scope before the user enables automatic organization.
+Agreed for the [automatic organization MVP](plans/automatic-organization.md): each classification request contains titles, URLs, source-tab relationships, current task names, the user's manual placement when present, and a short readable-text excerpt. The settings page shows this exact scope before the user enables automatic organization.
 
 ## Download name suggestions
 

@@ -1,0 +1,433 @@
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+index 63c989a76dadc13953e35513998e83326ee3612b..6601bf4be7909e78d750a3ae42dec07c11ff22fe 100644
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -3904,6 +3904,34 @@
+         System
+       </message>
+     </if>
++
++    <!-- uw organization page -->
++    <if expr="not is_chromeos">
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the uw tab organization settings section.">
++        Tab organization
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_SAVE" desc="Button saving and validating the uw organization connection.">
++        Save and validate
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Title of the uw automatic-organization pause controls.">
++        Pause automatic organization
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED" desc="Note that an API key is stored in the OS credential store.">
++        API key saved
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_NO_KEY" desc="Note that no API key is stored.">
++        No API key saved
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_CHECKING" desc="Status shown while the uw connection is being validated.">
++        Checking connection…
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOADING" desc="Status shown while uw loads the endpoint model list.">
++        Loading models…
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_LOADED" desc="Status shown after uw loads the endpoint model list.">
++        Loaded <ph name="COUNT">$1<ex>3</ex></ph> models
++      </message>
++    </if>
+     <if expr="not is_chromeos">
+       <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
+         Use graphics acceleration when available
+diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+index 8a0281a596af3532fa6342b5653f93e913261023..1a378c8c1cdeae405a891da8efc4da0e8c249c99 100644
+--- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
++++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+@@ -223,6 +223,10 @@
+ #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
+ #endif
+ 
++#if !BUILDFLAG(IS_CHROMEOS)
++#include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
++#endif
++
+ namespace chrome::internal {
+ 
+ using content::RegisterWebUIControllerInterfaceBinder;
+@@ -676,6 +680,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+ #if !BUILDFLAG(IS_CHROMEOS)
+       .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
+       .Add<signin::mojom::SigninPageHandlerFactory>()
++      .Add<uw::mojom::OrganizationHandler>()
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+       .Add<batch_upload_promo::mojom::PageHandlerFactory>()
+       .Add<customize_color_scheme_mode::mojom::
+diff --git a/chrome/browser/resources/BUILD.gn b/chrome/browser/resources/BUILD.gn
+index e66dc00a9a34f11922e90ce88a7f03070fc65bed..e8a57d3131b6c08c6615577c625c55f778cd228a 100644
+--- a/chrome/browser/resources/BUILD.gn
++++ b/chrome/browser/resources/BUILD.gn
+@@ -104,6 +104,7 @@ group("resources") {
+       "webui_toolbar_shared:resources",
+       "whats_new:resources",
+       "//components/browser_apis/tab_strip/resources",
++      "//uw/browser/resources/uw_organization:resources",
+     ]
+     if (is_chrome_branded) {
+       public_deps += [
+diff --git a/chrome/browser/resources/settings/BUILD.gn b/chrome/browser/resources/settings/BUILD.gn
+index 976b9be21f9c1379d782718127641d169a01d0d0..98fabc7f7a5544da8dd664787c3ef8f12fadb4af 100644
+--- a/chrome/browser/resources/settings/BUILD.gn
++++ b/chrome/browser/resources/settings/BUILD.gn
+@@ -570,6 +570,7 @@ build_webui("build") {
+     "//ui/webui/resources/cr_elements:build_ts",
+     "//ui/webui/resources/js:build_ts",
+     "//ui/webui/resources/mojo:build_ts",
++    "//uw/browser/resources/uw_organization:build_ts",
+   ]
+ 
+   if (!is_chromeos) {
+@@ -579,10 +580,14 @@ build_webui("build") {
+     ts_deps += [ "//ash/webui/common/resources:build_ts" ]
+   }
+ 
+-  ts_path_mappings =
+-      [ "/shared/settings/*|" + rebase_path(
+-            "$root_gen_dir/chrome/browser/resources/settings_shared/tsc/*",
+-            target_gen_dir) ]
++  ts_path_mappings = [
++    "/shared/settings/*|" + rebase_path(
++          "$root_gen_dir/chrome/browser/resources/settings_shared/tsc/*",
++          target_gen_dir),
++    "/uw/uw_organization/*|" + rebase_path(
++          "$root_gen_dir/uw/browser/resources/uw_organization/tsc/*",
++          target_gen_dir),
++  ]
+ 
+   if (is_chromeos) {
+     # TODO(crbug.com/1013466): Browser Settings should not depend on ash/webui/
+@@ -602,9 +607,13 @@ build_webui("build") {
+     ]
+     optimize_webui_excludes =
+         [ "chrome://resources/mojo/skia/public/mojom/skcolor.mojom-webui.js" ]
+-    optimize_webui_external_paths =
+-        [ "/shared/settings|" + rebase_path(
+-              "$root_gen_dir/chrome/browser/resources/settings_shared/tsc",
+-              root_build_dir) ]
++    optimize_webui_external_paths = [
++      "/shared/settings|" + rebase_path(
++            "$root_gen_dir/chrome/browser/resources/settings_shared/tsc",
++            root_build_dir),
++      "/uw/uw_organization|" + rebase_path(
++            "$root_gen_dir/uw/browser/resources/uw_organization/tsc",
++            root_build_dir),
++    ]
+   }
+ }
+diff --git a/chrome/browser/resources/settings/ensure_lazy_loaded.ts b/chrome/browser/resources/settings/ensure_lazy_loaded.ts
+index b285da512c1e177bf00eab6cc5652f67bedefc39..19cf59f9066cee5bdbfa16be25672ef5d97af307 100644
+--- a/chrome/browser/resources/settings/ensure_lazy_loaded.ts
++++ b/chrome/browser/resources/settings/ensure_lazy_loaded.ts
+@@ -29,6 +29,7 @@ export function ensureLazyLoaded(): Promise<void> {
+                             'settings-reset-page',
+                             // <if expr="not is_chromeos">
+                             'settings-system-page',
++                            'settings-uw-organization-page',
+                             // </if>
+                             // <if expr="not is_chromeos and not is_macosx">
+                             'settings-edit-dictionary-page',
+diff --git a/chrome/browser/resources/settings/lazy_load.ts b/chrome/browser/resources/settings/lazy_load.ts
+index 58a23b7b0063477bd1adeb1233d2580a925fa0c2..23068f1f6c3f750656c99e146da51b4ce53fd4bc 100644
+--- a/chrome/browser/resources/settings/lazy_load.ts
++++ b/chrome/browser/resources/settings/lazy_load.ts
+@@ -116,6 +116,7 @@ import './languages_page/languages_page_index.js';
+ import './reset_page/reset_page.js';
+ // <if expr="not is_chromeos">
+ import './system_page/system_page.js';
++import '/uw/uw_organization/uw_organization_page.js';
+ 
+ // </if>
+ 
+diff --git a/chrome/browser/resources/settings/page_visibility.ts b/chrome/browser/resources/settings/page_visibility.ts
+index feff9bdf645523030d2b06eb354d09c234ae733e..9226668a610c78db410aaa4042560b57a553f8c1 100644
+--- a/chrome/browser/resources/settings/page_visibility.ts
++++ b/chrome/browser/resources/settings/page_visibility.ts
+@@ -23,6 +23,7 @@ export interface PageVisibility {
+   reset?: boolean;
+   safetyHub?: boolean;
+   system?: boolean;
++  uwOrganization?: boolean;
+   yourSavedInfo?: boolean;
+ }
+ 
+@@ -64,6 +65,7 @@ function createPageVisibility(): PageVisibility|undefined {
+     reset: false,
+     safetyHub: false,
+     system: false,
++    uwOrganization: false,
+     yourSavedInfo: false,
+   };
+   // </if>
+diff --git a/chrome/browser/resources/settings/route.ts b/chrome/browser/resources/settings/route.ts
+index 2aaa938c7e14a03b6528aa087ff6109f8ac335eb..42458ccfa83c2efc248f98feeca90d5efbacdbe5 100644
+--- a/chrome/browser/resources/settings/route.ts
++++ b/chrome/browser/resources/settings/route.ts
+@@ -306,6 +306,14 @@ function createRoutes(): SettingsRoutes {
+         loadTimeData.getString('performancePageTitle'));
+   }
+ 
++  // <if expr="not is_chromeos">
++  if (visibility.uwOrganization !== false) {
++    r.UW_ORGANIZATION = r.BASIC.createSection(
++        '/uwOrganization', 'uwOrganization',
++        loadTimeData.getString('uwOrganizationPageTitle'));
++  }
++  // </if>
++
+   return r as unknown as SettingsRoutes;
+ }
+ 
+diff --git a/chrome/browser/resources/settings/router.ts b/chrome/browser/resources/settings/router.ts
+index a6b043271a7318309f7490d90f6ffd8ee4bc0a2a..576ab91e2e17f009e857e707102cf1861cbc614c 100644
+--- a/chrome/browser/resources/settings/router.ts
++++ b/chrome/browser/resources/settings/router.ts
+@@ -118,6 +118,7 @@ export interface SettingsRoutes {
+   SYNC: Route;
+   SYNC_ADVANCED: Route;
+   SYSTEM: Route;
++  UW_ORGANIZATION: Route;
+   TRAVEL: Route;
+   TRIGGERED_RESET_DIALOG: Route;
+   ACCOUNT: Route;
+diff --git a/chrome/browser/resources/settings/settings_main/settings_main.html b/chrome/browser/resources/settings/settings_main/settings_main.html
+index 7b00df716ccbf2adc37f38fd2c71f9bdc1997c29..45ad069d886ebfc17d5b65a06162928231bc7bcb 100644
+--- a/chrome/browser/resources/settings/settings_main/settings_main.html
++++ b/chrome/browser/resources/settings/settings_main/settings_main.html
+@@ -194,6 +194,17 @@
+   </template>
+ </if>
+ 
++<if expr="not is_chromeos">
++  <template is="dom-if" if="[[showPage_(pageVisibility_.uwOrganization)]]">
++    <div slot="view" id="uwOrganization">
++      <template is="dom-if" if="[[renderPlugin_(
++          routes_.UW_ORGANIZATION, lastRoute_, inSearchMode_)]]">
++        <settings-uw-organization-page></settings-uw-organization-page>
++      </template>
++    </div>
++  </template>
++</if>
++
+   <template is="dom-if" if="[[showPage_(pageVisibility_.reset)]]">
+     <div slot="view" id="reset">
+       <template is="dom-if" if="[[renderPlugin_(
+diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+index efde1c73dfca6509223b6a626ab426faeed9af76..75d5d51c0aa25c3683322e590ae9cbff516fd5d4 100644
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+@@ -143,6 +143,15 @@
+           $i18n{systemPageTitle}
+           <cr-ripple></cr-ripple>
+         </a>
++</if>
++<if expr="not is_chromeos">
++        <a role="menuitem" id="uwOrganization" href="/uwOrganization"
++            class="cr-nav-menu-item"
++            hidden="[[!pageVisibility_.uwOrganization]]">
++          <cr-icon icon="settings:dashboard"></cr-icon>
++          $i18n{uwOrganizationPageTitle}
++          <cr-ripple></cr-ripple>
++        </a>
+ </if>
+         <a role="menuitem" id="reset" href="/reset"
+             hidden="[[!pageVisibility_.reset]]" class="cr-nav-menu-item">
+diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.ts b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+index 564554a675e1b9c16ecbd9414f14083ed1d024a3..de13d59ff1d514a50b75b18a2b83ce50bc893be6 100644
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.ts
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+@@ -58,6 +58,7 @@ const pathToActionMap: Map<string, string> = new Map([
+   ['/downloads', 'SettingsMenu_DownloadsClicked'],
+   ['/accessibility', 'SettingsMenu_AccessibilityClicked'],
+   ['/system', 'SettingsMenu_SystemClicked'],
++  ['/uwOrganization', 'SettingsMenu_UwOrganizationClicked'],
+   ['/reset', 'SettingsMenu_ResetClicked'],
+   ['/help', 'SettingsMenu_AboutClicked'],
+ ]);
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -1332,7 +1332,8 @@ static_library("ui") {
+ 
+     # Non-android deps for "ui" target.
+     deps += [
+       "//uw/browser/tab_organization",
++      "//uw/browser/ui/webui/uw_organization:mojo_bindings",
+       ":accelerator_table",
+       ":browser_actions",
+       ":browser_select_file_dialog_controller",
+diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
+index fc817a0be4151d4d401b068657bd624613e93c82..04e0763b2ddc0a31d16fc0bd77afae7965fd28cc 100644
+--- a/chrome/browser/ui/webui/settings/BUILD.gn
++++ b/chrome/browser/ui/webui/settings/BUILD.gn
+@@ -122,6 +122,12 @@ source_set("settings") {
+     sources += [ "mac_system_settings_handler.h" ]
+   }
+ 
++  if (!is_chromeos) {
++    public_deps += [
++      "//uw/browser/ui/webui/uw_organization:uw_organization_handler",
++    ]
++  }
++
+   if (is_chromeos) {
+     public_deps += [
+       "//chrome/browser/ash/accessibility",
+@@ -234,6 +240,7 @@ source_set("impl") {
+     "//chrome/browser/renderer_context_menu:bubble_models",
+     "//chrome/browser/resources/settings:resources_grit",
+     "//chrome/browser/resources/settings_shared:resources_grit",
++    "//uw/browser/resources/uw_organization:resources_grit",
+     "//chrome/browser/safe_browsing",
+     "//chrome/browser/search_engines",
+     "//chrome/browser/serial",
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+index 4a53cfbc0ecc60b14902fdd344c851a2da932a3f..ca68b6ac22d198c01af5704ffa9802e28e0c13a9 100644
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -155,6 +155,10 @@
+ #include "chrome/browser/ui/webui/settings/system_handler.h"
+ #endif
+ 
++#if !BUILDFLAG(IS_CHROMEOS)
++#include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
++#endif
++
+ #if BUILDFLAG(IS_LINUX)
+ #include "ui/display/screen.h"
+ #endif
+@@ -4563,6 +4567,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
+   AddDefaultBrowserStrings(html_source);
+   AddImportDataStrings(html_source);
+   AddSystemStrings(html_source);
++  uw::UwOrganizationHandler::AddLoadTimeData(html_source);
+ #endif
+ 
+   policy_indicator::AddLocalizedStrings(html_source);
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
+index 42854fe44420c30e654bfc3ad3076e65646bb391..503dd54679174003491edc7e57b293c9856d0b24 100644
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -162,6 +162,11 @@
+ #include "chrome/grit/settings_shared_resources_map.h"
+ #endif
+ 
++#if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(OPTIMIZE_WEBUI)
++#include "chrome/grit/uw_organization_resources.h"
++#include "chrome/grit/uw_organization_resources_map.h"
++#endif
++
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/ui/webui/settings/languages_handler.h"
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
+@@ -215,6 +220,9 @@
+ #endif
+ 
+ #include "chrome/browser/ui/webui/batch_upload_promo/batch_upload_promo_handler.h"
++#if !BUILDFLAG(IS_CHROMEOS)
++#include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
++#endif
+ 
+ namespace settings {
+ 
+@@ -477,6 +485,7 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
+ 
+ #if !BUILDFLAG(OPTIMIZE_WEBUI)
+   html_source->AddResourcePaths(kSettingsSharedResources);
++  html_source->AddResourcePaths(kUwOrganizationResources);
+ #endif
+ 
+   AddLocalizedStrings(html_source, profile, web_ui->GetWebContents());
+@@ -773,6 +782,12 @@ void SettingsUI::BindInterface(
+   }
+   signin_handler_factory_receiver_.Bind(std::move(pending_receiver));
+ }
++
++void SettingsUI::BindInterface(
++    mojo::PendingReceiver<uw::mojom::OrganizationHandler> receiver) {
++  organization_handler_ = std::make_unique<uw::UwOrganizationHandler>(
++      Profile::FromWebUI(web_ui()), std::move(receiver));
++}
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+ void SettingsUI::BindInterface(
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.h b/chrome/browser/ui/webui/settings/settings_ui.h
+index 3bbfa947460fa296877d0d4fc08ceb9b9a5d5a52..1d54ea1035f31bba9c0ba322dfba8326070112e0 100644
+--- a/chrome/browser/ui/webui/settings/settings_ui.h
++++ b/chrome/browser/ui/webui/settings/settings_ui.h
+@@ -24,6 +24,7 @@
+ #if !BUILDFLAG(IS_CHROMEOS)
+ #include "ui/webui/resources/cr_components/signin/signin.mojom.h"
+ #include "ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom.h"
++#include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ #include "ui/webui/resources/js/batch_upload_promo/batch_upload_promo.mojom.h"
+ 
+@@ -38,6 +39,9 @@ class PrefRegistrySyncable;
+ #if !BUILDFLAG(IS_CHROMEOS)
+ class ThemeColorPickerHandler;
+ class SigninUtilsHandler;
++namespace uw {
++class UwOrganizationHandler;
++}  // namespace uw
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ class BatchUploadPromoHandler;
+ 
+@@ -95,6 +99,11 @@ class SettingsUI
+   void BindInterface(
+       mojo::PendingReceiver<signin::mojom::SigninPageHandlerFactory>
+           pending_receiver);
++#if !BUILDFLAG(IS_CHROMEOS)
++  // Binds the uw organization section backend.
++  void BindInterface(
++      mojo::PendingReceiver<uw::mojom::OrganizationHandler> pending_receiver);
++#endif  // !BUILDFLAG(IS_CHROMEOS)
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+   // Instantiates the implementor of the
+@@ -146,6 +155,8 @@ class SettingsUI
+   std::unique_ptr<SigninUtilsHandler> signin_handler_;
+   mojo::Receiver<signin::mojom::SigninPageHandlerFactory>
+       signin_handler_factory_receiver_{this};
++
++  std::unique_ptr<uw::UwOrganizationHandler> organization_handler_;
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+   // batch_upload_promo::mojom::PageHandlerFactory:
+diff --git a/third_party/lit/v3_0/BUILD.gn b/third_party/lit/v3_0/BUILD.gn
+index 595b377b5091b584e7347ee0d05f73d6f997823e..ed7f52de0bafa10f890ba92d6ae93e296a2acc4e 100644
+--- a/third_party/lit/v3_0/BUILD.gn
++++ b/third_party/lit/v3_0/BUILD.gn
+@@ -177,6 +177,9 @@ ts_library("build_ts") {
+     "//ui/webui/resources/cr_components/searchbox:build_ts",
+     "//ui/webui/resources/cr_components/theme_color_picker:build_ts",
+     "//ui/webui/resources/cr_elements:build_ts",
++
++    # uw settings page (see uw/browser/resources/uw_organization).
++    "//uw/browser/resources/uw_organization:build_ts",
+   ]
+   tsconfig_base = "tsconfig_base.json"
+   composite = true
+diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
+index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..408ed932e177a61646d345648e649f7d8d6ec335 100644
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -1789,6 +1789,11 @@
+     "includes": [10140],
+   },
+ 
++  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_organization/resources.grd": {
++    "META": {"sizes": {"includes": [10],}},
++    "includes": [10240],
++  },
++
+   "<(SHARED_INTERMEDIATE_DIR)/THIS_IS_A_PLACEHOLDER.grd": {
+     "META": {"sizes": {"includes": [800]}},
+     "includes": [12000],

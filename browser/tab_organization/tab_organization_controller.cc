@@ -18,6 +18,7 @@
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/content_extraction/content/browser/inner_text.h"
@@ -173,7 +174,10 @@ void TabOrganizationController::Sync() {
   // saved placement.
   if (fresh.size() == 1 && last_active_) {
     if (tree_.PlaceBeside(fresh[0], *last_active_)) {
-      AlignTabOrder();
+      // TabStripModel holds its reentrancy guard while notifying observers
+      // of the insertion, so moving tabs here would hit its CHECK. Defer the
+      // reorder until the insertion completes.
+      ScheduleAlignTabOrder();
     }
   }
   if (auto* active = tabs_->GetActiveTab()) {
@@ -453,6 +457,20 @@ void TabOrganizationController::AlignTabOrder() {
       tabs_->MoveWebContentsAt(index, destination, false, std::nullopt);
     ++destination;
   }
+}
+
+void TabOrganizationController::ScheduleAlignTabOrder() {
+  if (align_pending_)
+    return;
+  align_pending_ = true;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&TabOrganizationController::RunScheduledAlign,
+                                weak_factory_.GetWeakPtr()));
+}
+
+void TabOrganizationController::RunScheduledAlign() {
+  align_pending_ = false;
+  AlignTabOrder();
 }
 
 void TabOrganizationController::BeginTabDrag() {
@@ -897,6 +915,10 @@ void TabOrganizationController::CancelAutomatic() {
   pending_.clear();
   probe_.reset();
   coordinator_.InvalidateAll();
+}
+
+void TabOrganizationController::OpenOrganizationSettings() {
+  chrome::ShowSettingsSubPage(window_.get(), "uwOrganization");
 }
 
 void TabOrganizationController::ValidateProviders() {

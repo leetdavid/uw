@@ -18,7 +18,7 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 - Every automatic action records one undoable organization action covering task creation, branch moves, and the generated name. It shows a brief sidebar message with Undo and never steals focus or blocks navigation. After the message disappears, undo stays available through the persistent "Undo tab organization" command. New tabs are preserved; closed pages are never resurrected.
 - The sidebar Organize menu provides "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
 - API keys are stored in macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
-- The setup dialog shows the exact request scope before the user enables automatic organization.
+- The settings page shows the exact request scope before the user enables automatic organization.
 - Provider outage, malformed responses, and slow responses never block browsing. Tabs stay where they are.
 
 ## Non-goals
@@ -37,7 +37,7 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 - The protocol is one OpenAI-compatible chat-completions request with a structured response. Parsing is strict and rejects malformed input so a bad response can never move a tab. Ollama uses its OpenAI-compatible endpoint.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
 - `TabTree` distinguishes automatic placements from manual adjustments. Automatic moves and task creation record one undoable organization action; generated naming amends that action without a second undo entry.
-- Browser integration owns profile prefs, Keychain secrets, `SimpleURLLoader` lifecycle, debounce timers, revision tracking, pause state, the setup dialog, and the sidebar message. Window-owned `TabOrganizationController` remains the only mutation seam.
+- Browser integration owns profile prefs, Keychain secrets, `SimpleURLLoader` lifecycle, debounce timers, revision tracking, pause state, the settings page, and the sidebar message. Window-owned `TabOrganizationController` remains the only mutation seam.
 - Narrow Chromium patches wire prefs registration, the setup surface, and controller hooks. Product C++ stays in tracked `browser/` and `components/` directories per [code organization](../architecture.md#code-organization).
 
 ## Acceptance checks
@@ -51,7 +51,7 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 7. One undo reverses task creation, branch moves, and generated naming together, and remains available after the sidebar message disappears through "Undo tab organization". New tabs are preserved.
 8. Pause stops automatic placements and application of pending results across all windows; resume restores them. Manual tree controls keep working while paused.
 9. Provider outage, malformed responses, and slow responses never block browsing.
-10. Each request contains the documented scope only. No API keys or request payloads appear in logs, preferences, session data, or crash reports. The setup dialog shows the scope before enabling.
+10. Each request contains the documented scope only. No API keys or request payloads appear in logs, preferences, session data, or crash reports. The settings page shows the scope before enabling.
 11. `pnpm run check` passes. `//chrome/test:unit_tests` passes `TabTreeTest.*`, `OrganizationCoordinatorTest.*`, and `AiProtocolTest.*`. `//chrome/test:browser_tests` passes `TabOrganizationControllerBrowserTest.*`.
 
 ## Later stages

@@ -107,6 +107,10 @@ class TabOrganizationController : public TabStripModelObserver {
   // notice.
   void ValidateProviders();
 
+  // Opens the uw organization section of chrome://settings. Settings owns
+  // every organization control; the sidebar only links there.
+  void OpenOrganizationSettings();
+
   // Global automatic-organization pause per the product pause choices.
   void SetPause(PauseMode mode, base::TimeDelta duration = base::TimeDelta());
   PauseMode pause_mode() const;
@@ -131,6 +135,8 @@ class TabOrganizationController : public TabStripModelObserver {
   bool Eligible(tabs::TabInterface* tab) const;
   void Sync();
   void AlignTabOrder();
+  void ScheduleAlignTabOrder();
+  void RunScheduledAlign();
   void ScheduleUpdate();
   void Update();
   void FinishTabDrag(bool completed);
@@ -170,6 +176,7 @@ class TabOrganizationController : public TabStripModelObserver {
   std::optional<TreeId> drop_parent_;
   std::optional<TreeId> drop_before_;
   bool aligning_ = false;
+  bool align_pending_ = false;
   bool update_pending_ = false;
   base::CallbackListSubscription tree_subscription_;
   base::RepeatingClosureList changed_;

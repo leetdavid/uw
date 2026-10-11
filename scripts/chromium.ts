@@ -283,6 +283,16 @@ export class Chromium {
     if (!this.doctor()) throw new BuildError("Preflight failed. See README.md#build-host-requirements before retrying.");
   }
 
+  requireJobsForMemory(jobs: number): void {
+    // autoninja and gclient sync both scale memory with job count. High job
+    // counts on small Macs die to OOM kills that look like flaky builds.
+    if (this.runtime.memoryBytes < 24 * GIB && jobs > 2) {
+      throw new BuildError(
+        `This host has ${(this.runtime.memoryBytes / GIB).toFixed(0)} GiB of memory; ` +
+        `use --jobs 2. Higher job counts exhaust memory and fail mid-build.`, 2);
+    }
+  }
+
   verifyRepo(path: string, url: string, revision?: string): void {
     if (!existsSync(join(path, ".git")) || !statSync(join(path, ".git")).isDirectory()) {
       throw new BuildError(`${path}: expected a Git checkout; run sync in a dedicated checkout root`);
@@ -367,6 +377,7 @@ export class Chromium {
 
   sync(jobs: number): void {
     this.requireHost();
+    this.requireJobsForMemory(jobs);
     requireOwnedRoot(this.layout, true);
     const config = join(this.layout.root, ".gclient");
     if (existsSync(config)) this.verifyConfig();
@@ -419,6 +430,7 @@ export class Chromium {
 
   build(jobs: number): void {
     this.requireHost();
+    this.requireJobsForMemory(jobs);
     this.prepare();
     const args = readFileSync(join(REPO, "chromium/args.gn"), "utf8") +
       (this.runtime.arch === "arm64" ? "\nuse_lld = false\n" : "");
@@ -449,7 +461,12 @@ export class Chromium {
         "--dump-dom", `data:text/html,${encodeURIComponent(html)}`,
       ], { timeout });
     } finally { rmSync(profile, { recursive: true, force: true }); }
-    if (!dom.includes('data-uw-smoke="passed"')) throw new BuildError("Browser started but the JavaScript/DOM smoke check failed");
+    if (!dom.includes('data-uw-smoke="passed"')) {
+      throw new BuildError(
+        "Browser started but the JavaScript/DOM smoke check failed. " +
+        "For a crash, record the quit time, then check the newest report: " +
+        "ls -lt ~/Library/Logs/DiagnosticReports/uw*.ips | head -3");
+    }
     this.runtime.log(`${version}\nPASS: headless navigation and JavaScript in an isolated profile`);
   }
 }

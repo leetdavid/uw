@@ -322,12 +322,20 @@ index a96f4b8..ab709cb 100644
    for (auto& child_node : collection_node_->children()) {
      auto* view = child_node->view();
      CHECK(view);
-@@ -222,6 +237,7 @@ gfx::Size UnpinnedTabContainerView::GetTargetPreferredSize() const {
+@@ -222,6 +237,15 @@ gfx::Size UnpinnedTabContainerView::GetTargetPreferredSize() const {
  }
  
  void UnpinnedTabContainerView::ResetCollectionNode() {
-+  uw_tree_.reset();
    collection_node_ = nullptr;
++  // Never detach adapter views here. Both window teardown and tab-orientation
++  // switches delete the TabStripView (and this host) right after the
++  // collection nodes are destroyed, so the views must die with the host in
++  // cascade order. Forcing their removal recalculates the animating layout
++  // while siblings are half-destroyed and leaves stale entries that trip its
++  // dangling-pointer check when the layout manager is destroyed. Releasing
++  // the adapter clears only its own tracking; live-host removals still go
++  // through RemoveOwnedView.
++  uw_tree_.reset();
  }
  
 @@ -241,6 +257,8 @@ const views::ProposedLayout& UnpinnedTabContainerView::GetLayoutForDrag()

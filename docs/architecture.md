@@ -34,6 +34,36 @@ Avoid whole-file Chromium replacements, macro-based source interception, and a g
 
 Implementability: **7/10** for this organization including ongoing Chromium updates, using the [roadmap convention](plans/roadmap.md#implementability-estimates). A successful version-bump trial is still needed to measure maintenance cost.
 
+### Native lifetime rules
+
+Three rules come from fixed native crashes. They apply to every uw
+customization, not just tab organization:
+
+- Never mutate `TabStripModel` from its observer notifications. Defer tab
+  moves to a posted task; the model holds a reentrancy guard while notifying.
+- Erase view-tracking entries before retiring their views, and detach the
+  adapter's back-pointers first. Buttons hold unowned `drag_controller_` and
+  `context_menu_controller_` pointers to the adapter, and the views outlive
+  the adapter at window teardown: destroying them later would otherwise
+  release a dangling pointer. At teardown, remove nothing: the views die
+  with the host in cascade order, and forcing their removal recalculates
+  the animating layout while siblings are half-destroyed. Explicit
+  retirement is only for when the host outlives the removed views.
+- Never delete a view the animating layout manager's cached targets still
+  reference. It caches raw pointers to laid-out children in its starting
+  and target layouts, and no synchronous relayout from the adapter reaches
+  that outer cache. Retire stale views instead: detach, hide, and exclude
+  them from calculated layouts, and let them die with the host. Erased map
+  entries plus detached, hidden views cannot dangle no matter when the
+  next layout or teardown runs.
+- Never keep an unowned pointer to an object owned by a dialog, bubble, or
+  host view. Look it up from the owning model while that model is alive; the
+  owner's member-destruction order will otherwise dangle it.
+
+Non-official builds keep Chromium's `DCHECK` and dangling-pointer checks
+enabled. Treat a debug-check crash as the safeguard working: fix the lifetime
+instead of silencing the check.
+
 ## Native tab tree
 
 The user has approved the [manual native tab-tree slice](plans/native-tab-tree.md). The patch enables Chromium's native vertical-tab default and connects the manual tab tree. The customized build and headless smoke test pass; native UI verification remains pending. The [pinned-source investigation](research/chromium-tab-api-research.md) identifies the reused controls and layout/input adaptations.

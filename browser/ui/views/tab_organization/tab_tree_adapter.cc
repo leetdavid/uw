@@ -35,7 +35,6 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
-#include "uw/browser/ui/views/tab_organization/ai_setup_dialog.h"
 
 namespace uw {
 namespace {
@@ -108,34 +107,41 @@ TabTreeAdapter::TabTreeAdapter(views::View* host,
 TabTreeAdapter::~TabTreeAdapter() {
   runner_.reset();
   notice_timer_.Stop();
-  std::vector<views::View*> owned;
-  owned.reserve(tasks_.size() + disclosures_.size() + 3);
+  // Never remove views here. When the host is being destroyed the views die
+  // with it in cascade order, exactly like native tab views; forcing their
+  // removal first recalculates the animating layout manager while siblings
+  // are half-destroyed and leaves stale entries that trip its
+  // dangling-pointer check on destruction. The same applies to
+  // ResetCollectionNode: it releases the adapter without touching views.
+  // Buttons hold unowned drag and context-menu back-pointers to this
+  // adapter, so detach them first: the views outlive the adapter here, and
+  // destroying them later would otherwise release a dangling pointer.
+  // Retired views are never deleted on a live host either: the animating
+  // layout manager caches raw pointers to laid-out children, and deleting
+  // one while its cached targets still reference it trips the same check
+  // when the old cached entry is released. Retired views stay hidden and
+  // detached until they die with the host.
   for (const auto& [id, view] : tasks_)
-    owned.push_back(view.get());
-  tasks_.clear();
+    DetachView(view);
   for (const auto& [id, view] : disclosures_)
-    owned.push_back(view.get());
+    DetachView(view);
+  tasks_.clear();
   disclosures_.clear();
-  if (organize_) {
-    owned.push_back(organize_.get());
-    organize_ = nullptr;
-  }
-  if (scratchpad_) {
-    owned.push_back(scratchpad_.get());
-    scratchpad_ = nullptr;
-  }
-  if (notice_) {
-    owned.push_back(notice_.get());
-    notice_ = nullptr;
-  }
-  for (auto* view : owned)
-    RemoveOwnedView(view);
+  removing_.clear();
+  organize_ = nullptr;
+  scratchpad_ = nullptr;
+  notice_ = nullptr;
 }
 
-void TabTreeAdapter::RemoveOwnedView(views::View* view) {
+void TabTreeAdapter::DetachView(views::View* view) {
+  view->set_context_menu_controller(nullptr);
+  view->set_drag_controller(nullptr);
+}
+
+void TabTreeAdapter::RetireView(views::View* view) {
+  DetachView(view);
+  view->SetVisible(false);
   removing_.insert(view);
-  host_->RemoveChildViewT(view);
-  removing_.erase(view);
 }
 
 void TabTreeAdapter::ShowOrganizationNotice(
@@ -174,7 +180,7 @@ void TabTreeAdapter::ClearNotice() {
   }
   auto* notice = notice_.get();
   notice_ = nullptr;
-  RemoveOwnedView(notice);
+  RetireView(notice);
   host_->InvalidateLayout();
 }
 
@@ -243,28 +249,31 @@ void TabTreeAdapter::Refresh() {
       visit(child.get());
   };
   visit(tree.root());
-  // Stale views are hidden, not destroyed: the host's animating layout
-  // manager retains raw pointers to laid-out children across animation
-  // frames, so freeing a view mid-life trips the dangling-pointer detector
-  // even after the recalculated target drops it. Hidden views stay alive
-  // (and invisible to events, layout, and accessibility) until adapter
-  // teardown, whose removal path the browser tests cover. Deletions only
-  // happen for discarded tasks, so the retained set stays small.
+  // Stale views are retired, never deleted: the animating layout manager
+  // caches raw pointers to laid-out children in its starting and target
+  // layouts, and no synchronous relayout from this adapter reaches that
+  // outer cache. Deleting a view while its cached targets still reference
+  // it trips the dangling-pointer check when the old cached entry is
+  // released. Retiring detaches the adapter back-pointers, hides the view,
+  // and excludes it from calculated layouts; the entries are erased first
+  // so the maps never hold a retired view. Retired views die with the host.
   for (auto it = tasks_.begin(); it != tasks_.end();) {
     if (tasks.contains(it->first)) {
       ++it;
       continue;
     }
-    it->second->SetVisible(false);
+    auto* view = it->second.get();
     it = tasks_.erase(it);
+    RetireView(view);
   }
   for (auto it = disclosures_.begin(); it != disclosures_.end();) {
     if (parents.contains(it->first)) {
       ++it;
       continue;
     }
-    it->second->SetVisible(false);
+    auto* view = it->second.get();
     it = disclosures_.erase(it);
+    RetireView(view);
   }
   host_->InvalidateLayout();
 }
@@ -427,7 +436,9 @@ void TabTreeAdapter::ExecuteCommand(int command, int) {
     return;
   }
   if (command == kSetupAutomatic) {
-    AiSetupDialog::Show(organize_, controller_->GetWeakPtr());
+    // Settings owns every organization control. Opening a settings tab keeps
+    // no bubble anchored to the sidebar, so window teardown cannot strand it.
+    controller_->OpenOrganizationSettings();
     return;
   }
   if (command == kPause1Hour) {

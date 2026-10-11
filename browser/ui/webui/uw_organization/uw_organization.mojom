@@ -1,0 +1,41 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+// Non-secret snapshot of the organization connection behind automatic tab
+// organization. The API key itself never crosses this boundary; only whether
+// one is stored.
+struct ConnectionState {
+  // Matches uw::ConnectionMode.
+  int32 mode;
+  string endpoint;
+  string model;
+  bool has_key;
+  bool enabled;
+  // Matches uw::PauseMode.
+  int32 pause_mode;
+};
+
+struct SaveResult {
+  bool ok;
+};
+
+struct ModelsResult {
+  bool ok;
+  array<string> models;
+};
+
+struct PauseResult {
+  int32 pause_mode;
+};
+
+// Profile-scoped backend for the uw organization section of
+// chrome://settings.
+interface OrganizationHandler {
+  GetState() => (ConnectionState state);
+  LoadModels(string endpoint, string api_key) => (ModelsResult result);
+  Save(int32 mode, string endpoint, string model, string api_key)
+      => (SaveResult result);
+  SetPause(int32 mode) => (PauseResult result);
+};

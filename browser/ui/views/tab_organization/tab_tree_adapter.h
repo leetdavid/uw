@@ -67,10 +67,15 @@ class TabTreeAdapter : public ui::SimpleMenuModel::Delegate,
     gfx::Rect bounds;
   };
   void Refresh();
-  // Removes an adapter-owned child view. The view stays attached while the
-  // layout manager processes its synchronous removal notification, so it is
-  // hidden from CalculateLayout until deletion completes.
-  void RemoveOwnedView(views::View* view);
+  // Nulls this adapter's back-pointers on a view it manages. Views outlive
+  // the adapter at window teardown, so every path that drops a view from
+  // tracking must detach first.
+  void DetachView(views::View* view);
+  // Hides a dropped view, detaches it, and marks it excluded from layouts.
+  // Retired views are never deleted: they stay hidden until they die with
+  // the host, because the animating layout manager caches raw pointers to
+  // laid-out children.
+  void RetireView(views::View* view);
   void ShowOrganizationNotice(TabOrganizationController::Notice notice);
   void ClearNotice();
   void OnNoticeActivated();
