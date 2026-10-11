@@ -1,12 +1,28 @@
 source_set("tab_organization") {
   sources = [
+    "organize_bar.cc",
+    "organize_bar.h",
+    "scratchpad_label.cc",
+    "scratchpad_label.h",
     "tab_indent.cc",
     "tab_indent.h",
   ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//ui/menus",
+    "//ui/views",
+    "//uw/browser/tab_organization",
+  ]
   deps = [
+    "//chrome:strings",
     "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
+    "//components/prefs",
+    "//ui/base",
+    "//ui/color",
+    "//ui/gfx",
+    "//uw/browser/tab_organization:ai_connection",
     "//chrome/browser/ui/views/tabs/common:common",
     "//components/tabs:public",
     "//ui/views",

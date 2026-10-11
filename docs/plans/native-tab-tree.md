@@ -14,7 +14,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
 - Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
 - Tab menu commands: "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
-- An "Organize" button in the sidebar header opens "Undo tab organization", the pause controls, and the settings page.
+- An "Organize" button at the foot of the sidebar opens "Undo tab organization", the pause controls, and the settings page.
 - [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.
 - Parent links survive session restore.
 
@@ -30,7 +30,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - `components/tab_organization/page_tree` is a value type: tab order, task key, and parent link for each page of one window. Every rule lives there as plain functions, so it is tested without a browser.
 - `browser/tab_organization/tab_organization_controller` is owned by the window. It mirrors `TabStripModel` into a page tree, and applies tree changes back through Chromium's tab-group and move calls. It never changes the tab strip from inside an observer notification.
 - When the user changes tabs natively, the controller adopts the new order. A parent link survives only while the child still sits inside its parent's branch.
-- uw adds three things to Chromium's vertical tab strip: indentation, the Scratchpad label, and the Organize button. No uw view replaces or wraps a Chromium container.
+- uw adds three things to Chromium's vertical tab strip: indentation, the Scratchpad label, and the Organize bar at its foot. The bar holds the Organize button and the [automatic-move message](automatic-organization.md#agreed-scope). No uw view replaces or wraps a Chromium container.
 - Chromium edits stay in `chromium/patches/` as small hooks.
 - The [Arc-style look](../product.md#minimum-usable-version) is separate work: it restyles Chromium's own views and does not change this structure.
 

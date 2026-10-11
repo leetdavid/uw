@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_group.h"
@@ -29,12 +30,15 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/model_test_server.h"
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/organize_bar.h"
 
 namespace uw {
 namespace {
@@ -99,6 +103,23 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
 
   AutomaticOrganizer* organizer() {
     return AutomaticOrganizer::From(browser());
+  }
+
+  // The Organize bar at the foot of the sidebar.
+  OrganizeBar* bar() {
+    return FindBar(BrowserView::GetBrowserViewForBrowser(browser()));
+  }
+
+  static OrganizeBar* FindBar(views::View* view) {
+    if (OrganizeBar* bar = views::AsViewClass<OrganizeBar>(view)) {
+      return bar;
+    }
+    for (views::View* child : view->children()) {
+      if (OrganizeBar* bar = FindBar(child)) {
+        return bar;
+      }
+    }
+    return nullptr;
   }
 
   TabStripModel* tabs() { return browser()->tab_strip_model(); }
@@ -195,11 +216,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   EXPECT_EQ(link->GetGroup(), task);
   EXPECT_EQ(controller()->DepthFor(link), 0);
-  const std::optional<AutomaticOrganizer::Notice> notice =
-      organizer()->TakeNotice();
-  ASSERT_TRUE(notice);
-  EXPECT_EQ(notice->task, u"Plan Lisbon trip");
-  EXPECT_FALSE(notice->created);
+  ASSERT_TRUE(bar()->notice_visible());
+  EXPECT_EQ(bar()->notice_text(), u"Moved to Plan Lisbon trip");
 
   const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 1u);
@@ -209,9 +227,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(requests[0].body.find("Notes about lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Plan Lisbon trip"), std::string::npos);
 
-  controller()->Undo();
+  bar()->UndoNotice();
   EXPECT_FALSE(link->GetGroup());
   EXPECT_EQ(controller()->DepthFor(link), 1);
+  EXPECT_FALSE(bar()->notice_visible());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -227,10 +246,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(link->GetGroup());
   EXPECT_EQ(TitleOf(*link->GetGroup()), u"Plan Lisbon trip");
   EXPECT_FALSE(InitialTab()->GetGroup());
-  const std::optional<AutomaticOrganizer::Notice> notice =
-      organizer()->TakeNotice();
-  ASSERT_TRUE(notice);
-  EXPECT_TRUE(notice->created);
+  ASSERT_TRUE(bar()->notice_visible());
+  EXPECT_EQ(bar()->notice_text(), u"Created task Plan Lisbon trip");
 
   const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 2u);
@@ -291,7 +308,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Browse(link, "weather");
   ASSERT_TRUE(SettleAfter(3));
   EXPECT_FALSE(link->GetGroup());
-  EXPECT_FALSE(organizer()->TakeNotice());
+  EXPECT_FALSE(bar()->notice_visible());
   EXPECT_FALSE(controller()->CanUndo() && link->GetGroup());
 }
 
@@ -311,6 +328,40 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(link->GetGroup(), mine);
   EXPECT_TRUE(Requests().empty());
   EXPECT_EQ(organizer()->pending_requests(), 0u);
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AManualMoveHidesTheMessage) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_TRUE(bar()->notice_visible());
+
+  ASSERT_TRUE(controller()->MoveToScratchpad({Id(link)}));
+  EXPECT_FALSE(bar()->notice_visible());
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       OrganizeMenuUndoesPausesAndOpensSettings) {
+  OneTask();
+  ASSERT_TRUE(bar()->GetVisible());
+  ASSERT_TRUE(bar()->IsCommandIdEnabled(OrganizeBar::kUndo));
+  bar()->ExecuteCommand(OrganizeBar::kUndo, 0);
+  EXPECT_TRUE(tabs()->group_model()->ListTabGroups().empty());
+  EXPECT_FALSE(bar()->IsCommandIdEnabled(OrganizeBar::kUndo));
+
+  EXPECT_FALSE(bar()->IsCommandIdEnabled(OrganizeBar::kResume));
+  bar()->ExecuteCommand(OrganizeBar::kPauseIndefinitely, 0);
+  EXPECT_EQ(ReadPauseState(prefs()), PauseMode::kIndefinite);
+  EXPECT_FALSE(bar()->IsCommandIdEnabled(OrganizeBar::kPauseIndefinitely));
+  bar()->ExecuteCommand(OrganizeBar::kResume, 0);
+  EXPECT_EQ(ReadPauseState(prefs()), PauseMode::kOff);
+
+  bar()->ExecuteCommand(OrganizeBar::kSettings, 0);
+  EXPECT_EQ(tabs()->GetActiveWebContents()->GetVisibleURL(),
+            GURL("chrome://settings/uwOrganization"));
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

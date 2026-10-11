@@ -68,8 +68,9 @@ AutomaticOrganizer* AutomaticOrganizer::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;
 }
 
-std::optional<AutomaticOrganizer::Notice> AutomaticOrganizer::TakeNotice() {
-  return std::exchange(notice_, std::nullopt);
+base::CallbackListSubscription AutomaticOrganizer::ObserveNotices(
+    NoticeCallback callback) {
+  return notices_.Add(std::move(callback));
 }
 
 void AutomaticOrganizer::DispatchNowForTesting() {
@@ -262,7 +263,7 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
         controller_->MoveToTask(
             {request->page}, *group,
             TabOrganizationController::Origin::kOrganizer)) {
-      notice_ = Notice{controller_->TaskTitle(answer->choice), false};
+      notices_.Notify(Notice{controller_->TaskTitle(answer->choice), false});
     }
     return;
   }
@@ -309,7 +310,7 @@ void AutomaticOrganizer::CreateTask(const Request& request,
   if (controller_->MoveToNewTask(
           {request.page}, title,
           TabOrganizationController::Origin::kOrganizer)) {
-    notice_ = Notice{std::move(title), true};
+    notices_.Notify(Notice{std::move(title), true});
   }
 }
 

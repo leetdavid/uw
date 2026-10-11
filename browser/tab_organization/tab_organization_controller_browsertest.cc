@@ -94,23 +94,26 @@ class TabOrganizationControllerBrowserTest
     EXPECT_EQ(tree, Strip());
   }
 
-  // The tab rows of the sidebar, top to bottom.
-  std::vector<views::View*> TabRows() {
+  // The views of one class in the window, top to bottom.
+  std::vector<views::View*> ViewsOfClass(std::string_view name) {
     views::Widget* widget =
         BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
     widget->LayoutRootViewIfNecessary();
-    std::vector<views::View*> rows;
+    std::vector<views::View*> found;
     const std::function<void(views::View*)> visit = [&](views::View* view) {
-      if (std::string_view(view->GetClassName()) == "TabView") {
-        rows.push_back(view);
+      if (std::string_view(view->GetClassName()) == name) {
+        found.push_back(view);
       }
       for (views::View* child : view->children()) {
         visit(child);
       }
     };
     visit(widget->GetRootView());
-    return rows;
+    return found;
   }
+
+  // The tab rows of the sidebar, top to bottom.
+  std::vector<views::View*> TabRows() { return ViewsOfClass("TabView"); }
 
   std::u16string TitleOf(const tab_groups::TabGroupId& group) {
     return tabs()->group_model()->GetTabGroup(group)->visual_data()->title();
@@ -363,6 +366,28 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   base::RunLoop().RunUntilIdle();
   rows = TabRows();
   EXPECT_EQ(rows[1]->GetBoundsInScreen().x(), rows[0]->GetBoundsInScreen().x());
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ScratchpadLabelSitsAboveUngroupedTabs) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  std::vector<views::View*> rows = TabRows();
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_EQ(rows[0]->y(), 24);
+
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(page)}, u"Plan"));
+  base::RunLoop().RunUntilIdle();
+  const std::vector<views::View*> tasks = ViewsOfClass("TabGroupView");
+  ASSERT_EQ(tasks.size(), 1u);
+  EXPECT_EQ(tasks[0]->y(), 0);
+
+  ASSERT_TRUE(controller()->MoveToScratchpad({Id(page)}));
+  base::RunLoop().RunUntilIdle();
+  rows = TabRows();
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_EQ(rows[0]->y(), 24);
 }
 
 // Switching tab orientation rebuilds the sidebar views. The window-owned

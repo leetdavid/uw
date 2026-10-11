@@ -25,7 +25,7 @@ All of these are manual tests. Record anything that differs from the expected re
 1. Open three disposable tabs with Cmd-T.
 2. Right-click one and choose `Move to new task`.
 
-Expected result: the tab moves into a new tab group named `New task`, below the ungrouped tabs. Rename, recolor, collapse, and drag the group as you would in Chromium.
+Expected result: the tab moves into a new tab group named `New task`, below the ungrouped tabs. The ungrouped tabs sit under a `Scratchpad` label. Rename, recolor, collapse, and drag the group as you would in Chromium.
 
 ### Link parentage and ordinary close
 
@@ -43,14 +43,28 @@ Right-click a tab that opened other tabs.
 - `Close branch` closes the tab and everything it opened.
 - `Undo tab organization` reverses the last of these moves. It does not reopen closed pages.
 
+### Organize button
+
+Click `Organize` at the foot of the sidebar.
+
+- `Undo tab organization` reverses the last move, as in the tab menu.
+- The pause items stop and resume automatic organization.
+- `Tab organization settings` opens the settings page.
+
+### Automatic organization
+
+Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. Then open a link in a new tab.
+
+Expected result: when the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button. This has only been run against a test server, never a live provider.
+
 ### Persistence
 
 Arrange a few tabs, quit uw, and launch it again with "Continue where you left off" set at `chrome://settings/onStartup`. Check that groups and tab order return. This is a trial, not a guarantee.
 
 ## Not available yet
 
-- The Scratchpad label and the Organize button. Use the tab's right-click menu for now.
-- A dependable automatic organization. The organizer files tabs once `uw://settings/uwOrganization` has saved and validated a decision model, a language model, or both. It has only been run against a test server, never a live provider. No message appears when a tab is filed. `Undo tab organization` in the tab menu reverses it.
+- The Arc-style look. The sidebar still looks like stock Chromium.
+- The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.
 - Verified extension compatibility or daily-use stability.

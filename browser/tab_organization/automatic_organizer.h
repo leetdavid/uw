@@ -45,7 +45,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   DECLARE_USER_DATA(AutomaticOrganizer);
   static constexpr double kMinConfidence = 0.90;
 
-  // The latest automatic change, for the sidebar message.
+  // One automatic change, for the sidebar message.
   struct Notice {
     std::u16string task;
     // True when the task was created by this change.
@@ -58,7 +58,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
 
   static AutomaticOrganizer* From(BrowserWindowInterface* window);
 
-  std::optional<Notice> TakeNotice();
+  using NoticeCallback = base::RepeatingCallback<void(const Notice&)>;
+  base::CallbackListSubscription ObserveNotices(NoticeCallback callback);
   size_t pending_requests() const { return requests_.size(); }
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
@@ -111,7 +112,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
   uint64_t next_request_ = 1;
-  std::optional<Notice> notice_;
+  base::RepeatingCallbackList<void(const Notice&)> notices_;
   base::OneShotTimer timer_;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription tree_changed_;
