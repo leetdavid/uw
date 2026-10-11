@@ -35,6 +35,11 @@ export class PatchSet {
     "--src-prefix=a/", "--dst-prefix=b/", "--ignore-submodules=all",
   ];
 
+  private sections(diff: string): Map<string, string> {
+    return new Map(diff.split(/(?=^diff --git )/m).filter(Boolean)
+      .map((file) => [file.split("\n", 1)[0]!, file]));
+  }
+
   private readState(): PatchState | undefined {
     if (!existsSync(this.state)) return undefined;
     const state: unknown = JSON.parse(readFileSync(this.state, "utf8"));
@@ -110,11 +115,24 @@ export class PatchSet {
       else if (this.readState()?.phase !== "applied") this.record("applied", expected);
       return;
     }
-    this.unapply();
-    if (!expected) return;
-    this.git(["apply", "--check", "--whitespace=error", "-"], expected);
+    // Touch only files whose patched content changes, so the next build
+    // recompiles those and nothing else.
+    const before = this.sections(current);
+    const after = this.sections(expected);
+    const stale = [...before].filter(([file, text]) => after.get(file) !== text).map(([, text]) => text).join("");
+    const fresh = [...after].filter(([file, text]) => before.get(file) !== text).map(([, text]) => text).join("");
+    if (stale) {
+      this.git(["apply", "--reverse", "--check", "-"], stale);
+      this.record("unapplying", current);
+      this.git(["apply", "--reverse", "-"], stale);
+    }
+    if (!expected) {
+      rmSync(this.state, { force: true });
+      return;
+    }
+    if (fresh) this.git(["apply", "--check", "--whitespace=error", "-"], fresh);
     this.record("applying", expected);
-    this.git(["apply", "--whitespace=error", "-"], expected);
+    if (fresh) this.git(["apply", "--whitespace=error", "-"], fresh);
     this.record("applied", expected);
   }
 

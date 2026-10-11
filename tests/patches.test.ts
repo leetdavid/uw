@@ -68,6 +68,23 @@ test("changed and removed patches replace the old recorded result", (t) => {
   f.patches.verify();
 });
 
+test("changing one patch leaves the files of other patches untouched", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.directory, "other.patch"),
+    "diff --git a/other.txt b/other.txt\n--- a/other.txt\n+++ b/other.txt\n@@ -1 +1 @@\n-other original\n+other patched\n");
+  writeFileSync(join(f.directory, "series"), "first.patch\nsecond.patch\nother.patch\n");
+  f.patches.apply();
+  const other = join(f.layout.source, "other.txt");
+  const untouched = statSync(other).mtimeMs;
+  writeFileSync(join(f.directory, "second.patch"), f.patch("first", "third"));
+  f.patches.apply(); f.patches.verify();
+  assert.equal(readFileSync(f.file, "utf8"), "before\nthird\n\n");
+  assert.equal(readFileSync(other, "utf8"), "other patched\n");
+  assert.equal(statSync(other).mtimeMs, untouched);
+  f.patches.unapply();
+  assert.equal(readFileSync(other, "utf8"), "other original\n");
+});
+
 test("a conflict in a later patch leaves the previously prepared tree intact", (t) => {
   const f = fixture(t);
   f.patches.apply();
