@@ -1,0 +1,21 @@
+# The Arc-style look's color rules. No browser dependencies, so they are
+# tested without a window.
+source_set("look") {
+  sources = [
+    "tint.cc",
+    "tint.h",
+  ]
+  public_deps = [ "//skia" ]
+  deps = [ "//ui/gfx:color_utils" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "tint_unittest.cc" ]
+  deps = [
+    ":look",
+    "//skia",
+    "//testing/gtest",
+    "//ui/gfx:color_utils",
+  ]
+}

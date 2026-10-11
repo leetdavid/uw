@@ -7,6 +7,8 @@
 
 #include "base/run_loop.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
@@ -38,20 +40,32 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
     return browser()->tab_strip_model()->GetTabForWebContents(
         params.navigated_or_inserted_contents);
   }
+
+  // Opens nested tabs and files two of them into a task.
+  void StageSidebar() {
+    TabOrganizationController* controller =
+        TabOrganizationController::From(browser());
+    tabs::TabInterface* first = browser()->tab_strip_model()->GetTabAtIndex(0);
+    tabs::TabInterface* flights = OpenLinkFrom(first, "SFO to LIS flights");
+    OpenLinkFrom(flights, "Fare details: TAP Air Portugal");
+    tabs::TabInterface* news = OpenLinkFrom(first, "Hacker News");
+    OpenLinkFrom(news, "Show HN: Tree-style tabs for Chromium");
+    ASSERT_TRUE(controller->MoveToNewTask({*controller->IdFor(flights)},
+                                          u"Plan Lisbon trip"));
+    EXPECT_EQ(controller->tree().Tasks().size(), 1u);
+  }
 };
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, Sidebar) {
-  TabOrganizationController* controller =
-      TabOrganizationController::From(browser());
-  tabs::TabInterface* first = browser()->tab_strip_model()->GetTabAtIndex(0);
-  tabs::TabInterface* flights = OpenLinkFrom(first, "SFO to LIS flights");
-  OpenLinkFrom(flights, "Fare details: TAP Air Portugal");
-  tabs::TabInterface* news = OpenLinkFrom(first, "Hacker News");
-  OpenLinkFrom(news, "Show HN: Tree-style tabs for Chromium");
-  ASSERT_TRUE(controller->MoveToNewTask({*controller->IdFor(flights)},
-                                        u"Plan Lisbon trip"));
-  EXPECT_EQ(controller->tree().Tasks().size(), 1u);
+  StageSidebar();
   SaveWindowScreenshot(browser(), "sidebar");
+}
+
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, SidebarInDarkMode) {
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  StageSidebar();
+  SaveWindowScreenshot(browser(), "sidebar-dark");
 }
 
 }  // namespace

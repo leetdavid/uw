@@ -345,14 +345,22 @@ index a06ae50..a407ed7 100644
    return delegate_->GetContextMenuAccelerator(command_id, accelerator);
  }
 diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
-index 62e11c5..0865040 100644
+index 62e11c5a7a4f2d235b97fdaae2abb26a8b9aa053..d498e1538c77f404e259cf12612a146eb3cbffbf 100644
 --- a/chrome/test/BUILD.gn
 +++ b/chrome/test/BUILD.gn
-@@ -6462,6 +6462,7 @@ test("unit_tests") {
+@@ -2799,6 +2799,7 @@ if (!is_android) {
+       "//ui/webui:buildflags",
+       "//ui/webui:test_support",
+       "//ui/webui/resources/cr_components/history_clusters:mojo_bindings",
++      "//uw/browser:browser_tests",
+     ]
+ 
+     # TODO(crbug.com/428666921): Remove this dependency when
+@@ -6462,6 +6463,7 @@ test("unit_tests") {
        "//chrome/browser/ui/tabs:tab_strip",
        "//chrome/browser/ui/tabs:test_support",
        "//chrome/browser/ui/tabs:unit_tests",
-+      "//uw/components/tab_organization:unit_tests",
++      "//uw/components:unit_tests",
        "//chrome/browser/ui/tabs/alert:tab_alert",
        "//chrome/browser/ui/tabs/organizer:unit_tests",
        "//chrome/browser/ui/tabs/saved_tab_groups",

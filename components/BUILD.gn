@@ -1,0 +1,7 @@
+group("unit_tests") {
+  testonly = true
+  deps = [
+    "look:unit_tests",
+    "tab_organization:unit_tests",
+  ]
+}

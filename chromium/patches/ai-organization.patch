@@ -31,15 +31,3 @@ index 6ccdf1e52f..60df06ad2f 100644
    registry->RegisterBooleanPref(prefs::kCtrlTabMru, false);
    cross_device::RegisterProfilePrefs(registry);
    enterprise::RegisterIdentifiersProfilePrefs(registry);
-diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
-index 62e11c5a7a..b65c74be2f 100644
---- a/chrome/test/BUILD.gn
-+++ b/chrome/test/BUILD.gn
-@@ -2799,6 +2799,7 @@ if (!is_android) {
-       "//ui/webui:buildflags",
-       "//ui/webui:test_support",
-       "//ui/webui/resources/cr_components/history_clusters:mojo_bindings",
-+      "//uw/browser/tab_organization:browser_tests",
-     ]
-
-     # TODO(crbug.com/428666921): Remove this dependency when

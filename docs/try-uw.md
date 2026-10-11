@@ -63,7 +63,7 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 
 ## Not available yet
 
-- The Arc-style look. The sidebar still looks like stock Chromium.
+- Most of the Arc-style look. The window has its tint, lilac in light mode and indigo in dark mode. The page card, tab sizes, favorites tiles, and task folder rows still look like stock Chromium.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.

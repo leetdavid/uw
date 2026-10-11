@@ -1,0 +1,7 @@
+group("browser_tests") {
+  testonly = true
+  deps = [
+    "tab_organization:browser_tests",
+    "ui/webui/uw_organization:browser_tests",
+  ]
+}

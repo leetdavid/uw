@@ -11,6 +11,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -34,6 +35,13 @@ constexpr base::TimeDelta kNoticeDuration = base::Seconds(6);
 constexpr int kRowSpacing = 4;
 constexpr char kSettingsSubPage[] = "uwOrganization";
 
+// A filled pill in the colors of the window tint.
+void StyleAsPill(views::MdTextButton* button) {
+  button->SetBgColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
+  button->SetStrokeColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
+  button->SetEnabledTextColors(kColorTabForegroundInactiveFrameActive);
+}
+
 }  // namespace
 
 OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
@@ -49,19 +57,22 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
   notice->SetVisible(false);
   notice_label_ = notice->AddChildView(std::make_unique<views::Label>());
   notice_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  notice_label_->SetEnabledColor(kColorTabForegroundInactiveFrameActive);
+  notice_label_->SetBackgroundColor(SK_ColorTRANSPARENT);
   notice_label_->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::LayoutOrientation::kHorizontal,
                                views::MinimumFlexSizeRule::kScaleToZero,
                                views::MaximumFlexSizeRule::kUnbounded));
-  notice->AddChildView(std::make_unique<views::MdTextButton>(
+  StyleAsPill(notice->AddChildView(std::make_unique<views::MdTextButton>(
       base::BindRepeating(&OrganizeBar::UndoNotice, base::Unretained(this)),
-      l10n_util::GetStringUTF16(IDS_UW_AUTO_UNDO)));
+      l10n_util::GetStringUTF16(IDS_UW_AUTO_UNDO))));
   notice_ = AddChildView(std::move(notice));
 
   button_ = AddChildView(std::make_unique<views::MdTextButton>(
       base::BindRepeating(&OrganizeBar::ShowMenu, base::Unretained(this)),
       l10n_util::GetStringUTF16(IDS_UW_ORGANIZE)));
+  StyleAsPill(button_);
   button_->SetProperty(views::kCrossAxisAlignmentKey,
                        views::LayoutAlignment::kStart);
   button_->SetProperty(views::kMarginsKey,

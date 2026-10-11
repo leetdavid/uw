@@ -3,11 +3,11 @@
 
 #include "uw/browser/ui/views/tab_organization/scratchpad_label.h"
 
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
@@ -20,6 +20,7 @@ namespace {
 
 constexpr int kLabelHeight = 24;
 constexpr int kLabelInset = 8;
+constexpr SkAlpha kLabelAlpha = 0x8C;
 
 }  // namespace
 
@@ -45,7 +46,9 @@ void PaintScratchpadLabel(const views::View* container,
       l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD),
       gfx::FontList().DeriveWithSizeDelta(-1).DeriveWithWeight(
           gfx::Font::Weight::SEMIBOLD),
-      container->GetColorProvider()->GetColor(ui::kColorSysOnSurfaceSubtle),
+      SkColorSetA(container->GetColorProvider()->GetColor(
+                      kColorTabForegroundInactiveFrameActive),
+                  kLabelAlpha),
       bounds, gfx::Canvas::TEXT_ALIGN_TO_HEAD);
 }
 

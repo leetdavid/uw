@@ -1,0 +1,85 @@
+diff --git a/chrome/browser/ui/color/BUILD.gn b/chrome/browser/ui/color/BUILD.gn
+index f3f7ea8c06809a546c7c59a268bd68a75d9ad6a2..f2c6d780f291629c3da201304aa6e931b50c5673 100644
+--- a/chrome/browser/ui/color/BUILD.gn
++++ b/chrome/browser/ui/color/BUILD.gn
+@@ -62,6 +62,7 @@ source_set("mixers") {
+     "//ui/base:buildflags",
+     "//ui/color",
+     "//ui/color:mixers",
++    "//uw/browser/ui/look",
+   ]
+ 
+   if (is_chromeos) {
+diff --git a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/color/chrome_color_mixers.cc
+index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86a1facb32 100644
+--- a/chrome/browser/ui/color/chrome_color_mixers.cc
++++ b/chrome/browser/ui/color/chrome_color_mixers.cc
+@@ -23,6 +23,7 @@
+ #include "chrome/browser/ui/color/product_specifications_color_mixer.h"
+ #include "chrome/browser/ui/color/tab_strip_color_mixer.h"
+ #include "ui/color/color_provider_utils.h"
++#include "uw/browser/ui/look/tint_color_mixer.h"
+ 
+ namespace {
+ 
+@@ -59,6 +60,7 @@ void AddChromeColorMixers(ui::ColorProvider* provider,
+       chrome_color_provider_utils_callbacks;
+   ui::SetColorProviderUtilsCallbacks(
+       chrome_color_provider_utils_callbacks.get());
++  uw::AddTintColorMixer(provider, key);
+   AddChromeColorMixer(provider, key);
+   AddNewTabPageColorMixer(provider, key);
+   AddOmniboxColorMixer(provider, key);
+@@ -70,6 +72,7 @@ void AddChromeColorMixers(ui::ColorProvider* provider,
+   AddMaterialOmniboxColorMixer(provider, key);
+   AddMaterialSidePanelColorMixer(provider, key);
+   AddMaterialTabStripColorMixer(provider, key);
++  uw::AddTintTabColorMixer(provider, key);
+ 
+   // Must be the last one in order to override other mixer colors.
+   AddNativeChromeColorMixer(provider, key);
+diff --git a/chrome/browser/ui/views/frame/themed_background.cc b/chrome/browser/ui/views/frame/themed_background.cc
+index 169aee34fb3855b3e85fc99725013a2259290e08..2bce08b2c1e98ac7d50add2ca81f374688a01594 100644
+--- a/chrome/browser/ui/views/frame/themed_background.cc
++++ b/chrome/browser/ui/views/frame/themed_background.cc
+@@ -16,6 +16,7 @@
+ #include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
+ #include "ui/gfx/canvas.h"
++#include "uw/browser/ui/look/tint_painter.h"
+ 
+ namespace {
+ 
+@@ -109,10 +110,16 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
+                                        ThemeChoice theme_choice) {
+   bool painted =
+       PaintThemeCustomImage(canvas, view, browser_view, theme_choice);
+-  if (!painted) {
+-    canvas->DrawColor(view->GetColorProvider()->GetColor(
+-        GetThemeChoiceInfo(theme_choice, view).second));
++  if (painted) {
++    return;
+   }
++  const SkColor color = view->GetColorProvider()->GetColor(
++      GetThemeChoiceInfo(theme_choice, view).second);
++  if (theme_choice == kFrameTheme) {
++    uw::PaintTint(canvas, view, browser_view, color);
++    return;
++  }
++  canvas->DrawColor(color);
+ }
+ 
+ std::optional<SkColor> ThemedBackground::GetBackgroundColor(
+diff --git a/chrome/browser/ui/views/frame/glass_frame_service.cc b/chrome/browser/ui/views/frame/glass_frame_service.cc
+index 17e0dba1800ebd223a67fb84c33593744d7f9745..736eeb5ebd4dbb33d3719e4c730feb48427e44bc 100644
+--- a/chrome/browser/ui/views/frame/glass_frame_service.cc
++++ b/chrome/browser/ui/views/frame/glass_frame_service.cc
+@@ -37,7 +37,7 @@ GlassFrameService* GlassFrameService::GetInstance() {
+ 
+ // static
+ void GlassFrameService::RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
+-  registry->RegisterBooleanPref(prefs::kGlassFrameEnabled, true);
++  registry->RegisterBooleanPref(prefs::kGlassFrameEnabled, false);
+ }
+ 
+ GlassFrameService::GlassFrameService(BrowserProcess& process)

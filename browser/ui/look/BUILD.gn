@@ -1,0 +1,19 @@
+# The Arc-style look: tint colors and the window gradient.
+source_set("look") {
+  sources = [
+    "tint_color_mixer.cc",
+    "tint_color_mixer.h",
+    "tint_painter.cc",
+    "tint_painter.h",
+  ]
+  public_deps = [ "//uw/components/look" ]
+  deps = [
+    "//cc/paint",
+    "//chrome/browser/ui/color:color_headers",
+    "//skia",
+    "//ui/color",
+    "//ui/gfx",
+    "//ui/gfx:color_utils",
+    "//ui/views",
+  ]
+}

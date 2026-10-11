@@ -45,7 +45,6 @@ source_set("browser_tests") {
     "//components/content_extraction/content/browser",
     "//net:test_support",
     "//uw/browser/ui/views/tab_organization",
-    "//uw/browser/ui/webui/uw_organization:browser_tests",
     "//base",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
