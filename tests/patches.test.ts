@@ -85,6 +85,19 @@ test("changing one patch leaves the files of other patches untouched", (t) => {
   assert.equal(readFileSync(other, "utf8"), "other original\n");
 });
 
+test("edits exported into the series are adopted without rewriting files", (t) => {
+  const f = fixture(t);
+  f.patches.apply();
+  writeFileSync(f.file, "before\nedited in the checkout\n\n");
+  assert.throws(() => f.patches.apply(), /local changes/);
+  writeFileSync(join(f.directory, "second.patch"), f.patch("first", "edited in the checkout"));
+  const modified = statSync(f.file).mtimeMs;
+  f.patches.apply(); f.patches.verify();
+  assert.equal(statSync(f.file).mtimeMs, modified);
+  f.patches.unapply();
+  assert.equal(readFileSync(f.file, "utf8"), "before\noriginal\n\n");
+});
+
 test("a conflict in a later patch leaves the previously prepared tree intact", (t) => {
   const f = fixture(t);
   f.patches.apply();
@@ -196,6 +209,7 @@ test("all patch commands inherit the supplied environment, including temporary-i
 test("unrecorded changes and invalid series fail without modifying the source", (t) => {
   const f = fixture(t);
   f.patches.apply(); rmSync(f.state);
+  writeFileSync(f.file, "before\nunrecorded\n\n");
   assert.throws(() => f.patches.apply(), /local changes/);
   writeFileSync(f.file, "before\noriginal\n\n");
   for (const series of ["", "../first.patch\n", "first.patch\nfirst.patch\n"]) {

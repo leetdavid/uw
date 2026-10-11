@@ -56,6 +56,11 @@ export class PatchSet {
     renameSync(`${this.state}.tmp`, this.state);
   }
 
+  private clean(): boolean {
+    return !this.git(["diff", "--cached", "--name-only", "--ignore-submodules=none"]) &&
+      !this.git(["ls-files", "--others", "--exclude-standard"]);
+  }
+
   /** Accept managed changes and known file states of an interrupted operation. */
   check(): string {
     const diff = this.git([...this.diffArgs, "HEAD"]);
@@ -70,9 +75,7 @@ export class PatchSet {
         return file === files.get(header) ||
           (files.has(header) && file.startsWith(`${header}\ndeleted file mode `));
       }));
-    if (!(diff === (recorded?.diff ?? "") || interrupted) ||
-        this.git(["diff", "--cached", "--name-only", "--ignore-submodules=none"]) ||
-        this.git(["ls-files", "--others", "--exclude-standard"])) {
+    if (!(diff === (recorded?.diff ?? "") || interrupted) || !this.clean()) {
       throw new Error(`${this.source} has local changes beyond the recorded uw patches. Preserve them before running prepare or sync.`);
     }
     return diff;
@@ -107,12 +110,15 @@ export class PatchSet {
   }
 
   apply(): void {
-    const current = this.check();
     // Validate the whole series before changing any source file.
     const expected = this.expectedDiff();
+    // Edits made in the checkout and then exported into the series are
+    // already in place: nothing in the checkout lies beyond the patches.
+    const adopted = expected !== "" && this.clean() && this.git([...this.diffArgs, "HEAD"]) === expected;
+    const current = adopted ? expected : this.check();
     if (current === expected) {
       if (!current) rmSync(this.state, { force: true });
-      else if (this.readState()?.phase !== "applied") this.record("applied", expected);
+      else if (adopted || this.readState()?.phase !== "applied") this.record("applied", expected);
       return;
     }
     // Touch only files whose patched content changes, so the next build
