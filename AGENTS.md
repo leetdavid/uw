@@ -27,6 +27,19 @@ uw browser means "ur web, ur way". It is a planned Chromium-based browser with A
 - Distinguish agreed requirements from proposals and open questions. Do not present planned features as working software.
 - Include implementability scores out of 10 in feature discussions. Use the [roadmap's scoring convention](docs/plans/roadmap.md#implementability-estimates) and update its estimates when scope changes.
 
+## Revamp decisions
+
+Agreed on 2026-10-11. Where older docs disagree, these win until the docs are updated.
+
+- Rewrite the tab-tree and automatic-organization C++. Keep the product docs and build tooling.
+- A task is a native Chromium tab group. uw adds page-parent indentation, the organizer, undo, and settings.
+- Ungrouped tabs are the Scratchpad.
+- Tasks do not nest inside tasks. Page tabs still nest under their parent page.
+
+## Designs
+
+uw's designs live on the Doop canvas `0yLEIltMCP`. Reach it through the `doop` MCP server (`https://doop.design/mcp`). Use pages to design and test different features.
+
 ## Managing the kanban
 
 The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Keep its status column current.
