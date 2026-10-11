@@ -32,7 +32,7 @@ Expected result: the tab moves into a new tab group named `New task`, below the 
 1. Open a page with a harmless link and Cmd-click it.
 2. Close the source page with its ordinary close control.
 
-Expected result: the new tab opens directly below its source. Closing the source leaves the new tab open.
+Expected result: the new tab opens directly below its source, indented one level. Closing the source leaves the new tab open and removes its indentation.
 
 ### Branch commands
 
@@ -49,7 +49,7 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 
 ## Not available yet
 
-- Indentation for nested tabs, the Scratchpad label, and the Organize button. Nesting already affects tab order and the commands above, but the sidebar does not draw it yet.
+- The Scratchpad label and the Organize button. Use the tab's right-click menu for now.
 - Automatic organization. The settings page at `uw://settings/uwOrganization` saves a connection, but nothing files tabs until the organizer is rebuilt.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.

@@ -187,14 +187,15 @@ index f8d51fa..9ae6552 100644
      // "already split" case is handled in Browser::OpenURLFromTab().
      if (params->disposition == WindowOpenDisposition::NEW_SPLIT_VIEW &&
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 9354e0d..9b9739c 100644
+index 9354e0d5497b85db204ebae5d6adcd41973ea01a..20eba10da629d12b9099a21e8facdf169342dc58 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
-@@ -77,6 +77,7 @@ source_set("impl") {
+@@ -77,6 +77,8 @@ source_set("impl") {
    ]
  
    deps = [
 +    "//uw/browser/tab_organization",
++    "//uw/browser/ui/views/tab_organization",
      "//chrome/browser:primitives",
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
@@ -349,3 +350,80 @@ index 62e11c5..0865040 100644
        "//chrome/browser/ui/tabs/alert:tab_alert",
        "//chrome/browser/ui/tabs/organizer:unit_tests",
        "//chrome/browser/ui/tabs/saved_tab_groups",
+diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
+index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..ed07d4a28ac7a2cda322006aee39ccd2f29fe83c 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
+@@ -22,6 +22,7 @@
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/tab_indent.h"
+ 
+ namespace {
+ constexpr int kTabVerticalPadding = 2;
+@@ -132,6 +133,10 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+     } else if (!is_focused) {
+       child_x = TabGroupView::kTabLeadingPadding;
+     }
++    if (tab_strip_collapse_state ==
++        tabs::VerticalTabStripCollapseState::kExpanded) {
++      child_x += uw::TabIndentFor(tab_group_view->collection_node_, child);
++    }
+     bounds.set_x(child_x);
+     // If width is bounded, child views should respect the width constraints
+     // and take up the available width excluding trailing horizontal padding.
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
+index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..74e37f5d4218f9002e36bc287220f3a4f4c9c292 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
+@@ -26,6 +26,7 @@
+ #include "ui/views/view_targeter.h"
+ #include "ui/views/view_targeter_delegate.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/tab_indent.h"
+ 
+ namespace {
+ 
+@@ -107,6 +108,7 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
+   node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
+       base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
+                      base::Unretained(this)));
++  uw_tree_subscription_ = uw::RelayoutOnTreeChange(collection_node_, this);
+ }
+ 
+ UnpinnedTabContainerView::~UnpinnedTabContainerView() = default;
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
+index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..68579b1a87e4ef6d600120ecea08a3bd0156d6ee 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
+@@ -83,6 +83,7 @@ class UnpinnedTabContainerView
+   const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
+ 
+   base::CallbackListSubscription node_destroyed_subscription_;
++  base::CallbackListSubscription uw_tree_subscription_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
+diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
+index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..579b79da65a75eab45b706f365cc7f0e54d31681 100644
+--- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
+@@ -21,6 +21,7 @@
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/tab_indent.h"
+ 
+ namespace {
+ constexpr int kTabVerticalPadding = 2;
+@@ -172,6 +173,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+                 collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
+             ? 0
+             : horizontal_padding;
++    if (collapse_state == tabs::VerticalTabStripCollapseState::kExpanded) {
++      x += uw::TabIndentFor(tab_container_view->collection_node_, child);
++    }
+     views::SizeBound child_height_bound = size_bounds.height();
+     // In focused mode, pass the scroll viewport height constraint to the child
+     // focused group if the incoming size bounds height is unbounded, so that

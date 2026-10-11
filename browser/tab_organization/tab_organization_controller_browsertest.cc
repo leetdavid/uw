@@ -3,7 +3,9 @@
 
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
+#include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/run_loop.h"
@@ -15,12 +17,17 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/animation_test_api.h"
+#include "ui/views/view.h"
+#include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 
 namespace uw {
@@ -84,6 +91,24 @@ class TabOrganizationControllerBrowserTest : public InProcessBrowserTest {
       EXPECT_EQ(page.task, group ? group->ToString() : std::string());
     }
     EXPECT_EQ(tree, Strip());
+  }
+
+  // The tab rows of the sidebar, top to bottom.
+  std::vector<views::View*> TabRows() {
+    views::Widget* widget =
+        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+    widget->LayoutRootViewIfNecessary();
+    std::vector<views::View*> rows;
+    const std::function<void(views::View*)> visit = [&](views::View* view) {
+      if (std::string_view(view->GetClassName()) == "TabView") {
+        rows.push_back(view);
+      }
+      for (views::View* child : view->children()) {
+        visit(child);
+      }
+    };
+    visit(widget->GetRootView());
+    return rows;
   }
 
   std::u16string TitleOf(const tab_groups::TabGroupId& group) {
@@ -309,6 +334,34 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_FALSE(page->GetGroup());
   EXPECT_TRUE(
       controller()->CanExecute(TabOrganizationController::kUndo, selection));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       NestedTabsAreIndentedInTheSidebar) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  OpenLinkFrom(child);
+  std::vector<views::View*> rows = TabRows();
+  ASSERT_EQ(rows.size(), 3u);
+  const int left = rows[0]->GetBoundsInScreen().x();
+  EXPECT_EQ(rows[1]->GetBoundsInScreen().x(), left + 16);
+  EXPECT_EQ(rows[2]->GetBoundsInScreen().x(), left + 32);
+  EXPECT_EQ(rows[2]->GetBoundsInScreen().right(),
+            rows[0]->GetBoundsInScreen().right());
+
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(page)}, u"Plan"));
+  base::RunLoop().RunUntilIdle();
+  rows = TabRows();
+  ASSERT_EQ(rows.size(), 3u);
+  EXPECT_EQ(rows[1]->GetBoundsInScreen().x(),
+            rows[0]->GetBoundsInScreen().x() + 16);
+
+  ASSERT_TRUE(controller()->Outdent(Id(child)));
+  base::RunLoop().RunUntilIdle();
+  rows = TabRows();
+  EXPECT_EQ(rows[1]->GetBoundsInScreen().x(), rows[0]->GetBoundsInScreen().x());
 }
 
 // Switching tab orientation rebuilds the sidebar views. The window-owned

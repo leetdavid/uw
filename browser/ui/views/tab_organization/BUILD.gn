@@ -1,0 +1,15 @@
+source_set("tab_organization") {
+  sources = [
+    "tab_indent.cc",
+    "tab_indent.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/tabs/common:common",
+    "//components/tabs:public",
+    "//ui/views",
+    "//uw/browser/tab_organization",
+  ]
+}
