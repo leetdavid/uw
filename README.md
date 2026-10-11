@@ -2,7 +2,7 @@
 
 **ur web, ur way**
 
-uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. The customized application has passed a full build and headless smoke test, and the automatic organization MVP passes its focused Chromium tests; live-provider and native UI verification remain pending. Later product features remain planned.
+uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. [Verification status](#verification-status) records what has been built and tested. Later product features remain planned.
 
 [Product docs and roadmap](docs/README.md)
 
@@ -129,7 +129,7 @@ This runs strict TypeScript checking and the Node.js test suite. These checks do
 pnpm run check && pnpm run verify --jobs 8
 ```
 
-`verify` builds, runs the smoke test, then runs the focused `unit_tests` and `browser_tests` suites. Use `--jobs 2` on a 16 GiB Mac.
+`verify` builds, runs the smoke test, then runs the focused `unit_tests` and `browser_tests` suites. It defaults to `--jobs 2`, which suits a 16 GiB Mac.
 
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
@@ -152,7 +152,7 @@ To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.a
 ## CI
 
 - [`checks.yml`](.github/workflows/checks.yml) installs dependencies with pnpm, runs the tooling checks, and validates workflows on a GitHub-hosted runner.
-- [`chromium-macos.yml`](.github/workflows/chromium-macos.yml) builds and smoke-tests uw on a self-hosted Mac, then uploads `uw.app` as a ZIP. It runs manually and on Chromium, product-source, or build-tool changes pushed to `main`.
+- [`chromium-macos.yml`](.github/workflows/chromium-macos.yml) builds and smoke-tests uw on a self-hosted Mac, then uploads `uw.app` as a ZIP. It runs only when started by hand, because no build Mac is registered yet.
 
 Register a current Actions runner with labels `self-hosted`, `macOS`, `ARM64`, and `uw-chromium`. It needs the build-host requirements above. Set repository variable `UW_CHROMIUM_ROOT` to a dedicated checkout on its build volume. The default is `$HOME/uw-chromium`, outside the Actions repository checkout so sources survive between jobs.
 

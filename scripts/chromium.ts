@@ -469,7 +469,27 @@ export class Chromium {
     }
     this.runtime.log(`${version}\nPASS: headless navigation and JavaScript in an isolated profile`);
   }
+
+  verify(jobs: number, timeout: number): void {
+    this.build(jobs);
+    const suites = Object.keys(TEST_SUITES);
+    this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, ...suites], this.layout.source);
+    this.smoke(timeout);
+    for (const [suite, tests] of Object.entries(TEST_SUITES)) {
+      this.run([join(this.layout.source, OUTPUT, suite), `--gtest_filter=${tests.join(":")}`], this.layout.source);
+    }
+    this.runtime.log("PASS: build, smoke test, and the focused Chromium test suites");
+  }
 }
+
+const TEST_SUITES = {
+  unit_tests: [
+    "PageTreeTest.*", "AiProtocolTest.*", "VerticalTabStripPrefsTest.*", "VerticalTabStripStateControllerTest.*",
+  ],
+  browser_tests: [
+    "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*",
+  ],
+} as const;
 
 const descriptions = {
   root: "Print the resolved checkout path without creating it.",
@@ -478,18 +498,27 @@ const descriptions = {
   prepare: "Apply the ordered uw patches to a synced checkout without downloading or compiling.",
   build: "Prepare uw customizations, generate build files, and compile the chrome target.",
   smoke: "Verify the built version and run an isolated headless JavaScript/DOM check.",
+  verify: "Build, smoke-test, and run the focused Chromium unit and browser test suites.",
 } as const;
 
 function help(command?: keyof typeof descriptions): string {
-  const usage = command ?? "<root|doctor|sync|prepare|build|smoke>";
+  const usage = command ?? "<root|doctor|sync|prepare|build|smoke|verify>";
   return `${command ? descriptions[command] : "Build uw from pinned Chromium source with upstream tools."}\n\n` +
     `Usage: node scripts/chromium.ts ${usage} [options]\n` +
     "  --checkout-dir PATH  Dedicated root; defaults to UW_CHROMIUM_ROOT or .chromium/\n" +
-    (command === "sync" || command === "build" ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
-    (command === "smoke" ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
+    (takesJobs(command) ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
+    (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
     `  node scripts/chromium.ts ${command ?? "sync"} --checkout-dir /Volumes/Build/uw-chromium\n`;
+}
+
+function takesJobs(command?: string): boolean {
+  return command === "sync" || command === "build" || command === "verify";
+}
+
+function takesTimeout(command?: string): boolean {
+  return command === "smoke" || command === "verify";
 }
 
 function positiveInteger(value: string, flag: string): number {
@@ -504,14 +533,14 @@ export function main(argv = process.argv.slice(2)): number {
   try {
     if (!argv.length || argv[0] === "--help" || argv[0] === "-h") { console.log(help()); return 0; }
     const command = argv[0];
-    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, prepare, build, or smoke. Use --help for examples.", 2);
+    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, prepare, build, smoke, or verify. Use --help for examples.", 2);
     const name = command as keyof typeof descriptions;
     const { values, positionals } = parseArgs({
       args: argv.slice(1), strict: true, allowPositionals: false,
       options: {
         help: { type: "boolean", short: "h" }, "checkout-dir": { type: "string" },
-        ...(name === "sync" || name === "build" ? { jobs: { type: "string" as const } } : {}),
-        ...(name === "smoke" ? { timeout: { type: "string" as const } } : {}),
+        ...(takesJobs(name) ? { jobs: { type: "string" as const } } : {}),
+        ...(takesTimeout(name) ? { timeout: { type: "string" as const } } : {}),
       },
     });
     if (positionals.length) throw new BuildError("Unexpected positional argument", 2);
@@ -526,6 +555,7 @@ export function main(argv = process.argv.slice(2)): number {
     if (name === "prepare") chromium.prepare();
     if (name === "build") chromium.build(jobs);
     if (name === "smoke") chromium.smoke(timeout);
+    if (name === "verify") chromium.verify(jobs, timeout);
     return 0;
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

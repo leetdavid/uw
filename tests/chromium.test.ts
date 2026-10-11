@@ -141,6 +141,7 @@ class Fixture {
       mkdirSync(dirname(this.layout.binary), { recursive: true }); writeFileSync(this.layout.binary, "browser fixture"); return "";
     }
     if (program === this.layout.binary) return operation === "--version" ? `uw ${pins.version}` : this.dom;
+    if (operation?.startsWith("--gtest_filter=")) return "";
     throw new Error(`Unexpected command: ${JSON.stringify(command)}`);
   }
 }
@@ -307,12 +308,25 @@ test("smoke requires the executed JavaScript result and cleans up on failure", (
   assert.equal(existsSync(profile), false);
 });
 
+test("verify builds, smoke-tests, then runs the focused test suites", (t) => {
+  const f = new Fixture(t);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.verify(2, 30_000);
+  const ran = f.calls.filter(({ options }) => options.inherit).map(({ command }) => command);
+  const compiled = ran.filter((command) => basename(command[0]!) === "autoninja").map((command) => command.slice(4));
+  assert.deepEqual(compiled, [["chrome"], ["unit_tests", "browser_tests"]]);
+  const suites = ran.filter((command) => command[1]?.startsWith("--gtest_filter="));
+  assert.deepEqual(suites.map((command) => basename(command[0]!)), ["unit_tests", "browser_tests"]);
+  assert.match(suites[1]![1]!, /AutomaticOrganizerBrowserTest\.\*/);
+  assert.ok(f.calls.findLastIndex(({ command }) => command.includes("--dump-dom")) < f.calls.findIndex(({ command }) => command === suites[0]));
+});
+
 function invoke(...args: string[]) {
   return spawnSync(process.execPath, [join(REPO, "scripts/chromium.ts"), ...args], { encoding: "utf8", timeout: 15_000 });
 }
 
 test("every command's help has examples", () => {
-  for (const command of [[], ["root"], ["doctor"], ["sync"], ["prepare"], ["build"], ["smoke"]]) {
+  for (const command of [[], ["root"], ["doctor"], ["sync"], ["prepare"], ["build"], ["smoke"], ["verify"]]) {
     const result = invoke(...command, "--help");
     assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /Examples:/);
   }

@@ -24,6 +24,6 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 
 ## Status
 
-The customized app builds and passes its headless smoke test on Apple Silicon. The first tab tree and organizer are being replaced by ones built on native tab groups; the [board](plans/roadmap.md#board) shows what has landed. No live model provider has been called yet. See [verification status](../README.md#verification-status). Later automation and shared-pin features remain planned.
+[Verification status](../README.md#verification-status) records what has been built and tested. The [board](plans/roadmap.md#board) shows what has landed. Later automation and shared-pin features remain planned.
 
 The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The current approach uses Chromium source customizations; the update process and local model runtime still need validation or selection.

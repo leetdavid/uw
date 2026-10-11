@@ -8,17 +8,6 @@ on:
         type: choice
         options: ['2', '4', '8', '16']
         default: '2'
-  push:
-    branches: [main]
-    paths:
-      - chromium/**
-      - browser/**
-      - components/**
-      - scripts/**
-      - .node-version
-      - package.json
-      - pnpm-lock.yaml
-      - .github/workflows/chromium-macos.yml
 
 permissions:
   contents: read
