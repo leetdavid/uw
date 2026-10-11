@@ -15,13 +15,15 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [Horse tab organization research](research/horse-tab-organization-research.md): documented tree behavior and open decisions for uw's nested organization.
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Roadmap](plans/roadmap.md): proposed build order, completion criteria, implementability estimates, and a ticket board.
-- [Approved native tab-tree slice](plans/native-tab-tree.md): implementation sequence, scope, and native acceptance checks.
-- [Approved automatic organization MVP](plans/automatic-organization.md): the automatic tab-filing loop, its agreed scope, and acceptance checks.
+- [Native tab tree plan](plans/native-tab-tree.md): tasks as native tab groups, page nesting, stages, and acceptance checks.
+- [Automatic organization plan](plans/automatic-organization.md): the tab-filing loop, the decision model and language model, and acceptance checks.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
-- [ADR: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
+- [ADR 0001: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
+- [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.
+- [ADR 0003: a decision model sits beside the language model](adr/0003-decision-model-beside-the-language-model.md): which providers decide tab placement and how.
 
 ## Status
 
-The upstream Chromium build and headless smoke test passed on Apple Silicon. The wrapper now prepares minimal uw branding, native vertical tabs by default, and the manual tab-tree slice. The customized app's full build and headless smoke test pass; native UI checks remain pending. The [automatic organization MVP](plans/automatic-organization.md) passes its focused Chromium tests; live-provider and native UI checks remain pending. See [verification status](../README.md#verification-status). Later automation and shared-pin features remain planned.
+The customized app builds and passes its headless smoke test on Apple Silicon. The first tab tree and organizer are being replaced by ones built on native tab groups; the [board](plans/roadmap.md#board) shows what has landed. No live model provider has been called yet. See [verification status](../README.md#verification-status). Later automation and shared-pin features remain planned.
 
 The product direction, headline features, and decisions marked agreed in [Product](product.md) are confirmed. Remaining behavior and build order are proposals. The current approach uses Chromium source customizations; the update process and local model runtime still need validation or selection.

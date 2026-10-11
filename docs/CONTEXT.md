@@ -8,7 +8,7 @@ Terms used in the product docs.
 The immediate activity the user is pursuing with a set of tabs. A broader project can contain several browsing tasks; this is the level of user intent that tab organization tries to infer.
 
 **Tab group**:
-A collection of regular tabs and nested tab groups in one window, organized around a browsing task.
+A native Chromium tab group holding the regular tabs of one browsing task in one window. Tab groups do not nest. Also called a task.
 _Avoid_: Workspace, space.
 
 **Pinned tab**:
@@ -30,10 +30,10 @@ The scheme and registrable domain of a pin's home URL. Navigation inside that si
 A temporary view opened from a pinned tab for a page outside the pin's site. Promoting it creates a regular tab in Scratchpad.
 
 **Tab tree**:
-The nested arrangement of regular tabs and tab groups within one browser window. Both tab groups and page tabs can contain children.
+The arrangement of regular tabs within one browser window: the Scratchpad, the tab groups, and page tabs nested under parent tabs.
 
 **Tab branch**:
-A tab or tab group together with all its descendants in the tab tree.
+A tab together with all its descendant tabs.
 
 **Parent tab**:
 A page tab with child tabs beneath it in the tab tree.
@@ -65,11 +65,14 @@ One LLM request that decides a tab branch's placement — leave in Scratchpad, m
 **Provisional task name**:
 The `New task` title a newly created task keeps when its classification call returns no valid name.
 
-**Jev classification**:
-A structured Jev decision about a tab's relationship to existing tasks or a new task, with a confidence value. It does not name new tasks. Part of the later Jev fast path.
+**Decision model**:
+A model that answers a typed question with a choice and a confidence instead of text. uw can use Jev, the OpenAI Decisions API, or a compatible endpoint to decide a tab branch's placement. It does not name tasks.
+
+**Language model**:
+The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. It names new tasks, and decides placement when no decision model is set.
 
 **Task naming call**:
-A separate LLM request that creates the user-visible name for a newly created task after Jev has classified it as a new task. Part of the later Jev fast path.
+A language-model request that names a task the decision model started.
 
 **User-directed mode**:
 An organization mode in which the user accepts or rejects task proposals while routine tab placement remains automatic.

@@ -1,83 +1,59 @@
-# Native tab tree: approved first slice
+# Native tab tree: tasks as tab groups
 
-Status: the user approved this staged plan and implementation of the first slice after the product interview. The source/API investigation, source implementation, customized build, and headless smoke test are complete. Native UI verification remains pending.
+Status: approved on 2026-10-11. This replaces the first slice, which drew uw-owned task containers inside Chromium's tab container. That code is kept in commit `f113a96` and is deleted as each stage below lands.
 
-Implementability: **6/10** for the first slice. The [roadmap](roadmap.md#implementability-estimates) scores later automation and shared live pins separately. Scores include integration and maintenance, not progress.
+Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium already draws, drags, renames, collapses, and restores tab groups. The remaining risk is keeping page nesting consistent with native drags and session restore.
+
+The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Tab tree". The decision is recorded in [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md).
 
 ## Scope
 
-Implement the manual browser workflow defined in [Product](../product.md#automatic-tab-organization):
+- A task is a native Chromium tab group. Chromium supplies its header, collapse, rename, color, drag, and session restore.
+- Ungrouped regular tabs are the [Scratchpad](../product.md#scratchpad). They carry a "Scratchpad" label and stay above every task.
+- A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch.
+- Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
+- Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
+- Tab menu commands: "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
+- An "Organize" button in the sidebar header opens "Undo tab organization", the pause controls, and the settings page.
+- [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.
+- Parent links survive session restore.
 
-- A native vertical tree with task containers and page-parent branches.
-- [Scratchpad](../product.md#scratchpad), including nested ungrouped branches.
-- Manual task creation, extraction, renaming, reordering, and nesting.
-- Ordinary close with child promotion, plus explicit branch closing.
-- [Organization undo](../product.md#organization-undo).
-- A native [sidebar button menu](../product.md#organization-controls) exposing the implemented manual commands.
+## Non-goals
 
-The approval defers Jev/LLM automation and shared live pins to measured prototypes. Their requirements remain in Product. AI-only menu actions become available with the automation stage; do not add no-op handlers for them. The existing Chromium pin area supplies pins in this slice. Arc-style home URLs, shared page ownership, Peek, and the new restart restore offer belong to the later pin work.
+- Tasks inside tasks.
+- Nesting a tab by dragging it. Drags reorder; the menu commands nest.
+- Moving a branch between windows as one unit.
+- Shared live pins. They stay in the later pin work.
 
-## Existing Chromium support
+## Design
 
-Use the exact [source investigation](../research/chromium-tab-api-research.md) when implementing and refreshing the patches.
+- `components/tab_organization/page_tree` is a value type: tab order, task key, and parent link for each page of one window. Every rule lives there as plain functions, so it is tested without a browser.
+- `browser/tab_organization/tab_organization_controller` is owned by the window. It mirrors `TabStripModel` into a page tree, and applies tree changes back through Chromium's tab-group and move calls. It never changes the tab strip from inside an observer notification.
+- When the user changes tabs natively, the controller adopts the new order. A parent link survives only while the child still sits inside its parent's branch.
+- uw adds three things to Chromium's vertical tab strip: indentation, the Scratchpad label, and the Organize button. No uw view replaces or wraps a Chromium container.
+- Chromium edits stay in `chromium/patches/` as small hooks.
 
-- Keep `TabStripModel` responsible for real tabs and `WebContents` lifetime.
-- Reuse `TabView`, the existing selection controller, and native tab-drag infrastructure. They already supply favicons, page-state indicators, close buttons, multi-selection, and ordinary tab actions.
-- Use Chromium's tree model for hierarchy metadata and a window-owned inverse-action history for organization undo. Keep it separate from page and text undo.
-- Chromium's collection model cannot directly represent nested tasks or page parents. Keep that hierarchy distinct from its collection ownership.
-- Stock `views::TreeView` supplies editing and expansion but lacks multi-selection and tree-specific dragging. Replacing tab rows with it would lose existing browser behavior.
+## Stages
 
-## Implementation sequence
+Each stage is a ticket on the [board](roadmap.md#board).
 
-### 1. Establish a reproducible native test loop
+1. Page tree model with unit tests.
+2. Window controller on native tab groups. Deletes the old tree model, coordinator, and adapter.
+3. Sidebar additions: indentation, Scratchpad label, Organize button.
 
-Prepare the pinned customized browser and build it on a host satisfying the [build requirements](../../README.md#build-host-requirements). The current preparation links tracked product source into `src/uw/` after applying the patch series. Record a working baseline before adapting the tab views.
-
-See the latest [verification status](../../README.md#customization-verification). The next work is native UI and focused Chromium-test verification, not another source bootstrap.
-
-### 2. Add window-owned hierarchy and commands
-
-Add the first real product module under `browser/tab_organization/`, following the [source layout](../architecture.md#code-organization). Own it from `BrowserWindowFeatures`, with an interface reachable through the window's existing unowned-user-data mechanism.
-
-Track tabs by `tabs::TabHandle`, checking both liveness and current window membership at command execution. Keep stable metadata IDs for tasks and restoration. Capture actual link-opening relationships rather than relying on Chromium's temporary opener bookkeeping.
-
-Implement extraction, nesting/reordering, rename, collapse state, child promotion, and inverse organization operations. Normalize selected parents and descendants into disjoint branches. Keep tab close handling in Chromium so unload cancellation and ordinary history continue to work.
-
-Undo applies to surviving tabs in the same window. Preserve tabs opened since the action and the current page/selection. Closing a tab is handled by Chromium's close/restore system; organization undo must not recreate a destroyed renderer and claim its live state survived.
-
-### 3. Connect native layout and input
-
-Add the tree projection and headers to the existing vertical unpinned region. Retain upstream pinned controls and browser tab rows. The primary layout seam is `UnpinnedTabContainerViewLayout::CalculateVerticalLayout`.
-
-Adapt drag destinations, link-drop positions, focus traversal, and accessibility to match the visible hierarchy. Route the sidebar menu and contextual commands to the same window-owned controller. Use existing native menu, label, button, and text-field controls.
-
-Organization must preserve page identity and browser selection. Move tabs in place when linear order must change; do not detach and recreate pages to organize one window. Metadata must survive view reconstruction and horizontal/vertical orientation changes.
-
-### 4. Integrate source preparation and persistence
-
-Add ordinary tracked product source and explicit GN targets. Extend preparation only enough to expose those real files beneath Chromium's `src/uw`; preserve the existing protection of local work. Keep upstream integration edits in the ordered patch series.
-
-Use Chromium's session extra-data hooks for hierarchy metadata and remap restored tab identities. Verify compatibility with the existing session-restore flow before adding the later pinned-session restore offer.
+Automatic organization builds on these stages. See [Automatic organization](automatic-organization.md).
 
 ## Acceptance checks
 
-Use native unit/browser tests for the model and integration. Run UI checks on the built application. Headless DOM smoke alone cannot pass this slice.
+1. Ungrouped tabs show under "Scratchpad", above every task.
+2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level.
+3. Closing a parent keeps its children open, one level up, in the same order.
+4. "Move to new task" moves the tab and its descendants into a new tab group placed after the source task, or first when the tab came from the Scratchpad.
+5. "Move to Scratchpad" ungroups the branch and detaches it from its parent.
+6. Dragging a child out of its parent's branch removes the indentation. Dragging a tab never changes another tab's task.
+7. One undo reverses a move or task creation as a whole. Tabs opened since stay open.
+8. Collapse, rename, color, and drag of a task behave exactly as they do in stock Chromium.
+9. Indentation and task membership survive restart with session restore.
+10. Switching to horizontal tabs and back keeps tasks and parent links.
 
-1. New ungrouped tabs appear in Scratchpad. New-tab links from regular pages retain parentage; ordinary navigation preserves children.
-2. Extraction preserves branch order and hierarchy, creates the sibling task in the specified position, and preserves a page's JavaScript sentinel, form value, and focus.
-3. Renaming and manual movement work for tasks and pages. Selection supports multiple tabs. Dragging cannot create cycles or leave the rendered order inconsistent with keyboard selection.
-4. Closing a parent promotes surviving children. Branch closing uses normal unload handling, including cancellation, and closing the final tab does not leave dangling callbacks.
-5. One undo reverses related organization edits. Intervening tab creation, closing, or movement to another window does not lose pages or move the current selection unexpectedly.
-6. Collapse choices, task names, and sibling order survive view reconstruction. Existing pins, native groups/splits, ordinary shortcuts, and horizontal mode remain usable.
-7. A restored session recovers hierarchy and expansion metadata using the correct restored tabs.
-
-Run repository checks with `pnpm run check`. On the build host, run `gn check`, compile the browser and relevant test targets, then execute the focused suites identified in the [API research](../research/chromium-tab-api-research.md#gn-ownership-and-verification).
-
-## Later stages
-
-These remain planned and are outside the current implementation approval:
-
-- **Jev/LLM prototype, 5/10:** validate the actual provider contract, opt-in input scope, accuracy, stale-result handling, and the complete initial latency budget on representative workloads.
-- **Shared-pin prototype, 3/10:** prove profile-owned page continuity, window handoff, inactive views, windowless retention, reset/unpin behavior, and recovery before integrating the full pin experience.
-
-Update the roadmap with measured results from those trials before expanding implementation.
+Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`.

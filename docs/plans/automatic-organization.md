@@ -1,65 +1,75 @@
-# Automatic organization MVP: approved plan
+# Automatic organization
 
-Status: approved. The loop below is part of the [minimum usable version](../product.md#minimum-usable-version). It replaces the earlier two-provider slice, preserved on the `wip/automatic-organization-prototype` branch.
+Status: approved. The loop below is part of the [minimum usable version](../product.md#minimum-usable-version). On 2026-10-11 it moved onto [native tab groups](native-tab-tree.md) and gained a decision model setting. The first implementation is kept in commit `f113a96`.
 
-Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Scores include integration, provider contracts, accuracy, latency, and maintenance, not progress.
+Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Scores include integration, provider contracts, accuracy, latency, and maintenance, not progress.
+
+The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pages "Automatic organization" and "Settings".
 
 ## Agreed scope
 
-- One configured LLM classifies and names in one [classification call](../CONTEXT.md#language). Connection modes: OpenAI-compatible (base URL, model ID, API key) and Ollama (endpoint, model picker, no key). Managed local models and Anthropic-format APIs are deferred.
-- Automatic organization stays disabled until a connection validates. There is no local fallback; without a validated LLM every tab stays in Scratchpad.
-- A classification call contains tab title, URL, source-tab relationship, current task names, the user's manual placement when one exists, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
-- One call returns the placement decision — leave in Scratchpad, move the whole branch to an existing task's top level, or create a new root-level task — a confidence value, and the new task's name when creating one.
-- Automatic moves and task creation require confidence at or above `0.90`. Lower results do nothing.
-- A new task is created with the call's name. A missing or invalid name leaves the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
-- Continuous reclassification: link opens and title or URL changes trigger background requests, debounced 750 ms after the latest change. A change starts a new activity revision and invalidates the branch's outstanding requests, so late or overridden results are discarded; closing a branch or moving it to another window invalidates pending work too.
-- Manual moves and renames hold until that tab's next debounced title or URL change. While held, requests report the manual placement so the model moves the branch only on a clear activity change.
-- The move unit is a whole tab branch. Destinations are shallow: an existing task's top level or a new root-level task.
-- Every automatic action records one undoable organization action covering task creation, branch moves, and the generated name. It shows a brief sidebar message with Undo and never steals focus or blocks navigation. After the message disappears, undo stays available through the persistent "Undo tab organization" command. New tabs are preserved; closed pages are never resurrected.
-- The sidebar Organize menu provides "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
-- API keys are stored in macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
-- The settings page shows the exact request scope before the user enables automatic organization.
+- Settings hold two model connections. See [ADR 0003](../adr/0003-decision-model-beside-the-language-model.md).
+  - **Decision model**, optional. Providers: Jev (TypeSafe System One), the OpenAI Decisions API, or any endpoint that speaks the OpenAI Decisions API at another base URL. It answers with a choice and a confidence, never text.
+  - **Language model**. Connection modes: Ollama (endpoint, model, no key) and OpenAI-compatible (base URL, model, API key).
+- The decision model decides where a tab branch goes. With no decision model, the language model decides in one [classification call](../CONTEXT.md#language).
+- The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
+- Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
+- A decision request contains the tab title, URL, source-tab relationship, current task names, the user's manual placement when one exists, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
+- A decision is one of: leave the branch in the Scratchpad, move it to the end of an existing task, or start a new task.
+- A move or a new task needs confidence at or above `0.90`. Lower results do nothing.
+- Link opens and title or URL changes trigger background requests, 750 ms after the latest change. A change invalidates that tab's outstanding request. Closing a branch or moving it to another window invalidates it too.
+- A manual move holds the branch until that tab's next title or URL change. Requests for a held branch report the manual placement. A response that arrives after a manual move is dropped.
+- The move unit is a whole tab branch. It detaches from its old parent.
+- Every automatic action is one undoable organization action. It shows a brief message at the foot of the sidebar with Undo, tints the moved tab for a moment, and never takes focus. After the message disappears, "Undo tab organization" in the Organize menu still works. Closed pages are never reopened.
+- The Organize menu and the settings page provide "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
+- API keys are stored in the macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
+- The settings page shows what is sent before the user enables automatic organization.
 - Provider outage, malformed responses, and slow responses never block browsing. Tabs stay where they are.
 
 ## Non-goals
 
-- Jev fast classification and the separate task naming call. They return in a later stage.
-- Managed local model runtime and Anthropic-format providers.
-- Nested automatic destinations or automatic reparenting beneath another page.
+- A managed local model runtime and Anthropic-format providers.
+- Placing a moved branch under a page in the destination task.
 - Automatic merging, splitting, or whole-window reorganization passes.
 - User-directed proposals and "Reorganize all tabs".
-- Revising a generated task name after creation.
+- Renaming a task after it is created.
 - Automatic tab closing and suspension.
+- The 200 ms placement budget in [Product](../product.md#organization-latency). Measure first.
 
 ## Design
 
-- `components/tab_organization/` owns a provider-independent coordinator behind a narrow fakeable decision interface. It applies only validated, current decisions to `TabTree`.
-- The protocol is one OpenAI-compatible chat-completions request with a structured response. Parsing is strict and rejects malformed input so a bad response can never move a tab. Ollama uses its OpenAI-compatible endpoint.
+- `components/tab_organization/ai_protocol` builds and parses requests in three decision formats: chat completions, the OpenAI Decisions API (`POST <base>/decisions`), and TypeSafe System One (`POST <base>/systemone`). It also builds the naming call. Parsing is strict, so a malformed response can never move a tab.
+- The organizer applies a decision to the [page tree](native-tab-tree.md#design) only if the branch is unchanged since the request.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
-- `TabTree` distinguishes automatic placements from manual adjustments. Automatic moves and task creation record one undoable organization action; generated naming amends that action without a second undo entry.
-- Browser integration owns profile prefs, Keychain secrets, `SimpleURLLoader` lifecycle, debounce timers, revision tracking, pause state, the settings page, and the sidebar message. Window-owned `TabOrganizationController` remains the only mutation seam.
-- Narrow Chromium patches wire prefs registration, the setup surface, and controller hooks. Product C++ stays in tracked `browser/` and `components/` directories per [code organization](../architecture.md#code-organization).
+- Browser integration owns profile prefs, Keychain secrets, `SimpleURLLoader` lifetime, debounce timers, pause state, the settings page, and the sidebar message.
+
+## Stages
+
+Each stage is a ticket on the [board](roadmap.md#board).
+
+1. Decision formats and the naming call, with unit tests.
+2. Organizer on native tab groups: requests, staleness checks, apply, undo, pause.
+3. Settings page: decision model, language model, pause, and validation that gates enablement.
 
 ## Acceptance checks
 
-1. A validated connection enables automatic organization. Without one, every tab stays in Scratchpad.
-2. Opening a link in a new tab moves its whole branch to the matched task's top level, or creates a root-level task named by the call. An invalid name leaves `New task`.
-3. A title or URL change starts a new request revision. An older response cannot move the tab.
-4. A manual move or rename blocks automatic results for that tab until its next debounced activity change; requests sent while held report the manual placement.
-5. A result with confidence below `0.90` does nothing and creates no task.
-6. Closing a branch or moving it to another window turns its pending responses into no-ops.
-7. One undo reverses task creation, branch moves, and generated naming together, and remains available after the sidebar message disappears through "Undo tab organization". New tabs are preserved.
-8. Pause stops automatic placements and application of pending results across all windows; resume restores them. Manual tree controls keep working while paused.
-9. Provider outage, malformed responses, and slow responses never block browsing.
-10. Each request contains the documented scope only. No API keys or request payloads appear in logs, preferences, session data, or crash reports. The settings page shows the scope before enabling.
-11. `pnpm run check` passes. `//chrome/test:unit_tests` passes `TabTreeTest.*`, `OrganizationCoordinatorTest.*`, and `AiProtocolTest.*`. `//chrome/test:browser_tests` passes `TabOrganizationControllerBrowserTest.*`.
+1. Automatic organization turns on only after every configured connection validates. A failed save turns it off.
+2. With a decision model set, a decision request goes to it in that provider's format. With none, the language model receives a classification call.
+3. Opening a link in a new tab moves its branch to the end of the matched task, or starts a task. With a language model the task is named by it; otherwise it is `New task`.
+4. A title or URL change invalidates that tab's outstanding request. An older response cannot move the tab.
+5. A manual move drops the response in flight and holds the branch until its page changes.
+6. A result with confidence below `0.90`, a refusal, or a malformed response does nothing.
+7. Closing a branch or moving it to another window turns its pending response into a no-op.
+8. One undo reverses task creation, the move, and the name together. It still works from the Organize menu after the message disappears.
+9. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
+10. Each request contains the documented scope only. No API key or request body appears in logs, preferences, session data, or crash reports.
+11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`.
 
 ## Later stages
 
-- Jev fast classification and the separate task naming call (prototype preserved on `wip/automatic-organization-prototype`).
-- 200 ms fast-path placement with measured provider latency ([Product](../product.md#organization-latency)).
+- The 200 ms placement path with measured provider latency.
 - User-directed proposals and "Reorganize all tabs".
 - Managed local runtime and Anthropic-format providers.
-- Revising generated task names when a task's activity clearly changes.
+- Renaming a task when its activity clearly changes.
 
 Update the roadmap with measured accuracy, confidence calibration, and latency before expanding scope.

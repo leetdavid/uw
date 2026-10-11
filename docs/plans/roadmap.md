@@ -4,24 +4,31 @@ The [minimum usable version](../product.md#minimum-usable-version) and [next fea
 
 ## Board
 
-Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progress`, `in review`, `done`. Scores use the [implementability convention](#implementability-estimates) below. Ticket IDs are stable, so commits and patches can reference them.
+Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progress`, `in review`, `done`, and `superseded` for a ticket replaced by a later one. Scores use the [implementability convention](#implementability-estimates) below. Ticket IDs are stable, so commits and patches can reference them.
 
 | ID | Ticket | Status | Score | Notes |
 | --- | --- | --- | --- | --- |
-| T1 | Blank new tabs open below the current tab | backlog | 8/10 | Cmd+T and the tab strip "+" button create the new tab as a sibling below the selected tab's branch, in the same parent (task group, nested group, or Scratchpad). Inside a task group this overrides "new ungrouped tabs appear in Scratchpad" in [native-tab-tree.md](native-tab-tree.md), because user placement is intent. A selected pinned tab, inactive pinned view, or Peek preview falls back to Scratchpad. Link-opened tabs, duplicates, and restores keep upstream placement. |
+| T1 | Blank new tabs open below the current tab | superseded | 8/10 | Now part of T13. |
 | T2 | Single-call classification protocol | in review | 7/10 | One OpenAI-compatible chat-completions request per classification returning the placement decision, confidence, and task name, with strict response parsing. Covers the OpenAI-compatible and Ollama connection modes in [automatic-organization.md](automatic-organization.md). |
-| T3 | Continuous reclassification coordinator | in review | 5/10 | Debounced requests on link opens and title/URL changes, revision and manual-adjustment tracking, stale-result discard, whole-branch moves to shallow destinations at confidence ≥ 0.90, one undoable action per automatic change. |
-| T4 | Readable-text excerpts in requests | in review | 6/10 | Reuse upstream inner-text extraction for a short excerpt per classification request per [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). |
-| T5 | Connection setup and Keychain storage | in review | 7/10 | Settings page for OpenAI-compatible and Ollama connections with validation and visible request scope; API keys in macOS Keychain, endpoints and model IDs in profile preferences. |
-| T6 | Automatic-action feedback and undo | in review | 6/10 | Brief sidebar message with Undo after each automatic action; undo stays reachable through "Undo tab organization" after the message disappears. |
-| T7 | Organization pause controls | in review | 8/10 | "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" in the settings page and the sidebar Organize menu; pausing stops placements and pending results across all windows. |
-| T8 | Organize-menu crash fixes | in review | 7/10 | Fix the four native crashes in the tab-tree UI: setup dialog DCHECK on enabled menu items, tab-strip reentrancy on tab insert, drag-handler CHECK on tab-orientation switch, and dangling task-view pointers on eviction. The setup dialog is removed in favor of the settings page (T9). Done when the Organize menu, pause controls, manual tree commands, and orientation switches run without crashing. |
-| T9 | Organization settings page and uw:// alias | in review | 6/10 | uw organization section in chrome://settings owning the connection and pause controls, and uw:// URLs aliasing their chrome:// counterparts. Done when setup, validation, model loading, and pause controls work from the settings page, the Organize menu routes there, and uw://settings resolves. |
-| T10 | Stability safeguards | in review | 7/10 | Regression browser tests pinning each fixed native crash, native lifetime rules in Architecture, and a crash-report ritual with a regression checklist in Try-uw. Done when the new `TabOrganizationControllerBrowserTest` cases pass, every Organize feature and orientation switch is covered by a test or checklist entry, and T8 verifies clean. |
+| T3 | Continuous reclassification coordinator | superseded | 5/10 | Replaced by T15. |
+| T4 | Readable-text excerpts in requests | superseded | 6/10 | Carried into T15 per [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). |
+| T5 | Connection setup and Keychain storage | superseded | 7/10 | Replaced by T16. Keychain storage carries over. |
+| T6 | Automatic-action feedback and undo | superseded | 6/10 | Replaced by T14 and T15. |
+| T7 | Organization pause controls | superseded | 8/10 | Replaced by T15 and T16. |
+| T8 | Organize-menu crash fixes | superseded | 7/10 | The crashing adapter is removed in T13. |
+| T9 | Organization settings page and uw:// alias | in review | 6/10 | The uw:// alias stands: uw:// URLs alias their chrome:// counterparts, and uw://settings resolves. The settings page is reworked in T16. |
+| T10 | Stability safeguards | superseded | 7/10 | Regression tests move to T13. The source-text checks are removed in T17. |
+| T11 | Decision formats and naming call | in progress | 8/10 | Request and response handling for the OpenAI Decisions API and TypeSafe System One (Jev), plus the task naming call, per [automatic-organization.md](automatic-organization.md). Done when `AiProtocolTest.*` passes. |
+| T12 | Page tree model | todo | 8/10 | Value type holding tab order, task, and parent link per page, with every tab-tree rule as plain functions, per [native-tab-tree.md](native-tab-tree.md). Done when `PageTreeTest.*` passes. |
+| T13 | Window controller on native tab groups | todo | 6/10 | Mirrors the tab strip into the page tree and applies changes back through tab-group and move calls: link parentage, new-tab placement, close promotion, branch commands, undo, session restore. Deletes the old tree model, coordinator, and adapter. Done when the new `TabOrganizationControllerBrowserTest` cases pass. |
+| T14 | Sidebar additions | todo | 6/10 | Indentation per nesting level, the Scratchpad label, the Organize button and menu, and the automatic-move message with Undo. Done when the [native tab tree acceptance checks](native-tab-tree.md#acceptance-checks) pass in the built app. |
+| T15 | Organizer on native tab groups | todo | 5/10 | Debounced decision requests, naming, staleness checks, branch moves and task creation at confidence 0.90 or more, one undo per action, and pause. Done when the [automatic organization acceptance checks](automatic-organization.md#acceptance-checks) pass against a test server. |
+| T16 | Settings: decision model, language model, pause | todo | 7/10 | Settings page with both connections and the pause controls. Validation gates enablement, a failed save turns automatic organization off, and the model list is fetched with GET. Done when each provider validates from the page against a test server. |
+| T17 | Tooling and docs cleanup | backlog | 9/10 | Remove the source-text checks in `scripts/native-rules.ts`, fold `verify` into the main CLI, make the macOS workflow manual until a runner exists, and give build status one home. |
 
 ## 1. Choose the browser foundation
 
-The [upstream Chromium baseline](../../README.md#upstream-baseline) built and passed headless smoke testing on Apple Silicon. The wrapper now prepares the [first uw customizations](../../README.md#customizing-chromium); their full build and UI checks are pending.
+The [upstream Chromium baseline](../../README.md#upstream-baseline) built and passed headless smoke testing on Apple Silicon. The [customized build](../../README.md#customizing-chromium) passes its headless smoke test; native UI checks are pending.
 
 Validate the source-customization approach for the [initial platform](../product.md#minimum-usable-version). Establish the security-update path with a patch-update trial and measure a performance baseline. Check compatibility with the [required extensions](../product.md#required-extensions), ad blocking, download hooks, and session persistence.
 
@@ -35,9 +42,9 @@ Done when the user can complete their daily workflows in uw without blocking cra
 
 ## 3. Add task-based tab organization
 
-Start with the [approved manual native tab-tree slice](native-tab-tree.md) and the [approved automatic organization MVP](automatic-organization.md); both are part of the minimum usable version. Jev fast automation and shared live pins follow measured prototypes and need separate implementation approval. The agreed behavior is in [Product](../product.md#automatic-tab-organization).
+Start with the [native tab tree](native-tab-tree.md) and [automatic organization](automatic-organization.md) plans; both are part of the minimum usable version. Shared live pins follow a measured prototype and need separate implementation approval. The agreed behavior is in [Product](../product.md#automatic-tab-organization).
 
-Done when nested organization supports task regrouping and extraction into separate groups, manual adjustments affect future organization, and users can configure the agreed AI connection modes. Verify automatic and user-directed organization, session restoration, undo, page continuity during moves, and that local inference keeps page context on the device. Measure the [organization latency requirement](../product.md#organization-latency) and verify immediate application without a sidebar-interaction delay. Check that inference completion does not block browsing, take focus, or override intervening manual actions, following the [primary design rule](../product.md#principles).
+Done when the tab tree supports task regrouping and extraction into separate groups, manual adjustments affect future organization, and users can configure the agreed AI connection modes. Verify automatic and user-directed organization, session restoration, undo, page continuity during moves, and that local inference keeps page context on the device. Measure the [organization latency requirement](../product.md#organization-latency) and verify immediate application without a sidebar-interaction delay. Check that inference completion does not block browsing, take focus, or override intervening manual actions, following the [primary design rule](../product.md#principles).
 
 Clutter removal can follow tab organization. Its order relative to the other later additions remains open.
 
@@ -70,7 +77,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
 | [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. The customized build and headless smoke test pass; native UI behavior remains unverified. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
-| [Native tree-style tabs](../product.md#automatic-tab-organization) | 6/10 | Page parents and nested task groups require hierarchy integration, stable child branches through ordinary navigation, child promotion after task changes, and reliable session restoration. |
+| [Native tree-style tabs](../product.md#automatic-tab-organization) | 7/10 | Tasks are native tab groups. uw adds page parents, indentation, child promotion on close, and restore of parent links. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
 | [Pinned-tab Peek previews](../product.md#pinned-tabs) | 6/10 | Same-site navigation remains in the pin; off-site links open a temporary preview that can promote into Scratchpad. |
 | [Shared live pinned-page state](../product.md#pinned-tabs) | 3/10 | The live page transfers between windows and remains alive without a browser window. Quit uses a new-tab restore offer; Chromium ownership and lifecycle need a trial. |
@@ -79,10 +86,10 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Managed local models](../product.md#ai-connections) | 6/10 | Device compatibility, download management, and resource use. |
 | [Ollama connection](../product.md#ai-connections) | 9/10 | An established API with a small configuration flow. |
 | [Online provider connections](../product.md#ai-connections) | 8/10 | Several API formats and model capabilities to support. |
-| [Jev fast tab classification](../architecture.md#tab-organization-models) | 5/10 | Current fast-path choice, behind explicit user opt-in, with metadata first and a bounded excerpt later. No match without an LLM leaves the tab in Scratchpad. Jev is early access; provider access, data handling, task accuracy, and the full latency deadline need validation. |
+| [Decision model connection](../architecture.md#tab-organization-models) | 7/10 | Jev, the OpenAI Decisions API, or a compatible endpoint decides placement. Request shapes come from public documentation; no provider has been called live yet. |
 | [On-demand AI tab reorganization](../product.md#automatic-tab-organization) | 6/10 | Now needs tree-aware changes and restoration while preserving manual choices within the current window. |
 | [Automatic task-based tree organization](../product.md#automatic-tab-organization) | 5/10 | The initial title/URL/source fast path must meet the agreed latency budget, then a clearer excerpt-informed pass may correct it. Background LLM discovery handles unmatched Scratchpad branches, with stale-result cancellation. |
-| [Automatic organization MVP](automatic-organization.md) | 5/10 | One classification call over an OpenAI-compatible or Ollama endpoint, continuous reclassification with stale-result and manual-override protection, page excerpts, Keychain secrets, undo, pause controls, and sidebar feedback. |
+| [Automatic organization](automatic-organization.md) | 6/10 | Decisions from the decision model or the language model, names from the language model, stale-result and manual-override protection, page excerpts, Keychain secrets, undo, pause, and sidebar feedback. |
 | [Scratchpad](../product.md#scratchpad) | 8/10 | A window-local nested tree below pins and above task groups for ungrouped tabs and pending candidates. Confident placement moves a whole branch. |
 | [User-directed task proposals](../product.md#user-directed-mode) | 6/10 | Pending proposals remain inline without moving tabs. Accepted proposals create a root group at the earliest candidate; rejected proposals stay suppressed until activity changes. |
 | [Manual task extraction](../product.md#manual-task-extraction) | 8/10 | Once the tab tree exists, this deterministically moves selected branches into a sibling task group without waiting for inference. |

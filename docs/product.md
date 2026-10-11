@@ -87,6 +87,8 @@ Agreed: require an explicit "Enable Jev tab classification" choice before sendin
 | Ollama | Connect to an Ollama endpoint and choose an available model. |
 | Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom OpenAI-compatible endpoints. |
 
+Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
+
 Show the active provider and model. Explain which features a model supports. If it lacks a required capability, offer a supported choice rather than silently switching providers.
 
 Local mode keeps inference local. Sending page content to a remote provider requires a user-selected remote feature or automation.
@@ -183,7 +185,7 @@ Agreed scope: the first tab-management release focuses on organization. Infer th
 
 Agreed:
 
-- Use tree-style tabs with nested organization, inspired by [Horse Browser](research/horse-tab-organization-research.md). Task groups can contain tabs and nested task groups. Individual page tabs can have child tabs.
+- Use tree-style tabs, inspired by [Horse Browser](research/horse-tab-organization-research.md). A task group is a native Chromium tab group. Task groups do not nest. Individual page tabs can have child tabs. Changed on 2026-10-11; see [ADR 0002](adr/0002-tasks-are-native-tab-groups.md).
 - Preserve standard link navigation. Same-tab navigation stays in the current tab; a link opened as a new tab becomes a child of its source tab, including through Cmd-click or middle-click. Intent-based organization can later move it.
 - Agreed: a lone new tab without a source link, such as Cmd+T, opens directly beneath the previously active tab as its sibling. Restored sessions and bulk opens keep their saved placement.
 - Closing a regular tab closes only that page. Its children move up one level, preserving their order and remaining descendants. A separate "Close branch" action closes the selected branch and all its descendants.
@@ -191,7 +193,7 @@ Agreed:
 - When a parent tab changes activity and moves to another task, children that still serve the original task remain there. Promote those children one level in the old location, preserving their order and subtrees. This automatic reclassification moves the repurposed parent, unlike an explicit whole-branch extraction.
 - Enable automatic grouping by default from the first AI grouping release. Organize new tabs and refine inactive groups.
 - Automatically regroup tabs as task intent becomes clearer, including pulling a distinct task out into its own group.
-- In automatic mode, creating a new task preserves candidate order and branches. Place it at the root at the earliest candidate's position, unless its relationship to an existing parent task is clear. In that case, create it as a nested task group under that parent.
+- In automatic mode, creating a new task preserves candidate order and branches. Place it after the task the branch came from, or first among tasks when the branch came from the Scratchpad.
 - Merge two automatically created groups when they clearly represent the same task and neither has a manual adjustment. If either group has a manual adjustment, propose the merge instead.
 - Split an automatically created group when its branches clearly represent separate tasks and it has no manual adjustment. If it has a manual adjustment, propose the split instead.
 - Clear task intent can trigger a move immediately, including for the selected tab and other tabs in the current task group. Switching away is not a prerequisite. A move must preserve the selected tab, its page state, and keyboard focus.
@@ -245,7 +247,7 @@ Agreed: an ignored task proposal stays as a small inline Scratchpad row until th
 
 Agreed: provide a "Move to new task" action in the tab/branch menu and for a selection of tabs. It creates a separate task group in the same window and counts as a manual adjustment. A selected parent moves with all its descendants by default; selecting individual child tabs allows part of a branch to be extracted.
 
-Preserve loaded pages, the selected tab, and the moved branches' internal hierarchy. The action takes effect without waiting for an AI decision. Place the new task group at the source task's nesting level, immediately after it.
+Preserve loaded pages, the selected tab, and the moved branches' internal hierarchy. The action takes effect without waiting for an AI decision. Place the new task group immediately after the source task.
 
 ### Task names
 

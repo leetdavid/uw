@@ -16,7 +16,7 @@ The initial upstream build passed on Apple Silicon. The wrapper now applies uw c
 
 Use one product repository and an ignored Chromium checkout. Keep Chromium integration edits in `chromium/patches/`, with pins and GN arguments alongside them. Product C++ lives in tracked `browser/` and `components/` directories; preparation links those into `src/uw/` after applying the patch series. `scripts/` owns TypeScript build orchestration; `tests/` tests that tooling. The [preparation workflow](../README.md#customizing-chromium) defines how the checkout is assembled.
 
-This combines Brave's use of ordinary product source with Helium's explicit patch ordering. [The source comparison](chromium-organization-research.md#main-comparison) records their actual mechanisms and maintenance costs. uw currently needs only the ordered patches.
+This combines Brave's use of ordinary product source with Helium's explicit patch ordering. [The source comparison](research/chromium-organization-research.md#main-comparison) records their actual mechanisms and maintenance costs.
 
 As substantial product code arrives, add directories for real implementations:
 
@@ -36,7 +36,7 @@ Implementability: **7/10** for this organization including ongoing Chromium upda
 
 ### Native lifetime rules
 
-Three rules come from fixed native crashes. They apply to every uw
+These rules come from fixed native crashes. They apply to every uw
 customization, not just tab organization:
 
 - Never mutate `TabStripModel` from its observer notifications. Defer tab
@@ -66,15 +66,13 @@ instead of silencing the check.
 
 ## Native tab tree
 
-The user has approved the [manual native tab-tree slice](plans/native-tab-tree.md). The patch enables Chromium's native vertical-tab default and connects the manual tab tree. The customized build and headless smoke test pass; native UI verification remains pending. The [pinned-source investigation](research/chromium-tab-api-research.md) identifies the reused controls and layout/input adaptations.
+A task is a native Chromium tab group. uw adds page tabs nested under their parent page, the Scratchpad label, the Organize button, and the organizer. See [ADR 0002](adr/0002-tasks-are-native-tab-groups.md) and the [approved plan](plans/native-tab-tree.md). The [pinned-source investigation](research/chromium-tab-api-research.md) identifies the Chromium controls this reuses.
 
-[Horse's documented hierarchy](research/horse-tab-organization-research.md) includes parent pages and non-page containers. Its organizing behavior does not establish a compatible implementation for uw. Trial the [agreed tree structure](product.md#automatic-tab-organization) against Chromium tabs, native Views, and session restoration. Check keyboard navigation, drag-and-drop, parent-tab lifecycle, and page continuity when branches move.
+Keep the rules in `components/tab_organization/page_tree`, separate from views, so they are tested without driving the interface. The window-owned controller mirrors `TabStripModel` into a page tree and applies changes back through Chromium's tab-group and move calls.
 
-Use the ordinary feature-source layout above for substantial hierarchy logic. Keep tree state separate from its view so regrouping can be tested without driving the interface. Updated [implementability estimates](plans/roadmap.md#implementability-estimates) include this additional work.
+The [organization controls](product.md#organization-controls) use a button menu in the tab sidebar. Route it and the tab context menu through the same controller. Keep organization undo distinct from the page's ordinary text-editing undo.
 
-The [organization controls](product.md#organization-controls) use a custom button menu in the tab sidebar. Proposed: implement it with native Views menu controls and route it and tab context menus through the same organization module. Chromium's existing [Tab menu](https://github.com/chromium/chromium/blob/792bf6722e73a45aa9e47c163b9901bdc17f3230/chrome/browser/ui/cocoa/main_menu_builder.mm) provides a reference for browser-command routing. Keep organization undo distinct from the page's ordinary text-editing undo.
-
-The organization pause is global. It supports one hour, until next launch, and indefinite durations. Each window's automatic organization must honor the same pause state, while its regular tab tree and explicitly requested operations remain window-scoped.
+The organization pause is global. It supports one hour, until next launch, and indefinite durations. Each window's automatic organization must honor the same pause state, while manual commands remain window-scoped.
 
 ## Shared pinned tabs
 
@@ -105,21 +103,19 @@ Tab classification has an [agreed latency budget](product.md#organization-latenc
 
 ## Tab organization models
 
-Agreed role: tab classification calls a dedicated fast decision model, alongside an LLM connected through the [supported AI connection modes](product.md#ai-connections). The current choice is [TypeSafe Jev](https://typesafe.ai/), which its developer describes as an early-access model for typed decisions with calibrated confidence. GLiNER2.5 is no longer the selected fast-path candidate.
+Settings hold an optional decision model and a language model. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md) and the [approved plan](plans/automatic-organization.md).
 
-Jev's published claims do not establish that it can classify browsing tasks accurately or meet uw's [context-to-placement deadline](product.md#organization-latency). Its execution location, endpoint behavior, input limits, terms, and local-runtime availability need validation before implementation.
+| Connection | Providers | Wire format |
+| --- | --- | --- |
+| Decision model | Jev (TypeSafe) | `POST <base>/systemone` |
+| Decision model | OpenAI Decisions API, or a compatible endpoint | `POST <base>/decisions` |
+| Language model | Ollama, or an OpenAI-compatible endpoint | `POST <base>/chat/completions` |
 
-Proposed integration:
+The decision model picks one option: an existing task, a new task, or the Scratchpad. The language model names a new task. With no decision model, the language model does both in one call.
 
-- After explicit opt-in, send Jev the title, URL, and source relationship for initial classification. Re-evaluate with a short readable-text excerpt when it becomes available, using the [agreed intent context](product.md#intent-context) to score matches to existing task descriptions.
-- Use the connected LLM to discover new tasks, refine task descriptions when intent is ambiguous, and propose larger organization changes using the [agreed intent context](product.md#intent-context). Classification against task descriptions stays with the fast model.
-- Without a configured LLM, Jev's no-match or low-confidence result leaves the tab in Scratchpad. The user can still create a task manually.
-- With a configured LLM, send background discovery for Scratchpad branches that Jev cannot match. Cancel or discard requests when their branch changes, closes, or receives a manual adjustment. Apply only results that still match current tree state.
-- Apply validated changes through native browser code, honoring the [agreed organization rules](product.md#automatic-tab-organization).
+Apply results asynchronously and check them against current tab state, so a late response never overrides a manual action or a newer navigation. A result needs the [agreed confidence](plans/automatic-organization.md#agreed-scope) to move anything.
 
-The [confident-placement rule](product.md#automatic-tab-organization) allows classification results to take effect without an LLM response. A clearer excerpt-informed result corrects the initial placement unless the user acted in between. Confidence calibration and failure behavior still need decisions and measured trials. Apply model results asynchronously and check them against current tab state so inference completion does not override an intervening manual action or newer navigation.
-
-Jev's HTTP contract is recorded in the [approved first slice](plans/automatic-organization.md): `POST https://api.typesafe.ai/v1/systemone` with model `jev-latest`, a structured state, and a Choice question returning the selected option, probabilities, and confidence. Verify access model, input limits, and terms before implementation. Measure end-to-end latency and intent accuracy on the target Mac; model-level speed claims alone are insufficient. The first remote release treats Jev as background correction; the [200 ms budget](product.md#organization-latency) remains a future milestone. The [required explicit opt-in](product.md#ai-connections) precedes any intent-context request. The integration is unimplemented. Implementability for the approved slice: **3/10**.
+The request and response shapes were taken from the providers' public documentation on 2026-10-11. No live provider has been called yet. Measure accuracy, confidence calibration, and latency on the target Mac before relying on any provider's published claims. The [200 ms budget](product.md#organization-latency) remains a future milestone.
 
 ## Data and execution
 
@@ -136,8 +132,8 @@ Ad blocking needs integration-level evaluation. Do not assume a particular exten
 | Chromium updates | Patch repair cost across a version bump, extension compatibility, and time to ship security updates. |
 | Platform support | Hardware requirements and packaging for the [initial platform](product.md#minimum-usable-version), plus support for later platforms. |
 | Managed local AI | Runtime, model licenses, hardware fit, download source, integrity checks, and model updates. |
-| Tab organization models | Validate Jev's provider contract and data handling, then measure its task accuracy, confidence calibration, and context-to-placement latency. |
-| Tab hierarchy | Mapping to Chromium's tab model, stable identities during branch changes, persistence, and live-move feedback. |
+| Tab organization models | Call each provider live, check its data handling, then measure task accuracy, confidence calibration, and context-to-placement latency. |
+| Tab hierarchy | Keeping page nesting consistent with native drags, stable identities during branch moves, and persistence. |
 | Shared pins | Shared live-page presentation and reset, unpin, and window-shutdown behavior. |
 | Background scheduling | Scheduler integration with the [agreed app lifecycle and catch-up behavior](product.md#scheduled-page-watches), plus daylight-saving handling. |
 | Watch sessions | How checks reuse the user's existing browser session while following the [agreed sign-in behavior](product.md#scheduled-page-watches). |
