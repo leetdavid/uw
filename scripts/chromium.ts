@@ -489,7 +489,7 @@ const TEST_SUITES = {
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "UwOrganizationPageBrowserTest.*",
-    "WindowScreenshotBrowserTest.*",
+    "WindowScreenshotBrowserTest.*", "TintBrowserTest.*",
   ],
 } as const;
 

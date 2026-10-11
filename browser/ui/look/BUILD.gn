@@ -1,4 +1,4 @@
-# The Arc-style look: tint colors and the window gradient.
+# The Arc-style look: tint colors, the window gradient, and favorite tiles.
 source_set("look") {
   sources = [
     "favorite_tile.cc",
@@ -17,5 +17,28 @@ source_set("look") {
     "//ui/gfx",
     "//ui/gfx:color_utils",
     "//ui/views",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "tint_browsertest.cc" ]
+  deps = [
+    ":look",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/themes",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/color:color_headers",
+    "//chrome/common:constants",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/test:test_support",
+    "//skia",
+    "//testing/gtest",
+    "//ui/base/mojom",
+    "//ui/color",
+    "//uw/browser/tab_organization:test_support",
   ]
 }

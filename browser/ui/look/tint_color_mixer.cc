@@ -26,7 +26,13 @@ bool UsesTint(const ui::ColorProviderKey& key) {
   return !key.custom_theme;
 }
 
+// The color the user picked in Chromium's theme color picker, when there is
+// one. Otherwise the default for light or dark mode.
 Tint TintFor(const ui::ColorProviderKey& key) {
+  if (key.user_color &&
+      key.user_color_source == ui::ColorProviderKey::UserColorSource::kAccent) {
+    return TintFrom(*key.user_color);
+  }
   return TintFrom(key.color_mode == ui::ColorProviderKey::ColorMode::kDark
                       ? kDefaultDarkTint
                       : kDefaultLightTint);

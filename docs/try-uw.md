@@ -61,9 +61,15 @@ Expected result: when the model is confident, the tab moves into a task. A messa
 
 Arrange a few tabs, quit uw, and launch it again with "Continue where you left off" set at `chrome://settings/onStartup`. Check that groups and tab order return. This is a trial, not a guarantee.
 
+### Window tint
+
+Open a new tab and click `Customize Chromium`, then pick a color.
+
+Expected result: the sidebar becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. With no color picked, the tint is lilac in light mode and indigo in dark mode.
+
 ## Not available yet
 
-- The rest of the Arc-style look. The window has its tint, lilac in light mode and indigo in dark mode, with taller tab rows and pinned tabs as tiles. The page card and task folder rows still look like stock Chromium.
+- The rest of the Arc-style look. The page is not in a rounded card yet, and a task still shows Chromium's colored group header instead of a folder row.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.
