@@ -16,8 +16,7 @@ import { BuildError, Chromium, REPO, layoutAt, loadPins, nativeRuntime } from ".
 const OUTPUT = "out/uw";
 const SMOKE_TIMEOUT = 120_000;
 const UNIT_FILTER = [
-  "TabTreeTest.*",
-  "OrganizationCoordinatorTest.*",
+  "PageTreeTest.*",
   "AiProtocolTest.*",
   "VerticalTabStripPrefsTest.*",
   "VerticalTabStripStateControllerTest.*",

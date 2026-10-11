@@ -168,18 +168,19 @@ index f8d51fa..9ae6552 100644
  
  #include <algorithm>
  #include <memory>
-@@ -990,6 +991,16 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+@@ -990,6 +991,17 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
          std::move(tab_to_insert), params->tabstrip_index, params->transition,
          params->tabstrip_add_types, group);
  
 +    if (source_browser == params->browser &&
 +        (params->disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB ||
-+         params->disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB) &&
-+        ui::PageTransitionCoreTypeIs(params->transition,
-+                                     ui::PAGE_TRANSITION_LINK)) {
-+      uw::TabOrganizationController::DidOpenLink(params->browser,
-+                                                 contents_to_navigate_or_insert,
-+                                                 params->source_contents);
++         params->disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB)) {
++      uw::TabOrganizationController::DidOpenTab(
++          params->browser, contents_to_navigate_or_insert,
++          ui::PageTransitionCoreTypeIs(params->transition,
++                                       ui::PAGE_TRANSITION_LINK)
++              ? params->source_contents.get()
++              : nullptr);
 +    }
 +
      // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
@@ -189,12 +190,11 @@ diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/vi
 index 9354e0d..9b9739c 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
-@@ -77,6 +77,8 @@ source_set("impl") {
+@@ -77,6 +77,7 @@ source_set("impl") {
    ]
  
    deps = [
 +    "//uw/browser/tab_organization",
-+    "//uw/browser/ui/views/tab_organization:tab_tree_adapter",
      "//chrome/browser:primitives",
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
@@ -210,28 +210,24 @@ index cdc7c0f..a260033 100644
  
  #include <algorithm>
  #include <memory>
-@@ -191,6 +192,12 @@ void TabDragHandlerImpl::InitializeDrag(
+@@ -191,6 +192,10 @@ void TabDragHandlerImpl::InitializeDrag(
      const ui::ListSelectionModel& original_selection_model,
      const ui::LocatedEvent& event) {
    ResetDragState();
-+  if (node.orientation() == TabStripOrientation::kVertical) {
-+    if (auto* organizer =
-+            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
-+      organizer->BeginTabDrag();
-+    }
++  if (auto* organizer =
++          uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++    organizer->BeginTabDrag();
 +  }
    drag_controller_ = std::make_unique<TabDragController>();
  
    DragInitData drag_init_data;
-@@ -358,6 +365,12 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -358,6 +363,10 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
  }
  
  void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
-+  if (reason == EndDragReason::kComplete || reason == EndDragReason::kCancel) {
-+    if (auto* organizer =
-+            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
-+      organizer->EndTabDrag(reason == EndDragReason::kComplete);
-+    }
++  if (auto* organizer =
++          uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++    organizer->EndTabDrag();
 +  }
    // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture
    // lost" because some window managers on Wayland don't send exit events to tab
@@ -262,207 +258,6 @@ index 1ad01e4..cfb11f7 100644
    CHECK(browser_view_->tab_strip_view());
    expand_on_hover_lock_ = browser_view_->tab_strip_view()->GetExpandOnHoverLock(
        ExpandOnHoverLockType::kKeepCurrentState);
-diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-index a96f4b8..ab709cb 100644
---- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-+++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-@@ -7,4 +7,5 @@
- #include "chrome/browser/ui/layout_constants.h"
-+#include "chrome/browser/ui/views/frame/browser_view.h"
- #include "chrome/browser/ui/tabs/tab_style.h"
- #include "chrome/browser/ui/views/tabs/common/dragged_tabs_container.h"
- #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
-@@ -26,6 +27,8 @@
- #include "ui/views/view_targeter.h"
- #include "ui/views/view_targeter_delegate.h"
- #include "ui/views/view_utils.h"
-+#include "uw/browser/tab_organization/tab_organization_controller.h"
-+#include "uw/browser/ui/views/tab_organization/tab_tree_adapter.h"
- 
- namespace {
- 
-@@ -107,11 +110,22 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
-   node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
-       base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
-                      base::Unretained(this)));
-+  if (collection_node_->orientation() == TabStripOrientation::kVertical) {
-+    auto* tab_strip_controller = collection_node_->GetController();
-+    auto* controller =
-+        tab_strip_controller
-+            ? uw::TabOrganizationController::From(
-+                  tab_strip_controller->GetBrowserView()->browser())
-+            : nullptr;
-+    auto adapter = std::make_unique<uw::TabTreeAdapter>(
-+        this, collection_node_, controller);
-+    if (adapter->available())
-+      uw_tree_ = std::move(adapter);
-+  }
- }
- 
- UnpinnedTabContainerView::~UnpinnedTabContainerView() = default;
- 
--
- std::optional<BrowserRootView::DropIndex>
- UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
-   if (!collection_node_) {
-@@ -120,6 +125,16 @@ UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
-   const bool is_horizontal =
-       collection_node_->orientation() == TabStripOrientation::kHorizontal;
- 
-+  if (uw_tree_) {
-+    if (auto index = uw_tree_->LinkDropIndex(loc_in_container)) {
-+      BrowserRootView::DropIndex drop;
-+      drop.index = *index;
-+      drop.relative_to_index =
-+          BrowserRootView::DropIndex::RelativeToIndex::kInsertBeforeIndex;
-+      return drop;
-+    }
-+  }
-+
-   for (auto& child_node : collection_node_->children()) {
-     auto* view = child_node->view();
-     CHECK(view);
-@@ -222,6 +237,15 @@ gfx::Size UnpinnedTabContainerView::GetTargetPreferredSize() const {
- }
- 
- void UnpinnedTabContainerView::ResetCollectionNode() {
-   collection_node_ = nullptr;
-+  // Never detach adapter views here. Both window teardown and tab-orientation
-+  // switches delete the TabStripView (and this host) right after the
-+  // collection nodes are destroyed, so the views must die with the host in
-+  // cascade order. Forcing their removal recalculates the animating layout
-+  // while siblings are half-destroyed and leaves stale entries that trip its
-+  // dangling-pointer check when the layout manager is destroyed. Releasing
-+  // the adapter clears only its own tracking; live-host removals still go
-+  // through RemoveOwnedView.
-+  uw_tree_.reset();
- }
- 
-@@ -241,6 +257,8 @@ const views::ProposedLayout& UnpinnedTabContainerView::GetLayoutForDrag()
- 
- DraggedTabsContainer& UnpinnedTabContainerView::GetTabDragTarget(
-     const gfx::Point& point_in_screen) {
-+  if (uw_tree_)
-+    uw_tree_->TrackNativeDrop(point_in_screen);
-   if (GetDragHandler().IsDraggingGroups()) {
-     // Don't consider other tab group views as a drag target if we're dragging
-     // a group header already.
-@@ -362,3 +380,26 @@ const TabCollectionNode* UnpinnedTabContainerView::GetCollectionNodeFromView(
- 
- BEGIN_METADATA(UnpinnedTabContainerView)
- END_METADATA
-+
-+bool UnpinnedTabContainerView::GetDropFormats(
-+    int* formats,
-+    std::set<ui::ClipboardFormatType>* types) {
-+  if (!uw_tree_)
-+    return false;
-+  *formats = 0;
-+  types->insert(uw::TabTreeAdapter::DragFormat());
-+  return true;
-+}
-+
-+bool UnpinnedTabContainerView::CanDrop(const ui::OSExchangeData& data) {
-+  return uw_tree_ && uw_tree_->CanDrop(data);
-+}
-+
-+int UnpinnedTabContainerView::OnDragUpdated(const ui::DropTargetEvent& event) {
-+  return uw_tree_ ? uw_tree_->DragUpdated(event) : 0;
-+}
-+
-+views::View::DropCallback UnpinnedTabContainerView::GetDropCallback(
-+    const ui::DropTargetEvent& event) {
-+  return uw_tree_ ? uw_tree_->DropCallback(event) : DropCallback();
-+}
-diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-index a7cf799..1349771 100644
---- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-+++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-@@ -5,11 +5,15 @@
- #ifndef CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
- #define CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
- 
-+#include <set>
-+
- #include "base/callback_list.h"
- #include "base/memory/raw_ptr.h"
- #include "chrome/browser/ui/views/frame/browser_root_view.h"
- #include "chrome/browser/ui/views/tabs/common/dragged_tabs_container.h"
- #include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
-+#include "ui/base/clipboard/clipboard_format_type.h"
-+#include "ui/base/dragdrop/drop_target_event.h"
- #include "ui/base/metadata/metadata_header_macros.h"
- #include "ui/views/view.h"
- 
-@@ -17,6 +21,10 @@ class TabCollectionNode;
- class TabGroupView;
- class UnpinnedTabContainerViewLayout;
- 
-+namespace uw {
-+class TabTreeAdapter;
-+}
-+
- // The view class that represents the unpinned tab region for the
- // tab strip. It hosts all the unpinned tabs and serves as the drag target
- // for unpinned tabs which aren't grouped. Layout is managed by
-@@ -54,6 +62,14 @@ class UnpinnedTabContainerView
-   // occupy once current animations complete.
-   gfx::Size GetTargetPreferredSize() const;
- 
-+  uw::TabTreeAdapter* uw_tree() const { return uw_tree_.get(); }
-+
-+  bool GetDropFormats(int* formats,
-+                      std::set<ui::ClipboardFormatType>* types) override;
-+  bool CanDrop(const ui::OSExchangeData& data) override;
-+  int OnDragUpdated(const ui::DropTargetEvent& event) override;
-+  DropCallback GetDropCallback(const ui::DropTargetEvent& event) override;
-+
-   // Sets the main-axis space allocated for this container during TabStripView
-   // layout passes.
-   void SetAvailableSpace(views::SizeBound space) { available_space_ = space; }
-@@ -76,6 +92,7 @@ class UnpinnedTabContainerView
-   void ResetCollectionNode();
- 
-   raw_ptr<TabCollectionNode> collection_node_;
-+  std::unique_ptr<uw::TabTreeAdapter> uw_tree_;
- 
-   // The available main-axis space allocated by TabStripViewLayout.
-   views::SizeBound available_space_;
-diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d..29d8039 100644
---- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-+++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-@@ -21,6 +21,7 @@
- #include "ui/views/layout/proposed_layout.h"
- #include "ui/views/view.h"
- #include "ui/views/view_utils.h"
-+#include "uw/browser/ui/views/tab_organization/tab_tree_adapter.h"
- 
- namespace {
- constexpr int kTabVerticalPadding = 2;
-@@ -147,6 +148,22 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateHorizontalLayout(
- views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
-     const UnpinnedTabContainerView* tab_container_view,
-     const views::SizeBounds& size_bounds) const {
-+  if (tab_container_view->uw_tree()) {
-+    auto layout = tab_container_view->uw_tree()->CalculateLayout(size_bounds);
-+    for (auto& child : layout.child_layouts) {
-+      if (auto drag = tab_container_view->GetVisualDataForDraggedView(
-+              *child.child_view)) {
-+        child.bounds.set_y(drag->offset.y());
-+        child.visible = child.visible && !drag->should_hide;
-+      }
-+    }
-+    if (tab_container_view->IsHandlingDrag()) {
-+      layout.host_size.set_height(
-+          std::max(layout.host_size.height(),
-+                   tab_container_view->GetDraggingViewsBounds().bottom()));
-+    }
-+    return layout;
-+  }
-   views::ProposedLayout layouts;
-   if (!tab_container_view->collection_node_) {
-     return layouts;
 diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
 index 88df244..6de19f2 100644
 --- a/chrome/browser/ui/views/tabs/tab/BUILD.gn

@@ -103,7 +103,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 
 - `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. This first pass retains Chromium's icons and most secondary strings.
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
-- `tab-tree.patch` connects the approved manual tab-tree slice to Chromium's vertical tab controls. It expects the product source prepared below.
+- `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It expects the product source prepared below.
 
 Substantial Chromium product code lives in tracked `browser/` and `components/` directories. Preparation links them into the ignored Chromium checkout at `src/uw/`; it does not copy the files. The tab-tree patch ignores that generated source directory. This keeps product source reviewable while preserving an upstream-only checkout between prepare runs.
 
@@ -123,7 +123,7 @@ The checkout's `.uw-patches.json` records the applied result and operation statu
 pnpm run check
 ```
 
-This runs strict TypeScript checking and the Node.js test suite. This includes native lifetime checks that pin the fixed app crashes without building Chromium. These checks do not require Python or a Chromium checkout. Browser compilation and smoke testing are separate checks.
+This runs strict TypeScript checking and the Node.js test suite. These checks do not require Python or a Chromium checkout. Browser compilation and smoke testing are separate checks.
 
 ```sh
 pnpm run check && pnpm run verify --jobs 8

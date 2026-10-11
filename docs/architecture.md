@@ -36,33 +36,13 @@ Implementability: **7/10** for this organization including ongoing Chromium upda
 
 ### Native lifetime rules
 
-These rules come from fixed native crashes. They apply to every uw
-customization, not just tab organization:
+These rules come from fixed native crashes. They apply to every uw customization:
 
-- Never mutate `TabStripModel` from its observer notifications. Defer tab
-  moves to a posted task; the model holds a reentrancy guard while notifying.
-- Erase view-tracking entries before retiring their views, and detach the
-  adapter's back-pointers first. Buttons hold unowned `drag_controller_` and
-  `context_menu_controller_` pointers to the adapter, and the views outlive
-  the adapter at window teardown: destroying them later would otherwise
-  release a dangling pointer. At teardown, remove nothing: the views die
-  with the host in cascade order, and forcing their removal recalculates
-  the animating layout while siblings are half-destroyed. Explicit
-  retirement is only for when the host outlives the removed views.
-- Never delete a view the animating layout manager's cached targets still
-  reference. It caches raw pointers to laid-out children in its starting
-  and target layouts, and no synchronous relayout from the adapter reaches
-  that outer cache. Retire stale views instead: detach, hide, and exclude
-  them from calculated layouts, and let them die with the host. Erased map
-  entries plus detached, hidden views cannot dangle no matter when the
-  next layout or teardown runs.
-- Never keep an unowned pointer to an object owned by a dialog, bubble, or
-  host view. Look it up from the owning model while that model is alive; the
-  owner's member-destruction order will otherwise dangle it.
+- Never change `TabStripModel` from inside its observer notifications. The model holds a reentrancy guard while notifying, so post a task and move tabs there.
+- Never add a view to a Chromium tab container and remove it later. The animating layout manager caches raw pointers to laid-out children. A uw view inside one of those containers is created with its host and dies with it; show and hide it instead.
+- Never keep an unowned pointer to an object owned by a dialog, bubble, or host view. Look it up from the owning model while that model is alive.
 
-Non-official builds keep Chromium's `DCHECK` and dangling-pointer checks
-enabled. Treat a debug-check crash as the safeguard working: fix the lifetime
-instead of silencing the check.
+Non-official builds keep Chromium's `DCHECK` and dangling-pointer checks enabled. Treat a debug-check crash as the safeguard working: fix the lifetime instead of silencing the check.
 
 ## Native tab tree
 

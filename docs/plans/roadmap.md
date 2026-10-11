@@ -17,14 +17,14 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T7 | Organization pause controls | superseded | 8/10 | Replaced by T15 and T16. |
 | T8 | Organize-menu crash fixes | superseded | 7/10 | The crashing adapter is removed in T13. |
 | T9 | Organization settings page and uw:// alias | in review | 6/10 | The uw:// alias stands: uw:// URLs alias their chrome:// counterparts, and uw://settings resolves. The settings page is reworked in T16. |
-| T10 | Stability safeguards | superseded | 7/10 | Regression tests move to T13. The source-text checks are removed in T17. |
+| T10 | Stability safeguards | superseded | 7/10 | Regression tests moved to T13, which also removed the source-text checks. |
 | T11 | Decision formats and naming call | in review | 8/10 | Request and response handling for the OpenAI Decisions API and TypeSafe System One (Jev), plus the task naming call, per [automatic-organization.md](automatic-organization.md). Done when `AiProtocolTest.*` passes. |
 | T12 | Page tree model | in review | 8/10 | Value type holding tab order, task, and parent link per page, with every tab-tree rule as plain functions, per [native-tab-tree.md](native-tab-tree.md). Done when `PageTreeTest.*` passes. |
-| T13 | Window controller on native tab groups | todo | 6/10 | Mirrors the tab strip into the page tree and applies changes back through tab-group and move calls: link parentage, new-tab placement, close promotion, branch commands, undo, session restore. Deletes the old tree model, coordinator, and adapter. Done when the new `TabOrganizationControllerBrowserTest` cases pass. |
+| T13 | Window controller on native tab groups | in review | 6/10 | Mirrors the tab strip into the page tree and applies changes back through tab-group and move calls: link parentage, new-tab placement, close promotion, branch commands, undo, session restore. Deletes the old tree model, coordinator, and adapter. Done when the new `TabOrganizationControllerBrowserTest` cases pass. |
 | T14 | Sidebar additions | todo | 6/10 | Indentation per nesting level, the Scratchpad label, the Organize button and menu, and the automatic-move message with Undo. Done when the [native tab tree acceptance checks](native-tab-tree.md#acceptance-checks) pass in the built app. |
 | T15 | Organizer on native tab groups | todo | 5/10 | Debounced decision requests, naming, staleness checks, branch moves and task creation at confidence 0.90 or more, one undo per action, and pause. Done when the [automatic organization acceptance checks](automatic-organization.md#acceptance-checks) pass against a test server. |
 | T16 | Settings: decision model, language model, pause | todo | 7/10 | Settings page with both connections and the pause controls. Validation gates enablement, a failed save turns automatic organization off, and the model list is fetched with GET. Done when each provider validates from the page against a test server. |
-| T17 | Tooling and docs cleanup | backlog | 9/10 | Remove the source-text checks in `scripts/native-rules.ts`, fold `verify` into the main CLI, make the macOS workflow manual until a runner exists, and give build status one home. |
+| T17 | Tooling and docs cleanup | backlog | 9/10 | Fold `verify` into the main CLI, make the macOS workflow manual until a runner exists, and give build status one home. |
 
 ## 1. Choose the browser foundation
 

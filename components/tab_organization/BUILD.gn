@@ -1,24 +1,22 @@
-source_set("tab_tree") {
+source_set("tab_organization") {
   sources = [
     "ai_protocol.cc",
     "ai_protocol.h",
-    "organization_coordinator.cc",
-    "organization_coordinator.h",
     "page_tree.cc",
     "page_tree.h",
-    "tab_tree.cc",
-    "tab_tree.h",
   ]
-  public_deps = [ "//base", "//ui/base" ]
+  public_deps = [ "//base" ]
 }
 
 source_set("unit_tests") {
   testonly = true
   sources = [
     "ai_protocol_unittest.cc",
-    "organization_coordinator_unittest.cc",
     "page_tree_unittest.cc",
-    "tab_tree_unittest.cc",
   ]
-  deps = [ ":tab_tree", "//base/test:test_support", "//testing/gtest" ]
+  deps = [
+    ":tab_organization",
+    "//base/test:test_support",
+    "//testing/gtest",
+  ]
 }

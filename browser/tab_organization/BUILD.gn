@@ -1,26 +1,27 @@
 source_set("tab_organization") {
-  sources = [ "tab_organization_controller.cc", "tab_organization_controller.h" ]
+  sources = [
+    "tab_organization_controller.cc",
+    "tab_organization_controller.h",
+  ]
   public_deps = [
     "//base",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tab_groups",
     "//components/tabs:public",
     "//ui/base/unowned_user_data",
-    "//uw/components/tab_organization:tab_tree",
+    "//uw/components/tab_organization",
   ]
   deps = [
-    ":ai_connection",
+    "//chrome:strings",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
-    "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui/browser_window",
-    "//chrome:strings",
-    "//components/content_extraction/content/browser",
+    "//chrome/common:constants",
     "//components/prefs",
     "//components/sessions",
     "//content/public/browser",
     "//ui/base",
     "//ui/menus",
-    "//url",
   ]
 }
 
@@ -29,16 +30,16 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "tab_organization_controller_browsertest.cc" ]
   deps = [
-    ":ai_connection",
     ":tab_organization",
     "//base",
     "//chrome/browser",
+    "//chrome/browser/ui",
     "//chrome/common",
     "//chrome/test:test_support",
     "//components/prefs",
+    "//components/tab_groups",
     "//content/public/browser",
     "//content/test:test_support",
-    "//crypto",
     "//testing/gtest",
     "//url",
   ]

@@ -25,6 +25,6 @@ source_set("uw_organization_handler") {
     "//components/prefs",
     "//url",
     "//uw/browser/tab_organization:ai_connection",
-    "//uw/components/tab_organization:tab_tree",
+    "//uw/components/tab_organization",
   ]
 }
