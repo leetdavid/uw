@@ -41,11 +41,18 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
         params.navigated_or_inserted_contents);
   }
 
-  // Opens nested tabs and files two of them into a task.
+  // Pins four favorites, opens nested tabs, and files two of them into a
+  // task.
   void StageSidebar() {
     TabOrganizationController* controller =
         TabOrganizationController::From(browser());
-    tabs::TabInterface* first = browser()->tab_strip_model()->GetTabAtIndex(0);
+    TabStripModel* tabs = browser()->tab_strip_model();
+    tabs::TabInterface* first = tabs->GetTabAtIndex(0);
+    for (const char* favorite : {"Mail", "Issues", "Code", "Music"}) {
+      tabs->SetTabPinned(tabs->GetIndexOfTab(OpenLinkFrom(first, favorite)),
+                         true);
+    }
+    base::RunLoop().RunUntilIdle();
     tabs::TabInterface* flights = OpenLinkFrom(first, "SFO to LIS flights");
     OpenLinkFrom(flights, "Fare details: TAP Air Portugal");
     tabs::TabInterface* news = OpenLinkFrom(first, "Hacker News");

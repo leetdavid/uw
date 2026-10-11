@@ -80,6 +80,7 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
         kColorTabSearchButtonCRForegroundFrameInactive}) {
     mixer[foreground] = {text};
   }
+  mixer[kColorVerticalTabPinnedOutline] = {SK_ColorTRANSPARENT};
   mixer[kColorTabBackgroundActiveFrameActive] = {ActiveTabOn(tint)};
   mixer[kColorTabBackgroundActiveFrameInactive] = {ActiveTabOn(tint)};
 }

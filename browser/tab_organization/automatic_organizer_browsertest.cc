@@ -174,12 +174,18 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Sends what is due and waits until every answer has been handled.
-  [[nodiscard]] bool SettleAfter(size_t request_count) {
+  [[nodiscard]] testing::AssertionResult SettleAfter(size_t request_count) {
     organizer()->DispatchNowForTesting();
-    return base::test::RunUntil([&] {
-      return Requests().size() >= request_count &&
-             organizer()->pending_requests() == 0;
-    });
+    if (base::test::RunUntil([&] {
+          return Requests().size() >= request_count &&
+                 organizer()->pending_requests() == 0;
+        })) {
+      return testing::AssertionSuccess();
+    }
+    return testing::AssertionFailure()
+           << "the test server received " << Requests().size() << " of "
+           << request_count << " requests and "
+           << organizer()->pending_requests() << " are still waiting";
   }
 
   PageId Id(tabs::TabInterface* tab) {

@@ -1,6 +1,8 @@
 # The Arc-style look: tint colors and the window gradient.
 source_set("look") {
   sources = [
+    "favorite_tile.cc",
+    "favorite_tile.h",
     "tint_color_mixer.cc",
     "tint_color_mixer.h",
     "tint_painter.cc",

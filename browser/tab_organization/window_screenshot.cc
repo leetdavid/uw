@@ -11,8 +11,11 @@
 #include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/run_loop.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
@@ -31,6 +34,7 @@ namespace {
 constexpr char kFolderVariable[] = "UW_SCREENSHOT_DIR";
 constexpr gfx::Rect kWindowBounds(0, 0, 1280, 800);
 constexpr int kMaxFrames = 60;
+constexpr base::TimeDelta kFrameGap = base::Milliseconds(150);
 
 SkBitmap Capture(views::Widget* widget) {
   widget->LayoutRootViewIfNecessary();
@@ -50,11 +54,19 @@ SkBitmap Capture(views::Widget* widget) {
   return pixels;
 }
 
-// Returns the window once two frames in a row look the same, which means the
-// views have finished drawing their latest state.
+void Wait(base::TimeDelta time) {
+  base::RunLoop loop;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, loop.QuitClosure(), time);
+  loop.Run();
+}
+
+// Returns the window once two frames taken a moment apart look the same,
+// which means every animation has finished.
 SkBitmap CaptureSettled(views::Widget* widget) {
   SkBitmap pixels = Capture(widget);
   for (int frames = 0; frames < kMaxFrames; ++frames) {
+    Wait(kFrameGap);
     SkBitmap next = Capture(widget);
     const bool settled = gfx::BitmapsAreEqual(pixels, next);
     pixels = std::move(next);

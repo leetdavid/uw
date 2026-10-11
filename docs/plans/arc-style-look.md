@@ -1,6 +1,6 @@
 # Arc-style look
 
-Status: approved on 2026-10-11 with the decisions below. Stage 1 and the tint half of stage 2 are built.
+Status: approved on 2026-10-11 with the decisions below. Stage 1, the tint half of stage 2, and stage 3 are built.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Sizes and colors are small changes because Chromium already has settings for them. The tint gradient, the user's own tint, and the task folder row need custom drawing in several views. Chromium's vertical tab strip is new and changes with every release, and the result can only be judged by eye.
 
@@ -51,7 +51,7 @@ Agreed on 2026-10-11:
 
 1. **Screenshot helper.** Built. It saves the sidebar with a task in light and dark mode, an automatic move, and the settings page.
 2. **Tint and card.** The default gradients and the text color on the tint are built. The card inset, radius, and shadow are not.
-3. **Tab rows and favorites.** Sizes, active and hover states, and tiles.
+3. **Tab rows and favorites.** Built: 34px rows with a 10px radius, the active tab as a card, and pinned tabs as filled tiles. Tiles use the row radius of 10px, not 12px, because Chromium has one radius for both.
 4. **Task rows.** The folder header.
 5. **Sidebar foot and toolbar.** The Organize pill, the message card, and the toolbar height.
 6. **User tint.** The picked color drives the gradient and the text color.
