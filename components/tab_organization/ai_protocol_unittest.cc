@@ -43,7 +43,6 @@ TEST_F(AiProtocolTest, ClassificationRequestRoundTripsContext) {
   context.url = "https://example.com/bench";
   context.source_description = "opened from tab A";
   context.excerpt = "A short readable excerpt.";
-  context.manual_placement = "the user manually placed this branch in \"Other\"";
   auto body = BuildClassificationRequestBody(
       "test-model", context,
       {{"task-1", "Research"}, {kNewTaskOption, "x"}, {"", "y"}});
@@ -65,7 +64,8 @@ TEST_F(AiProtocolTest, ClassificationRequestRoundTripsContext) {
   ASSERT_TRUE(user_message);
   const std::string* user_content = user_message->FindString("content");
   ASSERT_TRUE(user_content);
-  auto description = base::JSONReader::ReadDict(*user_content, base::JSON_PARSE_RFC);
+  auto description =
+      base::JSONReader::ReadDict(*user_content, base::JSON_PARSE_RFC);
   ASSERT_TRUE(description);
   const std::string* title = description->FindString("title");
   ASSERT_TRUE(title);
@@ -79,9 +79,6 @@ TEST_F(AiProtocolTest, ClassificationRequestRoundTripsContext) {
   const std::string* excerpt = description->FindString("excerpt");
   ASSERT_TRUE(excerpt);
   EXPECT_EQ(*excerpt, "A short readable excerpt.");
-  const std::string* placement = description->FindString("manual_placement");
-  ASSERT_TRUE(placement);
-  EXPECT_EQ(*placement, "the user manually placed this branch in \"Other\"");
   const base::ListValue* tasks = description->FindList("tasks");
   ASSERT_TRUE(tasks);
   ASSERT_EQ(tasks->size(), 2u);
@@ -150,7 +147,8 @@ TEST_F(AiProtocolTest, ClassificationRejectsMalformedResponses) {
   // Empty choices.
   EXPECT_FALSE(ParseClassificationResponse(R"({"choices": []})"));
   // Missing content.
-  EXPECT_FALSE(ParseClassificationResponse(R"({"choices": [{"message": {}}]})"));
+  EXPECT_FALSE(
+      ParseClassificationResponse(R"({"choices": [{"message": {}}]})"));
   // Unknown decision.
   EXPECT_FALSE(ParseClassificationResponse(
       WrapContent(R"({"decision": "merge", "confidence": 1.0})")));
@@ -161,16 +159,16 @@ TEST_F(AiProtocolTest, ClassificationRejectsMalformedResponses) {
   EXPECT_FALSE(ParseClassificationResponse(WrapContent(
       R"({"decision": "move", "target": "new_task", "confidence": 1.0})")));
   // Confidence out of range.
-  EXPECT_FALSE(ParseClassificationResponse(WrapContent(
-      R"({"decision": "leave", "confidence": 2.0})")));
+  EXPECT_FALSE(ParseClassificationResponse(
+      WrapContent(R"({"decision": "leave", "confidence": 2.0})")));
   // Prose instead of the JSON object.
-  EXPECT_FALSE(ParseClassificationResponse(WrapContent(
-      R"("I think the branch belongs to Research.")")));
+  EXPECT_FALSE(ParseClassificationResponse(
+      WrapContent(R"("I think the branch belongs to Research.")")));
 }
 
 TEST_F(AiProtocolTest, ModelListParsesIds) {
-  auto models = ParseModelList(
-      R"({"data": [{"id": "llama3.2"}, {"id": "qwen2.5"}]})");
+  auto models =
+      ParseModelList(R"({"data": [{"id": "llama3.2"}, {"id": "qwen2.5"}]})");
   ASSERT_TRUE(models);
   EXPECT_EQ(*models, (std::vector<std::u16string>{u"llama3.2", u"qwen2.5"}));
 
@@ -203,7 +201,6 @@ TEST_F(AiProtocolTest, DecisionsRequestAsksOneChoiceQuestion) {
   ASSERT_TRUE(input);
   EXPECT_NE(input->find("Title: Lisbon in three days"), std::string::npos);
   EXPECT_NE(input->find("Page excerpt: Day one"), std::string::npos);
-  EXPECT_EQ(input->find("Manual placement"), std::string::npos);
   const base::ListValue* questions = parsed->FindList("questions");
   ASSERT_TRUE(questions);
   ASSERT_EQ(questions->size(), 1u);
@@ -222,10 +219,8 @@ TEST_F(AiProtocolTest, DecisionsRequestAsksOneChoiceQuestion) {
 }
 
 TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
-  BranchContext context = LisbonContext();
-  context.manual_placement = "the user left this branch ungrouped";
-  auto body = BuildDecisionRequestBody(DecisionFormat::kSystemOne,
-                                       "jev-latest", context,
+  auto body = BuildDecisionRequestBody(DecisionFormat::kSystemOne, "jev-latest",
+                                       LisbonContext(),
                                        {{"task-1", "Plan Lisbon trip"}});
   ASSERT_TRUE(body);
   auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
@@ -233,7 +228,7 @@ TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
   EXPECT_EQ(*parsed->FindString("model"), "jev-latest");
   const std::string* state = parsed->FindString("state");
   ASSERT_TRUE(state);
-  EXPECT_NE(state->find("Manual placement: the user left"), std::string::npos);
+  EXPECT_NE(state->find("Source: opened from"), std::string::npos);
   const base::DictValue* question =
       parsed->FindDict("questions")->FindDict("destination");
   ASSERT_TRUE(question);
@@ -251,7 +246,8 @@ TEST_F(AiProtocolTest, DecisionRequestRejectsBadInput) {
   for (DecisionFormat format :
        {DecisionFormat::kDecisions, DecisionFormat::kSystemOne}) {
     EXPECT_FALSE(BuildDecisionRequestBody(format, "", context, {}));
-    EXPECT_FALSE(BuildDecisionRequestBody(format, "model", BranchContext(), {}));
+    EXPECT_FALSE(
+        BuildDecisionRequestBody(format, "model", BranchContext(), {}));
     EXPECT_FALSE(BuildDecisionRequestBody(format, "model", context,
                                           {{kScratchpadOption, "x"}}));
     std::vector<std::pair<std::string, std::string>> tasks;
@@ -294,7 +290,8 @@ TEST_F(AiProtocolTest, DecisionsResponseRejectsUnusableAnswers) {
   };
   EXPECT_FALSE(parse("not json"));
   EXPECT_FALSE(parse(R"({"answers": []})"));
-  EXPECT_FALSE(parse(R"({"answers": [{"type": "refusal", "name": "destination"}]})"));
+  EXPECT_FALSE(
+      parse(R"({"answers": [{"type": "refusal", "name": "destination"}]})"));
   EXPECT_FALSE(parse(R"({"answers": [
       {"type": "choice", "name": "another", "choice": "task-1", "confidence": 1}]})"));
   EXPECT_FALSE(parse(R"({"answers": [
@@ -322,8 +319,8 @@ TEST_F(AiProtocolTest, SystemOneResponseParsesTheDestinationAnswer) {
   ASSERT_TRUE(answer);
   EXPECT_DOUBLE_EQ(answer->confidence, 0.0);
 
-  EXPECT_FALSE(ParseDecisionResponse(DecisionFormat::kSystemOne,
-                                     R"({"answers": {}})"));
+  EXPECT_FALSE(
+      ParseDecisionResponse(DecisionFormat::kSystemOne, R"({"answers": {}})"));
   EXPECT_FALSE(ParseDecisionResponse(
       DecisionFormat::kSystemOne,
       R"({"answers": {"destination": {"type": "noul", "noul": 0.9}}})"));
@@ -340,7 +337,8 @@ TEST_F(AiProtocolTest, ChatFormatUsesTheClassificationCall) {
                                            {{"task-1", "Plan Lisbon trip"}}));
   auto answer = ParseDecisionResponse(
       DecisionFormat::kChat,
-      WrapContent(R"({"decision": "new_task", "confidence": 0.95, "name": "Plan trip"})"));
+      WrapContent(
+          R"({"decision": "new_task", "confidence": 0.95, "name": "Plan trip"})"));
   ASSERT_TRUE(answer);
   EXPECT_EQ(answer->choice, kNewTaskOption);
   EXPECT_EQ(*answer->task_name, u"Plan trip");

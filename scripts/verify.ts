@@ -21,7 +21,8 @@ const UNIT_FILTER = [
   "VerticalTabStripPrefsTest.*",
   "VerticalTabStripStateControllerTest.*",
 ].join(":");
-const BROWSER_FILTER = "TabOrganizationControllerBrowserTest.*";
+const BROWSER_FILTER =
+  "TabOrganizationControllerBrowserTest.*:AutomaticOrganizerBrowserTest.*";
 
 function positiveInteger(value: string, flag: string): number {
   const number = Number(value);

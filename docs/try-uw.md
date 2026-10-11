@@ -50,7 +50,7 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 ## Not available yet
 
 - The Scratchpad label and the Organize button. Use the tab's right-click menu for now.
-- Automatic organization. The settings page at `uw://settings/uwOrganization` saves a connection, but nothing files tabs until the organizer is rebuilt.
+- A dependable automatic organization. The organizer files tabs once the settings page at `uw://settings/uwOrganization` has saved and validated a language model connection, but it has only been run against a test server. The page cannot set a decision model yet, and no message appears when a tab is filed. `Undo tab organization` in the tab menu reverses it.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.
 - Verified extension compatibility or daily-use stability.

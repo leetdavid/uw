@@ -9,6 +9,7 @@
 
 #include "base/time/time.h"
 #include "url/gurl.h"
+#include "uw/components/tab_organization/ai_protocol.h"
 
 class PrefService;
 namespace user_prefs {
@@ -31,6 +32,21 @@ inline constexpr char kOrganizationPauseModePref[] =
 inline constexpr char kOrganizationPauseUntilPref[] =
     "uw.organization.pause_until";
 
+// The optional decision model. It decides where a tab branch goes; the
+// language model above names new tasks.
+inline constexpr char kDecisionProviderPref[] =
+    "uw.organization.decision.provider";
+inline constexpr char kDecisionEndpointPref[] =
+    "uw.organization.decision.endpoint";
+inline constexpr char kDecisionModelPref[] = "uw.organization.decision.model";
+inline constexpr char kDecisionKeyAccountPref[] =
+    "uw.organization.decision.key_account";
+
+inline constexpr char kJevDefaultEndpoint[] = "https://api.typesafe.ai/v1";
+inline constexpr char kJevDefaultModel[] = "jev-latest";
+inline constexpr char kOpenAiDefaultEndpoint[] = "https://api.openai.com/v1";
+inline constexpr char kOpenAiDecisionsDefaultModel[] = "gpt-6-luna";
+
 // Default Ollama base endpoint. Ollama needs no API key.
 inline constexpr char kOllamaDefaultEndpoint[] = "http://localhost:11434/v1";
 
@@ -47,13 +63,37 @@ struct AiConnectionConfig {
   bool organization_enabled = false;
 };
 
+// Jev speaks TypeSafe System One. The other two speak the OpenAI Decisions
+// API, the second at a base URL the user enters.
+enum class DecisionProvider {
+  kNone = 0,
+  kJev = 1,
+  kOpenAi = 2,
+  kOpenAiCompatible = 3,
+};
+
+struct DecisionModelConfig {
+  DecisionProvider provider = DecisionProvider::kNone;
+  std::string endpoint;
+  std::string model;
+  // Keychain account id holding the API key.
+  std::string key_account;
+};
+
 // Global suspension of automatic organization per the product pause choices.
 // "Until next launch" is process state: it resets when uw next starts.
-enum class PauseMode { kOff = 0, kTimed = 1, kUntilLaunch = 2, kIndefinite = 3 };
+enum class PauseMode {
+  kOff = 0,
+  kTimed = 1,
+  kUntilLaunch = 2,
+  kIndefinite = 3
+};
 
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry);
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs);
+// Fills in the provider's default endpoint and model where none is saved.
+DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
 
 // Accepts https URLs, plus http loopback for local testing. Rejects
 // credentials, fragments, and invalid URLs.
@@ -62,6 +102,16 @@ bool IsValidProviderEndpoint(std::string_view endpoint);
 // Request URLs under a base endpoint like https://api.openai.com/v1.
 GURL ChatCompletionsUrl(std::string_view endpoint);
 GURL ModelsUrl(std::string_view endpoint);
+DecisionFormat FormatFor(DecisionProvider provider);
+GURL DecisionUrl(const DecisionModelConfig& config);
+
+// True when the connection has everything a request needs.
+bool IsComplete(const AiConnectionConfig& config);
+bool IsComplete(const DecisionModelConfig& config);
+
+// True when automatic organization may send requests: it was enabled by a
+// successful validation and at least one connection is complete.
+bool OrganizationReady(const PrefService* prefs);
 
 // True when automatic organization may dispatch: explicitly enabled with a
 // valid endpoint, a selected model, and (outside Ollama mode) a Keychain

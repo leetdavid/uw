@@ -40,6 +40,8 @@ class TabOrganizationController : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(TabOrganizationController);
   static constexpr char kSessionKey[] = "uw.page_tree";
+  // Who asked for a move. User moves are reported to ObserveManualMoves.
+  enum class Origin { kUser, kOrganizer };
   enum Command {
     kNewTask = 56000,
     kScratchpad,
@@ -71,6 +73,9 @@ class TabOrganizationController : public TabStripModelObserver {
   tabs::TabInterface* TabFor(const PageId& id) const;
   // Nesting level under parent pages. 0 for a top-level or untracked tab.
   int DepthFor(const tabs::TabInterface* tab) const;
+  // True for a tab opened in this window by a link or a new-tab command, as
+  // opposed to one that was restored or dragged in.
+  bool WasOpenedHere(const PageId& id) const { return opened_.contains(id); }
   // The selected pages when `context` is selected or null; else `context`.
   std::vector<PageId> SelectionFor(
       const tabs::TabInterface* context = nullptr) const;
@@ -81,9 +86,11 @@ class TabOrganizationController : public TabStripModelObserver {
   // Each call is one undoable organization action over whole branches.
   std::optional<tab_groups::TabGroupId> MoveToNewTask(
       const std::vector<PageId>& ids,
-      std::u16string title);
+      std::u16string title,
+      Origin origin = Origin::kUser);
   bool MoveToTask(const std::vector<PageId>& ids,
-                  const tab_groups::TabGroupId& group);
+                  const tab_groups::TabGroupId& group,
+                  Origin origin = Origin::kUser);
   bool MoveToScratchpad(const std::vector<PageId>& ids);
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
@@ -96,7 +103,16 @@ class TabOrganizationController : public TabStripModelObserver {
   void BeginTabDrag();
   void EndTabDrag();
 
+  std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
+  std::u16string TaskTitle(const std::string& task) const;
+
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
+  // Runs with the pages the user moved by a command, a drag, a native group
+  // change, or an undo. Each moved branch is listed in full.
+  using ManualMoveCallback =
+      base::RepeatingCallback<void(const std::vector<PageId>&)>;
+  base::CallbackListSubscription ObserveManualMoves(
+      ManualMoveCallback callback);
 
  private:
   struct Snapshot {
@@ -122,7 +138,8 @@ class TabOrganizationController : public TabStripModelObserver {
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
-  std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
+  void NotifyManualMove(const std::vector<PageId>& roots);
+  void NotifyNativeMoves(const std::set<PageId>& moved);
   // Brings `tree_` up to date with the strip. Never changes the strip.
   void Mirror(const std::set<PageId>& moved);
   void LinkRestoredPages();
@@ -146,6 +163,10 @@ class TabOrganizationController : public TabStripModelObserver {
   // pages are in this window.
   std::map<PageId, PageId> restored_parents_;
   std::map<PageId, PageId> saved_parents_;
+  // Pages first seen since the last update. Chromium groups a new tab as it
+  // inserts it, which is not a move the user made.
+  std::set<PageId> fresh_;
+  std::set<PageId> opened_;
   std::map<std::string, PendingTask> pending_tasks_;
   std::vector<Snapshot> undo_;
   bool applying_ = false;
@@ -153,6 +174,7 @@ class TabOrganizationController : public TabStripModelObserver {
   bool dragging_ = false;
   bool update_pending_ = false;
   base::RepeatingClosureList changed_;
+  base::RepeatingCallbackList<void(const std::vector<PageId>&)> manual_moves_;
   ui::ScopedUnownedUserData<TabOrganizationController> user_data_;
   base::WeakPtrFactory<TabOrganizationController> weak_factory_{this};
 };

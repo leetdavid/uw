@@ -1,5 +1,7 @@
 source_set("tab_organization") {
   sources = [
+    "automatic_organizer.cc",
+    "automatic_organizer.h",
     "tab_organization_controller.cc",
     "tab_organization_controller.h",
   ]
@@ -12,9 +14,12 @@ source_set("tab_organization") {
     "//uw/components/tab_organization",
   ]
   deps = [
+    ":ai_connection",
     "//chrome:strings",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
+    "//components/content_extraction/content/browser",
+    "//services/network/public/cpp",
     "//chrome/browser/ui/browser_window",
     "//chrome/common:constants",
     "//components/prefs",
@@ -28,11 +33,19 @@ source_set("tab_organization") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "tab_organization_controller_browsertest.cc" ]
+  sources = [
+    "automatic_organizer_browsertest.cc",
+    "tab_organization_controller_browsertest.cc",
+  ]
   deps = [
+    ":ai_connection",
     ":tab_organization",
+    "//components/content_extraction/content/browser",
+    "//crypto",
+    "//net:test_support",
     "//base",
     "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
     "//chrome/common",
     "//chrome/test:test_support",
@@ -61,7 +74,10 @@ source_set("ai_connection") {
     # process and never touch disk.
     sources += [ "api_key_store_stub.cc" ]
   }
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//uw/components/tab_organization",
+  ]
   deps = [
     "//components/pref_registry",
     "//components/prefs",

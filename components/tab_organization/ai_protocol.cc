@@ -15,7 +15,6 @@ namespace uw {
 
 const char kNewTaskOption[] = "new_task";
 const char kScratchpadOption[] = "scratchpad";
-const char16_t kAutomaticTaskProvisionalTitle[] = u"New task";
 const size_t kMaxGeneratedTaskNameLength = 80;
 const size_t kMaxExcerptLength = 2000;
 
@@ -36,8 +35,7 @@ constexpr char kSystemPrompt[] =
     "\"name\" to a short action-oriented phrase of at most five words.\n"
     "- \"leave\": keep the branch ungrouped in the Scratchpad.\n"
     "Prefer \"leave\" when unsure. Only move or create at high confidence "
-    "(0.90 or higher). If the description says the user manually placed the "
-    "branch, move it only when its activity clearly changed.";
+    "(0.90 or higher).";
 
 constexpr char kDestinationQuestion[] = "destination";
 constexpr size_t kMaxDecisionChoices = 255;
@@ -45,8 +43,7 @@ constexpr char kDecisionInstructions[] =
     "Decide which browsing task this tab branch belongs to. Choose an "
     "existing task only when the branch clearly continues it. Choose new_task "
     "when it clearly starts a separate browsing task. Choose scratchpad when "
-    "unsure, or when the user manually placed the branch and its activity has "
-    "not clearly changed.";
+    "unsure.";
 constexpr char kNewTaskDescription[] =
     "Start a new browsing task for this branch.";
 constexpr char kScratchpadDescription[] =
@@ -72,9 +69,6 @@ bool ValidTaskOptions(
 std::string DescribeBranch(const BranchContext& context) {
   std::string text = "Title: " + context.title + "\nURL: " + context.url +
                      "\nSource: " + context.source_description;
-  if (!context.manual_placement.empty()) {
-    text += "\nManual placement: " + context.manual_placement;
-  }
   if (!context.excerpt.empty()) {
     text += "\nPage excerpt: " + context.excerpt;
   }
@@ -87,7 +81,8 @@ const std::string* FirstMessageContent(const base::DictValue& response) {
     return nullptr;
   }
   const base::DictValue* choice = (*choices)[0].GetIfDict();
-  const base::DictValue* message = choice ? choice->FindDict("message") : nullptr;
+  const base::DictValue* message =
+      choice ? choice->FindDict("message") : nullptr;
   return message ? message->FindString("content") : nullptr;
 }
 
@@ -258,9 +253,6 @@ std::optional<std::string> BuildClassificationRequestBody(
   if (!context.excerpt.empty()) {
     description.Set("excerpt", context.excerpt);
   }
-  if (!context.manual_placement.empty()) {
-    description.Set("manual_placement", context.manual_placement);
-  }
   base::ListValue tasks;
   for (const auto& [key, name] : task_options) {
     base::DictValue task;
@@ -356,9 +348,8 @@ std::optional<ClassificationAnswer> ParseDecisionResponse(
   if (!parsed) {
     return std::nullopt;
   }
-  return format == DecisionFormat::kDecisions
-             ? ParseDecisionsResponse(*parsed)
-             : ParseSystemOneResponse(*parsed);
+  return format == DecisionFormat::kDecisions ? ParseDecisionsResponse(*parsed)
+                                              : ParseSystemOneResponse(*parsed);
 }
 
 std::optional<std::string> BuildNamingRequestBody(

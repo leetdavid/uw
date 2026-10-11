@@ -29,13 +29,17 @@ GURL EndpointUrl(std::string_view endpoint, std::string_view suffix) {
 
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
-  registry->RegisterIntegerPref(
-      kOrganizationModePref,
-      static_cast<int>(ConnectionMode::kOllama));
+  registry->RegisterIntegerPref(kOrganizationModePref,
+                                static_cast<int>(ConnectionMode::kOllama));
   registry->RegisterStringPref(kOrganizationEndpointPref, std::string());
   registry->RegisterStringPref(kOrganizationModelPref, std::string());
   registry->RegisterStringPref(kOrganizationKeyAccountPref, std::string());
   registry->RegisterBooleanPref(kOrganizationEnabledPref, false);
+  registry->RegisterIntegerPref(kDecisionProviderPref,
+                                static_cast<int>(DecisionProvider::kNone));
+  registry->RegisterStringPref(kDecisionEndpointPref, std::string());
+  registry->RegisterStringPref(kDecisionModelPref, std::string());
+  registry->RegisterStringPref(kDecisionKeyAccountPref, std::string());
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));
   registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);
@@ -54,6 +58,32 @@ AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
   config.model = prefs->GetString(kOrganizationModelPref);
   config.key_account = prefs->GetString(kOrganizationKeyAccountPref);
   config.organization_enabled = prefs->GetBoolean(kOrganizationEnabledPref);
+  return config;
+}
+
+DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs) {
+  DecisionModelConfig config;
+  if (!prefs) {
+    return config;
+  }
+  const int provider = prefs->GetInteger(kDecisionProviderPref);
+  if (provider < static_cast<int>(DecisionProvider::kJev) ||
+      provider > static_cast<int>(DecisionProvider::kOpenAiCompatible)) {
+    return config;
+  }
+  config.provider = static_cast<DecisionProvider>(provider);
+  config.endpoint = prefs->GetString(kDecisionEndpointPref);
+  config.model = prefs->GetString(kDecisionModelPref);
+  config.key_account = prefs->GetString(kDecisionKeyAccountPref);
+  const bool jev = config.provider == DecisionProvider::kJev;
+  if (config.endpoint.empty() &&
+      config.provider != DecisionProvider::kOpenAiCompatible) {
+    config.endpoint = jev ? kJevDefaultEndpoint : kOpenAiDefaultEndpoint;
+  }
+  if (config.model.empty() &&
+      config.provider != DecisionProvider::kOpenAiCompatible) {
+    config.model = jev ? kJevDefaultModel : kOpenAiDecisionsDefaultModel;
+  }
   return config;
 }
 
@@ -77,11 +107,37 @@ GURL ModelsUrl(std::string_view endpoint) {
   return EndpointUrl(endpoint, "/models");
 }
 
-bool CanOrganize(const AiConnectionConfig& config) {
-  return config.organization_enabled &&
-         IsValidProviderEndpoint(config.endpoint) && !config.model.empty() &&
+DecisionFormat FormatFor(DecisionProvider provider) {
+  return provider == DecisionProvider::kJev ? DecisionFormat::kSystemOne
+                                            : DecisionFormat::kDecisions;
+}
+
+GURL DecisionUrl(const DecisionModelConfig& config) {
+  return EndpointUrl(config.endpoint, config.provider == DecisionProvider::kJev
+                                          ? "/systemone"
+                                          : "/decisions");
+}
+
+bool IsComplete(const AiConnectionConfig& config) {
+  return IsValidProviderEndpoint(config.endpoint) && !config.model.empty() &&
          (config.mode == ConnectionMode::kOllama ||
           !config.key_account.empty());
+}
+
+bool IsComplete(const DecisionModelConfig& config) {
+  return config.provider != DecisionProvider::kNone &&
+         IsValidProviderEndpoint(config.endpoint) && !config.model.empty() &&
+         !config.key_account.empty();
+}
+
+bool OrganizationReady(const PrefService* prefs) {
+  return prefs && prefs->GetBoolean(kOrganizationEnabledPref) &&
+         (IsComplete(ReadDecisionModelConfig(prefs)) ||
+          IsComplete(ReadAiConnectionConfig(prefs)));
+}
+
+bool CanOrganize(const AiConnectionConfig& config) {
+  return config.organization_enabled && IsComplete(config);
 }
 
 PauseMode ReadPauseState(const PrefService* prefs) {
@@ -105,7 +161,9 @@ PauseMode ReadPauseState(const PrefService* prefs) {
   }
 }
 
-void SetPauseState(PrefService* prefs, PauseMode mode, base::TimeDelta duration) {
+void SetPauseState(PrefService* prefs,
+                   PauseMode mode,
+                   base::TimeDelta duration) {
   g_paused_until_launch = mode == PauseMode::kUntilLaunch;
   if (!prefs) {
     return;
@@ -113,11 +171,11 @@ void SetPauseState(PrefService* prefs, PauseMode mode, base::TimeDelta duration)
   prefs->SetInteger(kOrganizationPauseModePref, static_cast<int>(mode));
   // The timed-pause deadline is stored in microseconds since the Windows
   // epoch.
-  prefs->SetDouble(
-      kOrganizationPauseUntilPref,
-      mode == PauseMode::kTimed
-          ? (base::Time::Now() + duration).ToDeltaSinceWindowsEpoch().InMicroseconds()
-          : 0);
+  prefs->SetDouble(kOrganizationPauseUntilPref,
+                   mode == PauseMode::kTimed ? (base::Time::Now() + duration)
+                                                   .ToDeltaSinceWindowsEpoch()
+                                                   .InMicroseconds()
+                                             : 0);
 }
 
 }  // namespace uw

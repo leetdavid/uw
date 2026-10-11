@@ -100,6 +100,7 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
   if (!id) {
     return;
   }
+  self->opened_.insert(*id);
   if (source) {
     if (const std::optional<PageId> parent =
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
@@ -247,7 +248,8 @@ void TabOrganizationController::Execute(int command,
 
 std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
     const std::vector<PageId>& ids,
-    std::u16string title) {
+    std::u16string title,
+    Origin origin) {
   const std::vector<PageId> roots = Roots(ids);
   if (roots.empty() || !tabs_->SupportsTabGroups()) {
     return std::nullopt;
@@ -260,12 +262,15 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
   }
   pending_tasks_[task] = {std::move(title), std::nullopt};
   Apply();
+  if (origin == Origin::kUser) {
+    NotifyManualMove(roots);
+  }
   return GroupFor(task);
 }
 
-bool TabOrganizationController::MoveToTask(
-    const std::vector<PageId>& ids,
-    const tab_groups::TabGroupId& group) {
+bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
+                                           const tab_groups::TabGroupId& group,
+                                           Origin origin) {
   const std::vector<PageId> roots = Roots(ids);
   const std::string task = group.ToString();
   if (roots.empty() || !GroupFor(task)) {
@@ -276,6 +281,9 @@ bool TabOrganizationController::MoveToTask(
     tree_.MoveToTask(root, task);
   }
   Apply();
+  if (origin == Origin::kUser) {
+    NotifyManualMove(roots);
+  }
   return true;
 }
 
@@ -290,6 +298,7 @@ bool TabOrganizationController::MoveToScratchpad(
     tree_.MoveToTask(root, std::string());
   }
   Apply();
+  NotifyManualMove(roots);
   return true;
 }
 
@@ -300,6 +309,7 @@ bool TabOrganizationController::Nest(const PageId& id) {
     return false;
   }
   Apply();
+  NotifyManualMove({id});
   return true;
 }
 
@@ -310,6 +320,7 @@ bool TabOrganizationController::Outdent(const PageId& id) {
     return false;
   }
   Apply();
+  NotifyManualMove({id});
   return true;
 }
 
@@ -344,6 +355,7 @@ void TabOrganizationController::Undo() {
   }
   Snapshot snapshot = std::move(undo_.back());
   undo_.pop_back();
+  const PageTree before = tree_;
   tree_.Restore(snapshot.tree);
   for (const std::string& task : tree_.Tasks()) {
     const auto visuals = snapshot.tasks.find(task);
@@ -352,6 +364,18 @@ void TabOrganizationController::Undo() {
     }
   }
   Apply();
+  // A restored placement counts as the user's own.
+  std::vector<PageId> restored;
+  for (const Page& page : tree_.pages()) {
+    const Page* earlier = before.Find(page.id);
+    if (earlier &&
+        (earlier->task != page.task || earlier->parent != page.parent)) {
+      restored.push_back(page.id);
+    }
+  }
+  if (!restored.empty()) {
+    manual_moves_.Notify(restored);
+  }
 }
 
 void TabOrganizationController::BeginTabDrag() {
@@ -363,9 +387,22 @@ void TabOrganizationController::EndTabDrag() {
   ScheduleApply();
 }
 
+std::u16string TabOrganizationController::TaskTitle(
+    const std::string& task) const {
+  const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
+  return group
+             ? tabs_->group_model()->GetTabGroup(*group)->visual_data()->title()
+             : std::u16string();
+}
+
 base::CallbackListSubscription TabOrganizationController::Observe(
     base::RepeatingClosure callback) {
   return changed_.Add(std::move(callback));
+}
+
+base::CallbackListSubscription TabOrganizationController::ObserveManualMoves(
+    ManualMoveCallback callback) {
+  return manual_moves_.Add(std::move(callback));
 }
 
 void TabOrganizationController::OnTabStripModelChanged(
@@ -382,6 +419,7 @@ void TabOrganizationController::OnTabStripModelChanged(
     }
   }
   Mirror(moved);
+  NotifyNativeMoves(moved);
   if (selection.active_tab_changed()) {
     if (const std::optional<PageId> old = IdFor(selection.old_tab)) {
       previous_active_ = old;
@@ -414,6 +452,7 @@ void TabOrganizationController::TabGroupedStateChanged(
     moved.insert(*id);
   }
   Mirror(moved);
+  NotifyNativeMoves(moved);
   ScheduleApply();
 }
 
@@ -423,6 +462,29 @@ void TabOrganizationController::OnSplitTabChanged(const SplitTabChange&) {
   }
   Mirror({});
   ScheduleApply();
+}
+
+void TabOrganizationController::NotifyNativeMoves(
+    const std::set<PageId>& moved) {
+  std::vector<PageId> manual;
+  for (const PageId& id : moved) {
+    if (!fresh_.contains(id)) {
+      manual.push_back(id);
+    }
+  }
+  if (!manual.empty()) {
+    manual_moves_.Notify(manual);
+  }
+}
+
+void TabOrganizationController::NotifyManualMove(
+    const std::vector<PageId>& roots) {
+  std::vector<PageId> moved;
+  for (const PageId& root : roots) {
+    const std::vector<PageId> branch = tree_.BranchOf(root);
+    moved.insert(moved.end(), branch.begin(), branch.end());
+  }
+  manual_moves_.Notify(moved);
 }
 
 std::vector<PageId> TabOrganizationController::Roots(
@@ -470,13 +532,14 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
     const auto [it, added] = ids_.try_emplace(tab->GetHandle());
     if (added) {
       it->second = PageId(base::Uuid::GenerateRandomV4().AsLowercaseString());
+      fresh_.insert(it->second);
     }
     strip.push_back({it->second, TaskOf(tab), PageId()});
   }
-  std::erase_if(ids_, [&live](const auto& entry) {
-    return !live.contains(entry.first);
-  });
+  std::erase_if(
+      ids_, [&live](const auto& entry) { return !live.contains(entry.first); });
   tree_.Adopt(strip, moved);
+  std::erase_if(opened_, [this](const PageId& id) { return !tree_.Find(id); });
   LinkRestoredPages();
   ScheduleUpdate();
 }
@@ -677,6 +740,7 @@ void TabOrganizationController::Update() {
     }
   }
   saved_parents_ = std::move(parents);
+  fresh_.clear();
   changed_.Notify();
 }
 

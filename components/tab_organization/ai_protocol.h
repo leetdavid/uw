@@ -22,22 +22,18 @@ namespace uw {
 extern const char kNewTaskOption[];
 // Option key meaning "leave the branch in Scratchpad".
 extern const char kScratchpadOption[];
-// Provisional title for a task created without a valid generated name.
-extern const char16_t kAutomaticTaskProvisionalTitle[];
 // Maximum accepted length of a generated task name, in characters.
 extern const size_t kMaxGeneratedTaskNameLength;
 // Maximum accepted length of the readable-page-text excerpt, in characters.
 extern const size_t kMaxExcerptLength;
 
 // Metadata sent for one tab branch. `excerpt` is short readable page text.
-// `manual_placement` is empty or describes the user's manual placement of the
-// branch. `title` must be non-empty.
+// `title` must be non-empty.
 struct BranchContext {
   std::string title;
   std::string url;
   std::string source_description;
   std::string excerpt;
-  std::string manual_placement;
 };
 
 // Builds an OpenAI-compatible chat-completions request body. `task_options`
@@ -53,8 +49,7 @@ struct ClassificationAnswer {
   // A task option key, or kNewTaskOption, or kScratchpadOption.
   std::string choice;
   double confidence = 0.0;
-  // Valid generated name for kNewTaskOption; absent leaves the provisional
-  // title.
+  // Valid generated name for kNewTaskOption, when the format carries one.
   std::optional<std::u16string> task_name;
 };
 

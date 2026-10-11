@@ -96,18 +96,19 @@ index 03bffe2..6c12a57 100644
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889..336b6a1 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..e9e431ead4fc34b9420ac516055c254122e96c70 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -6,6 +6,7 @@
+@@ -6,6 +6,8 @@
  
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "uw/browser/tab_organization/automatic_organizer.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,7 +22,10 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,7 +23,12 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -115,32 +116,36 @@ index a2c0889..336b6a1 100644
 +  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL) {
 +    tab_organization_ =
 +        std::make_unique<uw::TabOrganizationController>(browser);
++    automatic_organizer_ = std::make_unique<uw::AutomaticOrganizer>(
++        browser, tab_organization_.get());
 +  }
  }
  
  void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a4..5aed37d 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..7d8e49b3171cae79825ad69652852b5165f4e123 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,12 @@
+@@ -7,6 +7,13 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
 +#include <memory>
 +
 +namespace uw {
++class AutomaticOrganizer;
 +class TabOrganizationController;
 +}
 +
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +50,7 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +51,8 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
 +  std::unique_ptr<uw::TabOrganizationController> tab_organization_;
++  std::unique_ptr<uw::AutomaticOrganizer> automatic_organizer_;
  };
  
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_
