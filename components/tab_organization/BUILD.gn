@@ -4,6 +4,8 @@ source_set("tab_tree") {
     "ai_protocol.h",
     "organization_coordinator.cc",
     "organization_coordinator.h",
+    "page_tree.cc",
+    "page_tree.h",
     "tab_tree.cc",
     "tab_tree.h",
   ]
@@ -15,6 +17,7 @@ source_set("unit_tests") {
   sources = [
     "ai_protocol_unittest.cc",
     "organization_coordinator_unittest.cc",
+    "page_tree_unittest.cc",
     "tab_tree_unittest.cc",
   ]
   deps = [ ":tab_tree", "//base/test:test_support", "//testing/gtest" ]
