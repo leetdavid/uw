@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {ConnectionInput, ModelsResult, PauseResult, SaveResult, State} from './uw_organization.mojom-webui.js';
+import type {ConnectionInput, ModelsResult, PauseResult, SaveResult, State, TintState} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -14,6 +14,9 @@ export interface UwOrganizationBrowserProxy {
   save(decision: ConnectionInput, language: ConnectionInput):
       Promise<SaveResult>;
   setPause(mode: number): Promise<PauseResult>;
+  getTint(): Promise<TintState>;
+  setTint(color: string): Promise<TintState>;
+  clearTint(): Promise<TintState>;
 }
 
 export class UwOrganizationBrowserProxyImpl implements
@@ -37,6 +40,18 @@ export class UwOrganizationBrowserProxyImpl implements
 
   setPause(mode: number) {
     return this.handler.setPause(mode).then(response => response.result);
+  }
+
+  getTint() {
+    return this.handler.getTint().then(response => response.tint);
+  }
+
+  setTint(color: string) {
+    return this.handler.setTint(color).then(response => response.tint);
+  }
+
+  clearTint() {
+    return this.handler.clearTint().then(response => response.tint);
   }
 
   static getInstance(): UwOrganizationBrowserProxy {

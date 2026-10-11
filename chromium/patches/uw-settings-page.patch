@@ -1,16 +1,16 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..f62d92d5847c40e3ea8e0f2a21d97b4d5b68159a 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..8b0b7b93568aff75f495aa29e27210d2d9f7d33c 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,121 @@
+@@ -3904,6 +3904,148 @@
          System
        </message>
      </if>
 +
 +    <!-- uw organization page -->
 +    <if expr="not is_chromeos">
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the tab organization settings page.">
-+        Tab organization
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the uw settings page. uw is the product name and stays lowercase.">
++        uw
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON" desc="Status line when automatic organization is on.">
 +        Automatic organization is on
@@ -119,6 +119,33 @@ index 63c989a76dadc13953e35513998e83326ee3612b..f62d92d5847c40e3ea8e0f2a21d97b4d
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Heading of the pause controls.">
 +        Pause automatic organization
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_TITLE" desc="Heading of the window tint settings.">
++        Window tint
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_COLOR" desc="Label of the window tint color choices.">
++        Color
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_SWATCH" desc="Accessible name of a preset window tint color.">
++        Use <ph name="COLOR">$1<ex>#5A1F3A</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_CUSTOM" desc="Accessible name of the control that picks any window tint color.">
++        Pick another color
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_DEFAULT" desc="Button that returns to the default window tint.">
++        Use the default
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_DEFAULT" desc="Status when no window tint color is picked.">
++        Default tint: lilac in light mode, indigo in dark mode.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_PICKED" desc="Status naming the picked window tint color.">
++        Tint: <ph name="COLOR">$1<ex>#5A1F3A</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED" desc="Status when uw made a picked window tint color lighter or darker.">
++        You picked <ph name="PICKED">$1<ex>#2747C7</ex></ph>. uw uses <ph name="APPLIED">$2<ex>#1E3799</ex></ph> so text on it stays readable.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_NOTE" desc="Explains the window tint.">
++        The window fades from this color to its neighbor on the color wheel. Text on it turns white or near-black, whichever reads better. The Customize Chromium panel changes the same color.
 +      </message>
 +    </if>
      <if expr="not is_chromeos">

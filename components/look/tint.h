@@ -23,15 +23,19 @@ struct Tint {
   SkColor end;
 };
 
+// Text on the tint reaches at least this contrast ratio everywhere on it.
+inline constexpr float kReadableContrast = 4.5f;
+
 // The tint for one picked color: the color itself, then the same color with
-// its hue turned by 40 degrees at the same saturation and lightness.
+// its hue turned by 40 degrees at the same saturation and lightness. A color
+// too close to mid-tone for readable text is first made lighter or darker,
+// whichever takes the smaller change.
 Tint TintFrom(SkColor picked);
 
 // The color halfway along the tint.
 SkColor MiddleOf(const Tint& tint);
 
-// Near-black or white, whichever has more contrast with the middle of the
-// tint.
+// Near-black or white, whichever keeps more contrast across the whole tint.
 SkColor TextColorOn(const Tint& tint);
 
 // True when the tint takes white text.

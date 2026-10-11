@@ -16,10 +16,16 @@ Agreed on 2026-10-11:
 - The address bar stays in the toolbar on the page card for now.
 - Looks are reviewed from screenshots saved by headless tests.
 
+Agreed on 2026-10-12:
+
+- The user picks the tint with a control on uw's settings page.
+- A picked color that would leave text hard to read is made readable.
+
 ## Scope
 
 - **Window tint.** The frame, the sidebar, and the area around the page share one gradient. It runs from the picked color to the same color with its hue turned by 40 degrees.
 - **Text on the tint.** Text and icons are near-black or white, whichever has more contrast with the tint. Fills and the active tab change strength the same way.
+- **Readable tints.** Text keeps at least a 4.5:1 contrast ratio everywhere on the tint. A mid-tone color cannot do that, so uw makes it lighter or darker, whichever takes the smaller change, and keeps its hue.
 - **Default tints.** Lilac to sky in light mode, indigo to slate in dark mode, until the user picks a color.
 - **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint.
 - **Tab rows.** 34px tall with a 10px radius. The active tab is a card. Other tabs have no background until hovered.
@@ -32,7 +38,7 @@ Agreed on 2026-10-11:
 
 - Moving the address bar into the sidebar.
 - Arc's Spaces and per-space themes.
-- A color picker built by uw. See the open question on how the user picks.
+- A color picker widget built by uw. The settings control uses preset colors and the browser's standard color input.
 - New icons, a new app icon, or custom window buttons.
 - Any change to how tabs, tasks, or the tab tree behave.
 
@@ -40,7 +46,7 @@ Agreed on 2026-10-11:
 
 - **Colors.** `components/look/tint` holds the color rules, tested without a window. A uw color mixer in `browser/ui/look` sets Chromium's existing color IDs from them. It is added in `chrome/browser/ui/color/chrome_color_mixers.cc`. No view picks colors by itself.
 - **Glass frame.** Chromium's transparent macOS frame hides every frame color, so uw turns it off by default. Its preference still works.
-- **Tint source.** The tint is the color the user picks in Chromium's "Customize Chromium" panel. That reuses Chromium's picker and its storage. uw adds no control of its own.
+- **Tint control.** uw's settings page has a "Window tint" section: eight preset colors, a color input for any other color, and a button for the default. It says so when it had to adjust a color. The pick is stored as Chromium's theme color, so the "Customize Chromium" panel changes the same value.
 - **Gradient.** `PaintTint` paints the gradient in window coordinates wherever Chromium paints the frame color, so every view draws one continuous sheet.
 - **Sizes.** `chrome/browser/ui/layout_constants.cc` already has values for the vertical tab height, radius, padding, and pinned tab height. The patch changes those numbers.
 - **Card.** The window layout insets the main area beside the vertical tab strip by `kPageCardMargins`, then reuses Chromium's own corner rounding for the toolbar and the page with `kPageCardRadius`. Fullscreen windows have no card.
@@ -54,7 +60,7 @@ Agreed on 2026-10-11:
 3. **Tab rows and favorites.** Built: 34px rows with a 10px radius, the active tab as a card, and pinned tabs as filled tiles. Tiles use the row radius of 10px, not 12px, because Chromium has one radius for both.
 4. **Task rows.** Built. The header shows a folder icon in the group's color, the name in semibold, and Chromium's chevron. Chromium's colored line beside a task's tabs stays, although the design has none.
 5. **Sidebar foot and toolbar.** The Organize and Undo buttons are pills. The message is plain text beside Undo, not a card. The toolbar keeps Chromium's height of about 46px.
-6. **User tint.** Built. A color picked in "Customize Chromium" drives the gradient and the text color.
+6. **User tint.** Built. A color picked on uw's settings page drives the gradient and the text color, and a mid-tone pick is made readable.
 
 ## Acceptance checks
 
@@ -62,7 +68,7 @@ Agreed on 2026-10-11:
 2. Tab and task behavior is unchanged: `TabOrganizationControllerBrowserTest.*` and `AutomaticOrganizerBrowserTest.*` pass without edits.
 3. Collapse, rename, recolor, and drag of a task still work from the folder row.
 4. With either default tint, text on the tint and on the card has at least a 4.5:1 contrast ratio.
-5. With a picked tint, text on it is whichever of near-black and white has more contrast. `TintTest.*` covers light, dark, and mid-tone colors, and `TintBrowserTest.*` covers a picked color in a window.
+5. With any picked tint, text on it has at least a 4.5:1 contrast ratio. `TintTest.*` covers light, dark, and mid-tone colors. `TintBrowserTest.*` covers a picked color in a window. `UwOrganizationPageBrowserTest.*` picks a preset, a mid-tone color, and the default from the settings page.
 6. Horizontal tabs keep Chromium's layout. Their frame takes the tint as a plain color, like any Chromium theme color.
 7. `pnpm run check` and `pnpm run verify` pass.
 
@@ -70,6 +76,4 @@ Agreed on 2026-10-11:
 
 | Question | Options |
 | --- | --- |
-| How the user picks the tint | Built on Chromium's own color picker in the "Customize Chromium" panel. This still needs confirming. The other option is a control on uw's settings page. |
-| Mid-tone tints | Some picked colors leave both text colors under 4.5:1. Either accept that, or nudge such a tint lighter or darker until text reaches 4.5:1. |
 | Collapsed sidebar | The design shows only the expanded sidebar. The collapsed strip keeps Chromium's layout unless designed. |

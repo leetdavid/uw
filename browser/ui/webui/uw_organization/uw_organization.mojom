@@ -47,8 +47,16 @@ struct PauseResult {
   int32 pause_mode;
 };
 
-// Profile-scoped backend for the uw organization section of
-// chrome://settings.
+// The window tint as the page shows it. Colors are "#RRGGBB".
+struct TintState {
+  // Empty when nothing is picked and the default tint applies.
+  string picked;
+  // The color the tint starts at. It differs from `picked` when uw made a
+  // mid-tone color lighter or darker to keep text readable.
+  string applied;
+};
+
+// Profile-scoped backend for the uw page of chrome://settings.
 interface OrganizationHandler {
   GetState() => (State state);
   // Lists the models of a connection as entered. `decision` says which
@@ -60,4 +68,10 @@ interface OrganizationHandler {
   Save(ConnectionInput decision, ConnectionInput language)
       => (SaveResult result);
   SetPause(int32 mode) => (PauseResult result);
+
+  GetTint() => (TintState tint);
+  // Picks the window tint. Ignores anything that is not a "#RRGGBB" color.
+  SetTint(string color) => (TintState tint);
+  // Returns to the default tint.
+  ClearTint() => (TintState tint);
 };

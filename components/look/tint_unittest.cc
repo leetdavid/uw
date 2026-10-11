@@ -3,6 +3,8 @@
 
 #include "uw/components/look/tint.h"
 
+#include <cmath>
+
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/color_utils.h"
@@ -72,13 +74,25 @@ TEST(TintTest, DefaultTintsKeepTextReadable) {
   }
 }
 
-TEST(TintTest, MidToneTintsTakeTheMoreReadableText) {
+TEST(TintTest, MidTonePicksAreNudgedUntilTextIsReadable) {
+  constexpr SkColor kTomato = SkColorSetRGB(0xD9, 0x53, 0x4F);
+  constexpr SkColor kTeal = SkColorSetRGB(0x1F, 0x8A, 0x8A);
+  constexpr SkColor kGray = SkColorSetRGB(0x80, 0x80, 0x80);
+  for (SkColor picked : {kRoyal, kTomato, kTeal, kGray}) {
+    const Tint tint = TintFrom(picked);
+    EXPECT_NE(tint.start, picked);
+    for (SkColor background : {tint.start, tint.end}) {
+      EXPECT_GE(color_utils::GetContrastRatio(background, TextColorOn(tint)),
+                kReadableContrast);
+    }
+    EXPECT_LT(std::abs(Lightness(tint.start) - Lightness(picked)), 0.2);
+  }
+}
+
+TEST(TintTest, ANudgedPickKeepsItsHue) {
   const Tint tint = TintFrom(kRoyal);
-  const SkColor chosen = TextColorOn(tint);
-  const SkColor other =
-      chosen == kDarkTextOnTint ? kLightTextOnTint : kDarkTextOnTint;
-  EXPECT_GE(color_utils::GetContrastRatio(MiddleOf(tint), chosen),
-            color_utils::GetContrastRatio(MiddleOf(tint), other));
+  EXPECT_NEAR(Hue(tint.start), Hue(kRoyal), 2);
+  EXPECT_NEAR(Hue(tint.start) - Hue(tint.end), 40, 2);
 }
 
 TEST(TintTest, ActiveTabIsWhiteOnLightAndTranslucentOnDark) {

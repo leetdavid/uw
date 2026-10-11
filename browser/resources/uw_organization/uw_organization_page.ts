@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 /**
- * @fileoverview uw organization settings: the decision model and the language
- * model behind automatic tab organization, plus the global pause controls.
- * API keys stay in the macOS Keychain; the page only learns whether one is
- * stored.
+ * @fileoverview uw settings: the decision model and the language model behind
+ * automatic tab organization, the global pause controls, and the window
+ * tint. API keys stay in the macOS Keychain; the page only learns whether
+ * one is stored.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -16,7 +16,7 @@ import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_sel
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import type {Connection, ConnectionInput} from './uw_organization.mojom-webui.js';
+import type {Connection, ConnectionInput, TintState} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
@@ -52,6 +52,19 @@ interface Defaults {
 // uw::DecisionProvider and uw::ConnectionMode values.
 const NO_DECISION_MODEL = 0;
 const OLLAMA = 0;
+
+// Lilac, sky, mint, butter, and peach take dark text. Indigo, wine, and forest
+// take white text.
+const TINT_PRESETS = [
+  '#E7E1F6',
+  '#D8E6F9',
+  '#CFEFDD',
+  '#F7E08A',
+  '#F9E3D2',
+  '#2B2542',
+  '#5A1F3A',
+  '#1F3A2E',
+];
 
 const PROVIDER_LABELS = [
   '',
@@ -128,6 +141,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       saving_: {type: Boolean},
       enabled_: {type: Boolean},
       pauseMode_: {type: Number},
+      tint_: {type: Object},
     };
   }
 
@@ -141,6 +155,8 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   protected accessor saving_: boolean = false;
   protected accessor enabled_: boolean = false;
   protected accessor pauseMode_: number = 0;
+  protected accessor tint_: TintState = {picked: '', applied: ''};
+  protected tintPresets_ = TINT_PRESETS;
   private browserProxy_ = UwOrganizationBrowserProxyImpl.getInstance();
 
   override connectedCallback() {
@@ -324,6 +340,42 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
             .join(' ');
   }
 
+  protected swatchLabel_(color: string): string {
+    return loadTimeData.getStringF('uwOrganizationTintSwatch', color);
+  }
+
+  // A color input only takes lowercase "#rrggbb".
+  protected customTintValue_(): string {
+    return (this.tint_.picked ||
+            loadTimeData.getString('uwOrganizationDefaultTint'))
+        .toLowerCase();
+  }
+
+  protected tintStatus_(): string {
+    const {picked, applied} = this.tint_;
+    if (!picked) {
+      return this.i18n_('uwOrganizationTintStatusDefault');
+    }
+    return picked === applied ?
+        loadTimeData.getStringF('uwOrganizationTintStatusPicked', picked) :
+        loadTimeData.getStringF(
+            'uwOrganizationTintStatusAdjusted', picked, applied);
+  }
+
+  protected async onSwatchClick_(e: Event) {
+    this.tint_ = await this.browserProxy_.setTint(
+        (e.currentTarget as HTMLElement).dataset['color']!);
+  }
+
+  protected async onCustomTintChange_(e: Event) {
+    this.tint_ = await this.browserProxy_.setTint(
+        (e.currentTarget as HTMLInputElement).value.toUpperCase());
+  }
+
+  protected async onDefaultTintClick_() {
+    this.tint_ = await this.browserProxy_.clearTint();
+  }
+
   protected onPause1HourClick_() {
     this.setPause_(1);
   }
@@ -361,6 +413,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     };
     this.enabled_ = state.enabled;
     this.pauseMode_ = state.pauseMode;
+    this.tint_ = await this.browserProxy_.getTint();
   }
 }
 

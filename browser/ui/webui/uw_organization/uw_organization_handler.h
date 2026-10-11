@@ -24,9 +24,11 @@ class WebUIDataSource;
 
 namespace uw {
 
-// Mojo backend for the uw organization section of chrome://settings.
-// Profile-scoped: it touches profile prefs and the profile's Keychain slots,
-// never window state, so closing windows while settings is open is safe.
+// Mojo backend for the uw page of chrome://settings: the models behind
+// automatic tab organization, its pause, and the window tint.
+// Profile-scoped: it touches profile prefs, the profile's theme color, and
+// the profile's Keychain slots, never window state, so closing windows while
+// settings is open is safe.
 // API keys stay in the Keychain and never reach prefs, logs, or the page.
 class UwOrganizationHandler : public mojom::OrganizationHandler {
  public:
@@ -48,8 +50,12 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
             mojom::ConnectionInputPtr language,
             SaveCallback callback) override;
   void SetPause(int32_t mode, SetPauseCallback callback) override;
+  void GetTint(GetTintCallback callback) override;
+  void SetTint(const std::string& color, SetTintCallback callback) override;
+  void ClearTint(ClearTintCallback callback) override;
 
  private:
+  mojom::TintStatePtr CurrentTint() const;
   void StoreDecision(const mojom::ConnectionInput& input);
   void StoreLanguage(const mojom::ConnectionInput& input);
   void CheckDecision();

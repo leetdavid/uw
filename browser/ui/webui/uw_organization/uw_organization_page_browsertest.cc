@@ -6,23 +6,33 @@
 
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/color_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/model_test_server.h"
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/components/look/tint.h"
 
 namespace uw {
 namespace {
@@ -137,6 +147,21 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
   std::string Save() {
     return ClickAndWait("saveButton", "saveStatus",
                         IDS_UW_SETTINGS_ORGANIZATION_CHECKING);
+  }
+
+  ThemeService* theme() {
+    return ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  }
+
+  SkColor FrameColor() {
+    return BrowserView::GetBrowserViewForBrowser(browser())
+        ->GetColorProvider()
+        ->GetColor(ui::kColorFrameActive);
+  }
+
+  static std::string Hex(SkColor color) {
+    return base::StringPrintf("#%02X%02X%02X", SkColorGetR(color),
+                              SkColorGetG(color), SkColorGetB(color));
   }
 
   std::vector<std::string> RequestPaths() {
@@ -296,6 +321,79 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   Choose("languageModelSelect", "qwen3");
   EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
   EXPECT_EQ(ReadAiConnectionConfig(prefs()).model, "qwen3");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       JevModelListLoadsInTypeSafesShape) {
+  models_.Answer("/v1/models",
+                 R"({"models":[{"name":"jev-latest","description":"Latest"},)"
+                 R"({"name":"jev-preview","description":"Preview"}]})");
+  OpenPage();
+  Choose("decisionKind", Number(DecisionProvider::kJev));
+  Type("decisionEndpoint", Endpoint());
+  Type("decisionKey", "jev-key");
+  EXPECT_EQ(ClickAndWait("decisionLoadModels", "decisionModelsStatus",
+                         IDS_UW_SETTINGS_ORGANIZATION_LOADING),
+            "Models found: 2");
+  EXPECT_EQ(ValueOf("decisionModelSelect"), "jev-latest");
+
+  const std::vector<ModelRequest> requests = models_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_EQ(requests[0].method, "GET");
+  EXPECT_EQ(requests[0].authorization, "Bearer jev-key");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       ASwatchSetsTheWindowTintAndTheDefaultClearsIt) {
+  constexpr SkColor kWine = SkColorSetRGB(0x5A, 0x1F, 0x3A);
+  OpenPage();
+  EXPECT_EQ(TextOf("tintStatus"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_DEFAULT));
+
+  ASSERT_EQ(true,
+            Run("const swatch = page().shadowRoot.querySelector("
+                "    '[data-color=\"#5A1F3A\"]');"
+                "swatch.scrollIntoView(); swatch.click();"
+                "await until(() => text('tintStatus').includes('#5A1F3A'));"
+                "return true;"));
+  EXPECT_EQ(theme()->GetUserColor(), kWine);
+  EXPECT_EQ(FrameColor(), kWine);
+  EXPECT_EQ(TextOf("tintStatus"),
+            l10n_util::GetStringFUTF8(
+                IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_PICKED, u"#5A1F3A"));
+  SaveWindowScreenshot(browser(), "settings-tint");
+
+  ASSERT_EQ(true,
+            Run(content::JsReplace(
+                "part('defaultTint').click();"
+                "await until(() => text('tintStatus') === $1);"
+                "return true;",
+                String(IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_DEFAULT))));
+  EXPECT_FALSE(theme()->GetUserColor());
+  EXPECT_EQ(FrameColor(), kDefaultLightTint);
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       AMidToneColorIsMadeReadableAndThePageSaysSo) {
+  constexpr SkColor kRoyal = SkColorSetRGB(0x27, 0x47, 0xC7);
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  OpenPage();
+  ASSERT_EQ(true,
+            Run("const input = part('customTint'); input.value = '#2747c7';"
+                "input.dispatchEvent(new Event('change'));"
+                "await until(() => text('tintStatus').includes('#2747C7'));"
+                "return true;"));
+
+  const Tint tint = TintFrom(kRoyal);
+  ASSERT_NE(tint.start, kRoyal);
+  EXPECT_EQ(theme()->GetUserColor(), kRoyal);
+  EXPECT_EQ(FrameColor(), tint.start);
+  EXPECT_GE(color_utils::GetContrastRatio(tint.start, TextColorOn(tint)),
+            kReadableContrast);
+  EXPECT_EQ(TextOf("tintStatus"),
+            l10n_util::GetStringFUTF8(
+                IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED, u"#2747C7",
+                base::UTF8ToUTF16(Hex(tint.start))));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
