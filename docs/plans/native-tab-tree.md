@@ -32,6 +32,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - When the user changes tabs natively, the controller adopts the new order. A parent link survives only while the child still sits inside its parent's branch.
 - uw adds three things to Chromium's vertical tab strip: indentation, the Scratchpad label, and the Organize button. No uw view replaces or wraps a Chromium container.
 - Chromium edits stay in `chromium/patches/` as small hooks.
+- The [Arc-style look](../product.md#minimum-usable-version) is separate work: it restyles Chromium's own views and does not change this structure.
 
 ## Stages
 

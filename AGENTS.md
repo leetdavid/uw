@@ -40,6 +40,8 @@ Agreed on 2026-10-11. Where older docs disagree, these win until the docs are up
 
 uw's designs live on the Doop canvas `0yLEIltMCP`. Reach it through the `doop` MCP server (`https://doop.design/mcp`). Use pages to design and test different features.
 
+The aesthetics should be like Arc browser. The canvas style guide `uw-arc-style` holds the palette, sizes, and rules.
+
 ## Managing the kanban
 
 The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Keep its status column current.

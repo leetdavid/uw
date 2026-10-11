@@ -25,6 +25,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T15 | Organizer on native tab groups | todo | 5/10 | Debounced decision requests, naming, staleness checks, branch moves and task creation at confidence 0.90 or more, one undo per action, and pause. Done when the [automatic organization acceptance checks](automatic-organization.md#acceptance-checks) pass against a test server. |
 | T16 | Settings: decision model, language model, pause | todo | 7/10 | Settings page with both connections and the pause controls. Validation gates enablement, a failed save turns automatic organization off, and the model list is fetched with GET. Done when each provider validates from the page against a test server. |
 | T17 | Tooling and docs cleanup | backlog | 9/10 | Fold `verify` into the main CLI, make the macOS workflow manual until a runner exists, and give build status one home. |
+| T18 | Arc-style look | todo | 4/10 | Tinted window, page in a rounded card, favorites tiles, and folder-style task headers, per the Doop canvas style guide. Restyles Chromium's vertical tab strip views. Whether the address bar moves into the sidebar is open. Needs its own plan before work starts. |
 
 ## 1. Choose the browser foundation
 
@@ -78,6 +79,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. The customized build and headless smoke test pass; native UI behavior remains unverified. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Native tree-style tabs](../product.md#automatic-tab-organization) | 7/10 | Tasks are native tab groups. uw adds page parents, indentation, child promotion on close, and restore of parent links. |
+| [Arc-style look](../product.md#minimum-usable-version) | 4/10 | Restyling Chromium's native tab strip, frame, and group headers to match the design. Each Chromium update can move the views it touches. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
 | [Pinned-tab Peek previews](../product.md#pinned-tabs) | 6/10 | Same-site navigation remains in the pin; off-site links open a temporary preview that can promote into Scratchpad. |
 | [Shared live pinned-page state](../product.md#pinned-tabs) | 3/10 | The live page transfers between windows and remains alive without a browser window. Quit uses a new-tab restore offer; Chromium ownership and lifecycle need a trial. |
