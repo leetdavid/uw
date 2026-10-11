@@ -65,11 +65,11 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 
 Open a new tab and click `Customize Chromium`, then pick a color.
 
-Expected result: the sidebar becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. With no color picked, the tint is lilac in light mode and indigo in dark mode.
+Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. With no color picked, the tint is lilac in light mode and indigo in dark mode.
 
 ## Not available yet
 
-- The rest of the Arc-style look. The page is not in a rounded card yet.
+- The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.

@@ -3,6 +3,7 @@ source_set("look") {
   sources = [
     "favorite_tile.cc",
     "favorite_tile.h",
+    "page_card.h",
     "tint_color_mixer.cc",
     "tint_color_mixer.h",
     "tint_painter.cc",

@@ -206,3 +206,56 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718
      SkColor background_color = GetColorProvider()->GetColor(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index 75f02715c7af13fa992eb95586cfbd860286bef6..4a8da993bfa8c432326ccf3a26757e5aa5b198f4 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -47,6 +47,7 @@
+ #include "ui/views/controls/separator.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/look/page_card.h"
+ 
+ #if BUILDFLAG(IS_MAC)
+ #include "chrome/browser/ui/fullscreen_util_mac.h"
+@@ -761,6 +762,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       const int inset_amount = horizontal_layout.vertical_tab_strip_width -
+                                GetVerticalTabStripContentOverlap();
+       params.InsetHorizontal(inset_amount, /*leading=*/true);
++      if (!is_fullscreen(layout_data_->window_state)) {
++        params.Inset(uw::kPageCardMargins);
++        unclipped_contents_region.Inset(uw::kPageCardMargins);
++      }
+ 
+       // Let the vertical tab strip animate out over the content.
+       if (vertical_tab_strip_animation.current_motion) {
+@@ -1150,8 +1155,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     }
+   }
+ 
+-  // If the window goes out of glass mode, these changes won't hurt anything.
+-  if (in_glass_mode()) {
++  if (layout_data_->tab_strip_type == TabStripType::kVertical &&
++      !is_fullscreen(layout_data_->window_state)) {
++    views().multi_contents_view->SetBackgroundRadii(gfx::RoundedCornersF(
++        0, 0, uw::kPageCardRadius, uw::kPageCardRadius));
++  } else if (in_glass_mode()) {
+     gfx::RoundedCornersF content_corners;
+     if (layout_data_->tab_strip_type == TabStripType::kVertical &&
+         !is_fullscreen(layout_data_->window_state) &&
+@@ -1613,11 +1621,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+     case TabStripType::kVertical: {
+       // Curve trailing corner when it becomes the top trailing corner of the
+       // browser.
+-      if (layout_data_->window_state == WindowState::kNormal &&
+-          IsParentedTo(views().top_container, views().browser_view) &&
+-          params.trailing_exclusion.IsEmpty()) {
+-        toolbar_corners[CornerOrientation::kTopTrailing] =
+-            toolbar_background->GetWindowCorner(/*upper=*/true);
++      if (!is_fullscreen(layout_data_->window_state)) {
++        toolbar_corners[CornerOrientation::kTopTrailing] = {
++            CustomCornersBackground::CornerType::kRoundedWithBackground,
++            uw::kPageCardRadius};
+       }
+       break;
+     }
