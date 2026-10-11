@@ -14,6 +14,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - The decision model decides where a tab branch goes. With no decision model, the language model decides in one [classification call](../CONTEXT.md#language).
 - The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
+- "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
+- "Load available models" lists a connection's models with `GET <base>/models`. When the endpoint has no such list, the user types the model ID.
 - A decision request contains the tab title, URL, source-tab relationship, current task names, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
 - A decision is one of: leave the branch in the Scratchpad, move it to the end of an existing task, or start a new task.
 - A move or a new task needs confidence at or above `0.90`. Lower results do nothing.
@@ -64,7 +66,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 8. One undo reverses task creation, the move, and the name together. It still works from the Organize menu after the message disappears.
 9. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
 10. Each request contains the documented scope only. No API key or request body appears in logs, preferences, session data, or crash reports.
-11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*` and `AutomaticOrganizerBrowserTest.*`.
+11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
 
 ## Later stages
 

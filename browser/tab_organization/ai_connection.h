@@ -42,6 +42,10 @@ inline constexpr char kDecisionModelPref[] = "uw.organization.decision.model";
 inline constexpr char kDecisionKeyAccountPref[] =
     "uw.organization.decision.key_account";
 
+// Keychain accounts holding the two API keys.
+inline constexpr char kLanguageKeyAccount[] = "organization";
+inline constexpr char kDecisionKeyAccount[] = "decision";
+
 inline constexpr char kJevDefaultEndpoint[] = "https://api.typesafe.ai/v1";
 inline constexpr char kJevDefaultModel[] = "jev-latest";
 inline constexpr char kOpenAiDefaultEndpoint[] = "https://api.openai.com/v1";
@@ -60,7 +64,6 @@ struct AiConnectionConfig {
   std::string model;
   // Keychain account id holding the API key; empty in Ollama mode.
   std::string key_account;
-  bool organization_enabled = false;
 };
 
 // Jev speaks TypeSafe System One. The other two speak the OpenAI Decisions
@@ -112,11 +115,6 @@ bool IsComplete(const DecisionModelConfig& config);
 // True when automatic organization may send requests: it was enabled by a
 // successful validation and at least one connection is complete.
 bool OrganizationReady(const PrefService* prefs);
-
-// True when automatic organization may dispatch: explicitly enabled with a
-// valid endpoint, a selected model, and (outside Ollama mode) a Keychain
-// account holding the API key.
-bool CanOrganize(const AiConnectionConfig& config);
 
 PauseMode ReadPauseState(const PrefService* prefs);
 // `duration` applies to PauseMode::kTimed.

@@ -103,7 +103,10 @@ For current manual test scenarios and known limits, see [Try the current build](
 
 - `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. This first pass retains Chromium's icons and most secondary strings.
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
-- `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It expects the product source prepared below.
+- `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu, and adds the sidebar and menu strings. It expects the product source prepared below.
+- `ai-organization.patch` registers the automatic organization preferences and links the uw browser tests into Chromium's `browser_tests`.
+- `uw-settings-page.patch` adds the Tab organization page and its strings to Chromium's settings.
+- `uw-scheme-alias.patch` makes `uw://` URLs open their `chrome://` pages.
 
 Substantial Chromium product code lives in tracked `browser/` and `components/` directories. Preparation links them into the ignored Chromium checkout at `src/uw/`; it does not copy the files. The tab-tree patch ignores that generated source directory. This keeps product source reviewable while preserving an upstream-only checkout between prepare runs.
 
@@ -186,7 +189,7 @@ The uw patches, including the manual tab-tree integration, were checked against 
 
 On 2026-09-24, the customized application built and passed the headless smoke test on a 64 GiB Apple Silicon Mac with Xcode 27.0 and macOS SDK 27.0. The smoke test reported `uw 153.0.8010.53` and passed its isolated-profile navigation and JavaScript check.
 
-On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*` and `AutomaticOrganizerBrowserTest.*` in `browser_tests`. The organizer tests use a local test server. No live provider has been called.
+On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, and `UwOrganizationPageBrowserTest.*` in `browser_tests`. The organizer and settings tests use a local test server. No live provider has been called.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 

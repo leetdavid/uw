@@ -25,21 +25,31 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     min-height: var(--cr-section-min-height);
     padding: 8px 0;
   }
+  .uw-row[hidden] {
+    display: none;
+  }
   .uw-row + .uw-row {
     border-top: var(--cr-separator-line);
   }
   .uw-label {
-    flex: 0 0 140px;
+    flex: 0 0 120px;
   }
   .uw-field {
     flex: 1;
   }
+  .uw-field[hidden] {
+    display: none;
+  }
+  .uw-secondary,
+  .uw-note {
+    color: var(--cr-secondary-text-color);
+  }
+  .uw-note {
+    border-top: var(--cr-separator-line);
+    padding: 12px 0 16px;
+  }
   .uw-status-error {
     color: var(--cr-fallback-color-error, red);
-  }
-  .uw-scope {
-    color: var(--cr-secondary-text-color);
-    padding: 8px 0 16px;
   }
   h2.uw-heading {
     font-size: 108%;
@@ -50,66 +60,109 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
 </style>
 <div class="cr-centered-card-container">
   <div class="uw-section">
-    <h2 class="uw-heading">${this.i18n_('uwOrganizationConnectionTitle')}</h2>
     <div class="uw-row">
-      <div class="uw-label">${this.i18n_('uwOrganizationModeLabel')}</div>
-      <select id="modeSelect" class="uw-field" aria-label="${
-          this.i18n_('uwOrganizationModeLabel')}"
-          @change="${this.onModeChange_}">
-        <option value="0">${this.i18n_('uwOrganizationModeOllama')}</option>
-        <option value="1">${this.i18n_('uwOrganizationModeOpenAi')}</option>
+      <div>
+        <div id="status">${this.statusTitle_()}</div>
+        <div id="statusDetail" class="uw-secondary">
+          ${this.statusDetail_()}
+        </div>
+      </div>
+    </div>
+  </div>
+  ${this.cards_().map(card => html`
+  <div class="uw-section">
+    <h2 class="uw-heading">${card.title}</h2>
+    <div class="uw-row">
+      <div class="uw-label">${card.kindLabel}</div>
+      <select id="${card.name}Kind" class="md-select uw-field"
+          aria-label="${card.kindLabel}" data-connection="${card.name}"
+          .value="${String(card.form.kind)}" @change="${this.onKindChange_}">
+        ${card.kinds.map(kind => html`
+          <option value="${kind.value}"
+              ?selected="${kind.value === card.form.kind}">
+            ${kind.label}
+          </option>`)}
       </select>
     </div>
-    <div class="uw-row">
-      <div class="uw-label">${this.i18n_('uwOrganizationEndpointLabel')}</div>
-      <cr-input id="endpointInput" class="uw-field" type="url"></cr-input>
+    <div class="uw-row" ?hidden="${!card.takesEndpoint}">
+      <div class="uw-label">${this.i18n_('uwOrganizationEndpoint')}</div>
+      <cr-input id="${card.name}Endpoint" class="uw-field" type="url"
+          aria-label="${this.i18n_('uwOrganizationEndpoint')}"
+          data-connection="${card.name}" data-field="endpoint"
+          .value="${card.form.endpoint}"
+          @value-changed="${this.onFieldValueChanged_}">
+      </cr-input>
     </div>
-    <div class="uw-row">
-      <cr-button id="loadModelsButton" @click="${this.onLoadModelsClick_}">
-        ${this.i18n_('uwOrganizationLoadModelsLabel')}
+    <div class="uw-row" ?hidden="${!card.takesEndpoint}">
+      <div class="uw-label">${this.i18n_('uwOrganizationModel')}</div>
+      <cr-input id="${card.name}Model" class="uw-field"
+          aria-label="${this.i18n_('uwOrganizationModel')}"
+          data-connection="${card.name}" data-field="model"
+          .value="${card.form.model}"
+          @value-changed="${this.onFieldValueChanged_}"
+          ?hidden="${card.form.models.length > 0}">
+      </cr-input>
+      <select id="${card.name}ModelSelect" class="md-select uw-field"
+          aria-label="${this.i18n_('uwOrganizationModel')}"
+          data-connection="${card.name}" @change="${this.onModelChange_}"
+          ?hidden="${card.form.models.length === 0}">
+        ${card.form.models.map(model => html`
+          <option value="${model}" ?selected="${model === card.form.model}">
+            ${model}
+          </option>`)}
+      </select>
+      <cr-button id="${card.name}LoadModels" data-connection="${card.name}"
+          @click="${this.onLoadModelsClick_}">
+        ${this.i18n_('uwOrganizationLoadModels')}
       </cr-button>
-      <div>${this.modelsStatus_}</div>
     </div>
-    <div class="uw-row">
-      <div class="uw-label">${this.i18n_('uwOrganizationModelLabel')}</div>
-      <cr-input id="modelInput" class="uw-field"></cr-input>
+    <div class="uw-row" ?hidden="${!card.form.modelsStatus}">
+      <div id="${card.name}ModelsStatus" class="uw-secondary">
+        ${card.form.modelsStatus}
+      </div>
     </div>
-    <div class="uw-row" ?hidden="${this.isOllama_()}">
-      <div class="uw-label">${this.i18n_('uwOrganizationKeyLabel')}</div>
-      <cr-input id="keyInput" class="uw-field" type="password"></cr-input>
+    <div class="uw-row" ?hidden="${!card.takesKey}">
+      <div class="uw-label">${this.i18n_('uwOrganizationKey')}</div>
+      <cr-input id="${card.name}Key" class="uw-field" type="password"
+          aria-label="${this.i18n_('uwOrganizationKey')}"
+          data-connection="${card.name}" data-field="key"
+          .value="${card.form.key}" @value-changed="${this.onFieldValueChanged_}">
+      </cr-input>
+      <div class="uw-secondary">${this.i18n_(
+          card.form.hasKey ? 'uwOrganizationKeySaved' :
+                             'uwOrganizationNoKey')}</div>
     </div>
-    <div class="uw-row" ?hidden="${this.isOllama_()}">
-      <div>${this.keyStatus_}</div>
-    </div>
-    <div class="uw-scope">${this.i18n_('uwOrganizationScope')}</div>
+    <div class="uw-note">${card.note}</div>
+  </div>`)}
+  <div class="uw-section">
     <div class="uw-row">
       <cr-button id="saveButton" class="action-button"
-          @click="${this.onSaveClick_}">
-        ${this.i18n_('uwOrganizationSaveLabel')}
+          ?disabled="${this.saving_}" @click="${this.onSaveClick_}">
+        ${this.i18n_('uwOrganizationSave')}
       </cr-button>
-      <div class="${this.saveError_ ? 'uw-status-error' : ''}">${
-          this.saveStatus_}</div>
+      <div id="saveStatus"
+          class="${this.saveError_ ? 'uw-status-error' : ''}">
+        ${this.saveStatus_}
+      </div>
     </div>
-    <div class="uw-row" ?hidden="${!this.enabled_}">
-      <div>${this.i18n_('uwOrganizationEnabled')}</div>
-    </div>
+    <div class="uw-note">${this.i18n_('uwOrganizationScope')}</div>
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwOrganizationPauseTitle')}</h2>
     <div class="uw-row">
-      <cr-button @click="${this.onPause1HourClick_}"
+      <cr-button id="pause1Hour" @click="${this.onPause1HourClick_}"
           ?disabled="${this.pauseMode_ === 1}">
         ${this.i18n_('uwOrganizationPause1Hour')}
       </cr-button>
-      <cr-button @click="${this.onPauseUntilLaunchClick_}"
+      <cr-button id="pauseUntilLaunch" @click="${this.onPauseUntilLaunchClick_}"
           ?disabled="${this.pauseMode_ === 2}">
         ${this.i18n_('uwOrganizationPauseUntilLaunch')}
       </cr-button>
-      <cr-button @click="${this.onPauseIndefiniteClick_}"
+      <cr-button id="pauseIndefinite" @click="${this.onPauseIndefiniteClick_}"
           ?disabled="${this.pauseMode_ === 3}">
         ${this.i18n_('uwOrganizationPauseIndefinite')}
       </cr-button>
-      <cr-button @click="${this.onResumeClick_}"
+      <cr-button id="resume" @click="${this.onResumeClick_}"
           ?disabled="${this.pauseMode_ === 0}">
         ${this.i18n_('uwOrganizationResume')}
       </cr-button>

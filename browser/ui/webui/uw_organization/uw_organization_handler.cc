@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/check.h"
 #include "base/functional/bind.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -17,22 +16,75 @@
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "mojo/public/cpp/bindings/callback_helpers.h"
+#include "ui/base/webui/web_ui_util.h"
+#include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
-#include "uw/browser/tab_organization/remote_model_client.h"
-#include "uw/components/tab_organization/ai_protocol.h"
 
 namespace uw {
 namespace {
 
-// Fixed Keychain account slot; the slot (not the secret) is unremarkable.
-constexpr char kOrganizationAccount[] = "organization";
 constexpr base::TimeDelta kRequestTimeout = base::Seconds(15);
 
 ConnectionMode ModeFromInt(int32_t mode) {
   return mode == static_cast<int32_t>(ConnectionMode::kOpenAiCompatible)
              ? ConnectionMode::kOpenAiCompatible
              : ConnectionMode::kOllama;
+}
+
+DecisionProvider ProviderFromInt(int32_t provider) {
+  switch (provider) {
+    case static_cast<int32_t>(DecisionProvider::kJev):
+      return DecisionProvider::kJev;
+    case static_cast<int32_t>(DecisionProvider::kOpenAi):
+      return DecisionProvider::kOpenAi;
+    case static_cast<int32_t>(DecisionProvider::kOpenAiCompatible):
+      return DecisionProvider::kOpenAiCompatible;
+    default:
+      return DecisionProvider::kNone;
+  }
+}
+
+// Stores `typed`, or keeps the stored key when nothing was typed. Removes the
+// key when the connection takes none. Returns the account to record in prefs.
+std::string StoreKey(const char* account,
+                     bool needed,
+                     const std::string& typed) {
+  ApiKeyStore keys;
+  if (!needed) {
+    keys.DeleteKey(account);
+    return std::string();
+  }
+  const bool stored = typed.empty() ? keys.GetKey(account).has_value()
+                                    : keys.SetKey(account, typed);
+  return stored ? account : std::string();
+}
+
+std::string StoredKey(const std::string& account) {
+  return account.empty()
+             ? std::string()
+             : ApiKeyStore().GetKey(account).value_or(std::string());
+}
+
+mojom::ConnectionPtr ConnectionState(int32_t kind,
+                                     const std::string& endpoint,
+                                     const std::string& model,
+                                     const std::string& key_account) {
+  auto connection = mojom::Connection::New();
+  connection->kind = kind;
+  connection->endpoint = endpoint;
+  connection->model = model;
+  connection->has_key = !StoredKey(key_account).empty();
+  return connection;
+}
+
+BranchContext CheckContext() {
+  BranchContext context;
+  context.title = "Connectivity check";
+  context.url = "about:blank";
+  context.source_description = "setup validation";
+  return context;
 }
 
 }  // namespace
@@ -47,31 +99,56 @@ UwOrganizationHandler::~UwOrganizationHandler() = default;
 // static
 void UwOrganizationHandler::AddLoadTimeData(
     content::WebUIDataSource* data_source) {
-  // Connection labels reuse the setup strings so the settings page and the
-  // former dialog describe the same scope.
   static constexpr webui::LocalizedString kLocalizedStrings[] = {
       {"uwOrganizationPageTitle", IDS_UW_SETTINGS_ORGANIZATION_TITLE},
-      {"uwOrganizationConnectionTitle", IDS_UW_AUTO_SETUP_TITLE},
-      {"uwOrganizationModeLabel", IDS_UW_AUTO_SETUP_MODE},
-      {"uwOrganizationModeOllama", IDS_UW_AUTO_SETUP_MODE_OLLAMA},
-      {"uwOrganizationModeOpenAi", IDS_UW_AUTO_SETUP_MODE_OPENAI},
-      {"uwOrganizationEndpointLabel", IDS_UW_AUTO_SETUP_ENDPOINT},
-      {"uwOrganizationLoadModelsLabel", IDS_UW_AUTO_SETUP_LOAD_MODELS},
-      {"uwOrganizationModelLabel", IDS_UW_AUTO_SETUP_MODEL},
-      {"uwOrganizationModelEmpty", IDS_UW_AUTO_SETUP_MODEL_EMPTY},
-      {"uwOrganizationModelsError", IDS_UW_AUTO_SETUP_MODELS_ERROR},
-      {"uwOrganizationModelsEmpty", IDS_UW_AUTO_SETUP_MODELS_EMPTY},
-      {"uwOrganizationKeyLabel", IDS_UW_AUTO_SETUP_KEY},
-      {"uwOrganizationKeySaved", IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED},
-      {"uwOrganizationNoKey", IDS_UW_SETTINGS_ORGANIZATION_NO_KEY},
-      {"uwOrganizationScope", IDS_UW_AUTO_SCOPE},
-      {"uwOrganizationSaveLabel", IDS_UW_SETTINGS_ORGANIZATION_SAVE},
-      {"uwOrganizationSetupError", IDS_UW_AUTO_SETUP_ERROR},
-      {"uwOrganizationEnabled", IDS_UW_AUTO_ENABLED},
-      {"uwOrganizationChecking", IDS_UW_SETTINGS_ORGANIZATION_CHECKING},
+      {"uwOrganizationStatusOn", IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON},
+      {"uwOrganizationStatusOff", IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF},
+      {"uwOrganizationStatusPaused",
+       IDS_UW_SETTINGS_ORGANIZATION_STATUS_PAUSED},
+      {"uwOrganizationStatusHint", IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT},
+      {"uwOrganizationStatusDecides",
+       IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES},
+      {"uwOrganizationStatusNames", IDS_UW_SETTINGS_ORGANIZATION_STATUS_NAMES},
+      {"uwOrganizationStatusDecidesAndNames",
+       IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES_AND_NAMES},
+      {"uwOrganizationDecisionTitle",
+       IDS_UW_SETTINGS_ORGANIZATION_DECISION_TITLE},
+      {"uwOrganizationDecisionNote",
+       IDS_UW_SETTINGS_ORGANIZATION_DECISION_NOTE},
+      {"uwOrganizationProvider", IDS_UW_SETTINGS_ORGANIZATION_PROVIDER},
+      {"uwOrganizationProviderNone",
+       IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_NONE},
+      {"uwOrganizationProviderJev", IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_JEV},
+      {"uwOrganizationProviderOpenai",
+       IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_OPENAI},
+      {"uwOrganizationOpenaiCompatible",
+       IDS_UW_SETTINGS_ORGANIZATION_OPENAI_COMPATIBLE},
+      {"uwOrganizationLanguageTitle",
+       IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_TITLE},
+      {"uwOrganizationLanguageNote",
+       IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE},
+      {"uwOrganizationConnection", IDS_UW_SETTINGS_ORGANIZATION_CONNECTION},
+      {"uwOrganizationOllama", IDS_UW_SETTINGS_ORGANIZATION_OLLAMA},
+      {"uwOrganizationEndpoint", IDS_UW_SETTINGS_ORGANIZATION_ENDPOINT},
+      {"uwOrganizationModel", IDS_UW_SETTINGS_ORGANIZATION_MODEL},
+      {"uwOrganizationLoadModels", IDS_UW_SETTINGS_ORGANIZATION_LOAD_MODELS},
       {"uwOrganizationLoading", IDS_UW_SETTINGS_ORGANIZATION_LOADING},
       {"uwOrganizationModelsLoaded",
        IDS_UW_SETTINGS_ORGANIZATION_MODELS_LOADED},
+      {"uwOrganizationModelsError", IDS_UW_SETTINGS_ORGANIZATION_MODELS_ERROR},
+      {"uwOrganizationModelsEmpty", IDS_UW_SETTINGS_ORGANIZATION_MODELS_EMPTY},
+      {"uwOrganizationKey", IDS_UW_SETTINGS_ORGANIZATION_KEY},
+      {"uwOrganizationKeySaved", IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED},
+      {"uwOrganizationNoKey", IDS_UW_SETTINGS_ORGANIZATION_NO_KEY},
+      {"uwOrganizationSave", IDS_UW_SETTINGS_ORGANIZATION_SAVE},
+      {"uwOrganizationChecking", IDS_UW_SETTINGS_ORGANIZATION_CHECKING},
+      {"uwOrganizationValidated", IDS_UW_SETTINGS_ORGANIZATION_VALIDATED},
+      {"uwOrganizationDecisionError",
+       IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR},
+      {"uwOrganizationLanguageError",
+       IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR},
+      {"uwOrganizationNothingSet", IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET},
+      {"uwOrganizationScope", IDS_UW_SETTINGS_ORGANIZATION_SCOPE},
       {"uwOrganizationPauseTitle", IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
@@ -79,140 +156,208 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationResume", IDS_UW_PAUSE_RESUME},
   };
   data_source->AddLocalizedStrings(kLocalizedStrings);
+  data_source->AddString("uwOrganizationJevEndpoint", kJevDefaultEndpoint);
+  data_source->AddString("uwOrganizationJevModel", kJevDefaultModel);
+  data_source->AddString("uwOrganizationOpenaiEndpoint",
+                         kOpenAiDefaultEndpoint);
+  data_source->AddString("uwOrganizationOpenaiModel",
+                         kOpenAiDecisionsDefaultModel);
+  data_source->AddString("uwOrganizationOllamaEndpoint",
+                         kOllamaDefaultEndpoint);
 }
 
 void UwOrganizationHandler::GetState(GetStateCallback callback) {
-  auto state = mojom::ConnectionState::New();
-  const AiConnectionConfig config =
-      ReadAiConnectionConfig(profile_->GetPrefs());
-  ApiKeyStore keys;
-  state->mode = static_cast<int32_t>(config.mode);
-  state->endpoint = config.endpoint;
-  state->model = config.model;
-  state->has_key = !config.key_account.empty() &&
-                   keys.GetKey(config.key_account).has_value();
-  state->enabled = config.organization_enabled;
-  state->pause_mode =
-      static_cast<int32_t>(ReadPauseState(profile_->GetPrefs()));
+  const PrefService* prefs = profile_->GetPrefs();
+  const DecisionModelConfig decision = ReadDecisionModelConfig(prefs);
+  const AiConnectionConfig language = ReadAiConnectionConfig(prefs);
+  auto state = mojom::State::New();
+  state->decision =
+      ConnectionState(static_cast<int32_t>(decision.provider),
+                      decision.endpoint, decision.model, decision.key_account);
+  state->language =
+      ConnectionState(static_cast<int32_t>(language.mode), language.endpoint,
+                      language.model, language.key_account);
+  state->enabled = OrganizationReady(prefs);
+  state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   std::move(callback).Run(std::move(state));
 }
 
-void UwOrganizationHandler::LoadModels(const std::string& endpoint,
-                                       const std::string& api_key,
+void UwOrganizationHandler::LoadModels(bool decision,
+                                       mojom::ConnectionInputPtr connection,
                                        LoadModelsCallback callback) {
-  auto result = mojom::ModelsResult::New();
-  if (profile_->IsOffTheRecord() || !IsValidProviderEndpoint(endpoint)) {
-    result->ok = false;
-    std::move(callback).Run(std::move(result));
+  callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+      std::move(callback), mojom::ModelsResult::New());
+  if (profile_->IsOffTheRecord() ||
+      !IsValidProviderEndpoint(connection->endpoint)) {
     return;
   }
-  models_request_ = std::make_unique<RemoteModelClient>(
-      profile_->GetDefaultStoragePartition()
-          ->GetURLLoaderFactoryForBrowserProcess(),
-      ModelsUrl(endpoint), api_key, std::string(), kRequestTimeout);
-  models_request_->Send(
+  const bool takes_key =
+      decision || ModeFromInt(connection->kind) != ConnectionMode::kOllama;
+  std::string key = connection->api_key;
+  if (takes_key && key.empty()) {
+    key = StoredKey(decision ? kDecisionKeyAccount : kLanguageKeyAccount);
+  }
+  models_request_ =
+      Client(ModelsUrl(connection->endpoint),
+             takes_key ? std::move(key) : std::string(), std::string());
+  models_request_->SendGet(
       base::BindOnce(&UwOrganizationHandler::OnModelsLoaded,
                      weak_factory_.GetWeakPtr(), std::move(callback)));
 }
 
-void UwOrganizationHandler::OnModelsLoaded(
-    LoadModelsCallback callback,
-    RemoteModelClient::Outcome outcome) {
+void UwOrganizationHandler::OnModelsLoaded(LoadModelsCallback callback,
+                                           RemoteModelClient::Outcome outcome) {
   models_request_.reset();
-  auto result = mojom::ModelsResult::New();
-  std::optional<std::vector<std::u16string>> models;
-  if (outcome.ok) {
-    models = ParseModelList(outcome.body);
-  }
+  const std::optional<std::vector<std::u16string>> models =
+      outcome.ok ? ParseModelList(outcome.body) : std::nullopt;
   if (!models) {
-    result->ok = false;
-    std::move(callback).Run(std::move(result));
     return;
   }
+  auto result = mojom::ModelsResult::New();
   result->ok = true;
-  for (const auto& model : *models) {
+  for (const std::u16string& model : *models) {
     result->models.push_back(base::UTF16ToUTF8(model));
   }
   std::move(callback).Run(std::move(result));
 }
 
-void UwOrganizationHandler::Save(int32_t mode_value,
-                                 const std::string& endpoint,
-                                 const std::string& model,
-                                 const std::string& key,
+void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
+                                 mojom::ConnectionInputPtr language,
                                  SaveCallback callback) {
-  auto fail = [](SaveCallback done) {
-    auto result = mojom::SaveResult::New();
-    result->ok = false;
-    std::move(done).Run(std::move(result));
-  };
-  if (profile_->IsOffTheRecord()) {
-    return fail(std::move(callback));
-  }
-  const ConnectionMode mode = ModeFromInt(mode_value);
-  if (!IsValidProviderEndpoint(endpoint) || model.empty()) {
-    return fail(std::move(callback));
-  }
+  decision_check_.reset();
+  language_check_.reset();
+  save_result_ = mojom::SaveResult::New();
+  save_callback_ = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+      std::move(callback), mojom::SaveResult::New());
   PrefService* prefs = profile_->GetPrefs();
-  ApiKeyStore keys;
-  std::string api_key;
-  std::string key_account;
-  if (mode == ConnectionMode::kOpenAiCompatible) {
-    if (!key.empty()) {
-      if (!keys.SetKey(kOrganizationAccount, key)) {
-        return fail(std::move(callback));
-      }
-    } else if (!keys.GetKey(kOrganizationAccount)) {
-      // No typed key and no stored key to keep.
-      return fail(std::move(callback));
-    }
-    key_account = kOrganizationAccount;
-    api_key = key.empty() ? keys.GetKey(kOrganizationAccount).value_or("")
-                          : key;
-  } else {
-    keys.DeleteKey(kOrganizationAccount);
-  }
-  prefs->SetInteger(kOrganizationModePref, static_cast<int>(mode));
-  prefs->SetString(kOrganizationEndpointPref, endpoint);
-  prefs->SetString(kOrganizationModelPref, model);
-  prefs->SetString(kOrganizationKeyAccountPref, key_account);
-  AiConnectionConfig pending{mode, endpoint, model, key_account,
-                             /*organization_enabled=*/true};
-  if (!CanOrganize(pending)) {
-    return fail(std::move(callback));
-  }
-  BranchContext context;
-  context.title = "Connectivity check";
-  context.url = "about:blank";
-  context.source_description = "setup validation";
-  std::optional<std::string> body =
-      BuildClassificationRequestBody(model, context, {});
-  if (!body) {
-    return fail(std::move(callback));
-  }
-  validation_request_ = std::make_unique<RemoteModelClient>(
-      profile_->GetDefaultStoragePartition()
-          ->GetURLLoaderFactoryForBrowserProcess(),
-      ChatCompletionsUrl(endpoint), api_key, *body, kRequestTimeout);
-  api_key.assign(api_key.size(), '\0');
-  validation_request_->Send(
-      base::BindOnce(&UwOrganizationHandler::OnValidationComplete,
-                     weak_factory_.GetWeakPtr(), std::move(callback)));
-}
-
-void UwOrganizationHandler::OnValidationComplete(
-    SaveCallback callback,
-    RemoteModelClient::Outcome outcome) {
-  validation_request_.reset();
-  auto result = mojom::SaveResult::New();
-  if (!outcome.ok || !ParseClassificationResponse(outcome.body)) {
-    result->ok = false;
-    std::move(callback).Run(std::move(result));
+  prefs->SetBoolean(kOrganizationEnabledPref, false);
+  if (profile_->IsOffTheRecord()) {
+    std::move(save_callback_).Run(std::move(save_result_));
     return;
   }
-  profile_->GetPrefs()->SetBoolean(kOrganizationEnabledPref, true);
-  result->ok = true;
-  std::move(callback).Run(std::move(result));
+  StoreDecision(*decision);
+  StoreLanguage(*language);
+  const bool decides =
+      ReadDecisionModelConfig(prefs).provider != DecisionProvider::kNone;
+  const bool has_language = !ReadAiConnectionConfig(prefs).model.empty();
+  if (!decides && !has_language) {
+    std::move(save_callback_).Run(std::move(save_result_));
+    return;
+  }
+  if (decides) {
+    CheckDecision();
+  }
+  if (has_language) {
+    CheckLanguage(/*names_only=*/decides);
+  }
+  FinishSaveWhenChecked();
+}
+
+void UwOrganizationHandler::StoreDecision(const mojom::ConnectionInput& input) {
+  PrefService* prefs = profile_->GetPrefs();
+  const DecisionProvider provider = ProviderFromInt(input.kind);
+  prefs->SetInteger(kDecisionProviderPref, static_cast<int>(provider));
+  prefs->SetString(kDecisionEndpointPref, input.endpoint);
+  prefs->SetString(kDecisionModelPref, input.model);
+  prefs->SetString(
+      kDecisionKeyAccountPref,
+      StoreKey(kDecisionKeyAccount, provider != DecisionProvider::kNone,
+               input.api_key));
+}
+
+void UwOrganizationHandler::StoreLanguage(const mojom::ConnectionInput& input) {
+  PrefService* prefs = profile_->GetPrefs();
+  const ConnectionMode mode = ModeFromInt(input.kind);
+  prefs->SetInteger(kOrganizationModePref, static_cast<int>(mode));
+  prefs->SetString(kOrganizationEndpointPref, input.endpoint);
+  prefs->SetString(kOrganizationModelPref, input.model);
+  prefs->SetString(
+      kOrganizationKeyAccountPref,
+      StoreKey(kLanguageKeyAccount, mode == ConnectionMode::kOpenAiCompatible,
+               input.api_key));
+}
+
+void UwOrganizationHandler::CheckDecision() {
+  const DecisionModelConfig config =
+      ReadDecisionModelConfig(profile_->GetPrefs());
+  const DecisionFormat format = FormatFor(config.provider);
+  std::optional<std::string> body =
+      IsComplete(config)
+          ? BuildDecisionRequestBody(format, config.model, CheckContext(), {})
+          : std::nullopt;
+  if (!body) {
+    save_result_->decision_failed = true;
+    return;
+  }
+  decision_check_ = Client(DecisionUrl(config), StoredKey(config.key_account),
+                           std::move(*body));
+  decision_check_->Send(
+      base::BindOnce(&UwOrganizationHandler::OnDecisionChecked,
+                     weak_factory_.GetWeakPtr(), format));
+}
+
+void UwOrganizationHandler::CheckLanguage(bool names_only) {
+  const AiConnectionConfig config =
+      ReadAiConnectionConfig(profile_->GetPrefs());
+  std::optional<std::string> body;
+  if (IsComplete(config)) {
+    body = names_only
+               ? BuildNamingRequestBody(config.model, CheckContext())
+               : BuildDecisionRequestBody(DecisionFormat::kChat, config.model,
+                                          CheckContext(), {});
+  }
+  if (!body) {
+    save_result_->language_failed = true;
+    return;
+  }
+  language_check_ = Client(ChatCompletionsUrl(config.endpoint),
+                           StoredKey(config.key_account), std::move(*body));
+  language_check_->Send(
+      base::BindOnce(&UwOrganizationHandler::OnLanguageChecked,
+                     weak_factory_.GetWeakPtr(), names_only));
+}
+
+void UwOrganizationHandler::OnDecisionChecked(
+    DecisionFormat format,
+    RemoteModelClient::Outcome outcome) {
+  decision_check_.reset();
+  save_result_->decision_failed =
+      !outcome.ok || !ParseDecisionResponse(format, outcome.body);
+  FinishSaveWhenChecked();
+}
+
+void UwOrganizationHandler::OnLanguageChecked(
+    bool names_only,
+    RemoteModelClient::Outcome outcome) {
+  language_check_.reset();
+  const bool valid =
+      outcome.ok &&
+      (names_only ? ParseNamingResponse(outcome.body).has_value()
+                  : ParseDecisionResponse(DecisionFormat::kChat, outcome.body)
+                        .has_value());
+  save_result_->language_failed = !valid;
+  FinishSaveWhenChecked();
+}
+
+void UwOrganizationHandler::FinishSaveWhenChecked() {
+  if (decision_check_ || language_check_) {
+    return;
+  }
+  save_result_->enabled =
+      !save_result_->decision_failed && !save_result_->language_failed;
+  profile_->GetPrefs()->SetBoolean(kOrganizationEnabledPref,
+                                   save_result_->enabled);
+  std::move(save_callback_).Run(std::move(save_result_));
+}
+
+std::unique_ptr<RemoteModelClient> UwOrganizationHandler::Client(
+    const GURL& url,
+    std::string api_key,
+    std::string body) {
+  return std::make_unique<RemoteModelClient>(
+      profile_->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess(),
+      url, std::move(api_key), std::move(body), kRequestTimeout);
 }
 
 void UwOrganizationHandler::SetPause(int32_t mode_value,
@@ -233,8 +378,7 @@ void UwOrganizationHandler::SetPause(int32_t mode_value,
       break;
   }
   auto result = mojom::PauseResult::New();
-  result->pause_mode =
-      static_cast<int32_t>(ReadPauseState(profile_->GetPrefs()));
+  result->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   std::move(callback).Run(std::move(result));
 }
 

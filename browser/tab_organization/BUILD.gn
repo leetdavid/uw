@@ -40,9 +40,10 @@ source_set("browser_tests") {
   deps = [
     ":ai_connection",
     ":tab_organization",
+    ":test_support",
     "//components/content_extraction/content/browser",
-    "//crypto",
     "//net:test_support",
+    "//uw/browser/ui/webui/uw_organization:browser_tests",
     "//base",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
@@ -54,6 +55,22 @@ source_set("browser_tests") {
     "//content/public/browser",
     "//content/test:test_support",
     "//testing/gtest",
+    "//url",
+  ]
+}
+
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "model_test_server.cc",
+    "model_test_server.h",
+    "scoped_memory_keychain.h",
+    "scoped_memory_keychain.mm",
+  ]
+  deps = [
+    "//base",
+    "//crypto",
+    "//net:test_support",
     "//url",
   ]
 }

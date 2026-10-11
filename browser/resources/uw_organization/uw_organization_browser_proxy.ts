@@ -4,13 +4,14 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {ConnectionState, ModelsResult, PauseResult, SaveResult} from './uw_organization.mojom-webui.js';
+import type {ConnectionInput, ModelsResult, PauseResult, SaveResult, State} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
-  getState(): Promise<ConnectionState>;
-  loadModels(endpoint: string, key: string): Promise<ModelsResult>;
-  save(mode: number, endpoint: string, model: string, key: string):
+  getState(): Promise<State>;
+  loadModels(decision: boolean, connection: ConnectionInput):
+      Promise<ModelsResult>;
+  save(decision: ConnectionInput, language: ConnectionInput):
       Promise<SaveResult>;
   setPause(mode: number): Promise<PauseResult>;
 }
@@ -24,13 +25,13 @@ export class UwOrganizationBrowserProxyImpl implements
     return this.handler.getState().then(response => response.state);
   }
 
-  loadModels(endpoint: string, key: string) {
-    return this.handler.loadModels(endpoint, key)
+  loadModels(decision: boolean, connection: ConnectionInput) {
+    return this.handler.loadModels(decision, connection)
         .then(response => response.result);
   }
 
-  save(mode: number, endpoint: string, model: string, key: string) {
-    return this.handler.save(mode, endpoint, model, key)
+  save(decision: ConnectionInput, language: ConnectionInput) {
+    return this.handler.save(decision, language)
         .then(response => response.result);
   }
 

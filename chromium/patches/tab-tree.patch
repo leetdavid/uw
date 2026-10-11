@@ -9,29 +9,30 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df5..3bb8048 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..56fc90e908735787e1fc68de848cfb801cdb54fb 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,22 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,23 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
-+      <message name="IDS_UW_SCRATCHPAD" desc="Section containing tabs not assigned to a task.">Scratchpad</message>
-+      <message name="IDS_UW_ORGANIZE" desc="Tab sidebar menu button.">Organize</message>
-+      <message name="IDS_UW_NEW_TASK" desc="Moves selected tab branches to a new task group.">Move to new task</message>
-+      <message name="IDS_UW_TASK_NAME" desc="Label for the name of a browsing task.">Task name</message>
-+      <message name="IDS_UW_UNTITLED_TASK" desc="Initial editable name for a manually created browsing task.">New task</message>
-+      <message name="IDS_UW_RENAME_TASK" desc="Edits a browsing task group name.">Rename task</message>
-+      <message name="IDS_UW_CLOSE_BRANCH" desc="Closes a tab or task and all descendant tabs.">Close branch</message>
++      <message name="IDS_UW_SCRATCHPAD" desc="Label above the tabs that belong to no task.">Scratchpad</message>
++      <message name="IDS_UW_ORGANIZE" desc="Tab sidebar button that opens the organization menu.">Organize</message>
++      <message name="IDS_UW_NEW_TASK" desc="Moves the selected tab branches to a new task.">Move to new task</message>
++      <message name="IDS_UW_UNTITLED_TASK" desc="Name of a new task before it is renamed.">New task</message>
++      <message name="IDS_UW_MOVE_TO_SCRATCHPAD" desc="Removes the selected tab branches from their task.">Move to Scratchpad</message>
++      <message name="IDS_UW_NEST_BRANCH" desc="Makes a tab a child of the tab above it.">Nest under previous tab</message>
++      <message name="IDS_UW_OUTDENT_BRANCH" desc="Moves a tab up one nesting level.">Move up one level</message>
++      <message name="IDS_UW_CLOSE_BRANCH" desc="Closes a tab and every tab nested under it.">Close branch</message>
 +      <message name="IDS_UW_UNDO_ORGANIZATION" desc="Reverses one tab organization action.">Undo tab organization</message>
-+      <message name="IDS_UW_MOVE_TO_SCRATCHPAD" desc="Removes selected branches from their task.">Move to Scratchpad</message>
-+      <message name="IDS_UW_MOVE_UP" desc="Moves a branch before its previous sibling.">Move up</message>
-+      <message name="IDS_UW_MOVE_DOWN" desc="Moves a branch after its next sibling.">Move down</message>
-+      <message name="IDS_UW_NEST_BRANCH" desc="Makes a branch a child of its previous sibling.">Nest under previous</message>
-+      <message name="IDS_UW_OUTDENT_BRANCH" desc="Moves a branch up one nesting level.">Move up one level</message>
-+      <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the descendants of a collapsed tab branch.">Expand branch</message>
-+      <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the descendants of a tab branch.">Collapse branch</message>
-+      <message name="IDS_UW_TOGGLE_BRANCH" desc="Expands or collapses the selected tab branch.">Expand or collapse branch</message>
++      <message name="IDS_UW_AUTO_MOVED_TASK" desc="Sidebar message after automatic organization moves a tab into a task.">Moved to <ph name="TASK_NAME">$1<ex>Research</ex></ph></message>
++      <message name="IDS_UW_AUTO_CREATED_TASK" desc="Sidebar message after automatic organization starts a task.">Created task <ph name="TASK_NAME">$1<ex>Plan Lisbon trip</ex></ph></message>
++      <message name="IDS_UW_AUTO_UNDO" desc="Button on the sidebar message that reverses the automatic change.">Undo</message>
++      <message name="IDS_UW_PAUSE_1HOUR" desc="Pauses automatic organization for one hour.">Pause for 1 hour</message>
++      <message name="IDS_UW_PAUSE_UNTIL_LAUNCH" desc="Pauses automatic organization until uw quits.">Pause until next launch</message>
++      <message name="IDS_UW_PAUSE_INDEFINITE" desc="Pauses automatic organization until the user resumes it.">Pause indefinitely</message>
++      <message name="IDS_UW_PAUSE_RESUME" desc="Resumes automatic organization.">Resume automatic organization</message>
++      <message name="IDS_UW_ORGANIZATION_SETTINGS" desc="Organize menu item that opens the tab organization settings page.">Tab organization settings</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  

@@ -28,3 +28,25 @@ source_set("uw_organization_handler") {
     "//uw/components/tab_organization",
   ]
 }
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "uw_organization_page_browsertest.cc" ]
+  deps = [
+    "//base",
+    "//chrome:strings",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//url",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/tab_organization:test_support",
+  ]
+}

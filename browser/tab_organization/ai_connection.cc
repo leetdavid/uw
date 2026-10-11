@@ -57,7 +57,6 @@ AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
   config.endpoint = prefs->GetString(kOrganizationEndpointPref);
   config.model = prefs->GetString(kOrganizationModelPref);
   config.key_account = prefs->GetString(kOrganizationKeyAccountPref);
-  config.organization_enabled = prefs->GetBoolean(kOrganizationEnabledPref);
   return config;
 }
 
@@ -134,10 +133,6 @@ bool OrganizationReady(const PrefService* prefs) {
   return prefs && prefs->GetBoolean(kOrganizationEnabledPref) &&
          (IsComplete(ReadDecisionModelConfig(prefs)) ||
           IsComplete(ReadAiConnectionConfig(prefs)));
-}
-
-bool CanOrganize(const AiConnectionConfig& config) {
-  return config.organization_enabled && IsComplete(config);
 }
 
 PauseMode ReadPauseState(const PrefService* prefs) {

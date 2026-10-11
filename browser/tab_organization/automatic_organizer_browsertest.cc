@@ -3,15 +3,12 @@
 
 #include "uw/browser/tab_organization/automatic_organizer.h"
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
-#include "base/strings/string_number_conversions.h"
-#include "base/synchronization/lock.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -29,115 +26,70 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "crypto/apple/scoped_fake_keychain_v2.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
+#include "uw/browser/tab_organization/model_test_server.h"
+#include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
 namespace uw {
 namespace {
-
-// The fake keychain answers every lookup with this key.
-constexpr char kStoredKey[] = "Bearer mock_password";
-
-struct ProviderRequest {
-  std::string path;
-  std::string body;
-  std::string authorization;
-};
-
-std::string DecisionsAnswer(const std::string& choice, double confidence) {
-  return R"({"answers":[{"type":"choice","name":"destination","choice":")" +
-         choice + R"(","confidence":)" + base::NumberToString(confidence) +
-         "}]}";
-}
-
-std::string SystemOneAnswer(const std::string& choice, double confidence) {
-  return R"({"answers":{"destination":{"type":"choice","choice":")" + choice +
-         R"(","confidence":)" + base::NumberToString(confidence) +
-         R"(,"probabilities":{}}}})";
-}
-
-std::string ChatAnswer(const std::string& escaped_content) {
-  return R"({"choices":[{"message":{"role":"assistant","content":")" +
-         escaped_content + R"("}}]})";
-}
 
 // Serves pages to browse and plays every model provider.
 class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
-    embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
-        &AutomaticOrganizerBrowserTest::Serve, base::Unretained(this)));
+    embedded_test_server()->RegisterRequestHandler(
+        base::BindRepeating(&ServePage));
     ASSERT_TRUE(embedded_test_server()->Start());
   }
 
-  std::unique_ptr<net::test_server::HttpResponse> Serve(
+  static std::unique_ptr<net::test_server::HttpResponse> ServePage(
       const net::test_server::HttpRequest& request) {
-    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
     const std::string path(request.GetURL().path());
-    if (path.starts_with("/page/")) {
-      const std::string name = path.substr(6);
-      response->set_content_type("text/html");
-      response->set_content("<html><head><title>" + name +
-                            "</title></head><body>Notes about " + name +
-                            ".</body></html>");
-      return response;
-    }
-    if (!path.starts_with("/v1/")) {
+    if (!path.starts_with("/page/")) {
       return nullptr;
     }
-    base::AutoLock hold(lock_);
-    const auto authorization = request.headers.find("Authorization");
-    requests_.push_back({path, request.content,
-                         authorization == request.headers.end()
-                             ? std::string()
-                             : authorization->second});
-    const auto answer = answers_.find(path);
-    if (answer == answers_.end()) {
-      response->set_code(net::HTTP_NOT_FOUND);
-      return response;
-    }
-    response->set_content_type("application/json");
-    response->set_content(answer->second);
+    const std::string name = path.substr(6);
+    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+    response->set_content_type("text/html");
+    response->set_content("<html><head><title>" + name +
+                          "</title></head><body>Notes about " + name +
+                          ".</body></html>");
     return response;
   }
 
   void Answer(const std::string& path, std::string body) {
-    base::AutoLock hold(lock_);
-    answers_[path] = std::move(body);
+    models_.Answer(path, std::move(body));
   }
 
-  std::vector<ProviderRequest> Requests() {
-    base::AutoLock hold(lock_);
-    return requests_;
-  }
+  std::vector<ModelRequest> Requests() { return models_.Requests(); }
 
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
 
   void UseDecisionModel(DecisionProvider provider) {
-    ASSERT_TRUE(ApiKeyStore().SetKey("decision", "decision-key"));
+    ASSERT_TRUE(ApiKeyStore().SetKey(kDecisionKeyAccount, "decision-key"));
     prefs()->SetInteger(kDecisionProviderPref, static_cast<int>(provider));
     prefs()->SetString(kDecisionEndpointPref,
                        embedded_test_server()->GetURL("/v1").spec());
     prefs()->SetString(kDecisionModelPref, "decision-model");
-    prefs()->SetString(kDecisionKeyAccountPref, "decision");
+    prefs()->SetString(kDecisionKeyAccountPref, kDecisionKeyAccount);
     prefs()->SetBoolean(kOrganizationEnabledPref, true);
   }
 
   void UseLanguageModel() {
-    ASSERT_TRUE(ApiKeyStore().SetKey("organization", "language-key"));
+    ASSERT_TRUE(ApiKeyStore().SetKey(kLanguageKeyAccount, "language-key"));
     prefs()->SetInteger(kOrganizationModePref,
                         static_cast<int>(ConnectionMode::kOpenAiCompatible));
     prefs()->SetString(kOrganizationEndpointPref,
                        embedded_test_server()->GetURL("/v1").spec());
     prefs()->SetString(kOrganizationModelPref, "language-model");
-    prefs()->SetString(kOrganizationKeyAccountPref, "organization");
+    prefs()->SetString(kOrganizationKeyAccountPref, kLanguageKeyAccount);
     prefs()->SetBoolean(kOrganizationEnabledPref, true);
   }
 
@@ -227,10 +179,8 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
  private:
-  crypto::apple::ScopedFakeKeychainV2 keychain_{"uw-test"};
-  base::Lock lock_;
-  std::vector<ProviderRequest> requests_ GUARDED_BY(lock_);
-  std::map<std::string, std::string> answers_ GUARDED_BY(lock_);
+  ScopedMemoryKeychain keychain_;
+  ModelTestServer models_{embedded_test_server()};
 };
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -251,10 +201,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(notice->task, u"Plan Lisbon trip");
   EXPECT_FALSE(notice->created);
 
-  const std::vector<ProviderRequest> requests = Requests();
+  const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 1u);
   EXPECT_EQ(requests[0].path, "/v1/decisions");
-  EXPECT_EQ(requests[0].authorization, kStoredKey);
+  EXPECT_EQ(requests[0].authorization, "Bearer decision-key");
   EXPECT_NE(requests[0].body.find("Title: lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Notes about lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Plan Lisbon trip"), std::string::npos);
@@ -282,13 +232,13 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(notice);
   EXPECT_TRUE(notice->created);
 
-  const std::vector<ProviderRequest> requests = Requests();
+  const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 2u);
   EXPECT_EQ(requests[0].path, "/v1/systemone");
-  EXPECT_EQ(requests[0].authorization, kStoredKey);
+  EXPECT_EQ(requests[0].authorization, "Bearer decision-key");
   EXPECT_NE(requests[0].body.find("\"criteria\""), std::string::npos);
   EXPECT_EQ(requests[1].path, "/v1/chat/completions");
-  EXPECT_EQ(requests[1].authorization, kStoredKey);
+  EXPECT_EQ(requests[1].authorization, "Bearer language-key");
 
   controller()->Undo();
   EXPECT_TRUE(tabs()->group_model()->ListTabGroups().empty());
@@ -319,7 +269,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   ASSERT_TRUE(link->GetGroup());
   EXPECT_EQ(TitleOf(*link->GetGroup()), u"Read news");
-  const std::vector<ProviderRequest> requests = Requests();
+  const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 1u);
   EXPECT_EQ(requests[0].path, "/v1/chat/completions");
 }

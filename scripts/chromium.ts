@@ -487,7 +487,7 @@ const TEST_SUITES = {
     "PageTreeTest.*", "AiProtocolTest.*", "VerticalTabStripPrefsTest.*", "VerticalTabStripStateControllerTest.*",
   ],
   browser_tests: [
-    "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*",
+    "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "UwOrganizationPageBrowserTest.*",
   ],
 } as const;
 

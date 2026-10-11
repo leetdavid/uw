@@ -3,22 +3,39 @@
 
 module uw.mojom;
 
-// Non-secret snapshot of the organization connection behind automatic tab
-// organization. The API key itself never crosses this boundary; only whether
-// one is stored.
-struct ConnectionState {
-  // Matches uw::ConnectionMode.
-  int32 mode;
+// One model connection as the settings page shows it. An API key never goes
+// back to the page; only whether one is stored.
+struct Connection {
+  // uw::DecisionProvider for the decision model, uw::ConnectionMode for the
+  // language model.
+  int32 kind;
   string endpoint;
   string model;
   bool has_key;
+};
+
+struct State {
+  Connection decision;
+  Connection language;
   bool enabled;
   // Matches uw::PauseMode.
   int32 pause_mode;
 };
 
+// One connection as the user entered it. An empty key keeps the stored one.
+struct ConnectionInput {
+  int32 kind;
+  string endpoint;
+  string model;
+  string api_key;
+};
+
 struct SaveResult {
-  bool ok;
+  // True when at least one connection is set and every set connection
+  // validated. Automatic organization is on exactly then.
+  bool enabled;
+  bool decision_failed;
+  bool language_failed;
 };
 
 struct ModelsResult {
@@ -33,9 +50,14 @@ struct PauseResult {
 // Profile-scoped backend for the uw organization section of
 // chrome://settings.
 interface OrganizationHandler {
-  GetState() => (ConnectionState state);
-  LoadModels(string endpoint, string api_key) => (ModelsResult result);
-  Save(int32 mode, string endpoint, string model, string api_key)
+  GetState() => (State state);
+  // Lists the models of a connection as entered. `decision` says which
+  // connection it is, so an empty key can fall back to the stored one.
+  LoadModels(bool decision, ConnectionInput connection)
+      => (ModelsResult result);
+  // Turns automatic organization off, stores both connections, then checks
+  // each one that is set.
+  Save(ConnectionInput decision, ConnectionInput language)
       => (SaveResult result);
   SetPause(int32 mode) => (PauseResult result);
 };

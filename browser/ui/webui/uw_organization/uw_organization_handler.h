@@ -13,7 +13,9 @@
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
 #include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
+#include "uw/components/tab_organization/ai_protocol.h"
 
+class GURL;
 class Profile;
 
 namespace content {
@@ -23,10 +25,9 @@ class WebUIDataSource;
 namespace uw {
 
 // Mojo backend for the uw organization section of chrome://settings.
-// Profile-scoped: it touches profile prefs and the profile's Keychain slot,
+// Profile-scoped: it touches profile prefs and the profile's Keychain slots,
 // never window state, so closing windows while settings is open is safe.
-// Secrets stay in the OS credential store and never cross into prefs, logs,
-// or page state.
+// API keys stay in the Keychain and never reach prefs, logs, or the page.
 class UwOrganizationHandler : public mojom::OrganizationHandler {
  public:
   UwOrganizationHandler(
@@ -40,26 +41,38 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
 
   // mojom::OrganizationHandler:
   void GetState(GetStateCallback callback) override;
-  void LoadModels(const std::string& endpoint,
-                  const std::string& api_key,
+  void LoadModels(bool decision,
+                  mojom::ConnectionInputPtr connection,
                   LoadModelsCallback callback) override;
-  void Save(int32_t mode,
-            const std::string& endpoint,
-            const std::string& model,
-            const std::string& api_key,
+  void Save(mojom::ConnectionInputPtr decision,
+            mojom::ConnectionInputPtr language,
             SaveCallback callback) override;
   void SetPause(int32_t mode, SetPauseCallback callback) override;
 
  private:
+  void StoreDecision(const mojom::ConnectionInput& input);
+  void StoreLanguage(const mojom::ConnectionInput& input);
+  void CheckDecision();
+  // `names_only` is true when a decision model does the deciding.
+  void CheckLanguage(bool names_only);
   void OnModelsLoaded(LoadModelsCallback callback,
                       RemoteModelClient::Outcome outcome);
-  void OnValidationComplete(SaveCallback callback,
-                            RemoteModelClient::Outcome outcome);
+  void OnDecisionChecked(DecisionFormat format,
+                         RemoteModelClient::Outcome outcome);
+  void OnLanguageChecked(bool names_only, RemoteModelClient::Outcome outcome);
+  // Turns automatic organization on when every check passed, then answers.
+  void FinishSaveWhenChecked();
+  std::unique_ptr<RemoteModelClient> Client(const GURL& url,
+                                            std::string api_key,
+                                            std::string body);
 
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::OrganizationHandler> receiver_;
   std::unique_ptr<RemoteModelClient> models_request_;
-  std::unique_ptr<RemoteModelClient> validation_request_;
+  std::unique_ptr<RemoteModelClient> decision_check_;
+  std::unique_ptr<RemoteModelClient> language_check_;
+  mojom::SaveResultPtr save_result_;
+  SaveCallback save_callback_;
   base::WeakPtrFactory<UwOrganizationHandler> weak_factory_{this};
 };
 

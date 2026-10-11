@@ -3,28 +3,105 @@
 // found in the LICENSE file.
 
 /**
- * @fileoverview uw organization settings: the AI connection behind automatic
- * tab organization (mode, endpoint, model, API key) plus the global pause
- * controls. Secrets stay in the OS credential store; only non-secret
- * settings cross the native boundary.
+ * @fileoverview uw organization settings: the decision model and the language
+ * model behind automatic tab organization, plus the global pause controls.
+ * API keys stay in the macOS Keychain; the page only learns whether one is
+ * stored.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
 
-import type {CrInputElement} from 'chrome://resources/cr_elements/cr_input/cr_input.js';
+import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_select_lit.css.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {getHtml} from './uw_organization_page.html.js';
+import type {Connection, ConnectionInput} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
+import {getHtml} from './uw_organization_page.html.js';
 
-export interface SettingsUwOrganizationPageElement {
-  $: {
-    modeSelect: HTMLSelectElement,
-    endpointInput: CrInputElement,
-    modelInput: CrInputElement,
-    keyInput: CrInputElement,
+type ConnectionName = 'decision'|'language';
+
+interface ConnectionForm {
+  kind: number;
+  endpoint: string;
+  model: string;
+  key: string;
+  hasKey: boolean;
+  models: string[];
+  modelsStatus: string;
+}
+
+// Everything the template needs to draw one connection.
+interface ConnectionCard {
+  name: ConnectionName;
+  title: string;
+  kindLabel: string;
+  kinds: Array<{value: number, label: string}>;
+  note: string;
+  form: ConnectionForm;
+  takesEndpoint: boolean;
+  takesKey: boolean;
+}
+
+interface Defaults {
+  endpoint: string;
+  model: string;
+}
+
+// uw::DecisionProvider and uw::ConnectionMode values.
+const NO_DECISION_MODEL = 0;
+const OLLAMA = 0;
+
+const PROVIDER_LABELS = [
+  '',
+  'uwOrganizationProviderJev',
+  'uwOrganizationProviderOpenai',
+  'uwOrganizationOpenaiCompatible',
+];
+
+function emptyForm(): ConnectionForm {
+  return {
+    kind: 0,
+    endpoint: '',
+    model: '',
+    key: '',
+    hasKey: false,
+    models: [],
+    modelsStatus: '',
+  };
+}
+
+function defaultsFor(name: ConnectionName, kind: number): Defaults {
+  const preset = name === 'decision' ? ['', 'Jev', 'Openai'][kind] :
+                                       ['Ollama'][kind];
+  if (!preset) {
+    return {endpoint: '', model: ''};
+  }
+  return {
+    endpoint: loadTimeData.getString(`uwOrganization${preset}Endpoint`),
+    model: name === 'decision' ?
+        loadTimeData.getString(`uwOrganization${preset}Model`) :
+        '',
+  };
+}
+
+function formFrom(name: ConnectionName, saved: Connection): ConnectionForm {
+  return {
+    ...emptyForm(),
+    kind: saved.kind,
+    endpoint: saved.endpoint || defaultsFor(name, saved.kind).endpoint,
+    model: saved.model,
+    hasKey: saved.hasKey,
+  };
+}
+
+function inputFrom(form: ConnectionForm, takesKey: boolean): ConnectionInput {
+  return {
+    kind: form.kind,
+    endpoint: form.endpoint.trim(),
+    model: form.model.trim(),
+    apiKey: takesKey ? form.key : '',
   };
 }
 
@@ -33,15 +110,19 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     return 'settings-uw-organization-page';
   }
 
+  static override get styles() {
+    return [getMdSelectLitCss()];
+  }
+
   override render() {
     return getHtml.bind(this)();
   }
 
   static override get properties() {
     return {
-      mode_: {type: Number},
-      modelsStatus_: {type: String},
-      keyStatus_: {type: String},
+      decision_: {type: Object},
+      language_: {type: Object},
+      saved_: {type: Object},
       saveStatus_: {type: String},
       saveError_: {type: Boolean},
       saving_: {type: Boolean},
@@ -50,9 +131,11 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     };
   }
 
-  protected accessor mode_: number = 0;
-  protected accessor modelsStatus_: string = '';
-  protected accessor keyStatus_: string = '';
+  protected accessor decision_: ConnectionForm = emptyForm();
+  protected accessor language_: ConnectionForm = emptyForm();
+  // The connections as last saved, for the status line.
+  protected accessor saved_: {decisionKind: number, languageModel: string} =
+      {decisionKind: NO_DECISION_MODEL, languageModel: ''};
   protected accessor saveStatus_: string = '';
   protected accessor saveError_: boolean = false;
   protected accessor saving_: boolean = false;
@@ -69,8 +152,75 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     return loadTimeData.getString(id);
   }
 
-  isOllama_(): boolean {
-    return this.mode_ === 0;
+  private form_(name: ConnectionName): ConnectionForm {
+    return name === 'decision' ? this.decision_ : this.language_;
+  }
+
+  private takesKey_(name: ConnectionName): boolean {
+    return name === 'decision' ? this.decision_.kind !== NO_DECISION_MODEL :
+                                 this.language_.kind !== OLLAMA;
+  }
+
+  protected cards_(): ConnectionCard[] {
+    const compatible = this.i18n_('uwOrganizationOpenaiCompatible');
+    return [
+      {
+        name: 'decision',
+        title: this.i18n_('uwOrganizationDecisionTitle'),
+        kindLabel: this.i18n_('uwOrganizationProvider'),
+        kinds: [
+          {value: 0, label: this.i18n_('uwOrganizationProviderNone')},
+          {value: 1, label: this.i18n_('uwOrganizationProviderJev')},
+          {value: 2, label: this.i18n_('uwOrganizationProviderOpenai')},
+          {value: 3, label: compatible},
+        ],
+        note: this.i18n_('uwOrganizationDecisionNote'),
+        form: this.decision_,
+        takesEndpoint: this.decision_.kind !== NO_DECISION_MODEL,
+        takesKey: this.takesKey_('decision'),
+      },
+      {
+        name: 'language',
+        title: this.i18n_('uwOrganizationLanguageTitle'),
+        kindLabel: this.i18n_('uwOrganizationConnection'),
+        kinds: [
+          {value: 0, label: this.i18n_('uwOrganizationOllama')},
+          {value: 1, label: compatible},
+        ],
+        note: this.i18n_('uwOrganizationLanguageNote'),
+        form: this.language_,
+        takesEndpoint: true,
+        takesKey: this.takesKey_('language'),
+      },
+    ];
+  }
+
+  protected statusTitle_(): string {
+    if (!this.enabled_) {
+      return this.i18n_('uwOrganizationStatusOff');
+    }
+    return this.i18n_(
+        this.pauseMode_ === 0 ? 'uwOrganizationStatusOn' :
+                                'uwOrganizationStatusPaused');
+  }
+
+  protected statusDetail_(): string {
+    if (!this.enabled_) {
+      return this.i18n_('uwOrganizationStatusHint');
+    }
+    const {decisionKind, languageModel} = this.saved_;
+    if (decisionKind === NO_DECISION_MODEL) {
+      return loadTimeData.getStringF(
+          'uwOrganizationStatusDecidesAndNames', languageModel);
+    }
+    const decides = loadTimeData.getStringF(
+        'uwOrganizationStatusDecides',
+        this.i18n_(PROVIDER_LABELS[decisionKind]!));
+    return languageModel ?
+        `${decides} ${
+            loadTimeData.getStringF(
+                'uwOrganizationStatusNames', languageModel)}` :
+        decides;
   }
 
   // Called by <settings-main> during settings search. Counts a match when
@@ -86,30 +236,65 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     return {canceled: false, matchCount, wasClearSearch: false};
   }
 
-  protected onModeChange_() {
-    this.mode_ = Number(this.$.modeSelect.value);
+  private update_(name: ConnectionName, changes: Partial<ConnectionForm>) {
+    const form = {...this.form_(name), ...changes};
+    if (name === 'decision') {
+      this.decision_ = form;
+    } else {
+      this.language_ = form;
+    }
   }
 
-  protected async onLoadModelsClick_() {
-    this.modelsStatus_ = this.i18n_('uwOrganizationLoading');
-    const endpoint = this.$.endpointInput.value.trim();
-    const key = this.isOllama_() ? '' : this.$.keyInput.value;
-    const response =
-        await this.browserProxy_.loadModels(endpoint, key);
-    if (!response.ok) {
-      this.modelsStatus_ = this.i18n_('uwOrganizationModelsError');
+  private connectionOf_(e: Event): ConnectionName {
+    return (e.currentTarget as HTMLElement).dataset['connection'] as
+        ConnectionName;
+  }
+
+  protected onKindChange_(e: Event) {
+    const name = this.connectionOf_(e);
+    const kind = Number((e.currentTarget as HTMLSelectElement).value);
+    this.update_(
+        name,
+        {kind, ...defaultsFor(name, kind), models: [], modelsStatus: ''});
+  }
+
+  protected onFieldValueChanged_(e: CustomEvent<{value: string}>) {
+    const field = (e.currentTarget as HTMLElement).dataset['field'];
+    const value = e.detail.value;
+    this.update_(
+        this.connectionOf_(e),
+        field === 'endpoint' ? {endpoint: value} :
+            field === 'model' ? {model: value} : {key: value});
+  }
+
+  protected onModelChange_(e: Event) {
+    this.update_(
+        this.connectionOf_(e),
+        {model: (e.currentTarget as HTMLSelectElement).value});
+  }
+
+  protected async onLoadModelsClick_(e: Event) {
+    const name = this.connectionOf_(e);
+    this.update_(name, {modelsStatus: this.i18n_('uwOrganizationLoading')});
+    const response = await this.browserProxy_.loadModels(
+        name === 'decision',
+        inputFrom(this.form_(name), this.takesKey_(name)));
+    if (!response.ok || response.models.length === 0) {
+      this.update_(name, {
+        models: [],
+        modelsStatus: this.i18n_(
+            response.ok ? 'uwOrganizationModelsEmpty' :
+                          'uwOrganizationModelsError'),
+      });
       return;
     }
-    if (response.models.length === 0) {
-      this.modelsStatus_ = this.i18n_('uwOrganizationModelsEmpty');
-      return;
-    }
-    const current = this.$.modelInput.value.trim();
-    if (!current || !response.models.includes(current)) {
-      this.$.modelInput.value = response.models[0]!;
-    }
-    this.modelsStatus_ = loadTimeData.getStringF(
-        'uwOrganizationModelsLoaded', response.models.length);
+    const current = this.form_(name).model.trim();
+    this.update_(name, {
+      models: response.models,
+      model: response.models.includes(current) ? current : response.models[0]!,
+      modelsStatus: loadTimeData.getStringF(
+          'uwOrganizationModelsLoaded', response.models.length),
+    });
   }
 
   protected async onSaveClick_() {
@@ -119,18 +304,24 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.saving_ = true;
     this.saveError_ = false;
     this.saveStatus_ = this.i18n_('uwOrganizationChecking');
-    const response = await this.browserProxy_.save(
-        this.mode_, this.$.endpointInput.value.trim(),
-        this.$.modelInput.value.trim(),
-        this.isOllama_() ? '' : this.$.keyInput.value);
+    const result = await this.browserProxy_.save(
+        inputFrom(this.decision_, this.takesKey_('decision')),
+        inputFrom(this.language_, this.takesKey_('language')));
+    await this.refresh_();
     this.saving_ = false;
-    if (!response.ok) {
-      this.saveError_ = true;
-      this.saveStatus_ = this.i18n_('uwOrganizationSetupError');
+    this.saveError_ = !result.enabled;
+    if (result.enabled) {
+      this.saveStatus_ = this.i18n_('uwOrganizationValidated');
       return;
     }
-    this.$.keyInput.value = '';
-    await this.refresh_();
+    const errors = [
+      result.decisionFailed ? 'uwOrganizationDecisionError' : '',
+      result.languageFailed ? 'uwOrganizationLanguageError' : '',
+    ].filter(id => id);
+    this.saveStatus_ =
+        (errors.length ? errors : ['uwOrganizationNothingSet'])
+            .map(id => this.i18n_(id))
+            .join(' ');
   }
 
   protected onPause1HourClick_() {
@@ -156,21 +347,20 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
 
   private async refresh_() {
     const state = await this.browserProxy_.getState();
-    await this.updateComplete;
-    this.mode_ = state.mode;
-    this.$.modeSelect.value = String(state.mode);
-    this.$.endpointInput.value = state.endpoint;
-    this.$.modelInput.value = state.model;
-    this.$.keyInput.value = '';
-    this.keyStatus_ = state.hasKey ? this.i18n_('uwOrganizationKeySaved') :
-                                     this.i18n_('uwOrganizationNoKey');
+    this.decision_ = {
+      ...formFrom('decision', state.decision),
+      models: this.decision_.models,
+    };
+    this.language_ = {
+      ...formFrom('language', state.language),
+      models: this.language_.models,
+    };
+    this.saved_ = {
+      decisionKind: state.decision.kind,
+      languageModel: state.language.model,
+    };
     this.enabled_ = state.enabled;
     this.pauseMode_ = state.pauseMode;
-    this.modelsStatus_ = state.model ?
-        '' :
-        this.i18n_('uwOrganizationModelEmpty');
-    this.saveStatus_ = '';
-    this.saveError_ = false;
   }
 }
 

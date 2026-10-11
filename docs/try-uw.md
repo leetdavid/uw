@@ -39,7 +39,7 @@ Expected result: the new tab opens directly below its source, indented one level
 Right-click a tab that opened other tabs.
 
 - `Move to new task` and `Move to Scratchpad` move the tab together with the tabs it opened.
-- `Nest under previous` and `Move up one level` change which tab it sits under.
+- `Nest under previous tab` and `Move up one level` change which tab it sits under.
 - `Close branch` closes the tab and everything it opened.
 - `Undo tab organization` reverses the last of these moves. It does not reopen closed pages.
 
@@ -50,7 +50,7 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 ## Not available yet
 
 - The Scratchpad label and the Organize button. Use the tab's right-click menu for now.
-- A dependable automatic organization. The organizer files tabs once the settings page at `uw://settings/uwOrganization` has saved and validated a language model connection, but it has only been run against a test server. The page cannot set a decision model yet, and no message appears when a tab is filed. `Undo tab organization` in the tab menu reverses it.
+- A dependable automatic organization. The organizer files tabs once `uw://settings/uwOrganization` has saved and validated a decision model, a language model, or both. It has only been run against a test server, never a live provider. No message appears when a tab is filed. `Undo tab organization` in the tab menu reverses it.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.
 - Verified extension compatibility or daily-use stability.

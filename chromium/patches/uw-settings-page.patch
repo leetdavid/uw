@@ -1,37 +1,124 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..6601bf4be7909e78d750a3ae42dec07c11ff22fe 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..f62d92d5847c40e3ea8e0f2a21d97b4d5b68159a 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,34 @@
+@@ -3904,6 +3904,121 @@
          System
        </message>
      </if>
 +
 +    <!-- uw organization page -->
 +    <if expr="not is_chromeos">
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the uw tab organization settings section.">
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the tab organization settings page.">
 +        Tab organization
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_SAVE" desc="Button saving and validating the uw organization connection.">
-+        Save and validate
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON" desc="Status line when automatic organization is on.">
++        Automatic organization is on
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Title of the uw automatic-organization pause controls.">
-+        Pause automatic organization
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF" desc="Status line when automatic organization is off.">
++        Automatic organization is off
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED" desc="Note that an API key is stored in the OS credential store.">
-+        API key saved
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_PAUSED" desc="Status line when automatic organization is paused.">
++        Automatic organization is paused
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT" desc="Hint under the status line when automatic organization is off.">
++        Save and validate a model below to turn it on.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES" desc="Says which model decides tab placement.">
++        <ph name="MODEL">$1<ex>Jev</ex></ph> decides where tabs go.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_NAMES" desc="Says which model names new tasks.">
++        <ph name="MODEL">$1<ex>llama3.2</ex></ph> names new tasks.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES_AND_NAMES" desc="Says which model both decides tab placement and names new tasks.">
++        <ph name="MODEL">$1<ex>llama3.2</ex></ph> decides where tabs go and names new tasks.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_TITLE" desc="Heading of the decision model settings.">
++        Decision model
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_NOTE" desc="Explains what the decision model does.">
++        Decides whether a tab joins a task, starts a new one, or stays in the Scratchpad. It answers with a choice and a confidence, never text. With None, the language model decides.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER" desc="Label of the decision model provider choice.">
++        Provider
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_NONE" desc="Decision model provider choice: no decision model.">
++        None
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_JEV" desc="Decision model provider choice. Jev is a product name.">
++        Jev
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_OPENAI" desc="Decision model provider choice. A product name.">
++        OpenAI Decisions API
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_OPENAI_COMPATIBLE" desc="Choice for an endpoint that follows the OpenAI API at another address.">
++        OpenAI-compatible
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_TITLE" desc="Heading of the language model settings.">
++        Language model
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE" desc="Explains what the language model does.">
++        Names a task when one is created. Leave the model empty to go without it. A new task is then called New task.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_CONNECTION" desc="Label of the language model connection choice.">
++        Connection
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_OLLAMA" desc="Language model connection choice. Ollama is a product name.">
++        Ollama
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_ENDPOINT" desc="Label of a model endpoint field.">
++        Endpoint
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODEL" desc="Label of a model name field.">
++        Model
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOAD_MODELS" desc="Button that fetches the model list of an endpoint.">
++        Load available models
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOADING" desc="Status while the model list loads.">
++        Loading models…
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_LOADED" desc="Status after the model list loads.">
++        Models found: <ph name="COUNT">$1<ex>3</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_ERROR" desc="Status when the model list could not be loaded.">
++        Could not load models
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_EMPTY" desc="Status when the endpoint lists no models.">
++        No models found
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY" desc="Label of an API key field.">
++        API key
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED" desc="Note that an API key is stored in the macOS Keychain.">
++        Saved in Keychain
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_NO_KEY" desc="Note that no API key is stored.">
 +        No API key saved
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_CHECKING" desc="Status shown while the uw connection is being validated.">
-+        Checking connection…
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_SAVE" desc="Button that saves the model settings and checks each connection.">
++        Save and validate
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOADING" desc="Status shown while uw loads the endpoint model list.">
-+        Loading models…
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_CHECKING" desc="Status while the connections are checked.">
++        Checking…
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_LOADED" desc="Status shown after uw loads the endpoint model list.">
-+        Loaded <ph name="COUNT">$1<ex>3</ex></ph> models
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_VALIDATED" desc="Status after every connection validated.">
++        Validated. Automatic organization is on.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR" desc="Status when the decision model failed validation.">
++        Could not validate the decision model. Check its endpoint, model, and API key.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR" desc="Status when the language model failed validation.">
++        Could not validate the language model. Check its endpoint, model, and API key.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET" desc="Status when a save has no model to validate.">
++        Choose a decision model or enter a language model first.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
++        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models above. API keys stay in the macOS Keychain.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Heading of the pause controls.">
++        Pause automatic organization
 +      </message>
 +    </if>
      <if expr="not is_chromeos">
