@@ -65,6 +65,40 @@ struct ClassificationAnswer {
 std::optional<ClassificationAnswer> ParseClassificationResponse(
     const std::string& body);
 
+// Wire formats a placement decision can use.
+enum class DecisionFormat {
+  // OpenAI-compatible chat completions. The answer can carry a task name.
+  kChat,
+  // OpenAI Decisions API: POST <base>/decisions with one choice question.
+  kDecisions,
+  // TypeSafe System One (Jev): POST <base>/systemone with one choice question.
+  kSystemOne,
+};
+
+// Builds the request body for one placement decision in `format`. Rejects the
+// same input as BuildClassificationRequestBody, plus task lists too long for
+// one choice question.
+std::optional<std::string> BuildDecisionRequestBody(
+    DecisionFormat format,
+    const std::string& model,
+    const BranchContext& context,
+    const std::vector<std::pair<std::string, std::string>>& task_options);
+
+// Parses and validates one placement decision out of a `format` response.
+// Decision models never name tasks, so `task_name` stays empty for them. A
+// refusal, or an answer without a usable confidence, is rejected.
+std::optional<ClassificationAnswer> ParseDecisionResponse(
+    DecisionFormat format,
+    const std::string& body);
+
+// Builds an OpenAI-compatible chat-completions request asking for a short
+// name for the browsing task that `context` starts.
+std::optional<std::string> BuildNamingRequestBody(const std::string& model,
+                                                  const BranchContext& context);
+
+// Extracts the generated task name from a chat-completions response body.
+std::optional<std::u16string> ParseNamingResponse(const std::string& body);
+
 // Parses the model ids out of a chat-completions model-list response body.
 // An empty result means the endpoint lists no models.
 std::optional<std::vector<std::u16string>> ParseModelList(

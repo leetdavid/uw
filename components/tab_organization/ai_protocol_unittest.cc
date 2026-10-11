@@ -3,8 +3,13 @@
 
 #include "uw/components/tab_organization/ai_protocol.h"
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/test/task_environment.h"
 #include "base/values.h"
@@ -175,6 +180,194 @@ TEST_F(AiProtocolTest, ModelListParsesIds) {
 
   EXPECT_FALSE(ParseModelList(R"({"data": [{"name": "no-id"}]})"));
   EXPECT_FALSE(ParseModelList("broken"));
+}
+
+BranchContext LisbonContext() {
+  BranchContext context;
+  context.title = "Lisbon in three days";
+  context.url = "https://example.com/lisbon";
+  context.source_description = "opened from \"Hacker News\"";
+  context.excerpt = "Day one: Alfama and the castle.";
+  return context;
+}
+
+TEST_F(AiProtocolTest, DecisionsRequestAsksOneChoiceQuestion) {
+  auto body = BuildDecisionRequestBody(
+      DecisionFormat::kDecisions, "gpt-6-luna", LisbonContext(),
+      {{"task-1", "Plan Lisbon trip"}, {"task-2", "Benchmark models"}});
+  ASSERT_TRUE(body);
+  auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(*parsed->FindString("model"), "gpt-6-luna");
+  const std::string* input = parsed->FindString("input");
+  ASSERT_TRUE(input);
+  EXPECT_NE(input->find("Title: Lisbon in three days"), std::string::npos);
+  EXPECT_NE(input->find("Page excerpt: Day one"), std::string::npos);
+  EXPECT_EQ(input->find("Manual placement"), std::string::npos);
+  const base::ListValue* questions = parsed->FindList("questions");
+  ASSERT_TRUE(questions);
+  ASSERT_EQ(questions->size(), 1u);
+  const base::DictValue& question = (*questions)[0].GetDict();
+  EXPECT_EQ(*question.FindString("type"), "choice");
+  EXPECT_EQ(*question.FindString("name"), "destination");
+  EXPECT_FALSE(question.FindString("instructions")->empty());
+  const base::ListValue* choices = question.FindList("choices");
+  ASSERT_TRUE(choices);
+  ASSERT_EQ(choices->size(), 4u);
+  EXPECT_EQ(*(*choices)[0].GetDict().FindString("value"), "task-1");
+  EXPECT_EQ(*(*choices)[0].GetDict().FindString("description"),
+            "Plan Lisbon trip");
+  EXPECT_EQ(*(*choices)[2].GetDict().FindString("value"), kNewTaskOption);
+  EXPECT_EQ(*(*choices)[3].GetDict().FindString("value"), kScratchpadOption);
+}
+
+TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
+  BranchContext context = LisbonContext();
+  context.manual_placement = "the user left this branch ungrouped";
+  auto body = BuildDecisionRequestBody(DecisionFormat::kSystemOne,
+                                       "jev-latest", context,
+                                       {{"task-1", "Plan Lisbon trip"}});
+  ASSERT_TRUE(body);
+  auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(*parsed->FindString("model"), "jev-latest");
+  const std::string* state = parsed->FindString("state");
+  ASSERT_TRUE(state);
+  EXPECT_NE(state->find("Manual placement: the user left"), std::string::npos);
+  const base::DictValue* question =
+      parsed->FindDict("questions")->FindDict("destination");
+  ASSERT_TRUE(question);
+  EXPECT_EQ(*question->FindString("type"), "choice");
+  const base::DictValue* criteria = question->FindDict("criteria");
+  ASSERT_TRUE(criteria);
+  EXPECT_EQ(criteria->size(), 3u);
+  EXPECT_EQ(*criteria->FindString("task-1"), "Plan Lisbon trip");
+  EXPECT_TRUE(criteria->FindString(kNewTaskOption));
+  EXPECT_TRUE(criteria->FindString(kScratchpadOption));
+}
+
+TEST_F(AiProtocolTest, DecisionRequestRejectsBadInput) {
+  const BranchContext context = LisbonContext();
+  for (DecisionFormat format :
+       {DecisionFormat::kDecisions, DecisionFormat::kSystemOne}) {
+    EXPECT_FALSE(BuildDecisionRequestBody(format, "", context, {}));
+    EXPECT_FALSE(BuildDecisionRequestBody(format, "model", BranchContext(), {}));
+    EXPECT_FALSE(BuildDecisionRequestBody(format, "model", context,
+                                          {{kScratchpadOption, "x"}}));
+    std::vector<std::pair<std::string, std::string>> tasks;
+    for (int i = 0; i < 253; ++i) {
+      tasks.emplace_back("task-" + base::NumberToString(i), "Task");
+    }
+    EXPECT_TRUE(BuildDecisionRequestBody(format, "model", context, tasks));
+    tasks.emplace_back("one-too-many", "Task");
+    EXPECT_FALSE(BuildDecisionRequestBody(format, "model", context, tasks));
+  }
+}
+
+TEST_F(AiProtocolTest, DecisionsResponseParsesTheDestinationAnswer) {
+  auto answer = ParseDecisionResponse(DecisionFormat::kDecisions, R"({
+    "model": "gpt-6-luna",
+    "answers": [
+      {"type": "predicate", "name": "other", "probability": 0.2},
+      {"type": "choice", "name": "destination", "choice": "task-1",
+       "confidence": 0.94,
+       "probabilities": [{"value": "task-1", "probability": 0.94},
+                         {"value": "scratchpad", "probability": 0.06}]}
+    ]})");
+  ASSERT_TRUE(answer);
+  EXPECT_EQ(answer->choice, "task-1");
+  EXPECT_DOUBLE_EQ(answer->confidence, 0.94);
+  EXPECT_FALSE(answer->task_name);
+
+  // Without a confidence field, the chosen value's probability stands in.
+  answer = ParseDecisionResponse(DecisionFormat::kDecisions, R"({"answers": [
+      {"type": "choice", "name": "destination", "choice": "new_task",
+       "probabilities": [{"value": "new_task", "probability": 0.91}]}]})");
+  ASSERT_TRUE(answer);
+  EXPECT_EQ(answer->choice, kNewTaskOption);
+  EXPECT_DOUBLE_EQ(answer->confidence, 0.91);
+}
+
+TEST_F(AiProtocolTest, DecisionsResponseRejectsUnusableAnswers) {
+  const auto parse = [](const char* body) {
+    return ParseDecisionResponse(DecisionFormat::kDecisions, body);
+  };
+  EXPECT_FALSE(parse("not json"));
+  EXPECT_FALSE(parse(R"({"answers": []})"));
+  EXPECT_FALSE(parse(R"({"answers": [{"type": "refusal", "name": "destination"}]})"));
+  EXPECT_FALSE(parse(R"({"answers": [
+      {"type": "choice", "name": "another", "choice": "task-1", "confidence": 1}]})"));
+  EXPECT_FALSE(parse(R"({"answers": [
+      {"type": "choice", "name": "destination", "choice": "task-1"}]})"));
+  EXPECT_FALSE(parse(R"({"answers": [
+      {"type": "choice", "name": "destination", "choice": "task-1", "confidence": 1.5}]})"));
+  EXPECT_FALSE(parse(R"({"answers": [
+      {"type": "choice", "name": "destination", "choice": true, "confidence": 0.99}]})"));
+}
+
+TEST_F(AiProtocolTest, SystemOneResponseParsesTheDestinationAnswer) {
+  auto answer = ParseDecisionResponse(DecisionFormat::kSystemOne, R"({
+    "model": "jev-latest",
+    "answers": {"destination": {
+      "type": "choice", "choice": "scratchpad", "confidence": 0.72,
+      "probabilities": {"scratchpad": 0.72, "task-1": 0.28}}}})");
+  ASSERT_TRUE(answer);
+  EXPECT_EQ(answer->choice, kScratchpadOption);
+  EXPECT_DOUBLE_EQ(answer->confidence, 0.72);
+
+  // A fallback language model reports no confidence as zero.
+  answer = ParseDecisionResponse(DecisionFormat::kSystemOne, R"({"answers": {
+      "destination": {"type": "choice", "choice": "task-1", "confidence": 0,
+                      "probabilities": {}}}})");
+  ASSERT_TRUE(answer);
+  EXPECT_DOUBLE_EQ(answer->confidence, 0.0);
+
+  EXPECT_FALSE(ParseDecisionResponse(DecisionFormat::kSystemOne,
+                                     R"({"answers": {}})"));
+  EXPECT_FALSE(ParseDecisionResponse(
+      DecisionFormat::kSystemOne,
+      R"({"answers": {"destination": {"type": "noul", "noul": 0.9}}})"));
+  EXPECT_FALSE(ParseDecisionResponse(
+      DecisionFormat::kSystemOne,
+      R"({"answers": {"destination": {"type": "choice", "choice": "task-1"}}})"));
+}
+
+TEST_F(AiProtocolTest, ChatFormatUsesTheClassificationCall) {
+  const BranchContext context = LisbonContext();
+  EXPECT_EQ(BuildDecisionRequestBody(DecisionFormat::kChat, "model", context,
+                                     {{"task-1", "Plan Lisbon trip"}}),
+            BuildClassificationRequestBody("model", context,
+                                           {{"task-1", "Plan Lisbon trip"}}));
+  auto answer = ParseDecisionResponse(
+      DecisionFormat::kChat,
+      WrapContent(R"({"decision": "new_task", "confidence": 0.95, "name": "Plan trip"})"));
+  ASSERT_TRUE(answer);
+  EXPECT_EQ(answer->choice, kNewTaskOption);
+  EXPECT_EQ(*answer->task_name, u"Plan trip");
+}
+
+TEST_F(AiProtocolTest, NamingCallAsksForAndCleansAShortName) {
+  EXPECT_FALSE(BuildNamingRequestBody("", LisbonContext()));
+  EXPECT_FALSE(BuildNamingRequestBody("model", BranchContext()));
+  auto body = BuildNamingRequestBody("llama3.2", LisbonContext());
+  ASSERT_TRUE(body);
+  auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(*parsed->FindString("model"), "llama3.2");
+  const base::ListValue* messages = parsed->FindList("messages");
+  ASSERT_TRUE(messages);
+  ASSERT_EQ(messages->size(), 2u);
+  EXPECT_NE((*messages)[1].GetDict().FindString("content")->find(
+                "Title: Lisbon in three days"),
+            std::string::npos);
+
+  EXPECT_EQ(ParseNamingResponse(
+                WrapContent("\"Plan Lisbon trip\"\n\nThis name fits because.")),
+            u"Plan Lisbon trip");
+  EXPECT_FALSE(ParseNamingResponse(WrapContent("  \n")));
+  EXPECT_FALSE(ParseNamingResponse("not json"));
+  EXPECT_EQ(ParseNamingResponse(WrapContent(std::string(200, 'a')))->size(),
+            kMaxGeneratedTaskNameLength);
 }
 
 }  // namespace
