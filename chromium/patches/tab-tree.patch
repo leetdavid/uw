@@ -365,10 +365,10 @@ index 62e11c5a7a4f2d235b97fdaae2abb26a8b9aa053..d498e1538c77f404e259cf12612a146e
        "//chrome/browser/ui/tabs/organizer:unit_tests",
        "//chrome/browser/ui/tabs/saved_tab_groups",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..ed07d4a28ac7a2cda322006aee39ccd2f29fe83c 100644
+index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..0fd2788971b9c8ccd4a03d3792fe7ecc5d771c7c 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-@@ -22,6 +22,7 @@
+@@ -22,12 +22,13 @@
  #include "ui/gfx/geometry/size.h"
  #include "ui/views/view.h"
  #include "ui/views/view_utils.h"
@@ -376,6 +376,13 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..ed07d4a28ac7a2cda322006aee39ccd2
  
  namespace {
  constexpr int kTabVerticalPadding = 2;
+ constexpr int kGroupLineWidth = 2;
+ constexpr int kGroupLineCollapsedLeadingPadding = 6;
+-constexpr int kGroupHeaderHeight = 26;
++constexpr int kGroupHeaderHeight = 34;
+ constexpr int kGroupHeaderVerticalMargin = 4;
+ }  // namespace
+ 
 @@ -132,6 +133,10 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
      } else if (!is_focused) {
        child_x = TabGroupView::kTabLeadingPadding;

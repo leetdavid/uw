@@ -25,7 +25,7 @@ All of these are manual tests. Record anything that differs from the expected re
 1. Open three disposable tabs with Cmd-T.
 2. Right-click one and choose `Move to new task`.
 
-Expected result: the tab moves into a new tab group named `New task`, below the ungrouped tabs. The ungrouped tabs sit under a `Scratchpad` label. Rename, recolor, collapse, and drag the group as you would in Chromium.
+Expected result: the tab moves into a new tab group named `New task`, below the ungrouped tabs. The group shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label. Rename, recolor, collapse, and drag the group as you would in Chromium.
 
 ### Link parentage and ordinary close
 
@@ -69,7 +69,7 @@ Expected result: the sidebar becomes a gradient that starts at your color. Text 
 
 ## Not available yet
 
-- The rest of the Arc-style look. The page is not in a rounded card yet, and a task still shows Chromium's colored group header instead of a folder row.
+- The rest of the Arc-style look. The page is not in a rounded card yet.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - Page watches, delegated browser tasks, and prompt-built site customizations.

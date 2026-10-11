@@ -1,6 +1,6 @@
 # Arc-style look
 
-Status: approved on 2026-10-11 with the decisions below. Stages 1, 3, and 6 and the tint half of stage 2 are built. The page card, the task folder rows, and the toolbar height are not.
+Status: approved on 2026-10-11 with the decisions below. Stages 1, 3, 4, and 6 and the tint half of stage 2 are built. The page card and the toolbar height are not.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Sizes and colors are small changes because Chromium already has settings for them. The tint gradient, the user's own tint, and the task folder row need custom drawing in several views. Chromium's vertical tab strip is new and changes with every release, and the result can only be judged by eye.
 
@@ -44,7 +44,7 @@ Agreed on 2026-10-11:
 - **Gradient.** `PaintTint` paints the gradient in window coordinates wherever Chromium paints the frame color, so every view draws one continuous sheet.
 - **Sizes.** `chrome/browser/ui/layout_constants.cc` already has values for the vertical tab height, radius, padding, and pinned tab height. The patch changes those numbers.
 - **Card.** Chromium already rounds the page corners beside the vertical tab strip and has a shadow frame view. The patch sets the radius and inset and reuses both.
-- **Task rows.** `TabGroupHeaderView` gets a vertical-mode drawing path in uw code, called from one patched line. Its click, drag, and editor code are untouched.
+- **Task rows.** `TabGroupHeaderView` is patched for the vertical strip: no fill, text in the tint's text color, and a folder icon where it shows the shared-group icon. Its click, drag, and editor code are untouched.
 - **Screenshots.** `SaveWindowScreenshot` saves the composited window as a PNG from a headless test. See [the README](../../README.md#tooling-checks).
 
 ## Stages
@@ -52,7 +52,7 @@ Agreed on 2026-10-11:
 1. **Screenshot helper.** Built. It saves the sidebar with a task in light and dark mode, an automatic move, and the settings page.
 2. **Tint and card.** The default gradients and the text color on the tint are built. The card inset, radius, and shadow are not.
 3. **Tab rows and favorites.** Built: 34px rows with a 10px radius, the active tab as a card, and pinned tabs as filled tiles. Tiles use the row radius of 10px, not 12px, because Chromium has one radius for both.
-4. **Task rows.** The folder header.
+4. **Task rows.** Built. The header shows a folder icon in the group's color, the name in semibold, and Chromium's chevron. Chromium's colored line beside a task's tabs stays, although the design has none.
 5. **Sidebar foot and toolbar.** The Organize pill, the message card, and the toolbar height.
 6. **User tint.** Built. A color picked in "Customize Chromium" drives the gradient and the text color.
 
