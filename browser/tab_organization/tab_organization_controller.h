@@ -67,6 +67,9 @@ class TabOrganizationController : public TabStripModelObserver {
   static void RestoreTab(BrowserWindowInterface* window,
                          content::WebContents* page,
                          const std::map<std::string, std::string>& extra_data);
+  // Opens a new tab in a new task of its own. Returns false when `window`
+  // has no tab tree, in which case nothing opened.
+  static bool OpenNewTask(BrowserWindowInterface* window);
 
   const PageTree& tree() const { return tree_; }
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;

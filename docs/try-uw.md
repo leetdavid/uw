@@ -47,15 +47,17 @@ Right-click a tab that opened other tabs.
 
 Click `Organize` at the foot of the sidebar.
 
+- `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+P do the same. Cmd-T still opens a tab beside the current one, inside its task.
 - `Undo tab organization` reverses the last move, as in the tab menu.
 - The pause items stop and resume automatic organization.
+- `Show organizer activity` makes the sidebar say what the model answered for each tab, with its confidence.
 - `Tab organization settings` opens the settings page.
 
 ### Automatic organization
 
 Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. Then open a link in a new tab.
 
-Expected result: when the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button. This has only been run against a test server, never a live provider.
+Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button. Filing tabs has only been run against a test server, not yet with a live provider.
 
 ### Persistence
 
@@ -63,9 +65,9 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 
 ### Window tint
 
-Open a new tab and click `Customize Chromium`, then pick a color.
+Open `uw://settings/uwOrganization` and scroll to `Window tint`. Click a color, or use the last swatch to pick any color.
 
-Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. With no color picked, the tint is lilac in light mode and indigo in dark mode.
+Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac in light mode and indigo in dark mode.
 
 ## Not available yet
 

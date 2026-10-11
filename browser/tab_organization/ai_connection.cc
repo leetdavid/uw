@@ -35,6 +35,7 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kOrganizationModelPref, std::string());
   registry->RegisterStringPref(kOrganizationKeyAccountPref, std::string());
   registry->RegisterBooleanPref(kOrganizationEnabledPref, false);
+  registry->RegisterBooleanPref(kOrganizationShowActivityPref, false);
   registry->RegisterIntegerPref(kDecisionProviderPref,
                                 static_cast<int>(DecisionProvider::kNone));
   registry->RegisterStringPref(kDecisionEndpointPref, std::string());

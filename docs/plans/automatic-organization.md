@@ -23,6 +23,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - A manual move holds the branch until that tab's next title or URL change. A response that arrives after a manual move is dropped. Commands, drags, native group changes, and undo all count as manual moves.
 - The move unit is a whole tab branch. It detaches from its old parent.
 - Every automatic action is one undoable organization action. It shows a brief message at the foot of the sidebar with Undo, tints the moved tab for a moment, and never takes focus. After the message disappears, "Undo tab organization" in the Organize menu still works. Closed pages are never reopened.
+- While a model is being asked about a tab, a line at the foot of the sidebar says so and names the model and the tab. It disappears when the answer arrives. Agreed on 2026-10-12.
+- "Show organizer activity" in the Organize menu keeps that line up for a few seconds with what the answer was: left in place, suggested without enough confidence, failed, unreadable, or ignored because the tab changed. It is off by default.
 - The Organize menu and the settings page provide "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
 - API keys are stored in the macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
 - The settings page shows what is sent before the user enables automatic organization.
@@ -67,6 +69,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 9. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
 10. Each request contains the documented scope only. No API key or request body appears in logs, preferences, session data, or crash reports.
 11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
+12. Each request shows the asking line. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own sentence with the confidence.
 
 ## Later stages
 

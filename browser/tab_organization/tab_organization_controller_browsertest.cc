@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/run_loop.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -26,6 +27,8 @@
 #include "content/public/test/browser_test.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
+#include "ui/views/controls/button/button.h"
+#include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
@@ -388,6 +391,37 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   rows = TabRows();
   ASSERT_EQ(rows.size(), 1u);
   EXPECT_EQ(rows[0]->y(), 24);
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ShortcutAndPlusButtonOpenATabInANewTask) {
+  tabs::TabInterface* page = InitialTab();
+  const std::optional<tab_groups::TabGroupId> plan =
+      controller()->MoveToNewTask({Id(page)}, u"Plan");
+  ASSERT_TRUE(plan);
+
+  ASSERT_TRUE(chrome::ExecuteCommand(browser(), IDC_CREATE_NEW_TAB_GROUP));
+  tabs::TabInterface* by_shortcut = tabs()->GetActiveTab();
+  ASSERT_NE(by_shortcut, page);
+  ASSERT_TRUE(by_shortcut->GetGroup());
+  EXPECT_NE(by_shortcut->GetGroup(), plan);
+  EXPECT_EQ(TitleOf(*by_shortcut->GetGroup()), u"New task");
+
+  const std::vector<views::View*> foot =
+      ViewsOfClass("VerticalTabStripBottomContainer");
+  ASSERT_EQ(foot.size(), 1u);
+  views::Button* plus = views::Button::AsButton(foot[0]->children().front());
+  ASSERT_TRUE(plus);
+  EXPECT_EQ(plus->GetTooltipText(), u"New task");
+  views::test::ButtonTestApi(plus).NotifyDefaultMouseClick();
+  tabs::TabInterface* by_button = tabs()->GetActiveTab();
+  ASSERT_NE(by_button, by_shortcut);
+  ASSERT_TRUE(by_button->GetGroup());
+  EXPECT_NE(by_button->GetGroup(), plan);
+  EXPECT_NE(by_button->GetGroup(), by_shortcut->GetGroup());
+  EXPECT_EQ(TitleOf(*by_button->GetGroup()), u"New task");
+  EXPECT_EQ(page->GetGroup(), plan);
+  EXPECT_EQ(controller()->tree().Tasks().size(), 3u);
 }
 
 // Switching tab orientation rebuilds the sidebar views. The window-owned

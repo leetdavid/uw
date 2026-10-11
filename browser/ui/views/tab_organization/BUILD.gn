@@ -1,5 +1,7 @@
 source_set("tab_organization") {
   sources = [
+    "new_task_button.cc",
+    "new_task_button.h",
     "organize_bar.cc",
     "organize_bar.h",
     "scratchpad_label.cc",

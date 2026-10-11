@@ -31,6 +31,9 @@ inline constexpr char kOrganizationPauseModePref[] =
     "uw.organization.pause_mode";
 inline constexpr char kOrganizationPauseUntilPref[] =
     "uw.organization.pause_until";
+// Whether the sidebar says what each automatic organization request did.
+inline constexpr char kOrganizationShowActivityPref[] =
+    "uw.organization.show_activity";
 
 // The optional decision model. It decides where a tab branch goes; the
 // language model above names new tasks.

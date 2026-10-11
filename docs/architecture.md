@@ -95,7 +95,7 @@ The decision model picks one option: an existing task, a new task, or the Scratc
 
 Apply results asynchronously and check them against current tab state, so a late response never overrides a manual action or a newer navigation. A result needs the [agreed confidence](plans/automatic-organization.md#agreed-scope) to move anything.
 
-The request and response shapes were taken from the providers' public documentation on 2026-10-11. No live provider has been called yet. Measure accuracy, confidence calibration, and latency on the target Mac before relying on any provider's published claims. The [200 ms budget](product.md#organization-latency) remains a future milestone.
+The request and response shapes were taken from the providers' public documentation on 2026-10-11. On 2026-10-12 TypeSafe's live API answered uw's System One validation request in that shape, and listed its models as `models[].name`. The OpenAI Decisions API has not been called. Measure accuracy, confidence calibration, and latency on the target Mac before relying on any provider's published claims. The [200 ms budget](product.md#organization-latency) remains a future milestone.
 
 ## Data and execution
 

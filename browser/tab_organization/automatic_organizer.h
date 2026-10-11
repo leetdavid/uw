@@ -45,11 +45,29 @@ class AutomaticOrganizer : public TabStripModelObserver {
   DECLARE_USER_DATA(AutomaticOrganizer);
   static constexpr double kMinConfidence = 0.90;
 
-  // One automatic change, for the sidebar message.
-  struct Notice {
-    std::u16string task;
-    // True when the task was created by this change.
-    bool created = false;
+  // One step of the organizer's work on a tab, for the sidebar.
+  struct Event {
+    enum class Kind {
+      // A request went out. `detail` is the model that was asked.
+      kAsking,
+      kNaming,
+      // The tab moved into the task named `detail`, or started it.
+      kMoved,
+      kCreated,
+      // The model chose to leave the tab where it is.
+      kLeft,
+      // The model suggested `detail` with less than kMinConfidence.
+      kUnsure,
+      kRequestFailed,
+      kAnswerUnreadable,
+      // The tab changed or was moved before the answer arrived.
+      kDropped,
+    };
+    Kind kind;
+    // The tab's title.
+    std::u16string page;
+    std::u16string detail;
+    double confidence = 0.0;
   };
 
   AutomaticOrganizer(BrowserWindowInterface* window,
@@ -58,8 +76,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
 
   static AutomaticOrganizer* From(BrowserWindowInterface* window);
 
-  using NoticeCallback = base::RepeatingCallback<void(const Notice&)>;
-  base::CallbackListSubscription ObserveNotices(NoticeCallback callback);
+  using EventCallback = base::RepeatingCallback<void(const Event&)>;
+  base::CallbackListSubscription ObserveEvents(EventCallback callback);
   size_t pending_requests() const { return requests_.size(); }
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
@@ -98,6 +116,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void CreateTask(const Request& request, std::u16string title);
+  void Report(Event::Kind kind,
+              const Request& request,
+              std::u16string detail = std::u16string(),
+              double confidence = 0.0);
   // True while the branch is where it was, and unchanged, since the request.
   bool Current(const Request& request) const;
   std::optional<Request> Take(uint64_t request_id);
@@ -112,7 +134,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
   uint64_t next_request_ = 1;
-  base::RepeatingCallbackList<void(const Notice&)> notices_;
+  base::RepeatingCallbackList<void(const Event&)> events_;
   base::OneShotTimer timer_;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription tree_changed_;

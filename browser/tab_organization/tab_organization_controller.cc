@@ -17,7 +17,9 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/pref_names.h"
@@ -85,6 +87,20 @@ TabOrganizationController* TabOrganizationController::From(
     TabStripModel* model) {
   tabs::TabInterface* tab = model ? model->GetActiveTab() : nullptr;
   return tab ? From(tab->GetBrowserWindowInterface()) : nullptr;
+}
+
+bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
+  TabOrganizationController* self = From(window);
+  if (!self) {
+    return false;
+  }
+  chrome::NewTab(window, NewTabTypes::kNewTabCommand);
+  if (const std::optional<PageId> page =
+          self->IdFor(self->tabs_->GetActiveTab())) {
+    self->MoveToNewTask({*page},
+                        l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
+  }
+  return true;
 }
 
 void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,

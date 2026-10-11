@@ -68,9 +68,9 @@ AutomaticOrganizer* AutomaticOrganizer::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;
 }
 
-base::CallbackListSubscription AutomaticOrganizer::ObserveNotices(
-    NoticeCallback callback) {
-  return notices_.Add(std::move(callback));
+base::CallbackListSubscription AutomaticOrganizer::ObserveEvents(
+    EventCallback callback) {
+  return events_.Add(std::move(callback));
 }
 
 void AutomaticOrganizer::DispatchNowForTesting() {
@@ -224,9 +224,9 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
     tasks.emplace_back(
         task, title.empty() ? kUntitledTask : base::UTF16ToUTF8(title));
   }
-  std::optional<std::string> body = BuildDecisionRequestBody(
-      request.format, decides ? decision.model : language.model,
-      request.context, tasks);
+  const std::string& model = decides ? decision.model : language.model;
+  std::optional<std::string> body =
+      BuildDecisionRequestBody(request.format, model, request.context, tasks);
   if (!body) {
     return;
   }
@@ -239,6 +239,7 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   CancelRequestsFor(id);
   const uint64_t request_id = next_request_++;
   RemoteModelClient* client = request.client.get();
+  Report(Event::Kind::kAsking, request, base::UTF8ToUTF16(model));
   requests_.emplace(request_id, std::move(request));
   client->Send(base::BindOnce(&AutomaticOrganizer::OnDecision,
                               weak_factory_.GetWeakPtr(), request_id));
@@ -247,24 +248,45 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
 void AutomaticOrganizer::OnDecision(uint64_t request_id,
                                     RemoteModelClient::Outcome outcome) {
   std::optional<Request> request = Take(request_id);
-  if (!request || !outcome.ok || !Current(*request)) {
+  if (!request) {
+    return;
+  }
+  if (!Current(*request)) {
+    Report(Event::Kind::kDropped, *request);
+    return;
+  }
+  if (!outcome.ok) {
+    Report(Event::Kind::kRequestFailed, *request);
     return;
   }
   const std::optional<ClassificationAnswer> answer =
       ParseDecisionResponse(request->format, outcome.body);
-  if (!answer || answer->confidence < kMinConfidence ||
-      answer->choice == kScratchpadOption) {
+  const bool starts_task = answer && answer->choice == kNewTaskOption;
+  const std::optional<tab_groups::TabGroupId> group =
+      answer && !starts_task ? controller_->GroupFor(answer->choice)
+                             : std::nullopt;
+  if (!answer ||
+      (!starts_task && !group && answer->choice != kScratchpadOption)) {
+    Report(Event::Kind::kAnswerUnreadable, *request);
     return;
   }
-  if (answer->choice != kNewTaskOption) {
-    const std::optional<tab_groups::TabGroupId> group =
-        controller_->GroupFor(answer->choice);
-    if (group && answer->choice != request->task &&
-        controller_->MoveToTask(
-            {request->page}, *group,
-            TabOrganizationController::Origin::kOrganizer)) {
-      notices_.Notify(Notice{controller_->TaskTitle(answer->choice), false});
-    }
+  if (answer->choice == kScratchpadOption || answer->choice == request->task) {
+    Report(Event::Kind::kLeft, *request, std::u16string(), answer->confidence);
+    return;
+  }
+  if (answer->confidence < kMinConfidence) {
+    Report(Event::Kind::kUnsure, *request,
+           starts_task
+               ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEW_TASK_CHOICE)
+               : controller_->TaskTitle(answer->choice),
+           answer->confidence);
+    return;
+  }
+  if (!starts_task) {
+    const bool moved = controller_->MoveToTask(
+        {request->page}, *group, TabOrganizationController::Origin::kOrganizer);
+    Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, *request,
+           controller_->TaskTitle(answer->choice));
     return;
   }
   if (answer->task_name) {
@@ -285,6 +307,7 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
     CreateTask(*request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     return;
   }
+  Report(Event::Kind::kNaming, *request, base::UTF8ToUTF16(language.model));
   const uint64_t naming_id = next_request_++;
   RemoteModelClient* client = naming.get();
   request->client = std::move(naming);
@@ -296,7 +319,11 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
 void AutomaticOrganizer::OnName(uint64_t request_id,
                                 RemoteModelClient::Outcome outcome) {
   std::optional<Request> request = Take(request_id);
-  if (!request || !Current(*request)) {
+  if (!request) {
+    return;
+  }
+  if (!Current(*request)) {
+    Report(Event::Kind::kDropped, *request);
     return;
   }
   std::optional<std::u16string> name =
@@ -307,11 +334,21 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
 
 void AutomaticOrganizer::CreateTask(const Request& request,
                                     std::u16string title) {
-  if (controller_->MoveToNewTask(
-          {request.page}, title,
-          TabOrganizationController::Origin::kOrganizer)) {
-    notices_.Notify(Notice{std::move(title), true});
-  }
+  const bool created =
+      controller_
+          ->MoveToNewTask({request.page}, title,
+                          TabOrganizationController::Origin::kOrganizer)
+          .has_value();
+  Report(created ? Event::Kind::kCreated : Event::Kind::kDropped, request,
+         std::move(title));
+}
+
+void AutomaticOrganizer::Report(Event::Kind kind,
+                                const Request& request,
+                                std::u16string detail,
+                                double confidence) {
+  events_.Notify(Event{kind, base::UTF8ToUTF16(request.context.title),
+                       std::move(detail), confidence});
 }
 
 bool AutomaticOrganizer::Current(const Request& request) const {

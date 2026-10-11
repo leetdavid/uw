@@ -7,8 +7,10 @@
 #include <string>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -303,21 +305,57 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        UnsureAndFailedAnswersLeaveTheTabWhereItIs) {
   const auto [ungrouped, task] = OneTask();
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
   EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->activity_text(), u"The request for lisbon failed.");
 
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.89));
   Browse(link, "hotels");
   ASSERT_TRUE(SettleAfter(2));
   EXPECT_FALSE(link->GetGroup());
+  ASSERT_TRUE(bar()->activity_visible());
+  EXPECT_EQ(bar()->activity_text(),
+            u"The model suggested Plan Lisbon trip for hotels. Confidence: "
+            u"0.89. uw moves a tab at 0.90 or more.");
+  SaveWindowScreenshot(browser(), "activity");
 
   Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.99));
   Browse(link, "weather");
   ASSERT_TRUE(SettleAfter(3));
   EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->activity_text(),
+            u"The model left weather where it is. Confidence: 0.99.");
+
+  Answer("/v1/decisions", "not json");
+  Browse(link, "museums");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(bar()->activity_text(),
+            u"The model's answer for museums could not be read.");
   EXPECT_FALSE(bar()->notice_visible());
   EXPECT_FALSE(controller()->CanUndo() && link->GetGroup());
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheSidebarSaysWhenAModelIsAskedAndThenClears) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  std::vector<AutomaticOrganizer::Event::Kind> kinds;
+  const base::CallbackListSubscription events = organizer()->ObserveEvents(
+      base::BindLambdaForTesting([&](const AutomaticOrganizer::Event& event) {
+        kinds.push_back(event.kind);
+      }));
+
+  OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+
+  EXPECT_EQ(kinds, (std::vector{AutomaticOrganizer::Event::Kind::kAsking,
+                                AutomaticOrganizer::Event::Kind::kUnsure}));
+  EXPECT_EQ(bar()->activity_text(),
+            u"Asking decision-model about lisbon\u2026");
+  EXPECT_FALSE(bar()->activity_visible());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -367,9 +405,33 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   bar()->ExecuteCommand(OrganizeBar::kResume, 0);
   EXPECT_EQ(ReadPauseState(prefs()), PauseMode::kOff);
 
+  EXPECT_FALSE(bar()->IsCommandIdChecked(OrganizeBar::kShowActivity));
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  EXPECT_TRUE(prefs()->GetBoolean(kOrganizationShowActivityPref));
+  EXPECT_TRUE(bar()->IsCommandIdChecked(OrganizeBar::kShowActivity));
+
   bar()->ExecuteCommand(OrganizeBar::kSettings, 0);
   EXPECT_EQ(tabs()->GetActiveWebContents()->GetVisibleURL(),
             GURL("chrome://settings/uwOrganization"));
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       OrganizeMenuOpensATabInANewTask) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  ASSERT_EQ(in_task->GetGroup(), task);
+  tabs()->ActivateTabAt(1);
+  const int before = tabs()->count();
+
+  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+
+  ASSERT_EQ(tabs()->count(), before + 1);
+  tabs::TabInterface* opened = tabs()->GetActiveTab();
+  ASSERT_TRUE(opened->GetGroup());
+  EXPECT_NE(opened->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*opened->GetGroup()), u"New task");
+  EXPECT_EQ(controller()->DepthFor(opened), 0);
+  EXPECT_EQ(in_task->GetGroup(), task);
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

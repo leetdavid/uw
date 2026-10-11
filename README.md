@@ -105,7 +105,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
 - `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
 - `ai-organization.patch` registers the automatic organization preferences.
-- `uw-settings-page.patch` adds the Tab organization page and its strings to Chromium's settings.
+- `uw-settings-page.patch` adds the uw page and its strings to Chromium's settings.
 - `uw-scheme-alias.patch` makes `uw://` URLs open their `chrome://` pages.
 - `uw-look.patch` adds the window tint: it hooks uw's colors and gradient into Chromium's frame painting and turns the transparent glass frame off by default.
 
@@ -137,7 +137,7 @@ pnpm run check && pnpm run verify --jobs 8
 
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
-To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its message, and the settings page.
+To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its message, the organizer's activity line, and the settings page with its models and its tint control.
 
 ## Build inputs and updates
 
@@ -192,7 +192,9 @@ The uw patches, including the manual tab-tree integration, were checked against 
 
 On 2026-09-24, the customized application built and passed the headless smoke test on a 64 GiB Apple Silicon Mac with Xcode 27.0 and macOS SDK 27.0. The smoke test reported `uw 153.0.8010.53` and passed its isolated-profile navigation and JavaScript check.
 
-On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `TintTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `UwOrganizationPageBrowserTest.*`, `WindowScreenshotBrowserTest.*`, and `TintBrowserTest.*` in `browser_tests`. The organizer and settings tests use a local test server. No live provider has been called.
+On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `TintTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `UwOrganizationPageBrowserTest.*`, `WindowScreenshotBrowserTest.*`, and `TintBrowserTest.*` in `browser_tests`. The organizer and settings tests use a local test server.
+
+On 2026-10-12, TypeSafe's live API answered the validation request that uw sends for Jev, sent by hand, in the shape uw expects. Its model list uses `models[].name`, which uw now reads. A DeepSeek chat model validated from the settings page in a real window. Filing tabs with a live provider has not been checked.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
