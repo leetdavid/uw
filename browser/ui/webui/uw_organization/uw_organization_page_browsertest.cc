@@ -21,6 +21,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
@@ -69,6 +70,12 @@ constexpr char kHelpers[] = R"(
 
 constexpr char kChatDecision[] =
     R"({\"decision\":\"leave\",\"confidence\":0.9})";
+
+// What a model that thinks first answers when its thinking used up the whole
+// token limit.
+constexpr char kThinkingRanOut[] =
+    R"({"choices":[{"finish_reason":"length","message":{"role":"assistant",)"
+    R"("content":"","reasoning_content":"The tab is a connectivity"}}]})";
 
 // Drives the real settings page against a local server that plays the model
 // providers.
@@ -149,6 +156,37 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
                         IDS_UW_SETTINGS_ORGANIZATION_CHECKING);
   }
 
+  // Clicks "Test connection" on the `connection` card and returns its result.
+  std::string TestConnection(const std::string& connection) {
+    return ClickAndWait(connection + "Test", connection + "TestStatus",
+                        IDS_UW_SETTINGS_ORGANIZATION_CHECKING);
+  }
+
+  bool ToggleIsOn() {
+    return Run("return part('enabledToggle').checked;").ExtractBool();
+  }
+
+  // Clicks the switch at the top of the page and returns what the save
+  // status says once the connections have been tested. The switch reports a
+  // click a moment later, so the old status is cleared first.
+  std::string TurnOn() {
+    return Run(content::JsReplace(
+                   "page().saveStatus_ = ''; await page().updateComplete;"
+                   "part('enabledToggle').click();"
+                   "return await until(() => text('saveStatus') !== $1 &&"
+                   "                         text('saveStatus'));",
+                   String(IDS_UW_SETTINGS_ORGANIZATION_CHECKING)))
+        .ExtractString();
+  }
+
+  void TurnOff() {
+    ASSERT_EQ(true, Run(content::JsReplace(
+                        "part('enabledToggle').click();"
+                        "await until(() => text('status') === $1);"
+                        "return true;",
+                        String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF))));
+  }
+
   ThemeService* theme() {
     return ThemeServiceFactory::GetForProfile(browser()->GetProfile());
   }
@@ -213,7 +251,106 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON));
   EXPECT_EQ(TextOf("statusDetail"),
             "Jev decides where tabs go. llama3.2 names new tasks.");
+  EXPECT_THAT(TextOf("decisionTestStatus"),
+              testing::StartsWith("Works. jev-latest answered in "));
+  EXPECT_THAT(TextOf("languageTestStatus"),
+              testing::StartsWith("Works. llama3.2 answered in "));
   SaveWindowScreenshot(browser(), "settings");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       EachConnectionIsTestedByItselfAndSavesNothing) {
+  models_.Answer("/v1/systemone", SystemOneAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/chat/completions", kThinkingRanOut);
+  OpenPage();
+  Choose("decisionKind", Number(DecisionProvider::kJev));
+  Type("decisionEndpoint", Endpoint());
+  Type("decisionKey", "jev-key");
+  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
+  Type("languageEndpoint", Endpoint());
+  Type("languageModel", "deepseek-flash");
+  Type("languageKey", "chat-key");
+
+  EXPECT_THAT(TestConnection("decision"),
+              testing::StartsWith("Works. jev-latest answered in "));
+  EXPECT_EQ(RequestPaths(), std::vector<std::string>{"POST /v1/systemone"});
+  EXPECT_THAT(
+      TextOf("decisionTestDetail"),
+      testing::AllOf(testing::HasSubstr("POST " + Endpoint() + "/systemone"),
+                     testing::HasSubstr("HTTP 200"),
+                     testing::HasSubstr("\"choice\": \"scratchpad\"")));
+
+  EXPECT_EQ(TestConnection("language"),
+            "deepseek-flash answered, but not in the form uw needs. The "
+            "details show its answer.");
+  EXPECT_THAT(
+      TextOf("languageTestDetail"),
+      testing::AllOf(
+          testing::HasSubstr("POST " + Endpoint() + "/chat/completions"),
+          testing::HasSubstr("\"max_tokens\": 4096"),
+          testing::HasSubstr("HTTP 200"),
+          testing::HasSubstr("\"finish_reason\": \"length\"")));
+  ASSERT_EQ(true, Run("part('languageTestDetails').open = true;"
+                      "part('languageTestDetails').scrollIntoView("
+                      "    {block: 'center'});"
+                      "await page().updateComplete; return true;"));
+  SaveWindowScreenshot(browser(), "settings-test");
+
+  models_.Answer("/v1/chat/completions", ChatAnswer("Check connection"));
+  EXPECT_THAT(TestConnection("language"),
+              testing::StartsWith("Works. deepseek-flash answered in "));
+  EXPECT_EQ(RequestPaths(),
+            (std::vector<std::string>{"POST /v1/systemone",
+                                      "POST /v1/chat/completions",
+                                      "POST /v1/chat/completions"}));
+
+  EXPECT_EQ(prefs()->GetInteger(kDecisionProviderPref),
+            static_cast<int>(DecisionProvider::kNone));
+  EXPECT_EQ(prefs()->GetString(kOrganizationModelPref), "");
+  EXPECT_FALSE(ApiKeyStore().GetKey(kDecisionKeyAccount));
+  EXPECT_FALSE(ApiKeyStore().GetKey(kLanguageKeyAccount));
+  EXPECT_FALSE(OrganizationReady(prefs()));
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       AFailedTestSaysWhyAndNeverShowsTheKey) {
+  models_.Fail(
+      "/v1/chat/completions", 402,
+      R"({"error":{"message":"Insufficient Balance for key chat-key"}})");
+  OpenPage();
+  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
+  Type("languageEndpoint", Endpoint());
+  Type("languageModel", "gpt-house");
+  Type("languageKey", "chat-key");
+
+  EXPECT_EQ(TestConnection("language"),
+            "127.0.0.1 answered with HTTP 402. Insufficient Balance for key "
+            "<api key>");
+  EXPECT_THAT(TextOf("languageTestDetail"),
+              testing::AllOf(testing::HasSubstr("HTTP 402"),
+                             testing::Not(testing::HasSubstr("chat-key"))));
+
+  models_.Redirect("/v1/chat/completions", "https://elsewhere.example/v1");
+  EXPECT_EQ(TestConnection("language"),
+            "No answer from 127.0.0.1 (ERR_UNSAFE_REDIRECT).");
+
+  Type("languageEndpoint", "http://example.com/v1");
+  EXPECT_EQ(TestConnection("language"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_TEST_INCOMPLETE));
+  EXPECT_EQ(models_.Requests().size(), 2u);
+
+  // What api.typesafe.ai answered to a wrong key on 2026-10-12.
+  models_.Fail(
+      "/v1/systemone", 401,
+      R"({"detail":{"error_type":"authentication_error","message":)"
+      R"("Cannot authenticate with the server. Please check your API key )"
+      R"(and try again."}})");
+  Choose("decisionKind", Number(DecisionProvider::kJev));
+  Type("decisionEndpoint", Endpoint());
+  Type("decisionKey", "wrong-key");
+  EXPECT_EQ(TestConnection("decision"),
+            "127.0.0.1 answered with HTTP 401. Cannot authenticate with the "
+            "server. Please check your API key and try again.");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
@@ -289,12 +426,60 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR));
   EXPECT_FALSE(OrganizationReady(prefs()));
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
+  EXPECT_EQ(TextOf("decisionTestStatus"),
+            "house-decider answered, but not in the form uw needs. The "
+            "details show its answer.");
+  EXPECT_THAT(TextOf("decisionTestDetail"), testing::HasSubstr("refusal"));
+  EXPECT_EQ(TextOf("languageTestStatus"), "");
 
   Type("languageEndpoint", Endpoint());
   Type("languageModel", "missing-model");
   EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR) + " " +
                         String(IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR));
   EXPECT_FALSE(OrganizationReady(prefs()));
+  EXPECT_EQ(TextOf("languageTestStatus"), "127.0.0.1 answered with HTTP 404.");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheSwitchTurnsOrganizationOffAndOnAgain) {
+  models_.Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.9));
+  OpenPage();
+  EXPECT_FALSE(ToggleIsOn());
+  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET));
+  EXPECT_FALSE(ToggleIsOn());
+  EXPECT_FALSE(OrganizationReady(prefs()));
+
+  Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
+  Type("decisionEndpoint", Endpoint());
+  Type("decisionModel", "house-decider");
+  Type("decisionKey", "house-key");
+  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
+  EXPECT_TRUE(ToggleIsOn());
+  EXPECT_TRUE(OrganizationReady(prefs()));
+  EXPECT_EQ(models_.Requests().size(), 1u);
+
+  // Off sends nothing and keeps the connection.
+  TurnOff();
+  EXPECT_FALSE(ToggleIsOn());
+  EXPECT_FALSE(OrganizationReady(prefs()));
+  EXPECT_EQ(TextOf("saveStatus"), "");
+  EXPECT_EQ(ReadDecisionModelConfig(prefs()).model, "house-decider");
+  EXPECT_EQ(ApiKeyStore().GetKey(kDecisionKeyAccount), "house-key");
+  EXPECT_EQ(models_.Requests().size(), 1u);
+
+  // On tests the connection again.
+  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
+  EXPECT_TRUE(ToggleIsOn());
+  EXPECT_TRUE(OrganizationReady(prefs()));
+  EXPECT_EQ(models_.Requests().size(), 2u);
+
+  // A connection that stopped working keeps it off, and the switch goes back.
+  TurnOff();
+  models_.Fail("/v1/decisions", 500, "{}");
+  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR));
+  EXPECT_FALSE(ToggleIsOn());
+  EXPECT_FALSE(OrganizationReady(prefs()));
+  EXPECT_EQ(TextOf("decisionTestStatus"), "127.0.0.1 answered with HTTP 500.");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

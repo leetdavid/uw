@@ -11,12 +11,15 @@
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
+import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
+
+import type {CrToggleElement} from 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 
 import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_select_lit.css.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import type {Connection, ConnectionInput, TintState} from './uw_organization.mojom-webui.js';
+import type {Connection, ConnectionInput, TestResult, TintState} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
@@ -30,6 +33,11 @@ interface ConnectionForm {
   hasKey: boolean;
   models: string[];
   modelsStatus: string;
+  testing: boolean;
+  testStatus: string;
+  testFailed: boolean;
+  // What the last test sent and what came back.
+  testDetail: string;
 }
 
 // Everything the template needs to draw one connection.
@@ -82,6 +90,10 @@ function emptyForm(): ConnectionForm {
     hasKey: false,
     models: [],
     modelsStatus: '',
+    testing: false,
+    testStatus: '',
+    testFailed: false,
+    testDetail: '',
   };
 }
 
@@ -313,6 +325,33 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     });
   }
 
+  private showTest_(name: ConnectionName, result: TestResult|null) {
+    this.update_(name, {
+      testing: false,
+      testStatus: result ? result.summary : '',
+      testFailed: !!result && !result.ok,
+      testDetail: result ? result.detail : '',
+    });
+  }
+
+  // Tests one connection as entered, without saving it. Beside a decision
+  // model the language model only names tasks, so that is what its test asks.
+  protected async onTestClick_(e: Event) {
+    const name = this.connectionOf_(e);
+    this.update_(name, {
+      testing: true,
+      testStatus: this.i18n_('uwOrganizationChecking'),
+      testFailed: false,
+      testDetail: '',
+    });
+    this.showTest_(
+        name,
+        await this.browserProxy_.testConnection(
+            name === 'decision',
+            inputFrom(this.form_(name), this.takesKey_(name)),
+            this.decision_.kind !== NO_DECISION_MODEL));
+  }
+
   protected async onSaveClick_() {
     if (this.saving_) {
       return;
@@ -324,6 +363,8 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
         inputFrom(this.decision_, this.takesKey_('decision')),
         inputFrom(this.language_, this.takesKey_('language')));
     await this.refresh_();
+    this.showTest_('decision', result.decision);
+    this.showTest_('language', result.language);
     this.saving_ = false;
     this.saveError_ = !result.enabled;
     if (result.enabled) {
@@ -331,13 +372,42 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       return;
     }
     const errors = [
-      result.decisionFailed ? 'uwOrganizationDecisionError' : '',
-      result.languageFailed ? 'uwOrganizationLanguageError' : '',
+      result.decision && !result.decision.ok ? 'uwOrganizationDecisionError' :
+                                               '',
+      result.language && !result.language.ok ? 'uwOrganizationLanguageError' :
+                                               '',
     ].filter(id => id);
     this.saveStatus_ =
         (errors.length ? errors : ['uwOrganizationNothingSet'])
             .map(id => this.i18n_(id))
             .join(' ');
+  }
+
+  // Turning it on saves and tests the connections, like the save button.
+  // Turning it off leaves them as they are.
+  protected async onEnabledChange_(e: CustomEvent<boolean>) {
+    const toggle = e.currentTarget as CrToggleElement;
+    if (e.detail) {
+      await this.onSaveClick_();
+      this.showWhyOff_();
+    } else {
+      await this.browserProxy_.turnOff();
+      await this.refresh_();
+      this.saveStatus_ = '';
+      this.saveError_ = false;
+    }
+    toggle.checked = this.enabled_;
+  }
+
+  // Brings the reason automatic organization stayed off into view.
+  private showWhyOff_() {
+    if (this.enabled_) {
+      return;
+    }
+    const reason = this.decision_.testFailed ?
+        'decisionTestStatus' :
+        this.language_.testFailed ? 'languageTestStatus' : 'saveStatus';
+    this.shadowRoot?.getElementById(reason)?.scrollIntoView({block: 'center'});
   }
 
   protected swatchLabel_(color: string): string {

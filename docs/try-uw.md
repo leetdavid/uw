@@ -55,7 +55,7 @@ Click `Organize` at the foot of the sidebar.
 
 ### Automatic organization
 
-Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. Then open a link in a new tab.
+Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. `Test connection` checks one model by itself without saving, and `Details` shows what the model answered and what uw sent. The switch at the top of the page turns automatic organization off and on again. Then open a link in a new tab.
 
 Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button. Filing tabs has only been run against a test server, not yet with a live provider.
 

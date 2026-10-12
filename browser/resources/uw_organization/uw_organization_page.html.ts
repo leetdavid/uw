@@ -85,6 +85,22 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   .uw-status-error {
     color: var(--cr-fallback-color-error, red);
   }
+  .uw-details {
+    border-top: var(--cr-separator-line);
+    padding: 12px 0;
+  }
+  .uw-details summary {
+    color: var(--cr-secondary-text-color);
+    cursor: pointer;
+  }
+  .uw-details pre {
+    font-size: 12px;
+    margin: 8px 0 0;
+    max-height: 280px;
+    overflow: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
   h2.uw-heading {
     font-size: 108%;
     font-weight: 500;
@@ -95,12 +111,16 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
 <div class="cr-centered-card-container">
   <div class="uw-section">
     <div class="uw-row">
-      <div>
+      <div class="uw-field">
         <div id="status">${this.statusTitle_()}</div>
         <div id="statusDetail" class="uw-secondary">
           ${this.statusDetail_()}
         </div>
       </div>
+      <cr-toggle id="enabledToggle" aria-labelledby="status"
+          ?checked="${this.enabled_}" ?disabled="${this.saving_}"
+          @change="${this.onEnabledChange_}">
+      </cr-toggle>
     </div>
   </div>
   ${this.cards_().map(card => html`
@@ -166,6 +186,22 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           card.form.hasKey ? 'uwOrganizationKeySaved' :
                              'uwOrganizationNoKey')}</div>
     </div>
+    <div class="uw-row" ?hidden="${!card.takesEndpoint}">
+      <cr-button id="${card.name}Test" data-connection="${card.name}"
+          ?disabled="${card.form.testing || this.saving_}"
+          @click="${this.onTestClick_}">
+        ${this.i18n_('uwOrganizationTest')}
+      </cr-button>
+      <div id="${card.name}TestStatus"
+          class="${card.form.testFailed ? 'uw-status-error' : ''}">
+        ${card.form.testStatus}
+      </div>
+    </div>
+    <details id="${card.name}TestDetails" class="uw-details"
+        ?hidden="${!card.form.testDetail}">
+      <summary>${this.i18n_('uwOrganizationTestDetails')}</summary>
+      <pre id="${card.name}TestDetail">${card.form.testDetail}</pre>
+    </details>
     <div class="uw-note">${card.note}</div>
   </div>`)}
   <div class="uw-section">

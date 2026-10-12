@@ -29,7 +29,6 @@ namespace uw {
 namespace {
 
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
-constexpr base::TimeDelta kProviderTimeout = base::Seconds(10);
 constexpr char kUntitledTask[] = "Untitled task";
 
 }  // namespace

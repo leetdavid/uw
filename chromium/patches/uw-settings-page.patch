@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..8b0b7b93568aff75f495aa29e27210d2d9f7d33c 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..ccbb3e775096650d563ee8bfb81ed28a3dffe63c 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,148 @@
+@@ -3904,6 +3904,169 @@
          System
        </message>
      </if>
@@ -105,11 +105,32 @@ index 63c989a76dadc13953e35513998e83326ee3612b..8b0b7b93568aff75f495aa29e27210d2
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_VALIDATED" desc="Status after every connection validated.">
 +        Validated. Automatic organization is on.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR" desc="Status when the decision model failed validation.">
-+        Could not validate the decision model. Check its endpoint, model, and API key.
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR" desc="Status after a save when the decision model failed its test. The test result is shown in the decision model section above.">
++        The decision model did not pass its test. See its result above.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR" desc="Status when the language model failed validation.">
-+        Could not validate the language model. Check its endpoint, model, and API key.
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR" desc="Status after a save when the language model failed its test. The test result is shown in the language model section above.">
++        The language model did not pass its test. See its result above.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST" desc="Button that sends one test request to a model connection as entered, without saving it.">
++        Test connection
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_PASSED" desc="Result of a connection test that worked.">
++        Works. <ph name="MODEL">$1<ex>jev-latest</ex></ph> answered in <ph name="SECONDS">$2<ex>1.4</ex></ph> seconds.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_INCOMPLETE" desc="Result of a connection test that could not be sent.">
++        Not ready to test. Check the endpoint, the model, and the API key. The endpoint must start with https, or with http for this computer.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_RESPONSE" desc="Result of a connection test when the provider sent no answer. ERROR is a network error code.">
++        No answer from <ph name="HOST">$1<ex>api.typesafe.ai</ex></ph> (<ph name="ERROR">$2<ex>ERR_TIMED_OUT</ex></ph>).
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_HTTP_ERROR" desc="Result of a connection test when the provider answered with an HTTP error status. The provider's own error message may follow this sentence.">
++        <ph name="HOST">$1<ex>api.typesafe.ai</ex></ph> answered with HTTP <ph name="STATUS">$2<ex>401</ex></ph>.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE" desc="Result of a connection test when the model answered in a form uw cannot use.">
++        <ph name="MODEL">$1<ex>llama3.2</ex></ph> answered, but not in the form uw needs. The details show its answer.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_DETAILS" desc="Label that opens the request and the answer of the last connection test.">
++        Details
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET" desc="Status when a save has no model to validate.">
 +        Choose a decision model or enter a language model first.

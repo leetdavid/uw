@@ -41,6 +41,10 @@ class ModelTestServer {
 
   // Sets the JSON body served at `path`. Other /v1/ paths answer 404.
   void Answer(const std::string& path, std::string body);
+  // Serves `body` at `path` with an error status.
+  void Fail(const std::string& path, int status, std::string body);
+  // Answers `path` with a redirect to `location`.
+  void Redirect(const std::string& path, std::string location);
   std::vector<ModelRequest> Requests();
 
  private:
@@ -49,7 +53,13 @@ class ModelTestServer {
 
   base::Lock lock_;
   std::vector<ModelRequest> requests_ GUARDED_BY(lock_);
-  std::map<std::string, std::string> answers_ GUARDED_BY(lock_);
+  struct Reply {
+    int status = 200;
+    std::string body;
+    std::string location;
+  };
+
+  std::map<std::string, Reply> answers_ GUARDED_BY(lock_);
 };
 
 }  // namespace uw

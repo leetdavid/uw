@@ -54,6 +54,11 @@ inline constexpr char kJevDefaultModel[] = "jev-latest";
 inline constexpr char kOpenAiDefaultEndpoint[] = "https://api.openai.com/v1";
 inline constexpr char kOpenAiDecisionsDefaultModel[] = "gpt-6-luna";
 
+// How long uw waits for a provider's answer, while browsing and in a
+// connection test alike. A local model can take this long to load, and a
+// model that thinks first is slow to answer.
+inline constexpr base::TimeDelta kProviderTimeout = base::Seconds(30);
+
 // Default Ollama base endpoint. Ollama needs no API key.
 inline constexpr char kOllamaDefaultEndpoint[] = "http://localhost:11434/v1";
 

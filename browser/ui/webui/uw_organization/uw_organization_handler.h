@@ -4,11 +4,13 @@
 #ifndef UW_BROWSER_UI_WEBUI_UW_ORGANIZATION_UW_ORGANIZATION_HANDLER_H_
 #define UW_BROWSER_UI_WEBUI_UW_ORGANIZATION_UW_ORGANIZATION_HANDLER_H_
 
+#include <array>
 #include <memory>
 #include <string>
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
@@ -32,6 +34,9 @@ namespace uw {
 // API keys stay in the Keychain and never reach prefs, logs, or the page.
 class UwOrganizationHandler : public mojom::OrganizationHandler {
  public:
+  // What a test of one connection sends and how its answer is judged.
+  struct ConnectionTest;
+
   UwOrganizationHandler(
       Profile* profile,
       mojo::PendingReceiver<mojom::OrganizationHandler> receiver);
@@ -46,28 +51,39 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void LoadModels(bool decision,
                   mojom::ConnectionInputPtr connection,
                   LoadModelsCallback callback) override;
+  void TestConnection(bool decision,
+                      mojom::ConnectionInputPtr connection,
+                      bool names_only,
+                      TestConnectionCallback callback) override;
   void Save(mojom::ConnectionInputPtr decision,
             mojom::ConnectionInputPtr language,
             SaveCallback callback) override;
+  void TurnOff(TurnOffCallback callback) override;
   void SetPause(int32_t mode, SetPauseCallback callback) override;
   void GetTint(GetTintCallback callback) override;
   void SetTint(const std::string& color, SetTintCallback callback) override;
   void ClearTint(ClearTintCallback callback) override;
 
  private:
+  // One test runs per connection at a time.
+  enum Slot { kDecisionSlot = 0, kLanguageSlot = 1 };
+
   mojom::TintStatePtr CurrentTint() const;
   void StoreDecision(const mojom::ConnectionInput& input);
   void StoreLanguage(const mojom::ConnectionInput& input);
-  void CheckDecision();
-  // `names_only` is true when a decision model does the deciding.
-  void CheckLanguage(bool names_only);
   void OnModelsLoaded(LoadModelsCallback callback,
                       RemoteModelClient::Outcome outcome);
-  void OnDecisionChecked(DecisionFormat format,
-                         RemoteModelClient::Outcome outcome);
-  void OnLanguageChecked(bool names_only, RemoteModelClient::Outcome outcome);
-  // Turns automatic organization on when every check passed, then answers.
-  void FinishSaveWhenChecked();
+  // Sends `test` and answers `done` with what it found. A newer test of
+  // the same connection replaces a running one.
+  void RunTest(Slot slot, ConnectionTest test, TestConnectionCallback done);
+  void OnTested(Slot slot,
+                ConnectionTest test,
+                base::TimeTicks sent_at,
+                TestConnectionCallback done,
+                RemoteModelClient::Outcome outcome);
+  // Turns automatic organization on when every test of a save passed, then
+  // answers the save.
+  void OnSaveTested(Slot slot, mojom::TestResultPtr result);
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,
                                             std::string api_key,
                                             std::string body);
@@ -75,8 +91,8 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::OrganizationHandler> receiver_;
   std::unique_ptr<RemoteModelClient> models_request_;
-  std::unique_ptr<RemoteModelClient> decision_check_;
-  std::unique_ptr<RemoteModelClient> language_check_;
+  std::array<std::unique_ptr<RemoteModelClient>, 2> tests_;
+  int save_tests_left_ = 0;
   mojom::SaveResultPtr save_result_;
   SaveCallback save_callback_;
   base::WeakPtrFactory<UwOrganizationHandler> weak_factory_{this};

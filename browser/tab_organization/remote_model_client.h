@@ -22,14 +22,20 @@ namespace uw {
 
 // One-shot HTTPS JSON client for the classification provider. POST bodies go
 // through Send(); SendGet() covers model listing. Responses are bounded
-// (64 KiB) and timed out; redirects are rejected and credentials are never
-// sent. No retries: a failed request leaves the branch where it is.
+// (64 KiB) and timed out; a redirect fails the request and credentials are
+// never sent. No retries: a failed request leaves the branch where it is.
 // Destroying the client cancels the in-flight request.
 class RemoteModelClient {
  public:
   struct Outcome {
     // True when transport succeeded with a 2xx status and a complete body.
     bool ok = false;
+    // A net::Error. It can be net::OK while `ok` is false: the provider
+    // answered with an error status.
+    int net_error = 0;
+    // 0 when the provider sent no status.
+    int http_status = 0;
+    // Whatever the provider sent, also with an error status.
     std::string body;
   };
   using ResultCallback = base::OnceCallback<void(Outcome)>;
@@ -49,7 +55,9 @@ class RemoteModelClient {
 
  private:
   void StartRequest(bool post, ResultCallback callback);
-  void OnComplete(ResultCallback callback, std::optional<std::string> body);
+  void OnRedirect();
+  void OnComplete(std::optional<std::string> body);
+  void Finish(Outcome outcome);
 
   scoped_refptr<network::SharedURLLoaderFactory> loader_factory_;
   GURL endpoint_;
@@ -57,6 +65,7 @@ class RemoteModelClient {
   std::string api_key_;
   std::string request_body_;
   base::TimeDelta timeout_;
+  ResultCallback callback_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
   base::WeakPtrFactory<RemoteModelClient> weak_factory_{this};
 };

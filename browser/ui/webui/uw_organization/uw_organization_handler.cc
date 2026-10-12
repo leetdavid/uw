@@ -9,10 +9,16 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
@@ -21,7 +27,9 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_ui_data_source.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
+#include "net/base/net_errors.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/webui/web_ui_util.h"
 #include "url/gurl.h"
@@ -32,7 +40,9 @@
 namespace uw {
 namespace {
 
-constexpr base::TimeDelta kRequestTimeout = base::Seconds(15);
+constexpr size_t kMaxDetailBytes = 6000;
+constexpr size_t kMaxProviderMessageBytes = 200;
+constexpr char kHiddenKey[] = "<api key>";
 
 ConnectionMode ModeFromInt(int32_t mode) {
   return mode == static_cast<int32_t>(ConnectionMode::kOpenAiCompatible)
@@ -108,6 +118,153 @@ BranchContext CheckContext() {
   return context;
 }
 
+// The key a request to a connection as entered carries: the typed one, or
+// the stored one when nothing was typed.
+std::string KeyFor(const char* account,
+                   bool takes_key,
+                   const std::string& typed) {
+  if (!takes_key) {
+    return std::string();
+  }
+  return typed.empty() ? StoredKey(account) : typed;
+}
+
+// Indents JSON for reading and keeps the start of anything long.
+std::string Readable(const std::string& text) {
+  const std::optional<base::Value> parsed =
+      base::JSONReader::Read(text, base::JSON_PARSE_RFC);
+  const std::optional<std::string> indented =
+      parsed ? base::WriteJsonWithOptions(*parsed, base::OPTIONS_PRETTY_PRINT)
+             : std::nullopt;
+  return std::string(
+      base::TruncateUTF8ToByteSize(indented.value_or(text), kMaxDetailBytes));
+}
+
+// The provider's own words about an error, when its answer has any. OpenAI
+// and DeepSeek send {"error": {"message": ...}}, TypeSafe sends
+// {"detail": {"message": ...}}, and Ollama sends {"error": "..."}.
+std::string ProviderMessage(const std::string& body) {
+  const std::optional<base::DictValue> parsed =
+      base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  if (!parsed) {
+    return std::string();
+  }
+  const std::string* message = nullptr;
+  for (const char* field : {"error", "detail", "message"}) {
+    const base::DictValue* nested = parsed->FindDict(field);
+    if (!message) {
+      message =
+          nested ? nested->FindString("message") : parsed->FindString(field);
+    }
+  }
+  return message ? std::string(base::TruncateUTF8ToByteSize(
+                       *message, kMaxProviderMessageBytes))
+                 : std::string();
+}
+
+}  // namespace
+
+struct UwOrganizationHandler::ConnectionTest {
+  std::string model;
+  GURL url;
+  // Kept until the answer arrives, to keep it out of what the page shows.
+  std::string key;
+  // Empty when the connection lacks a usable endpoint, a model, or a key.
+  std::optional<std::string> body;
+  base::RepeatingCallback<bool(const std::string&)> reads;
+};
+
+namespace {
+
+using ConnectionTest = UwOrganizationHandler::ConnectionTest;
+
+ConnectionTest DecisionTest(const DecisionModelConfig& config,
+                            std::string key) {
+  const DecisionFormat format = FormatFor(config.provider);
+  ConnectionTest test;
+  test.model = config.model;
+  test.key = std::move(key);
+  if (config.provider != DecisionProvider::kNone &&
+      IsValidProviderEndpoint(config.endpoint) && !test.key.empty()) {
+    test.url = DecisionUrl(config);
+    test.body =
+        BuildDecisionRequestBody(format, config.model, CheckContext(), {});
+  }
+  test.reads = base::BindRepeating(
+      [](DecisionFormat format, const std::string& body) {
+        return ParseDecisionResponse(format, body).has_value();
+      },
+      format);
+  return test;
+}
+
+// `names_only` is true when a decision model does the deciding.
+ConnectionTest LanguageTest(const AiConnectionConfig& config,
+                            std::string key,
+                            bool names_only) {
+  ConnectionTest test;
+  test.model = config.model;
+  test.key = std::move(key);
+  if (IsValidProviderEndpoint(config.endpoint) &&
+      (config.mode == ConnectionMode::kOllama || !test.key.empty())) {
+    test.url = ChatCompletionsUrl(config.endpoint);
+    test.body =
+        names_only ? BuildNamingRequestBody(config.model, CheckContext())
+                   : BuildDecisionRequestBody(DecisionFormat::kChat,
+                                              config.model, CheckContext(), {});
+  }
+  test.reads = base::BindRepeating(
+      [](bool names_only, const std::string& body) {
+        return names_only ? ParseNamingResponse(body).has_value()
+                          : ParseDecisionResponse(DecisionFormat::kChat, body)
+                                .has_value();
+      },
+      names_only);
+  return test;
+}
+
+// Says in one sentence how a test went, and lists what came back and what
+// was sent. The answer comes first because it is what explains a failure.
+mojom::TestResultPtr Describe(const ConnectionTest& test,
+                              const RemoteModelClient::Outcome& outcome,
+                              base::TimeDelta took) {
+  const std::u16string host = base::UTF8ToUTF16(test.url.host());
+  const std::u16string model = base::UTF8ToUTF16(test.model);
+  const std::string seconds = base::StringPrintf("%.1f", took.InSecondsF());
+  const std::string error = net::ErrorToShortString(outcome.net_error);
+  auto result = mojom::TestResult::New();
+  std::u16string summary;
+  if (outcome.net_error != net::OK) {
+    summary = l10n_util::GetStringFUTF16(
+        IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_RESPONSE, host,
+        base::UTF8ToUTF16(error));
+  } else if (!outcome.ok) {
+    summary = l10n_util::GetStringFUTF16(
+        IDS_UW_SETTINGS_ORGANIZATION_TEST_HTTP_ERROR, host,
+        base::NumberToString16(outcome.http_status));
+    const std::string message = ProviderMessage(outcome.body);
+    if (!message.empty()) {
+      summary += u" " + base::UTF8ToUTF16(message);
+    }
+  } else if (!test.reads.Run(outcome.body)) {
+    summary = l10n_util::GetStringFUTF16(
+        IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE, model);
+  } else {
+    result->ok = true;
+    summary =
+        l10n_util::GetStringFUTF16(IDS_UW_SETTINGS_ORGANIZATION_TEST_PASSED,
+                                   model, base::UTF8ToUTF16(seconds));
+  }
+  result->summary = base::UTF16ToUTF8(summary);
+  result->detail =
+      base::StrCat({outcome.net_error == net::OK
+                        ? "HTTP " + base::NumberToString(outcome.http_status)
+                        : error,
+                    " (", seconds, " s)\n", Readable(outcome.body), "\n\nPOST ",
+                    test.url.spec(), "\n", Readable(*test.body)});
+  return result;
+}
+
 }  // namespace
 
 UwOrganizationHandler::UwOrganizationHandler(
@@ -169,6 +326,8 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationLanguageError",
        IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR},
       {"uwOrganizationNothingSet", IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET},
+      {"uwOrganizationTest", IDS_UW_SETTINGS_ORGANIZATION_TEST},
+      {"uwOrganizationTestDetails", IDS_UW_SETTINGS_ORGANIZATION_TEST_DETAILS},
       {"uwOrganizationScope", IDS_UW_SETTINGS_ORGANIZATION_SCOPE},
       {"uwOrganizationPauseTitle", IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE},
       {"uwOrganizationTintTitle", IDS_UW_SETTINGS_ORGANIZATION_TINT_TITLE},
@@ -227,13 +386,11 @@ void UwOrganizationHandler::LoadModels(bool decision,
   }
   const bool takes_key =
       decision || ModeFromInt(connection->kind) != ConnectionMode::kOllama;
-  std::string key = connection->api_key;
-  if (takes_key && key.empty()) {
-    key = StoredKey(decision ? kDecisionKeyAccount : kLanguageKeyAccount);
-  }
   models_request_ =
       Client(ModelsUrl(connection->endpoint),
-             takes_key ? std::move(key) : std::string(), std::string());
+             KeyFor(decision ? kDecisionKeyAccount : kLanguageKeyAccount,
+                    takes_key, connection->api_key),
+             std::string());
   models_request_->SendGet(
       base::BindOnce(&UwOrganizationHandler::OnModelsLoaded,
                      weak_factory_.GetWeakPtr(), std::move(callback)));
@@ -255,11 +412,47 @@ void UwOrganizationHandler::OnModelsLoaded(LoadModelsCallback callback,
   std::move(callback).Run(std::move(result));
 }
 
+void UwOrganizationHandler::TestConnection(bool decision,
+                                           mojom::ConnectionInputPtr connection,
+                                           bool names_only,
+                                           TestConnectionCallback callback) {
+  callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+      std::move(callback), mojom::TestResult::New());
+  if (profile_->IsOffTheRecord()) {
+    return;
+  }
+  if (decision) {
+    DecisionModelConfig config;
+    config.provider = ProviderFromInt(connection->kind);
+    config.endpoint = connection->endpoint;
+    config.model = connection->model;
+    RunTest(
+        kDecisionSlot,
+        DecisionTest(config, KeyFor(kDecisionKeyAccount,
+                                    config.provider != DecisionProvider::kNone,
+                                    connection->api_key)),
+        std::move(callback));
+    return;
+  }
+  AiConnectionConfig config;
+  config.mode = ModeFromInt(connection->kind);
+  config.endpoint = connection->endpoint;
+  config.model = connection->model;
+  RunTest(kLanguageSlot,
+          LanguageTest(config,
+                       KeyFor(kLanguageKeyAccount,
+                              config.mode == ConnectionMode::kOpenAiCompatible,
+                              connection->api_key),
+                       names_only),
+          std::move(callback));
+}
+
 void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
                                  mojom::ConnectionInputPtr language,
                                  SaveCallback callback) {
-  decision_check_.reset();
-  language_check_.reset();
+  for (std::unique_ptr<RemoteModelClient>& test : tests_) {
+    test.reset();
+  }
   save_result_ = mojom::SaveResult::New();
   save_callback_ = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
       std::move(callback), mojom::SaveResult::New());
@@ -271,20 +464,28 @@ void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
   }
   StoreDecision(*decision);
   StoreLanguage(*language);
-  const bool decides =
-      ReadDecisionModelConfig(prefs).provider != DecisionProvider::kNone;
-  const bool has_language = !ReadAiConnectionConfig(prefs).model.empty();
-  if (!decides && !has_language) {
+  const DecisionModelConfig decides = ReadDecisionModelConfig(prefs);
+  const AiConnectionConfig names = ReadAiConnectionConfig(prefs);
+  const bool has_decision = decides.provider != DecisionProvider::kNone;
+  const bool has_language = !names.model.empty();
+  save_tests_left_ = (has_decision ? 1 : 0) + (has_language ? 1 : 0);
+  if (save_tests_left_ == 0) {
     std::move(save_callback_).Run(std::move(save_result_));
     return;
   }
-  if (decides) {
-    CheckDecision();
+  if (has_decision) {
+    RunTest(kDecisionSlot,
+            DecisionTest(decides, StoredKey(decides.key_account)),
+            base::BindOnce(&UwOrganizationHandler::OnSaveTested,
+                           weak_factory_.GetWeakPtr(), kDecisionSlot));
   }
   if (has_language) {
-    CheckLanguage(/*names_only=*/decides);
+    RunTest(kLanguageSlot,
+            LanguageTest(names, StoredKey(names.key_account),
+                         /*names_only=*/has_decision),
+            base::BindOnce(&UwOrganizationHandler::OnSaveTested,
+                           weak_factory_.GetWeakPtr(), kLanguageSlot));
   }
-  FinishSaveWhenChecked();
 }
 
 void UwOrganizationHandler::StoreDecision(const mojom::ConnectionInput& input) {
@@ -311,74 +512,46 @@ void UwOrganizationHandler::StoreLanguage(const mojom::ConnectionInput& input) {
                input.api_key));
 }
 
-void UwOrganizationHandler::CheckDecision() {
-  const DecisionModelConfig config =
-      ReadDecisionModelConfig(profile_->GetPrefs());
-  const DecisionFormat format = FormatFor(config.provider);
-  std::optional<std::string> body =
-      IsComplete(config)
-          ? BuildDecisionRequestBody(format, config.model, CheckContext(), {})
-          : std::nullopt;
-  if (!body) {
-    save_result_->decision_failed = true;
+void UwOrganizationHandler::RunTest(Slot slot,
+                                    ConnectionTest test,
+                                    TestConnectionCallback done) {
+  tests_[slot].reset();
+  if (!test.body) {
+    auto result = mojom::TestResult::New();
+    result->summary =
+        l10n_util::GetStringUTF8(IDS_UW_SETTINGS_ORGANIZATION_TEST_INCOMPLETE);
+    std::move(done).Run(std::move(result));
     return;
   }
-  decision_check_ = Client(DecisionUrl(config), StoredKey(config.key_account),
-                           std::move(*body));
-  decision_check_->Send(
-      base::BindOnce(&UwOrganizationHandler::OnDecisionChecked,
-                     weak_factory_.GetWeakPtr(), format));
+  tests_[slot] = Client(test.url, test.key, *test.body);
+  tests_[slot]->Send(base::BindOnce(
+      &UwOrganizationHandler::OnTested, weak_factory_.GetWeakPtr(), slot,
+      std::move(test), base::TimeTicks::Now(), std::move(done)));
 }
 
-void UwOrganizationHandler::CheckLanguage(bool names_only) {
-  const AiConnectionConfig config =
-      ReadAiConnectionConfig(profile_->GetPrefs());
-  std::optional<std::string> body;
-  if (IsComplete(config)) {
-    body = names_only
-               ? BuildNamingRequestBody(config.model, CheckContext())
-               : BuildDecisionRequestBody(DecisionFormat::kChat, config.model,
-                                          CheckContext(), {});
+void UwOrganizationHandler::OnTested(Slot slot,
+                                     ConnectionTest test,
+                                     base::TimeTicks sent_at,
+                                     TestConnectionCallback done,
+                                     RemoteModelClient::Outcome outcome) {
+  tests_[slot].reset();
+  if (!test.key.empty()) {
+    base::ReplaceSubstringsAfterOffset(&outcome.body, 0, test.key, kHiddenKey);
   }
-  if (!body) {
-    save_result_->language_failed = true;
-    return;
-  }
-  language_check_ = Client(ChatCompletionsUrl(config.endpoint),
-                           StoredKey(config.key_account), std::move(*body));
-  language_check_->Send(
-      base::BindOnce(&UwOrganizationHandler::OnLanguageChecked,
-                     weak_factory_.GetWeakPtr(), names_only));
+  std::move(done).Run(
+      Describe(test, outcome, base::TimeTicks::Now() - sent_at));
 }
 
-void UwOrganizationHandler::OnDecisionChecked(
-    DecisionFormat format,
-    RemoteModelClient::Outcome outcome) {
-  decision_check_.reset();
-  save_result_->decision_failed =
-      !outcome.ok || !ParseDecisionResponse(format, outcome.body);
-  FinishSaveWhenChecked();
-}
-
-void UwOrganizationHandler::OnLanguageChecked(
-    bool names_only,
-    RemoteModelClient::Outcome outcome) {
-  language_check_.reset();
-  const bool valid =
-      outcome.ok &&
-      (names_only ? ParseNamingResponse(outcome.body).has_value()
-                  : ParseDecisionResponse(DecisionFormat::kChat, outcome.body)
-                        .has_value());
-  save_result_->language_failed = !valid;
-  FinishSaveWhenChecked();
-}
-
-void UwOrganizationHandler::FinishSaveWhenChecked() {
-  if (decision_check_ || language_check_) {
+void UwOrganizationHandler::OnSaveTested(Slot slot,
+                                         mojom::TestResultPtr result) {
+  (slot == kDecisionSlot ? save_result_->decision : save_result_->language) =
+      std::move(result);
+  if (--save_tests_left_ > 0) {
     return;
   }
   save_result_->enabled =
-      !save_result_->decision_failed && !save_result_->language_failed;
+      (!save_result_->decision || save_result_->decision->ok) &&
+      (!save_result_->language || save_result_->language->ok);
   profile_->GetPrefs()->SetBoolean(kOrganizationEnabledPref,
                                    save_result_->enabled);
   std::move(save_callback_).Run(std::move(save_result_));
@@ -391,7 +564,12 @@ std::unique_ptr<RemoteModelClient> UwOrganizationHandler::Client(
   return std::make_unique<RemoteModelClient>(
       profile_->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess(),
-      url, std::move(api_key), std::move(body), kRequestTimeout);
+      url, std::move(api_key), std::move(body), kProviderTimeout);
+}
+
+void UwOrganizationHandler::TurnOff(TurnOffCallback callback) {
+  profile_->GetPrefs()->SetBoolean(kOrganizationEnabledPref, false);
+  std::move(callback).Run();
 }
 
 void UwOrganizationHandler::SetPause(int32_t mode_value,

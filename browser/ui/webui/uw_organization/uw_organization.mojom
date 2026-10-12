@@ -30,12 +30,23 @@ struct ConnectionInput {
   string api_key;
 };
 
+// What one test request to a connection found.
+struct TestResult {
+  bool ok;
+  // One sentence for the user.
+  string summary;
+  // What uw sent and what came back: the request, the HTTP status or the
+  // network error, and the start of the provider's answer. Never an API key.
+  string detail;
+};
+
 struct SaveResult {
   // True when at least one connection is set and every set connection
-  // validated. Automatic organization is on exactly then.
+  // passed its test. Automatic organization is on exactly then.
   bool enabled;
-  bool decision_failed;
-  bool language_failed;
+  // Null when that connection is not set.
+  TestResult? decision;
+  TestResult? language;
 };
 
 struct ModelsResult {
@@ -63,10 +74,19 @@ interface OrganizationHandler {
   // connection it is, so an empty key can fall back to the stored one.
   LoadModels(bool decision, ConnectionInput connection)
       => (ModelsResult result);
-  // Turns automatic organization off, stores both connections, then checks
+  // Tests one connection as entered and saves nothing. `decision` says which
+  // connection it is. `names_only` asks a language model for a task name
+  // alone, which is its whole job beside a decision model; otherwise it is
+  // asked to place a tab.
+  TestConnection(bool decision, ConnectionInput connection, bool names_only)
+      => (TestResult result);
+  // Turns automatic organization off, stores both connections, then tests
   // each one that is set.
   Save(ConnectionInput decision, ConnectionInput language)
       => (SaveResult result);
+  // Turns automatic organization off and leaves both connections as saved.
+  // Save turns it on again.
+  TurnOff() => ();
   SetPause(int32 mode) => (PauseResult result);
 
   GetTint() => (TintState tint);

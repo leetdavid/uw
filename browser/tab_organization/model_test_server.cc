@@ -40,8 +40,19 @@ ModelTestServer::ModelTestServer(net::test_server::EmbeddedTestServer* server) {
 ModelTestServer::~ModelTestServer() = default;
 
 void ModelTestServer::Answer(const std::string& path, std::string body) {
+  Fail(path, net::HTTP_OK, std::move(body));
+}
+
+void ModelTestServer::Fail(const std::string& path,
+                           int status,
+                           std::string body) {
   base::AutoLock hold(lock_);
-  answers_[path] = std::move(body);
+  answers_[path] = {status, std::move(body), std::string()};
+}
+
+void ModelTestServer::Redirect(const std::string& path, std::string location) {
+  base::AutoLock hold(lock_);
+  answers_[path] = {net::HTTP_FOUND, std::string(), std::move(location)};
 }
 
 std::vector<ModelRequest> ModelTestServer::Requests() {
@@ -67,8 +78,14 @@ std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
     response->set_code(net::HTTP_NOT_FOUND);
     return response;
   }
+  const Reply& reply = answer->second;
+  response->set_code(static_cast<net::HttpStatusCode>(reply.status));
+  if (!reply.location.empty()) {
+    response->AddCustomHeader("Location", reply.location);
+    return response;
+  }
   response->set_content_type("application/json");
-  response->set_content(answer->second);
+  response->set_content(reply.body);
   return response;
 }
 

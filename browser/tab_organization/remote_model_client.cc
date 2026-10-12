@@ -4,6 +4,8 @@
 #include "uw/browser/tab_organization/remote_model_client.h"
 
 #include "base/functional/bind.h"
+#include "base/location.h"
+#include "base/task/sequenced_task_runner.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_request_headers.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
@@ -69,6 +71,7 @@ void RemoteModelClient::SendGet(ResultCallback callback) {
 }
 
 void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
+  callback_ = std::move(callback);
   auto resource = std::make_unique<network::ResourceRequest>();
   resource->url = endpoint_;
   resource->method = post ? "POST" : "GET";
@@ -85,43 +88,57 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
     api_key_.assign(api_key_.size(), '\0');
     api_key_.clear();
   }
-  loader_ = network::SimpleURLLoader::Create(std::move(resource),
-                                             kTrafficAnnotation);
+  loader_ =
+      network::SimpleURLLoader::Create(std::move(resource), kTrafficAnnotation);
   loader_->SetAllowHttpErrorResults(true);
   loader_->SetTimeoutDuration(timeout_);
   // Reject redirects: following one could send the API key elsewhere.
   loader_->SetOnRedirectCallback(base::BindRepeating(
       [](base::WeakPtr<RemoteModelClient> self, const GURL&,
-         const net::RedirectInfo&,
-         const network::mojom::URLResponseHead&,
+         const net::RedirectInfo&, const network::mojom::URLResponseHead&,
          std::vector<std::string>*) {
         if (self) {
-          self->loader_.reset();
+          self->OnRedirect();
         }
       },
       weak_factory_.GetWeakPtr()));
   if (post) {
     loader_->AttachStringForUpload(request_body_, "application/json");
   }
-  loader_->DownloadToString(
-      loader_factory_.get(),
-      base::BindOnce(&RemoteModelClient::OnComplete,
-                     weak_factory_.GetWeakPtr(), std::move(callback)),
-      kMaxResponseBytes);
+  loader_->DownloadToString(loader_factory_.get(),
+                            base::BindOnce(&RemoteModelClient::OnComplete,
+                                           weak_factory_.GetWeakPtr()),
+                            kMaxResponseBytes);
 }
 
-void RemoteModelClient::OnComplete(ResultCallback callback,
-                                   std::optional<std::string> body) {
-  Outcome outcome;
-  const int net_error = loader_->NetError();
-  const network::mojom::URLResponseHead* head = loader_->ResponseInfo();
-  const int code = head && head->headers ? head->headers->response_code() : -1;
-  if (net_error == net::OK && body && code >= 200 && code < 300) {
-    outcome.ok = true;
-    outcome.body = std::move(*body);
-  }
+// Runs inside the loader, so the answer goes out from a fresh task.
+void RemoteModelClient::OnRedirect() {
   loader_.reset();
-  std::move(callback).Run(std::move(outcome));
+  Outcome outcome;
+  outcome.net_error = net::ERR_UNSAFE_REDIRECT;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&RemoteModelClient::Finish, weak_factory_.GetWeakPtr(),
+                     std::move(outcome)));
+}
+
+void RemoteModelClient::OnComplete(std::optional<std::string> body) {
+  Outcome outcome;
+  outcome.net_error = loader_->NetError();
+  const network::mojom::URLResponseHead* head = loader_->ResponseInfo();
+  outcome.http_status =
+      head && head->headers ? head->headers->response_code() : 0;
+  outcome.body = std::move(body).value_or(std::string());
+  outcome.ok = outcome.net_error == net::OK && outcome.http_status >= 200 &&
+               outcome.http_status < 300;
+  loader_.reset();
+  Finish(std::move(outcome));
+}
+
+void RemoteModelClient::Finish(Outcome outcome) {
+  if (callback_) {
+    std::move(callback_).Run(std::move(outcome));
+  }
 }
 
 }  // namespace uw

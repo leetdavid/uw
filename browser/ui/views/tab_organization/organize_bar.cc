@@ -38,7 +38,7 @@ using Kind = AutomaticOrganizer::Event::Kind;
 constexpr base::TimeDelta kNoticeDuration = base::Seconds(6);
 constexpr base::TimeDelta kAnswerDuration = base::Seconds(8);
 // Longer than a request can take, so the line cannot outlive its request.
-constexpr base::TimeDelta kAskingDuration = base::Seconds(15);
+constexpr base::TimeDelta kAskingDuration = kProviderTimeout + base::Seconds(5);
 constexpr int kRowSpacing = 4;
 constexpr int kActivityLines = 4;
 constexpr char kSettingsSubPage[] = "uwOrganization";

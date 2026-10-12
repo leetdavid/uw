@@ -15,6 +15,11 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
 - "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
+- Each connection has "Test connection". It sends one test request for that connection as entered and saves nothing. Beside a decision model, the language model's test asks for a task name; alone, it asks for a placement. Agreed on 2026-10-12.
+- A test result says the connection works and how long the answer took, or why it failed: no answer (with the network error), an HTTP error status (with the provider's own message), or an answer uw cannot use. "Details" shows the request uw sent and the start of the answer. An API key never appears there.
+- "Save and validate" runs the same tests and shows each result on its connection.
+- uw waits 30 seconds for an answer, in a test and while browsing, so a test that passes means the model is fast enough to use.
+- A switch at the top of the settings page turns automatic organization off and on. Off sends nothing and keeps both connections. On saves and tests the connections like "Save and validate", and stays off when a test fails. Agreed on 2026-10-12.
 - "Load available models" lists a connection's models with `GET <base>/models`. When the endpoint has no such list, the user types the model ID.
 - A decision request contains the tab title, URL, source-tab relationship, current task names, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
 - A decision is one of: leave the branch in the Scratchpad, move it to the end of an existing task, or start a new task.
@@ -69,7 +74,9 @@ Each stage is a ticket on the [board](roadmap.md#board).
 9. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
 10. Each request contains the documented scope only. No API key or request body appears in logs, preferences, session data, or crash reports.
 11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
-12. Each request shows the asking line. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own sentence with the confidence.
+12. "Test connection" tests one connection, saves nothing, and names the reason for a failure. `UwOrganizationPageBrowserTest.*` covers a pass, an unusable answer, an HTTP error with the provider's message, a refused redirect, and a connection that is not filled in.
+13. The switch turns automatic organization off without a request and on only after the connections pass their tests again.
+14. Each request shows the asking line. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own sentence with the confidence.
 
 ## Later stages
 
