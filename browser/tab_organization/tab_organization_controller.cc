@@ -10,6 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/token.h"
 #include "base/uuid.h"
@@ -153,6 +154,11 @@ void TabOrganizationController::RestoreTab(
   if (parent && !parent->empty()) {
     self->restored_parents_[PageId(*id)] = PageId(*parent);
   }
+  const std::string* task_name = state->FindString("task_name");
+  if (task_name && tab->GetGroup()) {
+    self->generated_names_.try_emplace(TaskOf(tab),
+                                       base::UTF8ToUTF16(*task_name));
+  }
   self->Mirror({});
   self->ScheduleApply();
 }
@@ -275,6 +281,9 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
   tree_.MoveToNewTask(roots.front(), task);
   for (size_t i = 1; i < roots.size(); ++i) {
     tree_.MoveToTask(roots[i], task);
+  }
+  if (origin == Origin::kOrganizer) {
+    generated_names_[task] = title;
   }
   pending_tasks_[task] = {std::move(title), std::nullopt};
   Apply();
@@ -424,6 +433,15 @@ void TabOrganizationController::NameTask(const std::string& task,
   tabs_->ChangeTabGroupVisuals(
       *group, tab_groups::TabGroupVisualData(title, visuals->color(),
                                              visuals->is_collapsed()));
+  generated_names_[task] = title;
+  ScheduleUpdate();
+}
+
+bool TabOrganizationController::HasGeneratedName(
+    const std::string& task) const {
+  const auto generated = generated_names_.find(task);
+  return generated != generated_names_.end() &&
+         generated->second == TaskTitle(task);
 }
 
 base::CallbackListSubscription TabOrganizationController::Observe(
@@ -747,7 +765,9 @@ void TabOrganizationController::Update() {
   SessionService* service = profile->IsOffTheRecord()
                                 ? nullptr
                                 : SessionServiceFactory::GetForProfile(profile);
-  std::map<PageId, PageId> parents;
+  std::erase_if(generated_names_,
+                [this](const auto& entry) { return !GroupFor(entry.first); });
+  std::map<PageId, std::string> states;
   for (const auto& [handle, id] : ids_) {
     const Page* page = tree_.Find(id);
     const tabs::TabInterface* tab = handle.Get();
@@ -755,22 +775,22 @@ void TabOrganizationController::Update() {
     if (!page || !contents) {
       continue;
     }
-    parents[id] = page->parent;
-    const auto saved = saved_parents_.find(id);
-    if (!service ||
-        (saved != saved_parents_.end() && saved->second == page->parent)) {
-      continue;
-    }
     base::DictValue state;
     state.Set("id", id.value());
     state.Set("parent", page->parent.value());
-    if (const std::optional<std::string> json = base::WriteJson(state)) {
+    if (HasGeneratedName(page->task)) {
+      state.Set("task_name", generated_names_[page->task]);
+    }
+    std::string& json = states[id];
+    json = base::WriteJson(state).value_or(std::string());
+    const auto saved = saved_states_.find(id);
+    if (service && (saved == saved_states_.end() || saved->second != json)) {
       service->AddTabExtraData(window_->GetSessionID(),
                                sessions::SessionTabHelper::IdForTab(contents),
-                               kSessionKey, *json);
+                               kSessionKey, json);
     }
   }
-  saved_parents_ = std::move(parents);
+  saved_states_ = std::move(states);
   fresh_.clear();
   changed_.Notify();
 }

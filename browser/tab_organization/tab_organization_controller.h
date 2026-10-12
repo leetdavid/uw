@@ -109,9 +109,12 @@ class TabOrganizationController : public TabStripModelObserver {
 
   std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
   std::u16string TaskTitle(const std::string& task) const;
-  // Renames a task. It is not an organization action, so undo leaves the
-  // name alone.
+  // Gives a task a name of uw's own. It is not an organization action, so
+  // undo leaves the name alone.
   void NameTask(const std::string& task, const std::u16string& title);
+  // True while `task` has the name uw gave it, in this session or an earlier
+  // one. Any other name is the user's.
+  bool HasGeneratedName(const std::string& task) const;
 
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
   // Runs with the pages the user moved by a command, a drag, a native group
@@ -169,7 +172,11 @@ class TabOrganizationController : public TabStripModelObserver {
   // Parent links from session restore or another window, kept until both
   // pages are in this window.
   std::map<PageId, PageId> restored_parents_;
-  std::map<PageId, PageId> saved_parents_;
+  // What the session last saved for each page.
+  std::map<PageId, std::string> saved_states_;
+  // The name uw gave each task. It is saved with every page of the task, so
+  // it comes back with the session.
+  std::map<std::string, std::u16string> generated_names_;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;

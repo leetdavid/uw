@@ -17,7 +17,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - A task with the provisional name, or with no name, is named when a tab in it starts a piece of work: the same two thresholds that start a new task from the Scratchpad. A one-off page names nothing. An unusable name leaves the task for the next tab that qualifies.
   - A task that uw named gets a new name when it has outgrown the old one. See the [name check](#name-check).
   - The [task naming call](../CONTEXT.md#language) holds the tab that triggered it and the titles of up to 20 other tabs in the task.
-- uw never replaces a name the user typed. It remembers the names it gave for the session only, so a task from an earlier session keeps its name too.
+- uw never replaces a name the user typed. It saves the names it gave with the tabs of the task, in the session, so it still knows them after a restart. The user asked for this on 2026-10-12. A tab or window brought back with "Reopen closed tab" does not carry that data, so a task that comes back that way keeps its name.
 - Naming moves nothing and is not an undo step.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
 - "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
@@ -146,7 +146,6 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - Automatic merging and whole-window reorganization passes. A single branch leaving its task is in scope; splitting a task into several is not.
 - User-directed proposals and "Reorganize all tabs".
 - Renaming a task whose name the user typed, and renaming without a decision model.
-- Keeping track of which names uw gave across a restart.
 - Automatic tab closing and suspension.
 - The 200 ms placement budget in [Product](../product.md#organization-latency). Measure first.
 
@@ -154,6 +153,7 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 
 - `components/tab_organization/ai_protocol` builds and parses requests in three decision formats: chat completions, the OpenAI Decisions API (`POST <base>/decisions`), and TypeSafe System One (`POST <base>/systemone`). It joins the two answers into one decision and reads the name check beside them. It also builds the naming call.
 - `components/tab_organization/placement` turns a decision into what uw does: nothing, a suggestion, a move, or a name for the task. It is a plain function of the answer, where the branch sits, and the two thresholds of the eagerness level. Chat requests allow 4096 answer tokens, because some chat models think before they answer and that thinking counts against the limit. Parsing is strict, so a malformed response can never move a tab.
+- `browser/tab_organization/tab_organization_controller` keeps the name uw gave each task and writes it into the session data of every tab in the task, beside the tab's parent link.
 - `browser/tab_organization/automatic_organizer` is owned by the window. It watches titles and URLs, sends the requests, and applies a decision through the window controller only if the branch is unchanged since the request.
 - The organizer keeps the latest automatic change as a notice for the sidebar message.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
@@ -194,6 +194,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 23. A tab that would start a second task instead renames its task when the name check reaches the confidence threshold. Short of it, the tab leaves as before. A name the user typed is never asked about and never replaced. An answer to a name check the request did not carry changes nothing. `OrganizerLogBrowserTest.ATaskThatOutgrowsItsNameIsRenamed` checks it.
 24. A tab opened from another tab, with no tabs under it, leaves its parent's task for a task of its own, and Undo puts it back under its parent. `AutomaticOrganizerBrowserTest.AChildTabBreaksOutOfItsParentsTask` checks it.
+
+25. After a restart with the session restored, a task uw named is still asked about in the name check, and a task the user named is not. `AutomaticOrganizerBrowserTest.ANameUwGaveIsRememberedAfterARestart` checks it across a real restart.
 
 ## Later stages
 

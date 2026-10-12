@@ -78,7 +78,7 @@ A language-model request for a task name. It is sent only when the placement ans
 The question in a placement request that asks whether the task a tab branch is in has outgrown its name. It is asked only about a generated name.
 
 **Generated name**:
-A task name uw gave. uw may replace it. A name the user typed is not generated and is never replaced.
+A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced.
 
 **Eagerness**:
 The setting for how sure a model must be before uw moves a tab branch without asking. Five levels, from careful to eager, each with a confidence threshold and a new-task threshold.

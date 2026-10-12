@@ -71,7 +71,7 @@ Expected result: with a language model set, the task called `New task` takes a n
 
 A tab is asked about again when its title changes or it goes to another site. Changing a filter or a sort order in a web app, which only changes the address, asks nothing.
 
-A task that uw named can change its name. Open a few related pages from it that its name is too narrow for, such as hotels in other parts of town in a task named after one neighbourhood. Expected result: the tabs stay and the task gets a wider name. A task you renamed yourself keeps your name, and so does every task after a restart.
+A task that uw named can change its name. Open a few related pages from it that its name is too narrow for, such as hotels in other parts of town in a task named after one neighbourhood. Expected result: the tabs stay and the task gets a wider name. A task you renamed yourself keeps your name. uw remembers which names it gave across a restart.
 
 The `Sorting` slider on the settings page sets how sure a model must be before a tab moves. Under it the page states the two thresholds of the chosen level. Drag it towards `Eager` and more tabs move on their own. Pinned tabs are never sorted.
 

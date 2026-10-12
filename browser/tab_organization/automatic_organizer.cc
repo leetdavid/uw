@@ -165,9 +165,6 @@ void AutomaticOrganizer::Scan() {
   std::erase_if(requests_, [&tree](const auto& entry) {
     return !tree.Find(entry.second.page);
   });
-  std::erase_if(generated_names_, [this](const auto& entry) {
-    return !controller_->GroupFor(entry.first);
-  });
   const bool enabled = Enabled();
   bool due = false;
   for (const Page& page : tree.pages()) {
@@ -365,7 +362,7 @@ void AutomaticOrganizer::NameTaskOf(Request request,
   }
   Report(Event::Kind::kNeedsName, request);
   if (name) {
-    GiveName(request.task, *name);
+    controller_->NameTask(request.task, *name);
     return;
   }
   Send(std::move(request), &AutomaticOrganizer::OnName);
@@ -518,7 +515,7 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   if (request->names_task) {
     if (name && Current(*request) &&
         (!Named(request->task) || Generated(request->task))) {
-      GiveName(request->task, *name);
+      controller_->NameTask(request->task, *name);
     }
     return;
   }
@@ -531,13 +528,12 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
 }
 
 void AutomaticOrganizer::CreateTask(Request& request, std::u16string title) {
-  const std::optional<tab_groups::TabGroupId> group =
-      controller_->MoveToNewTask({request.page}, title,
-                                 TabOrganizationController::Origin::kOrganizer);
-  if (group) {
-    generated_names_[group->ToString()] = title;
-  }
-  Report(group ? Event::Kind::kCreated : Event::Kind::kDropped, request,
+  const bool created =
+      controller_
+          ->MoveToNewTask({request.page}, title,
+                          TabOrganizationController::Origin::kOrganizer)
+          .has_value();
+  Report(created ? Event::Kind::kCreated : Event::Kind::kDropped, request,
          std::move(title));
 }
 
@@ -590,15 +586,7 @@ bool AutomaticOrganizer::Named(const std::string& task) const {
 }
 
 bool AutomaticOrganizer::Generated(const std::string& task) const {
-  const auto generated = generated_names_.find(task);
-  return generated != generated_names_.end() && Named(task) &&
-         generated->second == controller_->TaskTitle(task);
-}
-
-void AutomaticOrganizer::GiveName(const std::string& task,
-                                  const std::u16string& name) {
-  controller_->NameTask(task, name);
-  generated_names_[task] = name;
+  return Named(task) && controller_->HasGeneratedName(task);
 }
 
 std::optional<AutomaticOrganizer::Request> AutomaticOrganizer::Take(

@@ -23,6 +23,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/values.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -906,6 +907,85 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(lines[2].FindDouble("needed"), 0.90);
   EXPECT_EQ(lines[4].FindDouble("new_name"), 0.89);
   EXPECT_EQ(lines[5].FindDouble("new_name"), 0.0);
+}
+
+// The names uw gave are saved with the session, so a task can still get a
+// new name after a restart, and a name the user typed is still theirs.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       PRE_ANameUwGaveIsRememberedAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  Browse(InitialTab(), "notes");
+  const std::optional<tab_groups::TabGroupId> mine =
+      controller()->MoveToNewTask({Id(InitialTab())}, u"Mine");
+  ASSERT_TRUE(mine);
+
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
+  tabs::TabInterface* first = OpenLinkFrom(InitialTab(), "baixa");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> named = first->GetGroup();
+  ASSERT_TRUE(named);
+  ASSERT_NE(named, mine);
+  Answer("/v1/systemone", SystemOneAnswer(named->ToString(), 0.95, 0.0, 0.1));
+  tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
+  ASSERT_TRUE(SettleAfter(3));
+  ASSERT_EQ(second->GetGroup(), named);
+
+  EXPECT_TRUE(controller()->HasGeneratedName(named->ToString()));
+  EXPECT_FALSE(controller()->HasGeneratedName(mine->ToString()));
+  // Lets the session take the tabs' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ANameUwGaveIsRememberedAfterARestart) {
+  std::optional<tab_groups::TabGroupId> named;
+  std::optional<tab_groups::TabGroupId> mine;
+  for (const tab_groups::TabGroupId& group :
+       tabs()->group_model()->ListTabGroups()) {
+    (TitleOf(group) == u"Mine" ? mine : named) = group;
+  }
+  ASSERT_TRUE(named);
+  ASSERT_TRUE(mine);
+  ASSERT_EQ(TitleOf(*named), u"Compare Baixa hotels");
+  EXPECT_TRUE(controller()->HasGeneratedName(named->ToString()));
+  EXPECT_FALSE(controller()->HasGeneratedName(mine->ToString()));
+
+  // So the model is asked about the restored name, and not about the user's.
+  tabs::TabInterface* restored = nullptr;
+  tabs::TabInterface* own = nullptr;
+  for (int i = 0; i < tabs()->count(); ++i) {
+    tabs::TabInterface* tab = tabs()->GetTabAtIndex(i);
+    (tab->GetGroup() == named ? restored : own) = tab;
+  }
+  ASSERT_TRUE(restored);
+  ASSERT_TRUE(own);
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer(named->ToString(), 0.95, 0.0, 0.1));
+  OpenLinkFrom(restored, "alfama");
+  OpenLinkFrom(own, "minutes");
+  const auto request_about = [&](const std::string& title) {
+    for (const ModelRequest& request : Requests()) {
+      if (request.body.find("Title: " + title) != std::string::npos) {
+        return request.body;
+      }
+    }
+    return std::string();
+  };
+  organizer()->DispatchNowForTesting();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !request_about("alfama").empty() &&
+           !request_about("minutes").empty();
+  }));
+  EXPECT_NE(request_about("alfama").find(
+                "The user's browsing task \\\"Compare Baixa hotels\\\" holds"),
+            std::string::npos);
+  EXPECT_EQ(request_about("minutes").find("needs a new name"),
+            std::string::npos);
 }
 
 // A tab opened from another tab starts in that tab's task, under it. When it

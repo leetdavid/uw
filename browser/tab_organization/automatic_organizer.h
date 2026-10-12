@@ -205,10 +205,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // False for a task that still has the name every new task starts with. The
   // model is not offered such a task: its name says nothing about it.
   bool Named(const std::string& task) const;
-  // True while `task` has the name uw gave it. A name the user typed is
+  // True while `task` has a name that uw gave it. A name the user typed is
   // theirs, and uw does not replace it.
   bool Generated(const std::string& task) const;
-  void GiveName(const std::string& task, const std::u16string& name);
   std::optional<Request> Take(uint64_t request_id);
   void CancelRequestsFor(const PageId& page);
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,
@@ -220,9 +219,6 @@ class AutomaticOrganizer : public TabStripModelObserver {
   const raw_ptr<TabStripModel> tabs_;
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
-  // The name uw gave each task. It is not kept across a restart, so a task
-  // from an earlier session keeps its name.
-  std::map<std::string, std::u16string> generated_names_;
   std::optional<Suggestion> suggestion_;
   uint64_t next_request_ = 1;
   base::RepeatingCallbackList<void(const Event&)> events_;
