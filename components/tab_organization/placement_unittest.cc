@@ -10,7 +10,7 @@ namespace {
 
 using Action = Placement::Action;
 
-constexpr Thresholds kNeeded{0.90, 0.75};
+constexpr Thresholds kNeeded{0.90, 0.75, 0.90};
 
 ClassificationAnswer Answer(const std::string& choice,
                             double confidence,
@@ -138,7 +138,7 @@ TEST(PlacementTest, ATaskThatHasOutgrownItsNameKeepsTheBranch) {
       PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, /*new_name=*/0.90));
   EXPECT_EQ(placement.action, Action::kName);
   EXPECT_EQ(placement.confidence, 0.90);
-  EXPECT_EQ(placement.needed, kNeeded.confidence);
+  EXPECT_EQ(placement.needed, kNeeded.new_name);
   EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.5, 0.9, 0.95)).action,
             Action::kName);
   EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, 0.95),
@@ -157,13 +157,14 @@ TEST(PlacementTest, ATaskThatHasOutgrownItsNameKeepsTheBranch) {
   EXPECT_EQ(placement.action, Action::kApply);
   EXPECT_EQ(placement.target, kNewTaskOption);
 
-  // A one-off says nothing about the task. It leaves for the Scratchpad.
+  // What the model calls a one-off says nothing about the task. It leaves
+  // for the Scratchpad.
   placement = PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1, 0.99));
   EXPECT_EQ(placement.action, Action::kApply);
   EXPECT_EQ(placement.target, kScratchpadOption);
-  placement = PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.74, 0.99));
-  EXPECT_EQ(placement.action, Action::kApply);
-  EXPECT_EQ(placement.target, kScratchpadOption);
+  // Anything else can rename the task, even short of starting one itself.
+  EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.74, 0.99)).action,
+            Action::kName);
 
   // Another task the branch belongs to comes first.
   placement = PlaceIn("task-1", Answer("task-2", 0.95, 0.0, 0.99));
@@ -178,29 +179,39 @@ TEST(PlacementTest, ATaskThatHasOutgrownItsNameKeepsTheBranch) {
       Action::kApply);
 }
 
-TEST(PlacementTest, EachEagernessLevelAsksForLess) {
-  EXPECT_EQ(ThresholdsFor(kMinEagerness).confidence, 0.90);
-  EXPECT_EQ(ThresholdsFor(kMinEagerness).new_task, 0.75);
-  EXPECT_EQ(ThresholdsFor(kDefaultEagerness).confidence, 0.70);
-  EXPECT_EQ(ThresholdsFor(kDefaultEagerness).new_task, 0.55);
-  for (int level = kMinEagerness; level < kMaxEagerness; ++level) {
-    EXPECT_GT(ThresholdsFor(level).confidence,
-              ThresholdsFor(level + 1).confidence);
-    EXPECT_GE(ThresholdsFor(level).new_task, ThresholdsFor(level + 1).new_task);
-  }
-  // Half is the least a probability between two answers can ask for.
-  EXPECT_EQ(ThresholdsFor(kMaxEagerness).new_task, 0.5);
-  EXPECT_EQ(ThresholdsFor(0).confidence,
-            ThresholdsFor(kMinEagerness).confidence);
-  EXPECT_EQ(ThresholdsFor(99).confidence,
-            ThresholdsFor(kMaxEagerness).confidence);
-
-  // The same answer moves a branch at one level and only suggests at another.
-  const ClassificationAnswer answer = Answer("task-2", 0.75);
-  EXPECT_EQ(Place(answer, {"task-1"}, ThresholdsFor(kMinEagerness)).action,
+TEST(PlacementTest, EachThresholdDecidesOneKindOfAnswer) {
+  const ClassificationAnswer joins = Answer("task-2", 0.75);
+  EXPECT_EQ(Place(joins, {"task-1"}, {0.80, 0.50, 0.50}).action,
             Action::kSuggest);
-  EXPECT_EQ(Place(answer, {"task-1"}, ThresholdsFor(kDefaultEagerness)).action,
+  EXPECT_EQ(Place(joins, {"task-1"}, {0.75, 0.95, 0.95}).action,
             Action::kApply);
+
+  const ClassificationAnswer starts = Answer(kNewTaskOption, 0.99, 0.6);
+  EXPECT_EQ(Place(starts, {}, {0.50, 0.65, 0.50}).action, Action::kSuggest);
+  EXPECT_EQ(Place(starts, {}, {0.95, 0.60, 0.95}).action, Action::kApply);
+
+  const ClassificationAnswer outgrown = Answer("task-1", 0.99, 0.0, 0.6);
+  EXPECT_EQ(Place(outgrown, {"task-1"}, {0.50, 0.50, 0.65}).action,
+            Action::kLeave);
+  const Placement placement = Place(outgrown, {"task-1"}, {0.95, 0.95, 0.60});
+  EXPECT_EQ(placement.action, Action::kName);
+  EXPECT_EQ(placement.needed, 0.60);
+  // The other two thresholds have no say in it.
+  EXPECT_EQ(Place(Answer(kNewTaskOption, 0.6, 0.6, 0.6), {"task-1"},
+                  {0.95, 0.95, 0.60})
+                .action,
+            Action::kName);
+}
+
+TEST(PlacementTest, AThresholdSettingStaysInItsRange) {
+  EXPECT_EQ(kDefaultThresholds.confidence, 0.70);
+  EXPECT_EQ(kDefaultThresholds.new_task, 0.55);
+  EXPECT_EQ(kDefaultThresholds.new_name, 0.70);
+  EXPECT_EQ(AsThreshold(0.2), kMinThreshold);
+  EXPECT_EQ(AsThreshold(1.0), kMaxThreshold);
+  // A slider stop that arithmetic left a hair off is the stop itself.
+  EXPECT_EQ(AsThreshold(0.5 + 4 * 0.05), 0.70);
+  EXPECT_EQ(AsThreshold(0.5499999), 0.55);
 }
 
 }  // namespace

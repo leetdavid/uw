@@ -9,7 +9,6 @@
 #include "components/prefs/pref_service.h"
 #include "net/base/url_util.h"
 #include "url/gurl.h"
-#include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
@@ -37,7 +36,12 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kOrganizationKeyAccountPref, std::string());
   registry->RegisterBooleanPref(kOrganizationEnabledPref, false);
   registry->RegisterBooleanPref(kOrganizationShowActivityPref, false);
-  registry->RegisterIntegerPref(kOrganizationEagernessPref, kDefaultEagerness);
+  registry->RegisterDoublePref(kOrganizationMoveThresholdPref,
+                               kDefaultThresholds.confidence);
+  registry->RegisterDoublePref(kOrganizationNewTaskThresholdPref,
+                               kDefaultThresholds.new_task);
+  registry->RegisterDoublePref(kOrganizationRenameThresholdPref,
+                               kDefaultThresholds.new_name);
   registry->RegisterIntegerPref(kDecisionProviderPref,
                                 static_cast<int>(DecisionProvider::kNone));
   registry->RegisterStringPref(kDecisionEndpointPref, std::string());
@@ -136,6 +140,21 @@ bool OrganizationReady(const PrefService* prefs) {
   return prefs && prefs->GetBoolean(kOrganizationEnabledPref) &&
          (IsComplete(ReadDecisionModelConfig(prefs)) ||
           IsComplete(ReadAiConnectionConfig(prefs)));
+}
+
+Thresholds ReadThresholds(const PrefService* prefs) {
+  return {AsThreshold(prefs->GetDouble(kOrganizationMoveThresholdPref)),
+          AsThreshold(prefs->GetDouble(kOrganizationNewTaskThresholdPref)),
+          AsThreshold(prefs->GetDouble(kOrganizationRenameThresholdPref))};
+}
+
+void SaveThresholds(PrefService* prefs, const Thresholds& thresholds) {
+  prefs->SetDouble(kOrganizationMoveThresholdPref,
+                   AsThreshold(thresholds.confidence));
+  prefs->SetDouble(kOrganizationNewTaskThresholdPref,
+                   AsThreshold(thresholds.new_task));
+  prefs->SetDouble(kOrganizationRenameThresholdPref,
+                   AsThreshold(thresholds.new_name));
 }
 
 PauseMode ReadPauseState(const PrefService* prefs) {

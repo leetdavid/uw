@@ -21,7 +21,7 @@ import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_sel
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import type {Connection, ConnectionInput, Eagerness, TestResult, TintState} from './uw_organization.mojom-webui.js';
+import type {Connection, ConnectionInput, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
@@ -63,9 +63,21 @@ interface Defaults {
 const NO_DECISION_MODEL = 0;
 const OLLAMA = 0;
 
-// uw::kMinEagerness and uw::kMaxEagerness.
-const MIN_EAGERNESS = 1;
-const MAX_EAGERNESS = 5;
+// uw::kMinThreshold and uw::kMaxThreshold, and the step between two stops of
+// a threshold slider.
+const MIN_THRESHOLD = 0.5;
+const MAX_THRESHOLD = 0.95;
+const THRESHOLD_STEP = 0.05;
+
+// One slider of the page: what the threshold is for, the slider's last stop
+// and current stop, and the threshold as shown beside it.
+interface ThresholdRow {
+  key: keyof Thresholds;
+  label: string;
+  stops: number;
+  stop: number;
+  shown: string;
+}
 
 // Lilac, sky, mint, butter, and peach take dark text. Indigo, wine, and forest
 // take white text.
@@ -159,8 +171,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       saving_: {type: Boolean},
       enabled_: {type: Boolean},
       pauseMode_: {type: Number},
-      eagerness_: {type: Object},
-      eagernessLevels_: {type: Object},
+      thresholds_: {type: Object},
       tint_: {type: Object},
     };
   }
@@ -175,13 +186,8 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   protected accessor saving_: boolean = false;
   protected accessor enabled_: boolean = false;
   protected accessor pauseMode_: number = 0;
-  // Null until the saved level has loaded.
-  protected accessor eagerness_: Eagerness|null = null;
-  protected accessor eagernessLevels_ = {
-    min: MIN_EAGERNESS,
-    max: MAX_EAGERNESS,
-    count: MAX_EAGERNESS - MIN_EAGERNESS + 1,
-  };
+  // Null until the saved thresholds have loaded.
+  protected accessor thresholds_: Thresholds|null = null;
   protected accessor tint_: TintState = {picked: '', applied: ''};
   protected tintPresets_ = TINT_PRESETS;
   private browserProxy_ = UwOrganizationBrowserProxyImpl.getInstance();
@@ -425,22 +431,38 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.shadowRoot?.getElementById(reason)?.scrollIntoView({block: 'center'});
   }
 
-  protected eagernessLevel_(): number {
-    return this.eagerness_ ? this.eagerness_.level : MIN_EAGERNESS;
+  protected thresholdRows_(): ThresholdRow[] {
+    const thresholds = this.thresholds_;
+    if (!thresholds) {
+      return [];
+    }
+    const labels: Array<[keyof Thresholds, string]> = [
+      ['move', 'uwOrganizationThresholdMove'],
+      ['newTask', 'uwOrganizationThresholdNewTask'],
+      ['rename', 'uwOrganizationThresholdRename'],
+    ];
+    return labels.map(([key, label]) => ({
+                        key,
+                        label: this.i18n_(label),
+                        stops: Math.round(
+                            (MAX_THRESHOLD - MIN_THRESHOLD) / THRESHOLD_STEP),
+                        stop: Math.round(
+                            (thresholds[key] - MIN_THRESHOLD) / THRESHOLD_STEP),
+                        shown: thresholds[key].toFixed(2),
+                      }));
   }
 
-  protected eagernessDetail_(): string {
-    return this.eagerness_ ?
-        loadTimeData.getStringF(
-            'uwOrganizationEagernessDetail',
-            this.eagerness_.confidence.toFixed(2),
-            this.eagerness_.newTask.toFixed(2)) :
-        '';
-  }
-
-  protected async onEagernessCrSliderValueChanged_(e: Event) {
-    this.eagerness_ = await this.browserProxy_.setEagerness(
-        (e.currentTarget as CrSliderElement).value);
+  protected async onThresholdCrSliderValueChanged_(e: Event) {
+    const slider = e.currentTarget as CrSliderElement;
+    const thresholds = this.thresholds_;
+    if (!thresholds) {
+      return;
+    }
+    this.thresholds_ = await this.browserProxy_.setThresholds({
+      ...thresholds,
+      [slider.dataset['key'] as keyof Thresholds]:
+          MIN_THRESHOLD + slider.value * THRESHOLD_STEP,
+    });
   }
 
   protected swatchLabel_(color: string): string {
@@ -516,7 +538,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     };
     this.enabled_ = state.enabled;
     this.pauseMode_ = state.pauseMode;
-    this.eagerness_ = state.eagerness;
+    this.thresholds_ = state.thresholds;
     this.tint_ = await this.browserProxy_.getTint();
   }
 }

@@ -10,6 +10,7 @@
 #include "base/time/time.h"
 #include "url/gurl.h"
 #include "uw/components/tab_organization/ai_protocol.h"
+#include "uw/components/tab_organization/placement.h"
 
 class PrefService;
 namespace user_prefs {
@@ -31,10 +32,14 @@ inline constexpr char kOrganizationPauseModePref[] =
     "uw.organization.pause_mode";
 inline constexpr char kOrganizationPauseUntilPref[] =
     "uw.organization.pause_until";
-// How readily uw moves a branch on a model's answer, from kMinEagerness to
-// kMaxEagerness. See ThresholdsFor.
-inline constexpr char kOrganizationEagernessPref[] =
-    "uw.organization.eagerness";
+// How sure a model must be before uw moves a branch, starts a task, or
+// renames one. See Thresholds.
+inline constexpr char kOrganizationMoveThresholdPref[] =
+    "uw.organization.threshold.move";
+inline constexpr char kOrganizationNewTaskThresholdPref[] =
+    "uw.organization.threshold.new_task";
+inline constexpr char kOrganizationRenameThresholdPref[] =
+    "uw.organization.threshold.rename";
 // Whether the sidebar says what each automatic organization request did.
 inline constexpr char kOrganizationShowActivityPref[] =
     "uw.organization.show_activity";
@@ -127,6 +132,11 @@ bool IsComplete(const DecisionModelConfig& config);
 // True when automatic organization may send requests: it was enabled by a
 // successful validation and at least one connection is complete.
 bool OrganizationReady(const PrefService* prefs);
+
+// The user's thresholds. A stored value outside the range counts as the
+// nearest one in it.
+Thresholds ReadThresholds(const PrefService* prefs);
+void SaveThresholds(PrefService* prefs, const Thresholds& thresholds);
 
 PauseMode ReadPauseState(const PrefService* prefs);
 // `duration` applies to PauseMode::kTimed.

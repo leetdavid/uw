@@ -12,23 +12,23 @@ namespace uw {
 
 // How sure the model must be before uw acts on its answer without asking.
 struct Thresholds {
-  // Of the task a branch belongs to, or that it belongs to none. Also of a
-  // task needing a new name.
+  // Of the task a branch belongs to, or that it belongs to none.
   double confidence;
   // The probability that a branch outside every task starts one of its own.
   // Below it, the branch is a one-off for the Scratchpad.
   double new_task;
+  // The probability that the task a branch is in has outgrown its name.
+  double new_name;
 };
 
-// The eagerness setting: how readily uw moves a branch. Each level up lowers
-// the thresholds.
-inline constexpr int kMinEagerness = 1;
-inline constexpr int kMaxEagerness = 5;
-inline constexpr int kDefaultEagerness = 3;
+// The thresholds until the user sets their own, and the range a setting can
+// take. Half is the least a probability between two answers can ask for.
+inline constexpr Thresholds kDefaultThresholds{0.70, 0.55, 0.70};
+inline constexpr double kMinThreshold = 0.50;
+inline constexpr double kMaxThreshold = 0.95;
 
-// The thresholds at `eagerness`. A level outside the range counts as the
-// nearest one in it.
-Thresholds ThresholdsFor(int eagerness);
+// `value` as a setting: inside the range, in hundredths.
+double AsThreshold(double value);
 
 // Where a branch sits when its answer arrives.
 struct Position {

@@ -428,8 +428,7 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
             {request->in_unnamed_task ? std::string() : request->task,
              request->in_unnamed_task,
              controller_->tree().BranchOf(request->page).size() == 1},
-            ThresholdsFor(
-                profile()->GetPrefs()->GetInteger(kOrganizationEagernessPref)));
+            ReadThresholds(profile()->GetPrefs()));
   request->target = placement.target;
   request->confidence = placement.confidence;
   request->needed = placement.needed;

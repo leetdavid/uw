@@ -1,5 +1,5 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..95201fcc4dff56bbfc16457c16df7315db88b5df 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..d2070ed7553a2c14367577a16e9bee3eb8e5c10a 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
 @@ -3904,6 +3904,181 @@
@@ -138,17 +138,17 @@ index 63c989a76dadc13953e35513998e83326ee3612b..95201fcc4dff56bbfc16457c16df7315
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
 +        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models above. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too. API keys stay in the macOS Keychain.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS" desc="Label of the slider that sets how readily automatic organization moves tabs.">
-+        Sorting
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_MOVE" desc="Label of the slider that sets how sure a model must be before a tab moves into a task or out of one.">
++        Move a tab
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_LOW" desc="The end of the sorting slider where a tab moves only on a very confident answer.">
-+        Careful
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_NEW_TASK" desc="Label of the slider that sets how sure a model must be before a tab starts a new task.">
++        Start a task
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_HIGH" desc="The end of the sorting slider where a tab moves on a weak answer.">
-+        Eager
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_RENAME" desc="Label of the slider that sets how sure a model must be before a task gets a new name.">
++        Rename a task
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_DETAIL" desc="Under the sorting slider: the confidence a model answer needs at the chosen level before a tab moves, and before a new task starts.">
-+        uw moves a tab at confidence <ph name="CONFIDENCE">$1<ex>0.70</ex></ph> or more and starts a new task at <ph name="NEW_TASK">$2<ex>0.55</ex></ph> or more.
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLDS_NOTE" desc="Explains the three sliders above it. Each sets a confidence between 0.50 and 0.95.">
++        How sure the model must be before uw does each of these without asking. Lower, and uw acts more often and is wrong more often.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Heading of the pause controls.">
 +        Pause automatic organization

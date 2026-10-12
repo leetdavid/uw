@@ -583,37 +583,43 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheSortingSliderSetsHowSureAnAnswerMustBe) {
-  const auto detail = [](const char16_t* confidence, const char16_t* new_task) {
-    return l10n_util::GetStringFUTF8(
-        IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_DETAIL, confidence, new_task);
-  };
-  // Presses `key` on the slider and returns the level it then shows.
-  const auto press = [this](const std::string& key) {
+                       EachThresholdHasItsOwnSlider) {
+  // Presses `key` on the slider `id` and returns the threshold then shown
+  // beside it.
+  const auto press = [this](const std::string& id, const std::string& key) {
     return Run(content::JsReplace(
-        "const slider = part('eagerness'); const before = slider.value;"
-        "slider.dispatchEvent(new KeyboardEvent('keydown', {key: $1}));"
-        "await until(() => page().eagerness_.level !== before);"
-        "await page().updateComplete; return slider.value;",
-        key));
+        "const before = text($1 + 'Value');"
+        "part($1).dispatchEvent(new KeyboardEvent('keydown', {key: $2}));"
+        "await until(() => text($1 + 'Value') !== before);"
+        "await page().updateComplete; return text($1 + 'Value');",
+        id, key));
   };
   OpenPage();
-  EXPECT_EQ(kDefaultEagerness, Run("return part('eagerness').value;"));
-  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.70", u"0.55"));
+  ASSERT_EQ(true,
+            Run("await until(() => part('moveThreshold')); return true;"));
+  EXPECT_EQ(TextOf("moveThresholdValue"), "0.70");
+  EXPECT_EQ(TextOf("newTaskThresholdValue"), "0.55");
+  EXPECT_EQ(TextOf("renameThresholdValue"), "0.70");
+  EXPECT_EQ(4, Run("return part('moveThreshold').value;"));
+  EXPECT_EQ(TextOf("thresholdsNote"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_THRESHOLDS_NOTE));
 
-  EXPECT_EQ(kMaxEagerness, press("End"));
-  EXPECT_EQ(prefs()->GetInteger(kOrganizationEagernessPref), kMaxEagerness);
-  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.50", u"0.50"));
-
-  EXPECT_EQ(kMinEagerness, press("Home"));
-  EXPECT_EQ(prefs()->GetInteger(kOrganizationEagernessPref), kMinEagerness);
-  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.90", u"0.75"));
-
-  EXPECT_EQ(kMinEagerness + 1, press("ArrowRight"));
-  SaveWindowScreenshot(browser(), "settings-sorting");
+  EXPECT_EQ("0.95", press("moveThreshold", "End"));
+  EXPECT_EQ("0.50", press("newTaskThreshold", "Home"));
+  EXPECT_EQ("0.75", press("renameThreshold", "ArrowRight"));
+  const Thresholds stored = ReadThresholds(prefs());
+  EXPECT_EQ(stored.confidence, 0.95);
+  EXPECT_EQ(stored.new_task, 0.50);
+  EXPECT_EQ(stored.new_name, 0.75);
+  SaveWindowScreenshot(browser(), "settings-thresholds");
 
   OpenPage();
-  EXPECT_EQ(kMinEagerness + 1, Run("return part('eagerness').value;"));
+  ASSERT_EQ(true,
+            Run("await until(() => part('moveThreshold')); return true;"));
+  EXPECT_EQ(TextOf("moveThresholdValue"), "0.95");
+  EXPECT_EQ(TextOf("newTaskThresholdValue"), "0.50");
+  EXPECT_EQ(TextOf("renameThresholdValue"), "0.75");
+  EXPECT_EQ(9, Run("return part('moveThreshold').value;"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

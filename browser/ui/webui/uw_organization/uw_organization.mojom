@@ -15,12 +15,12 @@ struct Connection {
 };
 
 // How readily uw moves a tab on a model's answer.
-struct Eagerness {
-  // From uw::kMinEagerness to uw::kMaxEagerness.
-  int32 level;
-  // What that level asks of an answer. See uw::Thresholds.
-  double confidence;
+// How sure a model must be before uw moves a tab, starts a task, or renames
+// one. See uw::Thresholds.
+struct Thresholds {
+  double move;
   double new_task;
+  double rename;
 };
 
 struct State {
@@ -29,7 +29,7 @@ struct State {
   bool enabled;
   // Matches uw::PauseMode.
   int32 pause_mode;
-  Eagerness eagerness;
+  Thresholds thresholds;
 };
 
 // One connection as the user entered it. An empty key keeps the stored one.
@@ -98,9 +98,9 @@ interface OrganizationHandler {
   // Save turns it on again.
   TurnOff() => ();
   SetPause(int32 mode) => (PauseResult result);
-  // Takes effect with the next answer. A level outside the range counts as
-  // the nearest one in it.
-  SetEagerness(int32 level) => (Eagerness eagerness);
+  // Takes effect with the next answer. A value outside the range counts as
+  // the nearest one in it. Returns what was stored.
+  SetThresholds(Thresholds thresholds) => (Thresholds thresholds);
 
   GetTint() => (TintState tint);
   // Picks the window tint. Ignores anything that is not a "#RRGGBB" color.

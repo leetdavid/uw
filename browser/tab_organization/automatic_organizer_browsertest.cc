@@ -79,9 +79,9 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     embedded_test_server()->RegisterRequestHandler(
         base::BindRepeating(&ServePage));
     ASSERT_TRUE(embedded_test_server()->Start());
-    // The careful end of the eagerness setting: a move needs confidence 0.90
-    // and a new task 0.75. A test of another level sets its own.
-    prefs()->SetInteger(kOrganizationEagernessPref, kMinEagerness);
+    // Careful thresholds: a move and a new name need 0.90, a new task 0.75.
+    // A test of other values sets its own.
+    SaveThresholds(prefs(), {0.90, 0.75, 0.90});
   }
 
   static std::unique_ptr<net::test_server::HttpResponse> ServePage(
@@ -1032,10 +1032,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(child), 1);
 }
 
-// Without the fixture's careful setting, uw asks for less before it moves a
-// tab or starts a task.
+// Without the fixture's careful values, uw asks for less before it acts,
+// and each kind of answer has its own threshold.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       EagernessSetsHowSureAnAnswerMustBe) {
+                       EachThresholdSetsHowSureOneKindOfAnswerMustBe) {
   const auto [ungrouped, task] = OneTask();
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
@@ -1047,25 +1047,57 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(bar()->card()->headline(), u"Suggested Plan Lisbon trip");
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.75 of 0.90");
 
-  prefs()->ClearPref(kOrganizationEagernessPref);
+  prefs()->ClearPref(kOrganizationMoveThresholdPref);
   Browse(link, "hotels");
   ASSERT_TRUE(SettleAfter(2));
   EXPECT_EQ(link->GetGroup(), task);
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.75 of 0.70");
 
+  // Starting a task still asks for the fixture's 0.75.
   Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.6));
   tabs::TabInterface* other = OpenLinkFrom(ungrouped, "laptops");
   ASSERT_TRUE(SettleAfter(3));
+  EXPECT_FALSE(other->GetGroup());
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.60 of 0.75");
+
+  prefs()->ClearPref(kOrganizationNewTaskThresholdPref);
+  Browse(other, "desks");
+  ASSERT_TRUE(SettleAfter(4));
   ASSERT_TRUE(other->GetGroup());
   EXPECT_NE(other->GetGroup(), task);
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.60 of 0.55");
 
-  prefs()->SetInteger(kOrganizationEagernessPref, kMaxEagerness);
+  SaveThresholds(prefs(), {0.50, 0.95, 0.95});
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   tabs::TabInterface* last = OpenLinkFrom(ungrouped, "flights");
-  ASSERT_TRUE(SettleAfter(4));
+  ASSERT_TRUE(SettleAfter(5));
   EXPECT_EQ(last->GetGroup(), task);
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.50 of 0.50");
+}
+
+// The threshold for a new name is its own. Here uw would neither move a tab
+// nor start a task on these answers, and still renames the task.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheRenameThresholdIsItsOwn) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
+  tabs::TabInterface* first = OpenLinkFrom(InitialTab(), "baixa");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> task = first->GetGroup();
+  ASSERT_TRUE(task);
+
+  SaveThresholds(prefs(), {0.95, 0.95, 0.60});
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.9, 0.9, 0.65));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Lisbon hotels"));
+  tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(second->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Compare Lisbon hotels");
+  EXPECT_EQ(bar()->card()->headline(), u"Naming the task");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.65 of 0.60");
 }
 
 // Web apps keep their state in the address. A tab is asked about again when

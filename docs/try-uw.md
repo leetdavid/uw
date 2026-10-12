@@ -73,9 +73,9 @@ A tab is asked about again when its title changes or it goes to another site. Ch
 
 A task that uw named can change its name. Open a few related pages from it that its name is too narrow for, such as hotels in other parts of town in a task named after one neighbourhood. Expected result: the tabs stay and the task gets a wider name. A task you renamed yourself keeps your name. uw remembers which names it gave across a restart.
 
-The `Sorting` slider on the settings page sets how sure a model must be before a tab moves. Under it the page states the two thresholds of the chosen level. Drag it towards `Eager` and more tabs move on their own. Pinned tabs are never sorted.
+Three sliders on the settings page set how sure a model must be before uw acts without asking: `Move a tab`, `Start a task`, and `Rename a task`. Each shows its number, from 0.50 to 0.95. Drag one down and uw does that one thing more often. Pinned tabs are never sorted.
 
-The [placement rules](plans/automatic-organization.md#placement-rules) and the [eagerness levels](plans/automatic-organization.md#eagerness) were checked against a test server, by replaying logged requests to the live Jev API, and by letting the built app file made-up pages headless with live Jev. Nobody has watched them file tabs in a real window yet.
+The [placement rules](plans/automatic-organization.md#placement-rules) and the [thresholds](plans/automatic-organization.md#thresholds) were checked against a test server, by replaying logged requests to the live Jev API, and by letting the built app file made-up pages headless with live Jev. Nobody has watched them file tabs in a real window yet.
 
 ### Persistence
 

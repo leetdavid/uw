@@ -4,24 +4,13 @@
 #include "uw/components/tab_organization/placement.h"
 
 #include <algorithm>
-#include <array>
+#include <cmath>
 
 namespace uw {
-namespace {
 
-constexpr std::array<Thresholds, kMaxEagerness> kThresholds = {{
-    {0.90, 0.75},
-    {0.80, 0.65},
-    {0.70, 0.55},
-    {0.60, 0.50},
-    {0.50, 0.50},
-}};
-
-}  // namespace
-
-Thresholds ThresholdsFor(int eagerness) {
-  return kThresholds[std::clamp(eagerness, kMinEagerness, kMaxEagerness) -
-                     kMinEagerness];
+double AsThreshold(double value) {
+  return std::clamp(std::round(value * 100.0) / 100.0, kMinThreshold,
+                    kMaxThreshold);
 }
 
 Placement Place(const ClassificationAnswer& answer,
@@ -38,9 +27,9 @@ Placement Place(const ClassificationAnswer& answer,
     return placement;
   }
   const Placement renamed{Action::kName, answer.choice, answer.new_name,
-                          needed.confidence};
+                          needed.new_name};
   const bool outgrown =
-      !position.task.empty() && answer.new_name >= needed.confidence;
+      !position.task.empty() && answer.new_name >= needed.new_name;
   if (fits_a_task) {
     return outgrown ? renamed : placement;
   }
@@ -51,10 +40,10 @@ Placement Place(const ClassificationAnswer& answer,
                            needed.new_task}
                : placement;
   }
-  // A branch that would start a task of its own has left its task, unless it
-  // is the task that has outgrown its name. A one-off says nothing about the
-  // task, so it leaves either way.
-  if (outgrown && answer.new_task >= needed.new_task) {
+  // A branch that no longer matches the name of its task has left the task,
+  // unless it is the task that has outgrown the name. What the model calls a
+  // one-off says nothing about the task, so it leaves either way.
+  if (outgrown && starts_task) {
     return renamed;
   }
   if (!sure) {

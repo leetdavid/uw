@@ -80,9 +80,9 @@ The question in a placement request that asks whether the task a tab branch is i
 **Generated name**:
 A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced.
 
-**Eagerness**:
-The setting for how sure a model must be before uw moves a tab branch without asking. Five levels, from careful to eager, each with a confidence threshold and a new-task threshold.
-_Avoid_: Aggressiveness, sensitivity.
+**Threshold**:
+How sure a model must be before uw acts on one kind of answer without asking. There are three, each set by the user: to move a tab branch, to start a task, and to rename a task.
+_Avoid_: Eagerness, aggressiveness, sensitivity.
 
 **User-directed mode**:
 An organization mode in which the user accepts or rejects task proposals while routine tab placement remains automatic.

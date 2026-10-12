@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {ConnectionInput, Eagerness, ModelsResult, PauseResult, SaveResult, State, TestResult, TintState} from './uw_organization.mojom-webui.js';
+import type {ConnectionInput, ModelsResult, PauseResult, SaveResult, State, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -18,7 +18,7 @@ export interface UwOrganizationBrowserProxy {
       Promise<SaveResult>;
   turnOff(): Promise<void>;
   setPause(mode: number): Promise<PauseResult>;
-  setEagerness(level: number): Promise<Eagerness>;
+  setThresholds(thresholds: Thresholds): Promise<Thresholds>;
   getTint(): Promise<TintState>;
   setTint(color: string): Promise<TintState>;
   clearTint(): Promise<TintState>;
@@ -57,9 +57,9 @@ export class UwOrganizationBrowserProxyImpl implements
     return this.handler.setPause(mode).then(response => response.result);
   }
 
-  setEagerness(level: number) {
-    return this.handler.setEagerness(level).then(
-        response => response.eagerness);
+  setThresholds(thresholds: Thresholds) {
+    return this.handler.setThresholds(thresholds).then(
+        response => response.thresholds);
   }
 
   getTint() {

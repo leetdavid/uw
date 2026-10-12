@@ -43,7 +43,8 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   .uw-slider {
     align-items: center;
     display: flex;
-    gap: 4px;
+    font-variant-numeric: tabular-nums;
+    gap: 8px;
   }
   .uw-slider cr-slider {
     flex: 1;
@@ -130,29 +131,22 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           @change="${this.onEnabledChange_}">
       </cr-toggle>
     </div>
+    ${this.thresholdRows_().map(row => html`
     <div class="uw-row">
-      <div class="uw-label">${this.i18n_('uwOrganizationEagerness')}</div>
-      <div class="uw-field">
-        <div class="uw-slider">
-          <div class="uw-secondary">
-            ${this.i18n_('uwOrganizationEagernessLow')}
-          </div>
-          <cr-slider id="eagerness"
-              aria-label="${this.i18n_('uwOrganizationEagerness')}"
-              .min="${this.eagernessLevels_.min}"
-              .max="${this.eagernessLevels_.max}"
-              .markerCount="${this.eagernessLevels_.count}"
-              .value="${this.eagernessLevel_()}" snaps
-              @cr-slider-value-changed="${this.onEagernessCrSliderValueChanged_}">
-          </cr-slider>
-          <div class="uw-secondary">
-            ${this.i18n_('uwOrganizationEagernessHigh')}
-          </div>
-        </div>
-        <div id="eagernessDetail" class="uw-secondary">
-          ${this.eagernessDetail_()}
+      <div class="uw-label">${row.label}</div>
+      <div class="uw-field uw-slider">
+        <cr-slider id="${row.key}Threshold" data-key="${row.key}"
+            aria-label="${row.label}" .max="${row.stops}"
+            .value="${row.stop}" snaps
+            @cr-slider-value-changed="${this.onThresholdCrSliderValueChanged_}">
+        </cr-slider>
+        <div id="${row.key}ThresholdValue" class="uw-secondary">
+          ${row.shown}
         </div>
       </div>
+    </div>`)}
+    <div id="thresholdsNote" class="uw-note">
+      ${this.i18n_('uwOrganizationThresholdsNote')}
     </div>
   </div>
   ${this.cards_().map(card => html`
