@@ -52,14 +52,20 @@ Click `Organize` at the foot of the sidebar.
 - `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+P do the same. Cmd-T still opens a tab beside the current one, inside its task.
 - `Undo tab organization` reverses the last move, as in the tab menu.
 - The pause items stop and resume automatic organization.
-- `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and its confidence against the 0.90 a move needs. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
+- `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
 - `Tab organization settings` opens the settings page.
 
 ### Automatic organization
 
 Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. `Test connection` checks one model by itself without saving, and `Details` shows what the model answered and what uw sent. The switch at the top of the page turns automatic organization off and on again. Then open a link in a new tab.
 
-Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button. Filing tabs has only been run against a test server, not yet with a live provider.
+Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button.
+
+Then press Cmd-T inside a named task and go to a page that has nothing to do with it.
+
+Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard, and `Created task …` for a page that clearly starts something of its own. A tab with tabs nested under it stays, and the card suggests the move with `Confirm`. A task still called `New task` keeps its tabs.
+
+The [placement rules](plans/automatic-organization.md#placement-rules) were checked against a test server and by replaying logged requests to the live Jev API. Nobody has watched them file tabs in a real window yet.
 
 ### Persistence
 

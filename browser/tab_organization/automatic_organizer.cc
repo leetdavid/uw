@@ -10,6 +10,7 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -17,12 +18,15 @@
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/page_transition_types.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -31,7 +35,6 @@ namespace uw {
 namespace {
 
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
-constexpr char kUntitledTask[] = "Untitled task";
 
 using Kind = AutomaticOrganizer::Event::Kind;
 
@@ -65,6 +68,24 @@ std::u16string FailureReason(const RemoteModelClient::Outcome& outcome) {
                                ? "HTTP " +
                                      base::NumberToString(outcome.http_status)
                                : net::ErrorToShortString(outcome.net_error));
+}
+
+// True while every page the tab has shown came from following a link, so
+// what it shows now still descends from the tab that opened it. Typing an
+// address, searching, or picking a bookmark breaks that: a blank new tab and
+// a tab the user reused for something else were not opened from anything.
+bool FollowedLinksOnly(content::WebContents* contents) {
+  content::NavigationController& entries = contents->GetController();
+  for (int i = 0; i <= entries.GetLastCommittedEntryIndex(); ++i) {
+    const ui::PageTransition type =
+        entries.GetEntryAtIndex(i)->GetTransitionType();
+    if (!ui::PageTransitionCoreTypeIs(type, ui::PAGE_TRANSITION_LINK) &&
+        !ui::PageTransitionCoreTypeIs(type, ui::PAGE_TRANSITION_FORM_SUBMIT) &&
+        !ui::PageTransitionCoreTypeIs(type, ui::PAGE_TRANSITION_RELOAD)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace
@@ -226,7 +247,9 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
                                       std::string excerpt) {
   const Page* page = controller_->tree().Find(id);
   const auto activity = pages_.find(id);
-  if (!Enabled() || !page || activity == pages_.end() ||
+  const tabs::TabInterface* tab = controller_->TabFor(id);
+  content::WebContents* contents = tab ? tab->GetContents() : nullptr;
+  if (!Enabled() || !page || !contents || activity == pages_.end() ||
       activity->second.revision != revision) {
     return;
   }
@@ -248,17 +271,18 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
                               : base::UTF16ToUTF8(activity->second.title);
   const auto parent = pages_.find(page->parent);
   request.context.source_description =
-      parent == pages_.end()
+      parent == pages_.end() || !FollowedLinksOnly(contents)
           ? "no source tab"
           : "opened from \"" + base::UTF16ToUTF8(parent->second.title) + "\"";
   request.context.excerpt = std::move(excerpt);
 
   std::vector<std::pair<std::string, std::string>> tasks;
   for (const std::string& task : controller_->tree().Tasks()) {
-    const std::u16string title = controller_->TaskTitle(task);
-    tasks.emplace_back(
-        task, title.empty() ? kUntitledTask : base::UTF16ToUTF8(title));
+    if (Named(task)) {
+      tasks.emplace_back(task, base::UTF16ToUTF8(controller_->TaskTitle(task)));
+    }
   }
+  request.has_tasks = !tasks.empty();
   const std::string& model = decides ? decision.model : language.model;
   std::optional<std::string> body =
       BuildDecisionRequestBody(request.format, model, request.context, tasks);
@@ -301,31 +325,34 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
     Report(Event::Kind::kRequestFailed, *request, FailureReason(outcome));
     return;
   }
-  const std::optional<ClassificationAnswer> answer =
-      ParseDecisionResponse(request->format, outcome.body);
-  request->confidence = answer ? answer->confidence : 0.0;
-  const bool starts_task = answer && answer->choice == kNewTaskOption;
-  const std::optional<tab_groups::TabGroupId> group =
-      answer && !starts_task ? controller_->GroupFor(answer->choice)
-                             : std::nullopt;
+  std::optional<ClassificationAnswer> answer =
+      ParseDecisionResponse(request->format, outcome.body, request->has_tasks);
   if (!answer ||
-      (!starts_task && !group && answer->choice != kScratchpadOption)) {
+      (answer->choice != kNewTaskOption &&
+       answer->choice != kScratchpadOption && !Named(answer->choice))) {
     Report(Event::Kind::kAnswerUnreadable, *request);
     return;
   }
-  if (answer->choice == kScratchpadOption || answer->choice == request->task) {
-    Report(Event::Kind::kLeft, *request);
-    return;
+  // A page with tabs under it stays in its task unless the user says so:
+  // those tabs came from what it showed before.
+  const Placement placement =
+      Place(*answer, Named(request->task) ? request->task : std::string(),
+            controller_->tree().BranchOf(request->page).size() == 1);
+  request->target = placement.target;
+  request->confidence = placement.confidence;
+  request->needed = placement.needed;
+  switch (placement.action) {
+    case Placement::Action::kLeave:
+      Report(Event::Kind::kLeft, *request);
+      return;
+    case Placement::Action::kSuggest:
+      Report(Event::Kind::kUnsure, *request, TargetName(*request));
+      suggestion_ =
+          Suggestion{std::move(*request), std::move(answer->task_name)};
+      return;
+    case Placement::Action::kApply:
+      Apply(std::move(*request), std::move(answer->task_name));
   }
-  if (answer->confidence < kMinConfidence) {
-    Report(Event::Kind::kUnsure, *request,
-           starts_task
-               ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEW_TASK_CHOICE)
-               : controller_->TaskTitle(answer->choice));
-    suggestion_ = Suggestion{std::move(*request), *answer};
-    return;
-  }
-  Apply(std::move(*request), *answer);
 }
 
 void AutomaticOrganizer::AcceptSuggestion() {
@@ -339,25 +366,33 @@ void AutomaticOrganizer::AcceptSuggestion() {
     return;
   }
   LogOrganizerExchange("accepted", suggestion.request.decision,
-                       suggestion.answer.choice, suggestion.request.confidence);
-  Apply(std::move(suggestion.request), suggestion.answer);
+                       suggestion.request.target,
+                       LogDetails(suggestion.request));
+  Apply(std::move(suggestion.request), std::move(suggestion.task_name));
 }
 
 void AutomaticOrganizer::Apply(Request request,
-                               const ClassificationAnswer& answer) {
-  if (answer.choice != kNewTaskOption) {
+                               std::optional<std::u16string> task_name) {
+  if (request.target == kScratchpadOption) {
+    const bool moved = controller_->MoveToScratchpad(
+        {request.page}, TabOrganizationController::Origin::kOrganizer);
+    Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
+           TargetName(request));
+    return;
+  }
+  if (request.target != kNewTaskOption) {
     const std::optional<tab_groups::TabGroupId> group =
-        controller_->GroupFor(answer.choice);
+        controller_->GroupFor(request.target);
     const bool moved =
         group &&
         controller_->MoveToTask({request.page}, *group,
                                 TabOrganizationController::Origin::kOrganizer);
     Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
-           controller_->TaskTitle(answer.choice));
+           TargetName(request));
     return;
   }
-  if (answer.task_name) {
-    CreateTask(request, *answer.task_name);
+  if (task_name) {
+    CreateTask(request, *task_name);
     return;
   }
   const AiConnectionConfig language =
@@ -399,7 +434,7 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   request->naming.took = base::TimeTicks::Now() - request->naming.sent_at;
   request->naming.answer = std::move(outcome);
   LogOrganizerExchange("name", request->naming,
-                       name ? "named" : "no usable name", 0.0);
+                       name ? "named" : "no usable name");
   if (!Current(*request)) {
     Report(Event::Kind::kDropped, *request);
     return;
@@ -423,13 +458,31 @@ void AutomaticOrganizer::Report(Event::Kind kind,
                                 std::u16string detail) {
   if (kind != Event::Kind::kAsking && !request.logged) {
     LogOrganizerExchange("placement", request.decision, ResultName(kind),
-                         request.confidence);
+                         LogDetails(request));
     request.logged = true;
   }
   events_.Notify(Event{kind, base::UTF8ToUTF16(request.context.title),
-                       std::move(detail), request.confidence,
+                       std::move(detail), request.confidence, request.needed,
                        base::UTF8ToUTF16(request.decision.model),
                        request.decision.took});
+}
+
+std::u16string AutomaticOrganizer::TargetName(const Request& request) const {
+  if (request.target == kNewTaskOption) {
+    return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEW_TASK_CHOICE);
+  }
+  return request.target == kScratchpadOption
+             ? l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD)
+             : controller_->TaskTitle(request.target);
+}
+
+base::DictValue AutomaticOrganizer::LogDetails(const Request& request) {
+  base::DictValue details;
+  details.Set("from", request.task);
+  details.Set("to", request.target);
+  details.Set("confidence", request.confidence);
+  details.Set("needed", request.needed);
+  return details;
 }
 
 bool AutomaticOrganizer::Current(const Request& request) const {
@@ -438,6 +491,12 @@ bool AutomaticOrganizer::Current(const Request& request) const {
   return Enabled() && page && activity != pages_.end() &&
          activity->second.revision == request.revision &&
          page->task == request.task && page->parent == request.parent;
+}
+
+bool AutomaticOrganizer::Named(const std::string& task) const {
+  const std::u16string title = controller_->TaskTitle(task);
+  return !title.empty() &&
+         title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK);
 }
 
 std::optional<AutomaticOrganizer::Request> AutomaticOrganizer::Take(

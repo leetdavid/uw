@@ -192,7 +192,8 @@ ConnectionTest DecisionTest(const DecisionModelConfig& config,
   }
   test.reads = base::BindRepeating(
       [](DecisionFormat format, const std::string& body) {
-        return ParseDecisionResponse(format, body).has_value();
+        return ParseDecisionResponse(format, body, /*has_tasks=*/false)
+            .has_value();
       },
       format);
   return test;
@@ -216,7 +217,8 @@ ConnectionTest LanguageTest(const AiConnectionConfig& config,
   test.reads = base::BindRepeating(
       [](bool names_only, const std::string& body) {
         return names_only ? ParseNamingResponse(body).has_value()
-                          : ParseDecisionResponse(DecisionFormat::kChat, body)
+                          : ParseDecisionResponse(DecisionFormat::kChat, body,
+                                                  /*has_tasks=*/false)
                                 .has_value();
       },
       names_only);

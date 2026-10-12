@@ -60,7 +60,7 @@ A set of related changes to the tab tree, such as creating a task group and movi
 The organizer's suggestion that a set of tabs represents a separate browsing task.
 
 **Classification call**:
-One LLM request that decides a tab branch's placement — leave in Scratchpad, move to an existing task, or create a new task — with a confidence value, and supplies the name when it creates a task.
+One LLM request that decides a tab branch's placement. It says which task the branch belongs to, or none, with a confidence. For a branch outside every task it says how likely the branch starts a task of its own, and supplies the name of that task.
 
 **Provisional task name**:
 The `New task` title a newly created task keeps when its classification call returns no valid name.

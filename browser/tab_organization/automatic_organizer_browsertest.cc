@@ -216,6 +216,12 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     return tabs()->group_model()->GetTabGroup(group)->visual_data()->title();
   }
 
+  // Opens a blank tab beside `tab`, in its task and under its parent.
+  tabs::TabInterface* NewTabBeside(tabs::TabInterface* tab) {
+    tabs()->ActivateTabAt(tabs()->GetIndexOfTab(tab));
+    return NewTab();
+  }
+
   // A window with one ungrouped tab and one task. Returns {ungrouped, task}.
   std::pair<tabs::TabInterface*, tab_groups::TabGroupId> OneTask() {
     tabs::TabInterface* grouped = InitialTab();
@@ -317,6 +323,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(requests[0].body.find("Title: lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Notes about lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Plan Lisbon trip"), std::string::npos);
+  EXPECT_NE(requests[0].body.find("Source: opened from"), std::string::npos);
 
   bar()->Undo();
   EXPECT_FALSE(link->GetGroup());
@@ -328,7 +335,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        JevDecidesAndTheLanguageModelNamesTheNewTask) {
   UseDecisionModel(DecisionProvider::kJev);
   UseLanguageModel();
-  Answer("/v1/systemone", SystemOneAnswer("new_task", 0.97));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
 
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
@@ -339,7 +346,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(InitialTab()->GetGroup());
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_EQ(bar()->card()->headline(), u"Created task Plan Lisbon trip");
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.90");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.75");
   EXPECT_TRUE(bar()->card()->offers_undo());
 
   const std::vector<ModelRequest> requests = Requests();
@@ -347,6 +354,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(requests[0].path, "/v1/systemone");
   EXPECT_EQ(requests[0].authorization, "Bearer decision-key");
   EXPECT_NE(requests[0].body.find("\"criteria\""), std::string::npos);
+  // With no task to belong to, only the second question is asked.
+  EXPECT_EQ(requests[0].body.find("\"destination\""), std::string::npos);
+  EXPECT_NE(requests[0].body.find("\"otherwise\""), std::string::npos);
   EXPECT_EQ(requests[1].path, "/v1/chat/completions");
   EXPECT_EQ(requests[1].authorization, "Bearer language-key");
 
@@ -357,7 +367,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        DecisionModelAloneCreatesAnUnnamedTask) {
   UseDecisionModel(DecisionProvider::kOpenAi);
-  Answer("/v1/decisions", DecisionsAnswer("new_task", 0.93));
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.93, 0.8));
 
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
   ASSERT_TRUE(SettleAfter(1));
@@ -371,8 +381,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        WithoutADecisionModelTheLanguageModelDecidesAndNames) {
   UseLanguageModel();
   Answer("/v1/chat/completions",
-         ChatAnswer(R"({\"decision\":\"new_task\",\"confidence\":0.95,)"
-                    R"(\"name\":\"Read news\"})"));
+         ChatAnswer(R"({\"task\":\"none\",\"confidence\":0.95,)"
+                    R"(\"new_task\":0.9,\"name\":\"Read news\"})"));
 
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "news");
   ASSERT_TRUE(SettleAfter(1));
@@ -409,7 +419,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(bar()->card()->offers_undo());
   SaveWindowScreenshot(browser(), "activity");
 
-  Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.99));
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
   Browse(link, "weather");
   ASSERT_TRUE(SettleAfter(3));
   EXPECT_FALSE(link->GetGroup());
@@ -506,7 +516,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        EveryRequestAndItsAnswerIsWritten) {
   UseDecisionModel(DecisionProvider::kJev);
   UseLanguageModel();
-  Answer("/v1/systemone", SystemOneAnswer("new_task", 0.97));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
   OpenLinkFrom(InitialTab(), "lisbon");
   ASSERT_TRUE(SettleAfter(2));
@@ -520,12 +530,15 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
             embedded_test_server()->GetURL("/v1/systemone").spec());
   EXPECT_EQ(*placement.FindString("result"), "new_task");
   EXPECT_EQ(placement.FindDouble("confidence"), 0.97);
+  EXPECT_EQ(placement.FindDouble("needed"), 0.75);
+  EXPECT_EQ(*placement.FindString("from"), "");
+  EXPECT_EQ(*placement.FindString("to"), "new_task");
   EXPECT_EQ(placement.FindInt("http_status"), 200);
   EXPECT_NE(
       placement.FindStringByDottedPath("request.state")->find("Title: lisbon"),
       std::string::npos);
   EXPECT_EQ(
-      *placement.FindStringByDottedPath("answer.answers.destination.choice"),
+      *placement.FindStringByDottedPath("answer.answers.otherwise.choice"),
       "new_task");
 
   const base::DictValue& name = lines[1];
@@ -569,6 +582,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   const base::DictValue& accepted = lines[1];
   EXPECT_EQ(*accepted.FindString("purpose"), "accepted");
   EXPECT_EQ(*accepted.FindString("result"), task.ToString());
+  EXPECT_EQ(*accepted.FindString("to"), task.ToString());
   EXPECT_EQ(accepted.FindDouble("confidence"), 0.5);
   ASSERT_TRUE(accepted.FindDict("request"));
   EXPECT_NE(base::WriteJson(*accepted.FindDict("request"))
@@ -584,17 +598,153 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(LogLines().size(), 2u);
 }
 
+// A blank tab opens inside the task of the tab beside it. Once the user takes
+// it somewhere that fits no task, it leaves for the Scratchpad.
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       ATabThatFitsNoTaskLeavesItForTheScratchpad) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  ASSERT_EQ(in_task->GetGroup(), task);
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* link = OpenLinkFrom(in_task, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+
+  tabs::TabInterface* blank = NewTabBeside(link);
+  ASSERT_EQ(blank->GetGroup(), task);
+  ASSERT_EQ(controller()->DepthFor(blank), 1);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.97, 0.1));
+  Browse(blank, "weather");
+  ASSERT_TRUE(SettleAfter(2));
+
+  EXPECT_FALSE(blank->GetGroup());
+  EXPECT_EQ(link->GetGroup(), task);
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Moved to Scratchpad");
+  EXPECT_EQ(bar()->card()->page(), u"weather");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.90");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+
+  // Only the tab a link opened is described as coming from its parent.
+  std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_NE(requests[0].body.find("Source: opened from"), std::string::npos);
+  EXPECT_NE(requests[1].body.find("Source: no source tab"), std::string::npos);
+
+  const std::vector<base::DictValue> lines = LogLines();
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[0].FindString("result"), "left");
+  EXPECT_EQ(*lines[1].FindString("result"), "moved");
+  EXPECT_EQ(*lines[1].FindString("from"), task.ToString());
+  EXPECT_EQ(*lines[1].FindString("to"), "scratchpad");
+  EXPECT_EQ(lines[1].FindDouble("confidence"), 0.97);
+
+  bar()->Undo();
+  EXPECT_EQ(blank->GetGroup(), task);
+
+  // A tab the user reuses for something else is no longer opened from
+  // anything either.
+  Browse(link, "news");
+  ASSERT_TRUE(SettleAfter(3));
+  requests = Requests();
+  EXPECT_NE(requests[2].body.find("Source: no source tab"), std::string::npos);
+  EXPECT_FALSE(link->GetGroup());
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATabThatClearlyStartsATaskLeavesForItsOwn) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8));
+  Answer("/v1/chat/completions", ChatAnswer("Compare laptops"));
+  tabs::TabInterface* blank = NewTabBeside(tabs()->GetTabAtIndex(1));
+  ASSERT_EQ(blank->GetGroup(), task);
+
+  Browse(blank, "laptops");
+  ASSERT_TRUE(SettleAfter(2));
+
+  ASSERT_TRUE(blank->GetGroup());
+  EXPECT_NE(blank->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*blank->GetGroup()), u"Compare laptops");
+  EXPECT_EQ(bar()->card()->headline(), u"Created task Compare laptops");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.80 of 0.75");
+}
+
+// The tabs under a page came from what it showed before, so the page does
+// not take them out of their task without the user.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       APageWithTabsUnderItStaysUntilTheUserConfirms) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = tabs()->GetTabAtIndex(1);
+  ASSERT_EQ(page->GetGroup(), task);
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* link = OpenLinkFrom(page, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.97, 0.1));
+  Browse(page, "weather");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(page->GetGroup(), task);
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested Scratchpad");
+  ASSERT_TRUE(bar()->card()->offers_accept());
+
+  bar()->AcceptSuggestion();
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->card()->headline(), u"Moved to Scratchpad");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+}
+
+// A task that still has the name every new task starts with tells the model
+// nothing, so it is not offered, and its tabs are not taken out of it.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATaskWithoutANameIsNotOfferedAndKeepsItsTabs) {
+  OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  tabs::TabInterface* opened = tabs()->GetActiveTab();
+  const std::optional<tab_groups::TabGroupId> unnamed = opened->GetGroup();
+  ASSERT_TRUE(unnamed);
+  ASSERT_EQ(TitleOf(*unnamed), u"New task");
+
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.97, 0.1));
+  Browse(opened, "weather");
+  ASSERT_TRUE(SettleAfter(1));
+
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_NE(requests[0].body.find("Plan Lisbon trip"), std::string::npos);
+  EXPECT_EQ(requests[0].body.find("New task"), std::string::npos);
+  EXPECT_EQ(opened->GetGroup(), unnamed);
+  EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
+
+  // An answer that names it anyway cannot be used.
+  Answer("/v1/decisions", DecisionsAnswer(unnamed->ToString(), 0.99));
+  tabs::TabInterface* link = OpenLinkFrom(opened, "forecast");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(bar()->card()->headline(), u"Could not read the answer");
+  EXPECT_EQ(link->GetGroup(), unnamed);
+}
+
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AConfirmedNewTaskIsNamedByTheLanguageModel) {
   UseDecisionModel(DecisionProvider::kJev);
   UseLanguageModel();
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
-  Answer("/v1/systemone", SystemOneAnswer("new_task", 0.6));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.6));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
   ASSERT_TRUE(SettleAfter(1));
   ASSERT_FALSE(link->GetGroup());
   EXPECT_EQ(bar()->card()->headline(), u"Suggested a new task");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.60 of 0.75");
   ASSERT_TRUE(bar()->card()->offers_accept());
 
   bar()->AcceptSuggestion();
@@ -721,7 +871,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OrganizationOffSendsNothing) {
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
   prefs()->SetBoolean(kOrganizationEnabledPref, false);
-  Answer("/v1/decisions", DecisionsAnswer("new_task", 0.99));
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
 
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
   organizer()->DispatchNowForTesting();

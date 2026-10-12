@@ -11,17 +11,19 @@
 
 namespace uw {
 
-// Pure request/response handling for the single classification call behind
-// automatic organization. The call runs against an OpenAI-compatible
-// chat-completions endpoint, including Ollama's. No networking, prefs, or
-// credentials here; browser integration owns transport. All functions
-// validate strictly and reject malformed input so a bad provider response can
-// never move a tab.
+// Pure request/response handling for the placement call behind automatic
+// organization. The call asks two things about one tab branch: which of the
+// user's tasks it belongs to, if any, and what a branch outside every task
+// is. No networking, prefs, or credentials here; browser integration owns
+// transport. All functions validate strictly and reject malformed input so a
+// bad provider response can never move a tab.
 
-// Option key meaning "create a new root-level task".
+// A branch outside every task that starts a task of its own.
 extern const char kNewTaskOption[];
-// Option key meaning "leave the branch in Scratchpad".
+// A branch outside every task that is a one-off for the Scratchpad.
 extern const char kScratchpadOption[];
+// What a model answers when the branch belongs to none of the tasks.
+extern const char kNoTaskOption[];
 // Maximum accepted length of a generated task name, in characters.
 extern const size_t kMaxGeneratedTaskNameLength;
 // Maximum accepted length of the readable-page-text excerpt, in characters.
@@ -46,9 +48,15 @@ std::optional<std::string> BuildClassificationRequestBody(
 
 // One validated placement decision from a classification response.
 struct ClassificationAnswer {
-  // A task option key, or kNewTaskOption, or kScratchpadOption.
+  // The task the branch belongs to, as a task option key. For a branch that
+  // belongs to no task: kNewTaskOption when the model finds it more likely
+  // than not that it starts a task of its own, kScratchpadOption otherwise.
   std::string choice;
+  // How sure the model is of that task, or that the branch belongs to none.
   double confidence = 0.0;
+  // For a branch that belongs to no task, the probability that it starts a
+  // task of its own.
+  double new_task = 0.0;
   // Valid generated name for kNewTaskOption, when the format carries one.
   std::optional<std::u16string> task_name;
 };
@@ -64,15 +72,16 @@ std::optional<ClassificationAnswer> ParseClassificationResponse(
 enum class DecisionFormat {
   // OpenAI-compatible chat completions. The answer can carry a task name.
   kChat,
-  // OpenAI Decisions API: POST <base>/decisions with one choice question.
+  // OpenAI Decisions API: POST <base>/decisions with choice questions.
   kDecisions,
-  // TypeSafe System One (Jev): POST <base>/systemone with one choice question.
+  // TypeSafe System One (Jev): POST <base>/systemone with choice questions.
   kSystemOne,
 };
 
 // Builds the request body for one placement decision in `format`. Rejects the
 // same input as BuildClassificationRequestBody, plus task lists too long for
-// one choice question.
+// one choice question. With no tasks, a decision model is asked only what a
+// branch outside every task is.
 std::optional<std::string> BuildDecisionRequestBody(
     DecisionFormat format,
     const std::string& model,
@@ -80,11 +89,14 @@ std::optional<std::string> BuildDecisionRequestBody(
     const std::vector<std::pair<std::string, std::string>>& task_options);
 
 // Parses and validates one placement decision out of a `format` response.
-// Decision models never name tasks, so `task_name` stays empty for them. A
-// refusal, or an answer without a usable confidence, is rejected.
+// `has_tasks` says whether the request listed any task: a decision model's
+// answer must then say which one the branch belongs to, or none. Decision
+// models never name tasks, so `task_name` stays empty for them. A refusal, or
+// an answer without a usable confidence, is rejected.
 std::optional<ClassificationAnswer> ParseDecisionResponse(
     DecisionFormat format,
-    const std::string& body);
+    const std::string& body,
+    bool has_tasks);
 
 // Builds an OpenAI-compatible chat-completions request asking for a short
 // name for the browsing task that `context` starts.

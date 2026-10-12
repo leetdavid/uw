@@ -94,7 +94,8 @@ class TabOrganizationController : public TabStripModelObserver {
   bool MoveToTask(const std::vector<PageId>& ids,
                   const tab_groups::TabGroupId& group,
                   Origin origin = Origin::kUser);
-  bool MoveToScratchpad(const std::vector<PageId>& ids);
+  bool MoveToScratchpad(const std::vector<PageId>& ids,
+                        Origin origin = Origin::kUser);
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);

@@ -215,7 +215,7 @@ void ActivityCard::Show(const Event& event) {
       IDS_UW_ACTIVITY_SOURCE, event.model, Number(event.took.InSecondsF(), 1)));
 
   const std::u16string value = Number(event.confidence, 2);
-  const std::u16string needed = Number(AutomaticOrganizer::kMinConfidence, 2);
+  const std::u16string needed = Number(event.needed, 2);
   const std::u16string hint =
       has_confidence ? l10n_util::GetStringFUTF16(
                            IDS_UW_ACTIVITY_CONFIDENCE_HINT, value, needed)

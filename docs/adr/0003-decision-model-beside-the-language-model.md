@@ -8,6 +8,6 @@ Three providers are supported through two wire formats:
 - The OpenAI Decisions API uses `POST <base>/decisions`, default base `https://api.openai.com/v1`.
 - "OpenAI-compatible" is the same Decisions format at a base URL the user enters, such as a gateway.
 
-Both formats ask one choice question whose options are the current tasks plus "new task" and "Scratchpad". An answer without a usable confidence is dropped.
+Both formats first asked one choice question whose options were the current tasks plus "new task" and "Scratchpad". On 2026-10-12 that became two choice questions in the same call: which task the branch belongs to, or none, and what a branch outside every task is. The one question split the model's vote between its two ways of being outside a task. See the [placement rules](../plans/automatic-organization.md#placement-rules). An answer without a usable confidence is dropped.
 
 Considered options: Jev only, as first planned (rejected: one early-access provider); requiring a decision model (rejected: a local Ollama setup could not organize at all).

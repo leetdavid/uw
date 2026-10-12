@@ -3,6 +3,7 @@
 
 #include "uw/components/tab_organization/ai_protocol.h"
 
+#include <string_view>
 #include <utility>
 
 #include "base/json/json_reader.h"
@@ -15,6 +16,7 @@ namespace uw {
 
 const char kNewTaskOption[] = "new_task";
 const char kScratchpadOption[] = "scratchpad";
+const char kNoTaskOption[] = "none";
 const size_t kMaxGeneratedTaskNameLength = 80;
 const size_t kMaxExcerptLength = 2000;
 
@@ -22,36 +24,46 @@ namespace {
 
 constexpr char kSystemPrompt[] =
     "You organize browser tabs into browsing tasks. The user message "
-    "describes one tab branch with its title, URL, source-tab relationship, "
-    "an optional readable-text excerpt, and the current task list. Decide "
-    "where the branch belongs.\n"
+    "describes one tab with its title, URL, source-tab relationship, an "
+    "optional readable-text excerpt, and the user's tasks.\n"
     "Respond with only a JSON object in this exact shape:\n"
-    "{\"decision\": \"move\" | \"new_task\" | \"leave\", "
-    "\"target\": \"<task key>\", \"confidence\": <number 0..1>, "
-    "\"name\": \"<short task name>\"}\n"
-    "- \"move\": the branch clearly continues one existing task. Set "
-    "\"target\" to that task's key.\n"
-    "- \"new_task\": the branch is clearly a separate browsing task. Set "
-    "\"name\" to a short action-oriented phrase of at most five words.\n"
-    "- \"leave\": keep the branch ungrouped in the Scratchpad.\n"
-    "Prefer \"leave\" when unsure. Only move or create at high confidence "
-    "(0.90 or higher).";
+    "{\"task\": \"<task key>\" | \"none\", \"confidence\": <number 0..1>, "
+    "\"new_task\": <number 0..1>, \"name\": \"<short task name>\"}\n"
+    "- \"task\": the key of the task the tab clearly continues, or \"none\" "
+    "when it fits none of them.\n"
+    "- \"confidence\": how sure you are of \"task\".\n"
+    "- \"new_task\": the probability that the tab starts a piece of work or "
+    "research of its own that the user is likely to continue in more tabs. A "
+    "one-off scores low: a quick lookup, a sign-in or verification page, a "
+    "home page, a feed, or a dashboard.\n"
+    "- \"name\": a short action-oriented phrase of at most five words that "
+    "names that piece of work.";
 
 // Some chat models think before they answer, and the provider counts that
 // thinking against the limit. A small limit leaves them no room to answer.
 constexpr int kMaxChatAnswerTokens = 4096;
 
+// A decision model answers two choice questions. The first asks which task
+// the branch belongs to, or none. The second asks what a branch outside every
+// task is. Asked as one question, the two ways of being outside a task split
+// the model's vote, and neither ever looked like a confident answer.
 constexpr char kDestinationQuestion[] = "destination";
+constexpr char kOtherwiseQuestion[] = "otherwise";
 constexpr size_t kMaxDecisionChoices = 255;
-constexpr char kDecisionInstructions[] =
-    "Decide which browsing task this tab branch belongs to. Choose an "
-    "existing task only when the branch clearly continues it. Choose new_task "
-    "when it clearly starts a separate browsing task. Choose scratchpad when "
-    "unsure.";
+constexpr char kDestinationInstructions[] =
+    "Decide which of the user's browsing tasks this tab belongs to. Choose a "
+    "task only when the tab clearly continues the work that task names. "
+    "Choose none when it fits none of them.";
+constexpr char kNoTaskDescription[] = "The tab belongs to none of these tasks.";
+constexpr char kOtherwiseInstructions[] =
+    "Suppose this tab belongs to none of the user's existing browsing tasks. "
+    "Decide what it is.";
 constexpr char kNewTaskDescription[] =
-    "Start a new browsing task for this branch.";
+    "The tab starts a piece of work or research of its own that the user is "
+    "likely to continue in more tabs.";
 constexpr char kScratchpadDescription[] =
-    "Leave the branch ungrouped in the Scratchpad.";
+    "The tab is a one-off: a quick lookup, a sign-in or verification page, a "
+    "home page, a feed, or a dashboard.";
 constexpr char kNamingPrompt[] =
     "Name the browsing task that this tab starts. Reply with only the name: a "
     "short, action-oriented phrase of at most five words, with no quotes.";
@@ -60,14 +72,30 @@ bool ValidConfidence(double value) {
   return value >= 0.0 && value <= 1.0;
 }
 
-bool ValidTaskOptions(
-    const std::vector<std::pair<std::string, std::string>>& task_options) {
+using Options = std::vector<std::pair<std::string, std::string>>;
+
+bool Reserved(const std::string& key) {
+  return key == kNewTaskOption || key == kScratchpadOption ||
+         key == kNoTaskOption;
+}
+
+bool ValidTaskOptions(const Options& task_options) {
   for (const auto& [key, name] : task_options) {
-    if (key.empty() || key == kNewTaskOption || key == kScratchpadOption) {
+    if (key.empty() || Reserved(key)) {
       return false;
     }
   }
   return true;
+}
+
+Options DestinationOptions(Options task_options) {
+  task_options.emplace_back(kNoTaskOption, kNoTaskDescription);
+  return task_options;
+}
+
+Options OtherwiseOptions() {
+  return {{kNewTaskOption, kNewTaskDescription},
+          {kScratchpadOption, kScratchpadDescription}};
 }
 
 std::string DescribeBranch(const BranchContext& context) {
@@ -111,46 +139,100 @@ std::optional<ClassificationAnswer> ChoiceAnswer(
   return result;
 }
 
-std::optional<double> ListedProbability(const base::DictValue& answer) {
-  const std::string* choice = answer.FindString("choice");
-  const base::ListValue* probabilities = answer.FindList("probabilities");
-  if (!choice || !probabilities) {
+// The probability a choice answer gives `option`. The Decisions API lists
+// them as {value, probability} pairs, System One as a dictionary.
+std::optional<double> Probability(const base::DictValue& answer,
+                                  std::string_view option) {
+  if (const base::DictValue* table = answer.FindDict("probabilities")) {
+    return table->FindDouble(option);
+  }
+  const base::ListValue* listed = answer.FindList("probabilities");
+  if (!listed) {
     return std::nullopt;
   }
-  for (const base::Value& item : *probabilities) {
+  for (const base::Value& item : *listed) {
     const base::DictValue* entry = item.GetIfDict();
     const std::string* value = entry ? entry->FindString("value") : nullptr;
-    if (value && *value == *choice) {
+    if (value && *value == option) {
       return entry->FindDouble("probability");
     }
   }
   return std::nullopt;
 }
 
+std::optional<double> ChosenProbability(const base::DictValue& answer) {
+  const std::string* choice = answer.FindString("choice");
+  return choice ? Probability(answer, *choice) : std::nullopt;
+}
+
+// Joins the answers to the two questions into one decision. `destination` is
+// read only when the request listed tasks. `listed` lets a missing confidence
+// fall back on the probability the answer lists for its choice.
+std::optional<ClassificationAnswer> JoinAnswers(
+    const base::DictValue* destination,
+    const base::DictValue* otherwise,
+    bool has_tasks,
+    bool listed) {
+  const auto read = [listed](const base::DictValue* answer) {
+    return answer ? ChoiceAnswer(*answer, listed ? ChosenProbability(*answer)
+                                                 : std::nullopt)
+                  : std::nullopt;
+  };
+  double outside = 1.0;
+  if (has_tasks) {
+    std::optional<ClassificationAnswer> task = read(destination);
+    if (!task || task->choice == kNewTaskOption ||
+        task->choice == kScratchpadOption) {
+      return std::nullopt;
+    }
+    if (task->choice != kNoTaskOption) {
+      return task;
+    }
+    outside = task->confidence;
+  }
+  std::optional<ClassificationAnswer> kind = read(otherwise);
+  if (!kind ||
+      (kind->choice != kNewTaskOption && kind->choice != kScratchpadOption)) {
+    return std::nullopt;
+  }
+  const double new_task =
+      Probability(*otherwise, kNewTaskOption)
+          .value_or(kind->choice == kNewTaskOption ? kind->confidence
+                                                   : 1.0 - kind->confidence);
+  if (!ValidConfidence(new_task)) {
+    return std::nullopt;
+  }
+  kind->confidence = outside;
+  kind->new_task = new_task;
+  return kind;
+}
+
 std::optional<std::string> BuildDecisionsRequestBody(
     const std::string& model,
     const BranchContext& context,
-    const std::vector<std::pair<std::string, std::string>>& task_options) {
-  base::ListValue choices;
-  const auto add = [&choices](const std::string& value,
-                              const std::string& description) {
-    base::DictValue choice;
-    choice.Set("value", value);
-    choice.Set("description", description);
-    choices.Append(std::move(choice));
-  };
-  for (const auto& [key, name] : task_options) {
-    add(key, name);
-  }
-  add(kNewTaskOption, kNewTaskDescription);
-  add(kScratchpadOption, kScratchpadDescription);
-  base::DictValue question;
-  question.Set("type", "choice");
-  question.Set("name", kDestinationQuestion);
-  question.Set("instructions", kDecisionInstructions);
-  question.Set("choices", std::move(choices));
+    const Options& task_options) {
   base::ListValue questions;
-  questions.Append(std::move(question));
+  const auto ask = [&questions](const char* name, const char* instructions,
+                                const Options& options) {
+    base::ListValue choices;
+    for (const auto& [value, description] : options) {
+      base::DictValue choice;
+      choice.Set("value", value);
+      choice.Set("description", description);
+      choices.Append(std::move(choice));
+    }
+    base::DictValue question;
+    question.Set("type", "choice");
+    question.Set("name", name);
+    question.Set("instructions", instructions);
+    question.Set("choices", std::move(choices));
+    questions.Append(std::move(question));
+  };
+  if (!task_options.empty()) {
+    ask(kDestinationQuestion, kDestinationInstructions,
+        DestinationOptions(task_options));
+  }
+  ask(kOtherwiseQuestion, kOtherwiseInstructions, OtherwiseOptions());
   base::DictValue body;
   body.Set("model", model);
   body.Set("input", DescribeBranch(context));
@@ -161,19 +243,25 @@ std::optional<std::string> BuildDecisionsRequestBody(
 std::optional<std::string> BuildSystemOneRequestBody(
     const std::string& model,
     const BranchContext& context,
-    const std::vector<std::pair<std::string, std::string>>& task_options) {
-  base::DictValue criteria;
-  for (const auto& [key, name] : task_options) {
-    criteria.Set(key, name);
-  }
-  criteria.Set(kNewTaskOption, kNewTaskDescription);
-  criteria.Set(kScratchpadOption, kScratchpadDescription);
-  base::DictValue question;
-  question.Set("type", "choice");
-  question.Set("instructions", kDecisionInstructions);
-  question.Set("criteria", std::move(criteria));
+    const Options& task_options) {
   base::DictValue questions;
-  questions.Set(kDestinationQuestion, std::move(question));
+  const auto ask = [&questions](const char* name, const char* instructions,
+                                const Options& options) {
+    base::DictValue criteria;
+    for (const auto& [key, description] : options) {
+      criteria.Set(key, description);
+    }
+    base::DictValue question;
+    question.Set("type", "choice");
+    question.Set("instructions", instructions);
+    question.Set("criteria", std::move(criteria));
+    questions.Set(name, std::move(question));
+  };
+  if (!task_options.empty()) {
+    ask(kDestinationQuestion, kDestinationInstructions,
+        DestinationOptions(task_options));
+  }
+  ask(kOtherwiseQuestion, kOtherwiseInstructions, OtherwiseOptions());
   base::DictValue body;
   body.Set("model", model);
   body.Set("state", DescribeBranch(context));
@@ -182,27 +270,36 @@ std::optional<std::string> BuildSystemOneRequestBody(
 }
 
 std::optional<ClassificationAnswer> ParseDecisionsResponse(
-    const base::DictValue& response) {
+    const base::DictValue& response,
+    bool has_tasks) {
   const base::ListValue* answers = response.FindList("answers");
   if (!answers) {
     return std::nullopt;
   }
-  for (const base::Value& item : *answers) {
-    const base::DictValue* answer = item.GetIfDict();
-    const std::string* name = answer ? answer->FindString("name") : nullptr;
-    if (name && *name == kDestinationQuestion) {
-      return ChoiceAnswer(*answer, ListedProbability(*answer));
+  const auto find = [answers](std::string_view question) {
+    for (const base::Value& item : *answers) {
+      const base::DictValue* answer = item.GetIfDict();
+      const std::string* name = answer ? answer->FindString("name") : nullptr;
+      if (name && *name == question) {
+        return answer;
+      }
     }
-  }
-  return std::nullopt;
+    return static_cast<const base::DictValue*>(nullptr);
+  };
+  return JoinAnswers(find(kDestinationQuestion), find(kOtherwiseQuestion),
+                     has_tasks, /*listed=*/true);
 }
 
 std::optional<ClassificationAnswer> ParseSystemOneResponse(
-    const base::DictValue& response) {
+    const base::DictValue& response,
+    bool has_tasks) {
   const base::DictValue* answers = response.FindDict("answers");
-  const base::DictValue* answer =
-      answers ? answers->FindDict(kDestinationQuestion) : nullptr;
-  return answer ? ChoiceAnswer(*answer, std::nullopt) : std::nullopt;
+  if (!answers) {
+    return std::nullopt;
+  }
+  return JoinAnswers(answers->FindDict(kDestinationQuestion),
+                     answers->FindDict(kOtherwiseQuestion), has_tasks,
+                     /*listed=*/false);
 }
 
 // Accepts the JSON object alone or inside a Markdown code fence.
@@ -297,29 +394,31 @@ std::optional<ClassificationAnswer> ParseClassificationResponse(
   if (!answer_dict) {
     return std::nullopt;
   }
-  const std::string* decision = answer_dict->FindString("decision");
+  const std::string* task = answer_dict->FindString("task");
   std::optional<double> confidence = answer_dict->FindDouble("confidence");
-  if (!decision || !confidence || !ValidConfidence(*confidence)) {
+  if (!task || task->empty() || *task == kNewTaskOption ||
+      *task == kScratchpadOption || !confidence ||
+      !ValidConfidence(*confidence)) {
     return std::nullopt;
   }
   ClassificationAnswer answer;
   answer.confidence = *confidence;
-  if (*decision == "leave") {
-    answer.choice = kScratchpadOption;
-  } else if (*decision == "new_task") {
-    answer.choice = kNewTaskOption;
-    if (const std::string* name = answer_dict->FindString("name")) {
-      answer.task_name = ValidTaskName(*name);
-    }
-  } else if (*decision == "move") {
-    const std::string* target = answer_dict->FindString("target");
-    if (!target || target->empty() || *target == kNewTaskOption ||
-        *target == kScratchpadOption) {
-      return std::nullopt;
-    }
-    answer.choice = *target;
-  } else {
+  if (*task != kNoTaskOption) {
+    answer.choice = *task;
+    return answer;
+  }
+  std::optional<double> new_task = answer_dict->FindDouble("new_task");
+  if (!new_task || !ValidConfidence(*new_task)) {
     return std::nullopt;
+  }
+  answer.new_task = *new_task;
+  if (*new_task < 0.5) {
+    answer.choice = kScratchpadOption;
+    return answer;
+  }
+  answer.choice = kNewTaskOption;
+  if (const std::string* name = answer_dict->FindString("name")) {
+    answer.task_name = ValidTaskName(*name);
   }
   return answer;
 }
@@ -334,7 +433,7 @@ std::optional<std::string> BuildDecisionRequestBody(
   }
   if (model.empty() || context.title.empty() ||
       !ValidTaskOptions(task_options) ||
-      task_options.size() + 2 > kMaxDecisionChoices) {
+      task_options.size() + 1 > kMaxDecisionChoices) {
     return std::nullopt;
   }
   return format == DecisionFormat::kDecisions
@@ -344,7 +443,8 @@ std::optional<std::string> BuildDecisionRequestBody(
 
 std::optional<ClassificationAnswer> ParseDecisionResponse(
     DecisionFormat format,
-    const std::string& body) {
+    const std::string& body,
+    bool has_tasks) {
   if (format == DecisionFormat::kChat) {
     return ParseClassificationResponse(body);
   }
@@ -352,8 +452,9 @@ std::optional<ClassificationAnswer> ParseDecisionResponse(
   if (!parsed) {
     return std::nullopt;
   }
-  return format == DecisionFormat::kDecisions ? ParseDecisionsResponse(*parsed)
-                                              : ParseSystemOneResponse(*parsed);
+  return format == DecisionFormat::kDecisions
+             ? ParseDecisionsResponse(*parsed, has_tasks)
+             : ParseSystemOneResponse(*parsed, has_tasks);
 }
 
 std::optional<std::string> BuildNamingRequestBody(

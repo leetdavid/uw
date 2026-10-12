@@ -58,14 +58,14 @@ OrganizerExchange::~OrganizerExchange() = default;
 void LogOrganizerExchange(std::string_view purpose,
                           const OrganizerExchange& exchange,
                           std::string_view result,
-                          double confidence) {
+                          base::DictValue details) {
   const base::FilePath path =
       base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
           kOrganizerLogSwitch);
   if (path.empty()) {
     return;
   }
-  base::DictValue entry;
+  base::DictValue entry = std::move(details);
   entry.Set("time", base::TimeFormatAsIso8601(base::Time::Now()));
   entry.Set("purpose", purpose);
   entry.Set("model", exchange.model);
@@ -76,7 +76,6 @@ void LogOrganizerExchange(std::string_view purpose,
                          ? std::string()
                          : net::ErrorToShortString(exchange.answer.net_error));
   entry.Set("result", result);
-  entry.Set("confidence", confidence);
   entry.Set("request", Parsed(exchange.body));
   entry.Set("answer", Parsed(exchange.answer.body));
   Writer().PostTask(

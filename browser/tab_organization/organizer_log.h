@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "base/time/time.h"
+#include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
 
@@ -34,12 +35,12 @@ struct OrganizerExchange {
 };
 
 // Appends `exchange` to the file named by --uw-organizer-log as one line of
-// JSON. `purpose` is "placement" or "name". `result` says what uw did with
-// the answer, and `confidence` is the one uw compared with its threshold.
+// JSON. `purpose` is "placement", "accepted", or "name". `result` says what
+// uw did with the answer. `details` are further fields of the line.
 void LogOrganizerExchange(std::string_view purpose,
                           const OrganizerExchange& exchange,
                           std::string_view result,
-                          double confidence);
+                          base::DictValue details = base::DictValue());
 
 }  // namespace uw
 

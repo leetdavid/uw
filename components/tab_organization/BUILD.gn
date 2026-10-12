@@ -4,6 +4,8 @@ source_set("tab_organization") {
     "ai_protocol.h",
     "page_tree.cc",
     "page_tree.h",
+    "placement.cc",
+    "placement.h",
   ]
   public_deps = [ "//base" ]
 }
@@ -13,6 +15,7 @@ source_set("unit_tests") {
   sources = [
     "ai_protocol_unittest.cc",
     "page_tree_unittest.cc",
+    "placement_unittest.cc",
   ]
   deps = [
     ":tab_organization",

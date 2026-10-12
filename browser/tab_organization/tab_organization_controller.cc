@@ -303,8 +303,8 @@ bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
   return true;
 }
 
-bool TabOrganizationController::MoveToScratchpad(
-    const std::vector<PageId>& ids) {
+bool TabOrganizationController::MoveToScratchpad(const std::vector<PageId>& ids,
+                                                 Origin origin) {
   const std::vector<PageId> roots = Roots(ids);
   if (roots.empty()) {
     return false;
@@ -314,7 +314,9 @@ bool TabOrganizationController::MoveToScratchpad(
     tree_.MoveToTask(root, std::string());
   }
   Apply();
-  NotifyManualMove(roots);
+  if (origin == Origin::kUser) {
+    NotifyManualMove(roots);
+  }
   return true;
 }
 

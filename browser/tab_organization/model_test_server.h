@@ -27,8 +27,15 @@ struct ModelRequest {
   std::string authorization;
 };
 
-std::string DecisionsAnswer(const std::string& choice, double confidence);
-std::string SystemOneAnswer(const std::string& choice, double confidence);
+// A decision model's answer that the tab belongs to the task `choice` or, for
+// "none", to no task. `new_task` is the probability it gives a tab outside
+// every task of starting one of its own.
+std::string DecisionsAnswer(const std::string& choice,
+                            double confidence,
+                            double new_task = 0.0);
+std::string SystemOneAnswer(const std::string& choice,
+                            double confidence,
+                            double new_task = 0.0);
 // `escaped_content` is the assistant message, already escaped for JSON.
 std::string ChatAnswer(const std::string& escaped_content);
 

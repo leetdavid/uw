@@ -69,7 +69,7 @@ constexpr char kHelpers[] = R"(
 )";
 
 constexpr char kChatDecision[] =
-    R"({\"decision\":\"leave\",\"confidence\":0.9})";
+    R"({\"task\":\"none\",\"confidence\":0.9,\"new_task\":0.1})";
 
 // What a model that thinks first answers when its thinking used up the whole
 // token limit.
@@ -216,7 +216,7 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        JevAndALanguageModelValidate) {
-  models_.Answer("/v1/systemone", SystemOneAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
   models_.Answer("/v1/chat/completions", ChatAnswer("Check connection"));
   OpenPage();
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
@@ -260,7 +260,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        EachConnectionIsTestedByItselfAndSavesNothing) {
-  models_.Answer("/v1/systemone", SystemOneAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
   models_.Answer("/v1/chat/completions", kThinkingRanOut);
   OpenPage();
   Choose("decisionKind", Number(DecisionProvider::kJev));
@@ -355,7 +355,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        OpenAiDecisionsValidatesWithoutALanguageModel) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
   OpenPage();
   Choose("decisionKind", Number(DecisionProvider::kOpenAi));
   EXPECT_EQ(ValueOf("decisionEndpoint"), kOpenAiDefaultEndpoint);
@@ -374,7 +374,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        OpenAiCompatibleDecisionModelValidates) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("new_task", 0.7));
+  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.7, 0.7));
   OpenPage();
   Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
   EXPECT_EQ(ValueOf("decisionEndpoint"), "");
@@ -413,7 +413,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        AFailedSaveTurnsOrganizationOff) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
   OpenPage();
   Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
   Type("decisionEndpoint", Endpoint());
@@ -442,7 +442,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        TheSwitchTurnsOrganizationOffAndOnAgain) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.9));
+  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
   OpenPage();
   EXPECT_FALSE(ToggleIsOn());
   EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET));

@@ -16,6 +16,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "base/values.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
@@ -24,6 +25,7 @@
 #include "uw/browser/tab_organization/remote_model_client.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 #include "uw/components/tab_organization/page_tree.h"
+#include "uw/components/tab_organization/placement.h"
 
 class BrowserWindowInterface;
 class Profile;
@@ -39,13 +41,13 @@ class TabOrganizationController;
 
 // Files tab branches into tasks in the background. When a page's title or
 // URL changes, it asks the decision model, or the language model when there
-// is none, where the branch belongs, and applies a confident answer through
-// the controller as one undoable action. It never blocks browsing: a slow,
-// failed, or stale answer changes nothing.
+// is none, which task the branch belongs to, if any. A confident answer moves
+// the branch into that task, out of a task it no longer fits, or into a new
+// task, through the controller as one undoable action. It never blocks
+// browsing: a slow, failed, or stale answer changes nothing.
 class AutomaticOrganizer : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(AutomaticOrganizer);
-  static constexpr double kMinConfidence = 0.90;
 
   // One step of the organizer's work on a tab, for the sidebar.
   struct Event {
@@ -54,12 +56,14 @@ class AutomaticOrganizer : public TabStripModelObserver {
       kAsking,
       // The language model was asked for a task name. `detail` is that model.
       kNaming,
-      // The tab moved into the task named `detail`, or started it.
+      // The tab moved into the task named `detail`, or started it. A tab
+      // that left its task moved to `detail`, the Scratchpad.
       kMoved,
       kCreated,
-      // The model chose to leave the tab where it is.
+      // The tab is already where the answer puts it.
       kLeft,
-      // The model suggested `detail` with less than kMinConfidence.
+      // The answer fell short of what a move needs. `detail` is where it
+      // would have put the tab.
       kUnsure,
       // `detail` is the HTTP status or the network error.
       kRequestFailed,
@@ -71,8 +75,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
     // The tab's title.
     std::u16string page;
     std::u16string detail;
-    // The model's confidence in its choice. Zero when it gave no usable one.
+    // The number that decided the answer, and what it had to reach for uw
+    // to act. Zero when the model gave no usable answer.
     double confidence = 0.0;
+    double needed = 0.0;
     // The model that was asked where the tab belongs.
     std::u16string model;
     // How long its answer took. Zero while the request is out.
@@ -88,8 +94,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   using EventCallback = base::RepeatingCallback<void(const Event&)>;
   base::CallbackListSubscription ObserveEvents(EventCallback callback);
   size_t pending_requests() const { return requests_.size(); }
-  // Carries out the last suggestion the model made without enough
-  // confidence, as one undoable action. Does nothing when the tab has changed
+  // Carries out the last suggestion: an answer that fell short of what a
+  // move needs, as one undoable action. Does nothing when the tab has changed
   // or moved since. The acceptance goes to the organizer log as an example
   // the user confirmed.
   void AcceptSuggestion();
@@ -110,20 +116,25 @@ class AutomaticOrganizer : public TabStripModelObserver {
     std::string task;
     PageId parent;
     DecisionFormat format = DecisionFormat::kChat;
+    // True when the request listed at least one task.
+    bool has_tasks = false;
     BranchContext context;
     // The placement request, and the naming request when there was one.
     OrganizerExchange decision;
     OrganizerExchange naming;
+    // What uw made of the answer. See Placement.
+    std::string target;
     double confidence = 0.0;
+    double needed = 0.0;
     // True once the placement request is in the organizer log.
     bool logged = false;
     std::unique_ptr<RemoteModelClient> client;
   };
 
-  // The last answer that fell short of kMinConfidence, with its request.
+  // The last answer that was only suggested, with its request.
   struct Suggestion {
     Request request;
-    ClassificationAnswer answer;
+    std::optional<std::u16string> task_name;
   };
 
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
@@ -141,8 +152,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
-  // Moves the branch to the answer's task, or starts the task it asks for.
-  void Apply(Request request, const ClassificationAnswer& answer);
+  // Moves the branch to `request.target`: a task, the Scratchpad, or a new
+  // task, named `task_name` or else by the language model.
+  void Apply(Request request, std::optional<std::u16string> task_name);
   void CreateTask(Request& request, std::u16string title);
   // Tells the sidebar. The first report after the answer also writes the
   // placement request to the organizer log.
@@ -151,6 +163,13 @@ class AutomaticOrganizer : public TabStripModelObserver {
               std::u16string detail = std::u16string());
   // True while the branch is where it was, and unchanged, since the request.
   bool Current(const Request& request) const;
+  // What the sidebar calls `request.target`.
+  std::u16string TargetName(const Request& request) const;
+  // Where the branch was, where the answer put it, and the numbers behind it.
+  static base::DictValue LogDetails(const Request& request);
+  // False for a task that still has the name every new task starts with. The
+  // model is not offered such a task: its name says nothing about it.
+  bool Named(const std::string& task) const;
   std::optional<Request> Take(uint64_t request_id);
   void CancelRequestsFor(const PageId& page);
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,

@@ -15,16 +15,38 @@
 
 namespace uw {
 
-std::string DecisionsAnswer(const std::string& choice, double confidence) {
-  return R"({"answers":[{"type":"choice","name":"destination","choice":")" +
-         choice + R"(","confidence":)" + base::NumberToString(confidence) +
-         "}]}";
+namespace {
+
+const char* Otherwise(double new_task) {
+  return new_task >= 0.5 ? "new_task" : "scratchpad";
 }
 
-std::string SystemOneAnswer(const std::string& choice, double confidence) {
+}  // namespace
+
+std::string DecisionsAnswer(const std::string& choice,
+                            double confidence,
+                            double new_task) {
+  return R"({"answers":[{"type":"choice","name":"destination","choice":")" +
+         choice + R"(","confidence":)" + base::NumberToString(confidence) +
+         R"(},{"type":"choice","name":"otherwise","choice":")" +
+         Otherwise(new_task) +
+         R"(","probabilities":[{"value":"new_task","probability":)" +
+         base::NumberToString(new_task) +
+         R"(},{"value":"scratchpad","probability":)" +
+         base::NumberToString(1.0 - new_task) + "}]}]}";
+}
+
+std::string SystemOneAnswer(const std::string& choice,
+                            double confidence,
+                            double new_task) {
   return R"({"answers":{"destination":{"type":"choice","choice":")" + choice +
          R"(","confidence":)" + base::NumberToString(confidence) +
-         R"(,"probabilities":{}}}})";
+         R"(,"probabilities":{}},"otherwise":{"type":"choice","choice":")" +
+         Otherwise(new_task) + R"(","confidence":)" +
+         base::NumberToString(new_task >= 0.5 ? 2 * new_task - 1
+                                              : 1 - 2 * new_task) +
+         R"(,"probabilities":{"new_task":)" + base::NumberToString(new_task) +
+         R"(,"scratchpad":)" + base::NumberToString(1.0 - new_task) + "}}}}";
 }
 
 std::string ChatAnswer(const std::string& escaped_content) {
