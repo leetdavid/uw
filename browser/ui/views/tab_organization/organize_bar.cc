@@ -40,6 +40,8 @@ using Kind = AutomaticOrganizer::Event::Kind;
 // How long the card stays after a move, and after any other answer.
 constexpr base::TimeDelta kChangeDuration = base::Seconds(6);
 constexpr base::TimeDelta kAnswerDuration = base::Seconds(8);
+// A suggestion stays longer, to leave time to confirm it.
+constexpr base::TimeDelta kSuggestionDuration = base::Seconds(15);
 // Longer than a request can take, so the card cannot outlive its request.
 constexpr base::TimeDelta kAskingDuration = kProviderTimeout + base::Seconds(5);
 constexpr int kRowSpacing = 4;
@@ -56,7 +58,9 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
                           LayoutConstant::kVerticalTabStripHorizontalPadding)));
 
   card_ = AddChildView(std::make_unique<ActivityCard>(
-      base::BindRepeating(&OrganizeBar::Undo, base::Unretained(this))));
+      base::BindRepeating(&OrganizeBar::Undo, base::Unretained(this)),
+      base::BindRepeating(&OrganizeBar::AcceptSuggestion,
+                          base::Unretained(this))));
   card_->Hide();
 
   button_ = AddChildView(std::make_unique<views::MdTextButton>(
@@ -77,7 +81,7 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
     manual_move_subscription_ =
         controller->ObserveManualMoves(base::BindRepeating(
             [](OrganizeBar* bar, const std::vector<PageId>&) {
-              if (bar->card_->offers_undo()) {
+              if (bar->card_->offers_undo() || bar->card_->offers_accept()) {
                 bar->HideCard();
               }
             },
@@ -102,6 +106,12 @@ void OrganizeBar::Undo() {
     controller->Undo();
   }
   HideCard();
+}
+
+void OrganizeBar::AcceptSuggestion() {
+  if (AutomaticOrganizer* organizer = AutomaticOrganizer::From(window_)) {
+    organizer->AcceptSuggestion();
+  }
 }
 
 bool OrganizeBar::IsCommandIdChecked(int command_id) const {
@@ -212,9 +222,10 @@ void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
   card_->Show(event);
   card_timer_.Start(
       FROM_HERE,
-      asking    ? kAskingDuration
-      : changed ? kChangeDuration
-                : kAnswerDuration,
+      asking                        ? kAskingDuration
+      : changed                     ? kChangeDuration
+      : event.kind == Kind::kUnsure ? kSuggestionDuration
+                                    : kAnswerDuration,
       base::BindOnce(&OrganizeBar::HideCard, base::Unretained(this)));
 }
 

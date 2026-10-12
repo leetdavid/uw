@@ -14,6 +14,7 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
 #include "base/run_loop.h"
 #include "base/strings/string_split.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
@@ -536,6 +537,89 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   const std::string text = LogText();
   EXPECT_EQ(text.find("decision-key"), std::string::npos);
   EXPECT_EQ(text.find("language-key"), std::string::npos);
+}
+
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       AConfirmedSuggestionMovesTheTabAndIsLogged) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_FALSE(link->GetGroup());
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested Plan Lisbon trip");
+  EXPECT_TRUE(bar()->card()->offers_accept());
+  EXPECT_FALSE(bar()->card()->offers_undo());
+  SaveWindowScreenshot(browser(), "suggestion");
+
+  bar()->AcceptSuggestion();
+  EXPECT_EQ(link->GetGroup(), task);
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Moved to Plan Lisbon trip");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+  EXPECT_FALSE(bar()->card()->offers_accept());
+  EXPECT_EQ(Requests().size(), 1u);
+
+  const std::vector<base::DictValue> lines = LogLines();
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[0].FindString("purpose"), "placement");
+  EXPECT_EQ(*lines[0].FindString("result"), "unsure");
+  const base::DictValue& accepted = lines[1];
+  EXPECT_EQ(*accepted.FindString("purpose"), "accepted");
+  EXPECT_EQ(*accepted.FindString("result"), task.ToString());
+  EXPECT_EQ(accepted.FindDouble("confidence"), 0.5);
+  ASSERT_TRUE(accepted.FindDict("request"));
+  EXPECT_NE(base::WriteJson(*accepted.FindDict("request"))
+                .value_or(std::string())
+                .find("Title: lisbon"),
+            std::string::npos);
+  EXPECT_TRUE(accepted.FindDict("answer"));
+
+  bar()->Undo();
+  EXPECT_FALSE(link->GetGroup());
+  bar()->AcceptSuggestion();
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(LogLines().size(), 2u);
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AConfirmedNewTaskIsNamedByTheLanguageModel) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/systemone", SystemOneAnswer("new_task", 0.6));
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested a new task");
+  ASSERT_TRUE(bar()->card()->offers_accept());
+
+  bar()->AcceptSuggestion();
+  ASSERT_TRUE(SettleAfter(2));
+  ASSERT_TRUE(link->GetGroup());
+  EXPECT_EQ(TitleOf(*link->GetGroup()), u"Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->headline(), u"Created task Plan Lisbon trip");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ASuggestionForAChangedTabIsNotCarriedOut) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_TRUE(bar()->card()->offers_accept());
+
+  Browse(link, "weather");
+  bar()->AcceptSuggestion();
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->card()->headline(), u"Ignored: the tab changed");
+  EXPECT_FALSE(bar()->card()->offers_accept());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -45,8 +46,8 @@ constexpr int kIconSize = 14;
 constexpr int kIconGap = 6;
 constexpr int kMeterHeight = 4;
 constexpr int kMeterSpacing = 7;
-constexpr int kUndoGap = 6;
-constexpr gfx::Insets kUndoPadding = gfx::Insets::VH(3, 10);
+constexpr int kActionSpacing = 6;
+constexpr gfx::Insets kActionPadding = gfx::Insets::VH(3, 10);
 constexpr int kSmallerText = -1;
 // What an indeterminate views::ProgressBar takes as its value.
 constexpr double kStillWaiting = -1.0;
@@ -137,7 +138,9 @@ std::unique_ptr<views::Label> Line(int size_delta, gfx::Font::Weight weight) {
 
 }  // namespace
 
-ActivityCard::ActivityCard(base::RepeatingClosure undo) {
+ActivityCard::ActivityCard(base::RepeatingClosure undo,
+                           base::RepeatingClosure accept)
+    : undo_(std::move(undo)), accept_(std::move(accept)) {
   SetOrientation(views::LayoutOrientation::kVertical);
   SetInteriorMargin(gfx::Insets(kCardPadding));
   SetBackground(views::CreateRoundedRectBackground(ui::kColorSysHeaderContainer,
@@ -168,21 +171,25 @@ ActivityCard::ActivityCard(base::RepeatingClosure undo) {
   meter_->SetProperty(views::kMarginsKey,
                       gfx::Insets::TLBR(kMeterSpacing, 0, 0, 0));
 
-  // Undo shares the last row with the confidence, which leaves the model
-  // and its time a row to themselves.
-  auto* footer = AddChildView(Row());
-  confidence_ =
-      footer->AddChildView(Line(kSmallerText, gfx::Font::Weight::NORMAL));
-  undo_ = footer->AddChildView(std::make_unique<views::MdTextButton>(
-      std::move(undo), l10n_util::GetStringUTF16(IDS_UW_AUTO_UNDO)));
-  // The card already has the pill's fill, so Undo takes the active tab's.
-  // It is kept small to leave the confidence its full width.
-  undo_->SetBgColorIdOverride(kColorTabBackgroundActiveFrameActive);
-  undo_->SetStrokeColorIdOverride(kColorTabBackgroundActiveFrameActive);
-  undo_->SetEnabledTextColors(kColorTabForegroundActiveFrameActive);
-  undo_->SetCustomPadding(kUndoPadding);
-  undo_->SetMinSize(gfx::Size());
-  undo_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, kUndoGap, 0, 0));
+  confidence_ = AddChildView(Line(kSmallerText, gfx::Font::Weight::NORMAL));
+  confidence_->SetProperty(views::kMarginsKey,
+                           gfx::Insets::TLBR(kLineSpacing, 0, 0, 0));
+
+  // The button has a row to itself, so no line of text gives way to it.
+  action_ =
+      AddChildView(std::make_unique<views::MdTextButton>(base::BindRepeating(
+          &ActivityCard::OnActionPressed, base::Unretained(this))));
+  // The card already has the pill's fill, so the button takes the active
+  // tab's.
+  action_->SetBgColorIdOverride(kColorTabBackgroundActiveFrameActive);
+  action_->SetStrokeColorIdOverride(kColorTabBackgroundActiveFrameActive);
+  action_->SetEnabledTextColors(kColorTabForegroundActiveFrameActive);
+  action_->SetCustomPadding(kActionPadding);
+  action_->SetMinSize(gfx::Size());
+  action_->SetProperty(views::kCrossAxisAlignmentKey,
+                       views::LayoutAlignment::kEnd);
+  action_->SetProperty(views::kMarginsKey,
+                       gfx::Insets::TLBR(kActionSpacing, 0, 0, 0));
 }
 
 ActivityCard::~ActivityCard() = default;
@@ -216,11 +223,15 @@ void ActivityCard::Show(const Event& event) {
   meter_->SetVisible(waits || has_confidence);
   meter_->SetValue(waits ? kStillWaiting : event.confidence);
   meter_->GetViewAccessibility().SetName(hint);
-  confidence_->parent()->SetVisible(has_confidence);
+  confidence_->SetVisible(has_confidence);
   confidence_->SetText(
       l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_CONFIDENCE, value, needed));
   confidence_->SetCustomTooltipText(hint);
-  undo_->SetVisible(OffersUndo(event.kind));
+
+  accepts_ = event.kind == Kind::kUnsure;
+  action_->SetVisible(accepts_ || OffersUndo(event.kind));
+  action_->SetText(
+      l10n_util::GetStringUTF16(accepts_ ? IDS_CONFIRM : IDS_UW_AUTO_UNDO));
   SetVisible(true);
 }
 
@@ -241,8 +252,8 @@ std::u16string_view ActivityCard::page() const {
 }
 
 std::u16string_view ActivityCard::confidence() const {
-  return confidence_->parent()->GetVisible() ? confidence_->GetText()
-                                             : std::u16string_view();
+  return confidence_->GetVisible() ? confidence_->GetText()
+                                   : std::u16string_view();
 }
 
 std::u16string_view ActivityCard::source() const {
@@ -254,7 +265,15 @@ bool ActivityCard::waiting() const {
 }
 
 bool ActivityCard::offers_undo() const {
-  return undo_->GetVisible();
+  return action_->GetVisible() && !accepts_;
+}
+
+bool ActivityCard::offers_accept() const {
+  return action_->GetVisible() && accepts_;
+}
+
+void ActivityCard::OnActionPressed() {
+  (accepts_ ? accept_ : undo_).Run();
 }
 
 BEGIN_METADATA(ActivityCard)

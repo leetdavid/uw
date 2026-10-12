@@ -322,43 +322,68 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
            starts_task
                ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEW_TASK_CHOICE)
                : controller_->TaskTitle(answer->choice));
+    suggestion_ = Suggestion{std::move(*request), *answer};
     return;
   }
-  if (!starts_task) {
-    const bool moved = controller_->MoveToTask(
-        {request->page}, *group, TabOrganizationController::Origin::kOrganizer);
-    Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, *request,
-           controller_->TaskTitle(answer->choice));
+  Apply(std::move(*request), *answer);
+}
+
+void AutomaticOrganizer::AcceptSuggestion() {
+  if (!suggestion_) {
     return;
   }
-  if (answer->task_name) {
-    CreateTask(*request, *answer->task_name);
+  Suggestion suggestion = std::move(*suggestion_);
+  suggestion_.reset();
+  if (!Current(suggestion.request)) {
+    Report(Event::Kind::kDropped, suggestion.request);
+    return;
+  }
+  LogOrganizerExchange("accepted", suggestion.request.decision,
+                       suggestion.answer.choice, suggestion.request.confidence);
+  Apply(std::move(suggestion.request), suggestion.answer);
+}
+
+void AutomaticOrganizer::Apply(Request request,
+                               const ClassificationAnswer& answer) {
+  if (answer.choice != kNewTaskOption) {
+    const std::optional<tab_groups::TabGroupId> group =
+        controller_->GroupFor(answer.choice);
+    const bool moved =
+        group &&
+        controller_->MoveToTask({request.page}, *group,
+                                TabOrganizationController::Origin::kOrganizer);
+    Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
+           controller_->TaskTitle(answer.choice));
+    return;
+  }
+  if (answer.task_name) {
+    CreateTask(request, *answer.task_name);
     return;
   }
   const AiConnectionConfig language =
       ReadAiConnectionConfig(profile()->GetPrefs());
   std::optional<std::string> body =
       IsComplete(language)
-          ? BuildNamingRequestBody(language.model, request->context)
+          ? BuildNamingRequestBody(language.model, request.context)
           : std::nullopt;
   if (body) {
-    request->naming.model = language.model;
-    request->naming.url = ChatCompletionsUrl(language.endpoint);
-    request->naming.body = *body;
-    request->naming.sent_at = base::TimeTicks::Now();
+    request.naming.model = language.model;
+    request.naming.url = ChatCompletionsUrl(language.endpoint);
+    request.naming.body = *body;
+    request.naming.sent_at = base::TimeTicks::Now();
   }
   std::unique_ptr<RemoteModelClient> naming =
-      body ? Client(request->naming.url, language.key_account, std::move(*body))
+      body ? Client(request.naming.url, language.key_account, std::move(*body))
            : nullptr;
   if (!naming) {
-    CreateTask(*request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
+    CreateTask(request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     return;
   }
-  Report(Event::Kind::kNaming, *request, base::UTF8ToUTF16(language.model));
+  Report(Event::Kind::kNaming, request, base::UTF8ToUTF16(language.model));
   const uint64_t naming_id = next_request_++;
   RemoteModelClient* client = naming.get();
-  request->client = std::move(naming);
-  requests_.emplace(naming_id, std::move(*request));
+  request.client = std::move(naming);
+  requests_.emplace(naming_id, std::move(request));
   client->Send(base::BindOnce(&AutomaticOrganizer::OnName,
                               weak_factory_.GetWeakPtr(), naming_id));
 }

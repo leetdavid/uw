@@ -88,6 +88,11 @@ class AutomaticOrganizer : public TabStripModelObserver {
   using EventCallback = base::RepeatingCallback<void(const Event&)>;
   base::CallbackListSubscription ObserveEvents(EventCallback callback);
   size_t pending_requests() const { return requests_.size(); }
+  // Carries out the last suggestion the model made without enough
+  // confidence, as one undoable action. Does nothing when the tab has changed
+  // or moved since. The acceptance goes to the organizer log as an example
+  // the user confirmed.
+  void AcceptSuggestion();
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
 
@@ -115,6 +120,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
     std::unique_ptr<RemoteModelClient> client;
   };
 
+  // The last answer that fell short of kMinConfidence, with its request.
+  struct Suggestion {
+    Request request;
+    ClassificationAnswer answer;
+  };
+
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
 
   Profile* profile() const;
@@ -130,6 +141,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
+  // Moves the branch to the answer's task, or starts the task it asks for.
+  void Apply(Request request, const ClassificationAnswer& answer);
   void CreateTask(Request& request, std::u16string title);
   // Tells the sidebar. The first report after the answer also writes the
   // placement request to the organizer log.
@@ -149,6 +162,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   const raw_ptr<TabStripModel> tabs_;
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
+  std::optional<Suggestion> suggestion_;
   uint64_t next_request_ = 1;
   base::RepeatingCallbackList<void(const Event&)> events_;
   base::OneShotTimer timer_;

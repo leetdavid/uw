@@ -63,6 +63,8 @@ class OrganizeBar : public views::FlexLayoutView,
   const ActivityCard* card() const { return card_; }
   // Reverses the last organization action and puts the card away.
   void Undo();
+  // Carries out the suggestion the card shows.
+  void AcceptSuggestion();
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override;

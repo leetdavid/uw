@@ -26,7 +26,8 @@ namespace uw {
 // one tab. While a model is asked it names the model and the tab, with a
 // spinner and a moving bar. After the answer it says what the model chose,
 // how confident it was against what a move needs, and how long it took.
-// After a move it carries the Undo button.
+// After a move it carries the Undo button, and under a suggestion a button
+// that carries the suggestion out.
 //
 // Every line is one line tall and shortens with an ellipsis, so the card's
 // height never depends on its width and nothing in it is cut off.
@@ -34,7 +35,9 @@ class ActivityCard : public views::FlexLayoutView {
   METADATA_HEADER(ActivityCard, views::FlexLayoutView)
 
  public:
-  explicit ActivityCard(base::RepeatingClosure undo);
+  // `undo` reverses the move the card reports. `accept` carries out the
+  // suggestion it shows.
+  ActivityCard(base::RepeatingClosure undo, base::RepeatingClosure accept);
   ActivityCard(const ActivityCard&) = delete;
   ActivityCard& operator=(const ActivityCard&) = delete;
   ~ActivityCard() override;
@@ -52,8 +55,15 @@ class ActivityCard : public views::FlexLayoutView {
   // True while a model is being asked.
   bool waiting() const;
   bool offers_undo() const;
+  // True while the card shows a suggestion the user can confirm.
+  bool offers_accept() const;
 
  private:
+  void OnActionPressed();
+
+  base::RepeatingClosure undo_;
+  base::RepeatingClosure accept_;
+  bool accepts_ = false;
   raw_ptr<views::Throbber> throbber_ = nullptr;
   raw_ptr<views::ImageView> icon_ = nullptr;
   raw_ptr<views::Label> headline_ = nullptr;
@@ -61,7 +71,8 @@ class ActivityCard : public views::FlexLayoutView {
   raw_ptr<views::ProgressBar> meter_ = nullptr;
   raw_ptr<views::Label> confidence_ = nullptr;
   raw_ptr<views::Label> source_ = nullptr;
-  raw_ptr<views::MdTextButton> undo_ = nullptr;
+  // Undo after a move, Confirm under a suggestion.
+  raw_ptr<views::MdTextButton> action_ = nullptr;
 };
 
 }  // namespace uw
