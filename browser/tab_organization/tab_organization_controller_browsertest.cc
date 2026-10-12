@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/run_loop.h"
+#include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -386,11 +387,12 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_EQ(tasks.size(), 1u);
   EXPECT_EQ(tasks[0]->y(), 0);
 
+  // The sidebar drops the task header a moment after the tab leaves it.
   ASSERT_TRUE(controller()->MoveToScratchpad({Id(page)}));
-  base::RunLoop().RunUntilIdle();
-  rows = TabRows();
-  ASSERT_EQ(rows.size(), 1u);
-  EXPECT_EQ(rows[0]->y(), 24);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    rows = TabRows();
+    return rows.size() == 1u && rows[0]->y() == 24;
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
