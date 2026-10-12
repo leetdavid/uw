@@ -14,12 +14,22 @@ struct Connection {
   bool has_key;
 };
 
+// How readily uw moves a tab on a model's answer.
+struct Eagerness {
+  // From uw::kMinEagerness to uw::kMaxEagerness.
+  int32 level;
+  // What that level asks of an answer. See uw::Thresholds.
+  double confidence;
+  double new_task;
+};
+
 struct State {
   Connection decision;
   Connection language;
   bool enabled;
   // Matches uw::PauseMode.
   int32 pause_mode;
+  Eagerness eagerness;
 };
 
 // One connection as the user entered it. An empty key keeps the stored one.
@@ -88,6 +98,9 @@ interface OrganizationHandler {
   // Save turns it on again.
   TurnOff() => ();
   SetPause(int32 mode) => (PauseResult result);
+  // Takes effect with the next answer. A level outside the range counts as
+  // the nearest one in it.
+  SetEagerness(int32 level) => (Eagerness eagerness);
 
   GetTint() => (TintState tint);
   // Picks the window tint. Ignores anything that is not a "#RRGGBB" color.

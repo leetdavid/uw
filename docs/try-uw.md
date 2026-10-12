@@ -63,9 +63,15 @@ Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` sh
 
 Then press Cmd-T inside a named task and go to a page that has nothing to do with it.
 
-Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard, and `Created task …` for a page that clearly starts something of its own. A tab with tabs nested under it stays, and the card suggests the move with `Confirm`. A task still called `New task` keeps its tabs.
+Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard, and `Created task …` for a page that clearly starts something of its own. A tab with tabs nested under it stays, and the card suggests the move with `Confirm`.
 
-The [placement rules](plans/automatic-organization.md#placement-rules) were checked against a test server and by replaying logged requests to the live Jev API. Nobody has watched them file tabs in a real window yet.
+Then choose `New task` from the `Organize` menu and open a page in it.
+
+Expected result: with a language model set, the task called `New task` takes a name from that page within a few seconds. If the model returns nothing usable, the next page you open in the task tries again. A task you renamed yourself keeps your name.
+
+The `Sorting` slider on the settings page sets how sure a model must be before a tab moves. Under it the page states the two thresholds of the chosen level. Drag it towards `Eager` and more tabs move on their own. Pinned tabs are never sorted.
+
+The [placement rules](plans/automatic-organization.md#placement-rules) and the [eagerness levels](plans/automatic-organization.md#eagerness) were checked against a test server, by replaying logged requests to the live Jev API, and by letting the built app file made-up pages headless with live Jev. Nobody has watched them file tabs in a real window yet.
 
 ### Persistence
 

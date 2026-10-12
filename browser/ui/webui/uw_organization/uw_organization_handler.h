@@ -60,6 +60,7 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
             SaveCallback callback) override;
   void TurnOff(TurnOffCallback callback) override;
   void SetPause(int32_t mode, SetPauseCallback callback) override;
+  void SetEagerness(int32_t level, SetEagernessCallback callback) override;
   void GetTint(GetTintCallback callback) override;
   void SetTint(const std::string& color, SetTintCallback callback) override;
   void ClearTint(ClearTintCallback callback) override;
@@ -68,6 +69,7 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   // One test runs per connection at a time.
   enum Slot { kDecisionSlot = 0, kLanguageSlot = 1 };
 
+  mojom::EagernessPtr CurrentEagerness() const;
   mojom::TintStatePtr CurrentTint() const;
   void StoreDecision(const mojom::ConnectionInput& input);
   void StoreLanguage(const mojom::ConnectionInput& input);

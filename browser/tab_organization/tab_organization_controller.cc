@@ -413,6 +413,19 @@ std::u16string TabOrganizationController::TaskTitle(
              : std::u16string();
 }
 
+void TabOrganizationController::NameTask(const std::string& task,
+                                         const std::u16string& title) {
+  const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
+  if (!group) {
+    return;
+  }
+  const tab_groups::TabGroupVisualData* visuals =
+      tabs_->group_model()->GetTabGroup(*group)->visual_data();
+  tabs_->ChangeTabGroupVisuals(
+      *group, tab_groups::TabGroupVisualData(title, visuals->color(),
+                                             visuals->is_collapsed()));
+}
+
 base::CallbackListSubscription TabOrganizationController::Observe(
     base::RepeatingClosure callback) {
   return changed_.Add(std::move(callback));

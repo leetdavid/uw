@@ -40,6 +40,14 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   .uw-field[hidden] {
     display: none;
   }
+  .uw-slider {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+  }
+  .uw-slider cr-slider {
+    flex: 1;
+  }
   .uw-secondary,
   .uw-note {
     color: var(--cr-secondary-text-color);
@@ -121,6 +129,30 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           ?checked="${this.enabled_}" ?disabled="${this.saving_}"
           @change="${this.onEnabledChange_}">
       </cr-toggle>
+    </div>
+    <div class="uw-row">
+      <div class="uw-label">${this.i18n_('uwOrganizationEagerness')}</div>
+      <div class="uw-field">
+        <div class="uw-slider">
+          <div class="uw-secondary">
+            ${this.i18n_('uwOrganizationEagernessLow')}
+          </div>
+          <cr-slider id="eagerness"
+              aria-label="${this.i18n_('uwOrganizationEagerness')}"
+              .min="${this.eagernessLevels_.min}"
+              .max="${this.eagernessLevels_.max}"
+              .markerCount="${this.eagernessLevels_.count}"
+              .value="${this.eagernessLevel_()}" snaps
+              @cr-slider-value-changed="${this.onEagernessCrSliderValueChanged_}">
+          </cr-slider>
+          <div class="uw-secondary">
+            ${this.i18n_('uwOrganizationEagernessHigh')}
+          </div>
+        </div>
+        <div id="eagernessDetail" class="uw-secondary">
+          ${this.eagernessDetail_()}
+        </div>
+      </div>
     </div>
   </div>
   ${this.cards_().map(card => html`

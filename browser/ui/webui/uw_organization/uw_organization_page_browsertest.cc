@@ -34,6 +34,7 @@
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/components/look/tint.h"
+#include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
@@ -579,6 +580,40 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
             l10n_util::GetStringFUTF8(
                 IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED, u"#2747C7",
                 base::UTF8ToUTF16(Hex(tint.start))));
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheSortingSliderSetsHowSureAnAnswerMustBe) {
+  const auto detail = [](const char16_t* confidence, const char16_t* new_task) {
+    return l10n_util::GetStringFUTF8(
+        IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_DETAIL, confidence, new_task);
+  };
+  // Presses `key` on the slider and returns the level it then shows.
+  const auto press = [this](const std::string& key) {
+    return Run(content::JsReplace(
+        "const slider = part('eagerness'); const before = slider.value;"
+        "slider.dispatchEvent(new KeyboardEvent('keydown', {key: $1}));"
+        "await until(() => page().eagerness_.level !== before);"
+        "await page().updateComplete; return slider.value;",
+        key));
+  };
+  OpenPage();
+  EXPECT_EQ(kDefaultEagerness, Run("return part('eagerness').value;"));
+  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.70", u"0.55"));
+
+  EXPECT_EQ(kMaxEagerness, press("End"));
+  EXPECT_EQ(prefs()->GetInteger(kOrganizationEagernessPref), kMaxEagerness);
+  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.50", u"0.50"));
+
+  EXPECT_EQ(kMinEagerness, press("Home"));
+  EXPECT_EQ(prefs()->GetInteger(kOrganizationEagernessPref), kMinEagerness);
+  EXPECT_EQ(TextOf("eagernessDetail"), detail(u"0.90", u"0.75"));
+
+  EXPECT_EQ(kMinEagerness + 1, press("ArrowRight"));
+  SaveWindowScreenshot(browser(), "settings-sorting");
+
+  OpenPage();
+  EXPECT_EQ(kMinEagerness + 1, Run("return part('eagerness').value;"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

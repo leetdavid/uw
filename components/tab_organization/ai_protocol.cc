@@ -3,6 +3,7 @@
 
 #include "uw/components/tab_organization/ai_protocol.h"
 
+#include <algorithm>
 #include <string_view>
 #include <utility>
 
@@ -19,6 +20,7 @@ const char kScratchpadOption[] = "scratchpad";
 const char kNoTaskOption[] = "none";
 const size_t kMaxGeneratedTaskNameLength = 80;
 const size_t kMaxExcerptLength = 2000;
+const size_t kMaxNamingTitles = 20;
 
 namespace {
 
@@ -67,6 +69,10 @@ constexpr char kScratchpadDescription[] =
 constexpr char kNamingPrompt[] =
     "Name the browsing task that this tab starts. Reply with only the name: a "
     "short, action-oriented phrase of at most five words, with no quotes.";
+constexpr char kTaskNamingPrompt[] =
+    "Name the browsing task that these tabs belong to. Reply with only the "
+    "name: a short, action-oriented phrase of at most five words, with no "
+    "quotes.";
 
 bool ValidConfidence(double value) {
   return value >= 0.0 && value <= 1.0;
@@ -459,16 +465,25 @@ std::optional<ClassificationAnswer> ParseDecisionResponse(
 
 std::optional<std::string> BuildNamingRequestBody(
     const std::string& model,
-    const BranchContext& context) {
+    const BranchContext& context,
+    const std::vector<std::string>& other_titles) {
   if (model.empty() || context.title.empty()) {
     return std::nullopt;
   }
+  std::string tabs = DescribeBranch(context);
+  if (!other_titles.empty()) {
+    tabs += "\nOther tabs in the task:";
+  }
+  for (size_t i = 0; i < std::min(other_titles.size(), kMaxNamingTitles); ++i) {
+    tabs += "\n- " + other_titles[i];
+  }
   base::DictValue system_message;
   system_message.Set("role", "system");
-  system_message.Set("content", kNamingPrompt);
+  system_message.Set("content",
+                     other_titles.empty() ? kNamingPrompt : kTaskNamingPrompt);
   base::DictValue user_message;
   user_message.Set("role", "user");
-  user_message.Set("content", DescribeBranch(context));
+  user_message.Set("content", std::move(tabs));
   base::ListValue messages;
   messages.Append(std::move(system_message));
   messages.Append(std::move(user_message));

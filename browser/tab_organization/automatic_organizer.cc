@@ -253,6 +253,7 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
       activity->second.revision != revision) {
     return;
   }
+  CancelRequestsFor(id);
   const PrefService* prefs = profile()->GetPrefs();
   const DecisionModelConfig decision = ReadDecisionModelConfig(prefs);
   const AiConnectionConfig language = ReadAiConnectionConfig(prefs);
@@ -275,6 +276,10 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
           ? "no source tab"
           : "opened from \"" + base::UTF16ToUTF8(parent->second.title) + "\"";
   request.context.excerpt = std::move(excerpt);
+  request.in_unnamed_task = !request.task.empty() && !Named(request.task);
+  if (request.in_unnamed_task) {
+    AskToNameTask(*page, revision, request.context);
+  }
 
   std::vector<std::pair<std::string, std::string>> tasks;
   for (const std::string& task : controller_->tree().Tasks()) {
@@ -300,13 +305,60 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   if (!request.client) {
     return;
   }
-  CancelRequestsFor(id);
+  Report(Event::Kind::kAsking, request);
+  Send(std::move(request), &AutomaticOrganizer::OnDecision);
+}
+
+void AutomaticOrganizer::AskToNameTask(const Page& page,
+                                       uint64_t revision,
+                                       const BranchContext& context) {
+  Request request;
+  request.page = page.id;
+  request.revision = revision;
+  request.task = page.task;
+  request.parent = page.parent;
+  request.context = context;
+  request.names_task = true;
+  std::vector<std::string> other_titles;
+  for (const Page& other : controller_->tree().pages()) {
+    const auto activity = pages_.find(other.id);
+    if (other.task == page.task && other.id != page.id &&
+        activity != pages_.end() && !activity->second.title.empty()) {
+      other_titles.push_back(base::UTF16ToUTF8(activity->second.title));
+    }
+  }
+  if (PrepareNaming(request, other_titles)) {
+    Send(std::move(request), &AutomaticOrganizer::OnName);
+  }
+}
+
+bool AutomaticOrganizer::PrepareNaming(
+    Request& request,
+    const std::vector<std::string>& other_titles) {
+  const AiConnectionConfig language =
+      ReadAiConnectionConfig(profile()->GetPrefs());
+  std::optional<std::string> body =
+      IsComplete(language) ? BuildNamingRequestBody(
+                                 language.model, request.context, other_titles)
+                           : std::nullopt;
+  if (!body) {
+    return false;
+  }
+  request.naming.model = language.model;
+  request.naming.url = ChatCompletionsUrl(language.endpoint);
+  request.naming.body = *body;
+  request.naming.sent_at = base::TimeTicks::Now();
+  request.client =
+      Client(request.naming.url, language.key_account, std::move(*body));
+  return !!request.client;
+}
+
+void AutomaticOrganizer::Send(Request request, AnswerHandler on_answer) {
   const uint64_t request_id = next_request_++;
   RemoteModelClient* client = request.client.get();
-  Report(Event::Kind::kAsking, request);
   requests_.emplace(request_id, std::move(request));
-  client->Send(base::BindOnce(&AutomaticOrganizer::OnDecision,
-                              weak_factory_.GetWeakPtr(), request_id));
+  client->Send(
+      base::BindOnce(on_answer, weak_factory_.GetWeakPtr(), request_id));
 }
 
 void AutomaticOrganizer::OnDecision(uint64_t request_id,
@@ -336,8 +388,12 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
   // A page with tabs under it stays in its task unless the user says so:
   // those tabs came from what it showed before.
   const Placement placement =
-      Place(*answer, Named(request->task) ? request->task : std::string(),
-            controller_->tree().BranchOf(request->page).size() == 1);
+      Place(*answer,
+            {request->in_unnamed_task ? std::string() : request->task,
+             request->in_unnamed_task,
+             controller_->tree().BranchOf(request->page).size() == 1},
+            ThresholdsFor(
+                profile()->GetPrefs()->GetInteger(kOrganizationEagernessPref)));
   request->target = placement.target;
   request->confidence = placement.confidence;
   request->needed = placement.needed;
@@ -395,32 +451,13 @@ void AutomaticOrganizer::Apply(Request request,
     CreateTask(request, *task_name);
     return;
   }
-  const AiConnectionConfig language =
-      ReadAiConnectionConfig(profile()->GetPrefs());
-  std::optional<std::string> body =
-      IsComplete(language)
-          ? BuildNamingRequestBody(language.model, request.context)
-          : std::nullopt;
-  if (body) {
-    request.naming.model = language.model;
-    request.naming.url = ChatCompletionsUrl(language.endpoint);
-    request.naming.body = *body;
-    request.naming.sent_at = base::TimeTicks::Now();
-  }
-  std::unique_ptr<RemoteModelClient> naming =
-      body ? Client(request.naming.url, language.key_account, std::move(*body))
-           : nullptr;
-  if (!naming) {
+  if (!PrepareNaming(request, {})) {
     CreateTask(request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     return;
   }
-  Report(Event::Kind::kNaming, request, base::UTF8ToUTF16(language.model));
-  const uint64_t naming_id = next_request_++;
-  RemoteModelClient* client = naming.get();
-  request.client = std::move(naming);
-  requests_.emplace(naming_id, std::move(request));
-  client->Send(base::BindOnce(&AutomaticOrganizer::OnName,
-                              weak_factory_.GetWeakPtr(), naming_id));
+  Report(Event::Kind::kNaming, request,
+         base::UTF8ToUTF16(request.naming.model));
+  Send(std::move(request), &AutomaticOrganizer::OnName);
 }
 
 void AutomaticOrganizer::OnName(uint64_t request_id,
@@ -435,6 +472,12 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   request->naming.answer = std::move(outcome);
   LogOrganizerExchange("name", request->naming,
                        name ? "named" : "no usable name");
+  if (request->names_task) {
+    if (name && Current(*request) && !Named(request->task)) {
+      controller_->NameTask(request->task, *name);
+    }
+    return;
+  }
   if (!Current(*request)) {
     Report(Event::Kind::kDropped, *request);
     return;

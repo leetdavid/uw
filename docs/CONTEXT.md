@@ -63,7 +63,7 @@ The organizer's suggestion that a set of tabs represents a separate browsing tas
 One LLM request that decides a tab branch's placement. It says which task the branch belongs to, or none, with a confidence. For a branch outside every task it says how likely the branch starts a task of its own, and supplies the name of that task.
 
 **Provisional task name**:
-The `New task` title a newly created task keeps when its classification call returns no valid name.
+The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
 
 **Decision model**:
 A model that answers a typed question with a choice and a confidence instead of text. uw can use Jev, the OpenAI Decisions API, or a compatible endpoint to decide a tab branch's placement. It does not name tasks.
@@ -72,7 +72,11 @@ A model that answers a typed question with a choice and a confidence instead of 
 The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. It names new tasks, and decides placement when no decision model is set.
 
 **Task naming call**:
-A language-model request that names a task the decision model started.
+A language-model request for a task name. It names a task the decision model started, and a task that still has the provisional name each time a tab in it changes.
+
+**Eagerness**:
+The setting for how sure a model must be before uw moves a tab branch without asking. Five levels, from careful to eager, each with a confidence threshold and a new-task threshold.
+_Avoid_: Aggressiveness, sensitivity.
 
 **User-directed mode**:
 An organization mode in which the user accepts or rejects task proposals while routine tab placement remains automatic.

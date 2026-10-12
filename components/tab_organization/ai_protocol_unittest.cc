@@ -538,6 +538,31 @@ TEST_F(AiProtocolTest, NamingCallAsksForAndCleansAShortName) {
             kMaxGeneratedTaskNameLength);
 }
 
+TEST_F(AiProtocolTest, NamingATaskListsItsOtherTabs) {
+  const auto messages_of = [](const std::string& body) {
+    return base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC)
+        ->FindList("messages")
+        ->Clone();
+  };
+  const base::ListValue alone =
+      messages_of(*BuildNamingRequestBody("model", LisbonContext()));
+  EXPECT_EQ(alone[1].GetDict().FindString("content")->find("Other tabs"),
+            std::string::npos);
+
+  std::vector<std::string> titles(kMaxNamingTitles + 1, "Alfama walking tour");
+  titles.back() = "One title too many";
+  const base::ListValue with_others =
+      messages_of(*BuildNamingRequestBody("model", LisbonContext(), titles));
+  const std::string& tabs = *with_others[1].GetDict().FindString("content");
+  EXPECT_NE(tabs.find("Title: Lisbon in three days"), std::string::npos);
+  EXPECT_NE(tabs.find("\nOther tabs in the task:\n- Alfama walking tour\n"),
+            std::string::npos);
+  EXPECT_EQ(tabs.find("One title too many"), std::string::npos);
+  // A task with several tabs is not one that a single tab starts.
+  EXPECT_NE(*alone[0].GetDict().FindString("content"),
+            *with_others[0].GetDict().FindString("content"));
+}
+
 // deepseek-flash thinks before it answers. With a limit of 32 tokens it spent
 // them all on thinking and answered with empty content.
 TEST_F(AiProtocolTest, ChatRequestsLeaveRoomForAModelThatThinksFirst) {

@@ -4,22 +4,24 @@
 
 /**
  * @fileoverview uw settings: the decision model and the language model behind
- * automatic tab organization, the global pause controls, and the window
- * tint. API keys stay in the macOS Keychain; the page only learns whether
- * one is stored.
+ * automatic tab organization, how eagerly it moves tabs, the global pause
+ * controls, and the window tint. API keys stay in the macOS Keychain; the page
+ * only learns whether one is stored.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
+import 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 
+import type {CrSliderElement} from 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 import type {CrToggleElement} from 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 
 import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_select_lit.css.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import type {Connection, ConnectionInput, TestResult, TintState} from './uw_organization.mojom-webui.js';
+import type {Connection, ConnectionInput, Eagerness, TestResult, TintState} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
@@ -60,6 +62,10 @@ interface Defaults {
 // uw::DecisionProvider and uw::ConnectionMode values.
 const NO_DECISION_MODEL = 0;
 const OLLAMA = 0;
+
+// uw::kMinEagerness and uw::kMaxEagerness.
+const MIN_EAGERNESS = 1;
+const MAX_EAGERNESS = 5;
 
 // Lilac, sky, mint, butter, and peach take dark text. Indigo, wine, and forest
 // take white text.
@@ -153,6 +159,8 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       saving_: {type: Boolean},
       enabled_: {type: Boolean},
       pauseMode_: {type: Number},
+      eagerness_: {type: Object},
+      eagernessLevels_: {type: Object},
       tint_: {type: Object},
     };
   }
@@ -167,6 +175,13 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   protected accessor saving_: boolean = false;
   protected accessor enabled_: boolean = false;
   protected accessor pauseMode_: number = 0;
+  // Null until the saved level has loaded.
+  protected accessor eagerness_: Eagerness|null = null;
+  protected accessor eagernessLevels_ = {
+    min: MIN_EAGERNESS,
+    max: MAX_EAGERNESS,
+    count: MAX_EAGERNESS - MIN_EAGERNESS + 1,
+  };
   protected accessor tint_: TintState = {picked: '', applied: ''};
   protected tintPresets_ = TINT_PRESETS;
   private browserProxy_ = UwOrganizationBrowserProxyImpl.getInstance();
@@ -410,6 +425,24 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.shadowRoot?.getElementById(reason)?.scrollIntoView({block: 'center'});
   }
 
+  protected eagernessLevel_(): number {
+    return this.eagerness_ ? this.eagerness_.level : MIN_EAGERNESS;
+  }
+
+  protected eagernessDetail_(): string {
+    return this.eagerness_ ?
+        loadTimeData.getStringF(
+            'uwOrganizationEagernessDetail',
+            this.eagerness_.confidence.toFixed(2),
+            this.eagerness_.newTask.toFixed(2)) :
+        '';
+  }
+
+  protected async onEagernessCrSliderValueChanged_(e: Event) {
+    this.eagerness_ = await this.browserProxy_.setEagerness(
+        (e.currentTarget as CrSliderElement).value);
+  }
+
   protected swatchLabel_(color: string): string {
     return loadTimeData.getStringF('uwOrganizationTintSwatch', color);
   }
@@ -483,6 +516,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     };
     this.enabled_ = state.enabled;
     this.pauseMode_ = state.pauseMode;
+    this.eagerness_ = state.eagerness;
     this.tint_ = await this.browserProxy_.getTint();
   }
 }

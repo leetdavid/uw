@@ -28,6 +28,8 @@ extern const char kNoTaskOption[];
 extern const size_t kMaxGeneratedTaskNameLength;
 // Maximum accepted length of the readable-page-text excerpt, in characters.
 extern const size_t kMaxExcerptLength;
+// How many other tab titles a naming request lists.
+extern const size_t kMaxNamingTitles;
 
 // Metadata sent for one tab branch. `excerpt` is short readable page text.
 // `title` must be non-empty.
@@ -99,9 +101,14 @@ std::optional<ClassificationAnswer> ParseDecisionResponse(
     bool has_tasks);
 
 // Builds an OpenAI-compatible chat-completions request asking for a short
-// name for the browsing task that `context` starts.
-std::optional<std::string> BuildNamingRequestBody(const std::string& model,
-                                                  const BranchContext& context);
+// name for a browsing task. `context` is the tab that starts the task, or
+// the tab that just changed in a task that has no name yet. `other_titles`
+// are the titles of the other tabs in that task; only the first
+// kMaxNamingTitles are sent.
+std::optional<std::string> BuildNamingRequestBody(
+    const std::string& model,
+    const BranchContext& context,
+    const std::vector<std::string>& other_titles = {});
 
 // Extracts the generated task name from a chat-completions response body.
 std::optional<std::u16string> ParseNamingResponse(const std::string& body);

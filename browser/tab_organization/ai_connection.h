@@ -31,6 +31,10 @@ inline constexpr char kOrganizationPauseModePref[] =
     "uw.organization.pause_mode";
 inline constexpr char kOrganizationPauseUntilPref[] =
     "uw.organization.pause_until";
+// How readily uw moves a branch on a model's answer, from kMinEagerness to
+// kMaxEagerness. See ThresholdsFor.
+inline constexpr char kOrganizationEagernessPref[] =
+    "uw.organization.eagerness";
 // Whether the sidebar says what each automatic organization request did.
 inline constexpr char kOrganizationShowActivityPref[] =
     "uw.organization.show_activity";

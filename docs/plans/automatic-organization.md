@@ -12,7 +12,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - **Decision model**, optional. Providers: Jev (TypeSafe System One), the OpenAI Decisions API, or any endpoint that speaks the OpenAI Decisions API at another base URL. It answers with a choice and a confidence, never text.
   - **Language model**. Connection modes: Ollama (endpoint, model, no key) and OpenAI-compatible (base URL, model, API key).
 - The decision model decides where a tab branch goes. With no decision model, the language model decides in one [classification call](../CONTEXT.md#language).
-- The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`. There is no later automatic renaming.
+- The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`.
+- A task with the provisional name, or with no name, is named as it goes on. Each time a tab in it changes, the language model gets a [task naming call](../CONTEXT.md#language) for that tab with the titles of up to 20 other tabs in the task. The first valid name sticks. A task with any other name, from the model or from the user, is never renamed. Naming moves nothing, shows no card, and is not an undo step. Agreed on 2026-10-12.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
 - "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
 - Each connection has "Test connection". It sends one test request for that connection as entered and saves nothing. Beside a decision model, the language model's test asks for a task name; alone, it asks for a placement. Agreed on 2026-10-12.
@@ -21,13 +22,15 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - uw waits 30 seconds for an answer, in a test and while browsing, so a test that passes means the model is fast enough to use.
 - A switch at the top of the settings page turns automatic organization off and on. Off sends nothing and keeps both connections. On saves and tests the connections like "Save and validate", and stays off when a test fails. Agreed on 2026-10-12.
 - "Load available models" lists a connection's models with `GET <base>/models`. When the endpoint has no such list, the user types the model ID.
-- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md).
+- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). A naming call for a task without a name adds the titles of the other tabs in that task.
+- Pinned tabs are outside the tab tree. The organizer sends nothing about a pinned tab and never moves one. Pinning a tab drops the request that was out for it. A tab opened from a pinned tab is a regular tab. Agreed on 2026-10-12.
 - The source-tab relationship is sent only for a tab that a link opened and that has followed links since. A blank new tab, and a tab the user took elsewhere by typing an address, searching, or picking a bookmark, has no source tab.
 - A request asks two questions. See [Placement rules](#placement-rules). Agreed on 2026-10-12.
   1. Which of the user's tasks does the branch belong to, or none?
   2. Is a branch outside every task the start of a task of its own, or a one-off for the Scratchpad?
 - A decision model gets both as choice questions in one call. The language model answers both in one JSON object. With no named task, a decision model gets only the second question.
-- A task that still has the provisional name `New task` is not offered as an answer, because its name says nothing about it. A branch inside one is treated like a branch in the Scratchpad.
+- A task that still has the provisional name `New task` is not offered as an answer, because its name says nothing about it. A branch inside one leaves only to join a named task. It does not start a second task: the task it is in may be the one it starts.
+- The settings page has a "Sorting" slider with five [eagerness](#eagerness) levels, from "Careful" to "Eager". It sets how sure a model must be before uw moves a tab without asking. A change applies to the next answer. Under the slider the page states the two thresholds of the chosen level. Agreed on 2026-10-12.
 - Link opens and title or URL changes trigger background requests, 750 ms after the latest change. Restored tabs and tabs dragged in from another window wait for their next change. A change invalidates that tab's outstanding request. Closing a branch or moving it to another window invalidates it too.
 - A manual move holds the branch until that tab's next title or URL change. A response that arrives after a manual move is dropped. Commands, drags, native group changes, and undo all count as manual moves.
 - The move unit is a whole tab branch. It detaches from its old parent.
@@ -44,19 +47,50 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 
 ## Placement rules
 
-Agreed on 2026-10-12. `components/tab_organization/placement` holds them.
+Agreed on 2026-10-12. `components/tab_organization/placement` holds them. The two thresholds, confidence and new task, come from the [eagerness](#eagerness) setting.
 
 | The model says | uw does |
 | --- | --- |
-| The branch belongs to another task, confidence `0.90` or more | Moves it to the end of that task. |
-| It belongs to no task (`0.90` or more) and starts a task of its own (probability `0.75` or more) | Starts a new task with it. |
-| It belongs to no task (`0.90` or more), does not clearly start one, and sits in a named task | Moves it to the Scratchpad. |
+| The branch belongs to another task, at the confidence threshold or more | Moves it to the end of that task. |
+| It belongs to no task (confidence threshold or more) and starts a task of its own (new-task threshold or more) | Starts a new task with it. |
+| It belongs to no task (confidence threshold or more), does not clearly start one, and sits in a named task | Moves it to the Scratchpad. |
 | The same, and it already sits in the Scratchpad | Suggests a new task when the model leans that way. Otherwise nothing. |
-| Any of the above, short of its number | Suggests it on the activity card. |
+| Any of the above, short of its threshold | Suggests it on the activity card. |
 | It belongs to the task it is in | Nothing. |
+| It belongs to no named task, and sits in a task without a name | Nothing. The task is [named as it goes on](#agreed-scope). |
 
 - A page with tabs under it does not leave its task automatically. Those tabs came from what it showed before. uw suggests the move, and Confirm moves the whole branch. Moving the page alone and promoting its children, as [Product](../product.md#automatic-tab-organization) asks, is a later stage.
 - Joining another task is not held back by tabs under the page.
+
+### Eagerness
+
+Agreed on 2026-10-12. The user picks a level on the settings page. Level 3 is the default. Before that day the thresholds were fixed at level 1.
+
+| Level | Confidence | New task |
+| --- | --- | --- |
+| 1, Careful | `0.90` | `0.75` |
+| 2 | `0.80` | `0.65` |
+| 3 | `0.70` | `0.55` |
+| 4 | `0.60` | `0.50` |
+| 5, Eager | `0.50` | `0.50` |
+
+- Confidence is how sure the model is of the task a branch belongs to, or that it belongs to none.
+- New task is the probability that a branch outside every task starts one. `0.50` is the least it can ask for. Below that the model's own answer is the Scratchpad.
+
+Measured on the 153 placement requests the organizer log recorded on 2026-10-12, replayed against the live Jev API in the two-question layout. 99 of them listed a named task. The build that recorded them moved nothing.
+
+| Level | Joins a task | Starts a task | Fits no task, starts none | Short of the confidence threshold |
+| --- | --- | --- | --- | --- |
+| 1 | 16 | 24 | 86 | 27 |
+| 2 | 23 | 29 | 84 | 17 |
+| 3 | 29 | 38 | 75 | 11 |
+| 4 | 31 | 44 | 69 | 9 |
+| 5 | 34 | 44 | 69 | 6 |
+
+- Eleven answers that joined a task at `0.68` to `0.88` were pages of one site going to the task named after that site. Level 1 held all of them back.
+- Four other answers between `0.62` and `0.88` followed a source line the old build sent by mistake. See [Why two questions](#why-two-questions).
+- The user confirmed five new tasks that day. They scored `0.93`, `0.76`, `0.69`, `0.67`, and `0.13` on the second question. The new-task threshold of level 3 passes four of them. That of level 1 passes two.
+- The counts say how often uw would act, not how often it would be right. Only the five confirmations are labeled.
 
 ### Why two questions
 
@@ -67,7 +101,7 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - Twelve of the other 22 were tabs described as opened from a search page they had nothing to do with. Without that line all twelve were outside every task at `0.98` or more.
 - Offering the tasks still named `New task` lowered `none` by `0.12` to `0.23` in 14 requests.
 - Telling the model which task the tab is in made it keep unrelated tabs there, so the request does not say.
-- The second question gave a new task `0.75` or more in 28 requests. The user confirmed five new tasks that day. It scored one at `0.93`, three between `0.59` and `0.77`, and one at `0.14`. So `0.75` is a cautious first value. Tune it against the log.
+- The second question gave a new task `0.75` or more in 28 requests. The user confirmed five new tasks that day. It scored one at `0.93`, three between `0.59` and `0.77`, and one at `0.14`. So `0.75` was a cautious first value. The [eagerness](#eagerness) setting replaced it.
 - The same request came back up to `0.08` apart on two runs. An answer near a threshold can go either way.
 
 ## Non-goals
@@ -76,14 +110,14 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - Placing a moved branch under a page in the destination task.
 - Automatic merging and whole-window reorganization passes. A single branch leaving its task is in scope; splitting a task into several is not.
 - User-directed proposals and "Reorganize all tabs".
-- Renaming a task after it is created.
+- Renaming a task that has a name.
 - Automatic tab closing and suspension.
 - The 200 ms placement budget in [Product](../product.md#organization-latency). Measure first.
 
 ## Design
 
 - `components/tab_organization/ai_protocol` builds and parses requests in three decision formats: chat completions, the OpenAI Decisions API (`POST <base>/decisions`), and TypeSafe System One (`POST <base>/systemone`). It joins the two answers into one decision. It also builds the naming call.
-- `components/tab_organization/placement` turns a decision into what uw does: nothing, a suggestion, or a move. It is a plain function with the two thresholds. Chat requests allow 4096 answer tokens, because some chat models think before they answer and that thinking counts against the limit. Parsing is strict, so a malformed response can never move a tab.
+- `components/tab_organization/placement` turns a decision into what uw does: nothing, a suggestion, or a move. It is a plain function of the answer, where the branch sits, and the two thresholds of the eagerness level. Chat requests allow 4096 answer tokens, because some chat models think before they answer and that thinking counts against the limit. Parsing is strict, so a malformed response can never move a tab.
 - `browser/tab_organization/automatic_organizer` is owned by the window. It watches titles and URLs, sends the requests, and applies a decision through the window controller only if the branch is unchanged since the request.
 - The organizer keeps the latest automatic change as a notice for the sidebar message.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
@@ -106,7 +140,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 5. A blank new tab, and a tab the user navigated by hand, is sent with no source tab. A task named `New task` is not in the request, and an answer that names it is unreadable.
 6. A title or URL change invalidates that tab's outstanding request. An older response cannot move the tab.
 7. A manual move drops the response in flight and holds the branch until its page changes.
-8. An answer short of its number, a refusal, or a malformed response moves nothing. `PlacementTest.*` covers every row of the [placement rules](#placement-rules).
+8. An answer short of its threshold, a refusal, or a malformed response moves nothing. `PlacementTest.*` covers every row of the [placement rules](#placement-rules) and every [eagerness](#eagerness) level.
 9. Closing a branch or moving it to another window turns its pending response into a no-op.
 10. One undo reverses task creation, the move, and the name together. It still works from the Organize menu after the message disappears.
 11. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
@@ -117,7 +151,10 @@ Each stage is a ticket on the [board](roadmap.md#board).
 16. Each request shows the activity card with the model and the tab. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own headline, with the confidence where the model gave one.
 17. With 30 more tabs than fit, the card keeps its full height, lies inside the sidebar foot, and overlaps nothing. `AutomaticOrganizerBrowserTest.TheCardFitsInACrowdedSidebar` checks it.
 18. Confirm on a suggestion moves the branch or starts the task, offers Undo, and sends no second placement request. A suggestion for a tab that has since changed is not carried out. With the log on, the confirmation is one `accepted` line.
-19. With `--uw-organizer-log`, a placement request and a naming request each leave one line with the request, the answer, the time taken, and what uw did. A placement line says where the branch was and where it went. No API key is in the file. `OrganizerLogBrowserTest.*` checks it.
+19. The "Sorting" slider shows the saved level and its two thresholds, saves a new level at once, and keeps it across a reload. The same answer that is only suggested at level 1 moves the tab at level 3.
+20. A pinned tab is never sent to a model. Pinning a tab drops its outstanding request.
+21. A task named `New task` gets a name when a tab in it changes and the language model returns a valid one. An unusable name leaves it for the next change. A named task is not renamed. A tab in a task without a name does not start a second task.
+22. With `--uw-organizer-log`, a placement request and a naming request each leave one line with the request, the answer, the time taken, and what uw did. A placement line says where the branch was and where it went. No API key is in the file. `OrganizerLogBrowserTest.*` checks it.
 
 ## Later stages
 
@@ -127,6 +164,5 @@ Each stage is a ticket on the [board](roadmap.md#board).
 - Renaming a task when its activity clearly changes.
 - Moving a repurposed parent page alone and promoting the tabs under it.
 - Describing a task to the model by the tabs in it, so a task named `New task` can be an answer. That sends more tab titles per request than this plan allows.
-- Naming a task that still has the provisional name from the tabs in it.
 
 Update the roadmap with measured accuracy, confidence calibration, and latency before expanding scope.

@@ -43,6 +43,7 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/test/views_test_utils.h"
 #include "ui/views/view.h"
@@ -60,6 +61,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
+#include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
@@ -72,6 +74,9 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     embedded_test_server()->RegisterRequestHandler(
         base::BindRepeating(&ServePage));
     ASSERT_TRUE(embedded_test_server()->Start());
+    // The careful end of the eagerness setting: a move needs confidence 0.90
+    // and a new task 0.75. A test of another level sets its own.
+    prefs()->SetInteger(kOrganizationEagernessPref, kMinEagerness);
   }
 
   static std::unique_ptr<net::test_server::HttpResponse> ServePage(
@@ -731,6 +736,136 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(SettleAfter(2));
   EXPECT_EQ(bar()->card()->headline(), u"Could not read the answer");
   EXPECT_EQ(link->GetGroup(), unnamed);
+
+  // A tab in it does not start a second task. The one it is in may be that
+  // task, once it has a name.
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
+  Browse(link, "radar");
+  ASSERT_TRUE(SettleAfter(3));
+  EXPECT_EQ(link->GetGroup(), unnamed);
+  EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
+}
+
+// The language model names a task that has no name when a tab in it changes,
+// and tries again with the next change until a name sticks.
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       ATaskWithoutANameIsNamedAsItsTabsChange) {
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseLanguageModel();
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
+  Answer("/v1/chat/completions", ChatAnswer(""));
+  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  tabs::TabInterface* opened = tabs()->GetActiveTab();
+  const std::optional<tab_groups::TabGroupId> task = opened->GetGroup();
+  ASSERT_TRUE(task);
+
+  Browse(opened, "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(opened->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"New task");
+
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  tabs::TabInterface* link = OpenLinkFrom(opened, "hotels");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(link->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
+  std::vector<std::string> naming;
+  for (const ModelRequest& request : Requests()) {
+    if (request.path == "/v1/chat/completions") {
+      naming.push_back(request.body);
+    }
+  }
+  ASSERT_EQ(naming.size(), 2u);
+  EXPECT_EQ(naming[0].find("Other tabs in the task"), std::string::npos);
+  EXPECT_NE(naming[1].find("Title: hotels"), std::string::npos);
+  EXPECT_NE(naming[1].find("Other tabs in the task:\\n- lisbon"),
+            std::string::npos);
+  std::vector<std::string> results;
+  for (const base::DictValue& line : LogLines()) {
+    if (*line.FindString("purpose") == "name") {
+      results.push_back(*line.FindString("result"));
+    }
+  }
+  EXPECT_THAT(results, testing::ElementsAre("no usable name", "named"));
+
+  // A task with a name keeps it, and is one the model can choose.
+  Answer("/v1/decisions", DecisionsAnswer(task->ToString(), 0.99));
+  Browse(link, "weather");
+  ASSERT_TRUE(SettleAfter(5));
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 5u);
+  EXPECT_EQ(requests[4].path, "/v1/decisions");
+  EXPECT_NE(requests[4].body.find("Plan Lisbon trip"), std::string::npos);
+  EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
+  EXPECT_EQ(link->GetGroup(), task);
+}
+
+// Without the fixture's careful setting, uw asks for less before it moves a
+// tab or starts a task.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       EagernessSetsHowSureAnAnswerMustBe) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.75));
+
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.75 of 0.90");
+
+  prefs()->ClearPref(kOrganizationEagernessPref);
+  Browse(link, "hotels");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(link->GetGroup(), task);
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.75 of 0.70");
+
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.6));
+  tabs::TabInterface* other = OpenLinkFrom(ungrouped, "laptops");
+  ASSERT_TRUE(SettleAfter(3));
+  ASSERT_TRUE(other->GetGroup());
+  EXPECT_NE(other->GetGroup(), task);
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.60 of 0.55");
+
+  prefs()->SetInteger(kOrganizationEagernessPref, kMaxEagerness);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  tabs::TabInterface* last = OpenLinkFrom(ungrouped, "flights");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(last->GetGroup(), task);
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.50 of 0.50");
+}
+
+// A pinned tab is not in the tab tree, so the organizer leaves it alone.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       APinnedTabIsNeverAskedAbout) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.99));
+
+  // Pinning a tab drops the request that was out for it.
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  organizer()->DispatchNowForTesting();
+  WaitForPageText(link);
+  tabs()->SetTabPinned(tabs()->GetIndexOfTab(link), true);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return organizer()->pending_requests() == 0; }));
+  EXPECT_TRUE(link->IsPinned());
+  EXPECT_FALSE(link->GetGroup());
+  const size_t sent = Requests().size();
+
+  Browse(link, "hotels");
+  organizer()->DispatchNowForTesting();
+  WaitForPageText(link);
+  EXPECT_EQ(Requests().size(), sent);
+  EXPECT_EQ(organizer()->pending_requests(), 0u);
+  EXPECT_TRUE(link->IsPinned());
+  EXPECT_FALSE(link->GetGroup());
+
+  // A tab opened from it is an ordinary tab.
+  tabs::TabInterface* opened = OpenLinkFrom(link, "flights");
+  ASSERT_TRUE(SettleAfter(sent + 1));
+  EXPECT_EQ(opened->GetGroup(), task);
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

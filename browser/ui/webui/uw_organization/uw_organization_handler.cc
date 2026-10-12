@@ -3,6 +3,7 @@
 
 #include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
@@ -36,6 +37,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/components/look/tint.h"
+#include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
@@ -331,6 +333,13 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationTest", IDS_UW_SETTINGS_ORGANIZATION_TEST},
       {"uwOrganizationTestDetails", IDS_UW_SETTINGS_ORGANIZATION_TEST_DETAILS},
       {"uwOrganizationScope", IDS_UW_SETTINGS_ORGANIZATION_SCOPE},
+      {"uwOrganizationEagerness", IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS},
+      {"uwOrganizationEagernessLow",
+       IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_LOW},
+      {"uwOrganizationEagernessHigh",
+       IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_HIGH},
+      {"uwOrganizationEagernessDetail",
+       IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS_DETAIL},
       {"uwOrganizationPauseTitle", IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE},
       {"uwOrganizationTintTitle", IDS_UW_SETTINGS_ORGANIZATION_TINT_TITLE},
       {"uwOrganizationTintColor", IDS_UW_SETTINGS_ORGANIZATION_TINT_COLOR},
@@ -374,6 +383,7 @@ void UwOrganizationHandler::GetState(GetStateCallback callback) {
                       language.model, language.key_account);
   state->enabled = OrganizationReady(prefs);
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
+  state->eagerness = CurrentEagerness();
   std::move(callback).Run(std::move(state));
 }
 
@@ -594,6 +604,22 @@ void UwOrganizationHandler::SetPause(int32_t mode_value,
   auto result = mojom::PauseResult::New();
   result->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   std::move(callback).Run(std::move(result));
+}
+
+void UwOrganizationHandler::SetEagerness(int32_t level,
+                                         SetEagernessCallback callback) {
+  profile_->GetPrefs()->SetInteger(
+      kOrganizationEagernessPref,
+      std::clamp(level, kMinEagerness, kMaxEagerness));
+  std::move(callback).Run(CurrentEagerness());
+}
+
+mojom::EagernessPtr UwOrganizationHandler::CurrentEagerness() const {
+  const int level =
+      std::clamp(profile_->GetPrefs()->GetInteger(kOrganizationEagernessPref),
+                 kMinEagerness, kMaxEagerness);
+  const Thresholds needed = ThresholdsFor(level);
+  return mojom::Eagerness::New(level, needed.confidence, needed.new_task);
 }
 
 void UwOrganizationHandler::GetTint(GetTintCallback callback) {

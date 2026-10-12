@@ -9,6 +9,7 @@
 #include "components/prefs/pref_service.h"
 #include "net/base/url_util.h"
 #include "url/gurl.h"
+#include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
@@ -36,6 +37,7 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kOrganizationKeyAccountPref, std::string());
   registry->RegisterBooleanPref(kOrganizationEnabledPref, false);
   registry->RegisterBooleanPref(kOrganizationShowActivityPref, false);
+  registry->RegisterIntegerPref(kOrganizationEagernessPref, kDefaultEagerness);
   registry->RegisterIntegerPref(kDecisionProviderPref,
                                 static_cast<int>(DecisionProvider::kNone));
   registry->RegisterStringPref(kDecisionEndpointPref, std::string());

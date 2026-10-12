@@ -43,8 +43,9 @@ class TabOrganizationController;
 // URL changes, it asks the decision model, or the language model when there
 // is none, which task the branch belongs to, if any. A confident answer moves
 // the branch into that task, out of a task it no longer fits, or into a new
-// task, through the controller as one undoable action. It never blocks
-// browsing: a slow, failed, or stale answer changes nothing.
+// task, through the controller as one undoable action. A task that has no
+// name yet is named by the language model when a tab in it changes. It never
+// blocks browsing: a slow, failed, or stale answer changes nothing.
 class AutomaticOrganizer : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(AutomaticOrganizer);
@@ -118,6 +119,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
     DecisionFormat format = DecisionFormat::kChat;
     // True when the request listed at least one task.
     bool has_tasks = false;
+    // True when `task` had no name as the request went out, so the model was
+    // not told about it. The answer is read that way even if the task has a
+    // name by the time it arrives.
+    bool in_unnamed_task = false;
     BranchContext context;
     // The placement request, and the naming request when there was one.
     OrganizerExchange decision;
@@ -128,6 +133,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
     double needed = 0.0;
     // True once the placement request is in the organizer log.
     bool logged = false;
+    // True for a request that only asks for a name for `task`, which has
+    // none.
+    bool names_task = false;
     std::unique_ptr<RemoteModelClient> client;
   };
 
@@ -150,6 +158,20 @@ class AutomaticOrganizer : public TabStripModelObserver {
                  uint64_t revision,
                  std::unique_ptr<content_extraction::InnerTextResult> result);
   void SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
+  // Asks the language model to name the task `page` is in, from that page
+  // and the titles of the task's other tabs. The task keeps trying this way,
+  // one changed page at a time, until a name sticks.
+  void AskToNameTask(const Page& page,
+                     uint64_t revision,
+                     const BranchContext& context);
+  // Fills in the naming request for `request`. False when there is no
+  // language model to ask.
+  bool PrepareNaming(Request& request,
+                     const std::vector<std::string>& other_titles);
+  using AnswerHandler =
+      void (AutomaticOrganizer::*)(uint64_t, RemoteModelClient::Outcome);
+  // Sends `request.client` and keeps the request until `on_answer` takes it.
+  void Send(Request request, AnswerHandler on_answer);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
   // Moves the branch to `request.target`: a task, the Scratchpad, or a new

@@ -109,6 +109,9 @@ class TabOrganizationController : public TabStripModelObserver {
 
   std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
   std::u16string TaskTitle(const std::string& task) const;
+  // Renames a task. It is not an organization action, so undo leaves the
+  // name alone.
+  void NameTask(const std::string& task, const std::u16string& title);
 
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
   // Runs with the pages the user moved by a command, a drag, a native group

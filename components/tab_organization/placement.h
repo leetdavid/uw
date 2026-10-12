@@ -10,13 +10,37 @@
 
 namespace uw {
 
-// A move into a task or out of one needs the model this sure of where the
-// branch belongs.
-inline constexpr double kMinConfidence = 0.90;
-// A branch that belongs to no task starts one of its own when the model gives
-// that at least this probability. Below it, the branch is a one-off for the
-// Scratchpad.
-inline constexpr double kMinNewTaskProbability = 0.75;
+// How sure the model must be before uw acts on its answer without asking.
+struct Thresholds {
+  // Of the task a branch belongs to, or that it belongs to none.
+  double confidence;
+  // The probability that a branch outside every task starts one of its own.
+  // Below it, the branch is a one-off for the Scratchpad.
+  double new_task;
+};
+
+// The eagerness setting: how readily uw moves a branch. Each level up lowers
+// the thresholds.
+inline constexpr int kMinEagerness = 1;
+inline constexpr int kMaxEagerness = 5;
+inline constexpr int kDefaultEagerness = 3;
+
+// The thresholds at `eagerness`. A level outside the range counts as the
+// nearest one in it.
+Thresholds ThresholdsFor(int eagerness);
+
+// Where a branch sits when its answer arrives.
+struct Position {
+  // The option key of the named task it is in. Empty in the Scratchpad and in
+  // a task that has no name yet.
+  std::string task;
+  // True in a task that has no name yet. The model was not told about that
+  // task, so its answer cannot say the branch does not fit there.
+  bool in_unnamed_task = false;
+  // False for a branch that must not be taken out of its task without the
+  // user.
+  bool may_leave = true;
+};
 
 // What uw does with one placement answer.
 struct Placement {
@@ -32,16 +56,13 @@ struct Placement {
   std::string target;
   // The number that decided it, and what it had to reach.
   double confidence = 0.0;
-  double needed = kMinConfidence;
+  double needed = 0.0;
 };
 
-// Decides what to do with `answer` for a branch that sits in `task`. `task`
-// is a task option key, or empty for the Scratchpad and for a task the model
-// was not told about. `may_leave` is false for a branch that must not be
-// taken out of its task without the user.
+// Decides what to do with `answer` for a branch at `position`.
 Placement Place(const ClassificationAnswer& answer,
-                const std::string& task,
-                bool may_leave);
+                const Position& position,
+                const Thresholds& needed);
 
 }  // namespace uw
 
