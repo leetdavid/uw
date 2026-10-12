@@ -66,13 +66,19 @@ One LLM request that decides a tab branch's placement. It says which task the br
 The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
 
 **Decision model**:
-A model that answers a typed question with a choice and a confidence instead of text. uw can use Jev, the OpenAI Decisions API, or a compatible endpoint to decide a tab branch's placement. It does not name tasks.
+A model that answers a typed question with a choice and a confidence instead of text. uw can use Jev, the OpenAI Decisions API, or a compatible endpoint to decide a tab branch's placement and whether a task needs a name. It does not write the name.
 
 **Language model**:
 The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. It names new tasks, and decides placement when no decision model is set.
 
 **Task naming call**:
-A language-model request for a task name. It names a task the decision model started, and a task that still has the provisional name each time a tab in it changes.
+A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it.
+
+**Name check**:
+The question in a placement request that asks whether the task a tab branch is in has outgrown its name. It is asked only about a generated name.
+
+**Generated name**:
+A task name uw gave. uw may replace it. A name the user typed is not generated and is never replaced.
 
 **Eagerness**:
 The setting for how sure a model must be before uw moves a tab branch without asking. Five levels, from careful to eager, each with a confidence threshold and a new-task threshold.

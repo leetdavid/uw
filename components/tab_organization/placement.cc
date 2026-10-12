@@ -30,17 +30,32 @@ Placement Place(const ClassificationAnswer& answer,
   using Action = Placement::Action;
   const bool sure = answer.confidence >= needed.confidence;
   const bool starts_task = answer.choice == kNewTaskOption;
+  const bool fits_a_task = !starts_task && answer.choice != kScratchpadOption;
   Placement placement{Action::kLeave, answer.choice, answer.confidence,
                       needed.confidence};
-  if (!starts_task && answer.choice != kScratchpadOption) {
-    if (answer.choice != position.task) {
-      placement.action = sure ? Action::kApply : Action::kSuggest;
-    }
+  if (fits_a_task && answer.choice != position.task) {
+    placement.action = sure ? Action::kApply : Action::kSuggest;
     return placement;
+  }
+  const Placement renamed{Action::kName, answer.choice, answer.new_name,
+                          needed.confidence};
+  const bool outgrown =
+      !position.task.empty() && answer.new_name >= needed.confidence;
+  if (fits_a_task) {
+    return outgrown ? renamed : placement;
   }
   // A task without a name may be the very task this branch starts.
   if (position.in_unnamed_task) {
-    return placement;
+    return sure && answer.new_task >= needed.new_task
+               ? Placement{Action::kName, kNewTaskOption, answer.new_task,
+                           needed.new_task}
+               : placement;
+  }
+  // A branch that would start a task of its own has left its task, unless it
+  // is the task that has outgrown its name. A one-off says nothing about the
+  // task, so it leaves either way.
+  if (outgrown && answer.new_task >= needed.new_task) {
+    return renamed;
   }
   if (!sure) {
     if (starts_task || !position.task.empty()) {

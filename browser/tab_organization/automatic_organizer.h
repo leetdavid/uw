@@ -39,12 +39,14 @@ namespace uw {
 
 class TabOrganizationController;
 
-// Files tab branches into tasks in the background. When a page's title or
-// URL changes, it asks the decision model, or the language model when there
-// is none, which task the branch belongs to, if any. A confident answer moves
+// Files tab branches into tasks in the background. When a page's title
+// changes, or the page goes to another site, it asks the decision model, or
+// the language model when there is none, which task the branch belongs to,
+// if any. A confident answer moves
 // the branch into that task, out of a task it no longer fits, or into a new
-// task, through the controller as one undoable action. A task that has no
-// name yet is named by the language model when a tab in it changes. It never
+// task, through the controller as one undoable action. The same answer says
+// when a task needs a name from the language model: a task without one that
+// the branch starts, or a task uw named that has outgrown its name. It never
 // blocks browsing: a slow, failed, or stale answer changes nothing.
 class AutomaticOrganizer : public TabStripModelObserver {
  public:
@@ -63,6 +65,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
       kCreated,
       // The tab is already where the answer puts it.
       kLeft,
+      // The tab stays, and the language model is asked to name its task.
+      kNeedsName,
       // The answer fell short of what a move needs. `detail` is where it
       // would have put the tab.
       kUnsure,
@@ -119,6 +123,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
     DecisionFormat format = DecisionFormat::kChat;
     // True when the request listed at least one task.
     bool has_tasks = false;
+    // True when the request carried the name check.
+    bool checks_name = false;
     // True when `task` had no name as the request went out, so the model was
     // not told about it. The answer is read that way even if the task has a
     // name by the time it arrives.
@@ -131,10 +137,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
     std::string target;
     double confidence = 0.0;
     double needed = 0.0;
+    // What the answer gave the name check. Zero when there was none.
+    double new_name = 0.0;
     // True once the placement request is in the organizer log.
     bool logged = false;
-    // True for a request that only asks for a name for `task`, which has
-    // none.
+    // True once the request is for a name for `task`, which the branch stays
+    // in.
     bool names_task = false;
     std::unique_ptr<RemoteModelClient> client;
   };
@@ -150,7 +158,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   Profile* profile() const;
   bool Enabled() const;
   void OnConfigChanged();
-  // Notes title and URL changes and starts the debounce timer for them.
+  // Notes which pages show something else and starts the debounce timer for
+  // them.
   void Scan();
   void OnManualMove(const std::vector<PageId>& pages);
   void Dispatch();
@@ -158,12 +167,15 @@ class AutomaticOrganizer : public TabStripModelObserver {
                  uint64_t revision,
                  std::unique_ptr<content_extraction::InnerTextResult> result);
   void SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
-  // Asks the language model to name the task `page` is in, from that page
-  // and the titles of the task's other tabs. The task keeps trying this way,
-  // one changed page at a time, until a name sticks.
-  void AskToNameTask(const Page& page,
-                     uint64_t revision,
-                     const BranchContext& context);
+  // The titles of the other tabs in the task `page` is in.
+  std::vector<std::string> OtherTitles(const Page& page) const;
+  // The name check for a branch in a task that uw named and that holds other
+  // tabs, when there is a language model to give a new name.
+  std::optional<NameCheck> NameCheckFor(const Page& page) const;
+  // Names the task the branch stays in: with `name` when the answer carried
+  // one, else by asking the language model. With neither, the branch is
+  // simply left where it is.
+  void NameTaskOf(Request request, std::optional<std::u16string> name);
   // Fills in the naming request for `request`. False when there is no
   // language model to ask.
   bool PrepareNaming(Request& request,
@@ -187,11 +199,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
   bool Current(const Request& request) const;
   // What the sidebar calls `request.target`.
   std::u16string TargetName(const Request& request) const;
-  // Where the branch was, where the answer put it, and the numbers behind it.
+  // Which page it was, where its branch was, where the answer put it, and
+  // the numbers behind it.
   static base::DictValue LogDetails(const Request& request);
   // False for a task that still has the name every new task starts with. The
   // model is not offered such a task: its name says nothing about it.
   bool Named(const std::string& task) const;
+  // True while `task` has the name uw gave it. A name the user typed is
+  // theirs, and uw does not replace it.
+  bool Generated(const std::string& task) const;
+  void GiveName(const std::string& task, const std::u16string& name);
   std::optional<Request> Take(uint64_t request_id);
   void CancelRequestsFor(const PageId& page);
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,
@@ -203,6 +220,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   const raw_ptr<TabStripModel> tabs_;
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
+  // The name uw gave each task. It is not kept across a restart, so a task
+  // from an earlier session keeps its name.
+  std::map<std::string, std::u16string> generated_names_;
   std::optional<Suggestion> suggestion_;
   uint64_t next_request_ = 1;
   base::RepeatingCallbackList<void(const Event&)> events_;

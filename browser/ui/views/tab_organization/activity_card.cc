@@ -62,7 +62,8 @@ bool OffersUndo(Kind kind) {
 
 // The kinds that carry the model's confidence in a choice.
 bool HasConfidence(Kind kind) {
-  return OffersUndo(kind) || kind == Kind::kLeft || kind == Kind::kUnsure;
+  return OffersUndo(kind) || kind == Kind::kLeft || kind == Kind::kUnsure ||
+         kind == Kind::kNeedsName;
 }
 
 const gfx::VectorIcon& IconFor(Kind kind) {
@@ -78,6 +79,7 @@ const gfx::VectorIcon& IconFor(Kind kind) {
     case Kind::kAsking:
     case Kind::kNaming:
     case Kind::kLeft:
+    case Kind::kNeedsName:
     case Kind::kDropped:
       return vector_icons::kInfoIcon;
   }
@@ -95,6 +97,8 @@ std::u16string Headline(const Event& event) {
       return l10n_util::GetStringFUTF16(IDS_UW_AUTO_CREATED_TASK, event.detail);
     case Kind::kLeft:
       return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_LEFT);
+    case Kind::kNeedsName:
+      return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEEDS_NAME);
     case Kind::kUnsure:
       return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_UNSURE, event.detail);
     case Kind::kRequestFailed:

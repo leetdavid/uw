@@ -3,6 +3,7 @@
 
 #include "uw/browser/tab_organization/model_test_server.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -21,11 +22,25 @@ const char* Otherwise(double new_task) {
   return new_task >= 0.5 ? "new_task" : "scratchpad";
 }
 
+const char* NameChoice(double new_name) {
+  return new_name >= 0.5 ? "rename" : "keep";
+}
+
 }  // namespace
 
 std::string DecisionsAnswer(const std::string& choice,
                             double confidence,
-                            double new_task) {
+                            double new_task,
+                            std::optional<double> new_name) {
+  std::string name;
+  if (new_name) {
+    name = std::string(R"(,{"type":"choice","name":"name","choice":")") +
+           NameChoice(*new_name) +
+           R"(","probabilities":[{"value":"keep","probability":)" +
+           base::NumberToString(1.0 - *new_name) +
+           R"(},{"value":"rename","probability":)" +
+           base::NumberToString(*new_name) + "}]}";
+  }
   return R"({"answers":[{"type":"choice","name":"destination","choice":")" +
          choice + R"(","confidence":)" + base::NumberToString(confidence) +
          R"(},{"type":"choice","name":"otherwise","choice":")" +
@@ -33,12 +48,22 @@ std::string DecisionsAnswer(const std::string& choice,
          R"(","probabilities":[{"value":"new_task","probability":)" +
          base::NumberToString(new_task) +
          R"(},{"value":"scratchpad","probability":)" +
-         base::NumberToString(1.0 - new_task) + "}]}]}";
+         base::NumberToString(1.0 - new_task) + "}]}" + name + "]}";
 }
 
 std::string SystemOneAnswer(const std::string& choice,
                             double confidence,
-                            double new_task) {
+                            double new_task,
+                            std::optional<double> new_name) {
+  std::string name;
+  if (new_name) {
+    name = std::string(R"(,"name":{"type":"choice","choice":")") +
+           NameChoice(*new_name) + R"(","confidence":)" +
+           base::NumberToString(std::max(*new_name, 1.0 - *new_name)) +
+           R"(,"probabilities":{"keep":)" +
+           base::NumberToString(1.0 - *new_name) + R"(,"rename":)" +
+           base::NumberToString(*new_name) + "}}";
+  }
   return R"({"answers":{"destination":{"type":"choice","choice":")" + choice +
          R"(","confidence":)" + base::NumberToString(confidence) +
          R"(,"probabilities":{}},"otherwise":{"type":"choice","choice":")" +
@@ -46,7 +71,8 @@ std::string SystemOneAnswer(const std::string& choice,
          base::NumberToString(new_task >= 0.5 ? 2 * new_task - 1
                                               : 1 - 2 * new_task) +
          R"(,"probabilities":{"new_task":)" + base::NumberToString(new_task) +
-         R"(,"scratchpad":)" + base::NumberToString(1.0 - new_task) + "}}}}";
+         R"(,"scratchpad":)" + base::NumberToString(1.0 - new_task) + "}}" +
+         name + "}}";
 }
 
 std::string ChatAnswer(const std::string& escaped_content) {

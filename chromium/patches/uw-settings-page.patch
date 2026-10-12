@@ -1,5 +1,5 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..5d35f5237372ffc5c4ade94893542a49a9e55bb0 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..95201fcc4dff56bbfc16457c16df7315db88b5df 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
 @@ -3904,6 +3904,181 @@
@@ -37,7 +37,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..5d35f5237372ffc5c4ade94893542a49
 +        Decision model
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_NOTE" desc="Explains what the decision model does.">
-+        Decides whether a tab belongs to one of your tasks, starts a new one, or goes to the Scratchpad. It answers with a choice and a confidence, never text. With None, the language model decides.
++        Decides whether a tab belongs to one of your tasks, starts a new one, or goes to the Scratchpad, and whether a task has outgrown the name uw gave it. It answers with a choice and a confidence, never text. With None, the language model decides where tabs go.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER" desc="Label of the decision model provider choice.">
 +        Provider
@@ -58,7 +58,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..5d35f5237372ffc5c4ade94893542a49
 +        Language model
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE" desc="Explains what the language model does.">
-+        Names tasks. A task still called New task is named when a tab in it changes. Leave the model empty to go without names.
++        Names a task when it starts, and again when the decision model finds the task has outgrown that name. uw keeps a name you typed. Leave the model empty to go without names.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_CONNECTION" desc="Label of the language model connection choice.">
 +        Connection
@@ -136,7 +136,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..5d35f5237372ffc5c4ade94893542a49
 +        Choose a decision model or enter a language model first.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
-+        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models above. To name a task, the language model also gets the titles of the other tabs in it. API keys stay in the macOS Keychain.
++        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models above. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too. API keys stay in the macOS Keychain.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_EAGERNESS" desc="Label of the slider that sets how readily automatic organization moves tabs.">
 +        Sorting

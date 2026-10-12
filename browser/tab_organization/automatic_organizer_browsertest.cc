@@ -40,6 +40,8 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/base/url_util.h"
+#include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
@@ -71,6 +73,8 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
+    // A second site, served by the same test server.
+    host_resolver()->AddRule("other.test", "127.0.0.1");
     embedded_test_server()->RegisterRequestHandler(
         base::BindRepeating(&ServePage));
     ASSERT_TRUE(embedded_test_server()->Start());
@@ -85,7 +89,9 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     if (!path.starts_with("/page/")) {
       return nullptr;
     }
-    const std::string name = path.substr(6);
+    // /page/<name> is titled <name>, unless ?title= says otherwise.
+    std::string name = path.substr(6);
+    net::GetValueForKeyInQuery(request.GetURL(), "title", &name);
     auto response = std::make_unique<net::test_server::BasicHttpResponse>();
     response->set_content_type("text/html");
     response->set_content("<html><head><title>" + name +
@@ -277,6 +283,17 @@ class OrganizerLogBrowserTest : public AutomaticOrganizerBrowserTest {
     std::string text;
     base::ReadFileToString(LogPath(), &text);
     return text;
+  }
+
+  // What uw did with each request of `purpose`, in order.
+  std::vector<std::string> Results(const std::string& purpose) {
+    std::vector<std::string> results;
+    for (const base::DictValue& line : LogLines()) {
+      if (*line.FindString("purpose") == purpose) {
+        results.push_back(*line.FindString("result"));
+      }
+    }
+    return results;
   }
 
   // The lines written so far, each one a JSON object.
@@ -746,27 +763,39 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
 }
 
-// The language model names a task that has no name when a tab in it changes,
-// and tries again with the next change until a name sticks.
+// A task that has no name gets one when the decision model finds that a tab
+// in it starts a piece of work. A one-off names nothing, and an unusable name
+// leaves the task for the next tab that does.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
-                       ATaskWithoutANameIsNamedAsItsTabsChange) {
+                       ATaskWithoutANameIsNamedWhenATabStartsIt) {
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
   UseLanguageModel();
-  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
   Answer("/v1/chat/completions", ChatAnswer(""));
   bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
   tabs::TabInterface* opened = tabs()->GetActiveTab();
   const std::optional<tab_groups::TabGroupId> task = opened->GetGroup();
   ASSERT_TRUE(task);
 
+  Browse(opened, "weather");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(TitleOf(*task), u"New task");
+  EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
+
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
   Browse(opened, "lisbon");
-  ASSERT_TRUE(SettleAfter(2));
+  ASSERT_TRUE(SettleAfter(3));
   EXPECT_EQ(opened->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"New task");
+  EXPECT_EQ(bar()->card()->headline(), u"Naming the task");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.99 of 0.75");
+  EXPECT_FALSE(bar()->card()->offers_undo());
 
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
   tabs::TabInterface* link = OpenLinkFrom(opened, "hotels");
-  ASSERT_TRUE(SettleAfter(4));
+  ASSERT_TRUE(SettleAfter(5));
   EXPECT_EQ(link->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
   std::vector<std::string> naming;
@@ -780,24 +809,147 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_NE(naming[1].find("Title: hotels"), std::string::npos);
   EXPECT_NE(naming[1].find("Other tabs in the task:\\n- lisbon"),
             std::string::npos);
-  std::vector<std::string> results;
-  for (const base::DictValue& line : LogLines()) {
-    if (*line.FindString("purpose") == "name") {
-      results.push_back(*line.FindString("result"));
-    }
-  }
-  EXPECT_THAT(results, testing::ElementsAre("no usable name", "named"));
+  EXPECT_THAT(Results("placement"),
+              testing::ElementsAre("left", "name", "name"));
+  EXPECT_THAT(Results("name"), testing::ElementsAre("no usable name", "named"));
 
-  // A task with a name keeps it, and is one the model can choose.
+  // A task with a name is one the model can choose.
   Answer("/v1/decisions", DecisionsAnswer(task->ToString(), 0.99));
   Browse(link, "weather");
-  ASSERT_TRUE(SettleAfter(5));
+  ASSERT_TRUE(SettleAfter(6));
   const std::vector<ModelRequest> requests = Requests();
-  ASSERT_EQ(requests.size(), 5u);
-  EXPECT_EQ(requests[4].path, "/v1/decisions");
-  EXPECT_NE(requests[4].body.find("Plan Lisbon trip"), std::string::npos);
+  ASSERT_EQ(requests.size(), 6u);
+  EXPECT_EQ(requests[5].path, "/v1/decisions");
+  EXPECT_NE(requests[5].body.find("Plan Lisbon trip"), std::string::npos);
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
   EXPECT_EQ(link->GetGroup(), task);
+}
+
+// A tab that no longer matches the name of its task has either left the task
+// or shows that the task has outgrown the name. The decision model says
+// which, and only a name uw gave is replaced.
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       ATaskThatOutgrowsItsNameIsRenamed) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
+  tabs::TabInterface* first = OpenLinkFrom(InitialTab(), "baixa");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> task = first->GetGroup();
+  ASSERT_TRUE(task);
+  ASSERT_EQ(TitleOf(*task), u"Compare Baixa hotels");
+  // A tab outside every task has no name to check.
+  EXPECT_EQ(Requests()[0].body.find("needs a new name"), std::string::npos);
+
+  // Alone, this answer would start a second task.
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.93));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Lisbon hotels"));
+  tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(second->GetGroup(), task);
+  EXPECT_EQ(tabs()->group_model()->ListTabGroups().size(), 1u);
+  EXPECT_EQ(TitleOf(*task), u"Compare Lisbon hotels");
+  EXPECT_EQ(bar()->card()->headline(), u"Naming the task");
+  EXPECT_EQ(bar()->card()->page(), u"chiado");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.93 of 0.90");
+  EXPECT_FALSE(bar()->card()->offers_undo());
+  std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 4u);
+  EXPECT_NE(requests[2].body.find(
+                "The user's browsing task \\\"Compare Baixa hotels\\\" holds "
+                "this tab and these tabs:\\n- baixa\\nDecide whether the task "
+                "needs a new name."),
+            std::string::npos);
+  EXPECT_EQ(requests[3].path, "/v1/chat/completions");
+  EXPECT_NE(requests[3].body.find("Other tabs in the task:\\n- baixa"),
+            std::string::npos);
+
+  // Short of what a new name needs, the task keeps its name. It is offered
+  // under the new one.
+  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.95, 0.0, 0.89));
+  Browse(second, "alfama");
+  ASSERT_TRUE(SettleAfter(5));
+  EXPECT_EQ(TitleOf(*task), u"Compare Lisbon hotels");
+  EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
+  requests = Requests();
+  ASSERT_EQ(requests.size(), 5u);
+  EXPECT_NE(requests[4].body.find("\"Compare Lisbon hotels\""),
+            std::string::npos);
+
+  // A name the user typed is theirs. The model is not asked about it, and a
+  // tab that fits no task leaves as it did before.
+  tabs()->ChangeTabGroupVisuals(
+      *task,
+      tab_groups::TabGroupVisualData(
+          u"Lisbon",
+          tabs()->group_model()->GetTabGroup(*task)->visual_data()->color()));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.99));
+  Answer("/v1/chat/completions", ChatAnswer("Read about Sintra"));
+  Browse(second, "sintra");
+  ASSERT_TRUE(SettleAfter(7));
+  requests = Requests();
+  ASSERT_EQ(requests.size(), 7u);
+  EXPECT_EQ(requests[5].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(TitleOf(*task), u"Lisbon");
+  ASSERT_TRUE(second->GetGroup());
+  EXPECT_NE(second->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*second->GetGroup()), u"Read about Sintra");
+
+  EXPECT_THAT(Results("placement"),
+              testing::ElementsAre("new_task", "name", "left", "new_task"));
+  EXPECT_THAT(Results("name"), testing::ElementsAre("named", "named", "named"));
+  const std::vector<base::DictValue> lines = LogLines();
+  ASSERT_EQ(lines.size(), 7u);
+  EXPECT_EQ(lines[2].FindDouble("new_name"), 0.93);
+  EXPECT_EQ(lines[2].FindDouble("needed"), 0.90);
+  EXPECT_EQ(lines[4].FindDouble("new_name"), 0.89);
+  EXPECT_EQ(lines[5].FindDouble("new_name"), 0.0);
+}
+
+// A tab opened from another tab starts in that tab's task, under it. When it
+// turns out to be a piece of work of its own, it leaves for a task of its
+// own, and the name check does not hold it back.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AChildTabBreaksOutOfItsParentsTask) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  tabs::TabInterface* parent = OpenLinkFrom(InitialTab(), "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> task = parent->GetGroup();
+  ASSERT_TRUE(task);
+
+  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.95, 0.0, 0.1));
+  tabs::TabInterface* sibling = OpenLinkFrom(parent, "hotels");
+  ASSERT_TRUE(SettleAfter(3));
+  ASSERT_EQ(sibling->GetGroup(), task);
+  ASSERT_EQ(controller()->DepthFor(sibling), 1);
+
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8, 0.3));
+  Answer("/v1/chat/completions", ChatAnswer("Compare laptops"));
+  tabs::TabInterface* child = OpenLinkFrom(parent, "laptops");
+  ASSERT_EQ(child->GetGroup(), task);
+  ASSERT_EQ(controller()->DepthFor(child), 1);
+  ASSERT_TRUE(SettleAfter(5));
+
+  ASSERT_TRUE(child->GetGroup());
+  EXPECT_NE(child->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*child->GetGroup()), u"Compare laptops");
+  EXPECT_EQ(controller()->DepthFor(child), 0);
+  EXPECT_EQ(parent->GetGroup(), task);
+  EXPECT_EQ(sibling->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->headline(), u"Created task Compare laptops");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+  // The request did carry the name check, and its answer was to keep the name.
+  EXPECT_NE(Requests()[3].body.find("needs a new name"), std::string::npos);
+
+  bar()->Undo();
+  EXPECT_EQ(child->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(child), 1);
 }
 
 // Without the fixture's careful setting, uw asks for less before it moves a
@@ -834,6 +986,58 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(SettleAfter(4));
   EXPECT_EQ(last->GetGroup(), task);
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.50 of 0.50");
+}
+
+// Web apps keep their state in the address. A tab is asked about again when
+// its title changes or it goes to another site, not for a new path or new
+// parameters under the same title.
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       OnlyANewTitleOrAnotherSiteAsksAgain) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  const auto nothing_sent = [&] {
+    organizer()->DispatchNowForTesting();
+    WaitForPageText(link);
+    return Requests().size() == 1u && organizer()->pending_requests() == 0u;
+  };
+
+  // The page changes its own address, as a filter or a sort order does.
+  ASSERT_TRUE(content::ExecJs(
+      link->GetContents(),
+      "history.pushState({}, '', '/page/lisbon?sort=price#top')"));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(nothing_sent());
+
+  // The same page loads again with other parameters, and then from another
+  // path.
+  Browse(link, "lisbon?sort=rating");
+  EXPECT_TRUE(nothing_sent());
+  Browse(link, "alfama?title=lisbon");
+  EXPECT_TRUE(nothing_sent());
+
+  Browse(link, "hotels");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(Requests().size(), 2u);
+  // The request carries the address the tab is at now.
+  EXPECT_NE(Requests()[1].body.find("/page/hotels"), std::string::npos);
+
+  // The same title on another site is another page.
+  content::WebContents* contents = link->GetContents();
+  contents->GetController().LoadURL(
+      embedded_test_server()->GetURL("other.test", "/page/hotels"),
+      content::Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
+  ASSERT_TRUE(content::WaitForLoadStop(contents));
+  ASSERT_TRUE(SettleAfter(3));
+  EXPECT_EQ(Requests().size(), 3u);
+
+  // Each line of the log says which tab it was about.
+  const std::vector<base::DictValue> lines = LogLines();
+  ASSERT_EQ(lines.size(), 3u);
+  EXPECT_EQ(*lines[0].FindString("page"), Id(link).value());
+  EXPECT_EQ(*lines[2].FindString("page"), Id(link).value());
 }
 
 // A pinned tab is not in the tab tree, so the organizer leaves it alone.

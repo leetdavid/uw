@@ -14,11 +14,13 @@ constexpr Thresholds kNeeded{0.90, 0.75};
 
 ClassificationAnswer Answer(const std::string& choice,
                             double confidence,
-                            double new_task = 0.0) {
+                            double new_task = 0.0,
+                            double new_name = 0.0) {
   ClassificationAnswer answer;
   answer.choice = choice;
   answer.confidence = confidence;
   answer.new_task = new_task;
+  answer.new_name = new_name;
   return answer;
 }
 
@@ -106,7 +108,7 @@ TEST(PlacementTest, InTheScratchpadOnlyAClearNewTaskChangesAnything) {
             Action::kLeave);
 }
 
-TEST(PlacementTest, InATaskWithoutANameOnlyANamedTaskChangesAnything) {
+TEST(PlacementTest, InATaskWithoutANameABranchJoinsANamedTaskOrNamesItsOwn) {
   const Position unnamed{std::string(), /*in_unnamed_task=*/true};
   Placement placement = Place(Answer("task-2", 0.95), unnamed, kNeeded);
   EXPECT_EQ(placement.action, Action::kApply);
@@ -114,14 +116,66 @@ TEST(PlacementTest, InATaskWithoutANameOnlyANamedTaskChangesAnything) {
   EXPECT_EQ(Place(Answer("task-2", 0.5), unnamed, kNeeded).action,
             Action::kSuggest);
 
-  // The task it is in may be the one it starts, once that task has a name.
-  EXPECT_EQ(Place(Answer(kNewTaskOption, 0.99, 0.99), unnamed, kNeeded).action,
+  // The task it is in is the one it starts, so that task gets its name.
+  placement = Place(Answer(kNewTaskOption, 0.99, 0.75), unnamed, kNeeded);
+  EXPECT_EQ(placement.action, Action::kName);
+  EXPECT_EQ(placement.confidence, 0.75);
+  EXPECT_EQ(placement.needed, kNeeded.new_task);
+
+  // A one-off, or an answer the model is not sure of, names nothing.
+  EXPECT_EQ(Place(Answer(kNewTaskOption, 0.99, 0.74), unnamed, kNeeded).action,
             Action::kLeave);
   EXPECT_EQ(Place(Answer(kNewTaskOption, 0.5, 0.99), unnamed, kNeeded).action,
             Action::kLeave);
   EXPECT_EQ(
       Place(Answer(kScratchpadOption, 0.99, 0.1), unnamed, kNeeded).action,
       Action::kLeave);
+}
+
+TEST(PlacementTest, ATaskThatHasOutgrownItsNameKeepsTheBranch) {
+  // Without the name check this branch would start a task of its own.
+  Placement placement =
+      PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, /*new_name=*/0.90));
+  EXPECT_EQ(placement.action, Action::kName);
+  EXPECT_EQ(placement.confidence, 0.90);
+  EXPECT_EQ(placement.needed, kNeeded.confidence);
+  EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.5, 0.9, 0.95)).action,
+            Action::kName);
+  EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, 0.95),
+                    /*may_leave=*/false)
+                .action,
+            Action::kName);
+
+  // A branch that fits its task can still show that the name is too narrow.
+  EXPECT_EQ(PlaceIn("task-1", Answer("task-1", 0.95, 0.0, 0.92)).action,
+            Action::kName);
+  EXPECT_EQ(PlaceIn("task-1", Answer("task-1", 0.95, 0.0, 0.89)).action,
+            Action::kLeave);
+
+  // Short of the threshold, it is the branch that has left the task.
+  placement = PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, 0.89));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, kNewTaskOption);
+
+  // A one-off says nothing about the task. It leaves for the Scratchpad.
+  placement = PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1, 0.99));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, kScratchpadOption);
+  placement = PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.74, 0.99));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, kScratchpadOption);
+
+  // Another task the branch belongs to comes first.
+  placement = PlaceIn("task-1", Answer("task-2", 0.95, 0.0, 0.99));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, "task-2");
+  EXPECT_EQ(PlaceIn("task-1", Answer("task-2", 0.5, 0.0, 0.99)).action,
+            Action::kSuggest);
+
+  // The Scratchpad has no name to outgrow.
+  EXPECT_EQ(
+      PlaceIn(std::string(), Answer(kNewTaskOption, 0.95, 0.9, 0.99)).action,
+      Action::kApply);
 }
 
 TEST(PlacementTest, EachEagernessLevelAsksForLess) {

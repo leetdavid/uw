@@ -27,6 +27,7 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/page_transition_types.h"
+#include "url/origin.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -47,6 +48,8 @@ const char* ResultName(Kind kind) {
       return "created";
     case Kind::kLeft:
       return "left";
+    case Kind::kNeedsName:
+      return "name";
     case Kind::kUnsure:
       return "unsure";
     case Kind::kRequestFailed:
@@ -162,6 +165,9 @@ void AutomaticOrganizer::Scan() {
   std::erase_if(requests_, [&tree](const auto& entry) {
     return !tree.Find(entry.second.page);
   });
+  std::erase_if(generated_names_, [this](const auto& entry) {
+    return !controller_->GroupFor(entry.first);
+  });
   const bool enabled = Enabled();
   bool due = false;
   for (const Page& page : tree.pages()) {
@@ -170,13 +176,26 @@ void AutomaticOrganizer::Scan() {
     if (!contents) {
       continue;
     }
-    Activity& activity = pages_[page.id];
-    const bool first_sight = activity.revision == 0;
-    if (!first_sight && activity.url == contents->GetLastCommittedURL() &&
-        activity.title == contents->GetTitle()) {
+    // A page that is still loading and has no title yet shows only its
+    // address. It is looked at once it has a title or has finished loading.
+    const content::NavigationEntry* entry =
+        contents->GetController().GetLastCommittedEntry();
+    if (contents->IsLoading() && (!entry || entry->GetTitle().empty())) {
       continue;
     }
-    activity.url = contents->GetLastCommittedURL();
+    Activity& activity = pages_[page.id];
+    const bool first_sight = activity.revision == 0;
+    const GURL& url = contents->GetLastCommittedURL();
+    // A tab shows something else when its title changes or it goes to another
+    // site. A new path or new parameters under the same title are the same
+    // page to the organizer: web apps keep their state in the address.
+    const bool same_page =
+        !first_sight && activity.title == contents->GetTitle() &&
+        (activity.url == url || url::IsSameOriginWith(activity.url, url));
+    activity.url = url;
+    if (same_page) {
+      continue;
+    }
     activity.title = contents->GetTitle();
     ++activity.revision;
     // A page is filed when it opens here or changes, not for being there:
@@ -277,9 +296,6 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
           : "opened from \"" + base::UTF16ToUTF8(parent->second.title) + "\"";
   request.context.excerpt = std::move(excerpt);
   request.in_unnamed_task = !request.task.empty() && !Named(request.task);
-  if (request.in_unnamed_task) {
-    AskToNameTask(*page, revision, request.context);
-  }
 
   std::vector<std::pair<std::string, std::string>> tasks;
   for (const std::string& task : controller_->tree().Tasks()) {
@@ -289,8 +305,11 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   }
   request.has_tasks = !tasks.empty();
   const std::string& model = decides ? decision.model : language.model;
-  std::optional<std::string> body =
-      BuildDecisionRequestBody(request.format, model, request.context, tasks);
+  const std::optional<NameCheck> name_check =
+      decides ? NameCheckFor(*page) : std::nullopt;
+  request.checks_name = name_check.has_value();
+  std::optional<std::string> body = BuildDecisionRequestBody(
+      request.format, model, request.context, tasks, name_check);
   if (!body) {
     return;
   }
@@ -309,27 +328,47 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   Send(std::move(request), &AutomaticOrganizer::OnDecision);
 }
 
-void AutomaticOrganizer::AskToNameTask(const Page& page,
-                                       uint64_t revision,
-                                       const BranchContext& context) {
-  Request request;
-  request.page = page.id;
-  request.revision = revision;
-  request.task = page.task;
-  request.parent = page.parent;
-  request.context = context;
-  request.names_task = true;
-  std::vector<std::string> other_titles;
+std::vector<std::string> AutomaticOrganizer::OtherTitles(
+    const Page& page) const {
+  std::vector<std::string> titles;
   for (const Page& other : controller_->tree().pages()) {
     const auto activity = pages_.find(other.id);
     if (other.task == page.task && other.id != page.id &&
         activity != pages_.end() && !activity->second.title.empty()) {
-      other_titles.push_back(base::UTF16ToUTF8(activity->second.title));
+      titles.push_back(base::UTF16ToUTF8(activity->second.title));
     }
   }
-  if (PrepareNaming(request, other_titles)) {
-    Send(std::move(request), &AutomaticOrganizer::OnName);
+  return titles;
+}
+
+std::optional<NameCheck> AutomaticOrganizer::NameCheckFor(
+    const Page& page) const {
+  if (!Generated(page.task) ||
+      !IsComplete(ReadAiConnectionConfig(profile()->GetPrefs()))) {
+    return std::nullopt;
   }
+  std::vector<std::string> titles = OtherTitles(page);
+  if (titles.empty()) {
+    return std::nullopt;
+  }
+  return NameCheck{base::UTF16ToUTF8(controller_->TaskTitle(page.task)),
+                   std::move(titles)};
+}
+
+void AutomaticOrganizer::NameTaskOf(Request request,
+                                    std::optional<std::u16string> name) {
+  const Page* page = controller_->tree().Find(request.page);
+  request.names_task = true;
+  if (!name && !(page && PrepareNaming(request, OtherTitles(*page)))) {
+    Report(Event::Kind::kLeft, request);
+    return;
+  }
+  Report(Event::Kind::kNeedsName, request);
+  if (name) {
+    GiveName(request.task, *name);
+    return;
+  }
+  Send(std::move(request), &AutomaticOrganizer::OnName);
 }
 
 bool AutomaticOrganizer::PrepareNaming(
@@ -377,8 +416,8 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
     Report(Event::Kind::kRequestFailed, *request, FailureReason(outcome));
     return;
   }
-  std::optional<ClassificationAnswer> answer =
-      ParseDecisionResponse(request->format, outcome.body, request->has_tasks);
+  std::optional<ClassificationAnswer> answer = ParseDecisionResponse(
+      request->format, outcome.body, request->has_tasks, request->checks_name);
   if (!answer ||
       (answer->choice != kNewTaskOption &&
        answer->choice != kScratchpadOption && !Named(answer->choice))) {
@@ -397,9 +436,13 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
   request->target = placement.target;
   request->confidence = placement.confidence;
   request->needed = placement.needed;
+  request->new_name = answer->new_name;
   switch (placement.action) {
     case Placement::Action::kLeave:
       Report(Event::Kind::kLeft, *request);
+      return;
+    case Placement::Action::kName:
+      NameTaskOf(std::move(*request), std::move(answer->task_name));
       return;
     case Placement::Action::kSuggest:
       Report(Event::Kind::kUnsure, *request, TargetName(*request));
@@ -473,8 +516,9 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   LogOrganizerExchange("name", request->naming,
                        name ? "named" : "no usable name");
   if (request->names_task) {
-    if (name && Current(*request) && !Named(request->task)) {
-      controller_->NameTask(request->task, *name);
+    if (name && Current(*request) &&
+        (!Named(request->task) || Generated(request->task))) {
+      GiveName(request->task, *name);
     }
     return;
   }
@@ -487,12 +531,13 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
 }
 
 void AutomaticOrganizer::CreateTask(Request& request, std::u16string title) {
-  const bool created =
-      controller_
-          ->MoveToNewTask({request.page}, title,
-                          TabOrganizationController::Origin::kOrganizer)
-          .has_value();
-  Report(created ? Event::Kind::kCreated : Event::Kind::kDropped, request,
+  const std::optional<tab_groups::TabGroupId> group =
+      controller_->MoveToNewTask({request.page}, title,
+                                 TabOrganizationController::Origin::kOrganizer);
+  if (group) {
+    generated_names_[group->ToString()] = title;
+  }
+  Report(group ? Event::Kind::kCreated : Event::Kind::kDropped, request,
          std::move(title));
 }
 
@@ -521,10 +566,12 @@ std::u16string AutomaticOrganizer::TargetName(const Request& request) const {
 
 base::DictValue AutomaticOrganizer::LogDetails(const Request& request) {
   base::DictValue details;
+  details.Set("page", request.page.value());
   details.Set("from", request.task);
   details.Set("to", request.target);
   details.Set("confidence", request.confidence);
   details.Set("needed", request.needed);
+  details.Set("new_name", request.new_name);
   return details;
 }
 
@@ -540,6 +587,18 @@ bool AutomaticOrganizer::Named(const std::string& task) const {
   const std::u16string title = controller_->TaskTitle(task);
   return !title.empty() &&
          title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK);
+}
+
+bool AutomaticOrganizer::Generated(const std::string& task) const {
+  const auto generated = generated_names_.find(task);
+  return generated != generated_names_.end() && Named(task) &&
+         generated->second == controller_->TaskTitle(task);
+}
+
+void AutomaticOrganizer::GiveName(const std::string& task,
+                                  const std::u16string& name) {
+  controller_->NameTask(task, name);
+  generated_names_[task] = name;
 }
 
 std::optional<AutomaticOrganizer::Request> AutomaticOrganizer::Take(

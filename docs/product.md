@@ -255,6 +255,8 @@ Preserve loaded pages, the selected tab, and the moved branches' internal hierar
 
 Agreed: once a task is known, give its group a short, action-oriented name describing the immediate activity, such as "Benchmark GLiNER2.5". Revise an automatically generated name only when the task clearly changes. Users can edit names; a user-edited name takes priority over automatic renaming.
 
+Agreed on 2026-10-12: the model that decides placement also decides when a task needs a name or a new one. The language model writes the name and is asked only then. See the [name check](plans/automatic-organization.md#name-check).
+
 ### Group order
 
 Agreed: existing sibling task groups keep their relative order when the user switches tasks. Activity or recency does not move a group to the top. Users can drag groups to reorder them; intent-based regrouping can still move tabs or branches when the task becomes clear.

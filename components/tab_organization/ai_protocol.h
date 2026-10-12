@@ -14,9 +14,10 @@ namespace uw {
 // Pure request/response handling for the placement call behind automatic
 // organization. The call asks two things about one tab branch: which of the
 // user's tasks it belongs to, if any, and what a branch outside every task
-// is. No networking, prefs, or credentials here; browser integration owns
-// transport. All functions validate strictly and reject malformed input so a
-// bad provider response can never move a tab.
+// is. A decision model can also be asked whether the task the branch is in
+// needs a new name. No networking, prefs, or credentials here; browser
+// integration owns transport. All functions validate strictly and reject
+// malformed input so a bad provider response can never move a tab.
 
 // A branch outside every task that starts a task of its own.
 extern const char kNewTaskOption[];
@@ -28,7 +29,7 @@ extern const char kNoTaskOption[];
 extern const size_t kMaxGeneratedTaskNameLength;
 // Maximum accepted length of the readable-page-text excerpt, in characters.
 extern const size_t kMaxExcerptLength;
-// How many other tab titles a naming request lists.
+// How many other tab titles a naming request or a name check lists.
 extern const size_t kMaxNamingTitles;
 
 // Metadata sent for one tab branch. `excerpt` is short readable page text.
@@ -61,6 +62,17 @@ struct ClassificationAnswer {
   double new_task = 0.0;
   // Valid generated name for kNewTaskOption, when the format carries one.
   std::optional<std::u16string> task_name;
+  // The probability that the task the branch is in needs a new name. Zero
+  // when the request carried no name check.
+  double new_name = 0.0;
+};
+
+// The name check: the task a branch is in, for the question whether that
+// task needs a new name. `other_titles` are the titles of its other tabs;
+// only the first kMaxNamingTitles are sent.
+struct NameCheck {
+  std::string name;
+  std::vector<std::string> other_titles;
 };
 
 // Parses and validates the placement decision out of a chat-completions
@@ -83,28 +95,33 @@ enum class DecisionFormat {
 // Builds the request body for one placement decision in `format`. Rejects the
 // same input as BuildClassificationRequestBody, plus task lists too long for
 // one choice question. With no tasks, a decision model is asked only what a
-// branch outside every task is.
+// branch outside every task is. `name_check` adds the question whether the
+// branch's task needs a new name. A chat request never carries it.
 std::optional<std::string> BuildDecisionRequestBody(
     DecisionFormat format,
     const std::string& model,
     const BranchContext& context,
-    const std::vector<std::pair<std::string, std::string>>& task_options);
+    const std::vector<std::pair<std::string, std::string>>& task_options,
+    const std::optional<NameCheck>& name_check = std::nullopt);
 
 // Parses and validates one placement decision out of a `format` response.
 // `has_tasks` says whether the request listed any task: a decision model's
 // answer must then say which one the branch belongs to, or none. Decision
 // models never name tasks, so `task_name` stays empty for them. A refusal, or
-// an answer without a usable confidence, is rejected.
+// an answer without a usable confidence, is rejected. The answer to the name
+// check is read only when `has_name_check` says the request carried one. A
+// missing or unusable one only leaves `new_name` at zero.
 std::optional<ClassificationAnswer> ParseDecisionResponse(
     DecisionFormat format,
     const std::string& body,
-    bool has_tasks);
+    bool has_tasks,
+    bool has_name_check = false);
 
 // Builds an OpenAI-compatible chat-completions request asking for a short
 // name for a browsing task. `context` is the tab that starts the task, or
-// the tab that just changed in a task that has no name yet. `other_titles`
-// are the titles of the other tabs in that task; only the first
-// kMaxNamingTitles are sent.
+// the tab that just changed in a task that needs a name. `other_titles` are
+// the titles of the other tabs in that task; only the first kMaxNamingTitles
+// are sent.
 std::optional<std::string> BuildNamingRequestBody(
     const std::string& model,
     const BranchContext& context,

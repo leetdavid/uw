@@ -67,7 +67,11 @@ Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-
 
 Then choose `New task` from the `Organize` menu and open a page in it.
 
-Expected result: with a language model set, the task called `New task` takes a name from that page within a few seconds. If the model returns nothing usable, the next page you open in the task tries again. A task you renamed yourself keeps your name.
+Expected result: with a language model set, the task called `New task` takes a name within a few seconds of a page that starts a piece of work. A sign-in page, a home page, or a feed names nothing. If the model returns nothing usable, the next such page tries again.
+
+A tab is asked about again when its title changes or it goes to another site. Changing a filter or a sort order in a web app, which only changes the address, asks nothing.
+
+A task that uw named can change its name. Open a few related pages from it that its name is too narrow for, such as hotels in other parts of town in a task named after one neighbourhood. Expected result: the tabs stay and the task gets a wider name. A task you renamed yourself keeps your name, and so does every task after a restart.
 
 The `Sorting` slider on the settings page sets how sure a model must be before a tab moves. Under it the page states the two thresholds of the chosen level. Drag it towards `Eager` and more tabs move on their own. Pinned tabs are never sorted.
 
