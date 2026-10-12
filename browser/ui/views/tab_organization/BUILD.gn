@@ -1,5 +1,7 @@
 source_set("tab_organization") {
   sources = [
+    "activity_card.cc",
+    "activity_card.h",
     "new_task_button.cc",
     "new_task_button.h",
     "organize_bar.cc",
@@ -8,6 +10,8 @@ source_set("tab_organization") {
     "scratchpad_label.h",
     "tab_indent.cc",
     "tab_indent.h",
+    "tint_style.cc",
+    "tint_style.h",
   ]
   public_deps = [
     "//base",
@@ -20,14 +24,16 @@ source_set("tab_organization") {
     "//chrome/browser:browser_public_dependencies",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/tabs/common",
     "//components/prefs",
+    "//components/tabs:public",
+    "//components/vector_icons",
+    "//skia",
     "//ui/base",
     "//ui/color",
     "//ui/gfx",
-    "//uw/browser/tab_organization:ai_connection",
-    "//chrome/browser/ui/views/tabs/common:common",
-    "//components/tabs:public",
     "//ui/views",
     "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
   ]
 }

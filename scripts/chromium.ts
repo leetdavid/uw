@@ -488,7 +488,8 @@ const TEST_SUITES = {
     "VerticalTabStripStateControllerTest.*",
   ],
   browser_tests: [
-    "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "UwOrganizationPageBrowserTest.*",
+    "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
+    "UwOrganizationPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*",
   ],
 } as const;

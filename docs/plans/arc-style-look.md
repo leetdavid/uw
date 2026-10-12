@@ -1,6 +1,6 @@
 # Arc-style look
 
-Status: approved on 2026-10-11 with the decisions below. Stages 1 to 4 and 6 are built, except the card's shadow. Stage 5 is half built: the pills are done, the toolbar height and the message card are not.
+Status: approved on 2026-10-11 with the decisions below. Stages 1 to 4 and 6 are built, except the card's shadow. Stage 5 is built except the toolbar height.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Sizes and colors are small changes because Chromium already has settings for them. The tint gradient, the user's own tint, and the task folder row need custom drawing in several views. Chromium's vertical tab strip is new and changes with every release, and the result can only be judged by eye.
 
@@ -59,7 +59,7 @@ Agreed on 2026-10-12:
 2. **Tint and card.** Built, except the shadow. The toolbar and the page sit in a card with an 8px inset and a 12px radius. The card has no shadow yet.
 3. **Tab rows and favorites.** Built: 34px rows with a 10px radius, the active tab as a card, and pinned tabs as filled tiles. Tiles use the row radius of 10px, not 12px, because Chromium has one radius for both.
 4. **Task rows.** Built. The header shows a folder icon in the group's color, the name in semibold, and Chromium's chevron. Chromium's colored line beside a task's tabs stays, although the design has none.
-5. **Sidebar foot and toolbar.** The Organize and Undo buttons are pills. The message is plain text beside Undo, not a card. The toolbar keeps Chromium's height of about 46px.
+5. **Sidebar foot and toolbar.** The Organize and Undo buttons are pills. The automatic-move message is the [activity card](automatic-organization.md#agreed-scope), built on 2026-10-12. The toolbar keeps Chromium's height of about 46px.
 6. **User tint.** Built. A color picked on uw's settings page drives the gradient and the text color, and a mid-tone pick is made readable.
 
 ## Acceptance checks

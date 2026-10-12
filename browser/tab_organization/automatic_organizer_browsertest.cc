@@ -8,14 +8,24 @@
 #include <vector>
 
 #include "base/callback_list.h"
+#include "base/command_line.h"
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/json/json_reader.h"
 #include "base/run_loop.h"
+#include "base/strings/string_split.h"
+#include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/threading/thread_restrictions.h"
+#include "base/values.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
@@ -32,15 +42,22 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/views/test/views_test_utils.h"
 #include "ui/views/view.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
+#include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "url/url_constants.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/model_test_server.h"
+#include "uw/browser/tab_organization/organizer_log.h"
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 
 namespace uw {
@@ -208,9 +225,66 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     return {ungrouped, *task};
   }
 
+  // Every visible view inside `view` lies within its parent and is at least
+  // as tall as it wants to be.
+  static void ExpectNothingClipped(const views::View* view) {
+    for (const views::View* child : view->children()) {
+      if (!child->GetVisible()) {
+        continue;
+      }
+      EXPECT_TRUE(view->GetLocalBounds().Contains(child->bounds()))
+          << child->GetClassName() << " at " << child->bounds().ToString()
+          << " in " << view->GetLocalBounds().ToString();
+      EXPECT_GE(child->height(), child->GetPreferredSize().height())
+          << child->GetClassName();
+      ExpectNothingClipped(child);
+    }
+  }
+
  private:
   ScopedMemoryKeychain keychain_;
   ModelTestServer models_{embedded_test_server()};
+};
+
+// Starts uw with --uw-organizer-log.
+class OrganizerLogBrowserTest : public AutomaticOrganizerBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    AutomaticOrganizerBrowserTest::SetUpCommandLine(command_line);
+    ASSERT_TRUE(folder_.CreateUniqueTempDir());
+    command_line->AppendSwitchPath(kOrganizerLogSwitch, LogPath());
+  }
+
+  base::FilePath LogPath() const {
+    return folder_.GetPath().AppendASCII("organizer-log.jsonl");
+  }
+
+  std::string LogText() {
+    base::ThreadPoolInstance::Get()->FlushForTesting();
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    std::string text;
+    base::ReadFileToString(LogPath(), &text);
+    return text;
+  }
+
+  // The lines written so far, each one a JSON object.
+  std::vector<base::DictValue> LogLines() {
+    std::vector<base::DictValue> lines;
+    for (const std::string& line :
+         base::SplitString(LogText(), "\n", base::TRIM_WHITESPACE,
+                           base::SPLIT_WANT_NONEMPTY)) {
+      std::optional<base::DictValue> parsed =
+          base::JSONReader::ReadDict(line, base::JSON_PARSE_RFC);
+      EXPECT_TRUE(parsed) << line;
+      if (parsed) {
+        lines.push_back(std::move(*parsed));
+      }
+    }
+    return lines;
+  }
+
+ private:
+  base::ScopedTempDir folder_;
 };
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -225,8 +299,14 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   EXPECT_EQ(link->GetGroup(), task);
   EXPECT_EQ(controller()->DepthFor(link), 0);
-  ASSERT_TRUE(bar()->notice_visible());
-  EXPECT_EQ(bar()->notice_text(), u"Moved to Plan Lisbon trip");
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Moved to Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.95 of 0.90");
+  EXPECT_TRUE(
+      bar()->card()->source().starts_with(u"Answered by decision-model in "));
+  EXPECT_TRUE(bar()->card()->offers_undo());
+  EXPECT_FALSE(bar()->card()->waiting());
   SaveWindowScreenshot(browser(), "automatic-move");
 
   const std::vector<ModelRequest> requests = Requests();
@@ -237,10 +317,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(requests[0].body.find("Notes about lisbon"), std::string::npos);
   EXPECT_NE(requests[0].body.find("Plan Lisbon trip"), std::string::npos);
 
-  bar()->UndoNotice();
+  bar()->Undo();
   EXPECT_FALSE(link->GetGroup());
   EXPECT_EQ(controller()->DepthFor(link), 1);
-  EXPECT_FALSE(bar()->notice_visible());
+  EXPECT_FALSE(bar()->card_visible());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -256,8 +336,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(link->GetGroup());
   EXPECT_EQ(TitleOf(*link->GetGroup()), u"Plan Lisbon trip");
   EXPECT_FALSE(InitialTab()->GetGroup());
-  ASSERT_TRUE(bar()->notice_visible());
-  EXPECT_EQ(bar()->notice_text(), u"Created task Plan Lisbon trip");
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Created task Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.90");
+  EXPECT_TRUE(bar()->card()->offers_undo());
 
   const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 2u);
@@ -309,31 +391,38 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
   EXPECT_FALSE(link->GetGroup());
-  EXPECT_EQ(bar()->activity_text(), u"The request for lisbon failed.");
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"The request failed: HTTP 404");
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
+  EXPECT_FALSE(bar()->card()->offers_undo());
 
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.89));
   Browse(link, "hotels");
   ASSERT_TRUE(SettleAfter(2));
   EXPECT_FALSE(link->GetGroup());
-  ASSERT_TRUE(bar()->activity_visible());
-  EXPECT_EQ(bar()->activity_text(),
-            u"The model suggested Plan Lisbon trip for hotels. Confidence: "
-            u"0.89. uw moves a tab at 0.90 or more.");
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested Plan Lisbon trip");
+  EXPECT_EQ(bar()->card()->page(), u"hotels");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.89 of 0.90");
+  EXPECT_FALSE(bar()->card()->offers_undo());
   SaveWindowScreenshot(browser(), "activity");
 
   Answer("/v1/decisions", DecisionsAnswer("scratchpad", 0.99));
   Browse(link, "weather");
   ASSERT_TRUE(SettleAfter(3));
   EXPECT_FALSE(link->GetGroup());
-  EXPECT_EQ(bar()->activity_text(),
-            u"The model left weather where it is. Confidence: 0.99.");
+  EXPECT_EQ(bar()->card()->headline(), u"Left where it is");
+  EXPECT_EQ(bar()->card()->page(), u"weather");
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.99 of 0.90");
 
   Answer("/v1/decisions", "not json");
   Browse(link, "museums");
   ASSERT_TRUE(SettleAfter(4));
-  EXPECT_EQ(bar()->activity_text(),
-            u"The model's answer for museums could not be read.");
-  EXPECT_FALSE(bar()->notice_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"Could not read the answer");
+  EXPECT_EQ(bar()->card()->page(), u"museums");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
+  EXPECT_FALSE(bar()->card()->offers_undo());
   EXPECT_FALSE(controller()->CanUndo() && link->GetGroup());
 }
 
@@ -342,10 +431,15 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   const auto [ungrouped, task] = OneTask();
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  // What the card showed as each step was reported.
   std::vector<AutomaticOrganizer::Event::Kind> kinds;
+  std::vector<bool> shown;
+  std::vector<bool> waiting;
   const base::CallbackListSubscription events = organizer()->ObserveEvents(
       base::BindLambdaForTesting([&](const AutomaticOrganizer::Event& event) {
         kinds.push_back(event.kind);
+        shown.push_back(bar()->card_visible());
+        waiting.push_back(bar()->card()->waiting());
       }));
 
   OpenLinkFrom(ungrouped, "lisbon");
@@ -353,9 +447,95 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   EXPECT_EQ(kinds, (std::vector{AutomaticOrganizer::Event::Kind::kAsking,
                                 AutomaticOrganizer::Event::Kind::kUnsure}));
-  EXPECT_EQ(bar()->activity_text(),
-            u"Asking decision-model about lisbon\u2026");
-  EXPECT_FALSE(bar()->activity_visible());
+  EXPECT_EQ(shown, (std::vector{true, false}));
+  EXPECT_EQ(waiting, (std::vector{true, true}));
+  EXPECT_EQ(bar()->card()->headline(), u"Asking decision-model");
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+  EXPECT_EQ(bar()->card()->source(), u"");
+  EXPECT_FALSE(bar()->card_visible());
+}
+
+// A sidebar full of tabs leaves the card exactly its own height. Nothing in
+// it may be cut off, and it may not sit under the buttons around it.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheCardFitsInACrowdedSidebar) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
+  BrowserView::GetBrowserViewForBrowser(browser())->GetWidget()->SetBounds(
+      gfx::Rect(0, 0, 1000, 600));
+  // Blank tabs load at once, so nothing is still spinning in the screenshot.
+  for (int i = 0; i < 30; ++i) {
+    chrome::AddTabAt(browser(), GURL(url::kAboutBlankURL), -1,
+                     /*foreground=*/false);
+  }
+  base::RunLoop().RunUntilIdle();
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.39));
+  OpenLinkFrom(ungrouped,
+               "a-page-whose-title-is-far-too-long-for-the-sidebar-to-show");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_TRUE(bar()->card_visible());
+  views::test::RunScheduledLayout(
+      BrowserView::GetBrowserViewForBrowser(browser()));
+
+  const views::View* card = bar()->card();
+  const gfx::Rect card_bounds = card->GetBoundsInScreen();
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.39 of 0.90");
+  EXPECT_TRUE(bar()->GetBoundsInScreen().Contains(card_bounds));
+  EXPECT_GE(card->height(), card->GetPreferredSize().height());
+  ExpectNothingClipped(card);
+  for (const views::View* sibling : bar()->children()) {
+    if (sibling != card && sibling->GetVisible()) {
+      EXPECT_FALSE(sibling->GetBoundsInScreen().Intersects(card_bounds))
+          << sibling->GetClassName();
+    }
+  }
+  for (const views::View* sibling : bar()->parent()->children()) {
+    if (sibling != bar() && sibling->GetVisible() &&
+        !sibling->GetProperty(views::kViewIgnoredByLayoutKey)) {
+      EXPECT_FALSE(
+          sibling->GetBoundsInScreen().Intersects(bar()->GetBoundsInScreen()))
+          << sibling->GetClassName();
+    }
+  }
+  SaveWindowScreenshot(browser(), "activity-crowded");
+}
+
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       EveryRequestAndItsAnswerIsWritten) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("new_task", 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  OpenLinkFrom(InitialTab(), "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+
+  const std::vector<base::DictValue> lines = LogLines();
+  ASSERT_EQ(lines.size(), 2u);
+  const base::DictValue& placement = lines[0];
+  EXPECT_EQ(*placement.FindString("purpose"), "placement");
+  EXPECT_EQ(*placement.FindString("model"), "decision-model");
+  EXPECT_EQ(*placement.FindString("endpoint"),
+            embedded_test_server()->GetURL("/v1/systemone").spec());
+  EXPECT_EQ(*placement.FindString("result"), "new_task");
+  EXPECT_EQ(placement.FindDouble("confidence"), 0.97);
+  EXPECT_EQ(placement.FindInt("http_status"), 200);
+  EXPECT_NE(
+      placement.FindStringByDottedPath("request.state")->find("Title: lisbon"),
+      std::string::npos);
+  EXPECT_EQ(
+      *placement.FindStringByDottedPath("answer.answers.destination.choice"),
+      "new_task");
+
+  const base::DictValue& name = lines[1];
+  EXPECT_EQ(*name.FindString("purpose"), "name");
+  EXPECT_EQ(*name.FindString("model"), "language-model");
+  EXPECT_EQ(*name.FindString("result"), "named");
+  EXPECT_NE(name.FindListByDottedPath("request.messages"), nullptr);
+
+  const std::string text = LogText();
+  EXPECT_EQ(text.find("decision-key"), std::string::npos);
+  EXPECT_EQ(text.find("language-key"), std::string::npos);
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -383,10 +563,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
-  ASSERT_TRUE(bar()->notice_visible());
+  ASSERT_TRUE(bar()->card_visible());
 
   ASSERT_TRUE(controller()->MoveToScratchpad({Id(link)}));
-  EXPECT_FALSE(bar()->notice_visible());
+  EXPECT_FALSE(bar()->card_visible());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

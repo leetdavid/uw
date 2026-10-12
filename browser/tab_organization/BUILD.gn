@@ -2,6 +2,8 @@ source_set("tab_organization") {
   sources = [
     "automatic_organizer.cc",
     "automatic_organizer.h",
+    "organizer_log.cc",
+    "organizer_log.h",
     "tab_organization_controller.cc",
     "tab_organization_controller.h",
   ]
@@ -15,16 +17,18 @@ source_set("tab_organization") {
   ]
   deps = [
     ":ai_connection",
+    "//base:i18n",
     "//chrome:strings",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
-    "//components/content_extraction/content/browser",
-    "//services/network/public/cpp",
     "//chrome/browser/ui/browser_window",
     "//chrome/common:constants",
+    "//components/content_extraction/content/browser",
     "//components/prefs",
     "//components/sessions",
     "//content/public/browser",
+    "//net",
+    "//services/network/public/cpp",
     "//ui/base",
     "//ui/menus",
   ]
@@ -42,22 +46,22 @@ source_set("browser_tests") {
     ":ai_connection",
     ":tab_organization",
     ":test_support",
-    "//components/content_extraction/content/browser",
-    "//net:test_support",
-    "//uw/browser/ui/views/tab_organization",
     "//base",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
     "//chrome/common",
     "//chrome/test:test_support",
+    "//components/content_extraction/content/browser",
     "//components/prefs",
     "//components/tab_groups",
     "//content/public/browser",
     "//content/test:test_support",
+    "//net:test_support",
     "//testing/gtest",
     "//ui/views:test_support",
     "//url",
+    "//uw/browser/ui/views/tab_organization",
   ]
 }
 

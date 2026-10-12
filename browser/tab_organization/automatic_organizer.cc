@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -19,6 +20,7 @@
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
+#include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -30,6 +32,40 @@ namespace {
 
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
 constexpr char kUntitledTask[] = "Untitled task";
+
+using Kind = AutomaticOrganizer::Event::Kind;
+
+// The word the organizer log uses for how a request ended.
+const char* ResultName(Kind kind) {
+  switch (kind) {
+    case Kind::kMoved:
+      return "moved";
+    case Kind::kCreated:
+      return "created";
+    case Kind::kLeft:
+      return "left";
+    case Kind::kUnsure:
+      return "unsure";
+    case Kind::kRequestFailed:
+      return "failed";
+    case Kind::kAnswerUnreadable:
+      return "unreadable";
+    case Kind::kDropped:
+      return "dropped";
+    case Kind::kNaming:
+      return "new_task";
+    case Kind::kAsking:
+      return "";
+  }
+}
+
+// The HTTP status or the network error of a request that failed.
+std::u16string FailureReason(const RemoteModelClient::Outcome& outcome) {
+  return base::UTF8ToUTF16(outcome.net_error == net::OK
+                               ? "HTTP " +
+                                     base::NumberToString(outcome.http_status)
+                               : net::ErrorToShortString(outcome.net_error));
+}
 
 }  // namespace
 
@@ -229,16 +265,21 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   if (!body) {
     return;
   }
-  request.client = Client(
-      decides ? DecisionUrl(decision) : ChatCompletionsUrl(language.endpoint),
-      decides ? decision.key_account : language.key_account, std::move(*body));
+  request.decision.model = model;
+  request.decision.url =
+      decides ? DecisionUrl(decision) : ChatCompletionsUrl(language.endpoint);
+  request.decision.body = *body;
+  request.decision.sent_at = base::TimeTicks::Now();
+  request.client = Client(request.decision.url,
+                          decides ? decision.key_account : language.key_account,
+                          std::move(*body));
   if (!request.client) {
     return;
   }
   CancelRequestsFor(id);
   const uint64_t request_id = next_request_++;
   RemoteModelClient* client = request.client.get();
-  Report(Event::Kind::kAsking, request, base::UTF8ToUTF16(model));
+  Report(Event::Kind::kAsking, request);
   requests_.emplace(request_id, std::move(request));
   client->Send(base::BindOnce(&AutomaticOrganizer::OnDecision,
                               weak_factory_.GetWeakPtr(), request_id));
@@ -250,16 +291,19 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
   if (!request) {
     return;
   }
+  request->decision.took = base::TimeTicks::Now() - request->decision.sent_at;
+  request->decision.answer = outcome;
   if (!Current(*request)) {
     Report(Event::Kind::kDropped, *request);
     return;
   }
   if (!outcome.ok) {
-    Report(Event::Kind::kRequestFailed, *request);
+    Report(Event::Kind::kRequestFailed, *request, FailureReason(outcome));
     return;
   }
   const std::optional<ClassificationAnswer> answer =
       ParseDecisionResponse(request->format, outcome.body);
+  request->confidence = answer ? answer->confidence : 0.0;
   const bool starts_task = answer && answer->choice == kNewTaskOption;
   const std::optional<tab_groups::TabGroupId> group =
       answer && !starts_task ? controller_->GroupFor(answer->choice)
@@ -270,15 +314,14 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
     return;
   }
   if (answer->choice == kScratchpadOption || answer->choice == request->task) {
-    Report(Event::Kind::kLeft, *request, std::u16string(), answer->confidence);
+    Report(Event::Kind::kLeft, *request);
     return;
   }
   if (answer->confidence < kMinConfidence) {
     Report(Event::Kind::kUnsure, *request,
            starts_task
                ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEW_TASK_CHOICE)
-               : controller_->TaskTitle(answer->choice),
-           answer->confidence);
+               : controller_->TaskTitle(answer->choice));
     return;
   }
   if (!starts_task) {
@@ -298,9 +341,14 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
       IsComplete(language)
           ? BuildNamingRequestBody(language.model, request->context)
           : std::nullopt;
+  if (body) {
+    request->naming.model = language.model;
+    request->naming.url = ChatCompletionsUrl(language.endpoint);
+    request->naming.body = *body;
+    request->naming.sent_at = base::TimeTicks::Now();
+  }
   std::unique_ptr<RemoteModelClient> naming =
-      body ? Client(ChatCompletionsUrl(language.endpoint), language.key_account,
-                    std::move(*body))
+      body ? Client(request->naming.url, language.key_account, std::move(*body))
            : nullptr;
   if (!naming) {
     CreateTask(*request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
@@ -321,18 +369,21 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   if (!request) {
     return;
   }
+  std::optional<std::u16string> name =
+      outcome.ok ? ParseNamingResponse(outcome.body) : std::nullopt;
+  request->naming.took = base::TimeTicks::Now() - request->naming.sent_at;
+  request->naming.answer = std::move(outcome);
+  LogOrganizerExchange("name", request->naming,
+                       name ? "named" : "no usable name", 0.0);
   if (!Current(*request)) {
     Report(Event::Kind::kDropped, *request);
     return;
   }
-  std::optional<std::u16string> name =
-      outcome.ok ? ParseNamingResponse(outcome.body) : std::nullopt;
   CreateTask(*request,
              name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
 }
 
-void AutomaticOrganizer::CreateTask(const Request& request,
-                                    std::u16string title) {
+void AutomaticOrganizer::CreateTask(Request& request, std::u16string title) {
   const bool created =
       controller_
           ->MoveToNewTask({request.page}, title,
@@ -343,11 +394,17 @@ void AutomaticOrganizer::CreateTask(const Request& request,
 }
 
 void AutomaticOrganizer::Report(Event::Kind kind,
-                                const Request& request,
-                                std::u16string detail,
-                                double confidence) {
+                                Request& request,
+                                std::u16string detail) {
+  if (kind != Event::Kind::kAsking && !request.logged) {
+    LogOrganizerExchange("placement", request.decision, ResultName(kind),
+                         request.confidence);
+    request.logged = true;
+  }
   events_.Notify(Event{kind, base::UTF8ToUTF16(request.context.title),
-                       std::move(detail), confidence});
+                       std::move(detail), request.confidence,
+                       base::UTF8ToUTF16(request.decision.model),
+                       request.decision.took});
 }
 
 bool AutomaticOrganizer::Current(const Request& request) const {

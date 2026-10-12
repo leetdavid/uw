@@ -91,7 +91,7 @@ After a successful build, launch the application with a separate development pro
 pnpm run launch
 ```
 
-`launch` starts a new `uw.app` instance and returns without waiting for it to close. It uses `~/Library/Application Support/uw-dev` to keep development settings and extensions separate. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it.
+`launch` starts a new `uw.app` instance and returns without waiting for it to close. It also records every organizer request and answer in `~/Library/Application Support/uw-dev/organizer-log.jsonl`; `pnpm run launch:nolog` starts uw without that record. See [Try uw](docs/try-uw.md). It uses `~/Library/Application Support/uw-dev` to keep development settings and extensions separate. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it. `launch` refuses to start while uw is already running, because a second launch would only open a window of the running copy, not the new build. `pnpm run kill` quits every running copy of this build.
 
 Launching `uw.app` normally uses `~/Library/Application Support/uw`. Profiles without an explicit tab-orientation preference start with vertical tabs. The upstream tab context menu can switch back to horizontal tabs, and that choice persists.
 
@@ -137,7 +137,7 @@ pnpm run check && pnpm run verify --jobs 8
 
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
-To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its message, the organizer's activity line, and the settings page with its models, a failed connection test with its details, and its tint control.
+To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, and the settings page with its models, a failed connection test with its details, and its tint control.
 
 ## Build inputs and updates
 

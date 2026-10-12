@@ -25,18 +25,19 @@ enum class VerticalTabStripCollapseState;
 }
 
 namespace views {
-class Label;
 class MdTextButton;
 class MenuRunner;
 }  // namespace views
 
 namespace uw {
 
+class ActivityCard;
+
 // Sits at the foot of the tab sidebar. Holds the Organize button with its
-// menu. Above it, a line says when a model is being asked about a tab, and a
-// message names the task after each automatic move, with an Undo button. With
-// "Show organizer activity" on, the line also says what every answer was. It
-// never takes focus by itself.
+// menu. Above it, a card shows when a model is being asked about a tab, and
+// names the task after each automatic move, with an Undo button. With "Show
+// organizer activity" on, the card also shows what every answer was. It never
+// takes focus by itself.
 class OrganizeBar : public views::FlexLayoutView,
                     public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(OrganizeBar, views::FlexLayoutView)
@@ -58,11 +59,10 @@ class OrganizeBar : public views::FlexLayoutView,
   OrganizeBar& operator=(const OrganizeBar&) = delete;
   ~OrganizeBar() override;
 
-  bool notice_visible() const;
-  std::u16string_view notice_text() const;
-  bool activity_visible() const;
-  std::u16string_view activity_text() const;
-  void UndoNotice();
+  bool card_visible() const;
+  const ActivityCard* card() const { return card_; }
+  // Reverses the last organization action and puts the card away.
+  void Undo();
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override;
@@ -75,21 +75,15 @@ class OrganizeBar : public views::FlexLayoutView,
   void OnMenuClosed();
   bool ShowsActivityDetails() const;
   void OnOrganizerEvent(const AutomaticOrganizer::Event& event);
-  void ShowNotice(std::u16string text);
-  void HideNotice();
-  void ShowActivity(std::u16string text, base::TimeDelta duration);
-  void HideActivity();
+  void HideCard();
 
   const raw_ptr<BrowserWindowInterface> window_;
-  raw_ptr<views::Label> activity_ = nullptr;
-  raw_ptr<views::View> notice_ = nullptr;
-  raw_ptr<views::Label> notice_label_ = nullptr;
+  raw_ptr<ActivityCard> card_ = nullptr;
   raw_ptr<views::MdTextButton> button_ = nullptr;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
-  base::OneShotTimer activity_timer_;
-  base::OneShotTimer notice_timer_;
+  base::OneShotTimer card_timer_;
   base::CallbackListSubscription collapse_subscription_;
   base::CallbackListSubscription event_subscription_;
   base::CallbackListSubscription manual_move_subscription_;

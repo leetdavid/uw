@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f2429533620859a4a3bbb3226167bf941275f841 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cdf41b557d8e3e22ff4221ba42bb0748c2d54766 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,33 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,36 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -35,14 +35,17 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f2429533620859a4a3bbb3226167bf94
 +      <message name="IDS_UW_ORGANIZATION_SETTINGS" desc="Organize menu item that opens the tab organization settings page.">Tab organization settings</message>
 +      <message name="IDS_UW_OPEN_NEW_TASK" desc="Organize menu item that opens a new tab in a new task.">New task</message>
 +      <message name="IDS_UW_SHOW_ACTIVITY" desc="Organize menu item that shows or hides what each automatic organization request did.">Show organizer activity</message>
-+      <message name="IDS_UW_ACTIVITY_ASKING" desc="Sidebar status while a model decides where a tab belongs.">Asking <ph name="MODEL">$1<ex>jev-latest</ex></ph> about <ph name="PAGE">$2<ex>Hotels in Lisbon</ex></ph>…</message>
-+      <message name="IDS_UW_ACTIVITY_NAMING" desc="Sidebar status while a model names a new task.">Asking <ph name="MODEL">$1<ex>llama3.2</ex></ph> for a task name…</message>
-+      <message name="IDS_UW_ACTIVITY_LEFT" desc="Sidebar status when the model chose to leave a tab in place.">The model left <ph name="PAGE">$1<ex>Hotels in Lisbon</ex></ph> where it is. Confidence: <ph name="CONFIDENCE">$2<ex>0.34</ex></ph>.</message>
-+      <message name="IDS_UW_ACTIVITY_UNSURE" desc="Sidebar status when the model suggested a move without enough confidence.">The model suggested <ph name="CHOICE">$1<ex>Plan Lisbon trip</ex></ph> for <ph name="PAGE">$2<ex>Hotels in Lisbon</ex></ph>. Confidence: <ph name="CONFIDENCE">$3<ex>0.62</ex></ph>. uw moves a tab at <ph name="THRESHOLD">$4<ex>0.90</ex></ph> or more.</message>
-+      <message name="IDS_UW_ACTIVITY_NEW_TASK_CHOICE" desc="Names the choice of starting a new task inside a sidebar status sentence.">a new task</message>
-+      <message name="IDS_UW_ACTIVITY_REQUEST_FAILED" desc="Sidebar status when the request to the model failed.">The request for <ph name="PAGE">$1<ex>Hotels in Lisbon</ex></ph> failed.</message>
-+      <message name="IDS_UW_ACTIVITY_ANSWER_UNREADABLE" desc="Sidebar status when the model's answer could not be used.">The model's answer for <ph name="PAGE">$1<ex>Hotels in Lisbon</ex></ph> could not be read.</message>
-+      <message name="IDS_UW_ACTIVITY_DROPPED" desc="Sidebar status when an answer arrived after the tab changed or was moved.">Ignored the answer for <ph name="PAGE">$1<ex>Hotels in Lisbon</ex></ph> because the tab changed.</message>
++      <message name="IDS_UW_ACTIVITY_ASKING" desc="Headline of the sidebar card while a model decides where a tab belongs.">Asking <ph name="MODEL">$1<ex>jev-latest</ex></ph></message>
++      <message name="IDS_UW_ACTIVITY_NAMING" desc="Headline of the sidebar card while a model names a new task.">Asking <ph name="MODEL">$1<ex>llama3.2</ex></ph> for a name</message>
++      <message name="IDS_UW_ACTIVITY_LEFT" desc="Headline of the sidebar card when the model chose to leave a tab in place.">Left where it is</message>
++      <message name="IDS_UW_ACTIVITY_UNSURE" desc="Headline of the sidebar card when the model suggested a destination without enough confidence. CHOICE is a task name, or the words for a new task.">Suggested <ph name="CHOICE">$1<ex>Plan Lisbon trip</ex></ph></message>
++      <message name="IDS_UW_ACTIVITY_NEW_TASK_CHOICE" desc="Names the choice of starting a new task inside the headline that begins with Suggested.">a new task</message>
++      <message name="IDS_UW_ACTIVITY_REQUEST_FAILED" desc="Headline of the sidebar card when the request to the model failed. REASON is an HTTP status or a network error code.">The request failed: <ph name="REASON">$1<ex>HTTP 401</ex></ph></message>
++      <message name="IDS_UW_ACTIVITY_ANSWER_UNREADABLE" desc="Headline of the sidebar card when the model's answer could not be used.">Could not read the answer</message>
++      <message name="IDS_UW_ACTIVITY_DROPPED" desc="Headline of the sidebar card when an answer arrived after the tab changed or was moved.">Ignored: the tab changed</message>
++      <message name="IDS_UW_ACTIVITY_CONFIDENCE" desc="Shown beside the confidence bar on the sidebar card: the model's confidence and the confidence a move needs.">Confidence <ph name="VALUE">$1<ex>0.39</ex></ph> of <ph name="NEEDED">$2<ex>0.90</ex></ph></message>
++      <message name="IDS_UW_ACTIVITY_CONFIDENCE_HINT" desc="Tooltip of the confidence bar on the sidebar card.">The model's confidence was <ph name="VALUE">$1<ex>0.39</ex></ph>. uw moves a tab at <ph name="NEEDED">$2<ex>0.90</ex></ph> or more.</message>
++      <message name="IDS_UW_ACTIVITY_SOURCE" desc="Last line of the sidebar card: the model that answered and how many seconds it took.">Answered by <ph name="MODEL">$1<ex>jev-latest</ex></ph> in <ph name="SECONDS">$2<ex>0.4</ex></ph> s</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  

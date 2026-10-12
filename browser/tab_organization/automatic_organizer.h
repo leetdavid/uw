@@ -14,11 +14,13 @@
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/organizer_log.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 #include "uw/components/tab_organization/page_tree.h"
@@ -48,8 +50,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // One step of the organizer's work on a tab, for the sidebar.
   struct Event {
     enum class Kind {
-      // A request went out. `detail` is the model that was asked.
+      // A request went out.
       kAsking,
+      // The language model was asked for a task name. `detail` is that model.
       kNaming,
       // The tab moved into the task named `detail`, or started it.
       kMoved,
@@ -58,6 +61,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
       kLeft,
       // The model suggested `detail` with less than kMinConfidence.
       kUnsure,
+      // `detail` is the HTTP status or the network error.
       kRequestFailed,
       kAnswerUnreadable,
       // The tab changed or was moved before the answer arrived.
@@ -67,7 +71,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
     // The tab's title.
     std::u16string page;
     std::u16string detail;
+    // The model's confidence in its choice. Zero when it gave no usable one.
     double confidence = 0.0;
+    // The model that was asked where the tab belongs.
+    std::u16string model;
+    // How long its answer took. Zero while the request is out.
+    base::TimeDelta took;
   };
 
   AutomaticOrganizer(BrowserWindowInterface* window,
@@ -97,6 +106,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
     PageId parent;
     DecisionFormat format = DecisionFormat::kChat;
     BranchContext context;
+    // The placement request, and the naming request when there was one.
+    OrganizerExchange decision;
+    OrganizerExchange naming;
+    double confidence = 0.0;
+    // True once the placement request is in the organizer log.
+    bool logged = false;
     std::unique_ptr<RemoteModelClient> client;
   };
 
@@ -115,11 +130,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
-  void CreateTask(const Request& request, std::u16string title);
+  void CreateTask(Request& request, std::u16string title);
+  // Tells the sidebar. The first report after the answer also writes the
+  // placement request to the organizer log.
   void Report(Event::Kind kind,
-              const Request& request,
-              std::u16string detail = std::u16string(),
-              double confidence = 0.0);
+              Request& request,
+              std::u16string detail = std::u16string());
   // True while the branch is where it was, and unchanged, since the request.
   bool Current(const Request& request) const;
   std::optional<Request> Take(uint64_t request_id);

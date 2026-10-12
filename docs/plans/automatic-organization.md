@@ -27,11 +27,12 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - Link opens and title or URL changes trigger background requests, 750 ms after the latest change. Restored tabs and tabs dragged in from another window wait for their next change. A change invalidates that tab's outstanding request. Closing a branch or moving it to another window invalidates it too.
 - A manual move holds the branch until that tab's next title or URL change. A response that arrives after a manual move is dropped. Commands, drags, native group changes, and undo all count as manual moves.
 - The move unit is a whole tab branch. It detaches from its old parent.
-- Every automatic action is one undoable organization action. It shows a brief message at the foot of the sidebar with Undo, tints the moved tab for a moment, and never takes focus. After the message disappears, "Undo tab organization" in the Organize menu still works. Closed pages are never reopened.
-- While a model is being asked about a tab, a line at the foot of the sidebar says so and names the model and the tab. It disappears when the answer arrives. Agreed on 2026-10-12.
-- "Show organizer activity" in the Organize menu keeps that line up for a few seconds with what the answer was: left in place, suggested without enough confidence, failed, unreadable, or ignored because the tab changed. It is off by default.
+- Every automatic action is one undoable organization action. It shows the activity card at the foot of the sidebar with Undo, tints the moved tab for a moment, and never takes focus. After the card disappears, "Undo tab organization" in the Organize menu still works. Closed pages are never reopened.
+- The activity card shows the organizer's work on one tab. While a model is asked, it names the model and the tab, with a spinner and a moving bar. After the answer it shows what the model chose, how long it took, and a bar with the confidence against the 0.90 a move needs. Each line is a single line that ends in an ellipsis, so the card cannot be cut off in a full sidebar. Agreed on 2026-10-12.
+- The card always shows a request on its way and a move or a new task. "Show organizer activity" in the Organize menu also shows every other answer for a few seconds: left in place, suggested without enough confidence, failed with the HTTP status or network error, unreadable, or ignored because the tab changed. It is off by default.
+- Starting uw with `--uw-organizer-log=<file>` appends every request the organizer makes, and its answer, to that file as one line of JSON. The lines hold tab titles, URLs, and page excerpts, so the browser writes nothing without the switch. The development script `pnpm run launch` passes it; `pnpm run launch:nolog` does not. Agreed on 2026-10-12.
 - The Organize menu and the settings page provide "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
-- API keys are stored in the macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports.
+- API keys are stored in the macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports, including the organizer log.
 - The settings page shows what is sent before the user enables automatic organization.
 - Provider outage, malformed responses, and slow responses never block browsing. Tabs stay where they are.
 
@@ -72,11 +73,13 @@ Each stage is a ticket on the [board](roadmap.md#board).
 7. Closing a branch or moving it to another window turns its pending response into a no-op.
 8. One undo reverses task creation, the move, and the name together. It still works from the Organize menu after the message disappears.
 9. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
-10. Each request contains the documented scope only. No API key or request body appears in logs, preferences, session data, or crash reports.
-11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
+10. Each request contains the documented scope only. No API key appears in logs, preferences, session data, or crash reports. A request body is written only to the organizer log, and only when uw was started with `--uw-organizer-log`.
+11. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*` and `AiProtocolTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `OrganizerLogBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
 12. "Test connection" tests one connection, saves nothing, and names the reason for a failure. `UwOrganizationPageBrowserTest.*` covers a pass, an unusable answer, an HTTP error with the provider's message, a refused redirect, and a connection that is not filled in.
 13. The switch turns automatic organization off without a request and on only after the connections pass their tests again.
-14. Each request shows the asking line. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own sentence with the confidence.
+14. Each request shows the activity card with the model and the tab. With "Show organizer activity" on, a failed request, an unreadable answer, a low-confidence suggestion, and a choice to leave the tab each show their own headline, with the confidence where the model gave one.
+15. With 30 more tabs than fit, the card keeps its full height, lies inside the sidebar foot, and overlaps nothing. `AutomaticOrganizerBrowserTest.TheCardFitsInACrowdedSidebar` checks it.
+16. With `--uw-organizer-log`, a placement request and a naming request each leave one line with the request, the answer, the time taken, and what uw did. No API key is in the file. `OrganizerLogBrowserTest.*` checks it.
 
 ## Later stages
 

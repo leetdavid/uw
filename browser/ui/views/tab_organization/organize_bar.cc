@@ -29,66 +29,21 @@
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/activity_card.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
 
 using Kind = AutomaticOrganizer::Event::Kind;
 
-constexpr base::TimeDelta kNoticeDuration = base::Seconds(6);
+// How long the card stays after a move, and after any other answer.
+constexpr base::TimeDelta kChangeDuration = base::Seconds(6);
 constexpr base::TimeDelta kAnswerDuration = base::Seconds(8);
-// Longer than a request can take, so the line cannot outlive its request.
+// Longer than a request can take, so the card cannot outlive its request.
 constexpr base::TimeDelta kAskingDuration = kProviderTimeout + base::Seconds(5);
 constexpr int kRowSpacing = 4;
-constexpr int kActivityLines = 4;
 constexpr char kSettingsSubPage[] = "uwOrganization";
-
-// A filled pill in the colors of the window tint.
-void StyleAsPill(views::MdTextButton* button) {
-  button->SetBgColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
-  button->SetStrokeColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
-  button->SetEnabledTextColors(kColorTabForegroundInactiveFrameActive);
-}
-
-void StyleOnTint(views::Label* label) {
-  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  label->SetEnabledColor(kColorTabForegroundInactiveFrameActive);
-  label->SetBackgroundColor(SK_ColorTRANSPARENT);
-}
-
-std::u16string Confidence(double confidence) {
-  return base::UTF8ToUTF16(base::StringPrintf("%.2f", confidence));
-}
-
-std::u16string Describe(const AutomaticOrganizer::Event& event) {
-  switch (event.kind) {
-    case Kind::kAsking:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING, event.detail,
-                                        event.page);
-    case Kind::kNaming:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_NAMING, event.detail);
-    case Kind::kMoved:
-      return l10n_util::GetStringFUTF16(IDS_UW_AUTO_MOVED_TASK, event.detail);
-    case Kind::kCreated:
-      return l10n_util::GetStringFUTF16(IDS_UW_AUTO_CREATED_TASK, event.detail);
-    case Kind::kLeft:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_LEFT, event.page,
-                                        Confidence(event.confidence));
-    case Kind::kUnsure:
-      return l10n_util::GetStringFUTF16(
-          IDS_UW_ACTIVITY_UNSURE, event.detail, event.page,
-          Confidence(event.confidence),
-          Confidence(AutomaticOrganizer::kMinConfidence));
-    case Kind::kRequestFailed:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_REQUEST_FAILED,
-                                        event.page);
-    case Kind::kAnswerUnreadable:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ANSWER_UNREADABLE,
-                                        event.page);
-    case Kind::kDropped:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_DROPPED, event.page);
-  }
-}
 
 }  // namespace
 
@@ -100,31 +55,9 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
                       GetLayoutConstant(
                           LayoutConstant::kVerticalTabStripHorizontalPadding)));
 
-  activity_ = AddChildView(std::make_unique<views::Label>());
-  StyleOnTint(activity_);
-  activity_->SetMultiLine(true);
-  activity_->SetMaxLines(kActivityLines);
-  activity_->SetProperty(
-      views::kFlexBehaviorKey,
-      views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
-                               views::MaximumFlexSizeRule::kPreferred,
-                               /*adjust_height_for_width=*/true));
-  activity_->SetVisible(false);
-
-  auto notice = std::make_unique<views::FlexLayoutView>();
-  notice->SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
-  notice->SetVisible(false);
-  notice_label_ = notice->AddChildView(std::make_unique<views::Label>());
-  StyleOnTint(notice_label_);
-  notice_label_->SetProperty(
-      views::kFlexBehaviorKey,
-      views::FlexSpecification(views::LayoutOrientation::kHorizontal,
-                               views::MinimumFlexSizeRule::kScaleToZero,
-                               views::MaximumFlexSizeRule::kUnbounded));
-  StyleAsPill(notice->AddChildView(std::make_unique<views::MdTextButton>(
-      base::BindRepeating(&OrganizeBar::UndoNotice, base::Unretained(this)),
-      l10n_util::GetStringUTF16(IDS_UW_AUTO_UNDO))));
-  notice_ = AddChildView(std::move(notice));
+  card_ = AddChildView(std::make_unique<ActivityCard>(
+      base::BindRepeating(&OrganizeBar::Undo, base::Unretained(this))));
+  card_->Hide();
 
   button_ = AddChildView(std::make_unique<views::MdTextButton>(
       base::BindRepeating(&OrganizeBar::ShowMenu, base::Unretained(this)),
@@ -144,7 +77,9 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
     manual_move_subscription_ =
         controller->ObserveManualMoves(base::BindRepeating(
             [](OrganizeBar* bar, const std::vector<PageId>&) {
-              bar->HideNotice();
+              if (bar->card_->offers_undo()) {
+                bar->HideCard();
+              }
             },
             base::Unretained(this)));
   }
@@ -157,28 +92,16 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
 
 OrganizeBar::~OrganizeBar() = default;
 
-bool OrganizeBar::notice_visible() const {
-  return notice_->GetVisible();
+bool OrganizeBar::card_visible() const {
+  return card_->GetVisible();
 }
 
-std::u16string_view OrganizeBar::notice_text() const {
-  return notice_label_->GetText();
-}
-
-bool OrganizeBar::activity_visible() const {
-  return activity_->GetVisible();
-}
-
-std::u16string_view OrganizeBar::activity_text() const {
-  return activity_->GetText();
-}
-
-void OrganizeBar::UndoNotice() {
+void OrganizeBar::Undo() {
   if (TabOrganizationController* controller =
           TabOrganizationController::From(window_)) {
     controller->Undo();
   }
-  HideNotice();
+  HideCard();
 }
 
 bool OrganizeBar::IsCommandIdChecked(int command_id) const {
@@ -213,7 +136,7 @@ void OrganizeBar::ExecuteCommand(int command_id, int event_flags) {
       TabOrganizationController::OpenNewTask(window_);
       break;
     case kUndo:
-      UndoNotice();
+      Undo();
       break;
     case kPauseForAnHour:
       SetPauseState(prefs, PauseMode::kTimed, base::Hours(1));
@@ -275,50 +198,29 @@ bool OrganizeBar::ShowsActivityDetails() const {
       kOrganizationShowActivityPref);
 }
 
+// A request on its way and a change that can be undone always show. What
+// else a model answered shows only with "Show organizer activity" on.
 void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
-  switch (event.kind) {
-    case Kind::kAsking:
-    case Kind::kNaming:
-      ShowActivity(Describe(event), kAskingDuration);
-      break;
-    case Kind::kMoved:
-    case Kind::kCreated:
-      HideActivity();
-      ShowNotice(Describe(event));
-      break;
-    default:
-      if (ShowsActivityDetails()) {
-        ShowActivity(Describe(event), kAnswerDuration);
-      } else {
-        HideActivity();
-      }
+  const bool asking =
+      event.kind == Kind::kAsking || event.kind == Kind::kNaming;
+  const bool changed =
+      event.kind == Kind::kMoved || event.kind == Kind::kCreated;
+  if (!asking && !changed && !ShowsActivityDetails()) {
+    HideCard();
+    return;
   }
+  card_->Show(event);
+  card_timer_.Start(
+      FROM_HERE,
+      asking    ? kAskingDuration
+      : changed ? kChangeDuration
+                : kAnswerDuration,
+      base::BindOnce(&OrganizeBar::HideCard, base::Unretained(this)));
 }
 
-void OrganizeBar::ShowNotice(std::u16string text) {
-  notice_label_->SetText(std::move(text));
-  notice_->SetVisible(true);
-  notice_timer_.Start(
-      FROM_HERE, kNoticeDuration,
-      base::BindOnce(&OrganizeBar::HideNotice, base::Unretained(this)));
-}
-
-void OrganizeBar::HideNotice() {
-  notice_timer_.Stop();
-  notice_->SetVisible(false);
-}
-
-void OrganizeBar::ShowActivity(std::u16string text, base::TimeDelta duration) {
-  activity_->SetText(std::move(text));
-  activity_->SetVisible(true);
-  activity_timer_.Start(
-      FROM_HERE, duration,
-      base::BindOnce(&OrganizeBar::HideActivity, base::Unretained(this)));
-}
-
-void OrganizeBar::HideActivity() {
-  activity_timer_.Stop();
-  activity_->SetVisible(false);
+void OrganizeBar::HideCard() {
+  card_timer_.Stop();
+  card_->Hide();
 }
 
 BEGIN_METADATA(OrganizeBar)

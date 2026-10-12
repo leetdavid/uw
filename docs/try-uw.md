@@ -12,7 +12,9 @@ Follow the [build instructions](../README.md#building), then run:
 pnpm run launch
 ```
 
-`launch` starts a new instance and returns immediately. It uses `~/Library/Application Support/uw-dev`, separate from your normal browser profile. Quit every uw window before rebuilding.
+`launch` starts a new instance and returns immediately. It uses `~/Library/Application Support/uw-dev`, separate from your normal browser profile. Quit uw before rebuilding and before launching a new build: press Cmd-Q, or run `pnpm run kill`, which asks every running copy of this build to quit and stops any that has not after 5 seconds. `launch` refuses to start while uw is running, because a second launch would only open a window of the running copy.
+
+`launch` also records what the organizer asks the models and what they answer. Each request and its answer is appended to `~/Library/Application Support/uw-dev/organizer-log.jsonl`. The file holds the titles, URLs, and text excerpts of the tabs the organizer looks at, and it stays on this computer. It grows until you delete it. `pnpm run launch:nolog` starts uw without it.
 
 A profile with no saved orientation starts with vertical tabs. uw keeps tabs in tree order only in vertical mode.
 
@@ -50,7 +52,7 @@ Click `Organize` at the foot of the sidebar.
 - `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+P do the same. Cmd-T still opens a tab beside the current one, inside its task.
 - `Undo tab organization` reverses the last move, as in the tab menu.
 - The pause items stop and resume automatic organization.
-- `Show organizer activity` makes the sidebar say what the model answered for each tab, with its confidence.
+- `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and its confidence against the 0.90 a move needs.
 - `Tab organization settings` opens the settings page.
 
 ### Automatic organization
