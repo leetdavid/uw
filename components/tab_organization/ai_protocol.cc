@@ -37,6 +37,10 @@ constexpr char kSystemPrompt[] =
     "Prefer \"leave\" when unsure. Only move or create at high confidence "
     "(0.90 or higher).";
 
+// Some chat models think before they answer, and the provider counts that
+// thinking against the limit. A small limit leaves them no room to answer.
+constexpr int kMaxChatAnswerTokens = 4096;
+
 constexpr char kDestinationQuestion[] = "destination";
 constexpr size_t kMaxDecisionChoices = 255;
 constexpr char kDecisionInstructions[] =
@@ -274,7 +278,7 @@ std::optional<std::string> BuildClassificationRequestBody(
   base::DictValue body;
   body.Set("model", model);
   body.Set("messages", std::move(messages));
-  body.Set("max_tokens", 200);
+  body.Set("max_tokens", kMaxChatAnswerTokens);
   body.Set("temperature", 0);
   return base::WriteJson(body);
 }
@@ -370,7 +374,7 @@ std::optional<std::string> BuildNamingRequestBody(
   base::DictValue body;
   body.Set("model", model);
   body.Set("messages", std::move(messages));
-  body.Set("max_tokens", 32);
+  body.Set("max_tokens", kMaxChatAnswerTokens);
   body.Set("temperature", 0);
   return base::WriteJson(body);
 }

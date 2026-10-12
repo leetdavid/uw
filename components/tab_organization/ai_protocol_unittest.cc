@@ -3,6 +3,7 @@
 
 #include "uw/components/tab_organization/ai_protocol.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -396,6 +397,30 @@ TEST_F(AiProtocolTest, NamingCallAsksForAndCleansAShortName) {
   EXPECT_FALSE(ParseNamingResponse("not json"));
   EXPECT_EQ(ParseNamingResponse(WrapContent(std::string(200, 'a')))->size(),
             kMaxGeneratedTaskNameLength);
+}
+
+// deepseek-flash thinks before it answers. With a limit of 32 tokens it spent
+// them all on thinking and answered with empty content.
+TEST_F(AiProtocolTest, ChatRequestsLeaveRoomForAModelThatThinksFirst) {
+  const BranchContext context = LisbonContext();
+  for (const std::optional<std::string>& body :
+       {BuildNamingRequestBody("deepseek-flash", context),
+        BuildClassificationRequestBody("deepseek-flash", context, {})}) {
+    ASSERT_TRUE(body);
+    auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
+    ASSERT_TRUE(parsed);
+    EXPECT_GE(parsed->FindInt("max_tokens").value_or(0), 2048);
+  }
+
+  EXPECT_EQ(ParseNamingResponse(
+                R"({"choices":[{"finish_reason":"stop","message":{
+              "role":"assistant","content":"Plan Lisbon trip",
+              "reasoning_content":"The tab is a Lisbon travel guide."}}]})"),
+            u"Plan Lisbon trip");
+  EXPECT_FALSE(ParseNamingResponse(
+      R"({"choices":[{"finish_reason":"length","message":{
+          "role":"assistant","content":"",
+          "reasoning_content":"The tab is a Lisbon travel"}}]})"));
 }
 
 }  // namespace

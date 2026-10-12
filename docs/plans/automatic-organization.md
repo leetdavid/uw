@@ -42,7 +42,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 
 ## Design
 
-- `components/tab_organization/ai_protocol` builds and parses requests in three decision formats: chat completions, the OpenAI Decisions API (`POST <base>/decisions`), and TypeSafe System One (`POST <base>/systemone`). It also builds the naming call. Parsing is strict, so a malformed response can never move a tab.
+- `components/tab_organization/ai_protocol` builds and parses requests in three decision formats: chat completions, the OpenAI Decisions API (`POST <base>/decisions`), and TypeSafe System One (`POST <base>/systemone`). It also builds the naming call. Chat requests allow 4096 answer tokens, because some chat models think before they answer and that thinking counts against the limit. Parsing is strict, so a malformed response can never move a tab.
 - `browser/tab_organization/automatic_organizer` is owned by the window. It watches titles and URLs, sends the requests, and applies a decision through the window controller only if the branch is unchanged since the request.
 - The organizer keeps the latest automatic change as a notice for the sidebar message.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
