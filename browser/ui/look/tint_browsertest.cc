@@ -3,6 +3,9 @@
 
 #include "uw/components/look/tint.h"
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -11,7 +14,9 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
@@ -20,6 +25,7 @@
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -29,6 +35,20 @@ namespace {
 
 constexpr SkColor kButter = SkColorSetRGB(0xF7, 0xE0, 0x8A);
 constexpr SkColor kWine = SkColorSetRGB(0x5A, 0x1F, 0x3A);
+
+int Channel(SkColor color, int shift) {
+  return (color >> shift) & 0xFF;
+}
+
+// The largest difference between two colors in any one channel.
+int Gap(SkColor first, SkColor second) {
+  int gap = 0;
+  for (int shift : {0, 8, 16}) {
+    gap =
+        std::max(gap, std::abs(Channel(first, shift) - Channel(second, shift)));
+  }
+  return gap;
+}
 
 class TintBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -93,15 +113,52 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarAndFrameDrawOneGradient) {
   const int reach = base::ClampRound(24 * scale);
   const int inset = base::ClampRound(3 * scale);
   for (int y : {inset, window.height() - inset}) {
-    const SkColor sidebar = window.getColor(seam - reach, y);
-    const SkColor frame = window.getColor(seam + reach, y);
-    EXPECT_NEAR(SkColorGetR(sidebar), SkColorGetR(frame), 3) << "at y=" << y;
-    EXPECT_NEAR(SkColorGetG(sidebar), SkColorGetG(frame), 3) << "at y=" << y;
-    EXPECT_NEAR(SkColorGetB(sidebar), SkColorGetB(frame), 3) << "at y=" << y;
+    EXPECT_LE(
+        Gap(window.getColor(seam - reach, y), window.getColor(seam + reach, y)),
+        3)
+        << "at y=" << y;
   }
 
   EXPECT_NE(window.getColor(seam + reach, inset),
             window.getColor(seam + reach, window.height() - inset));
+}
+
+// A square corner shows the toolbar or the page where the tint should be.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, ThePageCardHasFourRoundCorners) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  const SkBitmap window = CaptureWindow(browser());
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+  const float scale = static_cast<float>(window.width()) / bounds.width();
+  gfx::Rect card = view->toolbar()->GetBoundsInScreen();
+  card.Union(view->multi_contents_view()->GetBoundsInScreen());
+  card.Offset(-bounds.OffsetFromOrigin());
+  const auto color_at = [&](gfx::Point corner, int x, int y) {
+    return window.getColor(base::ClampRound((corner.x() + x) * scale),
+                           base::ClampRound((corner.y() + y) * scale));
+  };
+
+  struct Corner {
+    const char* name;
+    gfx::Point point;
+    int into_card_x;
+    int into_card_y;
+  };
+  const Corner corners[] = {
+      {"top left", card.origin(), 1, 1},
+      {"top right", card.top_right(), -1, 1},
+      {"bottom left", card.bottom_left(), 1, -1},
+      {"bottom right", card.bottom_right(), -1, -1},
+  };
+  for (const Corner& corner : corners) {
+    const SkColor inside =
+        color_at(corner.point, corner.into_card_x, corner.into_card_y);
+    const SkColor outside = color_at(corner.point, -4 * corner.into_card_x,
+                                     -4 * corner.into_card_y);
+    EXPECT_LE(Gap(inside, outside), 3) << corner.name;
+  }
+  const gfx::Point center = card.CenterPoint();
+  EXPECT_GT(Gap(color_at(center, 0, 0), color_at(card.origin(), -4, -4)), 3);
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {

@@ -207,7 +207,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 75f02715c7af13fa992eb95586cfbd860286bef6..4a8da993bfa8c432326ccf3a26757e5aa5b198f4 100644
+index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4cdafdd34 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -47,6 +47,7 @@
@@ -243,7 +243,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..4a8da993bfa8c432326ccf3a26757e5a
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state) &&
-@@ -1613,11 +1621,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1613,11 +1621,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      case TabStripType::kVertical: {
        // Curve trailing corner when it becomes the top trailing corner of the
        // browser.
@@ -253,6 +253,9 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..4a8da993bfa8c432326ccf3a26757e5a
 -        toolbar_corners[CornerOrientation::kTopTrailing] =
 -            toolbar_background->GetWindowCorner(/*upper=*/true);
 +      if (!is_fullscreen(layout_data_->window_state)) {
++        toolbar_corners[CornerOrientation::kTopLeading] = {
++            CustomCornersBackground::CornerType::kRoundedWithBackground,
++            uw::kPageCardRadius};
 +        toolbar_corners[CornerOrientation::kTopTrailing] = {
 +            CustomCornersBackground::CornerType::kRoundedWithBackground,
 +            uw::kPageCardRadius};
