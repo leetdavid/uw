@@ -20,8 +20,10 @@
 #include "ui/gfx/geometry/insets.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/border.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
 namespace uw {
@@ -81,10 +83,10 @@ void NameLock::OnThemeChanged() {
       GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive);
   SetImageModel(STATE_NORMAL,
                 ui::ImageModel::FromVectorIcon(
-                    vector_icons::kLockIcon,
-                    SkColorSetA(color, kRestingAlpha), kIconSize));
-  const ui::ImageModel hot = ui::ImageModel::FromVectorIcon(
-      vector_icons::kLockIcon, color, kIconSize);
+                    vector_icons::kLockIcon, SkColorSetA(color, kRestingAlpha),
+                    kIconSize));
+  const ui::ImageModel hot =
+      ui::ImageModel::FromVectorIcon(vector_icons::kLockIcon, color, kIconSize);
   SetImageModel(STATE_HOVERED, hot);
   SetImageModel(STATE_PRESSED, hot);
 }
@@ -108,6 +110,51 @@ void NameLock::HandBack() {
 }
 
 BEGIN_METADATA(NameLock)
+END_METADATA
+
+NamingSpinner::NamingSpinner(const tab_groups::TabGroupId& group)
+    : Throbber(kIconSize), group_(group) {
+  GetViewAccessibility().SetName(
+      l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEEDS_NAME));
+  SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kPadding));
+  SetVisible(false);
+}
+
+NamingSpinner::~NamingSpinner() = default;
+
+void NamingSpinner::AddedToWidget() {
+  Throbber::AddedToWidget();
+  BrowserView* window = WindowOf(this);
+  AutomaticOrganizer* organizer =
+      window ? AutomaticOrganizer::From(window->browser()) : nullptr;
+  if (!organizer) {
+    return;
+  }
+  naming_ = organizer->ObserveNaming(
+      base::BindRepeating(&NamingSpinner::Refresh, base::Unretained(this)));
+  Refresh();
+}
+
+void NamingSpinner::RemovedFromWidget() {
+  naming_ = {};
+  Stop();
+  Throbber::RemovedFromWidget();
+}
+
+void NamingSpinner::Refresh() {
+  BrowserView* window = WindowOf(this);
+  const AutomaticOrganizer* organizer =
+      window ? AutomaticOrganizer::From(window->browser()) : nullptr;
+  const bool naming = organizer && organizer->IsNaming(group_.ToString());
+  SetVisible(naming);
+  if (naming) {
+    Start();
+  } else {
+    Stop();
+  }
+}
+
+BEGIN_METADATA(NamingSpinner)
 END_METADATA
 
 }  // namespace uw

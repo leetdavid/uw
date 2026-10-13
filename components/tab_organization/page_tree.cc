@@ -73,7 +73,8 @@ PageId PageTree::TopOf(const PageId& id) const {
 std::vector<std::string> PageTree::Tasks() const {
   std::vector<std::string> tasks;
   for (const Page& page : pages_) {
-    if (!page.task.empty() && std::ranges::find(tasks, page.task) == tasks.end()) {
+    if (!page.task.empty() &&
+        std::ranges::find(tasks, page.task) == tasks.end()) {
       tasks.push_back(page.task);
     }
   }
@@ -196,15 +197,11 @@ bool PageTree::MoveToTask(const PageId& id, const std::string& task) {
 }
 
 bool PageTree::MoveToNewTask(const PageId& id, const std::string& task) {
-  const Page* page = Find(id);
-  if (!page || task.empty() || HasTask(task)) {
+  if (!Find(id) || task.empty() || HasTask(task)) {
     return false;
   }
-  const std::string source = page->task;
-  size_t origin = 0;
-  std::vector<Page> branch = Detach(id, &origin);
-  Attach(std::move(branch), task, PageId(),
-         source.empty() || HasTask(source) ? EndOfTask(source) : origin);
+  std::vector<Page> branch = Detach(id);
+  Attach(std::move(branch), task, PageId(), pages_.size());
   return true;
 }
 
@@ -223,7 +220,8 @@ bool PageTree::Nest(const PageId& id) {
 
 bool PageTree::Outdent(const PageId& id) {
   const Page* page = Find(id);
-  const Page* parent = page && IsSet(page->parent) ? Find(page->parent) : nullptr;
+  const Page* parent =
+      page && IsSet(page->parent) ? Find(page->parent) : nullptr;
   if (!parent) {
     return false;
   }
@@ -363,10 +361,10 @@ void PageTree::Normalize() {
           }
         }
       };
-  emit(std::string(), PageId());
   for (const std::string& task : Tasks()) {
     emit(task, PageId());
   }
+  emit(std::string(), PageId());
   pages_ = std::move(ordered);
 }
 

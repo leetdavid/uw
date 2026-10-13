@@ -105,6 +105,11 @@ void ModelTestServer::Fail(const std::string& path,
   answers_[path] = {status, std::move(body), std::string()};
 }
 
+void ModelTestServer::Hold(const std::string& path) {
+  base::AutoLock hold(lock_);
+  answers_[path] = {net::HTTP_OK, std::string(), std::string(), /*held=*/true};
+}
+
 void ModelTestServer::Redirect(const std::string& path, std::string location) {
   base::AutoLock hold(lock_);
   answers_[path] = {net::HTTP_FOUND, std::string(), std::move(location)};
@@ -141,6 +146,9 @@ std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
     return response;
   }
   const Reply& reply = about ? *about : answer->second;
+  if (reply.held) {
+    return std::make_unique<net::test_server::HungResponse>();
+  }
   response->set_code(static_cast<net::HttpStatusCode>(reply.status));
   if (!reply.location.empty()) {
     response->AddCustomHeader("Location", reply.location);

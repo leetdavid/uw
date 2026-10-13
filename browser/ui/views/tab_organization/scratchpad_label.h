@@ -16,10 +16,14 @@ class View;
 
 namespace uw {
 
-// Height to leave above `children`, the views of the unpinned tab container
-// in order, for the "Scratchpad" label. Zero when the first one is a task,
-// which means no tab is ungrouped.
-int ScratchpadLabelHeight(const std::vector<views::View*>& children);
+// Height the "Scratchpad" label takes above the first ungrouped tab.
+inline constexpr int kScratchpadLabelHeight = 24;
+
+// The first of `children`, the views of the unpinned tab container in order,
+// that is a tab in no task. The Scratchpad starts there, below every task.
+// Null when no tab is ungrouped.
+const views::View* FirstScratchpadTab(
+    const std::vector<views::View*>& children);
 
 // Paints the label on `container` when its layout left room for it.
 void PaintScratchpadLabel(const views::View* container,

@@ -9,7 +9,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 ## Scope
 
 - A task is a native Chromium tab group. Chromium supplies its header, collapse, rename, color, drag, and session restore.
-- Ungrouped regular tabs are the [Scratchpad](../product.md#scratchpad). They carry a "Scratchpad" label and stay above every task.
+- Ungrouped regular tabs are the [Scratchpad](../product.md#scratchpad). They carry a "Scratchpad" label and stay below every task. Changed on 2026-10-13.
+- Tasks are listed in the order they were started. A new task comes after every other task. Agreed on 2026-10-13.
 - A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch.
 - Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
 - Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
@@ -48,11 +49,11 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 
 ## Acceptance checks
 
-1. Ungrouped tabs show under "Scratchpad", above every task.
+1. Ungrouped tabs show under "Scratchpad", below every task. `TabOrganizationControllerBrowserTest.ScratchpadLabelSitsAboveUngroupedTabs` checks where the label sits.
 2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level.
 3. Closing a parent keeps its children open, one level up, in the same order.
-4. "Move to new task" moves the tab and its descendants into a new tab group placed after the source task, or first when the tab came from the Scratchpad.
-5. "Move to Scratchpad" ungroups the branch and detaches it from its parent.
+4. "Move to new task" moves the tab and its descendants into a new tab group placed after every other task. `TabOrganizationControllerBrowserTest.ANewTaskComesAfterEveryOtherTask` checks it.
+5. "Move to Scratchpad" ungroups the branch, detaches it from its parent, and puts it at the end of the Scratchpad.
 6. Dragging a child out of its parent's branch removes the indentation. Dragging a tab never changes another tab's task.
 7. One undo reverses a move or task creation as a whole. Tabs opened since stay open.
 8. Collapse, rename, color, and drag of a task behave exactly as they do in stock Chromium.

@@ -464,7 +464,7 @@ index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..397943a376515aa3088ac117c5540fb0
  
  #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..d186e9edc0d24197eb0f1c5d9a289e46464b524a 100644
+index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..478a22bca2adc3f28081ddc61a5e4126f162df59 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 @@ -21,6 +21,8 @@
@@ -476,22 +476,19 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..d186e9edc0d24197eb0f1c5d9a289e46
  
  namespace {
  constexpr int kTabVerticalPadding = 2;
-@@ -159,9 +161,13 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
-       tab_container_view->collection_node_->GetDirectChildren();
- 
-   int width = 0;
--  int height = 0;
+@@ -162,6 +164,11 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+   int height = 0;
    int dragged_view_bottom = 0;
    auto collapse_state = tab_container_view->GetTabStripCollapseState();
-+  int height =
++  const views::View* scratchpad_top =
 +      collapse_state == tabs::VerticalTabStripCollapseState::kExpanded &&
 +              !focused_group_id.has_value()
-+          ? uw::ScratchpadLabelHeight(children)
-+          : 0;
++          ? uw::FirstScratchpadTab(children)
++          : nullptr;
  
    const int horizontal_padding =
        GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
-@@ -172,6 +178,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -172,6 +179,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
                  collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
              ? 0
              : horizontal_padding;
@@ -501,6 +498,16 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..d186e9edc0d24197eb0f1c5d9a289e46
      views::SizeBound child_height_bound = size_bounds.height();
      // In focused mode, pass the scroll viewport height constraint to the child
      // focused group if the incoming size bounds height is unbounded, so that
+@@ -202,6 +212,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+       continue;
+     }
+ 
++    if (child == scratchpad_top) {
++      height += uw::kScratchpadLabelHeight;
++    }
+     bounds.set_y(drag_data ? drag_data->offset.y() : height);
+ 
+     if (size_bounds.width().is_bounded()) {
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 index ab919030ae2fbd70240f192e1a7060776530523a..91eca2cc713d27a3669dda6499f7ee582bb293f3 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc

@@ -48,12 +48,13 @@ class TabOrganizationController;
 // once no request about a tab of that branch is out. Tabs that sit under
 // each other and agree move together: into a task, out of a task they no
 // longer fit, or into a new task, through the controller as one undoable
-// action. A tab that still fits its task stays behind. The same answers say
-// when a task needs a name from the language model: a task without one that
-// the branch starts, or a task uw named that has outgrown its name. A name
-// that could not be had is asked for again when a tab in that task next
-// changes. It never blocks browsing: a slow, failed, or stale answer changes
-// nothing.
+// action. A tab that still fits its task stays behind. A new task starts
+// under the name every new task has, so its tabs move at once, and the
+// language model is asked for its name afterwards. The same answers say when
+// another task needs a name: a task without one that the branch starts, or a
+// task uw named that has outgrown its name. A name that could not be had is
+// asked for again when a tab in that task next changes. It never blocks
+// browsing: a slow, failed, or stale answer changes nothing.
 class AutomaticOrganizer : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(AutomaticOrganizer);
@@ -107,6 +108,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Pages a placement request is being prepared or is out for, plus naming
   // requests on their way.
   size_t pending_requests() const;
+  // True while the language model is asked for a name for `task`.
+  bool IsNaming(const std::string& task) const;
+  // Runs when such a request starts or ends.
+  base::CallbackListSubscription ObserveNaming(base::RepeatingClosure callback);
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
   // or moved since. The acceptance goes to the organizer log as an example
@@ -162,8 +167,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
     bool names_task = false;
     // The tabs under `page` that stay behind when its branch moves.
     std::vector<PageId> staying;
-    // True once the user confirmed the move as a suggestion.
-    bool confirmed = false;
+    // How many moves there had been once this one started a task. A later
+    // move is what Undo reverses then.
+    uint64_t moves = 0;
   };
   // A request on its way, with the client that sends it.
   struct Pending {
@@ -201,10 +207,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // task with a name, a tab that is still being asked about, or that the
   // model put outside the task, is not one of them.
   std::vector<std::string> MemberTitles(const Page& page) const;
-  // The titles of the tabs under `top` that move with it.
-  std::vector<std::string> TitlesUnder(
-      const PageId& top,
-      const std::vector<PageId>& staying) const;
+  // The titles of the tabs under `top`.
+  std::vector<std::string> TitlesUnder(const PageId& top) const;
   // The name check for a tab in a task that uw named and that holds other
   // tabs, when there is a language model to give a new name.
   std::optional<NameCheck> NameCheckFor(const Page& page) const;
@@ -243,12 +247,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
   bool AskRest(const std::vector<PageId>& branch);
   void CarryOut(const BranchPlacement& group);
   // Moves the branch of `request.page`, without `request.staying`, to
-  // `request.target`: a task, the Scratchpad, or a new task, named
-  // `task_name` or else by the language model.
+  // `request.target`: a task, the Scratchpad, or a new task. A new task is
+  // named `task_name`, or else starts without a name and gets one from the
+  // language model afterwards.
   void Apply(Request request, std::optional<std::u16string> task_name);
-  // The task, when it was started.
-  std::optional<tab_groups::TabGroupId> CreateTask(Request& request,
-                                                   std::u16string title);
   // Marks `pages` as placed by what uw did with `by`, and writes the kept
   // requests about them to the organizer log.
   void Placed(const std::vector<PageId>& pages,
@@ -264,8 +266,6 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // True while the page shows what the answer was about, in the same task
   // under the same name.
   bool Valid(const Kept& kept) const;
-  // True while the language model is asked to name the task `page` starts.
-  bool NamingOutFor(const PageId& page) const;
   // What the sidebar calls `request.target`.
   std::u16string TargetName(const Request& request) const;
   // Which page it was, where its branch was, where the answer put it, and
@@ -278,6 +278,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // theirs, and uw does not replace it.
   bool Generated(const std::string& task) const;
   std::optional<Pending> Take(uint64_t request_id);
+  // Works out which tasks a name is being asked for, and tells the observers
+  // when that changed.
+  void UpdateNaming();
   void CancelRequestsFor(const PageId& page);
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,
                                             const std::string& key_account,
@@ -291,6 +294,11 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::map<PageId, Kept> kept_;
   // Top pages of the branches whose unasked tabs are being asked about.
   std::set<PageId> asked_;
+  // Tasks the language model is being asked to name.
+  std::set<std::string> naming_;
+  base::RepeatingClosureList naming_changed_;
+  // Moves so far, by uw and by the user.
+  uint64_t moves_ = 0;
   bool settle_pending_ = false;
   std::optional<Suggestion> suggestion_;
   // Tasks left without a name because the call for one failed or gave nothing

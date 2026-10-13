@@ -60,21 +60,19 @@ void MoveTo(std::vector<Page>& strip, const char* id, size_t index) {
   strip.insert(strip.begin() + index, page);
 }
 
-TEST(PageTreeTest, OrdersScratchpadFirstTasksTogetherChildrenAfterParents) {
+TEST(PageTreeTest, OrdersTasksTogetherScratchpadLastChildrenAfterParents) {
   PageTree tree({P("hotels", "trip"), P("show", "", "news"),
-                 P("gliner", "models"), P("fare", "trip", "flights"),
-                 P("news"), P("flights", "trip"), P("ollama", "models"),
-                 P("weather")});
-  EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "  show@-", "weather@-", "hotels@trip",
-                   "flights@trip", "  fare@trip", "gliner@models",
-                   "ollama@models"}));
+                 P("gliner", "models"), P("fare", "trip", "flights"), P("news"),
+                 P("flights", "trip"), P("ollama", "models"), P("weather")});
+  EXPECT_EQ(Render(tree), (Lines{"hotels@trip", "flights@trip", "  fare@trip",
+                                 "gliner@models", "ollama@models", "news@-",
+                                 "  show@-", "weather@-"}));
 }
 
 TEST(PageTreeTest, DropsLinksAcrossTasksToMissingPagesAndInCycles) {
   PageTree tree({P("a", "", "b"), P("b", "", "a"), P("c", "trip", "a"),
                  P("d", "", "gone"), P("e", "", "e")});
-  EXPECT_EQ(Render(tree), (Lines{"a@-", "  b@-", "d@-", "e@-", "c@trip"}));
+  EXPECT_EQ(Render(tree), (Lines{"c@trip", "a@-", "  b@-", "d@-", "e@-"}));
 }
 
 TEST(PageTreeTest, ReportsBranchDepthTopTasksAndPreviousSibling) {
@@ -96,13 +94,13 @@ TEST(PageTreeTest, BlankNewTabOpensBelowTheActiveBranch) {
   std::vector<Page> strip = Strip(tree);
   strip.push_back(P("new"));
   tree.Adopt(strip, {});
-  EXPECT_EQ(Render(tree)[3], "new@-");
+  EXPECT_EQ(Render(tree).back(), "new@-");
 
   EXPECT_TRUE(tree.OpenBeside(Id("new"), Id("flights")));
   EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "  show@-", "weather@-", "flights@trip",
-                   "  fare@trip", "new@trip", "hotels@trip", "gliner@models",
-                   "ollama@models"}));
+            (Lines{"flights@trip", "  fare@trip", "new@trip", "hotels@trip",
+                   "gliner@models", "ollama@models", "news@-", "  show@-",
+                   "weather@-"}));
   EXPECT_FALSE(tree.OpenBeside(Id("new"), Id("new")));
   EXPECT_FALSE(tree.OpenBeside(Id("new"), Id("unknown")));
 }
@@ -110,14 +108,14 @@ TEST(PageTreeTest, BlankNewTabOpensBelowTheActiveBranch) {
 TEST(PageTreeTest, LinkOpensAsLastChildWithoutBreakingOtherLinks) {
   PageTree tree = Seed();
   std::vector<Page> strip = Strip(tree);
-  strip.insert(strip.begin() + 1, P("link"));
+  strip.insert(strip.begin() + 6, P("link"));
   tree.Adopt(strip, {});
-  EXPECT_EQ(Render(tree)[1], "  link@-");
-  EXPECT_EQ(Render(tree)[2], "  show@-");
+  EXPECT_EQ(Render(tree)[6], "  link@-");
+  EXPECT_EQ(Render(tree)[7], "  show@-");
 
   EXPECT_TRUE(tree.SetParent(Id("link"), Id("news")));
-  EXPECT_EQ(Render(tree)[1], "  show@-");
-  EXPECT_EQ(Render(tree)[2], "  link@-");
+  EXPECT_EQ(Render(tree)[6], "  show@-");
+  EXPECT_EQ(Render(tree)[7], "  link@-");
   EXPECT_FALSE(tree.SetParent(Id("news"), Id("link")));
   EXPECT_FALSE(tree.SetParent(Id("link"), Id("unknown")));
 }
@@ -125,10 +123,10 @@ TEST(PageTreeTest, LinkOpensAsLastChildWithoutBreakingOtherLinks) {
 TEST(PageTreeTest, LinkIntoAnotherTaskTakesItsParentsTask) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.SetParent(Id("weather"), Id("fare")));
-  EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "  show@-", "flights@trip", "  fare@trip",
-                   "    weather@trip", "hotels@trip", "gliner@models",
-                   "ollama@models"}));
+  EXPECT_EQ(
+      Render(tree),
+      (Lines{"flights@trip", "  fare@trip", "    weather@trip", "hotels@trip",
+             "gliner@models", "ollama@models", "news@-", "  show@-"}));
 }
 
 TEST(PageTreeTest, ClosingAParentMovesItsChildrenUpOneLevel) {
@@ -144,42 +142,40 @@ TEST(PageTreeTest, ClosingAParentMovesItsChildrenUpOneLevel) {
   EXPECT_EQ(Render(tree), (Lines{"c@-", "d@-", "e@-"}));
 }
 
-TEST(PageTreeTest, NewTaskFollowsItsSourceOrComesFirst) {
+TEST(PageTreeTest, ANewTaskComesAfterEveryOtherTask) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.MoveToNewTask(Id("news"), "read"));
-  EXPECT_EQ(Render(tree),
-            (Lines{"weather@-", "news@read", "  show@read", "flights@trip",
-                   "  fare@trip", "hotels@trip", "gliner@models",
-                   "ollama@models"}));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "gliner@models", "ollama@models", "news@read",
+                                 "  show@read", "weather@-"}));
   EXPECT_TRUE(tree.MoveToNewTask(Id("hotels"), "book"));
   EXPECT_EQ(tree.Tasks(),
-            (std::vector<std::string>{"read", "trip", "book", "models"}));
+            (std::vector<std::string>{"trip", "models", "read", "book"}));
 
   EXPECT_FALSE(tree.MoveToNewTask(Id("weather"), "trip"));
   EXPECT_FALSE(tree.MoveToNewTask(Id("weather"), ""));
   EXPECT_FALSE(tree.MoveToNewTask(Id("unknown"), "fresh"));
 }
 
-TEST(PageTreeTest, NewTaskFromAnEmptiedTaskKeepsItsPosition) {
+TEST(PageTreeTest, ANewTaskFromAnEmptiedTaskComesLastToo) {
   PageTree tree({P("x", "one"), P("y", "two"), P("z", "three")});
   EXPECT_TRUE(tree.MoveToNewTask(Id("y"), "fresh"));
-  EXPECT_EQ(tree.Tasks(), (std::vector<std::string>{"one", "fresh", "three"}));
+  EXPECT_EQ(tree.Tasks(), (std::vector<std::string>{"one", "three", "fresh"}));
 }
 
 TEST(PageTreeTest, MoveToTaskAppendsTheBranchAndDetachesIt) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.MoveToTask(Id("show"), "trip"));
   EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "weather@-", "flights@trip", "  fare@trip",
-                   "hotels@trip", "show@trip", "gliner@models",
-                   "ollama@models"}));
+            (Lines{"flights@trip", "  fare@trip", "hotels@trip", "show@trip",
+                   "gliner@models", "ollama@models", "news@-", "weather@-"}));
   EXPECT_TRUE(tree.MoveToTask(Id("flights"), "models"));
   EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "weather@-", "hotels@trip", "show@trip",
-                   "gliner@models", "ollama@models", "flights@models",
-                   "  fare@models"}));
+            (Lines{"hotels@trip", "show@trip", "gliner@models", "ollama@models",
+                   "flights@models", "  fare@models", "news@-", "weather@-"}));
+  // The Scratchpad takes a branch at its end, the foot of the strip.
   EXPECT_TRUE(tree.MoveToTask(Id("fare"), ""));
-  EXPECT_EQ(Render(tree)[2], "fare@-");
+  EXPECT_EQ(Render(tree).back(), "fare@-");
   EXPECT_FALSE(tree.MoveToTask(Id("fare"), "no-such-task"));
   EXPECT_FALSE(tree.MoveToTask(Id("unknown"), "trip"));
 }
@@ -187,13 +183,13 @@ TEST(PageTreeTest, MoveToTaskAppendsTheBranchAndDetachesIt) {
 TEST(PageTreeTest, NestAndOutdentMoveABranchOneLevel) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.Nest(Id("hotels")));
-  EXPECT_EQ(Render(tree)[3], "flights@trip");
-  EXPECT_EQ(Render(tree)[4], "  fare@trip");
-  EXPECT_EQ(Render(tree)[5], "  hotels@trip");
+  EXPECT_EQ(Render(tree)[0], "flights@trip");
+  EXPECT_EQ(Render(tree)[1], "  fare@trip");
+  EXPECT_EQ(Render(tree)[2], "  hotels@trip");
   EXPECT_TRUE(tree.Outdent(Id("fare")));
-  EXPECT_EQ(Render(tree)[3], "flights@trip");
-  EXPECT_EQ(Render(tree)[4], "  hotels@trip");
-  EXPECT_EQ(Render(tree)[5], "fare@trip");
+  EXPECT_EQ(Render(tree)[0], "flights@trip");
+  EXPECT_EQ(Render(tree)[1], "  hotels@trip");
+  EXPECT_EQ(Render(tree)[2], "fare@trip");
   EXPECT_FALSE(tree.Nest(Id("news")));
   EXPECT_FALSE(tree.Outdent(Id("news")));
 }
@@ -215,8 +211,8 @@ TEST(PageTreeTest, ReorderingSiblingsKeepsThemNested) {
 }
 
 TEST(PageTreeTest, DroppingATabIntoABranchJoinsItAndKeepsOtherLinks) {
-  const PageTree before({P("p"), P("c1", "", "p"), P("g", "", "c1"),
-                         P("c2", "", "p"), P("x")});
+  const PageTree before(
+      {P("p"), P("c1", "", "p"), P("g", "", "c1"), P("c2", "", "p"), P("x")});
   PageTree tree = before;
   std::vector<Page> strip = Strip(tree);
   MoveTo(strip, "x", 2);
@@ -252,9 +248,12 @@ TEST(PageTreeTest, AMovedBranchKeepsItsShape) {
 TEST(PageTreeTest, AnUngroupedTabDroppedBetweenTasksReturnsToTheScratchpad) {
   PageTree tree = Seed();
   std::vector<Page> strip = Strip(tree);
-  MoveTo(strip, "weather", 5);
+  MoveTo(strip, "weather", 3);
   tree.Adopt(strip, {Id("weather")});
-  EXPECT_EQ(tree, Seed());
+  // It lands at the top of the Scratchpad, the nearest place it can be.
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "gliner@models", "ollama@models", "weather@-",
+                                 "news@-", "  show@-"}));
 }
 
 TEST(PageTreeTest, RegroupingATabDetachesItFromItsParent) {
@@ -263,10 +262,9 @@ TEST(PageTreeTest, RegroupingATabDetachesItFromItsParent) {
   Erase(strip, "fare");
   strip.push_back(P("fare", "models"));
   tree.Adopt(strip, {Id("fare")});
-  EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "  show@-", "weather@-", "flights@trip",
-                   "hotels@trip", "gliner@models", "ollama@models",
-                   "fare@models"}));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "hotels@trip", "gliner@models",
+                                 "ollama@models", "fare@models", "news@-",
+                                 "  show@-", "weather@-"}));
 }
 
 TEST(PageTreeTest, RestoreReturnsABranchToItsTask) {
@@ -280,15 +278,14 @@ TEST(PageTreeTest, RestoreKeepsPagesOpenedSinceAndDropsAVanishedTask) {
   PageTree tree = Seed();
   ASSERT_TRUE(tree.MoveToNewTask(Id("weather"), "check"));
   std::vector<Page> strip = Strip(tree);
-  strip.insert(strip.begin() + 3, P("new", "check"));
+  strip.insert(strip.begin() + 6, P("new", "check"));
   tree.Adopt(strip, {});
-  ASSERT_EQ(Render(tree)[3], "new@check");
+  ASSERT_EQ(Render(tree)[6], "new@check");
 
   tree.Restore(Seed());
-  EXPECT_EQ(Render(tree),
-            (Lines{"news@-", "  show@-", "weather@-", "new@-", "flights@trip",
-                   "  fare@trip", "hotels@trip", "gliner@models",
-                   "ollama@models"}));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "gliner@models", "ollama@models", "news@-",
+                                 "  show@-", "weather@-", "new@-"}));
 }
 
 TEST(PageTreeTest, RestoreSkipsClosedPagesAndUsesASurvivingAncestor) {

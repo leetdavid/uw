@@ -3,6 +3,8 @@
 
 #include "uw/browser/ui/views/tab_organization/scratchpad_label.h"
 
+#include <algorithm>
+
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
@@ -18,30 +20,39 @@
 namespace uw {
 namespace {
 
-constexpr int kLabelHeight = 24;
 constexpr int kLabelInset = 8;
 constexpr SkAlpha kLabelAlpha = 0x8C;
 
 }  // namespace
 
-int ScratchpadLabelHeight(const std::vector<views::View*>& children) {
-  return children.empty() || views::IsViewClass<TabGroupView>(children.front())
-             ? 0
-             : kLabelHeight;
+const views::View* FirstScratchpadTab(
+    const std::vector<views::View*>& children) {
+  const auto first = std::ranges::find_if_not(children, [](views::View* child) {
+    return views::IsViewClass<TabGroupView>(child);
+  });
+  return first == children.end() ? nullptr : *first;
 }
 
 void PaintScratchpadLabel(const views::View* container,
                           const std::vector<views::View*>& children,
                           gfx::Canvas* canvas) {
-  if (ScratchpadLabelHeight(children) == 0 ||
-      children.front()->y() < kLabelHeight) {
+  const views::View* first = FirstScratchpadTab(children);
+  if (!first) {
+    return;
+  }
+  // A collapsed strip leaves no room between the last task and the tab.
+  const auto above = std::ranges::find(children, first);
+  const int top = first->y() - kScratchpadLabelHeight;
+  if (top < (above == children.begin()
+                 ? 0
+                 : (*std::prev(above))->bounds().bottom())) {
     return;
   }
   const int inset =
       GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding) +
       kLabelInset;
-  const gfx::Rect bounds = container->GetMirroredRect(
-      gfx::Rect(inset, 0, container->width() - 2 * inset, kLabelHeight));
+  const gfx::Rect bounds = container->GetMirroredRect(gfx::Rect(
+      inset, top, container->width() - 2 * inset, kScratchpadLabelHeight));
   canvas->DrawStringRectWithFlags(
       l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD),
       gfx::FontList().DeriveWithSizeDelta(-1).DeriveWithWeight(

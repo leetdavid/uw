@@ -26,10 +26,11 @@ struct Page {
   friend bool operator==(const Page&, const Page&) = default;
 };
 
-// The regular tabs of one window in tab-strip order. Scratchpad pages come
-// first, each task's pages are contiguous, and a page's children follow it
-// directly inside the same task. Every mutation restores those invariants.
-// Tasks themselves are native tab groups; this holds only their keys.
+// The regular tabs of one window in tab-strip order. Each task's pages are
+// contiguous, Scratchpad pages come after every task, and a page's children
+// follow it directly inside the same task. Every mutation restores those
+// invariants. Tasks themselves are native tab groups; this holds only their
+// keys.
 class PageTree {
  public:
   PageTree();
@@ -64,8 +65,8 @@ class PageTree {
   // Moves a branch to the end of an existing task, or of the Scratchpad when
   // `task` is empty, and detaches it from its parent.
   bool MoveToTask(const PageId& id, const std::string& task);
-  // Moves a branch into the unused key `task`, placed after the task it came
-  // from, or first among tasks when it came from the Scratchpad.
+  // Moves a branch into the unused key `task`, placed after every other
+  // task.
   bool MoveToNewTask(const PageId& id, const std::string& task);
   // Makes a branch the last child of its previous sibling.
   bool Nest(const PageId& id);

@@ -718,18 +718,6 @@ void TabOrganizationController::ApplyOrder() {
     }
   }
   int next = tabs_->IndexOfFirstNonPinnedTab();
-  for (const Page& page : tree_.pages()) {
-    const tabs::TabInterface* tab = TabFor(page.id);
-    if (!tab || !page.task.empty() || tab->GetGroup()) {
-      continue;
-    }
-    const int index = tabs_->GetIndexOfTab(tab);
-    if (index != next) {
-      tabs_->MoveWebContentsAt(index, next, /*select_after_move=*/false,
-                               std::nullopt);
-    }
-    ++next;
-  }
   for (const std::string& task : tree_.Tasks()) {
     const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
     if (!group) {
@@ -752,6 +740,18 @@ void TabOrganizationController::ApplyOrder() {
       ++next;
     }
     next = static_cast<int>(native->ListTabs().end());
+  }
+  for (const Page& page : tree_.pages()) {
+    const tabs::TabInterface* tab = TabFor(page.id);
+    if (!tab || !page.task.empty() || tab->GetGroup()) {
+      continue;
+    }
+    const int index = tabs_->GetIndexOfTab(tab);
+    if (index != next) {
+      tabs_->MoveWebContentsAt(index, next, /*select_after_move=*/false,
+                               std::nullopt);
+    }
+    ++next;
   }
 }
 

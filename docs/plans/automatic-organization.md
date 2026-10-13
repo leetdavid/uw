@@ -13,6 +13,12 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - **Language model**. Connection modes: Ollama (endpoint, model, no key) and OpenAI-compatible (base URL, model, API key).
 - The decision model decides where a tab goes. With no decision model, the language model decides in one [classification call](../CONTEXT.md#language). uw asks about one tab at a time and acts on the whole [tab branch](#branch-moves).
 - The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`.
+- A new task does not wait for its name. Agreed on 2026-10-13, after the user's log showed naming calls of 7 to 21 seconds during which nothing moved.
+  - The tabs move at once into a task with the provisional name, placed after every other task. Then uw asks the language model for the name.
+  - While it waits, a spinner shows on the task's row and the activity card says "Asking <model> for a name".
+  - When the name arrives, the task takes it and the card says "Created task <name>" with Undo. After another move in between, the card says nothing: Undo would reverse that other move.
+  - Undo works from the moment of the move, from the Organize menu and its shortcut. Undo during the wait drops the request for the name.
+  - A tab opened from a page of the new task lands in that task. While a name is being asked for a task, no second request for one goes out.
 - The model that decides placement also decides when a task needs a name. The language model is asked for one only then. Agreed on 2026-10-12. It replaces a naming call on every tab change.
   - A task with the provisional name, or with no name, is named when a tab in it starts a piece of work: the same two thresholds that start a new task from the Scratchpad. A one-off page names nothing.
   - When the naming call fails or returns an unusable name, uw asks again for the next tab that changes and stays in that task, one-off or not. uw forgets which tasks are waiting when it quits. The user approved this on 2026-10-13. Before, such a task waited for the next tab that starts a piece of work.
@@ -88,7 +94,6 @@ Agreed on 2026-10-13. `PlaceBranch` in `components/tab_organization/placement` h
 - Tabs that leave together and fit no task start a task when any one of them reaches the "Start a task" threshold. Otherwise they go to the Scratchpad. The same holds in the Scratchpad: a one-off page there goes into the task that a tab under it starts.
 - The top tab of the tabs that leave together decides whether their task has outgrown its name instead.
 - A tab that uw filed stays where it is until it shows something else. uw does not ask about it again before then.
-- While the language model is asked to name a new task, tabs opened under the leaving page join it. uw looks at the branch again when the name arrives.
 - The same answers give the same moves, and carrying them out twice changes nothing. `PlacementTest.TheSameAnswersGiveTheSameMovesAndASecondPassMovesNothing` checks it.
 
 "Reorganize all tabs" would run the same rules over every branch in the window. It is a [later stage](#later-stages).
@@ -194,14 +199,14 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 1. Automatic organization turns on only after every configured connection validates. A failed save turns it off.
 2. With a decision model set, a decision request goes to it in that provider's format. With none, the language model receives a classification call.
-3. Opening a link in a new tab moves its branch to the end of the matched task, or starts a task. With a language model the task is named by it; otherwise it is `New task`.
+3. Opening a link in a new tab moves its branch to the end of the matched task, or starts a task after every other task. With a language model the task is named by it; otherwise it is `New task`.
 4. A tab in a named task that the model places outside every task moves to the Scratchpad, or to a new task when it clearly starts one. Undo puts it back.
 5. A blank new tab, and a tab the user navigated by hand, is sent with no source tab. A task named `New task` is not in the request, and an answer that names it is unreadable.
 6. A new title or another site invalidates that tab's outstanding request, and an older response cannot move the tab. A new path or new parameters under the same title send nothing. `OrganizerLogBrowserTest.OnlyANewTitleOrAnotherSiteAsksAgain` checks it.
 7. A manual move drops the response in flight and holds the branch until its page changes.
 8. An answer short of its threshold, a refusal, or a malformed response moves nothing. `PlacementTest.*` covers every row of the [placement rules](#placement-rules) and each [threshold](#thresholds).
 9. Closing a branch or moving it to another window turns its pending response into a no-op.
-10. One undo reverses task creation, the move, and the name together. It still works from the Organize menu after the message disappears.
+10. One undo reverses task creation and the move together, and the name goes with the task. It still works from the Organize menu after the message disappears.
 11. Pause stops requests and drops responses in flight across all windows. Resume restores them. Manual commands keep working while paused.
 12. Each request contains the documented scope only. No API key appears in logs, preferences, session data, or crash reports. A request body is written only to the organizer log, and only when uw was started with `--uw-organizer-log`.
 13. `pnpm run check` passes. `unit_tests` passes `PageTreeTest.*`, `AiProtocolTest.*`, and `PlacementTest.*`. `browser_tests` passes `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `OrganizerLogBrowserTest.*`, and `UwOrganizationPageBrowserTest.*`.
@@ -225,6 +230,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 29. A tab under a leaving page stays in its task, where the page was, when its own answer says it fits there. A tab under it without a sure answer goes along. `AutomaticOrganizerBrowserTest.ATabThatStillFitsItsTaskStaysBehind` checks it.
 30. A tab the user placed by hand is not asked about when its branch moves, and stays. `AutomaticOrganizerBrowserTest.TabsNobodyAskedAboutAreAskedBeforeTheirBranchMoves` checks it.
 31. The name check lists the tabs that make up the task, without a tab the model put outside it. `ABranchThatFitsNoTaskLeavesTogether` checks the list.
+32. A new task appears before its name: the tabs are in a task called `New task`, its row shows the spinner, and the card waits. A tab opened from it lands in the task and sends no second naming request. Undo during the wait takes the tabs back and drops the request. `AutomaticOrganizerBrowserTest.ANewTaskStartsBeforeItsName` checks it.
+33. When the name arrives, the task takes it, the spinner goes, and the card says "Created task <name>" with Undo. `AutomaticOrganizerBrowserTest.JevDecidesAndTheLanguageModelNamesTheNewTask` checks it.
 
 ## Later stages
 
@@ -233,7 +240,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 - Managed local runtime and Anthropic-format providers.
 - A card with Undo for a new task name.
 - Not asking again when a title only flips on the same page, such as an unread counter.
-- A browser test for an answer that waits while another request about its branch is out. The test server answers at once, so only the unit tests cover the rule.
+- A browser test for an answer that waits while another request about its branch is out. The test server can hold back every request to one address, not the request about one tab, so only the unit tests cover the rule.
+- A browser test for a name that arrives after another move, where the card stays quiet.
 - Leaving tabs that sat unfiled in a task before a restart out of the name check.
 - Describing a task to the model by the tabs in it, so a task named `New task` can be an answer. That sends more tab titles per request than this plan allows.
 

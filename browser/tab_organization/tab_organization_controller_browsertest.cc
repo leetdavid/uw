@@ -3,6 +3,7 @@
 
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -176,7 +177,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       MoveToNewTaskGroupsTheBranchBelowTheScratchpad) {
+                       MoveToNewTaskGroupsTheBranchAboveTheScratchpad) {
   tabs::TabInterface* page = InitialTab();
   tabs::TabInterface* child = OpenLinkFrom(page);
   tabs::TabInterface* other = NewTab();
@@ -190,7 +191,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_FALSE(other->GetGroup());
   EXPECT_EQ(TitleOf(*group), u"Plan Lisbon trip");
   EXPECT_EQ(controller()->DepthFor(child), 1);
-  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(other), Id(page), Id(child)}));
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(page), Id(child), Id(other)}));
   EXPECT_EQ(page->GetContents(), contents);
   EXPECT_EQ(tabs()->GetActiveTab(), other);
   ExpectStripMatchesTree();
@@ -209,7 +210,36 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_FALSE(child->GetGroup());
   EXPECT_EQ(page->GetGroup(), group);
   EXPECT_EQ(controller()->DepthFor(child), 0);
-  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(other), Id(child), Id(page)}));
+  // The Scratchpad takes it at its end, the foot of the strip.
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(page), Id(other), Id(child)}));
+  ExpectStripMatchesTree();
+}
+
+// Tasks keep the order they were started in: a new one comes after every
+// other task, wherever its tabs came from.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ANewTaskComesAfterEveryOtherTask) {
+  tabs::TabInterface* first = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(first);
+  tabs::TabInterface* second = NewTab();
+  tabs::TabInterface* loose = NewTab();
+  const std::optional<tab_groups::TabGroupId> one =
+      controller()->MoveToNewTask({Id(first)}, u"One");
+  const std::optional<tab_groups::TabGroupId> two =
+      controller()->MoveToNewTask({Id(second)}, u"Two");
+  ASSERT_TRUE(one);
+  ASSERT_TRUE(two);
+  EXPECT_EQ(Strip(),
+            (std::vector<PageId>{Id(first), Id(child), Id(second), Id(loose)}));
+
+  const std::optional<tab_groups::TabGroupId> three =
+      controller()->MoveToNewTask({Id(child)}, u"Three");
+  ASSERT_TRUE(three);
+  EXPECT_EQ(controller()->tree().Tasks(),
+            (std::vector<std::string>{one->ToString(), two->ToString(),
+                                      three->ToString()}));
+  EXPECT_EQ(Strip(),
+            (std::vector<PageId>{Id(first), Id(second), Id(child), Id(loose)}));
   ExpectStripMatchesTree();
 }
 
@@ -268,7 +298,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       NativeGroupingIsAdoptedAndScratchpadStaysOnTop) {
+                       NativeGroupingIsAdoptedAndTheScratchpadStaysLast) {
   tabs::TabInterface* first = InitialTab();
   tabs::TabInterface* second = NewTab();
   tabs::TabInterface* third = NewTab();
@@ -277,7 +307,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(controller()->tree().Find(Id(first))->task, group.ToString());
-  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(second), Id(third), Id(first)}));
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(first), Id(second), Id(third)}));
   ExpectStripMatchesTree();
 }
 
@@ -381,14 +411,23 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_EQ(rows.size(), 1u);
   EXPECT_EQ(rows[0]->y(), 24);
 
+  // A task sits at the top. The label and the ungrouped tab come below it,
+  // once the sidebar has grown the task's box around its tab.
+  tabs::TabInterface* loose = NewTab();
   ASSERT_TRUE(controller()->MoveToNewTask({Id(page)}, u"Plan"));
-  base::RunLoop().RunUntilIdle();
-  const std::vector<views::View*> tasks = ViewsOfClass("TabGroupView");
-  ASSERT_EQ(tasks.size(), 1u);
-  EXPECT_EQ(tasks[0]->y(), 0);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const std::vector<views::View*> tasks = ViewsOfClass("TabGroupView");
+    rows = TabRows();
+    return tasks.size() == 1u && tasks[0]->y() == 0 && rows.size() == 2u &&
+           std::max(rows[0]->GetBoundsInScreen().y(),
+                    rows[1]->GetBoundsInScreen().y()) ==
+               tasks[0]->GetBoundsInScreen().bottom() + 2 + 24;
+  }));
 
   // The sidebar drops the task header a moment after the tab leaves it.
   ASSERT_TRUE(controller()->MoveToScratchpad({Id(page)}));
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(loose),
+                             TabCloseTypes::CLOSE_NONE);
   EXPECT_TRUE(base::test::RunUntil([&] {
     rows = TabRows();
     return rows.size() == 1u && rows[0]->y() == 24;

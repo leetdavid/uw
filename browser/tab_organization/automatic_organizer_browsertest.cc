@@ -129,6 +129,9 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     return std::string();
   }
 
+  // Leaves requests to `path` without an answer.
+  void Hold(const std::string& path) { models_.Hold(path); }
+
   void Fail(const std::string& path, int status) {
     models_.Fail(path, status, "{}");
   }
@@ -185,17 +188,25 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
 
   // The lock on the row of the task `group`.
   NameLock* NameLockOf(const tab_groups::TabGroupId& group) {
-    return FindLock(BrowserView::GetBrowserViewForBrowser(browser()), group);
+    return FindOnRow<NameLock>(BrowserView::GetBrowserViewForBrowser(browser()),
+                               group);
   }
 
-  static NameLock* FindLock(views::View* view,
-                            const tab_groups::TabGroupId& group) {
-    NameLock* lock = views::AsViewClass<NameLock>(view);
-    if (lock && lock->group() == group) {
-      return lock;
+  // The spinner on the row of the task `group`.
+  NamingSpinner* SpinnerOf(const tab_groups::TabGroupId& group) {
+    return FindOnRow<NamingSpinner>(
+        BrowserView::GetBrowserViewForBrowser(browser()), group);
+  }
+
+  template <typename Mark>
+  static Mark* FindOnRow(views::View* view,
+                         const tab_groups::TabGroupId& group) {
+    Mark* mark = views::AsViewClass<Mark>(view);
+    if (mark && mark->group() == group) {
+      return mark;
     }
     for (views::View* child : view->children()) {
-      if (NameLock* found = FindLock(child, group)) {
+      if (Mark* found = FindOnRow<Mark>(child, group)) {
         return found;
       }
     }
@@ -420,12 +431,18 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
 
-  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
+  tabs::TabInterface* initial = InitialTab();
+  tabs::TabInterface* link = OpenLinkFrom(initial, "lisbon");
   ASSERT_TRUE(SettleAfter(2));
 
   ASSERT_TRUE(link->GetGroup());
   EXPECT_EQ(TitleOf(*link->GetGroup()), u"Plan Lisbon trip");
-  EXPECT_FALSE(InitialTab()->GetGroup());
+  ASSERT_TRUE(SpinnerOf(*link->GetGroup()));
+  EXPECT_FALSE(SpinnerOf(*link->GetGroup())->GetVisible());
+  EXPECT_FALSE(initial->GetGroup());
+  // The new task sits above the Scratchpad.
+  EXPECT_EQ(tabs()->GetIndexOfTab(link), 0);
+  EXPECT_EQ(tabs()->GetIndexOfTab(initial), 1);
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_EQ(bar()->card()->headline(), u"Created task Plan Lisbon trip");
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.75");
@@ -449,10 +466,65 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TheOrganizeMenuShowsTheUndoShortcut) {
   ui::Accelerator shortcut;
-  ASSERT_TRUE(
-      bar()->GetAcceleratorForCommandId(OrganizeBar::kUndo, &shortcut));
-  EXPECT_EQ(shortcut, ui::Accelerator(ui::VKEY_Z, ui::EF_COMMAND_DOWN |
-                                                      ui::EF_ALT_DOWN));
+  ASSERT_TRUE(bar()->GetAcceleratorForCommandId(OrganizeBar::kUndo, &shortcut));
+  EXPECT_EQ(shortcut,
+            ui::Accelerator(ui::VKEY_Z, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN));
+}
+
+// A new task does not wait for its name. Its tabs move at once into a task
+// called "New task", the row spins, and the card waits. A tab opened from it
+// meanwhile lands in the task and asks for no second name. Undo takes the
+// tabs back and drops the request for the name.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ANewTaskStartsBeforeItsName) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Hold("/v1/chat/completions");
+
+  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
+  organizer()->DispatchNowForTesting();
+  ASSERT_TRUE(base::test::RunUntil([&] { return Requests().size() == 2u; }));
+  const std::optional<tab_groups::TabGroupId> task = link->GetGroup();
+  ASSERT_TRUE(task);
+  EXPECT_EQ(TitleOf(*task), u"New task");
+  EXPECT_TRUE(organizer()->IsNaming(task->ToString()));
+  ASSERT_TRUE(SpinnerOf(*task));
+  EXPECT_TRUE(SpinnerOf(*task)->GetVisible());
+  EXPECT_TRUE(SpinnerOf(*task)->spinning());
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_TRUE(bar()->card()->waiting());
+  EXPECT_EQ(bar()->card()->headline(), u"Asking language-model for a name");
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+  SaveWindowScreenshot(browser(), "naming-a-new-task");
+
+  tabs::TabInterface* opened = OpenLinkFrom(link, "hotels");
+  ASSERT_EQ(opened->GetGroup(), task);
+  organizer()->DispatchNowForTesting();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return Requests().size() == 3u && organizer()->pending_requests() == 1u;
+  }));
+  EXPECT_EQ(Requests()[2].path, "/v1/systemone");
+  EXPECT_EQ(opened->GetGroup(), task);
+
+  // The page moves on before its name arrives. The task is still owed one,
+  // so the next answer asks again, even about a one-off.
+  AnswerAbout("weather", SystemOneAnswer("none", 0.99, 0.1));
+  Browse(link, "weather");
+  organizer()->DispatchNowForTesting();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return Requests().size() == 5u && organizer()->pending_requests() == 1u;
+  }));
+  EXPECT_EQ(Requests()[4].path, "/v1/chat/completions");
+  EXPECT_EQ(link->GetGroup(), task);
+  EXPECT_TRUE(organizer()->IsNaming(task->ToString()));
+  EXPECT_TRUE(SpinnerOf(*task)->GetVisible());
+
+  controller()->Undo();
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_FALSE(organizer()->IsNaming(task->ToString()));
+  EXPECT_EQ(organizer()->pending_requests(), 0u);
+  EXPECT_EQ(Requests().size(), 5u);
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -694,7 +766,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ATabThatFitsNoTaskLeavesItForTheScratchpad) {
   const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   ASSERT_EQ(in_task->GetGroup(), task);
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
@@ -750,7 +822,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8));
   Answer("/v1/chat/completions", ChatAnswer("Compare laptops"));
-  tabs::TabInterface* blank = NewTabBeside(tabs()->GetTabAtIndex(1));
+  tabs::TabInterface* blank = NewTabBeside(tabs()->GetTabAtIndex(0));
   ASSERT_EQ(blank->GetGroup(), task);
 
   Browse(blank, "laptops");
@@ -803,6 +875,9 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(controller()->DepthFor(result), 1);
   EXPECT_EQ(TitleOf(*search->GetGroup()), u"Print slippers");
   EXPECT_EQ(tabs()->group_model()->ListTabGroups().size(), 2u);
+  // The new task comes after the older one.
+  EXPECT_EQ(controller()->tree().Tasks().back(),
+            search->GetGroup()->ToString());
   EXPECT_EQ(warp->GetGroup(), task);
   EXPECT_EQ(ssh->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Research Warp");
@@ -841,7 +916,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ATabThatStillFitsItsTaskStaysBehind) {
   const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   ASSERT_EQ(in_task->GetGroup(), task);
   UseDecisionModel(DecisionProvider::kJev);
   Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.95));
@@ -879,7 +954,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TabsNobodyAskedAboutAreAskedBeforeTheirBranchMoves) {
   const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* page = OpenLinkFrom(in_task, "lisbon");
   tabs::TabInterface* fits = OpenLinkFrom(page, "hotels");
   tabs::TabInterface* leaves = OpenLinkFrom(page, "radar");
@@ -1595,7 +1670,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OrganizeMenuOpensATabInANewTask) {
   const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   ASSERT_EQ(in_task->GetGroup(), task);
   tabs()->ActivateTabAt(1);
   const int before = tabs()->count();

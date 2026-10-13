@@ -195,7 +195,7 @@ Agreed:
 - When a parent tab changes activity and moves to another task, children that still serve the original task remain there. Promote those children one level in the old location, preserving their order and subtrees. This automatic reclassification moves the repurposed parent, unlike an explicit whole-branch extraction.
 - Enable automatic grouping by default from the first AI grouping release. Organize new tabs and refine inactive groups.
 - Automatically regroup tabs as task intent becomes clearer, including pulling a distinct task out into its own group.
-- In automatic mode, creating a new task preserves candidate order and branches. Place it after the task the branch came from, or first among tasks when the branch came from the Scratchpad.
+- In automatic mode, creating a new task preserves candidate order and branches. Place it after every other task, just above the Scratchpad. Changed on 2026-10-13. Before, it went after the task the branch came from, or first among tasks.
 - Merge two automatically created groups when they clearly represent the same task and neither has a manual adjustment. If either group has a manual adjustment, propose the merge instead.
 - Split an automatically created group when its branches clearly represent separate tasks and it has no manual adjustment. If it has a manual adjustment, propose the split instead.
 - Clear task intent can trigger a move immediately, including for the selected tab and other tabs in the current task group. Switching away is not a prerequisite. A move must preserve the selected tab, its page state, and keyboard focus.
@@ -227,7 +227,7 @@ Reference hardware, representative input sizes and task counts, and cold-start e
 
 ### Scratchpad
 
-Agreed: each window has an always-visible Scratchpad section directly below the pinned-icon row and above task groups. It contains every ungrouped regular tab and candidate branch, rendered as a nested tree. A confident placement moves a whole Scratchpad branch into the matched task by default. Tabs leave it only through confident automatic placement, an accepted task proposal, or a manual move. Scratchpad is not a task group and does not participate in task ordering or automatic task restructuring.
+Agreed: each window has an always-visible Scratchpad section below every task group, at the foot of the tab list. Changed on 2026-10-13. It used to sit above the tasks. It contains every ungrouped regular tab and candidate branch, rendered as a nested tree. A confident placement moves a whole Scratchpad branch into the matched task by default. Tabs leave it only through confident automatic placement, an accepted task proposal, or a manual move. Scratchpad is not a task group and does not participate in task ordering or automatic task restructuring.
 
 ### User-directed mode
 
@@ -249,7 +249,7 @@ Agreed: an ignored task proposal stays as a small inline Scratchpad row until th
 
 Agreed: provide a "Move to new task" action in the tab/branch menu and for a selection of tabs. It creates a separate task group in the same window and counts as a manual adjustment. A selected parent moves with all its descendants by default; selecting individual child tabs allows part of a branch to be extracted.
 
-Preserve loaded pages, the selected tab, and the moved branches' internal hierarchy. The action takes effect without waiting for an AI decision. Place the new task group immediately after the source task.
+Preserve loaded pages, the selected tab, and the moved branches' internal hierarchy. The action takes effect without waiting for an AI decision. Place the new task group after every other task. Changed on 2026-10-13. Before, it went immediately after the source task.
 
 ### Task names
 
@@ -257,7 +257,11 @@ Agreed: once a task is known, give its group a short, action-oriented name descr
 
 Agreed on 2026-10-12: the model that decides placement also decides when a task needs a name or a new one. The language model writes the name and is asked only then. See the [name check](plans/automatic-organization.md#name-check).
 
+Agreed on 2026-10-13: a new task does not wait for its name. Its tabs move at once into a task with the provisional name, and the task takes its name when the language model answers. Until then a spinner shows on the task's row and the activity card says a name is being asked for.
+
 ### Group order
+
+Agreed on 2026-10-13: tasks are listed in the order they were started, oldest first. A new task comes last, whoever started it.
 
 Agreed: existing sibling task groups keep their relative order when the user switches tasks. Activity or recency does not move a group to the top. Users can drag groups to reorder them; intent-based regrouping can still move tabs or branches when the task becomes clear.
 

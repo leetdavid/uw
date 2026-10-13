@@ -145,6 +145,15 @@ size_t AutomaticOrganizer::pending_requests() const {
       }));
 }
 
+bool AutomaticOrganizer::IsNaming(const std::string& task) const {
+  return naming_.contains(task);
+}
+
+base::CallbackListSubscription AutomaticOrganizer::ObserveNaming(
+    base::RepeatingClosure callback) {
+  return naming_changed_.Add(std::move(callback));
+}
+
 void AutomaticOrganizer::DispatchNowForTesting() {
   timer_.Stop();
   Dispatch();
@@ -173,6 +182,7 @@ void AutomaticOrganizer::OnConfigChanged() {
     for (auto& [id, activity] : pages_) {
       activity.asking = false;
     }
+    UpdateNaming();
   }
 }
 
@@ -189,6 +199,7 @@ void AutomaticOrganizer::Scan() {
   std::erase_if(asked_, [&tree](const PageId& id) { return !tree.Find(id); });
   // A page that closed may be what the rest of its branch waited for.
   if (pages_.size() + requests_.size() != known) {
+    UpdateNaming();
     ScheduleSettle();
   }
   const bool enabled = Enabled();
@@ -242,6 +253,7 @@ void AutomaticOrganizer::Scan() {
 }
 
 void AutomaticOrganizer::OnManualMove(const std::vector<PageId>& pages) {
+  ++moves_;
   for (const PageId& page : pages) {
     const auto activity = pages_.find(page);
     if (activity != pages_.end()) {
@@ -394,18 +406,11 @@ std::vector<std::string> AutomaticOrganizer::MemberTitles(
 }
 
 std::vector<std::string> AutomaticOrganizer::TitlesUnder(
-    const PageId& top,
-    const std::vector<PageId>& staying) const {
-  const PageTree& tree = controller_->tree();
-  std::set<PageId> left;
-  for (const PageId& root : staying) {
-    const std::vector<PageId> branch = tree.BranchOf(root);
-    left.insert(branch.begin(), branch.end());
-  }
+    const PageId& top) const {
   std::vector<std::string> titles;
-  for (const PageId& id : tree.BranchOf(top)) {
+  for (const PageId& id : controller_->tree().BranchOf(top)) {
     const auto activity = pages_.find(id);
-    if (id != top && !left.contains(id) && activity != pages_.end() &&
+    if (id != top && activity != pages_.end() &&
         !activity->second.title.empty()) {
       titles.push_back(base::UTF16ToUTF8(activity->second.title));
     }
@@ -430,6 +435,11 @@ void AutomaticOrganizer::NameTaskOf(Request request,
                                     std::optional<std::u16string> name) {
   const Page* page = controller_->tree().Find(request.page);
   request.names_task = true;
+  // One request for a name is enough.
+  if (IsNaming(request.task)) {
+    Report(Event::Kind::kLeft, request);
+    return;
+  }
   owed_names_.erase(request.task);
   std::unique_ptr<RemoteModelClient> client;
   if (!name && page) {
@@ -477,6 +487,7 @@ void AutomaticOrganizer::Send(Request request,
   const uint64_t request_id = next_request_++;
   RemoteModelClient* sender = client.get();
   requests_.emplace(request_id, Pending{std::move(request), std::move(client)});
+  UpdateNaming();
   sender->Send(
       base::BindOnce(on_answer, weak_factory_.GetWeakPtr(), request_id));
 }
@@ -701,7 +712,6 @@ void AutomaticOrganizer::AcceptSuggestion() {
   LogOrganizerExchange("accepted", suggestion.request.decision,
                        suggestion.request.target,
                        LogDetails(suggestion.request));
-  suggestion.request.confirmed = true;
   Apply(std::move(suggestion.request), std::move(suggestion.task_name));
 }
 
@@ -722,6 +732,7 @@ void AutomaticOrganizer::Apply(Request request,
     Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
            TargetName(request));
     if (moved) {
+      ++moves_;
       Placed(controller_->tree().BranchOf(request.page), Event::Kind::kMoved,
              request);
     } else {
@@ -729,21 +740,35 @@ void AutomaticOrganizer::Apply(Request request,
     }
     return;
   }
-  if (NamingOutFor(request.page)) {
+  // A new task starts under the name every new task has, so the tabs move at
+  // once. The language model is asked for the name afterwards.
+  const std::u16string title =
+      task_name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
+  const std::optional<tab_groups::TabGroupId> task = controller_->MoveToNewTask(
+      {request.page}, title, TabOrganizationController::Origin::kOrganizer,
+      request.staying);
+  if (!task) {
+    Report(Event::Kind::kDropped, request);
+    kept_.erase(request.page);
     return;
   }
-  if (task_name) {
-    CreateTask(request, *task_name);
-    return;
-  }
+  request.moves = ++moves_;
   std::unique_ptr<RemoteModelClient> client =
-      PrepareNaming(request, TitlesUnder(request.page, request.staying));
+      task_name ? nullptr : PrepareNaming(request, TitlesUnder(request.page));
+  if (client) {
+    Report(Event::Kind::kNaming, request,
+           base::UTF8ToUTF16(request.naming.model));
+  } else {
+    Report(Event::Kind::kCreated, request, title);
+  }
+  Placed(controller_->tree().BranchOf(request.page), Event::Kind::kCreated,
+         request);
   if (!client) {
-    CreateTask(request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     return;
   }
-  Report(Event::Kind::kNaming, request,
-         base::UTF8ToUTF16(request.naming.model));
+  // From here on the request is about the page in the task it started.
+  request.task = task->ToString();
+  request.parent = PageId();
   Send(std::move(request), std::move(client), &AutomaticOrganizer::OnName);
 }
 
@@ -760,59 +785,19 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   request.naming.answer = std::move(outcome);
   LogOrganizerExchange("name", request.naming,
                        name ? "named" : "no usable name");
-  if (request.names_task) {
-    if (!name) {
-      owed_names_.insert(request.task);
-    } else if (Current(request) &&
-               (!Named(request.task) || Generated(request.task))) {
-      controller_->NameTask(request.task, *name);
-    }
-    return;
+  const bool current = Current(request);
+  if (!name) {
+    owed_names_.insert(request.task);
+  } else if (current && (!Named(request.task) || Generated(request.task))) {
+    controller_->NameTask(request.task, *name);
   }
-  bool leaves = Current(request);
-  // The branch may have grown while the name was on its way, so what moves
-  // and what stays behind is looked at again. A move the user confirmed is
-  // carried out as they saw it.
-  if (leaves && !request.confirmed) {
-    const std::vector<BranchPlacement> placements =
-        PlaceBranchOf(controller_->tree().TopOf(request.page));
-    const auto group = std::ranges::find_if(
-        placements, [&request](const BranchPlacement& candidate) {
-          return candidate.top == request.page &&
-                 candidate.placement.action == Placement::Action::kApply &&
-                 candidate.placement.target == kNewTaskOption;
-        });
-    leaves = group != placements.end();
-    if (leaves) {
-      request.staying = group->staying;
-    }
+  // The card that waited for the name of a new task now says what the task
+  // is called and offers Undo. After another move, Undo would reverse that
+  // move, so the card stays as it is.
+  if (!request.names_task && current && request.moves == moves_) {
+    Report(Event::Kind::kCreated, request,
+           controller_->TaskTitle(request.task));
   }
-  if (!leaves) {
-    Report(Event::Kind::kDropped, request);
-    return;
-  }
-  const std::optional<tab_groups::TabGroupId> task = CreateTask(
-      request, name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
-  if (!name && task) {
-    owed_names_.insert(task->ToString());
-  }
-}
-
-std::optional<tab_groups::TabGroupId> AutomaticOrganizer::CreateTask(
-    Request& request,
-    std::u16string title) {
-  const std::optional<tab_groups::TabGroupId> task = controller_->MoveToNewTask(
-      {request.page}, title, TabOrganizationController::Origin::kOrganizer,
-      request.staying);
-  Report(task ? Event::Kind::kCreated : Event::Kind::kDropped, request,
-         std::move(title));
-  if (task) {
-    Placed(controller_->tree().BranchOf(request.page), Event::Kind::kCreated,
-           request);
-  } else {
-    kept_.erase(request.page);
-  }
-  return task;
 }
 
 void AutomaticOrganizer::Placed(const std::vector<PageId>& pages,
@@ -891,14 +876,6 @@ bool AutomaticOrganizer::Valid(const Kept& kept) const {
          controller_->TaskTitle(request.task) == request.task_title;
 }
 
-bool AutomaticOrganizer::NamingOutFor(const PageId& page) const {
-  return std::ranges::any_of(requests_, [&page](const auto& entry) {
-    const Request& request = entry.second.request;
-    return request.page == page && !request.names_task &&
-           !request.naming.body.empty();
-  });
-}
-
 bool AutomaticOrganizer::Named(const std::string& task) const {
   const std::u16string title = controller_->TaskTitle(task);
   return !title.empty() &&
@@ -917,13 +894,36 @@ std::optional<AutomaticOrganizer::Pending> AutomaticOrganizer::Take(
   }
   Pending pending = std::move(it->second);
   requests_.erase(it);
+  UpdateNaming();
   return pending;
 }
 
+void AutomaticOrganizer::UpdateNaming() {
+  std::set<std::string> naming;
+  for (const auto& [id, pending] : requests_) {
+    if (!pending.request.naming.body.empty()) {
+      naming.insert(pending.request.task);
+    }
+  }
+  if (naming != naming_) {
+    naming_ = std::move(naming);
+    naming_changed_.Notify();
+  }
+}
+
 void AutomaticOrganizer::CancelRequestsFor(const PageId& page) {
-  std::erase_if(requests_, [&page](const auto& entry) {
-    return entry.second.request.page == page;
+  std::erase_if(requests_, [&](const auto& entry) {
+    const Request& request = entry.second.request;
+    if (request.page != page) {
+      return false;
+    }
+    // A name that was asked for and will not come is still owed.
+    if (!request.naming.body.empty()) {
+      owed_names_.insert(request.task);
+    }
+    return true;
   });
+  UpdateNaming();
 }
 
 std::unique_ptr<RemoteModelClient> AutomaticOrganizer::Client(

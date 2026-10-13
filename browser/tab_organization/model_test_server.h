@@ -60,6 +60,8 @@ class ModelTestServer {
                    std::string body);
   // Serves `body` at `path` with an error status.
   void Fail(const std::string& path, int status, std::string body);
+  // Never answers `path`, like a model that takes its time.
+  void Hold(const std::string& path);
   // Answers `path` with a redirect to `location`.
   void Redirect(const std::string& path, std::string location);
   std::vector<ModelRequest> Requests();
@@ -74,6 +76,7 @@ class ModelTestServer {
     int status = 200;
     std::string body;
     std::string location;
+    bool held = false;
   };
 
   std::map<std::string, Reply> answers_ GUARDED_BY(lock_);

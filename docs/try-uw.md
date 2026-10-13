@@ -27,7 +27,7 @@ All of these are manual tests. Record anything that differs from the expected re
 1. Open three disposable tabs with Cmd-T.
 2. Right-click one and choose `Move to new task`.
 
-Expected result: the tab moves into a new tab group named `New task`, below the ungrouped tabs. The group shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label. Rename, recolor, collapse, and drag the group as you would in Chromium.
+Expected result: the tab moves into a new tab group named `New task`, above the ungrouped tabs and after any other task. The group shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the group as you would in Chromium.
 
 ### Link parentage and ordinary close
 
@@ -63,7 +63,7 @@ Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` sh
 
 Then press Cmd-T inside a named task and go to a page that has nothing to do with it.
 
-Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard, and `Created task …` for a page that clearly starts something of its own. A tab with tabs nested under it stays, and the card suggests the move with `Confirm`.
+Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard. A page that clearly starts something of its own moves at once into a task called `New task`, after every other task. A spinner turns on that task's row and the card says `Asking … for a name`. When the name arrives the task takes it and the card says `Created task …` with `Undo`. Tabs nested under the page go with it, except ones that still fit the old task.
 
 Then choose `New task` from the `Organize` menu and open a page in it.
 

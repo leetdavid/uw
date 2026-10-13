@@ -9,6 +9,7 @@
 #include "components/tab_groups/tab_group_id.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/image_button.h"
+#include "ui/views/controls/throbber.h"
 
 namespace uw {
 
@@ -44,6 +45,32 @@ class NameLock : public views::ImageButton {
   const tab_groups::TabGroupId group_;
   base::CallbackListSubscription changed_;
   PrefChangeRegistrar prefs_;
+};
+
+// A small spinner on a task's row while the language model is asked for the
+// task's name. A task that uw has just started shows it until its name
+// arrives.
+class NamingSpinner : public views::Throbber {
+  METADATA_HEADER(NamingSpinner, views::Throbber)
+
+ public:
+  explicit NamingSpinner(const tab_groups::TabGroupId& group);
+  NamingSpinner(const NamingSpinner&) = delete;
+  NamingSpinner& operator=(const NamingSpinner&) = delete;
+  ~NamingSpinner() override;
+
+  const tab_groups::TabGroupId& group() const { return group_; }
+  bool spinning() const { return IsRunning(); }
+
+  // views::Throbber:
+  void AddedToWidget() override;
+  void RemovedFromWidget() override;
+
+ private:
+  void Refresh();
+
+  const tab_groups::TabGroupId group_;
+  base::CallbackListSubscription naming_;
 };
 
 }  // namespace uw
