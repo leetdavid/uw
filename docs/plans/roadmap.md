@@ -39,6 +39,13 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T29 | A new task moves first and is named after | in review | 7/10 | uw starts a new task at once under the name `New task` and asks the language model for the name afterwards, per the [agreed scope](automatic-organization.md#agreed-scope). A spinner on the task's row and the waiting card show that a name is on its way. The user asked for it on 2026-10-13: naming calls took 7 to 21 seconds in their log, and nothing moved until they returned. It removes the code that held a branch back while its name was asked for. Done when `AutomaticOrganizerBrowserTest.ANewTaskStartsBeforeItsName` and `JevDecidesAndTheLanguageModelNamesTheNewTask` pass and a screenshot shows the spinner on the row. No test covers a name that arrives after another move. Nobody has watched it in a real window yet. |
 | T30 | Scratchpad last, tasks in the order they were started | in review | 7/10 | The sidebar lists the tasks oldest first and the Scratchpad below them, with its label above the first ungrouped tab. Every new task, uw's or the user's, comes after every other task, and a tab sent to the Scratchpad lands at its end, per the [native tab tree scope](native-tab-tree.md#scope). The user asked for it on 2026-10-13. It reverses the agreed order, in which the Scratchpad sat on top and a new task followed its source. Done when `PageTreeTest.*` and `TabOrganizationControllerBrowserTest.*` pass and a screenshot shows the order. A window from an older build reorders itself when it opens. The designs on the canvas still show the Scratchpad on top. |
 | T31 | Hub pages are never made into a task | in review | 6/10 | Every decision request also asks whether the page is a hub or about one subject, per [Hub pages](automatic-organization.md#hub-pages). A hub outside every task is a one-off whatever its other scores, never goes with the page above it, and is left behind by the tabs under it. The user asked for it on 2026-10-13, when a feed page turned out to follow the first article opened from it into a new task. Done when `PlacementTest.*`, `AiProtocolTest.*`, and `AutomaticOrganizerBrowserTest.AFeedStaysWhenATabOpenedFromItStartsATask` pass. Measured against the live Jev API on every distinct page of the log: 46 search pages scored `0.05` or less, the real feeds and dashboards `0.95` or more. A home page with an unread count in its title scored as low as `0.25`. The chat format has no such question. Nobody has watched it in a real window yet. |
+| T32 | Terminal spike | in progress | 8/10 | Two checks before anything else is built, per the [terminal tab plan](terminal-tab.md): ghostty-web in a test page under the content security policy of a `uw://` page, and the shell host as a C++ class with a unit test. Done when the findings are in `docs/research/terminal-spike.md`. Agreed on 2026-10-14. |
+| T33 | Terminal shell host | backlog | 7/10 | `components/terminal/` starts the user's login shell on a pseudo-terminal, reads, writes, resizes, reports the folder and the running command, and kills the shell, per the [terminal tab plan](terminal-tab.md). Waits for approval after T32. |
+| T34 | Terminal page and opening controls | backlog | 6/10 | The `uw://terminal` page drawn by ghostty-web, its link to the shell host, "New terminal" on the "+" and File menus, Ctrl+`, the key split, and the organizer leaving terminal tabs alone, per the [terminal tab plan](terminal-tab.md). Waits for approval after T32. |
+| T35 | Terminal links open as child tabs | backlog | 7/10 | Cmd-click on a printed `http` or `https` address opens it under the terminal tab. Waits for approval after T32. |
+| T36 | Busy terminal warning | backlog | 5/10 | One dialog names the running commands before a tab, branch, task, or window closes or uw quits. It touches four of Chromium's closing paths. Waits for approval after T32. |
+| T37 | Terminal restore in the same folder | backlog | 6/10 | A restored terminal tab comes back in its last folder and starts its shell when first shown. Reopening a closed tab needs a carrier for the folder that uw does not have yet. Waits for approval after T32. |
+| T38 | Terminal settings | backlog | 7/10 | Font, size, and a theme list on uw's settings page. Needs a design on the Doop canvas first. Waits for approval after T32. |
 
 ## 1. Choose the browser foundation
 
@@ -77,6 +84,12 @@ Done when a user can generate a page modification, inspect its site access, enab
 ## Future: delegated browser tasks
 
 [Agent-controlled browser tasks](../product.md#delegated-browser-tasks) are agreed future direction. Define their product behavior before scheduling implementation.
+
+## Later: terminal tabs
+
+Agreed on 2026-10-14 as a later addition outside the minimum usable version. Run the [spike](terminal-tab.md#spike) first, then build the [terminal tab plan](terminal-tab.md) once it is approved.
+
+Done when the plan's [acceptance checks](terminal-tab.md#acceptance-checks) pass and the user has used a terminal tab for real work without falling back to a terminal app.
 
 ## Implementability estimates
 
@@ -120,6 +133,9 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Prompt-built extensions and site customization](../product.md#prompt-built-extensions) | 5/10 | Generating working changes across different sites and coding tools. |
 | [Customization persistence and controls](../product.md#prompt-built-extensions) | 8/10 | Remember enabled changes across visits and expose per-site editing and removal. |
 | [Open-ended agent automation](../product.md#delegated-browser-tasks) | 3/10 | Arbitrary multi-step tasks are hard to complete and verify consistently. |
+| [Terminal tab](terminal-tab.md) | 6/10 | The first uw page outside settings, WebAssembly in such a page, a pre-1.0 dependency, and a close warning on four closing paths. The [spike](terminal-tab.md#spike) should move this score. |
+| [Terminal commands from other sources](../product.md#terminal-tabs) | 4/10 | Pages and other parts of uw asking to run a command with the user's approval. The prompt and what is remembered are undecided, and a mistake gives a website the shell. |
+| [Native libghostty terminal](../research/native-libghostty-terminal.md) | 3/10 | A tab whose content is a native view, on an embedding API not described as stable. A guess until a trial. |
 | [Recommended filenames and naming preferences](../product.md#download-name-suggestions) | 8/10 | Bounded settings; useful names depend on accurate context. |
 | [Clutter-removal options page](../product.md#ad-blocking-and-privacy) | 9/10 | Clear, independent settings; removal behaviors scored separately. |
 | [Ad blocking](../product.md#ad-blocking-and-privacy) | 8/10 | Established filter lists, with site compatibility work. |

@@ -18,7 +18,14 @@ A persistent sidebar icon with a saved home URL. When open, it represents one co
 A hazed placeholder where a pinned page's live session is currently displayed in another window. Selecting it transfers the session back.
 
 **Regular tab**:
-A page tab in a window's task tree.
+A page tab or terminal tab in a window's tab tree.
+
+**Terminal tab**:
+A regular tab that shows a shell instead of a web page. The organizer never moves it and sends nothing about it to a model.
+_Avoid_: Console, shell tab.
+
+**Busy terminal**:
+A terminal tab whose shell is running a command.
 
 **Home URL**:
 The saved starting address a pinned tab returns to when reset.
@@ -30,13 +37,13 @@ The scheme and registrable domain of a pin's home URL. Navigation inside that si
 A temporary view opened from a pinned tab for a page outside the pin's site. Promoting it creates a regular tab in Scratchpad.
 
 **Tab tree**:
-The arrangement of regular tabs within one browser window: the Scratchpad, the tab groups, and page tabs nested under parent tabs.
+The arrangement of regular tabs within one browser window: the Scratchpad, the tab groups, and regular tabs nested under parent tabs.
 
 **Tab branch**:
 A tab together with all its descendant tabs.
 
 **Parent tab**:
-A page tab with child tabs beneath it in the tab tree.
+A regular tab with child tabs beneath it in the tab tree.
 
 **Selected tab**:
 The tab whose page is currently displayed in a browser window.

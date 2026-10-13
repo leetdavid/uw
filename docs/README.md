@@ -19,10 +19,13 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [Native tab tree plan](plans/native-tab-tree.md): tasks as native tab groups, page nesting, stages, and acceptance checks.
 - [Automatic organization plan](plans/automatic-organization.md): the tab-filing loop, the decision model and language model, and acceptance checks.
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
+- [Terminal tab plan](plans/terminal-tab.md): a shell in a regular tab drawn by ghostty-web, the spike that comes first, stages, and acceptance checks.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
+- [Native libghostty terminal research](research/native-libghostty-terminal.md): what a native Ghostty view would need and when to reopen it.
 - [ADR 0001: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
 - [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.
 - [ADR 0003: a decision model sits beside the language model](adr/0003-decision-model-beside-the-language-model.md): which providers decide tab placement and how.
+- [ADR 0004: the terminal draws with ghostty-web in a page](adr/0004-the-terminal-draws-with-ghostty-web.md): why a terminal tab is a page and not a native Ghostty view.
 
 ## Status
 

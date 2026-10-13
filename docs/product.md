@@ -126,6 +126,21 @@ Other proposed behavior:
 
 Use ordinary page comparisons where sufficient and AI when interpretation is needed.
 
+## Terminal tabs
+
+Agreed on 2026-10-14, as a later addition outside the minimum usable version:
+
+- A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
+- The organizer never moves a terminal tab and sends nothing about it to a model.
+- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
+- Closing a busy terminal asks first, however it is closed.
+
+The [terminal tab plan](plans/terminal-tab.md) has the full scope and what is left out.
+
+Agreed future direction: other parts of uw, and pages the user allows, may ask to run a command in a terminal, and each needs the user's approval. The prompt and what uw remembers are open.
+
+Agreed future direction: explore [full libghostty in a native view](research/native-libghostty-terminal.md) once the first version works.
+
 ## Delegated browser tasks
 
 Agreed future direction: let an agent take control of the browser for open-ended automation. Support any browser task the agent can perform, including retrieving information and taking actions that change things. Tasks are not limited to a predefined catalog.

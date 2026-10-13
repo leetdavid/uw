@@ -56,6 +56,10 @@ The [organization controls](product.md#organization-controls) use a button menu 
 
 The organization pause is global. It supports one hour, until next launch, and indefinite durations. Each window's automatic organization must honor the same pause state, while manual commands remain window-scoped.
 
+## Terminal
+
+A [terminal tab](CONTEXT.md#language) is a `uw://terminal` page drawn by ghostty-web. A shell host in the browser process runs the shell, and every byte to the shell passes through one function there. See [ADR 0004](adr/0004-the-terminal-draws-with-ghostty-web.md) and the [plan](plans/terminal-tab.md). Only the plan's spike is approved to build.
+
 ## Shared pinned tabs
 
 The [pinned-tab requirements](product.md#pinned-tabs) include a continuing live page session across windows. Sharing icon order and saved URLs alone does not satisfy that requirement. Arc's [documentation](research/arc-pinned-tabs-research.md) does not establish the Chromium ownership or presentation mechanism to reuse.
@@ -104,6 +108,8 @@ The request and response shapes were taken from the providers' public documentat
 Keep browser state and automation history local by default. Send only the context needed for the configured remote operation.
 
 Treat page content as input, not authority to change browser permissions or execute commands. Run generated extensions with declared site access and Chromium's permission boundaries. Keep the browser sandbox enabled.
+
+A terminal tab takes text only from the user. Commands from any other source are a [later stage](plans/terminal-tab.md#later-stages) and need the user's approval, so page content carries no authority there either.
 
 Ad blocking needs integration-level evaluation. Do not assume a particular extension API can provide the required filtering behavior.
 
