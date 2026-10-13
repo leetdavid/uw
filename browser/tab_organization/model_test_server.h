@@ -32,15 +32,18 @@ struct ModelRequest {
 // "none", to no task. `new_task` is the probability it gives a tab outside
 // every task of starting one of its own. `same_work` answers the name check:
 // the probability that the tab is the same piece of work as the other tabs of
-// its task.
+// its task. `hub` is the probability that the tab shows a hub, a page the
+// user comes back to for many things.
 std::string DecisionsAnswer(const std::string& choice,
                             double confidence,
                             double new_task = 0.0,
-                            std::optional<double> same_work = std::nullopt);
+                            std::optional<double> same_work = std::nullopt,
+                            double hub = 0.0);
 std::string SystemOneAnswer(const std::string& choice,
                             double confidence,
                             double new_task = 0.0,
-                            std::optional<double> same_work = std::nullopt);
+                            std::optional<double> same_work = std::nullopt,
+                            double hub = 0.0);
 // `escaped_content` is the assistant message, already escaped for JSON.
 std::string ChatAnswer(const std::string& escaped_content);
 

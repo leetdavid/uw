@@ -273,7 +273,7 @@ TEST_F(AiProtocolTest, DecisionsRequestAsksWhichTaskAndWhatElse) {
   EXPECT_NE(input->find("Page excerpt: Day one"), std::string::npos);
   const base::ListValue* questions = parsed->FindList("questions");
   ASSERT_TRUE(questions);
-  ASSERT_EQ(questions->size(), 2u);
+  ASSERT_EQ(questions->size(), 3u);
   const base::DictValue& destination = (*questions)[0].GetDict();
   EXPECT_EQ(*destination.FindString("type"), "choice");
   EXPECT_EQ(*destination.FindString("name"), "destination");
@@ -293,6 +293,14 @@ TEST_F(AiProtocolTest, DecisionsRequestAsksWhichTaskAndWhatElse) {
   ASSERT_EQ(kinds->size(), 2u);
   EXPECT_EQ(*(*kinds)[0].GetDict().FindString("value"), kNewTaskOption);
   EXPECT_EQ(*(*kinds)[1].GetDict().FindString("value"), kScratchpadOption);
+
+  const base::DictValue& kind = (*questions)[2].GetDict();
+  EXPECT_EQ(*kind.FindString("name"), "kind");
+  const base::ListValue* pages = kind.FindList("choices");
+  ASSERT_TRUE(pages);
+  ASSERT_EQ(pages->size(), 2u);
+  EXPECT_EQ(*(*pages)[0].GetDict().FindString("value"), "hub");
+  EXPECT_EQ(*(*pages)[1].GetDict().FindString("value"), "subject");
 }
 
 TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
@@ -308,7 +316,7 @@ TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
   EXPECT_NE(state->find("Source: opened from"), std::string::npos);
   const base::DictValue* questions = parsed->FindDict("questions");
   ASSERT_TRUE(questions);
-  EXPECT_EQ(questions->size(), 2u);
+  EXPECT_EQ(questions->size(), 3u);
   const base::DictValue* destination = questions->FindDict("destination");
   ASSERT_TRUE(destination);
   EXPECT_EQ(*destination->FindString("type"), "choice");
@@ -327,9 +335,8 @@ TEST_F(AiProtocolTest, SystemOneRequestListsTasksAsCriteria) {
   EXPECT_TRUE(kinds->FindString(kScratchpadOption));
 }
 
-// The request Jev answered with the first recorded body above. The wording of
-// the two questions was measured against real requests, so a change to it
-// should be measured too.
+// The request Jev is sent. The wording of its questions was measured against
+// real requests, so a change to it should be measured too.
 TEST_F(AiProtocolTest, SystemOneRequestIsTheOneJevAnswered) {
   const auto body = BuildDecisionRequestBody(
       DecisionFormat::kSystemOne, "jev-latest", LisbonContext(),
@@ -350,14 +357,19 @@ TEST_F(AiProtocolTest, SystemOneRequestIsTheOneJevAnswered) {
       R"( or research of its own that the user is likely to continue in mor)"
       R"(e tabs.","scratchpad":"The tab is a one-off: a quick lookup, a sig)"
       R"(n-in or verification page, a home page, a feed, or a dashboard."}})"
-      R"(}})",
+      R"(,"kind":{"type":"choice","instructions":"Decide what kind of page )"
+      R"(this tab shows.","criteria":{"hub":"The tab is a place the user co)"
+      R"(mes back to for many things: a home page, a feed, an inbox, a dash)"
+      R"(board, or a list of items.","subject":"The tab is about one subjec)"
+      R"(t: an article, a search for something, a document, a product, a v)"
+      R"(ideo, or a discussion."}}}})",
       base::JSON_PARSE_RFC);
   ASSERT_TRUE(sent);
   EXPECT_EQ(base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC), sent);
 }
 
-// With no task to belong to, only the second question is worth asking.
-TEST_F(AiProtocolTest, DecisionRequestWithoutTasksAsksOneQuestion) {
+// With no task to belong to, the first question is not worth asking.
+TEST_F(AiProtocolTest, DecisionRequestWithoutTasksDoesNotAskWhichTask) {
   auto body = BuildDecisionRequestBody(DecisionFormat::kSystemOne, "jev-latest",
                                        LisbonContext(), {});
   ASSERT_TRUE(body);
@@ -365,15 +377,16 @@ TEST_F(AiProtocolTest, DecisionRequestWithoutTasksAsksOneQuestion) {
   ASSERT_TRUE(parsed);
   const base::DictValue* questions = parsed->FindDict("questions");
   ASSERT_TRUE(questions);
-  EXPECT_EQ(questions->size(), 1u);
+  EXPECT_EQ(questions->size(), 2u);
   EXPECT_TRUE(questions->FindDict("otherwise"));
+  EXPECT_TRUE(questions->FindDict("kind"));
 
   body = BuildDecisionRequestBody(DecisionFormat::kDecisions, "gpt-6-luna",
                                   LisbonContext(), {});
   ASSERT_TRUE(body);
   parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
   ASSERT_TRUE(parsed);
-  ASSERT_EQ(parsed->FindList("questions")->size(), 1u);
+  ASSERT_EQ(parsed->FindList("questions")->size(), 2u);
   EXPECT_EQ(*(*parsed->FindList("questions"))[0].GetDict().FindString("name"),
             "otherwise");
 }
@@ -514,7 +527,7 @@ TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTabIsTheSamePieceOfWork) {
   ASSERT_TRUE(parsed);
   const base::DictValue* questions = parsed->FindDict("questions");
   ASSERT_TRUE(questions);
-  EXPECT_EQ(questions->size(), 3u);
+  EXPECT_EQ(questions->size(), 4u);
   const base::DictValue* name = questions->FindDict("name");
   ASSERT_TRUE(name);
   EXPECT_EQ(*name->FindString("type"), "choice");
@@ -544,7 +557,7 @@ TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTabIsTheSamePieceOfWork) {
   ASSERT_TRUE(parsed);
   const base::ListValue* listed = parsed->FindList("questions");
   ASSERT_TRUE(listed);
-  ASSERT_EQ(listed->size(), 3u);
+  ASSERT_EQ(listed->size(), 4u);
   const base::DictValue& last = (*listed)[2].GetDict();
   EXPECT_EQ(*last.FindString("name"), "name");
   EXPECT_EQ(*last.FindString("instructions"), instructions);
@@ -617,6 +630,67 @@ TEST_F(AiProtocolTest, TheNameCheckAnswerIsTheProbabilityOfTheSameWork) {
   ASSERT_TRUE(decisions);
   EXPECT_EQ(decisions->choice, "task-1");
   EXPECT_DOUBLE_EQ(decisions->same_work, 0.75);
+}
+
+// A hub is a page the user comes back to for many things. The wording was
+// measured against Jev on the real pages of the organizer log.
+TEST_F(AiProtocolTest, TheKindAnswerIsTheProbabilityOfAHub) {
+  const auto parsed = base::JSONReader::ReadDict(
+      *BuildDecisionRequestBody(DecisionFormat::kSystemOne, "jev-latest",
+                                LisbonContext(), {}),
+      base::JSON_PARSE_RFC);
+  ASSERT_TRUE(parsed);
+  const base::DictValue* kind = parsed->FindDictByDottedPath("questions.kind");
+  ASSERT_TRUE(kind);
+  EXPECT_EQ(*kind->FindString("instructions"),
+            "Decide what kind of page this tab shows.");
+  EXPECT_EQ(*kind->FindStringByDottedPath("criteria.hub"),
+            "The tab is a place the user comes back to for many things: a "
+            "home page, a feed, an inbox, a dashboard, or a list of items.");
+  EXPECT_EQ(*kind->FindStringByDottedPath("criteria.subject"),
+            "The tab is about one subject: an article, a search for "
+            "something, a document, a product, a video, or a discussion.");
+
+  const auto hub = [](const std::string& kind_answer) {
+    const auto answer = ParseDecisionResponse(
+        DecisionFormat::kSystemOne,
+        R"({"answers": {"otherwise": {"type": "choice", "choice": "new_task",
+            "confidence": 0.8})" +
+            kind_answer + "}}",
+        /*has_tasks=*/false);
+    EXPECT_TRUE(answer);
+    // The placement is read the same whatever the page is.
+    EXPECT_EQ(answer->choice, kNewTaskOption);
+    return answer->hub;
+  };
+  EXPECT_DOUBLE_EQ(hub(""), 0.0);
+  EXPECT_DOUBLE_EQ(hub(R"(, "kind": {"type": "choice", "choice": "hub",
+      "confidence": 0.9, "probabilities": {"hub": 0.97, "subject": 0.03}})"),
+                   0.97);
+  EXPECT_DOUBLE_EQ(hub(R"(, "kind": {"type": "choice", "choice": "subject",
+      "confidence": 0.9, "probabilities": {"hub": 0.02, "subject": 0.98}})"),
+                   0.02);
+  // An answer uw cannot use holds no page back.
+  EXPECT_DOUBLE_EQ(hub(R"(, "kind": {"type": "choice", "choice": "portal",
+      "confidence": 0.99})"),
+                   0.0);
+
+  const auto decisions =
+      ParseDecisionResponse(DecisionFormat::kDecisions, R"({"answers": [
+      {"type": "choice", "name": "otherwise", "choice": "scratchpad",
+       "confidence": 0.9},
+      {"type": "choice", "name": "kind", "choice": "hub",
+       "probabilities": [{"value": "hub", "probability": 0.75},
+                         {"value": "subject", "probability": 0.25}]}]})",
+                            /*has_tasks=*/false);
+  ASSERT_TRUE(decisions);
+  EXPECT_DOUBLE_EQ(decisions->hub, 0.75);
+
+  // A chat request never carries the question.
+  EXPECT_EQ(BuildDecisionRequestBody(DecisionFormat::kChat, "model",
+                                     LisbonContext(), {})
+                ->find("\"kind\""),
+            std::string::npos);
 }
 
 TEST_F(AiProtocolTest, ChatFormatUsesTheClassificationCall) {

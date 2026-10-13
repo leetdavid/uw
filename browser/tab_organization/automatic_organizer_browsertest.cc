@@ -949,6 +949,32 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(fits), 2);
 }
 
+// A feed is a hub: a page the user comes back to for many things. uw never
+// makes one into a task. An article opened from it starts a task of its own,
+// and the feed stays in the Scratchpad.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AFeedStaysWhenATabOpenedFromItStartsATask) {
+  UseDecisionModel(DecisionProvider::kJev);
+  AnswerAbout("feed", SystemOneAnswer("none", 0.99, 0.9, std::nullopt,
+                                      /*hub=*/0.97));
+  AnswerAbout("article", SystemOneAnswer("none", 0.99, 0.9, std::nullopt,
+                                         /*hub=*/0.02));
+  tabs::TabInterface* feed = InitialTab();
+  Browse(feed, "feed");
+  ASSERT_TRUE(SettleAfter(1));
+  // The model said it starts a task. A hub does not.
+  EXPECT_FALSE(feed->GetGroup());
+  EXPECT_NE(Requests()[0].body.find("\"kind\""), std::string::npos);
+
+  tabs::TabInterface* article = OpenLinkFrom(feed, "article");
+  ASSERT_TRUE(SettleAfter(2));
+  ASSERT_TRUE(article->GetGroup());
+  EXPECT_FALSE(feed->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(article), 0);
+  EXPECT_EQ(tabs()->group_model()->ListTabGroups().size(), 1u);
+  EXPECT_EQ(Requests().size(), 2u);
+}
+
 // Tabs that were there before automatic organization came on were never
 // asked about. Before their branch moves, they are.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

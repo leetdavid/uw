@@ -28,6 +28,12 @@ ClassificationAnswer Answer(const std::string& choice,
   return answer;
 }
 
+// The answer about a page the model calls a hub, such as a feed.
+ClassificationAnswer Hub(ClassificationAnswer answer) {
+  answer.hub = 0.9;
+  return answer;
+}
+
 Placement PlaceIn(const std::string& task, const ClassificationAnswer& answer) {
   return Place(answer, {task, /*in_unnamed_task=*/false}, kNeeded);
 }
@@ -212,6 +218,96 @@ TEST(PlacementTest, EachThresholdDecidesOneKindOfAnswer) {
                   {0.95, 0.95, 0.60})
                 .action,
             Action::kName);
+}
+
+TEST(PlacementTest, AHubIsNeverMadeIntoATask) {
+  // Whatever the model makes of it otherwise, it starts no task.
+  const ClassificationAnswer feed = Hub(Answer(kNewTaskOption, 0.99, 0.99));
+  EXPECT_EQ(PlaceIn(std::string(), feed).action, Action::kLeave);
+  Placement placement = PlaceIn("task-1", feed);
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, kScratchpadOption);
+  placement = PlaceIn("task-1", Hub(Answer(kNewTaskOption, 0.5, 0.99)));
+  EXPECT_EQ(placement.action, Action::kSuggest);
+  EXPECT_EQ(placement.target, kScratchpadOption);
+
+  // It gives no task a name, a first one or a new one.
+  EXPECT_EQ(
+      Place(feed, {std::string(), /*in_unnamed_task=*/true}, kNeeded).action,
+      Action::kLeave);
+  EXPECT_EQ(
+      PlaceIn("task-1", Hub(Answer(kNewTaskOption, 0.99, 0.99, 0.99))).target,
+      kScratchpadOption);
+
+  // A hub that fits a task by name still joins it, or stays in it.
+  placement = PlaceIn("task-1", Hub(Answer("task-2", 0.95)));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, "task-2");
+  EXPECT_EQ(PlaceIn("task-1", Hub(Answer("task-1", 0.95))).action,
+            Action::kLeave);
+
+  // Short of even odds, the page is not a hub.
+  ClassificationAnswer page = Answer(kNewTaskOption, 0.99, 0.99);
+  page.hub = 0.49;
+  EXPECT_EQ(PlaceIn(std::string(), page).target, kNewTaskOption);
+}
+
+// A feed in the Scratchpad and an article opened from it. The article starts
+// a task. The feed stays where it is.
+TEST(PlacementTest, TabsUnderAHubLeaveWithoutIt) {
+  const PageTree tree({{Id("feed"), std::string(), PageId()},
+                       {Id("article"), std::string(), Id("feed")},
+                       {Id("comments"), std::string(), Id("article")}});
+  std::vector<BranchPlacement> placements =
+      PlaceBranch(tree, Id("feed"),
+                  {{Id("feed"), {Hub(Answer(kScratchpadOption, 0.99, 0.1))}},
+                   {Id("article"), {Answer(kNewTaskOption, 0.99, 0.9)}}},
+                  {}, kNeeded);
+  ASSERT_EQ(placements.size(), 2u);
+  EXPECT_EQ(placements[0].top, Id("feed"));
+  EXPECT_EQ(placements[0].pages, Ids({"feed"}));
+  EXPECT_EQ(placements[0].placement.action, Action::kLeave);
+  EXPECT_EQ(placements[1].top, Id("article"));
+  EXPECT_EQ(placements[1].pages, Ids({"article", "comments"}));
+  EXPECT_EQ(placements[1].placement.action, Action::kApply);
+  EXPECT_EQ(placements[1].placement.target, kNewTaskOption);
+
+  // A search page is no hub, so it still goes with its result.
+  placements =
+      PlaceBranch(tree, Id("feed"),
+                  {{Id("feed"), {Answer(kScratchpadOption, 0.99, 0.1)}},
+                   {Id("article"), {Answer(kNewTaskOption, 0.99, 0.9)}}},
+                  {}, kNeeded);
+  ASSERT_EQ(placements.size(), 1u);
+  EXPECT_EQ(placements[0].pages, Ids({"feed", "article", "comments"}));
+  EXPECT_EQ(placements[0].placement.target, kNewTaskOption);
+}
+
+TEST(PlacementTest, AHubNeverGoesAlongWithThePageAboveIt) {
+  // The search leaves for a task of its own. A hub under it that the model
+  // is not sure about stays, and one that fits no task goes to the
+  // Scratchpad, not into the new task.
+  std::vector<BranchPlacement> placements =
+      PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.9)}},
+                   {Id("result"), {Hub(Answer(kNewTaskOption, 0.5, 0.9))}},
+                   {Id("other"), {Hub(Answer(kNewTaskOption, 0.99, 0.9))}}});
+  ASSERT_EQ(placements.size(), 3u);
+  EXPECT_EQ(placements[0].top, Id("search"));
+  EXPECT_EQ(placements[0].pages, Ids({"search"}));
+  EXPECT_EQ(placements[0].staying, Ids({"result", "other"}));
+  EXPECT_EQ(placements[0].placement.target, kNewTaskOption);
+  EXPECT_EQ(placements[1].top, Id("result"));
+  EXPECT_EQ(placements[1].placement.action, Action::kSuggest);
+  EXPECT_EQ(placements[2].top, Id("other"));
+  EXPECT_EQ(placements[2].placement.action, Action::kApply);
+  EXPECT_EQ(placements[2].placement.target, kScratchpadOption);
+
+  // Its own score cannot make the tabs around it a task either.
+  placements =
+      PlaceSearch({{Id("search"), {Answer(kScratchpadOption, 0.99, 0.2)}},
+                   {Id("result"), {Hub(Answer(kNewTaskOption, 0.5, 0.99))}}});
+  ASSERT_FALSE(placements.empty());
+  EXPECT_EQ(placements[0].placement.target, kScratchpadOption);
 }
 
 // The case from the user's log: a search that has nothing to do with its

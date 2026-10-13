@@ -76,6 +76,19 @@ constexpr char kSameWorkDescription[] =
     "This tab continues the piece of work those tabs share.";
 constexpr char kOtherWorkDescription[] =
     "This tab is a different piece of work from those tabs.";
+// Asked about every tab. uw never makes a hub into a task. A search page
+// scores like a one-off on the question before, so that one cannot tell the
+// two apart.
+constexpr char kKindQuestion[] = "kind";
+constexpr char kHubOption[] = "hub";
+constexpr char kSubjectOption[] = "subject";
+constexpr char kKindInstructions[] = "Decide what kind of page this tab shows.";
+constexpr char kHubDescription[] =
+    "The tab is a place the user comes back to for many things: a home page, "
+    "a feed, an inbox, a dashboard, or a list of items.";
+constexpr char kSubjectDescription[] =
+    "The tab is about one subject: an article, a search for something, a "
+    "document, a product, a video, or a discussion.";
 constexpr char kNamingPrompt[] =
     "Name the browsing task that this tab starts. Reply with only the name: a "
     "short, action-oriented phrase of at most five words, with no quotes.";
@@ -117,6 +130,10 @@ Options OtherwiseOptions() {
 Options NameOptions() {
   return {{kSameWorkOption, kSameWorkDescription},
           {kOtherWorkOption, kOtherWorkDescription}};
+}
+
+Options KindOptions() {
+  return {{kHubOption, kHubDescription}, {kSubjectOption, kSubjectDescription}};
 }
 
 std::string ListTitles(const std::vector<std::string>& titles) {
@@ -219,14 +236,17 @@ double ProbabilityOf(const base::DictValue& answer,
                                       : 1.0 - read.confidence);
 }
 
-// Zero for a missing or unusable answer, so a bad one cannot rename a task.
-double SameWorkProbability(const base::DictValue* name, bool listed) {
-  const std::optional<ClassificationAnswer> read = ReadChoice(name, listed);
-  if (!read ||
-      (read->choice != kSameWorkOption && read->choice != kOtherWorkOption)) {
+// The probability `answer` gives `option`, the first of its two options.
+// Zero for a missing or unusable answer, so a bad one changes nothing.
+double OptionProbability(const base::DictValue* answer,
+                         bool listed,
+                         std::string_view option,
+                         std::string_view other) {
+  const std::optional<ClassificationAnswer> read = ReadChoice(answer, listed);
+  if (!read || (read->choice != option && read->choice != other)) {
     return 0.0;
   }
-  const double probability = ProbabilityOf(*name, *read, kSameWorkOption);
+  const double probability = ProbabilityOf(*answer, *read, option);
   return ValidConfidence(probability) ? probability : 0.0;
 }
 
@@ -267,12 +287,15 @@ std::optional<ClassificationAnswer> JoinAnswers(
     const base::DictValue* destination,
     const base::DictValue* otherwise,
     const base::DictValue* name,
+    const base::DictValue* kind,
     bool has_tasks,
     bool listed) {
   std::optional<ClassificationAnswer> answer =
       JoinPlacement(destination, otherwise, has_tasks, listed);
   if (answer) {
-    answer->same_work = SameWorkProbability(name, listed);
+    answer->same_work =
+        OptionProbability(name, listed, kSameWorkOption, kOtherWorkOption);
+    answer->hub = OptionProbability(kind, listed, kHubOption, kSubjectOption);
   }
   return answer;
 }
@@ -308,6 +331,7 @@ std::optional<std::string> BuildDecisionsRequestBody(
   if (name_check) {
     ask(kNameQuestion, NameInstructions(*name_check), NameOptions());
   }
+  ask(kKindQuestion, kKindInstructions, KindOptions());
   base::DictValue body;
   body.Set("model", model);
   body.Set("input", DescribeBranch(context));
@@ -342,6 +366,7 @@ std::optional<std::string> BuildSystemOneRequestBody(
   if (name_check) {
     ask(kNameQuestion, NameInstructions(*name_check), NameOptions());
   }
+  ask(kKindQuestion, kKindInstructions, KindOptions());
   base::DictValue body;
   body.Set("model", model);
   body.Set("state", DescribeBranch(context));
@@ -368,8 +393,8 @@ std::optional<ClassificationAnswer> ParseDecisionsResponse(
     return static_cast<const base::DictValue*>(nullptr);
   };
   return JoinAnswers(find(kDestinationQuestion), find(kOtherwiseQuestion),
-                     has_name_check ? find(kNameQuestion) : nullptr, has_tasks,
-                     /*listed=*/true);
+                     has_name_check ? find(kNameQuestion) : nullptr,
+                     find(kKindQuestion), has_tasks, /*listed=*/true);
 }
 
 std::optional<ClassificationAnswer> ParseSystemOneResponse(
@@ -383,8 +408,8 @@ std::optional<ClassificationAnswer> ParseSystemOneResponse(
   return JoinAnswers(
       answers->FindDict(kDestinationQuestion),
       answers->FindDict(kOtherwiseQuestion),
-      has_name_check ? answers->FindDict(kNameQuestion) : nullptr, has_tasks,
-      /*listed=*/false);
+      has_name_check ? answers->FindDict(kNameQuestion) : nullptr,
+      answers->FindDict(kKindQuestion), has_tasks, /*listed=*/false);
 }
 
 // Accepts the JSON object alone or inside a Markdown code fence.

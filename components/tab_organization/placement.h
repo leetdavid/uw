@@ -67,7 +67,9 @@ struct Placement {
   friend bool operator==(const Placement&, const Placement&) = default;
 };
 
-// Decides what to do with `answer` for a branch at `position`.
+// Decides what to do with `answer` for a branch at `position`. A hub outside
+// every task is a one-off whatever else the model says: it starts no task
+// and gives none a name.
 Placement Place(const ClassificationAnswer& answer,
                 const Position& position,
                 const Thresholds& needed);
@@ -102,8 +104,10 @@ struct BranchPlacement {
 // place go together: `top` of each group decides where, and whether its task
 // has outgrown its name, while any tab of the group can make it the start of
 // a task. A tab that fits where it is, or that is `placed`, stays behind. A
-// tab without a usable answer goes with the page above it. `tabs` holds what
-// is known about each tab; a tab missing from it was not asked about. The
+// tab without a usable answer goes with the page above it. A hub is never
+// made into a task: it is filed on its own answer alone, for a task it fits
+// or for the Scratchpad, and the tabs under it leave without it. `tabs` holds
+// what is known about each tab; a tab missing from it was not asked about. The
 // result lists every tab that has an answer, alone or in its group, in tree
 // order.
 std::vector<BranchPlacement> PlaceBranch(

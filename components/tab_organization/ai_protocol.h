@@ -14,9 +14,9 @@ namespace uw {
 // Pure request/response handling for the placement call behind automatic
 // organization. The call asks two things about one tab branch: which of the
 // user's tasks it belongs to, if any, and what a branch outside every task
-// is. A decision model can also be asked whether the branch is the same piece
-// of work as the other tabs of its task. No networking, prefs, or credentials
-// here; browser
+// is. A decision model is also asked what kind of page the tab shows, and can
+// be asked whether the branch is the same piece of work as the other tabs of
+// its task. No networking, prefs, or credentials here; browser
 // integration owns transport. All functions validate strictly and reject
 // malformed input so a bad provider response can never move a tab.
 
@@ -66,6 +66,10 @@ struct ClassificationAnswer {
   // The probability that the branch is the same piece of work as the other
   // tabs of its task. Zero when the request carried no name check.
   double same_work = 0.0;
+  // The probability that the tab shows a hub: a page the user comes back to
+  // for many things, such as a home page, a feed, an inbox, or a dashboard.
+  // Zero when the format has no such answer.
+  double hub = 0.0;
 };
 
 // The name check: the question whether a branch is the same piece of work as
@@ -95,10 +99,10 @@ enum class DecisionFormat {
 
 // Builds the request body for one placement decision in `format`. Rejects the
 // same input as BuildClassificationRequestBody, plus task lists too long for
-// one choice question. With no tasks, a decision model is asked only what a
-// branch outside every task is. `name_check` adds the question whether the
-// branch is the same piece of work as its task's other tabs. A chat request
-// never carries it.
+// one choice question. With no tasks, a decision model is not asked which one
+// the branch belongs to. It is always asked what kind of page the tab shows.
+// `name_check` adds the question whether the branch is the same piece of work
+// as its task's other tabs. A chat request never carries it.
 std::optional<std::string> BuildDecisionRequestBody(
     DecisionFormat format,
     const std::string& model,
@@ -112,7 +116,8 @@ std::optional<std::string> BuildDecisionRequestBody(
 // models never name tasks, so `task_name` stays empty for them. A refusal, or
 // an answer without a usable confidence, is rejected. The answer to the name
 // check is read only when `has_name_check` says the request carried one. A
-// missing or unusable one only leaves `same_work` at zero.
+// missing or unusable one only leaves `same_work` at zero, as a missing or
+// unusable answer about the kind of page leaves `hub` at zero.
 std::optional<ClassificationAnswer> ParseDecisionResponse(
     DecisionFormat format,
     const std::string& body,

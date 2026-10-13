@@ -28,6 +28,12 @@ bool Outside(const ClassificationAnswer& answer) {
   return answer.choice == kNewTaskOption || answer.choice == kScratchpadOption;
 }
 
+// True when the model finds it more likely than not that the tab shows a hub:
+// a page the user comes back to for many things.
+bool Hub(const ClassificationAnswer& answer) {
+  return answer.hub >= 0.5;
+}
+
 Lean LeanOf(const TabAnswer& tab,
             const Position& position,
             const Thresholds& needed) {
@@ -41,10 +47,16 @@ Lean LeanOf(const TabAnswer& tab,
   if (!Outside(answer) && answer.choice == position.task) {
     return {Lean::Kind::kStays};
   }
+  // A hub never goes along with the page above it.
   if (answer.confidence < needed.confidence) {
-    return {};
+    return {Hub(answer) ? Lean::Kind::kStays : Lean::Kind::kFollows};
   }
-  return {Lean::Kind::kLeaves, Outside(answer) ? kNoTaskOption : answer.choice};
+  if (!Outside(answer)) {
+    return {Lean::Kind::kLeaves, answer.choice};
+  }
+  // Outside every task a hub is bound for the Scratchpad. That keeps it
+  // apart from the tabs around it that may start a task.
+  return {Lean::Kind::kLeaves, Hub(answer) ? kScratchpadOption : kNoTaskOption};
 }
 
 // The answer of a group of tabs that go together. Its top tab decides where
@@ -59,7 +71,7 @@ ClassificationAnswer JointAnswer(const BranchPlacement& group,
   for (const PageId& id : group.pages) {
     const auto tab = tabs.find(id);
     if (tab == tabs.end() || !tab->second.answer ||
-        !Outside(*tab->second.answer)) {
+        !Outside(*tab->second.answer) || Hub(*tab->second.answer)) {
       continue;
     }
     const ClassificationAnswer& answer = *tab->second.answer;
@@ -83,9 +95,13 @@ Placement Place(const ClassificationAnswer& answer,
                 const Thresholds& needed) {
   using Action = Placement::Action;
   const bool sure = answer.confidence >= needed.confidence;
-  const bool starts_task = answer.choice == kNewTaskOption;
-  Placement placement{Action::kLeave, answer.choice, answer.confidence,
-                      needed.confidence};
+  // A hub outside every task is a one-off, whatever else the model says.
+  const bool hub = Hub(answer) && Outside(answer);
+  const bool starts_task = answer.choice == kNewTaskOption && !hub;
+  const double new_task = hub ? 0.0 : answer.new_task;
+  Placement placement{Action::kLeave,
+                      hub ? std::string(kScratchpadOption) : answer.choice,
+                      answer.confidence, needed.confidence};
   if (!Outside(answer)) {
     if (answer.choice != position.task) {
       placement.action = sure ? Action::kApply : Action::kSuggest;
@@ -94,8 +110,8 @@ Placement Place(const ClassificationAnswer& answer,
   }
   // A task without a name may be the very task this branch starts.
   if (position.in_unnamed_task) {
-    return sure && answer.new_task >= needed.new_task
-               ? Placement{Action::kName, kNewTaskOption, answer.new_task,
+    return sure && new_task >= needed.new_task
+               ? Placement{Action::kName, kNewTaskOption, new_task,
                            needed.new_task}
                : placement;
   }
@@ -114,8 +130,8 @@ Placement Place(const ClassificationAnswer& answer,
     return placement;
   }
   // The branch belongs to no task. What is left is whether it starts one.
-  if (answer.new_task >= needed.new_task) {
-    return {Action::kApply, kNewTaskOption, answer.new_task, needed.new_task};
+  if (new_task >= needed.new_task) {
+    return {Action::kApply, kNewTaskOption, new_task, needed.new_task};
   }
   if (!position.task.empty()) {
     placement.target = kScratchpadOption;
@@ -123,7 +139,7 @@ Placement Place(const ClassificationAnswer& answer,
     return placement;
   }
   if (starts_task) {
-    return {Action::kSuggest, kNewTaskOption, answer.new_task, needed.new_task};
+    return {Action::kSuggest, kNewTaskOption, new_task, needed.new_task};
   }
   return placement;
 }

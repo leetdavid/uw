@@ -26,12 +26,17 @@ const char* NameChoice(double same_work) {
   return same_work >= 0.5 ? "same" : "different";
 }
 
+const char* KindChoice(double hub) {
+  return hub >= 0.5 ? "hub" : "subject";
+}
+
 }  // namespace
 
 std::string DecisionsAnswer(const std::string& choice,
                             double confidence,
                             double new_task,
-                            std::optional<double> same_work) {
+                            std::optional<double> same_work,
+                            double hub) {
   std::string name;
   if (same_work) {
     name = std::string(R"(,{"type":"choice","name":"name","choice":")") +
@@ -48,13 +53,18 @@ std::string DecisionsAnswer(const std::string& choice,
          R"(","probabilities":[{"value":"new_task","probability":)" +
          base::NumberToString(new_task) +
          R"(},{"value":"scratchpad","probability":)" +
-         base::NumberToString(1.0 - new_task) + "}]}" + name + "]}";
+         base::NumberToString(1.0 - new_task) + "}]}" + name +
+         R"(,{"type":"choice","name":"kind","choice":")" + KindChoice(hub) +
+         R"(","probabilities":[{"value":"hub","probability":)" +
+         base::NumberToString(hub) + R"(},{"value":"subject","probability":)" +
+         base::NumberToString(1.0 - hub) + "}]}]}";
 }
 
 std::string SystemOneAnswer(const std::string& choice,
                             double confidence,
                             double new_task,
-                            std::optional<double> same_work) {
+                            std::optional<double> same_work,
+                            double hub) {
   std::string name;
   if (same_work) {
     name = std::string(R"(,"name":{"type":"choice","choice":")") +
@@ -72,7 +82,10 @@ std::string SystemOneAnswer(const std::string& choice,
                                               : 1 - 2 * new_task) +
          R"(,"probabilities":{"new_task":)" + base::NumberToString(new_task) +
          R"(,"scratchpad":)" + base::NumberToString(1.0 - new_task) + "}}" +
-         name + "}}";
+         name + R"(,"kind":{"type":"choice","choice":")" + KindChoice(hub) +
+         R"(","confidence":)" + base::NumberToString(std::max(hub, 1.0 - hub)) +
+         R"(,"probabilities":{"hub":)" + base::NumberToString(hub) +
+         R"(,"subject":)" + base::NumberToString(1.0 - hub) + "}}}}";
 }
 
 std::string ChatAnswer(const std::string& escaped_content) {

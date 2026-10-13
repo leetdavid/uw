@@ -83,6 +83,9 @@ A task name uw gave. uw may replace it, and remembers it across a restart. A nam
 **Name lock**:
 The small lock on the sidebar row of a task whose name the user typed. A click hands the name back to uw, which then treats it as a generated name.
 
+**Hub**:
+A page the user comes back to for many things, such as a home page, a feed, an inbox, or a dashboard. uw never makes a hub into a task.
+
 **Threshold**:
 How sure a model must be before uw acts on one kind of answer without asking. There are three, each set by the user: to move a tab branch, to start a task, and to rename a task.
 _Avoid_: Eagerness, aggressiveness, sensitivity.

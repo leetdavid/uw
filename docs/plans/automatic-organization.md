@@ -41,7 +41,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - A request asks two questions about placement. See [Placement rules](#placement-rules). Agreed on 2026-10-12.
   1. Which of the user's tasks does the branch belong to, or none?
   2. Is a branch outside every task the start of a task of its own, or a one-off for the Scratchpad?
-- A decision model gets both as choice questions in one call, with the [name check](#name-check) as a third when it applies. The language model answers both in one JSON object. With no named task, a decision model gets only the second question.
+- A decision model gets both as choice questions in one call, with the [name check](#name-check) as a third when it applies. The language model answers both in one JSON object. With no named task, a decision model does not get the first question.
+- A decision model is also asked, about every tab, whether the page is a [hub](#hub-pages) or about one subject. uw never makes a hub into a task. Agreed on 2026-10-13.
 - A task that still has the provisional name `New task` is not offered as an answer, because its name says nothing about it. A branch inside one leaves only to join a named task. It does not start a second task: the task it is in is the one it starts, and gets its name then.
 - The settings page has three sliders, one for each [threshold](#thresholds): move a tab, start a task, and rename a task. Each runs from `0.50` to `0.95` in steps of `0.05` and shows its value. A change applies to the next answer. The user asked for a bar for each threshold on 2026-10-12, for now. It replaces the single "Sorting" slider of earlier that day, whose number for moving a tab had also come to decide renames.
 - A tab is asked about when a link opens it, when its title changes, and when it goes to another site, 750 ms after the latest such change. A new path or new parameters under the same title on the same site ask nothing and leave an outstanding request alone: web apps keep their state in the address. The user asked for this on 2026-10-12 as "only when the title changes"; counting a change of site is uw's addition and open to review.
@@ -77,6 +78,7 @@ Agreed on 2026-10-12. `components/tab_organization/placement` holds them. The th
 | It belongs to no named task, starts a task of its own (both thresholds), and sits in a task without a name | Leaves it there and asks the language model to name that task. |
 | The same, short of either threshold | Nothing. |
 
+- A [hub](#hub-pages) outside every task is a one-off whatever its other scores are: it starts no task and gives none a name.
 - Joining another task comes before the name check.
 - A tab opened from another tab starts in that tab's task. It leaves on its own, like any other tab, when the page above it stays.
 - The table reads one answer. [Branch moves](#branch-moves) says how the answers about the tabs of a branch combine.
@@ -93,10 +95,38 @@ Agreed on 2026-10-13. `PlaceBranch` in `components/tab_organization/placement` h
 - A tab without an answer, or with one short of the move threshold, goes with the page above it.
 - Tabs that leave together and fit no task start a task when any one of them reaches the "Start a task" threshold. Otherwise they go to the Scratchpad. The same holds in the Scratchpad: a one-off page there goes into the task that a tab under it starts.
 - The top tab of the tabs that leave together decides whether their task has outgrown its name instead.
+- A [hub](#hub-pages) is filed on its own answer alone. It never goes with the page above it, and the tabs under it leave without it. Its score cannot make the tabs around it a task.
 - A tab that uw filed stays where it is until it shows something else. uw does not ask about it again before then.
 - The same answers give the same moves, and carrying them out twice changes nothing. `PlacementTest.TheSameAnswersGiveTheSameMovesAndASecondPassMovesNothing` checks it.
 
 "Reorganize all tabs" would run the same rules over every branch in the window. It is a [later stage](#later-stages).
+
+### Hub pages
+
+Agreed on 2026-10-13. A hub is a page the user comes back to for many things: a home page, a feed, an inbox, a dashboard, a list. The user asked that the model tell these apart and that uw never make one into a task. A feed page in the Scratchpad had been going into the task that the first article opened from it started.
+
+- Every decision request asks one more choice question: is the page a `hub`, or about one `subject`? A page is a hub when the model gives `hub` half or more. That bar is fixed.
+- A hub that fits no task goes to the Scratchpad, or stays there. It starts no task, names none, and renames none.
+- A hub that fits a task by name still joins it or stays in it.
+- A hub never goes along with the page above it, and a tab under it never takes it along.
+- The chat format has no such question, so with a language model alone uw cannot tell a hub.
+
+Measured on 2026-10-13 against the live Jev API, on every distinct page in the organizer log.
+
+| Pages | `hub` |
+| --- | --- |
+| 46 search pages | `0.00` to `0.05` |
+| Video site home, spreadsheet home, mail, issue tracker, dashboards | `0.95` to `1.00` |
+| Made-up news feed, forum front page, inbox, and code host home | `1.00` |
+| A chat assistant's home page | `0.55` to `0.96` |
+| A social site's home page | `0.25` to `0.99`, depending on the unread count in its title |
+
+- Of 61 hub pages the model put outside every task, none reached the "Start a task" threshold by itself, and none of the 14 tasks uw started came from one. So the rule changes nothing for a hub alone.
+- 77 hub pages fit a task by name. They join it as before.
+- In 14 real cases a page went along with a tab under it that started a task: 12 search pages, one article, and one spreadsheet home. Only the last was a hub.
+- Two simpler rules failed on the same pages. The model calls 28 of 32 search pages a one-off, so "a one-off stays behind" would have left 10 of those 12 searches behind. Asked whether a tab is the same piece of work as the page it was opened from, the model gave feeds `0.74` to `0.94`, the same as searches.
+- The extra question did not disturb placement. In 39 real requests the task choice never changed, and its probability moved by `0.09` at most.
+- Weak spot: a home page whose title carries an unread count scored as low as `0.25`.
 
 ### Thresholds
 
@@ -232,6 +262,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 31. The name check lists the tabs that make up the task, without a tab the model put outside it. `ABranchThatFitsNoTaskLeavesTogether` checks the list.
 32. A new task appears before its name: the tabs are in a task called `New task`, its row shows the spinner, and the card waits. A tab opened from it lands in the task and sends no second naming request. Undo during the wait takes the tabs back and drops the request. `AutomaticOrganizerBrowserTest.ANewTaskStartsBeforeItsName` checks it.
 33. When the name arrives, the task takes it, the spinner goes, and the card says "Created task <name>" with Undo. `AutomaticOrganizerBrowserTest.JevDecidesAndTheLanguageModelNamesTheNewTask` checks it.
+34. A feed page stays in the Scratchpad when a tab opened from it starts a task, and does not start a task itself whatever its other scores. The request carries the question. `AutomaticOrganizerBrowserTest.AFeedStaysWhenATabOpenedFromItStartsATask` and `PlacementTest.AHubIsNeverMadeIntoATask` check it.
 
 ## Later stages
 
@@ -242,6 +273,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 - Not asking again when a title only flips on the same page, such as an unread counter.
 - A browser test for an answer that waits while another request about its branch is out. The test server can hold back every request to one address, not the request about one tab, so only the unit tests cover the rule.
 - A browser test for a name that arrives after another move, where the card stays quiet.
+- Telling a hub with a language model alone.
 - Leaving tabs that sat unfiled in a task before a restart out of the name check.
 - Describing a task to the model by the tabs in it, so a task named `New task` can be an answer. That sends more tab titles per request than this plan allows.
 

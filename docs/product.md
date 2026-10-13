@@ -207,6 +207,7 @@ Agreed:
 - Group primarily by inferred task or intent. A group can span websites, and tabs from the same website can belong to different tasks.
 - Use separate groups for distinct immediate activities within the same project. For example, "Implement vertical tabs" and "Choose a grouping model" are separate groups, rather than one "Build uw" group.
 - Keep brief detours ungrouped until continued browsing makes the separate task intent clear. An unrelated tab does not by itself require a new group.
+- Never make a [hub](CONTEXT.md#language) into a task. A feed, an inbox, or a dashboard stays in the Scratchpad, or in a task it fits by name, while the tabs opened from it are filed on their own. Agreed on 2026-10-13.
 - A regular tab opened from a shared pin starts ungrouped in the current window. A confident classification may place it immediately; the last active task alone does not determine its placement.
 - For now, when a tab clearly belongs to an existing task but has no clear parent page, append it at that task group's top level. Nest it under a page only when the parent relationship is clear, such as a link explicitly opened from that page.
 - Organize the regular tab tree independently within each window. Moving regular tabs between windows remains a manual action; [pinned tabs](#pinned-tabs) have their own shared-state requirements.
