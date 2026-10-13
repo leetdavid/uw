@@ -1,6 +1,13 @@
-# uw browser
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img src="docs/assets/logo-light.svg" width="160" height="160" alt="uw browser logo">
+  </picture>
+</p>
 
-**ur web, ur way**
+<h1 align="center">uw browser</h1>
+
+<p align="center"><strong>ur web, ur way</strong></p>
 
 uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. [Verification status](#verification-status) records what has been built and tested. Later product features remain planned.
 

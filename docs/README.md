@@ -8,6 +8,7 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 
 - [Product](product.md): experience, headline features, and expected behavior.
 - [Glossary](CONTEXT.md): product terminology.
+- [Logo](logo.md): the mark, its colors and files, and what is still undecided.
 - [Building and using Chromium](../README.md#build-host-requirements): setup, build and run commands, CI, and verification status.
 - [Try the current build](try-uw.md): exploratory manual tests for the built app and its current limits.
 - [Architecture](architecture.md): technical direction and decisions still to make.
