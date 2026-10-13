@@ -3,6 +3,9 @@ is_debug = false
 is_official_build = false
 is_chrome_branded = false
 is_component_build = false
+# Development checks crash tabs on real sites. See docs/architecture.md.
+dcheck_always_on = false
+enable_dangling_raw_ptr_checks = false
 symbol_level = 0
 use_system_xcode = true
 use_remoteexec = false

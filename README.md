@@ -142,7 +142,7 @@ To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an ex
 ## Build inputs and updates
 
 - [`chromium/pins.json`](chromium/pins.json) pins Chromium, `depot_tools`, and the SDK requirement.
-- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build with debug symbols disabled.
+- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build with debug symbols and [development checks](docs/architecture.md#native-lifetime-rules) disabled. Changing it rebuilds every file.
 - [`chromium/patches/series`](chromium/patches/series) orders the reviewed uw changes on top of the pin.
 - [`browser/`](browser) and [`components/`](components) hold product-owned C++ source linked into the prepared checkout.
 - [`pnpm-lock.yaml`](pnpm-lock.yaml) locks the TypeScript tooling dependencies.
