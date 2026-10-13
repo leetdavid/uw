@@ -22,8 +22,8 @@ const char* Otherwise(double new_task) {
   return new_task >= 0.5 ? "new_task" : "scratchpad";
 }
 
-const char* NameChoice(double new_name) {
-  return new_name >= 0.5 ? "rename" : "keep";
+const char* NameChoice(double same_work) {
+  return same_work >= 0.5 ? "same" : "different";
 }
 
 }  // namespace
@@ -31,15 +31,15 @@ const char* NameChoice(double new_name) {
 std::string DecisionsAnswer(const std::string& choice,
                             double confidence,
                             double new_task,
-                            std::optional<double> new_name) {
+                            std::optional<double> same_work) {
   std::string name;
-  if (new_name) {
+  if (same_work) {
     name = std::string(R"(,{"type":"choice","name":"name","choice":")") +
-           NameChoice(*new_name) +
-           R"(","probabilities":[{"value":"keep","probability":)" +
-           base::NumberToString(1.0 - *new_name) +
-           R"(},{"value":"rename","probability":)" +
-           base::NumberToString(*new_name) + "}]}";
+           NameChoice(*same_work) +
+           R"(","probabilities":[{"value":"different","probability":)" +
+           base::NumberToString(1.0 - *same_work) +
+           R"(},{"value":"same","probability":)" +
+           base::NumberToString(*same_work) + "}]}";
   }
   return R"({"answers":[{"type":"choice","name":"destination","choice":")" +
          choice + R"(","confidence":)" + base::NumberToString(confidence) +
@@ -54,15 +54,15 @@ std::string DecisionsAnswer(const std::string& choice,
 std::string SystemOneAnswer(const std::string& choice,
                             double confidence,
                             double new_task,
-                            std::optional<double> new_name) {
+                            std::optional<double> same_work) {
   std::string name;
-  if (new_name) {
+  if (same_work) {
     name = std::string(R"(,"name":{"type":"choice","choice":")") +
-           NameChoice(*new_name) + R"(","confidence":)" +
-           base::NumberToString(std::max(*new_name, 1.0 - *new_name)) +
-           R"(,"probabilities":{"keep":)" +
-           base::NumberToString(1.0 - *new_name) + R"(,"rename":)" +
-           base::NumberToString(*new_name) + "}}";
+           NameChoice(*same_work) + R"(","confidence":)" +
+           base::NumberToString(std::max(*same_work, 1.0 - *same_work)) +
+           R"(,"probabilities":{"different":)" +
+           base::NumberToString(1.0 - *same_work) + R"(,"same":)" +
+           base::NumberToString(*same_work) + "}}";
   }
   return R"({"answers":{"destination":{"type":"choice","choice":")" + choice +
          R"(","confidence":)" + base::NumberToString(confidence) +
@@ -89,6 +89,13 @@ ModelTestServer::~ModelTestServer() = default;
 
 void ModelTestServer::Answer(const std::string& path, std::string body) {
   Fail(path, net::HTTP_OK, std::move(body));
+}
+
+void ModelTestServer::AnswerAbout(const std::string& path,
+                                  const std::string& text,
+                                  std::string body) {
+  base::AutoLock hold(lock_);
+  answers_about_[{path, text}] = {net::HTTP_OK, std::move(body), std::string()};
 }
 
 void ModelTestServer::Fail(const std::string& path,
@@ -121,12 +128,19 @@ std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
                            ? std::string()
                            : authorization->second});
   auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+  const Reply* about = nullptr;
+  for (const auto& [key, candidate] : answers_about_) {
+    if (key.first == path &&
+        request.content.find(key.second) != std::string::npos) {
+      about = &candidate;
+    }
+  }
   const auto answer = answers_.find(path);
-  if (answer == answers_.end()) {
+  if (!about && answer == answers_.end()) {
     response->set_code(net::HTTP_NOT_FOUND);
     return response;
   }
-  const Reply& reply = answer->second;
+  const Reply& reply = about ? *about : answer->second;
   response->set_code(static_cast<net::HttpStatusCode>(reply.status));
   if (!reply.location.empty()) {
     response->AddCustomHeader("Location", reply.location);

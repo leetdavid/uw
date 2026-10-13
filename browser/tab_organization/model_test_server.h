@@ -30,16 +30,17 @@ struct ModelRequest {
 
 // A decision model's answer that the tab belongs to the task `choice` or, for
 // "none", to no task. `new_task` is the probability it gives a tab outside
-// every task of starting one of its own. `new_name` answers the name check:
-// the probability that the tab's task needs a new name.
+// every task of starting one of its own. `same_work` answers the name check:
+// the probability that the tab is the same piece of work as the other tabs of
+// its task.
 std::string DecisionsAnswer(const std::string& choice,
                             double confidence,
                             double new_task = 0.0,
-                            std::optional<double> new_name = std::nullopt);
+                            std::optional<double> same_work = std::nullopt);
 std::string SystemOneAnswer(const std::string& choice,
                             double confidence,
                             double new_task = 0.0,
-                            std::optional<double> new_name = std::nullopt);
+                            std::optional<double> same_work = std::nullopt);
 // `escaped_content` is the assistant message, already escaped for JSON.
 std::string ChatAnswer(const std::string& escaped_content);
 
@@ -52,6 +53,11 @@ class ModelTestServer {
 
   // Sets the JSON body served at `path`. Other /v1/ paths answer 404.
   void Answer(const std::string& path, std::string body);
+  // Serves `body` at `path` to a request whose own body holds `text`, such
+  // as the title of the tab it is about. Comes before Answer().
+  void AnswerAbout(const std::string& path,
+                   const std::string& text,
+                   std::string body);
   // Serves `body` at `path` with an error status.
   void Fail(const std::string& path, int status, std::string body);
   // Answers `path` with a redirect to `location`.
@@ -71,6 +77,9 @@ class ModelTestServer {
   };
 
   std::map<std::string, Reply> answers_ GUARDED_BY(lock_);
+  // Keyed by path and the text a request must hold.
+  std::map<std::pair<std::string, std::string>, Reply> answers_about_
+      GUARDED_BY(lock_);
 };
 
 }  // namespace uw

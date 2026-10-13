@@ -500,12 +500,12 @@ TEST_F(AiProtocolTest, SystemOneResponseRejectsUnusableAnswers) {
 
 // The wording of the name check was measured against Jev, so a change to it
 // should be measured too.
-TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTaskNeedsANewName) {
+TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTabIsTheSamePieceOfWork) {
   const std::vector<std::pair<std::string, std::string>> tasks = {
       {"task-1", "Compare Baixa hotels"}};
   std::vector<std::string> titles(kMaxNamingTitles + 1, "Chiado hotels");
   titles.back() = "One title too many";
-  const NameCheck check{"Compare Baixa hotels", titles};
+  const NameCheck check{titles};
 
   auto parsed = base::JSONReader::ReadDict(
       *BuildDecisionRequestBody(DecisionFormat::kSystemOne, "jev-latest",
@@ -520,19 +520,20 @@ TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTaskNeedsANewName) {
   EXPECT_EQ(*name->FindString("type"), "choice");
   const std::string instructions = *name->FindString("instructions");
   EXPECT_TRUE(instructions.starts_with(
-      "The user's browsing task \"Compare Baixa hotels\" holds this tab and "
-      "these tabs:\n- Chiado hotels\n"));
+      "The tab sits in a group with these tabs:\n- Chiado hotels\n"));
   EXPECT_TRUE(instructions.ends_with(
-      "- Chiado hotels\nDecide whether the task needs a new name."));
+      "- Chiado hotels\nDecide whether this tab is part of the same piece of "
+      "work as those tabs."));
+  // The task's name is the business of the first question alone.
+  EXPECT_EQ(instructions.find("Baixa"), std::string::npos);
   EXPECT_EQ(instructions.find("One title too many"), std::string::npos);
   const base::DictValue* criteria = name->FindDict("criteria");
   ASSERT_TRUE(criteria);
   EXPECT_EQ(criteria->size(), 2u);
-  EXPECT_EQ(*criteria->FindString("keep"),
-            "The name still covers the work these tabs share.");
-  EXPECT_EQ(*criteria->FindString("rename"),
-            "These tabs share work that the name is too narrow or too old to "
-            "cover.");
+  EXPECT_EQ(*criteria->FindString("same"),
+            "This tab continues the piece of work those tabs share.");
+  EXPECT_EQ(*criteria->FindString("different"),
+            "This tab is a different piece of work from those tabs.");
   // The tab's own description does not say which task it is in.
   EXPECT_EQ(parsed->FindString("state")->find("Baixa"), std::string::npos);
 
@@ -550,8 +551,8 @@ TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTaskNeedsANewName) {
   const base::ListValue* choices = last.FindList("choices");
   ASSERT_TRUE(choices);
   ASSERT_EQ(choices->size(), 2u);
-  EXPECT_EQ(*(*choices)[0].GetDict().FindString("value"), "keep");
-  EXPECT_EQ(*(*choices)[1].GetDict().FindString("value"), "rename");
+  EXPECT_EQ(*(*choices)[0].GetDict().FindString("value"), "same");
+  EXPECT_EQ(*(*choices)[1].GetDict().FindString("value"), "different");
 
   // A chat request never carries it.
   EXPECT_EQ(BuildDecisionRequestBody(DecisionFormat::kChat, "model",
@@ -560,7 +561,7 @@ TEST_F(AiProtocolTest, ANameCheckAsksWhetherTheTaskNeedsANewName) {
                                      LisbonContext(), tasks));
 }
 
-TEST_F(AiProtocolTest, TheNameCheckAnswerIsTheProbabilityOfANewName) {
+TEST_F(AiProtocolTest, TheNameCheckAnswerIsTheProbabilityOfTheSameWork) {
   const auto system_one = [](const std::string& name, bool asked = true) {
     const auto answer = ParseDecisionResponse(
         DecisionFormat::kSystemOne,
@@ -573,26 +574,27 @@ TEST_F(AiProtocolTest, TheNameCheckAnswerIsTheProbabilityOfANewName) {
     // The placement is read the same with or without the name check.
     EXPECT_EQ(answer->choice, kNewTaskOption);
     EXPECT_DOUBLE_EQ(answer->confidence, 0.97);
-    return answer->new_name;
+    return answer->same_work;
   };
   EXPECT_DOUBLE_EQ(system_one(""), 0.0);
+  EXPECT_DOUBLE_EQ(system_one(R"(, "name": {"type": "choice", "choice": "same",
+          "confidence": 0.7,
+          "probabilities": {"different": 0.17, "same": 0.83}})"),
+                   0.83);
   EXPECT_DOUBLE_EQ(
-      system_one(R"(, "name": {"type": "choice", "choice": "rename",
-          "confidence": 0.7, "probabilities": {"keep": 0.17, "rename": 0.83}})"),
-      0.83);
-  EXPECT_DOUBLE_EQ(system_one(R"(, "name": {"type": "choice", "choice": "keep",
-          "confidence": 0.9, "probabilities": {"keep": 0.94, "rename": 0.06}})"),
-                   0.06);
+      system_one(R"(, "name": {"type": "choice", "choice": "different",
+          "confidence": 0.9,
+          "probabilities": {"different": 0.94, "same": 0.06}})"),
+      0.06);
   // Without probabilities, the confidence in the choice stands in.
-  EXPECT_NEAR(system_one(R"(, "name": {"type": "choice", "choice": "keep",
+  EXPECT_NEAR(system_one(R"(, "name": {"type": "choice", "choice": "different",
                   "confidence": 0.9})"),
               0.1, 1e-9);
   // An answer to a question the request did not ask renames nothing.
-  EXPECT_DOUBLE_EQ(
-      system_one(R"(, "name": {"type": "choice", "choice": "rename",
+  EXPECT_DOUBLE_EQ(system_one(R"(, "name": {"type": "choice", "choice": "same",
           "confidence": 0.99})",
-                 /*asked=*/false),
-      0.0);
+                              /*asked=*/false),
+                   0.0);
   // An answer uw cannot use renames nothing.
   EXPECT_DOUBLE_EQ(
       system_one(R"(, "name": {"type": "choice", "choice": "perhaps",
@@ -600,22 +602,21 @@ TEST_F(AiProtocolTest, TheNameCheckAnswerIsTheProbabilityOfANewName) {
       0.0);
   EXPECT_DOUBLE_EQ(system_one(R"(, "name": {"type": "noul", "noul": 0.9})"),
                    0.0);
-  EXPECT_DOUBLE_EQ(
-      system_one(R"(, "name": {"type": "choice", "choice": "rename",
-          "confidence": 0.9, "probabilities": {"keep": 0.1, "rename": 7}})"),
-      0.0);
+  EXPECT_DOUBLE_EQ(system_one(R"(, "name": {"type": "choice", "choice": "same",
+          "confidence": 0.9, "probabilities": {"different": 0.1, "same": 7}})"),
+                   0.0);
 
   const auto decisions =
       ParseDecisionResponse(DecisionFormat::kDecisions, R"({"answers": [
       {"type": "choice", "name": "destination", "choice": "task-1",
        "confidence": 0.8},
-      {"type": "choice", "name": "name", "choice": "rename",
-       "probabilities": [{"value": "keep", "probability": 0.25},
-                         {"value": "rename", "probability": 0.75}]}]})",
+      {"type": "choice", "name": "name", "choice": "same",
+       "probabilities": [{"value": "different", "probability": 0.25},
+                         {"value": "same", "probability": 0.75}]}]})",
                             /*has_tasks=*/true, /*has_name_check=*/true);
   ASSERT_TRUE(decisions);
   EXPECT_EQ(decisions->choice, "task-1");
-  EXPECT_DOUBLE_EQ(decisions->new_name, 0.75);
+  EXPECT_DOUBLE_EQ(decisions->same_work, 0.75);
 }
 
 TEST_F(AiProtocolTest, ChatFormatUsesTheClassificationCall) {

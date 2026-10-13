@@ -109,6 +109,23 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     models_.Answer(path, std::move(body));
   }
 
+  // Answers the decision model's request about the tab titled `title`.
+  void AnswerAbout(const std::string& title, std::string body) {
+    models_.AnswerAbout("/v1/systemone", "Title: " + title + "\\n",
+                        std::move(body));
+  }
+
+  // The body of the decision request about the tab titled `title`.
+  std::string RequestAbout(const std::string& title) {
+    for (const ModelRequest& request : Requests()) {
+      if (request.path == "/v1/systemone" &&
+          request.body.find("Title: " + title + "\\n") != std::string::npos) {
+        return request.body;
+      }
+    }
+    return std::string();
+  }
+
   void Fail(const std::string& path, int status) {
     models_.Fail(path, status, "{}");
   }
@@ -734,33 +751,154 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.80 of 0.75");
 }
 
-// The tabs under a page came from what it showed before, so the page does
-// not take them out of their task without the user.
-IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       APageWithTabsUnderItStaysUntilTheUserConfirms) {
-  const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* page = tabs()->GetTabAtIndex(1);
-  ASSERT_EQ(page->GetGroup(), task);
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
-  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
-  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
-  tabs::TabInterface* link = OpenLinkFrom(page, "lisbon");
-  ASSERT_TRUE(SettleAfter(1));
-  ASSERT_EQ(link->GetGroup(), task);
-
-  Answer("/v1/decisions", DecisionsAnswer("none", 0.97, 0.1));
-  Browse(page, "weather");
+// The case from the user's log: a search that has nothing to do with the
+// task it sits in, and a result opened from it. Nobody asked about the
+// search, as after a restart, so it is asked about before the result moves.
+// Alone the search is a one-off. The result makes the two of them a task,
+// and they leave together, with one request for a name.
+IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
+                       ABranchThatFitsNoTaskLeavesTogether) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Research Warp"));
+  tabs::TabInterface* warp = OpenLinkFrom(InitialTab(), "warp");
   ASSERT_TRUE(SettleAfter(2));
-  EXPECT_EQ(page->GetGroup(), task);
-  ASSERT_TRUE(bar()->card_visible());
-  EXPECT_EQ(bar()->card()->headline(), u"Suggested Scratchpad");
-  ASSERT_TRUE(bar()->card()->offers_accept());
+  const std::optional<tab_groups::TabGroupId> task = warp->GetGroup();
+  ASSERT_TRUE(task);
+  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.95, 0.0, 0.9));
+  tabs::TabInterface* ssh = OpenLinkFrom(warp, "ssh");
+  ASSERT_TRUE(SettleAfter(3));
+  ASSERT_EQ(ssh->GetGroup(), task);
 
-  bar()->AcceptSuggestion();
+  prefs()->SetBoolean(kOrganizationEnabledPref, false);
+  tabs::TabInterface* search = NewTabBeside(warp);
+  ASSERT_EQ(search->GetGroup(), task);
+  Browse(search, "slippers");
+  prefs()->SetBoolean(kOrganizationEnabledPref, true);
+
+  AnswerAbout("slippers", SystemOneAnswer("none", 0.99, 0.2, 0.0));
+  AnswerAbout("tpu", SystemOneAnswer("none", 0.99, 0.9, 0.0));
+  Answer("/v1/chat/completions", ChatAnswer("Print slippers"));
+  tabs::TabInterface* result = OpenLinkFrom(search, "tpu");
+  ASSERT_EQ(result->GetGroup(), task);
+  ASSERT_TRUE(SettleAfter(6));
+
+  ASSERT_TRUE(search->GetGroup());
+  EXPECT_NE(search->GetGroup(), task);
+  EXPECT_EQ(result->GetGroup(), search->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(search), 0);
+  EXPECT_EQ(controller()->DepthFor(result), 1);
+  EXPECT_EQ(TitleOf(*search->GetGroup()), u"Print slippers");
+  EXPECT_EQ(tabs()->group_model()->ListTabGroups().size(), 2u);
+  EXPECT_EQ(warp->GetGroup(), task);
+  EXPECT_EQ(ssh->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Research Warp");
+  EXPECT_EQ(bar()->card()->headline(), u"Created task Print slippers");
+  EXPECT_EQ(bar()->card()->page(), u"slippers");
+  // The result decided it: the search alone scored 0.20.
+  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.90 of 0.75");
+
+  // The search was compared with the tabs that make up the task, not with
+  // the result the model had put outside it.
+  EXPECT_NE(RequestAbout("slippers")
+                .find("The tab sits in a group with these tabs:\\n- warp\\n- "
+                      "ssh\\nDecide whether this tab is part of the same piece "
+                      "of work as those tabs."),
+            std::string::npos);
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 6u);
+  EXPECT_EQ(requests[5].path, "/v1/chat/completions");
+  EXPECT_NE(requests[5].body.find("Title: slippers"), std::string::npos);
+  EXPECT_NE(requests[5].body.find("Other tabs in the task:\\n- tpu"),
+            std::string::npos);
+  EXPECT_NE(requests[3].body.find("Title: tpu"), std::string::npos);
+  EXPECT_NE(requests[4].body.find("Title: slippers"), std::string::npos);
+  EXPECT_THAT(Results("placement"),
+              testing::ElementsAre("new_task", "left", "new_task", "created"));
+
+  bar()->Undo();
+  EXPECT_EQ(search->GetGroup(), task);
+  EXPECT_EQ(result->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(result), 1);
+}
+
+// A page that goes on to something else leaves its task. A tab under it that
+// still fits the task stays there, where the page was, and a tab under it
+// that fits no task either goes along.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATabThatStillFitsItsTaskStaysBehind) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  ASSERT_EQ(in_task->GetGroup(), task);
+  UseDecisionModel(DecisionProvider::kJev);
+  Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.95));
+  AnswerAbout("weather", SystemOneAnswer("none", 0.97, 0.1));
+  AnswerAbout("radar", SystemOneAnswer("none", 0.6, 0.1));
+  tabs::TabInterface* page = OpenLinkFrom(in_task, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  tabs::TabInterface* fits = OpenLinkFrom(page, "hotels");
+  ASSERT_TRUE(SettleAfter(2));
+  // The model is not sure about this one, so it stays for now.
+  tabs::TabInterface* unsure = OpenLinkFrom(page, "radar");
+  ASSERT_TRUE(SettleAfter(3));
+  ASSERT_EQ(unsure->GetGroup(), task);
+  ASSERT_EQ(controller()->DepthFor(fits), 2);
+
+  Browse(page, "weather");
+  ASSERT_TRUE(SettleAfter(4));
   EXPECT_FALSE(page->GetGroup());
-  EXPECT_FALSE(link->GetGroup());
+  EXPECT_FALSE(unsure->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(unsure), 1);
+  EXPECT_EQ(fits->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(fits), 1);
   EXPECT_EQ(bar()->card()->headline(), u"Moved to Scratchpad");
-  EXPECT_TRUE(bar()->card()->offers_undo());
+  EXPECT_EQ(bar()->card()->page(), u"weather");
+  EXPECT_EQ(Requests().size(), 4u);
+
+  bar()->Undo();
+  EXPECT_EQ(page->GetGroup(), task);
+  EXPECT_EQ(unsure->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(fits), 2);
+}
+
+// Tabs that were there before automatic organization came on were never
+// asked about. Before their branch moves, they are.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TabsNobodyAskedAboutAreAskedBeforeTheirBranchMoves) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* in_task = tabs()->GetTabAtIndex(1);
+  tabs::TabInterface* page = OpenLinkFrom(in_task, "lisbon");
+  tabs::TabInterface* fits = OpenLinkFrom(page, "hotels");
+  tabs::TabInterface* leaves = OpenLinkFrom(page, "radar");
+  ASSERT_EQ(leaves->GetGroup(), task);
+
+  UseDecisionModel(DecisionProvider::kJev);
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.1));
+  AnswerAbout("hotels", SystemOneAnswer(task.ToString(), 0.95));
+  organizer()->DispatchNowForTesting();
+  WaitForPageText(page);
+  ASSERT_TRUE(Requests().empty());
+
+  Browse(page, "weather");
+  ASSERT_TRUE(SettleAfter(3));
+  EXPECT_FALSE(RequestAbout("hotels").empty());
+  EXPECT_FALSE(RequestAbout("radar").empty());
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_FALSE(leaves->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(leaves), 1);
+  EXPECT_EQ(fits->GetGroup(), task);
+  EXPECT_EQ(Requests().size(), 3u);
+
+  // A tab the user placed by hand is not asked about, and stays.
+  bar()->Undo();
+  ASSERT_EQ(page->GetGroup(), task);
+  Browse(page, "forecast");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_EQ(fits->GetGroup(), task);
+  EXPECT_EQ(leaves->GetGroup(), task);
+  EXPECT_EQ(Requests().size(), 4u);
 }
 
 // A task that still has the name every new task starts with tells the model
@@ -934,7 +1072,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   ASSERT_TRUE(task);
   ASSERT_EQ(TitleOf(*task), u"Compare Baixa hotels");
   // A tab outside every task has no name to check.
-  EXPECT_EQ(Requests()[0].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(Requests()[0].body.find("same piece of work"), std::string::npos);
 
   // Alone, this answer would start a second task.
   Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.93));
@@ -951,9 +1089,9 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 4u);
   EXPECT_NE(requests[2].body.find(
-                "The user's browsing task \\\"Compare Baixa hotels\\\" holds "
-                "this tab and these tabs:\\n- baixa\\nDecide whether the task "
-                "needs a new name."),
+                "The tab sits in a group with these tabs:\\n- baixa\\nDecide "
+                "whether this tab is part of the same piece of work as those "
+                "tabs."),
             std::string::npos);
   EXPECT_EQ(requests[3].path, "/v1/chat/completions");
   EXPECT_NE(requests[3].body.find("Other tabs in the task:\\n- baixa"),
@@ -984,7 +1122,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   ASSERT_TRUE(SettleAfter(7));
   requests = Requests();
   ASSERT_EQ(requests.size(), 7u);
-  EXPECT_EQ(requests[5].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(requests[5].body.find("same piece of work"), std::string::npos);
   EXPECT_EQ(TitleOf(*task), u"Lisbon");
   ASSERT_TRUE(second->GetGroup());
   EXPECT_NE(second->GetGroup(), task);
@@ -1052,7 +1190,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.99));
   tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
   ASSERT_TRUE(SettleAfter(3));
-  EXPECT_EQ(Requests()[2].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(Requests()[2].body.find("same piece of work"), std::string::npos);
   EXPECT_EQ(TitleOf(*task), u"Lisbon");
 
   views::test::ButtonTestApi(NameLockOf(*task)).NotifyDefaultMouseClick();
@@ -1060,11 +1198,11 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(NameLockOf(*task)->GetVisible());
   EXPECT_EQ(TitleOf(*task), u"Lisbon");
 
-  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.99, 0.0, 0.95));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.95));
   Answer("/v1/chat/completions", ChatAnswer("Compare Lisbon hotels"));
   Browse(second, "alfama");
   ASSERT_TRUE(SettleAfter(5));
-  EXPECT_NE(Requests()[3].body.find("needs a new name"), std::string::npos);
+  EXPECT_NE(Requests()[3].body.find("same piece of work"), std::string::npos);
   EXPECT_EQ(second->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Compare Lisbon hotels");
   EXPECT_FALSE(NameLockOf(*task)->GetVisible());
@@ -1142,10 +1280,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
     return !request_about("alfama").empty() &&
            !request_about("minutes").empty();
   }));
-  EXPECT_NE(request_about("alfama").find(
-                "The user's browsing task \\\"Compare Baixa hotels\\\" holds"),
-            std::string::npos);
-  EXPECT_EQ(request_about("minutes").find("needs a new name"),
+  EXPECT_NE(
+      request_about("alfama").find("The tab sits in a group with these tabs:"),
+      std::string::npos);
+  EXPECT_EQ(request_about("minutes").find("same piece of work"),
             std::string::npos);
 }
 
@@ -1185,8 +1323,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
   EXPECT_EQ(bar()->card()->headline(), u"Created task Compare laptops");
   EXPECT_TRUE(bar()->card()->offers_undo());
-  // The request did carry the name check, and its answer was to keep the name.
-  EXPECT_NE(Requests()[3].body.find("needs a new name"), std::string::npos);
+  // The request did carry the name check, and its answer was that the tab is
+  // another piece of work.
+  EXPECT_NE(Requests()[3].body.find("same piece of work"), std::string::npos);
 
   bar()->Undo();
   EXPECT_EQ(child->GetGroup(), task);

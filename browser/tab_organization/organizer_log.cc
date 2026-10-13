@@ -51,6 +51,9 @@ base::SequencedTaskRunner& Writer() {
 }  // namespace
 
 OrganizerExchange::OrganizerExchange() = default;
+OrganizerExchange::OrganizerExchange(const OrganizerExchange&) = default;
+OrganizerExchange& OrganizerExchange::operator=(const OrganizerExchange&) =
+    default;
 OrganizerExchange::OrganizerExchange(OrganizerExchange&&) = default;
 OrganizerExchange& OrganizerExchange::operator=(OrganizerExchange&&) = default;
 OrganizerExchange::~OrganizerExchange() = default;

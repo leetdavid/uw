@@ -271,13 +271,15 @@ void TabOrganizationController::Execute(int command,
 std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
     const std::vector<PageId>& ids,
     std::u16string title,
-    Origin origin) {
+    Origin origin,
+    const std::vector<PageId>& staying) {
   const std::vector<PageId> roots = Roots(ids);
   if (roots.empty() || !tabs_->SupportsTabGroups()) {
     return std::nullopt;
   }
   const std::string task = tab_groups::TabGroupId::GenerateNew().ToString();
   Record();
+  LeaveBehind(roots, staying);
   tree_.MoveToNewTask(roots.front(), task);
   for (size_t i = 1; i < roots.size(); ++i) {
     tree_.MoveToTask(roots[i], task);
@@ -295,13 +297,15 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
 
 bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
                                            const tab_groups::TabGroupId& group,
-                                           Origin origin) {
+                                           Origin origin,
+                                           const std::vector<PageId>& staying) {
   const std::vector<PageId> roots = Roots(ids);
   const std::string task = group.ToString();
   if (roots.empty() || !GroupFor(task)) {
     return false;
   }
   Record();
+  LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
     tree_.MoveToTask(root, task);
   }
@@ -312,13 +316,16 @@ bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
   return true;
 }
 
-bool TabOrganizationController::MoveToScratchpad(const std::vector<PageId>& ids,
-                                                 Origin origin) {
+bool TabOrganizationController::MoveToScratchpad(
+    const std::vector<PageId>& ids,
+    Origin origin,
+    const std::vector<PageId>& staying) {
   const std::vector<PageId> roots = Roots(ids);
   if (roots.empty()) {
     return false;
   }
   Record();
+  LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
     tree_.MoveToTask(root, std::string());
   }
@@ -575,6 +582,20 @@ std::vector<PageId> TabOrganizationController::Roots(
     }
   }
   return roots;
+}
+
+void TabOrganizationController::LeaveBehind(
+    const std::vector<PageId>& roots,
+    const std::vector<PageId>& staying) {
+  const auto inside = [&](const PageId& id) {
+    return std::ranges::any_of(roots, [&](const PageId& root) {
+      return root != id && Has(tree_.BranchOf(root), id);
+    });
+  };
+  for (const PageId& id : staying) {
+    while (inside(id) && tree_.Outdent(id)) {
+    }
+  }
 }
 
 std::optional<tab_groups::TabGroupId> TabOrganizationController::GroupFor(

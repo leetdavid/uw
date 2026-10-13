@@ -14,8 +14,9 @@ namespace uw {
 // Pure request/response handling for the placement call behind automatic
 // organization. The call asks two things about one tab branch: which of the
 // user's tasks it belongs to, if any, and what a branch outside every task
-// is. A decision model can also be asked whether the task the branch is in
-// needs a new name. No networking, prefs, or credentials here; browser
+// is. A decision model can also be asked whether the branch is the same piece
+// of work as the other tabs of its task. No networking, prefs, or credentials
+// here; browser
 // integration owns transport. All functions validate strictly and reject
 // malformed input so a bad provider response can never move a tab.
 
@@ -62,16 +63,16 @@ struct ClassificationAnswer {
   double new_task = 0.0;
   // Valid generated name for kNewTaskOption, when the format carries one.
   std::optional<std::u16string> task_name;
-  // The probability that the task the branch is in needs a new name. Zero
-  // when the request carried no name check.
-  double new_name = 0.0;
+  // The probability that the branch is the same piece of work as the other
+  // tabs of its task. Zero when the request carried no name check.
+  double same_work = 0.0;
 };
 
-// The name check: the task a branch is in, for the question whether that
-// task needs a new name. `other_titles` are the titles of its other tabs;
-// only the first kMaxNamingTitles are sent.
+// The name check: the question whether a branch is the same piece of work as
+// the other tabs of its task. A branch that is, and yet fits no task name,
+// shows that its task has outgrown the name. `other_titles` are the titles of
+// those tabs; only the first kMaxNamingTitles are sent.
 struct NameCheck {
-  std::string name;
   std::vector<std::string> other_titles;
 };
 
@@ -96,7 +97,8 @@ enum class DecisionFormat {
 // same input as BuildClassificationRequestBody, plus task lists too long for
 // one choice question. With no tasks, a decision model is asked only what a
 // branch outside every task is. `name_check` adds the question whether the
-// branch's task needs a new name. A chat request never carries it.
+// branch is the same piece of work as its task's other tabs. A chat request
+// never carries it.
 std::optional<std::string> BuildDecisionRequestBody(
     DecisionFormat format,
     const std::string& model,
@@ -110,7 +112,7 @@ std::optional<std::string> BuildDecisionRequestBody(
 // models never name tasks, so `task_name` stays empty for them. A refusal, or
 // an answer without a usable confidence, is rejected. The answer to the name
 // check is read only when `has_name_check` says the request carried one. A
-// missing or unusable one only leaves `new_name` at zero.
+// missing or unusable one only leaves `same_work` at zero.
 std::optional<ClassificationAnswer> ParseDecisionResponse(
     DecisionFormat format,
     const std::string& body,

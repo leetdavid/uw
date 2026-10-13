@@ -3,12 +3,16 @@
 
 #include "uw/browser/tab_organization/automatic_organizer.h"
 
+#include <algorithm>
+#include <functional>
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/location.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
@@ -132,6 +136,15 @@ base::CallbackListSubscription AutomaticOrganizer::ObserveEvents(
   return events_.Add(std::move(callback));
 }
 
+size_t AutomaticOrganizer::pending_requests() const {
+  return static_cast<size_t>(
+      std::ranges::count_if(
+          pages_, [](const auto& entry) { return entry.second.asking; }) +
+      std::ranges::count_if(requests_, [](const auto& entry) {
+        return !entry.second.request.naming.body.empty();
+      }));
+}
+
 void AutomaticOrganizer::DispatchNowForTesting() {
   timer_.Stop();
   Dispatch();
@@ -155,16 +168,29 @@ void AutomaticOrganizer::OnConfigChanged() {
   if (!Enabled()) {
     timer_.Stop();
     requests_.clear();
+    kept_.clear();
+    asked_.clear();
+    for (auto& [id, activity] : pages_) {
+      activity.asking = false;
+    }
   }
 }
 
 void AutomaticOrganizer::Scan() {
   const PageTree& tree = controller_->tree();
+  const size_t known = pages_.size() + requests_.size();
   std::erase_if(pages_,
                 [&tree](const auto& entry) { return !tree.Find(entry.first); });
   std::erase_if(requests_, [&tree](const auto& entry) {
-    return !tree.Find(entry.second.page);
+    return !tree.Find(entry.second.request.page);
   });
+  std::erase_if(kept_,
+                [&tree](const auto& entry) { return !tree.Find(entry.first); });
+  std::erase_if(asked_, [&tree](const PageId& id) { return !tree.Find(id); });
+  // A page that closed may be what the rest of its branch waited for.
+  if (pages_.size() + requests_.size() != known) {
+    ScheduleSettle();
+  }
   const bool enabled = Enabled();
   bool due = false;
   for (const Page& page : tree.pages()) {
@@ -195,6 +221,9 @@ void AutomaticOrganizer::Scan() {
     }
     activity.title = contents->GetTitle();
     ++activity.revision;
+    activity.asking = false;
+    activity.placed = false;
+    kept_.erase(page.id);
     // A page is filed when it opens here or changes, not for being there:
     // restored tabs and tabs opened while organization is off keep their
     // place.
@@ -217,9 +246,14 @@ void AutomaticOrganizer::OnManualMove(const std::vector<PageId>& pages) {
     const auto activity = pages_.find(page);
     if (activity != pages_.end()) {
       activity->second.requested = ++activity->second.revision;
+      activity->second.asking = false;
+      activity->second.placed = true;
     }
+    kept_.erase(page);
     CancelRequestsFor(page);
   }
+  // The rest of a branch may have waited for a request that is now dropped.
+  ScheduleSettle();
 }
 
 void AutomaticOrganizer::Dispatch() {
@@ -236,8 +270,11 @@ void AutomaticOrganizer::Dispatch() {
     content::RenderFrameHost* frame =
         contents ? contents->GetPrimaryMainFrame() : nullptr;
     if (!frame || !activity.url.SchemeIsHTTPOrHTTPS()) {
+      // Nothing is asked about this page, so its branch need not wait for it.
+      ScheduleSettle();
       continue;
     }
+    activity.asking = true;
     content_extraction::GetInnerText(
         *frame, std::nullopt,
         base::BindOnce(&AutomaticOrganizer::OnExcerpt,
@@ -255,10 +292,17 @@ void AutomaticOrganizer::OnExcerpt(
         base::CollapseWhitespaceASCII(result->inner_text, true),
         kMaxExcerptLength, &excerpt);
   }
-  SendDecision(page, revision, std::move(excerpt));
+  if (SendDecision(page, revision, std::move(excerpt))) {
+    return;
+  }
+  const auto activity = pages_.find(page);
+  if (activity != pages_.end() && activity->second.revision == revision) {
+    activity->second.asking = false;
+  }
+  ScheduleSettle();
 }
 
-void AutomaticOrganizer::SendDecision(const PageId& id,
+bool AutomaticOrganizer::SendDecision(const PageId& id,
                                       uint64_t revision,
                                       std::string excerpt) {
   const Page* page = controller_->tree().Find(id);
@@ -267,7 +311,7 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   content::WebContents* contents = tab ? tab->GetContents() : nullptr;
   if (!Enabled() || !page || !contents || activity == pages_.end() ||
       activity->second.revision != revision) {
-    return;
+    return false;
   }
   CancelRequestsFor(id);
   const PrefService* prefs = profile()->GetPrefs();
@@ -279,6 +323,7 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   request.page = id;
   request.revision = revision;
   request.task = page->task;
+  request.task_title = controller_->TaskTitle(page->task);
   request.parent = page->parent;
   request.format =
       decides ? FormatFor(decision.provider) : DecisionFormat::kChat;
@@ -308,30 +353,60 @@ void AutomaticOrganizer::SendDecision(const PageId& id,
   std::optional<std::string> body = BuildDecisionRequestBody(
       request.format, model, request.context, tasks, name_check);
   if (!body) {
-    return;
+    return false;
   }
   request.decision.model = model;
   request.decision.url =
       decides ? DecisionUrl(decision) : ChatCompletionsUrl(language.endpoint);
   request.decision.body = *body;
   request.decision.sent_at = base::TimeTicks::Now();
-  request.client = Client(request.decision.url,
-                          decides ? decision.key_account : language.key_account,
-                          std::move(*body));
-  if (!request.client) {
-    return;
+  std::unique_ptr<RemoteModelClient> client = Client(
+      request.decision.url,
+      decides ? decision.key_account : language.key_account, std::move(*body));
+  if (!client) {
+    return false;
   }
   Report(Event::Kind::kAsking, request);
-  Send(std::move(request), &AutomaticOrganizer::OnDecision);
+  Send(std::move(request), std::move(client), &AutomaticOrganizer::OnDecision);
+  return true;
 }
 
-std::vector<std::string> AutomaticOrganizer::OtherTitles(
+std::vector<std::string> AutomaticOrganizer::MemberTitles(
     const Page& page) const {
+  const bool named = Named(page.task);
   std::vector<std::string> titles;
   for (const Page& other : controller_->tree().pages()) {
     const auto activity = pages_.find(other.id);
-    if (other.task == page.task && other.id != page.id &&
-        activity != pages_.end() && !activity->second.title.empty()) {
+    if (other.task != page.task || other.id == page.id ||
+        activity == pages_.end() || activity->second.title.empty()) {
+      continue;
+    }
+    const auto kept = kept_.find(other.id);
+    if (named &&
+        (activity->second.asking ||
+         activity->second.requested < activity->second.revision ||
+         (kept != kept_.end() && kept->second.answer.choice != page.task))) {
+      continue;
+    }
+    titles.push_back(base::UTF16ToUTF8(activity->second.title));
+  }
+  return titles;
+}
+
+std::vector<std::string> AutomaticOrganizer::TitlesUnder(
+    const PageId& top,
+    const std::vector<PageId>& staying) const {
+  const PageTree& tree = controller_->tree();
+  std::set<PageId> left;
+  for (const PageId& root : staying) {
+    const std::vector<PageId> branch = tree.BranchOf(root);
+    left.insert(branch.begin(), branch.end());
+  }
+  std::vector<std::string> titles;
+  for (const PageId& id : tree.BranchOf(top)) {
+    const auto activity = pages_.find(id);
+    if (id != top && !left.contains(id) && activity != pages_.end() &&
+        !activity->second.title.empty()) {
       titles.push_back(base::UTF16ToUTF8(activity->second.title));
     }
   }
@@ -344,12 +419,11 @@ std::optional<NameCheck> AutomaticOrganizer::NameCheckFor(
       !IsComplete(ReadAiConnectionConfig(profile()->GetPrefs()))) {
     return std::nullopt;
   }
-  std::vector<std::string> titles = OtherTitles(page);
+  std::vector<std::string> titles = MemberTitles(page);
   if (titles.empty()) {
     return std::nullopt;
   }
-  return NameCheck{base::UTF16ToUTF8(controller_->TaskTitle(page.task)),
-                   std::move(titles)};
+  return NameCheck{std::move(titles)};
 }
 
 void AutomaticOrganizer::NameTaskOf(Request request,
@@ -357,7 +431,11 @@ void AutomaticOrganizer::NameTaskOf(Request request,
   const Page* page = controller_->tree().Find(request.page);
   request.names_task = true;
   owed_names_.erase(request.task);
-  if (!name && !(page && PrepareNaming(request, OtherTitles(*page)))) {
+  std::unique_ptr<RemoteModelClient> client;
+  if (!name && page) {
+    client = PrepareNaming(request, MemberTitles(*page));
+  }
+  if (!name && !client) {
     Report(Event::Kind::kLeft, request);
     return;
   }
@@ -366,10 +444,10 @@ void AutomaticOrganizer::NameTaskOf(Request request,
     controller_->NameTask(request.task, *name);
     return;
   }
-  Send(std::move(request), &AutomaticOrganizer::OnName);
+  Send(std::move(request), std::move(client), &AutomaticOrganizer::OnName);
 }
 
-bool AutomaticOrganizer::PrepareNaming(
+std::unique_ptr<RemoteModelClient> AutomaticOrganizer::PrepareNaming(
     Request& request,
     const std::vector<std::string>& other_titles) {
   const AiConnectionConfig language =
@@ -379,80 +457,235 @@ bool AutomaticOrganizer::PrepareNaming(
                                  language.model, request.context, other_titles)
                            : std::nullopt;
   if (!body) {
-    return false;
+    return nullptr;
+  }
+  std::unique_ptr<RemoteModelClient> client = Client(
+      ChatCompletionsUrl(language.endpoint), language.key_account, *body);
+  if (!client) {
+    return nullptr;
   }
   request.naming.model = language.model;
   request.naming.url = ChatCompletionsUrl(language.endpoint);
-  request.naming.body = *body;
+  request.naming.body = std::move(*body);
   request.naming.sent_at = base::TimeTicks::Now();
-  request.client =
-      Client(request.naming.url, language.key_account, std::move(*body));
-  return !!request.client;
+  return client;
 }
 
-void AutomaticOrganizer::Send(Request request, AnswerHandler on_answer) {
+void AutomaticOrganizer::Send(Request request,
+                              std::unique_ptr<RemoteModelClient> client,
+                              AnswerHandler on_answer) {
   const uint64_t request_id = next_request_++;
-  RemoteModelClient* client = request.client.get();
-  requests_.emplace(request_id, std::move(request));
-  client->Send(
+  RemoteModelClient* sender = client.get();
+  requests_.emplace(request_id, Pending{std::move(request), std::move(client)});
+  sender->Send(
       base::BindOnce(on_answer, weak_factory_.GetWeakPtr(), request_id));
 }
 
 void AutomaticOrganizer::OnDecision(uint64_t request_id,
                                     RemoteModelClient::Outcome outcome) {
-  std::optional<Request> request = Take(request_id);
-  if (!request) {
+  std::optional<Pending> pending = Take(request_id);
+  if (!pending) {
     return;
   }
-  request->decision.took = base::TimeTicks::Now() - request->decision.sent_at;
-  request->decision.answer = outcome;
-  if (!Current(*request)) {
-    Report(Event::Kind::kDropped, *request);
+  Request& request = pending->request;
+  const PageId page = request.page;
+  request.decision.took = base::TimeTicks::Now() - request.decision.sent_at;
+  request.decision.answer = outcome;
+  const auto activity = pages_.find(page);
+  if (activity != pages_.end() &&
+      activity->second.revision == request.revision) {
+    activity->second.asking = false;
+  }
+  std::optional<ClassificationAnswer> answer =
+      outcome.ok ? ParseDecisionResponse(request.format, outcome.body,
+                                         request.has_tasks, request.checks_name)
+                 : std::nullopt;
+  if (answer && answer->choice != kNewTaskOption &&
+      answer->choice != kScratchpadOption && !Named(answer->choice)) {
+    answer.reset();
+  }
+  if (!Current(request)) {
+    Report(Event::Kind::kDropped, request);
+  } else if (!outcome.ok) {
+    Report(Event::Kind::kRequestFailed, request, FailureReason(outcome));
+  } else if (!answer) {
+    Report(Event::Kind::kAnswerUnreadable, request);
+  } else {
+    request.new_name = answer->same_work;
+    kept_.insert_or_assign(page, Kept{std::move(request), std::move(*answer)});
+  }
+  Settle(page);
+}
+
+void AutomaticOrganizer::Settle(const PageId& page) {
+  if (!Enabled()) {
     return;
   }
-  if (!outcome.ok) {
-    Report(Event::Kind::kRequestFailed, *request, FailureReason(outcome));
+  const PageTree& tree = controller_->tree();
+  const PageId top = tree.TopOf(page);
+  if (!tree.Find(top)) {
     return;
   }
-  std::optional<ClassificationAnswer> answer = ParseDecisionResponse(
-      request->format, outcome.body, request->has_tasks, request->checks_name);
-  if (!answer ||
-      (answer->choice != kNewTaskOption &&
-       answer->choice != kScratchpadOption && !Named(answer->choice))) {
-    Report(Event::Kind::kAnswerUnreadable, *request);
+  const std::vector<PageId> branch = tree.BranchOf(top);
+  for (const PageId& id : branch) {
+    const auto activity = pages_.find(id);
+    if (activity != pages_.end() &&
+        (activity->second.asking ||
+         activity->second.requested < activity->second.revision)) {
+      return;
+    }
+  }
+  std::vector<BranchPlacement> placements = PlaceBranchOf(top);
+  const auto moves = [](const BranchPlacement& group) {
+    return group.placement.action == Placement::Action::kApply;
+  };
+  // Before a tab moves or its task gets a name, the tabs of the branch that
+  // nobody asked about are asked about, once.
+  const bool acts =
+      std::ranges::any_of(placements, [](const BranchPlacement& group) {
+        return group.placement.action == Placement::Action::kApply ||
+               group.placement.action == Placement::Action::kName;
+      });
+  if (acts && asked_.insert(top).second && AskRest(branch)) {
     return;
   }
-  // A page with tabs under it stays in its task unless the user says so:
-  // those tabs came from what it showed before.
-  const Placement placement =
-      Place(*answer,
-            {request->in_unnamed_task ? std::string() : request->task,
-             request->in_unnamed_task,
-             controller_->tree().BranchOf(request->page).size() == 1},
-            ReadThresholds(profile()->GetPrefs()));
-  request->target = placement.target;
-  request->confidence = placement.confidence;
-  request->needed = placement.needed;
-  request->new_name = answer->new_name;
+  asked_.erase(top);
+  // Moves come last, so the sidebar ends on what changed.
+  std::ranges::stable_partition(placements, std::not_fn(moves));
+  for (const BranchPlacement& group : placements) {
+    CarryOut(group);
+  }
+}
+
+void AutomaticOrganizer::SettleKept() {
+  settle_pending_ = false;
+  std::set<PageId> tops;
+  for (const auto& [id, kept] : kept_) {
+    tops.insert(controller_->tree().TopOf(id));
+  }
+  for (const PageId& top : tops) {
+    Settle(top);
+  }
+}
+
+void AutomaticOrganizer::ScheduleSettle() {
+  if (settle_pending_) {
+    return;
+  }
+  settle_pending_ = true;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&AutomaticOrganizer::SettleKept,
+                                weak_factory_.GetWeakPtr()));
+}
+
+std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
+    const PageId& top) {
+  const PageTree& tree = controller_->tree();
+  const std::string task = tree.Find(top)->task;
+  std::map<PageId, TabAnswer> tabs;
+  for (const PageId& id : tree.BranchOf(top)) {
+    const auto activity = pages_.find(id);
+    if (activity == pages_.end()) {
+      continue;
+    }
+    TabAnswer& tab = tabs[id];
+    tab.placed = activity->second.placed;
+    const auto kept = kept_.find(id);
+    if (kept == kept_.end()) {
+      continue;
+    }
+    if (Valid(kept->second)) {
+      tab.answer = kept->second.answer;
+    } else {
+      Report(Event::Kind::kDropped, kept->second.request);
+      kept_.erase(kept);
+    }
+  }
+  const bool named = Named(task);
+  return PlaceBranch(tree, top, tabs,
+                     {named ? task : std::string(), !task.empty() && !named},
+                     ReadThresholds(profile()->GetPrefs()));
+}
+
+bool AutomaticOrganizer::AskRest(const std::vector<PageId>& branch) {
+  bool asked = false;
+  for (const PageId& id : branch) {
+    const auto activity = pages_.find(id);
+    if (activity == pages_.end() || activity->second.placed ||
+        kept_.contains(id) || !activity->second.url.SchemeIsHTTPOrHTTPS()) {
+      continue;
+    }
+    activity->second.requested = activity->second.revision - 1;
+    asked = true;
+  }
+  if (asked) {
+    Dispatch();
+  }
+  return asked;
+}
+
+void AutomaticOrganizer::CarryOut(const BranchPlacement& group) {
+  using Action = Placement::Action;
+  const auto top = kept_.find(group.top);
+  if (top == kept_.end()) {
+    return;
+  }
+  const bool owed = group.placement.action == Action::kLeave &&
+                    top->second.request.in_unnamed_task &&
+                    owed_names_.contains(top->second.request.task);
   // A task whose name could not be had gets it from the next tab that stays.
-  const bool owed = placement.action == Placement::Action::kLeave &&
-                    request->in_unnamed_task &&
-                    owed_names_.contains(request->task);
-  switch (owed ? Placement::Action::kName : placement.action) {
-    case Placement::Action::kLeave:
-      Report(Event::Kind::kLeft, *request);
-      return;
-    case Placement::Action::kName:
-      NameTaskOf(std::move(*request), std::move(answer->task_name));
-      return;
-    case Placement::Action::kSuggest:
-      Report(Event::Kind::kUnsure, *request, TargetName(*request));
-      suggestion_ =
-          Suggestion{std::move(*request), std::move(answer->task_name)};
-      return;
-    case Placement::Action::kApply:
-      Apply(std::move(*request), std::move(answer->task_name));
+  const Action action = owed ? Action::kName : group.placement.action;
+  // The requests of the group that the log does not hold yet.
+  std::vector<Kept*> fresh;
+  for (const PageId& id : group.pages) {
+    const auto kept = kept_.find(id);
+    if (kept == kept_.end()) {
+      continue;
+    }
+    Request& request = kept->second.request;
+    if (!request.logged || id == group.top) {
+      request.target = group.placement.target;
+      request.confidence = group.placement.confidence;
+      request.needed = group.placement.needed;
+    }
+    if (!request.logged) {
+      fresh.push_back(&kept->second);
+    }
   }
+  if (action == Action::kLeave || action == Action::kSuggest) {
+    if (action == Action::kSuggest && !fresh.empty()) {
+      suggestion_ =
+          Suggestion{top->second.request, top->second.answer.task_name};
+      suggestion_->request.staying = group.staying;
+      suggestion_->request.logged = true;
+    }
+    for (Kept* kept : fresh) {
+      if (action == Action::kLeave) {
+        Report(Event::Kind::kLeft, kept->request);
+      } else {
+        Report(Event::Kind::kUnsure, kept->request, TargetName(kept->request));
+      }
+    }
+    return;
+  }
+  // A move is about the top tab of the group. A name is asked for with the
+  // tab that brought it up: the one whose answer is new. The copy reports for
+  // the kept request from here on.
+  Kept& lead =
+      action == Action::kName && top->second.request.logged && !fresh.empty()
+          ? *fresh.front()
+          : top->second;
+  Request request = lead.request;
+  request.staying = group.staying;
+  lead.request.logged = true;
+  std::optional<std::u16string> task_name = lead.answer.task_name;
+  if (action == Action::kName) {
+    const Request named = request;
+    NameTaskOf(std::move(request), std::move(task_name));
+    Placed(group.pages, Event::Kind::kNeedsName, named);
+    return;
+  }
+  Apply(std::move(request), std::move(task_name));
 }
 
 void AutomaticOrganizer::AcceptSuggestion() {
@@ -468,69 +701,98 @@ void AutomaticOrganizer::AcceptSuggestion() {
   LogOrganizerExchange("accepted", suggestion.request.decision,
                        suggestion.request.target,
                        LogDetails(suggestion.request));
+  suggestion.request.confirmed = true;
   Apply(std::move(suggestion.request), std::move(suggestion.task_name));
 }
 
 void AutomaticOrganizer::Apply(Request request,
                                std::optional<std::u16string> task_name) {
-  if (request.target == kScratchpadOption) {
-    const bool moved = controller_->MoveToScratchpad(
-        {request.page}, TabOrganizationController::Origin::kOrganizer);
-    Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
-           TargetName(request));
-    return;
-  }
   if (request.target != kNewTaskOption) {
     const std::optional<tab_groups::TabGroupId> group =
         controller_->GroupFor(request.target);
     const bool moved =
-        group &&
-        controller_->MoveToTask({request.page}, *group,
-                                TabOrganizationController::Origin::kOrganizer);
+        request.target == kScratchpadOption
+            ? controller_->MoveToScratchpad(
+                  {request.page}, TabOrganizationController::Origin::kOrganizer,
+                  request.staying)
+            : group && controller_->MoveToTask(
+                           {request.page}, *group,
+                           TabOrganizationController::Origin::kOrganizer,
+                           request.staying);
     Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
            TargetName(request));
+    if (moved) {
+      Placed(controller_->tree().BranchOf(request.page), Event::Kind::kMoved,
+             request);
+    } else {
+      kept_.erase(request.page);
+    }
+    return;
+  }
+  if (NamingOutFor(request.page)) {
     return;
   }
   if (task_name) {
     CreateTask(request, *task_name);
     return;
   }
-  if (!PrepareNaming(request, {})) {
+  std::unique_ptr<RemoteModelClient> client =
+      PrepareNaming(request, TitlesUnder(request.page, request.staying));
+  if (!client) {
     CreateTask(request, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     return;
   }
   Report(Event::Kind::kNaming, request,
          base::UTF8ToUTF16(request.naming.model));
-  Send(std::move(request), &AutomaticOrganizer::OnName);
+  Send(std::move(request), std::move(client), &AutomaticOrganizer::OnName);
 }
 
 void AutomaticOrganizer::OnName(uint64_t request_id,
                                 RemoteModelClient::Outcome outcome) {
-  std::optional<Request> request = Take(request_id);
-  if (!request) {
+  std::optional<Pending> pending = Take(request_id);
+  if (!pending) {
     return;
   }
+  Request& request = pending->request;
   std::optional<std::u16string> name =
       outcome.ok ? ParseNamingResponse(outcome.body) : std::nullopt;
-  request->naming.took = base::TimeTicks::Now() - request->naming.sent_at;
-  request->naming.answer = std::move(outcome);
-  LogOrganizerExchange("name", request->naming,
+  request.naming.took = base::TimeTicks::Now() - request.naming.sent_at;
+  request.naming.answer = std::move(outcome);
+  LogOrganizerExchange("name", request.naming,
                        name ? "named" : "no usable name");
-  if (request->names_task) {
+  if (request.names_task) {
     if (!name) {
-      owed_names_.insert(request->task);
-    } else if (Current(*request) &&
-               (!Named(request->task) || Generated(request->task))) {
-      controller_->NameTask(request->task, *name);
+      owed_names_.insert(request.task);
+    } else if (Current(request) &&
+               (!Named(request.task) || Generated(request.task))) {
+      controller_->NameTask(request.task, *name);
     }
     return;
   }
-  if (!Current(*request)) {
-    Report(Event::Kind::kDropped, *request);
+  bool leaves = Current(request);
+  // The branch may have grown while the name was on its way, so what moves
+  // and what stays behind is looked at again. A move the user confirmed is
+  // carried out as they saw it.
+  if (leaves && !request.confirmed) {
+    const std::vector<BranchPlacement> placements =
+        PlaceBranchOf(controller_->tree().TopOf(request.page));
+    const auto group = std::ranges::find_if(
+        placements, [&request](const BranchPlacement& candidate) {
+          return candidate.top == request.page &&
+                 candidate.placement.action == Placement::Action::kApply &&
+                 candidate.placement.target == kNewTaskOption;
+        });
+    leaves = group != placements.end();
+    if (leaves) {
+      request.staying = group->staying;
+    }
+  }
+  if (!leaves) {
+    Report(Event::Kind::kDropped, request);
     return;
   }
   const std::optional<tab_groups::TabGroupId> task = CreateTask(
-      *request, name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
+      request, name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
   if (!name && task) {
     owed_names_.insert(task->ToString());
   }
@@ -540,10 +802,41 @@ std::optional<tab_groups::TabGroupId> AutomaticOrganizer::CreateTask(
     Request& request,
     std::u16string title) {
   const std::optional<tab_groups::TabGroupId> task = controller_->MoveToNewTask(
-      {request.page}, title, TabOrganizationController::Origin::kOrganizer);
+      {request.page}, title, TabOrganizationController::Origin::kOrganizer,
+      request.staying);
   Report(task ? Event::Kind::kCreated : Event::Kind::kDropped, request,
          std::move(title));
+  if (task) {
+    Placed(controller_->tree().BranchOf(request.page), Event::Kind::kCreated,
+           request);
+  } else {
+    kept_.erase(request.page);
+  }
   return task;
+}
+
+void AutomaticOrganizer::Placed(const std::vector<PageId>& pages,
+                                Event::Kind kind,
+                                const Request& by) {
+  for (const PageId& id : pages) {
+    const auto activity = pages_.find(id);
+    if (activity != pages_.end()) {
+      activity->second.placed = true;
+    }
+    const auto kept = kept_.find(id);
+    if (kept == kept_.end()) {
+      continue;
+    }
+    Request& request = kept->second.request;
+    if (!request.logged) {
+      request.target = by.target;
+      request.confidence = by.confidence;
+      request.needed = by.needed;
+      LogOrganizerExchange("placement", request.decision, ResultName(kind),
+                           LogDetails(request));
+    }
+    kept_.erase(kept);
+  }
 }
 
 void AutomaticOrganizer::Report(Event::Kind kind,
@@ -588,6 +881,24 @@ bool AutomaticOrganizer::Current(const Request& request) const {
          page->task == request.task && page->parent == request.parent;
 }
 
+bool AutomaticOrganizer::Valid(const Kept& kept) const {
+  const Request& request = kept.request;
+  const Page* page = controller_->tree().Find(request.page);
+  const auto activity = pages_.find(request.page);
+  return page && activity != pages_.end() &&
+         activity->second.revision == request.revision &&
+         page->task == request.task &&
+         controller_->TaskTitle(request.task) == request.task_title;
+}
+
+bool AutomaticOrganizer::NamingOutFor(const PageId& page) const {
+  return std::ranges::any_of(requests_, [&page](const auto& entry) {
+    const Request& request = entry.second.request;
+    return request.page == page && !request.names_task &&
+           !request.naming.body.empty();
+  });
+}
+
 bool AutomaticOrganizer::Named(const std::string& task) const {
   const std::u16string title = controller_->TaskTitle(task);
   return !title.empty() &&
@@ -598,20 +909,20 @@ bool AutomaticOrganizer::Generated(const std::string& task) const {
   return Named(task) && controller_->HasGeneratedName(task);
 }
 
-std::optional<AutomaticOrganizer::Request> AutomaticOrganizer::Take(
+std::optional<AutomaticOrganizer::Pending> AutomaticOrganizer::Take(
     uint64_t request_id) {
   const auto it = requests_.find(request_id);
   if (it == requests_.end()) {
     return std::nullopt;
   }
-  Request request = std::move(it->second);
+  Pending pending = std::move(it->second);
   requests_.erase(it);
-  return request;
+  return pending;
 }
 
 void AutomaticOrganizer::CancelRequestsFor(const PageId& page) {
   std::erase_if(requests_, [&page](const auto& entry) {
-    return entry.second.page == page;
+    return entry.second.request.page == page;
   });
 }
 

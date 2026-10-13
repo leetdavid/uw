@@ -22,6 +22,8 @@ inline constexpr char kOrganizerLogSwitch[] = "uw-organizer-log";
 // One request to a model and its answer.
 struct OrganizerExchange {
   OrganizerExchange();
+  OrganizerExchange(const OrganizerExchange&);
+  OrganizerExchange& operator=(const OrganizerExchange&);
   OrganizerExchange(OrganizerExchange&&);
   OrganizerExchange& operator=(OrganizerExchange&&);
   ~OrganizerExchange();

@@ -60,7 +60,7 @@ A set of related changes to the tab tree, such as creating a task group and movi
 The organizer's suggestion that a set of tabs represents a separate browsing task.
 
 **Classification call**:
-One LLM request that decides a tab branch's placement. It says which task the branch belongs to, or none, with a confidence. For a branch outside every task it says how likely the branch starts a task of its own, and supplies the name of that task.
+One LLM request about where a tab belongs. It says which task the tab belongs to, or none, with a confidence. For a tab outside every task it says how likely the tab starts a task of its own, and supplies the name of that task. uw decides about a tab branch from the answers about its tabs.
 
 **Provisional task name**:
 The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
@@ -75,7 +75,7 @@ The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. I
 A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it. After a call that failed or gave no usable name, it is sent again for the next tab that changes and stays in that task.
 
 **Name check**:
-The question in a placement request that asks whether the task a tab branch is in has outgrown its name. It is asked only about a generated name.
+The question in a placement request that asks whether a tab is the same piece of work as the tabs that make up its task. A tab that is, and yet fits no task name, shows that its task has outgrown its name. It is asked only about a generated name.
 
 **Generated name**:
 A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced, until the user hands it back with the name lock.

@@ -68,14 +68,14 @@ constexpr char kScratchpadDescription[] =
     "home page, a feed, or a dashboard.";
 // Asked about a branch in a task that uw named. It settles whether a branch
 // that no longer matches the name has left the task, or the task has outgrown
-// the name.
+// the name: the branch then is the same piece of work as the task's tabs.
 constexpr char kNameQuestion[] = "name";
-constexpr char kKeepNameOption[] = "keep";
-constexpr char kNewNameOption[] = "rename";
-constexpr char kKeepNameDescription[] =
-    "The name still covers the work these tabs share.";
-constexpr char kNewNameDescription[] =
-    "These tabs share work that the name is too narrow or too old to cover.";
+constexpr char kSameWorkOption[] = "same";
+constexpr char kOtherWorkOption[] = "different";
+constexpr char kSameWorkDescription[] =
+    "This tab continues the piece of work those tabs share.";
+constexpr char kOtherWorkDescription[] =
+    "This tab is a different piece of work from those tabs.";
 constexpr char kNamingPrompt[] =
     "Name the browsing task that this tab starts. Reply with only the name: a "
     "short, action-oriented phrase of at most five words, with no quotes.";
@@ -115,8 +115,8 @@ Options OtherwiseOptions() {
 }
 
 Options NameOptions() {
-  return {{kKeepNameOption, kKeepNameDescription},
-          {kNewNameOption, kNewNameDescription}};
+  return {{kSameWorkOption, kSameWorkDescription},
+          {kOtherWorkOption, kOtherWorkDescription}};
 }
 
 std::string ListTitles(const std::vector<std::string>& titles) {
@@ -128,9 +128,10 @@ std::string ListTitles(const std::vector<std::string>& titles) {
 }
 
 std::string NameInstructions(const NameCheck& check) {
-  return "The user's browsing task \"" + check.name +
-         "\" holds this tab and these tabs:" + ListTitles(check.other_titles) +
-         "\nDecide whether the task needs a new name.";
+  return "The tab sits in a group with these tabs:" +
+         ListTitles(check.other_titles) +
+         "\nDecide whether this tab is part of the same piece of work as "
+         "those tabs.";
 }
 
 std::string DescribeBranch(const BranchContext& context) {
@@ -219,13 +220,13 @@ double ProbabilityOf(const base::DictValue& answer,
 }
 
 // Zero for a missing or unusable answer, so a bad one cannot rename a task.
-double NewNameProbability(const base::DictValue* name, bool listed) {
+double SameWorkProbability(const base::DictValue* name, bool listed) {
   const std::optional<ClassificationAnswer> read = ReadChoice(name, listed);
   if (!read ||
-      (read->choice != kKeepNameOption && read->choice != kNewNameOption)) {
+      (read->choice != kSameWorkOption && read->choice != kOtherWorkOption)) {
     return 0.0;
   }
-  const double probability = ProbabilityOf(*name, *read, kNewNameOption);
+  const double probability = ProbabilityOf(*name, *read, kSameWorkOption);
   return ValidConfidence(probability) ? probability : 0.0;
 }
 
@@ -271,7 +272,7 @@ std::optional<ClassificationAnswer> JoinAnswers(
   std::optional<ClassificationAnswer> answer =
       JoinPlacement(destination, otherwise, has_tasks, listed);
   if (answer) {
-    answer->new_name = NewNameProbability(name, listed);
+    answer->same_work = SameWorkProbability(name, listed);
   }
   return answer;
 }

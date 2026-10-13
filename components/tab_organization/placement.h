@@ -4,9 +4,13 @@
 #ifndef UW_COMPONENTS_TAB_ORGANIZATION_PLACEMENT_H_
 #define UW_COMPONENTS_TAB_ORGANIZATION_PLACEMENT_H_
 
+#include <map>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "uw/components/tab_organization/ai_protocol.h"
+#include "uw/components/tab_organization/page_tree.h"
 
 namespace uw {
 
@@ -39,9 +43,6 @@ struct Position {
   // task, so its answer cannot say the branch does not fit there. A branch
   // that starts a task gives this one its name.
   bool in_unnamed_task = false;
-  // False for a branch that must not be taken out of its task without the
-  // user.
-  bool may_leave = true;
 };
 
 // What uw does with one placement answer.
@@ -62,12 +63,55 @@ struct Placement {
   // The number that decided it, and what it had to reach.
   double confidence = 0.0;
   double needed = 0.0;
+
+  friend bool operator==(const Placement&, const Placement&) = default;
 };
 
 // Decides what to do with `answer` for a branch at `position`.
 Placement Place(const ClassificationAnswer& answer,
                 const Position& position,
                 const Thresholds& needed);
+
+// What uw knows about one tab when it decides about the branch the tab is in.
+struct TabAnswer {
+  // The model's last answer about what the tab shows now. None for a tab that
+  // was not asked about, or whose request failed.
+  std::optional<ClassificationAnswer> answer;
+  // True for a tab that stays where it is whatever was answered: the user
+  // placed it by hand, or uw has already acted on its answer.
+  bool placed = false;
+};
+
+// What uw does with some of the tabs of one branch.
+struct BranchPlacement {
+  // The tab that decides it.
+  PageId top;
+  // `top` and the tabs under it that go where it goes, in tree order.
+  std::vector<PageId> pages;
+  // Tabs directly under one of `pages` that do not go along. When `pages`
+  // move, these stay behind.
+  std::vector<PageId> staying;
+  Placement placement;
+
+  friend bool operator==(const BranchPlacement&,
+                         const BranchPlacement&) = default;
+};
+
+// Decides about the whole branch under `top` from the answers about its
+// tabs. Tabs that sit under each other and whose answers put them in the same
+// place go together: `top` of each group decides where, and whether its task
+// has outgrown its name, while any tab of the group can make it the start of
+// a task. A tab that fits where it is, or that is `placed`, stays behind. A
+// tab without a usable answer goes with the page above it. `tabs` holds what
+// is known about each tab; a tab missing from it was not asked about. The
+// result lists every tab that has an answer, alone or in its group, in tree
+// order.
+std::vector<BranchPlacement> PlaceBranch(
+    const PageTree& tree,
+    const PageId& top,
+    const std::map<PageId, TabAnswer>& tabs,
+    const Position& position,
+    const Thresholds& needed);
 
 }  // namespace uw
 

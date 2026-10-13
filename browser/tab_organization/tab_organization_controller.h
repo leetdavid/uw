@@ -87,15 +87,20 @@ class TabOrganizationController : public TabStripModelObserver {
   void Execute(int command, const std::vector<PageId>& ids);
 
   // Each call is one undoable organization action over whole branches.
+  // `staying` are pages inside those branches that do not go along. Each
+  // moves up to where the top page of its branch was, with the tabs under it.
   std::optional<tab_groups::TabGroupId> MoveToNewTask(
       const std::vector<PageId>& ids,
       std::u16string title,
-      Origin origin = Origin::kUser);
+      Origin origin = Origin::kUser,
+      const std::vector<PageId>& staying = {});
   bool MoveToTask(const std::vector<PageId>& ids,
                   const tab_groups::TabGroupId& group,
-                  Origin origin = Origin::kUser);
+                  Origin origin = Origin::kUser,
+                  const std::vector<PageId>& staying = {});
   bool MoveToScratchpad(const std::vector<PageId>& ids,
-                        Origin origin = Origin::kUser);
+                        Origin origin = Origin::kUser,
+                        const std::vector<PageId>& staying = {});
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);
@@ -155,6 +160,9 @@ class TabOrganizationController : public TabStripModelObserver {
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
+  // Takes each of `staying` out of the branches of `roots`.
+  void LeaveBehind(const std::vector<PageId>& roots,
+                   const std::vector<PageId>& staying);
   void NotifyManualMove(const std::vector<PageId>& roots);
   void NotifyNativeMoves(const std::set<PageId>& moved);
   // Brings `tree_` up to date with the strip. Never changes the strip.
