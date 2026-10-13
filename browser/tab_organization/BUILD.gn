@@ -53,6 +53,7 @@ source_set("browser_tests") {
     "//chrome/common",
     "//chrome/test:test_support",
     "//components/content_extraction/content/browser",
+    "//components/os_crypt/common:switches",
     "//components/prefs",
     "//components/tab_groups",
     "//content/public/browser",
@@ -113,6 +114,7 @@ source_set("ai_connection") {
     "//uw/components/tab_organization",
   ]
   deps = [
+    "//components/os_crypt/common:switches",
     "//components/pref_registry",
     "//components/prefs",
     "//crypto",

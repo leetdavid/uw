@@ -20,6 +20,7 @@
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_command_line.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/values.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -35,6 +36,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/content_extraction/content/browser/inner_text.h"
+#include "components/os_crypt/common/os_crypt_switches.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/navigation_controller.h"
@@ -854,6 +856,34 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(SettleAfter(4));
   EXPECT_EQ(link->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
+}
+
+// Every test and every scripted run of the app passes --use-mock-keychain.
+// Such a run keeps its keys in memory: it neither reads nor replaces a key
+// the user saved in the Keychain, which every profile on the Mac shares.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AMockKeychainRunLeavesTheUsersKeysAlone) {
+  ApiKeyStore keys;
+  {
+    // The user's own browser runs without the switch.
+    base::test::ScopedCommandLine their_run;
+    their_run.GetProcessCommandLine()->RemoveSwitch(
+        os_crypt::switches::kUseMockKeychain);
+    ASSERT_TRUE(keys.SetKey(kLanguageKeyAccount, "their-key"));
+  }
+
+  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
+  ASSERT_TRUE(keys.SetKey(kLanguageKeyAccount, "test-key"));
+  EXPECT_EQ(keys.GetKey(kLanguageKeyAccount), "test-key");
+  EXPECT_TRUE(keys.DeleteKey(kLanguageKeyAccount));
+  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
+
+  base::test::ScopedCommandLine their_run;
+  their_run.GetProcessCommandLine()->RemoveSwitch(
+      os_crypt::switches::kUseMockKeychain);
+  EXPECT_EQ(keys.GetKey(kLanguageKeyAccount), "their-key");
+  EXPECT_TRUE(keys.DeleteKey(kLanguageKeyAccount));
+  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
 }
 
 // A tab that no longer matches the name of its task has either left the task

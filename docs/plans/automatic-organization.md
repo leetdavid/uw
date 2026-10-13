@@ -49,7 +49,8 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - Starting uw with `--uw-organizer-log=<file>` appends every request the organizer makes, and its answer, to that file as one line of JSON. A placement line also says which tab it was about (`page`, an id that means nothing outside the session), where the branch was (`from`), where the answer put it (`to`), the number that decided it against what it had to reach (`confidence`, `needed`), and what the name check answered (`new_name`, zero when it was not asked). Its `result` is `name` when uw went on to ask for a task name. The lines hold tab titles, URLs, and page excerpts, so the browser writes nothing without the switch. The development script `pnpm run launch` passes it; `pnpm run launch:nolog` does not. Agreed on 2026-10-12.
 - A confirmed suggestion adds its own line to that log with `purpose` set to `accepted`: `request` is what the model saw and `result` is the choice the user confirmed. These lines are labeled examples for tuning or training a model. uw only records them; it sends them nowhere and trains nothing itself.
 - The Organize menu and the settings page provide "Pause for 1 hour", "Pause until next launch", "Pause indefinitely", and "Resume automatic organization" per [Product](../product.md#organization-controls).
-- API keys are stored in the macOS Keychain. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports, including the organizer log.
+- API keys are stored in the macOS Keychain, in items that every uw profile on the Mac shares. Endpoints and model IDs live in profile preferences. Keys never appear in logs, preferences, session data, or crash reports, including the organizer log.
+- A run started with `--use-mock-keychain` keeps its keys in memory. It never reads or replaces a key in the Keychain. Every browser test passes that switch, and a scripted run of the app must pass it too. The user approved this on 2026-10-13, after a scripted run replaced their saved language model key.
 - The settings page shows what is sent before the user enables automatic organization.
 - Provider outage, malformed responses, and slow responses never block browsing. Tabs stay where they are.
 
@@ -193,6 +194,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 23. A tab that would start a second task instead renames its task when the name check reaches the rename threshold. Short of it, the tab leaves as before. A name the user typed is never asked about and never replaced. An answer to a name check the request did not carry changes nothing. `OrganizerLogBrowserTest.ATaskThatOutgrowsItsNameIsRenamed` checks it.
 24. A tab opened from another tab, with no tabs under it, leaves its parent's task for a task of its own, and Undo puts it back under its parent. `AutomaticOrganizerBrowserTest.AChildTabBreaksOutOfItsParentsTask` checks it.
+25. A run with `--use-mock-keychain` does not see a key saved in the Keychain, and saving or removing a key in that run leaves the saved one as it was. `AutomaticOrganizerBrowserTest.AMockKeychainRunLeavesTheUsersKeysAlone` checks it.
 
 25. After a restart with the session restored, a task uw named is still asked about in the name check, and a task the user named is not. `AutomaticOrganizerBrowserTest.ANameUwGaveIsRememberedAfterARestart` checks it across a real restart.
 

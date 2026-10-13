@@ -11,7 +11,8 @@ namespace uw {
 
 // Stores provider API keys in macOS Keychain under non-secret account ids.
 // The account id itself (which provider slot the key fills) lives in profile
-// prefs; only the secret lives here. Never log keys.
+// prefs; only the secret lives here. Never log keys. A run started with
+// --use-mock-keychain keeps its keys in memory and leaves the Keychain alone.
 class ApiKeyStore {
  public:
   ApiKeyStore();
