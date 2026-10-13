@@ -8,6 +8,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include "base/values.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/organizer_log.h"
@@ -46,8 +48,10 @@ class TabOrganizationController;
 // the branch into that task, out of a task it no longer fits, or into a new
 // task, through the controller as one undoable action. The same answer says
 // when a task needs a name from the language model: a task without one that
-// the branch starts, or a task uw named that has outgrown its name. It never
-// blocks browsing: a slow, failed, or stale answer changes nothing.
+// the branch starts, or a task uw named that has outgrown its name. A name
+// that could not be had is asked for again when a tab in that task next
+// changes. It never blocks browsing: a slow, failed, or stale answer changes
+// nothing.
 class AutomaticOrganizer : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(AutomaticOrganizer);
@@ -189,7 +193,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Moves the branch to `request.target`: a task, the Scratchpad, or a new
   // task, named `task_name` or else by the language model.
   void Apply(Request request, std::optional<std::u16string> task_name);
-  void CreateTask(Request& request, std::u16string title);
+  // The task, when it was started.
+  std::optional<tab_groups::TabGroupId> CreateTask(Request& request,
+                                                   std::u16string title);
   // Tells the sidebar. The first report after the answer also writes the
   // placement request to the organizer log.
   void Report(Event::Kind kind,
@@ -220,6 +226,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::map<PageId, Activity> pages_;
   std::map<uint64_t, Request> requests_;
   std::optional<Suggestion> suggestion_;
+  // Tasks left without a name because the call for one failed or gave nothing
+  // usable.
+  std::set<std::string> owed_names_;
   uint64_t next_request_ = 1;
   base::RepeatingCallbackList<void(const Event&)> events_;
   base::OneShotTimer timer_;

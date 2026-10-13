@@ -72,7 +72,7 @@ A model that answers a typed question with a choice and a confidence instead of 
 The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. It names new tasks, and decides placement when no decision model is set.
 
 **Task naming call**:
-A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it.
+A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it. After a call that failed or gave no usable name, it is sent again for the next tab that changes and stays in that task.
 
 **Name check**:
 The question in a placement request that asks whether the task a tab branch is in has outgrown its name. It is asked only about a generated name.

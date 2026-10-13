@@ -356,6 +356,7 @@ void AutomaticOrganizer::NameTaskOf(Request request,
                                     std::optional<std::u16string> name) {
   const Page* page = controller_->tree().Find(request.page);
   request.names_task = true;
+  owed_names_.erase(request.task);
   if (!name && !(page && PrepareNaming(request, OtherTitles(*page)))) {
     Report(Event::Kind::kLeft, request);
     return;
@@ -433,7 +434,11 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
   request->confidence = placement.confidence;
   request->needed = placement.needed;
   request->new_name = answer->new_name;
-  switch (placement.action) {
+  // A task whose name could not be had gets it from the next tab that stays.
+  const bool owed = placement.action == Placement::Action::kLeave &&
+                    request->in_unnamed_task &&
+                    owed_names_.contains(request->task);
+  switch (owed ? Placement::Action::kName : placement.action) {
     case Placement::Action::kLeave:
       Report(Event::Kind::kLeft, *request);
       return;
@@ -512,8 +517,10 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   LogOrganizerExchange("name", request->naming,
                        name ? "named" : "no usable name");
   if (request->names_task) {
-    if (name && Current(*request) &&
-        (!Named(request->task) || Generated(request->task))) {
+    if (!name) {
+      owed_names_.insert(request->task);
+    } else if (Current(*request) &&
+               (!Named(request->task) || Generated(request->task))) {
       controller_->NameTask(request->task, *name);
     }
     return;
@@ -522,18 +529,21 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
     Report(Event::Kind::kDropped, *request);
     return;
   }
-  CreateTask(*request,
-             name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
+  const std::optional<tab_groups::TabGroupId> task = CreateTask(
+      *request, name.value_or(l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK)));
+  if (!name && task) {
+    owed_names_.insert(task->ToString());
+  }
 }
 
-void AutomaticOrganizer::CreateTask(Request& request, std::u16string title) {
-  const bool created =
-      controller_
-          ->MoveToNewTask({request.page}, title,
-                          TabOrganizationController::Origin::kOrganizer)
-          .has_value();
-  Report(created ? Event::Kind::kCreated : Event::Kind::kDropped, request,
+std::optional<tab_groups::TabGroupId> AutomaticOrganizer::CreateTask(
+    Request& request,
+    std::u16string title) {
+  const std::optional<tab_groups::TabGroupId> task = controller_->MoveToNewTask(
+      {request.page}, title, TabOrganizationController::Origin::kOrganizer);
+  Report(task ? Event::Kind::kCreated : Event::Kind::kDropped, request,
          std::move(title));
+  return task;
 }
 
 void AutomaticOrganizer::Report(Event::Kind kind,

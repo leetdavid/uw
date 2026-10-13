@@ -105,6 +105,10 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     models_.Answer(path, std::move(body));
   }
 
+  void Fail(const std::string& path, int status) {
+    models_.Fail(path, status, "{}");
+  }
+
   std::vector<ModelRequest> Requests() { return models_.Requests(); }
 
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
@@ -766,8 +770,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 }
 
 // A task that has no name gets one when the decision model finds that a tab
-// in it starts a piece of work. A one-off names nothing, and an unusable name
-// leaves the task for the next tab that does.
+// in it starts a piece of work. A one-off names nothing. After an unusable
+// name, the next tab in the task that changes asks again, one-off or not.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ATaskWithoutANameIsNamedWhenATabStartsIt) {
   UseDecisionModel(DecisionProvider::kOpenAiCompatible);
@@ -795,6 +799,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.99 of 0.75");
   EXPECT_FALSE(bar()->card()->offers_undo());
 
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
   tabs::TabInterface* link = OpenLinkFrom(opened, "hotels");
   ASSERT_TRUE(SettleAfter(5));
@@ -825,6 +830,30 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_NE(requests[5].body.find("Plan Lisbon trip"), std::string::npos);
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
   EXPECT_EQ(link->GetGroup(), task);
+}
+
+// A task uw starts keeps the provisional name when the call for its name
+// fails. The next change of a tab in the task asks for the name again, even a
+// change to a one-off.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ANameThatFailedIsAskedForAgain) {
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseLanguageModel();
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.97));
+  Fail("/v1/chat/completions", 401);
+
+  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> task = link->GetGroup();
+  ASSERT_TRUE(task);
+  EXPECT_EQ(TitleOf(*task), u"New task");
+
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  Browse(link, "weather");
+  ASSERT_TRUE(SettleAfter(4));
+  EXPECT_EQ(link->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
 }
 
 // A tab that no longer matches the name of its task has either left the task
