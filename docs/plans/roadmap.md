@@ -46,6 +46,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T36 | Busy terminal warning | backlog | 5/10 | One dialog names the running commands before a tab, branch, task, or window closes or uw quits. It touches four of Chromium's closing paths. Waits for approval after T32. |
 | T37 | Terminal restore in the same folder | backlog | 6/10 | A restored terminal tab comes back in its last folder and starts its shell when first shown. Reopening a closed tab needs a carrier for the folder that uw does not have yet. Waits for approval after T32. |
 | T38 | Terminal settings | backlog | 7/10 | Font, size, and a theme list on uw's settings page. Needs a design on the Doop canvas first. Waits for approval after T32. |
+| T39 | The logo as the app icon | in progress | 8/10 | The Dock, Finder, and the app switcher show the uw logo as a layered macOS icon that follows the system's light and dark icon styles, per [App icon](../logo.md#app-icon). `pnpm run icon` compiles it from the logo files and `uw-branding.patch` points the app bundle at the result. Agreed on 2026-10-14. Logos inside the browser and uw's own Clear and Tinted styles are left out. Done when the built `uw.app` holds the two icon files, macOS returns the logo as the app's icon, and the user has seen it in the Dock. |
 
 ## 1. Choose the browser foundation
 
@@ -103,6 +104,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | --- | --- | --- |
 | [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
 | [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. The customized build and headless smoke test pass; native UI behavior remains unverified. |
+| [App icon](../logo.md#app-icon) | 8/10 | Xcode compiles a layered icon from the logo files, and two lines of `chrome/BUILD.gn` point the app bundle at it. Each logo change means rerunning one command. Logos inside the browser are not covered. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Native tree-style tabs](../product.md#automatic-tab-organization) | 7/10 | Tasks are native tab groups. uw adds page parents, indentation, child promotion on close, and restore of parent links. |
 | [Arc-style look](arc-style-look.md) | 4/10 | Chromium already has settings for the sizes, colors, and rounded page corners. The tint gradient, the user's own tint, and the task folder row need custom drawing, and each Chromium update can move the views it touches. |

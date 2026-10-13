@@ -2,7 +2,7 @@
 
 Agreed on 2026-10-14, for now. It can still change.
 
-The logo is a design asset. The browser build does not use it yet and still ships Chromium's icons.
+On macOS it is the [app icon](#app-icon). Logos inside the browser are still Chromium's.
 
 <p align="center">
   <img src="assets/logo-light.svg" width="160" height="160" alt="uw logo on the light tile">
@@ -62,9 +62,38 @@ Four effects sit on the flat mark. Their exact values are in the SVG files.
 
 Below about 32 pixels the grain, rim, and shadow are too fine to see. The shading and the wash remain.
 
+## App icon
+
+Agreed on 2026-10-14. The Dock, Finder, and the app switcher show the logo.
+
+- The icon is a layered macOS icon: the mark above the tile, each with a light and a dark image.
+- macOS supplies the shape, the edge highlight, and the shadow. The corners are rounder than the logo's own tile.
+- macOS picks the image from its icon style setting. Default shows the light tile and Dark shows the dark tile.
+- Clear and Tinted are versions macOS derives from the layers. uw does not draw its own.
+
+Two generated files carry it. Do not edit them by hand.
+
+| File | Used on |
+| --- | --- |
+| `browser/branding/mac/Assets.car` | macOS 26 and later |
+| `browser/branding/mac/app.icns` | Older macOS |
+
+`uw-branding.patch` points the app bundle at both. See [Customizing Chromium](../README.md#customizing-chromium).
+
+After changing a logo file, rebuild the icon files and commit them:
+
+```sh
+pnpm run icon
+```
+
+- The command needs Xcode and a Chromium-based browser that can take a headless screenshot.
+- It uses Google Chrome. Pass `--browser <path>` for another. The built uw does not work: its headless screenshot hangs.
+- It cuts each logo file into a tile image and a mark image along markers in the SVG: `id="shadow"`, `id="art"`, `class="ground"`, `id="mark"`, and `id="ring"`. Keep them when editing the files.
+
 ## Not decided
 
-- Using the logo as the app icon. The build still ships Chromium's icons. See [Customizing Chromium](../README.md#customizing-chromium).
+- Logos inside the browser, such as the About page. They are still Chromium's.
+- Clear and Tinted icon styles drawn by uw.
 - A wordmark.
 - A one-color version.
 

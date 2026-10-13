@@ -1,3 +1,21 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -682,12 +682,12 @@
+   }
+ 
+   bundle_data("chrome_app_icon") {
+-    sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
++    sources = [ "//uw/browser/branding/mac/app.icns" ]
+     outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
+   }
+ 
+   bundle_data("chrome_asset_catalog") {
+-    sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
++    sources = [ "//uw/browser/branding/mac/Assets.car" ]
+     outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
+   }
+ 
 diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
 --- a/chrome/app/app-Info.plist
 +++ b/chrome/app/app-Info.plist

@@ -60,13 +60,13 @@
       <use href="#u1" stroke="#BEC6FF" mask="url(#on-u2)"/>
     </g>
   </defs>
-  <rect x="64" y="76" width="512" height="512" rx="115.2" fill="#000" opacity=".35" filter="url(#lift)"/>
+  <rect id="shadow" x="64" y="76" width="512" height="512" rx="115.2" fill="#000" opacity=".35" filter="url(#lift)"/>
   <g transform="translate(64 64)">
-    <g clip-path="url(#tile)">
-      <rect width="512" height="512" fill="url(#sheet)"/>
-      <rect width="512" height="512" fill="url(#wash-blue)"/>
-      <rect width="512" height="512" fill="url(#wash-violet)"/>
-      <g transform="translate(264.3 260.4) rotate(-12) scale(1.68) translate(-144 -100)" fill="none" stroke-width="60" stroke-linecap="round">
+    <g id="art" clip-path="url(#tile)">
+      <rect class="ground" width="512" height="512" fill="url(#sheet)"/>
+      <rect class="ground" width="512" height="512" fill="url(#wash-blue)"/>
+      <rect class="ground" width="512" height="512" fill="url(#wash-violet)"/>
+      <g id="mark" transform="translate(264.3 260.4) rotate(-12) scale(1.68) translate(-144 -100)" fill="none" stroke-width="60" stroke-linecap="round">
         <g filter="url(#soft)" opacity=".42" transform="translate(0 12)"><use href="#inks"/></g>
         <g filter="url(#grain)">
           <use href="#inks"/>
@@ -76,6 +76,6 @@
         <use href="#u1" stroke="url(#rim)" mask="url(#rim-u1)"/>
       </g>
     </g>
-    <rect x="1" y="1" width="510" height="510" rx="114.2" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
+    <rect id="ring" x="1" y="1" width="510" height="510" rx="114.2" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
   </g>
 </svg>

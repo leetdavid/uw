@@ -108,7 +108,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 
 [`chromium/patches/series`](chromium/patches/series) lists patches in application order:
 
-- `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. This first pass retains Chromium's icons and most secondary strings.
+- `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. It points the app bundle at uw's [app icon](docs/logo.md#app-icon). Chromium's logos inside the browser and most secondary strings remain.
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
 - `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
 - `ai-organization.patch` registers the automatic organization preferences.
