@@ -34,6 +34,19 @@ index e30528ed87d953945e26395ce2c7c1ff52ac7d5a..ca86e9178a9b605d489cd7a15ba36432
    // Handler to rewrite chrome://about and chrome://sync URLs.
    handler->AddHandlerPair(&HandleChromeAboutAndChromeSyncRewrite,
                            BrowserURLHandler::null_handler());
+diff --git a/chrome/browser/profiles/profile_io_data.cc b/chrome/browser/profiles/profile_io_data.cc
+index 080e9b0e43c70913f84490ccafb068ab1e9fbc62..57b7a839390dbfa2b431aea4b24a089333566df4 100644
+--- a/chrome/browser/profiles/profile_io_data.cc
++++ b/chrome/browser/profiles/profile_io_data.cc
+@@ -44,6 +44,8 @@ bool ProfileIOData::IsHandledProtocol(std::string_view scheme) {
+       extensions::kExtensionScheme,
+ #endif
+       content::kChromeUIScheme,
++      // uw:// aliases chrome:// (see uw::HandleUwSchemeRewrite).
++      "uw",
+       content::kChromeUIUntrustedScheme,
+       url::kDataScheme,
+ #if BUILDFLAG(IS_CHROMEOS)
 diff --git a/chrome/common/chrome_content_client.cc b/chrome/common/chrome_content_client.cc
 index 5df291a12226596061c7f461fb2a7e2b2a2f2d6c..1c5279c0b94195c8c1341d4acbdfd1550ec85f24 100644
 --- a/chrome/common/chrome_content_client.cc
