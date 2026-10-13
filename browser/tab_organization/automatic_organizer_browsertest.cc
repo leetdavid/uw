@@ -162,6 +162,7 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   tabs::TabInterface* NewTab() {
     chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
     tabs::TabInterface* tab = tabs()->GetActiveTab();
+    EXPECT_TRUE(content::WaitForLoadStop(tab->GetContents()));
     base::RunLoop().RunUntilIdle();
     return tab;
   }
