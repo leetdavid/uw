@@ -50,6 +50,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_utils.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
@@ -65,6 +66,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
+#include "uw/browser/ui/views/tab_organization/name_lock.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -161,6 +163,25 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     return nullptr;
   }
 
+  // The lock on the row of the task `group`.
+  NameLock* NameLockOf(const tab_groups::TabGroupId& group) {
+    return FindLock(BrowserView::GetBrowserViewForBrowser(browser()), group);
+  }
+
+  static NameLock* FindLock(views::View* view,
+                            const tab_groups::TabGroupId& group) {
+    NameLock* lock = views::AsViewClass<NameLock>(view);
+    if (lock && lock->group() == group) {
+      return lock;
+    }
+    for (views::View* child : view->children()) {
+      if (NameLock* found = FindLock(child, group)) {
+        return found;
+      }
+    }
+    return nullptr;
+  }
+
   TabStripModel* tabs() { return browser()->tab_strip_model(); }
 
   tabs::TabInterface* InitialTab() { return tabs()->GetTabAtIndex(0); }
@@ -233,6 +254,17 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
 
   std::u16string TitleOf(const tab_groups::TabGroupId& group) {
     return tabs()->group_model()->GetTabGroup(group)->visual_data()->title();
+  }
+
+  // What typing a name in the task's editor does.
+  void Rename(const tab_groups::TabGroupId& group,
+              const std::u16string& title) {
+    tabs()->ChangeTabGroupVisuals(
+        group,
+        tab_groups::TabGroupVisualData(
+            title,
+            tabs()->group_model()->GetTabGroup(group)->visual_data()->color()));
+    base::RunLoop().RunUntilIdle();
   }
 
   // Opens a blank tab beside `tab`, in its task and under its parent.
@@ -967,6 +999,75 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(lines[2].FindDouble("needed"), 0.90);
   EXPECT_EQ(lines[4].FindDouble("new_name"), 0.89);
   EXPECT_EQ(lines[5].FindDouble("new_name"), 0.0);
+}
+
+// A lock on a task's row marks a name the user typed. Nothing else has one:
+// not a name uw gave, not the name every new task starts with, and no task
+// while automatic organization is off.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       OnlyANameTheUserTypedIsLocked) {
+  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  base::RunLoop().RunUntilIdle();
+  const std::optional<tab_groups::TabGroupId> task =
+      tabs()->GetActiveTab()->GetGroup();
+  ASSERT_TRUE(task);
+  ASSERT_TRUE(NameLockOf(*task));
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
+
+  Rename(*task, u"Taxes 2026");
+  EXPECT_TRUE(NameLockOf(*task)->GetVisible());
+  EXPECT_EQ(NameLockOf(*task)->GetTooltipText(),
+            u"Named by you. Click to let uw rename this task.");
+  SaveWindowScreenshot(browser(), "name-lock");
+
+  prefs()->SetBoolean(kOrganizationEnabledPref, false);
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
+  prefs()->SetBoolean(kOrganizationEnabledPref, true);
+  EXPECT_TRUE(NameLockOf(*task)->GetVisible());
+
+  controller()->NameTask(task->ToString(), u"File taxes");
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
+}
+
+// uw leaves a locked name alone and does not ask the model about it. A click
+// on the lock hands the name back: the lock goes, the name stays, and uw
+// renames the task once it has outgrown that name.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AClickOnTheLockHandsTheNameBack) {
+  UseDecisionModel(DecisionProvider::kJev);
+  UseLanguageModel();
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
+  tabs::TabInterface* first = OpenLinkFrom(InitialTab(), "baixa");
+  ASSERT_TRUE(SettleAfter(2));
+  const std::optional<tab_groups::TabGroupId> task = first->GetGroup();
+  ASSERT_TRUE(task);
+  ASSERT_TRUE(NameLockOf(*task));
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
+
+  Rename(*task, u"Lisbon");
+  EXPECT_TRUE(NameLockOf(*task)->GetVisible());
+  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.99));
+  tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
+  ASSERT_TRUE(SettleAfter(3));
+  EXPECT_EQ(Requests()[2].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(TitleOf(*task), u"Lisbon");
+
+  views::test::ButtonTestApi(NameLockOf(*task)).NotifyDefaultMouseClick();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
+  EXPECT_EQ(TitleOf(*task), u"Lisbon");
+
+  Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.99, 0.0, 0.95));
+  Answer("/v1/chat/completions", ChatAnswer("Compare Lisbon hotels"));
+  Browse(second, "alfama");
+  ASSERT_TRUE(SettleAfter(5));
+  EXPECT_NE(Requests()[3].body.find("needs a new name"), std::string::npos);
+  EXPECT_EQ(second->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Compare Lisbon hotels");
+  EXPECT_FALSE(NameLockOf(*task)->GetVisible());
 }
 
 // The names uw gave are saved with the session, so a task can still get a

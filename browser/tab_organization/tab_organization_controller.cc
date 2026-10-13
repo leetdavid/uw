@@ -430,10 +430,10 @@ void TabOrganizationController::NameTask(const std::string& task,
   }
   const tab_groups::TabGroupVisualData* visuals =
       tabs_->group_model()->GetTabGroup(*group)->visual_data();
+  generated_names_[task] = title;
   tabs_->ChangeTabGroupVisuals(
       *group, tab_groups::TabGroupVisualData(title, visuals->color(),
                                              visuals->is_collapsed()));
-  generated_names_[task] = title;
   ScheduleUpdate();
 }
 
@@ -442,6 +442,21 @@ bool TabOrganizationController::HasGeneratedName(
   const auto generated = generated_names_.find(task);
   return generated != generated_names_.end() &&
          generated->second == TaskTitle(task);
+}
+
+bool TabOrganizationController::HasManualName(const std::string& task) const {
+  const std::u16string title = TaskTitle(task);
+  return !title.empty() &&
+         title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK) &&
+         !HasGeneratedName(task);
+}
+
+void TabOrganizationController::NameAutomatically(const std::string& task) {
+  if (!HasManualName(task)) {
+    return;
+  }
+  generated_names_[task] = TaskTitle(task);
+  ScheduleUpdate();
 }
 
 base::CallbackListSubscription TabOrganizationController::Observe(
@@ -485,6 +500,13 @@ void TabOrganizationController::OnTabPinnedStateChanged(tabs::TabInterface*,
   }
   Mirror({});
   ScheduleApply();
+}
+
+void TabOrganizationController::OnTabGroupChanged(
+    const TabGroupChange& change) {
+  if (change.type == TabGroupChange::kVisualsChanged) {
+    ScheduleUpdate();
+  }
 }
 
 void TabOrganizationController::TabGroupedStateChanged(

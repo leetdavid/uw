@@ -78,7 +78,10 @@ A language-model request for a task name. It is sent only when the placement ans
 The question in a placement request that asks whether the task a tab branch is in has outgrown its name. It is asked only about a generated name.
 
 **Generated name**:
-A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced.
+A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced, until the user hands it back with the name lock.
+
+**Name lock**:
+The small lock on the sidebar row of a task whose name the user typed. A click hands the name back to uw, which then treats it as a generated name.
 
 **Threshold**:
 How sure a model must be before uw acts on one kind of answer without asking. There are three, each set by the user: to move a tab branch, to start a task, and to rename a task.

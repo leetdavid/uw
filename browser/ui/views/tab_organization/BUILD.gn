@@ -2,6 +2,8 @@ source_set("tab_organization") {
   sources = [
     "activity_card.cc",
     "activity_card.h",
+    "name_lock.cc",
+    "name_lock.h",
     "new_task_button.cc",
     "new_task_button.h",
     "organize_bar.cc",
@@ -26,6 +28,7 @@ source_set("tab_organization") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/views/tabs/common",
     "//components/prefs",
+    "//components/tab_groups",
     "//components/tabs:public",
     "//components/vector_icons",
     "//skia",

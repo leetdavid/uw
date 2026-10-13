@@ -141,7 +141,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..0f3976e6aeaedf3dcf07c55ccf785da8
  
  SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718832f13c6 100644
+index cfaf18f54f721f3f4bf0eb438454e3e41f963728..35f2e493ad72b7993b98e2d22f789c741959a052 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -9,6 +9,7 @@
@@ -152,7 +152,15 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718
  #include "chrome/browser/ui/tabs/tab_group_data.h"
  #include "chrome/browser/ui/tabs/tab_group_theme.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -169,6 +170,13 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -45,6 +46,7 @@
+ #include "ui/views/view.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/views/tab_organization/name_lock.h"
+ 
+ namespace {
+ constexpr int kGroupHeaderCornerRadius = 8;
+@@ -169,6 +171,16 @@ TabGroupHeaderView::TabGroupHeaderView(
        editor_bubble_tracker_.RegisterOnBubbleClosed(base::BindRepeating(
            &TabGroupHeaderView::OnBubbleClosed, base::Unretained(this)));
  
@@ -161,12 +169,15 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718
 +        group_header_label_->font_list().DeriveWithWeight(
 +            gfx::Font::Weight::SEMIBOLD));
 +    group_header_label_->SetSubpixelRenderingEnabled(false);
++    AddChildViewAt(
++        std::make_unique<uw::NameLock>(delegate_->GetTabGroup().id()),
++        GetIndexOf(editor_bubble_button_).value());
 +  }
 +
    SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
    SetInteriorMargin(gfx::Insets::VH(0, kGroupHeaderHorizontalInset));
    SetDefault(views::kFlexBehaviorKey,
-@@ -527,18 +535,26 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -527,18 +539,26 @@ void TabGroupHeaderView::OnDataChanged(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
      SkColor foreground_color = GetForegroundColor();
@@ -195,7 +206,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..5ebeeaa250987aacbd5dc20ccaec5718
      }
      if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
-@@ -673,6 +689,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -673,6 +693,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {

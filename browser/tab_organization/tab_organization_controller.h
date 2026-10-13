@@ -115,6 +115,12 @@ class TabOrganizationController : public TabStripModelObserver {
   // True while `task` has the name uw gave it, in this session or an earlier
   // one. Any other name is the user's.
   bool HasGeneratedName(const std::string& task) const;
+  // True while `task` has a name the user typed, which uw never replaces. A
+  // task that still has the name every new task starts with has neither.
+  bool HasManualName(const std::string& task) const;
+  // Hands the name of `task` back to uw. The task keeps the name it has, as
+  // one uw gave: uw replaces it once the task has outgrown it.
+  void NameAutomatically(const std::string& task);
 
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
   // Runs with the pages the user moved by a command, a drag, a native group
@@ -139,6 +145,7 @@ class TabOrganizationController : public TabStripModelObserver {
       const TabStripModelChange& change,
       const TabStripSelectionChange& selection) override;
   void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
+  void OnTabGroupChanged(const TabGroupChange& change) override;
   void TabGroupedStateChanged(TabStripModel* model,
                               std::optional<tab_groups::TabGroupId> old_group,
                               std::optional<tab_groups::TabGroupId> new_group,
