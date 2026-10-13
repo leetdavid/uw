@@ -169,6 +169,14 @@ void OrganizeBar::ExecuteCommand(int command_id, int event_flags) {
   }
 }
 
+bool OrganizeBar::GetAcceleratorForCommandId(
+    int command_id,
+    ui::Accelerator* accelerator) const {
+  return command_id == kUndo &&
+         BrowserView::GetBrowserViewForBrowser(window_)->GetAccelerator(
+             TabOrganizationController::kUndo, accelerator);
+}
+
 void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
   SetVisible(state == tabs::VerticalTabStripCollapseState::kExpanded);
 }

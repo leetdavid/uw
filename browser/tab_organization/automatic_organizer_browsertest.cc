@@ -49,6 +49,9 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "ui/base/accelerators/accelerator.h"
+#include "ui/events/event_constants.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_utils.h"
@@ -441,6 +444,15 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   controller()->Undo();
   EXPECT_TRUE(tabs()->group_model()->ListTabGroups().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheOrganizeMenuShowsTheUndoShortcut) {
+  ui::Accelerator shortcut;
+  ASSERT_TRUE(
+      bar()->GetAcceleratorForCommandId(OrganizeBar::kUndo, &shortcut));
+  EXPECT_EQ(shortcut, ui::Accelerator(ui::VKEY_Z, ui::EF_COMMAND_DOWN |
+                                                      ui::EF_ALT_DOWN));
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

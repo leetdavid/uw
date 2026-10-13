@@ -70,6 +70,8 @@ class OrganizeBar : public views::FlexLayoutView,
   bool IsCommandIdChecked(int command_id) const override;
   bool IsCommandIdEnabled(int command_id) const override;
   void ExecuteCommand(int command_id, int event_flags) override;
+  bool GetAcceleratorForCommandId(int command_id,
+                                  ui::Accelerator* accelerator) const override;
 
  private:
   void OnCollapseChanged(tabs::VerticalTabStripCollapseState state);

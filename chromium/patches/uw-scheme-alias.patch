@@ -1,11 +1,12 @@
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index eaa7929a316674a9d2673e07bab3b8a110b895b1..e2547e24e8d01aed8a01d50e4492035473170aee 100644
+index eaa7929a316674a9d2673e07bab3b8a110b895b1..4df973b6628747b7688e41a0f650f7816902458b 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -884,6 +884,7 @@ source_set("core") {
+@@ -884,6 +884,8 @@ source_set("core") {
    }
  
    deps = [
++    "//uw/browser/tab_organization",
 +    "//uw/browser/ui:ui",
      ":active_use_util",
      ":after_startup_task_utils",

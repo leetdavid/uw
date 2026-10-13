@@ -523,7 +523,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..91eca2cc713d27a3669dda6499f7ee58
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..495d07932e662a565ca5b5bff9314cff143aad58 100644
+index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..5842222862285c65b71c2e04f7665588698f8835 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -143,6 +143,7 @@
@@ -545,6 +545,48 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..495d07932e662a565ca5b5bff9314cff
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kCreateNewTabGroup);
        break;
+@@ -1406,6 +1409,11 @@ void BrowserCommandController::HandleCommandWithDisposition(
+       base::UmaHistogramEnumeration("TabGroups.Shortcuts",
+                                     TabGroupShortcut::kAddNewTabToGroup);
+       break;
++    case uw::TabOrganizationController::kUndo:
++      if (auto* organizer = uw::TabOrganizationController::From(browser_)) {
++        organizer->Undo();
++      }
++      break;
+     case IDC_GROUP_UNGROUPED_TABS:
+       GroupAllUngroupedTabs(browser_);
+       base::RecordAction(
+@@ -1731,6 +1739,8 @@ void BrowserCommandController::InitCommandState() {
+   command_updater_->UpdateCommandEnabled(IDC_GROUP_UNGROUPED_TABS, true);
+   command_updater_->UpdateCommandEnabled(IDC_ADD_NEW_TAB_RECENT_GROUP, true);
+   command_updater_->UpdateCommandEnabled(IDC_UNFOCUS_TAB_GROUP, true);
++  command_updater_->UpdateCommandEnabled(uw::TabOrganizationController::kUndo,
++                                         true);
+ 
+   // Omnibox commands
+   command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
+diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
+index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..9d1a931290aca1dae15aab958e97420b9834105f 100644
+--- a/chrome/browser/global_keyboard_shortcuts_mac.mm
++++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
+@@ -24,6 +24,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/events/event_constants.h"
+ #include "ui/events/keycodes/keyboard_code_conversion_mac.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+ 
+@@ -164,6 +165,8 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+         {true, false, true, false, kVK_ANSI_X, IDC_FOCUS_NEXT_TAB_GROUP});
+     keys.push_back(
+         {true, false, true, false, kVK_ANSI_Z, IDC_FOCUS_PREV_TAB_GROUP});
++    keys.push_back({true, false, false, true, kVK_ANSI_Z,
++                    uw::TabOrganizationController::kUndo});
+ 
+     if (base::FeatureList::IsEnabled(features::kUIDebugTools)) {
+       keys.push_back(
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
 index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..84722bf8122b6941f3494dad5d41abf3017bddad 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc

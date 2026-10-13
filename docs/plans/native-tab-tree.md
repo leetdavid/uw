@@ -17,6 +17,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - An "Organize" button at the foot of the sidebar opens a menu: "New task", "Undo tab organization", the pause controls, "Show organizer activity", and the settings page.
 - "New task" opens a new tab in a new task of its own, named `New task`. The sidebar's "+" button and Ctrl+Cmd+P do the same; that shortcut is Chromium's own for a new tab group. Cmd-T still opens a tab beside the active tab, in its task. Agreed on 2026-10-12.
 - [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.
+- Option+Cmd+Z runs "Undo tab organization" in the focused window. Each press goes back one action, the user's or uw's, whether or not the activity card is showing. Nothing extra is shown. The Organize menu shows the key beside the item. Agreed on 2026-10-13.
 - Parent links survive session restore.
 
 ## Non-goals
@@ -57,5 +58,6 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 8. Collapse, rename, color, and drag of a task behave exactly as they do in stock Chromium.
 9. Indentation and task membership survive restart with session restore.
 10. Switching to horizontal tabs and back keeps tasks and parent links.
+11. Option+Cmd+Z undoes one organization action per press. `UndoShortcutBrowserTest.OptionCmdZUndoesOneOrganizationActionPerPress` checks it.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`.
