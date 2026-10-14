@@ -28,6 +28,6 @@
     "typescript": "7.0.2"
   },
   "dependencies": {
-    "ghostty-web": "0.4.0"
+    "ghostty-web": "0.4.0-next.20.g1858a59"
   }
 }

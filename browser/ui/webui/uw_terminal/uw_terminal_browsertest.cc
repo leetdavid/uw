@@ -24,9 +24,11 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "third_party/blink/public/common/input/web_mouse_event.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/point.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -163,6 +165,26 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, KeysTheBrowserKeepsStayOutOfIt) {
       WaitForFile("keys",
                   [](const std::string& text) { return text.ends_with('\n'); }),
       "^[bx\n");
+}
+
+// A program that asks for the mouse, as a TUI does, gets each click.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       AProgramThatAsksForTheMouseGetsClicks) {
+  OpenTerminal();
+  Type(u"cd " + Folder() +
+       u" && printf '\\033[?1000h\\033[?1006h' && cat -v > clicks\r");
+  // The file appears once cat has started.
+  WaitForFile("clicks", [](const std::string&) { return true; });
+  content::SimulateMouseClickAt(
+      contents(), 0, blink::WebMouseEvent::Button::kLeft, gfx::Point(100, 60));
+  Type(u"\r");
+  Press('d', ui::DomCode::US_D, ui::VKEY_D, /*control=*/true, false, false);
+  const std::string clicks = WaitForFile(
+      "clicks", [](const std::string& text) { return text.ends_with('\n'); });
+  // A press and a release, in the SGR form.
+  EXPECT_TRUE(clicks.starts_with("^[[<0;")) << clicks;
+  EXPECT_NE(clicks.find("M^[[<0;"), std::string::npos) << clicks;
+  EXPECT_TRUE(clicks.ends_with("m\n")) << clicks;
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, ClosingTheTabEndsTheShell) {

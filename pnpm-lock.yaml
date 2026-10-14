@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       ghostty-web:
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.4.0-next.20.g1858a59
+        version: 0.4.0-next.20.g1858a59
     devDependencies:
       '@types/node':
         specifier: 24.13.5
@@ -302,8 +302,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  ghostty-web@0.4.0:
-    resolution: {integrity: sha512-0puDBik2qapbD/QQBW9o5ZHfXnZBqZWx/ctBiVtKZ6ZLds4NYb+wZuw1cRLXZk9zYovIQ908z3rvFhexAvc5Hg==}
+  ghostty-web@0.4.0-next.20.g1858a59:
+    resolution: {integrity: sha512-NXA9H3IJlx+DGJukXbOPQWFkigYdAatTqkoIvM8tvhfbaYoDf3gGKxXLLyXtLYOBt5qzGdEZa294TU36gULjVg==}
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -379,7 +379,7 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  ghostty-web@0.4.0: {}
+  ghostty-web@0.4.0-next.20.g1858a59: {}
 
   typescript@7.0.2:
     optionalDependencies:
