@@ -194,6 +194,24 @@ TEST(PageTreeTest, NestAndOutdentMoveABranchOneLevel) {
   EXPECT_FALSE(tree.Outdent(Id("news")));
 }
 
+TEST(PageTreeTest, MoveUpAndDownSwapABranchWithItsSibling) {
+  PageTree tree = Seed();
+  EXPECT_TRUE(tree.MoveUp(Id("hotels")));
+  EXPECT_EQ(Render(tree)[0], "hotels@trip");
+  EXPECT_EQ(Render(tree)[1], "flights@trip");
+  EXPECT_EQ(Render(tree)[2], "  fare@trip");
+  EXPECT_TRUE(tree.MoveDown(Id("hotels")));
+  EXPECT_EQ(Render(tree)[0], "flights@trip");
+  EXPECT_EQ(Render(tree)[1], "  fare@trip");
+  EXPECT_EQ(Render(tree)[2], "hotels@trip");
+  EXPECT_FALSE(tree.MoveUp(Id("flights")));
+  EXPECT_FALSE(tree.MoveDown(Id("hotels")));
+  EXPECT_FALSE(tree.MoveUp(Id("fare")));
+  EXPECT_FALSE(tree.MoveDown(Id("fare")));
+  ASSERT_TRUE(tree.NextSibling(Id("news")));
+  EXPECT_EQ(tree.NextSibling(Id("news"))->id, Id("weather"));
+}
+
 TEST(PageTreeTest, DraggingAChildPastAnotherTabDetachesIt) {
   PageTree tree({P("a"), P("b", "", "a"), P("c", "", "a"), P("d")});
   std::vector<Page> strip = Strip(tree);

@@ -31,38 +31,80 @@ index 7274b66570dd11e3e6899974ef0f1307697f22c6..906d52d22a23d32e05a323fffd4be0ed
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 12d6be60e250efa15872027b297baab899e250c9..554f4ce4e17719c3d4ea0017f804d856e3615626 100644
+index 12d6be60e250efa15872027b297baab899e250c9..2113f1a02095125e41fd2b2fef7ce001e2e5b594 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-@@ -19,6 +19,7 @@
+@@ -19,6 +19,9 @@
  #import "ui/base/accelerators/platform_accelerator_cocoa.h"
  #import "ui/events/cocoa/cocoa_event_utils.h"
  #import "ui/events/keycodes/keyboard_code_conversion_mac.h"
++#include "uw/browser/tab_organization/commands.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/terminal/terminal_tab.h"
  
  namespace {
  
-@@ -42,6 +43,7 @@ const struct AcceleratorMapping {
+@@ -42,6 +45,37 @@ const struct AcceleratorMapping {
      {IDC_NEW_INCOGNITO_WINDOW, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
       ui::VKEY_N},
      {IDC_NEW_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_T},
 +    {uw::kNewTerminalCommand, ui::EF_CONTROL_DOWN, ui::VKEY_OEM_3},
++    {uw::TabOrganizationController::kNest,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_RIGHT},
++    {uw::TabOrganizationController::kOutdent,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_LEFT},
++    {uw::TabOrganizationController::kMoveUp,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_UP},
++    {uw::TabOrganizationController::kMoveDown,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_DOWN},
++    {uw::TabOrganizationController::kCloseBranch,
++     ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_W},
++    {uw::TabOrganizationController::kNewTask,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_N},
++    {uw::TabOrganizationController::kScratchpad,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_S},
++    {uw::TabOrganizationController::kUndo,
++     ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_Z},
++    {uw::kGoToTask1, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_1},
++    {uw::kGoToTask1 + 1, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_2},
++    {uw::kGoToTask1 + 2, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_3},
++    {uw::kGoToTask1 + 3, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_4},
++    {uw::kGoToTask1 + 4, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_5},
++    {uw::kGoToTask1 + 5, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_6},
++    {uw::kGoToTask1 + 6, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_7},
++    {uw::kGoToTask1 + 7, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_8},
++    {uw::kGoToTask1 + 8, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_9},
++    {uw::kGoToScratchpad,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_0},
++    {uw::kRenameTask, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_R},
++    {uw::kConfirmSuggestion,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_RETURN},
      {IDC_NEW_WINDOW, ui::EF_COMMAND_DOWN, ui::VKEY_N},
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..cbab0d310935cc010dff7332dc94cd90cff247f8 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f0b001e8ac51746b58b280ec0ab9ddca0f47410a 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
-@@ -28,6 +28,7 @@
+@@ -9,6 +9,7 @@
+ #include "base/feature_list.h"
+ #include "base/i18n/rtl.h"
+ #include "base/mac/mac_util.h"
++#include "base/strings/string_number_conversions.h"
+ #include "build/branding_buildflags.h"
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/browser_features.h"
+@@ -28,6 +29,9 @@
  #include "ui/base/l10n/l10n_util.h"
  #import "ui/base/l10n/l10n_util_mac.h"
  #include "ui/strings/grit/ui_strings.h"
++#include "uw/browser/tab_organization/commands.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/terminal/terminal_tab.h"
  
  #if !defined(__MAC_27_0)
  
-@@ -136,6 +137,9 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
+@@ -136,6 +140,9 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
                Item(IDS_NEW_TAB_MAC)
                    .command_id(IDC_NEW_TAB)
                    .remove_if(is_pwa),
@@ -72,6 +114,100 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..cbab0d310935cc010dff7332dc94cd90
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
+@@ -583,12 +590,85 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+               Item(IDS_SEARCH_TABS)
+                   .command_id(IDC_TAB_SEARCH),
+               Item().is_separator(),
++              Item(IDS_UW_NEST_BRANCH_MAC)
++                  .command_id(uw::TabOrganizationController::kNest),
++              Item(IDS_UW_OUTDENT_BRANCH_MAC)
++                  .command_id(uw::TabOrganizationController::kOutdent),
++              Item(IDS_UW_MOVE_BRANCH_UP_MAC)
++                  .command_id(uw::TabOrganizationController::kMoveUp),
++              Item(IDS_UW_MOVE_BRANCH_DOWN_MAC)
++                  .command_id(uw::TabOrganizationController::kMoveDown),
++              Item(IDS_UW_CLOSE_BRANCH_MAC)
++                  .command_id(uw::TabOrganizationController::kCloseBranch),
++              Item().is_separator(),
+           })
+           .Build();
+   // clang-format on
+   return item;
+ }
+ 
++NSMenuItem* BuildTasksMenu(NSApplication* nsapp,
++                           id app_delegate,
++                           const std::u16string& product_name,
++                           bool is_pwa,
++                           bool is_rtl) {
++  if (is_pwa) {
++    return nil;
++  }
++
++  std::vector<Item> go_to_task;
++  for (int task = 0; task < 9; ++task) {
++    go_to_task.push_back(
++        Item(IDS_UW_TASK_NUMBER_MAC)
++            .command_id(uw::kGoToTask1 + task)
++            .string_format_1(base::NumberToString16(task + 1)));
++  }
++  go_to_task.push_back(
++      Item(IDS_UW_SCRATCHPAD).command_id(uw::kGoToScratchpad));
++
++  // clang-format off
++  return Item(IDS_UW_TASKS_MENU_MAC)
++      .submenu({
++          Item(IDS_UW_NEW_TASK_MAC)
++              .command_id(IDC_CREATE_NEW_TAB_GROUP)
++              .key_equivalent(@"p", NSEventModifierFlagCommand |
++                                        NSEventModifierFlagControl),
++          Item(IDS_UW_MOVE_TO_NEW_TASK_MAC)
++              .command_id(uw::TabOrganizationController::kNewTask),
++          Item(IDS_UW_MOVE_TO_SCRATCHPAD_MAC)
++              .command_id(uw::TabOrganizationController::kScratchpad),
++          Item().is_separator(),
++          Item(IDS_UW_GO_TO_TASK_MAC).submenu(std::move(go_to_task)),
++          Item(IDS_UW_RENAME_TASK_MAC).command_id(uw::kRenameTask),
++          Item(IDS_UW_SUGGEST_NAME_MAC).command_id(uw::kSuggestTaskName),
++          Item(IDS_UW_CLOSE_TASK_MAC)
++              .command_id(IDC_CLOSE_TAB_GROUP)
++              .key_equivalent(@"w", NSEventModifierFlagCommand |
++                                        NSEventModifierFlagControl),
++          Item().is_separator(),
++          Item(IDS_UW_CONFIRM_SUGGESTION_MAC)
++              .command_id(uw::kConfirmSuggestion),
++          Item(IDS_UW_UNDO_ORGANIZATION_MAC)
++              .command_id(uw::TabOrganizationController::kUndo),
++          Item(IDS_UW_SHOW_ACTIVITY_MAC)
++              .command_id(uw::kShowOrganizerActivity),
++          Item().is_separator(),
++          Item(IDS_UW_PAUSE_1HOUR_MAC)
++              .command_id(uw::kPauseOrganizationForAnHour),
++          Item(IDS_UW_PAUSE_UNTIL_LAUNCH_MAC)
++              .command_id(uw::kPauseOrganizationUntilLaunch),
++          Item(IDS_UW_PAUSE_INDEFINITE_MAC)
++              .command_id(uw::kPauseOrganizationIndefinitely),
++          Item(IDS_UW_PAUSE_RESUME_MAC)
++              .command_id(uw::kResumeOrganization),
++          Item().is_separator(),
++          Item(IDS_UW_ORGANIZATION_SETTINGS_MAC)
++              .command_id(uw::kShowOrganizationSettings),
++      })
++      .Build();
++  // clang-format on
++}
++
+ NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
+                           id app_delegate,
+                           const std::u16string& product_name,
+@@ -644,6 +724,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+            &BuildBookmarksMenu,
+            &BuildPeopleMenu,
+            &BuildTabMenu,
++           &BuildTasksMenu,
+            &BuildWindowMenu,
+            &BuildHelpMenu,
+        }) {
 diff --git a/chrome/browser/ui/views/tabs/new_tab_button.cc b/chrome/browser/ui/views/tabs/new_tab_button.cc
 index b316adf2f9b6facc57dab99083b3015ecb9c0f71..b8c498a4d31e33899d9c4427a9c19d9448e00853 100644
 --- a/chrome/browser/ui/views/tabs/new_tab_button.cc

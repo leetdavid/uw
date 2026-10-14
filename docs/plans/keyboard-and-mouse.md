@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. Nothing is built yet. Each ticket waits for approval. The [command bar](command-bar.md) follows this plan and runs the commands it defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, is built and in review. The other tickets wait for approval. The [command bar](command-bar.md) follows this plan and runs the commands it defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -83,6 +83,8 @@ Once the command bar lands, the "+" and the double-click open it instead of a bl
 
 - uw's commands are defined once: a number from the `TabOrganizationController::Command` range, a string, and a key. The menu bar, the tab context menu, and later the command bar read that list. No `IDC_` value is added, because `chrome_command_ids.h` rebuilds thousands of files.
 - The Tasks menu is built in `main_menu_builder.mm` beside the Tab menu, so each item carries its key equivalent.
+- uw's menu keys run like Chromium's shortcuts that are not in the menu: the key lookup hands them to the command code, not to `NSMenu`, which serves only the window in front. A page still sees each key first. Headless tests can press them.
+- The menu bar, the keys, the tab menu, and the Organize menu all run commands through `browser/ui/views/tab_organization/window_commands`.
 - Branch drags extend Chromium's drag set to the branch in `TabDragHandlerImpl::InitializeDrag`, which uw already hooks. Chromium already drags several selected tabs together.
 - The page tree's `Adopt` takes the depth the drop asked for. `tab_indent` shows it while the drag runs.
 - The page tree stores which parents are collapsed and saves it with the session data that already carries parent links. Hiding rows touches the vertical tab strip layout that `tab-tree.patch` already changes. Skipping hidden tabs needs a hook in `TabStripModel`, next to the code that skips collapsed groups.
@@ -102,7 +104,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 
 ## Acceptance checks
 
-1. Each key in the [table](#keys) runs its command in a headless window through a real key event, once with a page selected and once with a terminal tab selected.
+1. Each key in the [table](#keys) runs its command in a headless window through a real key event. With a terminal tab selected it is checked by hand: a headless window sends a key the focused page left alone back into the page, not to the browser.
 2. The Tab and Tasks menus list every command with its key. Help → Search finds "Move to Scratchpad".
 3. In a task with a terminal tab, Ctrl+` selects it and a second press returns to the page. In a task without one, Ctrl+` opens one below the active tab's branch. Ctrl+Shift+` opens a second one.
 4. Dragging a parent moves its branch with its nesting intact. Option-drag moves the parent alone and its children move up one level.

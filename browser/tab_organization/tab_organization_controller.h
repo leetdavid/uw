@@ -49,7 +49,9 @@ class TabOrganizationController : public TabStripModelObserver {
     kOutdent,
     kCloseBranch,
     kUndo,
-    kLastCommand = kUndo,
+    kMoveUp,
+    kMoveDown,
+    kLastCommand = kMoveDown,
   };
   static bool IsCommand(int command);
   static void AppendCommands(ui::SimpleMenuModel* menu);
@@ -103,7 +105,13 @@ class TabOrganizationController : public TabStripModelObserver {
                         const std::vector<PageId>& staying = {});
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
+  // Swaps a branch with the sibling branch above or below it.
+  bool MoveUp(const PageId& id);
+  bool MoveDown(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);
+  // Selects the tab used last in `task`, or in the Scratchpad when `task` is
+  // empty. Returns false when it holds no tab.
+  bool SelectTask(const std::string& task);
   bool CanUndo() const { return !undo_.empty(); }
   void Undo();
 
@@ -164,6 +172,8 @@ class TabOrganizationController : public TabStripModelObserver {
   void LeaveBehind(const std::vector<PageId>& roots,
                    const std::vector<PageId>& staying);
   void NotifyManualMove(const std::vector<PageId>& roots);
+  // Puts `id` first among the recently selected pages.
+  void Remember(const std::optional<PageId>& id);
   void NotifyNativeMoves(const std::set<PageId>& moved);
   // Brings `tree_` up to date with the strip. Never changes the strip.
   void Mirror(const std::set<PageId>& moved);
@@ -184,6 +194,8 @@ class TabOrganizationController : public TabStripModelObserver {
   std::map<tabs::TabHandle, PageId> ids_;
   std::optional<PageId> active_;
   std::optional<PageId> previous_active_;
+  // Pages in the order they were last selected, most recent first.
+  std::vector<PageId> recent_;
   // Parent links from session restore or another window, kept until both
   // pages are in this window.
   std::map<PageId, PageId> restored_parents_;

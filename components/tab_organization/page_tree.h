@@ -50,6 +50,7 @@ class PageTree {
   // Task keys in display order.
   std::vector<std::string> Tasks() const;
   const Page* PreviousSibling(const PageId& id) const;
+  const Page* NextSibling(const PageId& id) const;
 
   // Takes the tab strip's order and task membership after a native change.
   // `strip` parent fields are ignored. Pages missing from `strip` are closed
@@ -72,6 +73,9 @@ class PageTree {
   bool Nest(const PageId& id);
   // Moves a branch up one level, directly below its old parent's branch.
   bool Outdent(const PageId& id);
+  // Swaps a branch with the sibling branch above or below it.
+  bool MoveUp(const PageId& id);
+  bool MoveDown(const PageId& id);
 
   // Puts every page that `earlier` also holds back where it was. Pages opened
   // since stay with their parent, or drop to the Scratchpad when their task

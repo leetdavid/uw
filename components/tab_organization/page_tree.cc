@@ -95,6 +95,20 @@ const Page* PageTree::PreviousSibling(const PageId& id) const {
   return page ? previous : nullptr;
 }
 
+const Page* PageTree::NextSibling(const PageId& id) const {
+  const Page* page = Find(id);
+  bool after = false;
+  for (const Page& other : pages_) {
+    if (&other == page) {
+      after = true;
+    } else if (after && other.task == page->task &&
+               other.parent == page->parent) {
+      return &other;
+    }
+  }
+  return nullptr;
+}
+
 void PageTree::Adopt(const std::vector<Page>& strip,
                      const std::set<PageId>& moved) {
   const PageTree earlier = *this;
@@ -230,6 +244,32 @@ bool PageTree::Outdent(const PageId& id) {
   const std::vector<PageId> above = BranchOf(parent->id);
   std::vector<Page> branch = Detach(id);
   Attach(std::move(branch), task, grandparent, EndOf(above));
+  return true;
+}
+
+bool PageTree::MoveUp(const PageId& id) {
+  const Page* previous = PreviousSibling(id);
+  if (!previous) {
+    return false;
+  }
+  const PageId above = previous->id;
+  const Page page = *Find(id);
+  std::vector<Page> branch = Detach(id);
+  const size_t index = static_cast<size_t>(
+      std::ranges::find(pages_, above, &Page::id) - pages_.begin());
+  Attach(std::move(branch), page.task, page.parent, index);
+  return true;
+}
+
+bool PageTree::MoveDown(const PageId& id) {
+  const Page* next = NextSibling(id);
+  if (!next) {
+    return false;
+  }
+  const std::vector<PageId> below = BranchOf(next->id);
+  const Page page = *Find(id);
+  std::vector<Page> branch = Detach(id);
+  Attach(std::move(branch), page.task, page.parent, EndOf(below));
   return true;
 }
 

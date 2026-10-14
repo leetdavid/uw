@@ -45,6 +45,17 @@ Right-click a tab that opened other tabs.
 - `Close branch` closes the tab and everything it opened.
 - `Undo tab organization` reverses the last of these moves. It does not reopen closed pages.
 
+### Keys and the Tasks menu
+
+Open the `Tab` and `Tasks` menus in the menu bar. Each uw command is there with its key, and the tab's right-click menu shows the same keys.
+
+- Ctrl+Cmd+→ and ← nest the selected tab under the tab above, or move it up a level. Ctrl+Cmd+↑ and ↓ move it and its children past the tab above or below.
+- Ctrl+Cmd+N moves it to a new task, Ctrl+Cmd+S to the Scratchpad, and Option+Cmd+W closes it with its children.
+- Ctrl+Cmd+1 to 9 go to the tab last used in that task, and Ctrl+Cmd+0 to the Scratchpad. Ctrl+Cmd+R opens the task's name field.
+- The keys also work while a terminal tab has focus.
+
+Expected result: each key does what its menu item says. A page that uses the same key for itself keeps it.
+
 ### Organize button
 
 Click `Organize` at the foot of the sidebar.

@@ -128,6 +128,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // or moved since. The acceptance goes to the organizer log as an example
   // the user confirmed.
   void AcceptSuggestion();
+  bool HasSuggestion() const { return suggestion_.has_value(); }
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
 

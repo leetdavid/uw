@@ -58,6 +58,7 @@ TabOrganizationController::TabOrganizationController(
   tabs_->AddObserver(this);
   Mirror({});
   active_ = IdFor(tabs_->GetActiveTab());
+  Remember(active_);
 }
 
 TabOrganizationController::~TabOrganizationController() {
@@ -232,6 +233,10 @@ bool TabOrganizationController::CanExecute(
     case kOutdent:
       return roots.size() == 1 &&
              !tree_.Find(roots.front())->parent.value().empty();
+    case kMoveUp:
+      return roots.size() == 1 && tree_.PreviousSibling(roots.front());
+    case kMoveDown:
+      return roots.size() == 1 && tree_.NextSibling(roots.front());
     case kCloseBranch:
       return std::ranges::any_of(roots, [this](const PageId& id) {
         return tree_.BranchOf(id).size() > 1;
@@ -258,6 +263,12 @@ void TabOrganizationController::Execute(int command,
       break;
     case kOutdent:
       Outdent(Roots(ids).front());
+      break;
+    case kMoveUp:
+      MoveUp(Roots(ids).front());
+      break;
+    case kMoveDown:
+      MoveDown(Roots(ids).front());
       break;
     case kCloseBranch:
       CloseBranches(ids);
@@ -358,6 +369,28 @@ bool TabOrganizationController::Outdent(const PageId& id) {
   return true;
 }
 
+bool TabOrganizationController::MoveUp(const PageId& id) {
+  Record();
+  if (!tree_.MoveUp(id)) {
+    undo_.pop_back();
+    return false;
+  }
+  Apply();
+  NotifyManualMove({id});
+  return true;
+}
+
+bool TabOrganizationController::MoveDown(const PageId& id) {
+  Record();
+  if (!tree_.MoveDown(id)) {
+    undo_.pop_back();
+    return false;
+  }
+  Apply();
+  NotifyManualMove({id});
+  return true;
+}
+
 void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
   std::vector<PageId> closing;
   for (const PageId& root : Roots(ids)) {
@@ -381,6 +414,36 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
           },
           weak_factory_.GetWeakPtr(), closing),
       false);
+}
+
+bool TabOrganizationController::SelectTask(const std::string& task) {
+  const auto in_task = [&](const PageId& id) {
+    const Page* page = tree_.Find(id);
+    return page && page->task == task;
+  };
+  auto page = std::ranges::find_if(recent_, in_task);
+  std::optional<PageId> target;
+  if (page != recent_.end()) {
+    target = *page;
+  } else if (auto first = std::ranges::find(tree_.pages(), task, &Page::task);
+             first != tree_.pages().end()) {
+    target = first->id;
+  }
+  tabs::TabInterface* tab = target ? TabFor(*target) : nullptr;
+  if (!tab) {
+    return false;
+  }
+  tabs_->ActivateTabAt(tabs_->GetIndexOfTab(tab));
+  return true;
+}
+
+void TabOrganizationController::Remember(const std::optional<PageId>& id) {
+  std::erase_if(recent_, [&](const PageId& page) {
+    return page == id || !tree_.Find(page);
+  });
+  if (id) {
+    recent_.insert(recent_.begin(), *id);
+  }
 }
 
 void TabOrganizationController::Undo() {
@@ -496,6 +559,7 @@ void TabOrganizationController::OnTabStripModelChanged(
       previous_active_ = old;
     }
     active_ = IdFor(selection.new_tab);
+    Remember(active_);
   }
   ScheduleApply();
 }

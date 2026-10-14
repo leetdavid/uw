@@ -2,6 +2,8 @@ source_set("tab_organization") {
   sources = [
     "automatic_organizer.cc",
     "automatic_organizer.h",
+    "commands.cc",
+    "commands.h",
     "organizer_log.cc",
     "organizer_log.h",
     "tab_organization_controller.cc",
@@ -41,6 +43,7 @@ source_set("browser_tests") {
   sources = [
     "automatic_organizer_browsertest.cc",
     "tab_organization_controller_browsertest.cc",
+    "task_keys_browsertest.mm",
     "undo_shortcut_browsertest.mm",
     "window_screenshot_browsertest.cc",
   ]

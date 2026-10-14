@@ -16,6 +16,8 @@
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
+#include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 
 class BrowserWindowInterface;
 class ExpandOnHoverLock;
@@ -43,15 +45,16 @@ class OrganizeBar : public views::FlexLayoutView,
   METADATA_HEADER(OrganizeBar, views::FlexLayoutView)
 
  public:
+  // Apart from kNewTask, these are the window commands of the menu bar.
   enum Command {
     kNewTask = 1,
-    kUndo,
-    kPauseForAnHour,
-    kPauseUntilLaunch,
-    kPauseIndefinitely,
-    kResume,
-    kShowActivity,
-    kSettings,
+    kUndo = TabOrganizationController::kUndo,
+    kPauseForAnHour = kPauseOrganizationForAnHour,
+    kPauseUntilLaunch = kPauseOrganizationUntilLaunch,
+    kPauseIndefinitely = kPauseOrganizationIndefinitely,
+    kResume = kResumeOrganization,
+    kShowActivity = kShowOrganizerActivity,
+    kSettings = kShowOrganizationSettings,
   };
 
   explicit OrganizeBar(BrowserWindowInterface* window);

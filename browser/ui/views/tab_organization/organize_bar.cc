@@ -9,9 +9,9 @@
 #include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
@@ -31,6 +31,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/tint_style.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
 namespace {
@@ -45,7 +46,6 @@ constexpr base::TimeDelta kSuggestionDuration = base::Seconds(15);
 // Longer than a request can take, so the card cannot outlive its request.
 constexpr base::TimeDelta kAskingDuration = kProviderTimeout + base::Seconds(5);
 constexpr int kRowSpacing = 4;
-constexpr char kSettingsSubPage[] = "uwOrganization";
 
 }  // namespace
 
@@ -115,32 +115,14 @@ void OrganizeBar::AcceptSuggestion() {
 }
 
 bool OrganizeBar::IsCommandIdChecked(int command_id) const {
-  return command_id == kShowActivity && ShowsActivityDetails();
+  return IsWindowCommandChecked(window_, command_id);
 }
 
 bool OrganizeBar::IsCommandIdEnabled(int command_id) const {
-  const PauseMode pause = ReadPauseState(window_->GetProfile()->GetPrefs());
-  switch (command_id) {
-    case kUndo: {
-      const TabOrganizationController* controller =
-          TabOrganizationController::From(window_);
-      return controller && controller->CanUndo();
-    }
-    case kPauseForAnHour:
-      return pause != PauseMode::kTimed;
-    case kPauseUntilLaunch:
-      return pause != PauseMode::kUntilLaunch;
-    case kPauseIndefinitely:
-      return pause != PauseMode::kIndefinite;
-    case kResume:
-      return pause != PauseMode::kOff;
-    default:
-      return true;
-  }
+  return command_id == kNewTask || CanRunWindowCommand(window_, command_id);
 }
 
 void OrganizeBar::ExecuteCommand(int command_id, int event_flags) {
-  PrefService* prefs = window_->GetProfile()->GetPrefs();
   switch (command_id) {
     case kNewTask:
       TabOrganizationController::OpenNewTask(window_);
@@ -148,33 +130,17 @@ void OrganizeBar::ExecuteCommand(int command_id, int event_flags) {
     case kUndo:
       Undo();
       break;
-    case kPauseForAnHour:
-      SetPauseState(prefs, PauseMode::kTimed, base::Hours(1));
-      break;
-    case kPauseUntilLaunch:
-      SetPauseState(prefs, PauseMode::kUntilLaunch);
-      break;
-    case kPauseIndefinitely:
-      SetPauseState(prefs, PauseMode::kIndefinite);
-      break;
-    case kResume:
-      SetPauseState(prefs, PauseMode::kOff);
-      break;
-    case kShowActivity:
-      prefs->SetBoolean(kOrganizationShowActivityPref, !ShowsActivityDetails());
-      break;
-    case kSettings:
-      chrome::ShowSettingsSubPage(window_, kSettingsSubPage);
-      break;
+    default:
+      RunWindowCommand(window_, command_id);
   }
 }
 
 bool OrganizeBar::GetAcceleratorForCommandId(
     int command_id,
     ui::Accelerator* accelerator) const {
-  return command_id == kUndo &&
-         BrowserView::GetBrowserViewForBrowser(window_)->GetAccelerator(
-             TabOrganizationController::kUndo, accelerator);
+  return GetCommandAccelerator(
+      window_, command_id == kNewTask ? IDC_CREATE_NEW_TAB_GROUP : command_id,
+      accelerator);
 }
 
 void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {

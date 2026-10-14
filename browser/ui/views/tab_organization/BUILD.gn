@@ -16,6 +16,8 @@ source_set("tab_organization") {
     "tab_indent.h",
     "tint_style.cc",
     "tint_style.h",
+    "window_commands.cc",
+    "window_commands.h",
   ]
   public_deps = [
     "//base",
