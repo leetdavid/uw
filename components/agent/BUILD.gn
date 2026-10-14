@@ -1,0 +1,20 @@
+# How uw's agent reads a page. See docs/plans/agent-chats.md.
+source_set("agent") {
+  sources = [
+    "page_text.cc",
+    "page_text.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//components/optimization_guide/proto:optimization_guide_proto" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "page_text_unittest.cc" ]
+  deps = [
+    ":agent",
+    "//components/optimization_guide/proto:optimization_guide_proto",
+    "//testing/gmock",
+    "//testing/gtest",
+  ]
+}

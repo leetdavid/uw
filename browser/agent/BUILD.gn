@@ -1,10 +1,39 @@
 # uw's agent: chats and the tools they use. See docs/plans/agent-chats.md.
 
+source_set("agent") {
+  sources = [
+    "agent_tools.cc",
+    "agent_tools.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/actor/core:task_id",
+    "//components/tabs:public",
+    "//uw/components/agent",
+  ]
+  deps = [
+    "//chrome/browser/actor",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/common",
+    "//components/actor/core",
+    "//components/optimization_guide/proto:optimization_guide_proto",
+    "//content/public/browser",
+    "//ui/base",
+    "//url",
+  ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "agent_engine_browsertest.cc" ]
+  sources = [
+    "agent_engine_browsertest.cc",
+    "agent_tools_browsertest.cc",
+  ]
   deps = [
+    ":agent",
     "//base",
     "//base/test:test_support",
     "//chrome/browser/actor",
@@ -18,8 +47,10 @@ source_set("browser_tests") {
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
+    "//testing/gmock",
     "//testing/gtest",
     "//ui/gfx/geometry",
     "//url",
+    "//uw/browser/tab_organization",
   ]
 }

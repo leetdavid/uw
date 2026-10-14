@@ -486,12 +486,14 @@ const TEST_SUITES = {
   unit_tests: [
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellSessionTest.*",
+    "PageTextTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
     "UwOrganizationPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "UwTerminalBrowserTest.*",
-    "UwTerminalMenuBrowserTest.*", "AgentEngineBrowserTest.*",
+    "UwTerminalMenuBrowserTest.*",
+    "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*",
   ],
 } as const;
 

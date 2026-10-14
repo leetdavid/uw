@@ -1,6 +1,7 @@
 group("unit_tests") {
   testonly = true
   deps = [
+    "agent:unit_tests",
     "look:unit_tests",
     "tab_organization:unit_tests",
     "terminal:unit_tests",

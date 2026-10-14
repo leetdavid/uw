@@ -42,7 +42,8 @@ Agreed before v2 started. The [organizer](automatic-organization.md) in-review t
 The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs: a chat at work, an approval, the Ask box on the new tab page, and every state of a chat row with the schedule popover. They are proposals until built.
 
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages.
-- **Tools.** `browser/agent/` holds uw's tools over the engine: open a child tab, navigate, read a page, click, type, scroll, and wait. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls.
+- **Tools.** `browser/agent/agent_tools.h` holds uw's tools over the engine: open a child tab, navigate, read a page, click, and type. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls. Scroll and wait come when a chat needs them.
+- **Reading a page.** `components/agent/page_text.h` turns Chromium's annotated page content into lines of text. Each link, field, and button gets a number, such as `[2] button "Send"`, and the agent clicks or types by that number. A password's value is never shown, and ads are left out.
 - **Agent loop.** It runs in the browser process. It reuses the model connection and Keychain code in `browser/tab_organization/`, which moves to a shared place when the agent becomes its second user.
 - **Chat page.** `uw://chat` is a WebUI page in TypeScript, built like `uw://terminal`.
 - **Approvals.** uw asks before every step the model marks as a change. It also asks before steps it can detect on its own: submitting a form, filling a password, and filling payment fields.
@@ -53,7 +54,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 1. T43: engine spike. A browser test drives the engine from uw in a background tab: navigate, read the page, click, and type, while the selected tab stays selected. It passed; see the [findings](../research/agent-engine-spike.md).
 2. T44: Agent model setting and its capability check on the settings page. The user can set it and test it in the app.
-3. T45: agent tools over the engine, with a browser test per tool.
+3. T45: agent tools over the engine, with a browser test per tool. Built: `AgentToolsBrowserTest.*` and `PageTextTest.*`.
 4. T46: agent loop. A browser test drives it with scripted tool calls from the test model server.
 5. T47: chat page, opened from a menu command. The agent's tabs nest under it. This is the first stage the user can try end to end.
 6. T48: approvals.
@@ -76,6 +77,6 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 ## Open questions
 
 - Where a scheduled chat runs when its tab was closed or no window is open. Proposal: it reopens its chat tab in the background in the most recent window. With no window open, it waits and runs as a [catch-up run](../CONTEXT.md#language) when a window opens.
-- What the model is given to read a page: Chromium's annotated page content, a screenshot, or both.
+- Whether the model also gets a screenshot of the page, beside its text. T46 decides.
 - Whether the engine's site checks need Safe Browsing on, and how its "sensitive site" prompt maps onto uw's approvals. The spike did not reach either.
 - Whether the agent should work on `http` pages such as a local development server. The engine refuses to act on them.
