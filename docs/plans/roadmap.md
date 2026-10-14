@@ -67,7 +67,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T57 | Branch collapse | backlog | 4/10 | Chevron, hidden-tab count, Ctrl+Cmd+., and Chromium's collapsed-group rules. T50 reuses it. Needs a design first. Waits for approval. |
 | T58 | Mouse actions and their settings | backlog | 6/10 | Option-click to close a branch, a + on a task row, double-click empty space, and middle-click to close a task, each with a switch. Needs a design first. Waits for approval. |
 | T59 | The sidebar as a keyboard tree | backlog | 5/10 | Ctrl+Cmd+L focuses the tab list, the arrow keys walk the tree, and VoiceOver reads each level. Waits for approval. |
-| T60 | Command bar spike | backlog | 6/10 | A top-chrome WebUI panel opens on Cmd+T without creating a tab and lists suggestions from Chromium's searchbox handler, per the [command bar plan](command-bar.md). Proposed, not agreed. Waits for approval. |
+| T60 | Command bar spike | backlog | 6/10 | A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler, per the [command bar plan](command-bar.md). Proposed, not agreed. Waits for approval. |
 | T61 | Command bar on Cmd+T | backlog | 4/10 | Commands, tasks, tabs, history, bookmarks, and web search, the best match first, and recent items before typing. Needs a design first. Waits for approval. |
 | T62 | Cmd+L and the address click open the command bar | backlog | 3/10 | Keeps the address bar's habits the plan lists. Waits for approval. |
 | T63 | Result menu and fallbacks | backlog | 6/10 | Cmd+K on a result, Search the web, and Ask uw, which waits for T47. Waits for approval. |
