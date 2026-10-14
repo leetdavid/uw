@@ -49,6 +49,12 @@ The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Ke
 - Set a ticket to `in progress` when work starts, `in review` when the change is ready to verify, and `done` once it is verified.
 - Update the status in the same change as the work it describes.
 
+## Commits
+
+- Commit your changes after every change, without waiting to be asked.
+- Use one line: `<type>(<scope>): <short lowercase imperative summary>`, such as `feat(organizer): file terminal tabs by title and folder`.
+- Commit only your own changes. Other sessions may have uncommitted work in the same files; leave their lines out.
+
 ## Writing docs
 
 - Get to the point. Use short sentences, short sections, and plain language.
