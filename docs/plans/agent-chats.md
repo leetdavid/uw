@@ -11,6 +11,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - While a chat runs, its tab and its child tabs move only together. After it finishes they are ordinary child tabs.
 - Every tab is a tab: the organizer may move a chat tab like any other.
 - The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in. Page text never counts as the user's instruction.
+- Until approvals land in T48, the chat page has no approval gate. The user tries it only on sites where a stray click does no harm. Decided on 2026-10-15.
 - Settings get an "Agent model" connection beside the decision and language models. It starts as a copy of the language model. uw checks that the model takes tool calls and images.
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
 - [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification.
