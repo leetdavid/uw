@@ -113,7 +113,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 - `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
 - `ai-organization.patch` registers the automatic organization preferences.
 - `uw-settings-page.patch` adds the uw page and its strings to Chromium's settings.
-- `uw-scheme-alias.patch` makes `uw://` addresses open their `chrome://` pages, typed in the address bar or opened by the browser. A web page cannot open them, as with `chrome://`.
+- `uw-scheme-alias.patch` gives every [uw page](docs/CONTEXT.md#language) a `uw://` address. A `uw://` address opens its `chrome://` page, typed in the address bar or opened by the browser. The address bar shows and copies a `chrome://` address as `uw://`. A web page cannot open them, as with `chrome://`.
 - `uw-look.patch` adds the window tint: it hooks uw's colors and gradient into Chromium's frame painting and turns the transparent glass frame off by default.
 
 Substantial Chromium product code lives in tracked `browser/` and `components/` directories. Preparation links them into the ignored Chromium checkout at `src/uw/`; it does not copy the files. The tab-tree patch ignores that generated source directory. This keeps product source reviewable while preserving an upstream-only checkout between prepare runs.

@@ -27,6 +27,10 @@ _Avoid_: Console, shell tab.
 **Busy terminal**:
 A terminal tab whose shell is running a command.
 
+**uw page**:
+A page that is part of the browser, such as settings. Its address starts with `uw://`.
+_Avoid_: Chrome page, internal page, WebUI page.
+
 **Home URL**:
 The saved starting address a pinned tab returns to when reset.
 

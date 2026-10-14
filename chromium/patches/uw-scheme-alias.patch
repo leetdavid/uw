@@ -60,6 +60,47 @@ index 5df291a12226596061c7f461fb2a7e2b2a2f2d6c..1c5279c0b94195c8c1341d4acbdfd155
  #if BUILDFLAG(IS_ANDROID)
      content::kAndroidAppScheme,
  #endif
+diff --git a/components/omnibox/browser/location_bar_model_impl.cc b/components/omnibox/browser/location_bar_model_impl.cc
+index fceda6b6429a016ef24f349704df3cb365b014a5..7c57183d69b7933ca18b8714b224cf51813ed05f 100644
+--- a/components/omnibox/browser/location_bar_model_impl.cc
++++ b/components/omnibox/browser/location_bar_model_impl.cc
+@@ -138,12 +138,17 @@ std::u16string LocationBarModelImpl::GetFormattedURL(
+   // Note that we can't unescape spaces here, because if the user copies this
+   // and pastes it into another program, that program may think the URL ends at
+   // the space.
+-  const std::u16string formatted_text =
++  std::u16string formatted_text =
+       delegate_->FormattedStringWithEquivalentMeaning(
+           url, url_formatter::FormatUrl(url, format_types,
+                                         base::UnescapeRule::NORMAL, nullptr,
+                                         nullptr, nullptr));
+ 
++  // uw:// is the shown form of chrome:// (see uw::HandleUwSchemeRewrite).
++  if (formatted_text.starts_with(u"chrome://")) {
++    formatted_text.replace(0, 6, u"uw");
++  }
++
+   // Truncating the URL breaks editing and then pressing enter, but hopefully
+   // people won't try to do much with such enormous URLs anyway. If this becomes
+   // a real problem, we could perhaps try to keep some sort of different "elided
+diff --git a/components/omnibox/browser/omnibox_text_util.cc b/components/omnibox/browser/omnibox_text_util.cc
+index 58610fbc031d79a04512b8f148d1e48253cacd62..4dc04f716e641c8e8bef0a01afe17a8a9fd2150e 100644
+--- a/components/omnibox/browser/omnibox_text_util.cc
++++ b/components/omnibox/browser/omnibox_text_util.cc
+@@ -179,6 +179,13 @@ void AdjustTextForCopy(
+       *url_from_text = contextual_tasks_inner_frame_url;
+     }
+ 
++    // uw:// is the shown form of chrome:// (see uw::HandleUwSchemeRewrite).
++    if (url_from_text->SchemeIs(content::kChromeUIScheme)) {
++      GURL::Replacements uw;
++      uw.SetSchemeStr("uw");
++      *url_from_text = url_from_text->ReplaceComponents(uw);
++    }
++
+     *text = base::UTF8ToUTF16(url_from_text->spec());
+     return;
+   }
 diff --git a/components/url_formatter/url_fixer.cc b/components/url_formatter/url_fixer.cc
 index d5d9a14c8d3d56a2dbae8e4353f943fd5c970b58..945b70854e2d038a279c60f5862579e5850ba4f4 100644
 --- a/components/url_formatter/url_fixer.cc
