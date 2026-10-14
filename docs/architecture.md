@@ -81,7 +81,7 @@ These describe responsibilities, not a required package or service layout.
 
 ## Performance
 
-Run model inference and background page checks outside the UI process. Limit concurrency, prioritize foreground browsing, and release idle model resources. Do not keep every watched page open between runs.
+Run model inference and background page checks outside the UI process. Limit the concurrency of background work, prioritize foreground browsing, and release idle model resources. Chats the user starts are their own requests and have no cap; see [agent chats](plans/agent-chats.md#agreed-scope). Do not keep every watched page open between runs.
 
 Establish a stock Chromium baseline on the same hardware and test pages. Measure startup, tab switching, active and suspended-tab memory, idle CPU, and energy use. Repeat with local inference and page watches running.
 
@@ -123,8 +123,8 @@ Ad blocking needs integration-level evaluation. Do not assume a particular exten
 | Tab organization models | Call each provider live, check its data handling, then measure task accuracy, confidence calibration, and context-to-placement latency. |
 | Tab hierarchy | Keeping page nesting consistent with native drags, stable identities during branch moves, and persistence. |
 | Shared pins | Shared live-page presentation and reset, unpin, and window-shutdown behavior. |
-| Background scheduling | Scheduler integration with the [agreed app lifecycle and catch-up behavior](product.md#scheduled-page-watches), plus daylight-saving handling. |
-| Watch sessions | How checks reuse the user's existing browser session while following the [agreed sign-in behavior](product.md#scheduled-page-watches). |
+| Background scheduling | Scheduler integration with the [agreed app lifecycle and catch-up behavior](product.md#scheduled-chats), plus daylight-saving handling. |
+| Watch sessions | How checks reuse the user's existing browser session while following the [agreed sign-in behavior](product.md#scheduled-chats). |
 | Coding-tool connections | Supported integration methods, credentials, and how tools return extension artifacts. |
 | Performance budgets | Validate the agreed context-to-placement deadline on reference hardware, define representative input sizes and task counts, and settle cold-start expectations and acceptable overhead versus stock Chromium. |
 

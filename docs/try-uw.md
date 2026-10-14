@@ -94,7 +94,7 @@ Expected result: the window around the page card becomes a gradient that starts 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
-- Page watches, delegated browser tasks, and prompt-built site customizations.
+- Chats, scheduled chats, and prompt-built site customizations.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem

@@ -107,20 +107,35 @@ An organization mode in which the user accepts or rejects task proposals while r
 **Organization pause**:
 A global suspension of automatic tab placement and task proposals. Manual organization and explicitly requested reorganization remain available.
 
-**Page watch**:
-A scheduled check of a page for a user-defined condition or relevant updates.
+**Scheduled chat**:
+A chat uw starts again on a schedule, such as every morning at 9, to check pages or carry out a request. Watching a page for changes is one use.
+_Avoid_: Page watch, routine.
 
-**Catch-up check**:
-A single page-watch run after uw becomes available following missed scheduled checks.
+**Catch-up run**:
+A single run of a scheduled chat after uw becomes available following missed scheduled runs.
+_Avoid_: Catch-up check.
 
 **Condition-based alert**:
-A notification that a page watch found a result matching the user's condition.
+A notification that a scheduled chat found a result matching the user's condition.
 
 **Scheduled summary**:
-A report of watched-page updates delivered on a chosen schedule.
+A report from one or more scheduled chats, delivered on a chosen schedule.
 
-**Delegated browser task**:
-A browser automation job the user asks an agent to carry out, such as retrieving information or taking an action.
+**Chat**:
+A conversation with uw's built-in agent, which may browse for the user to answer or carry out a request. Its page is a regular tab, and the tabs the agent opens are child tabs beneath it.
+_Avoid_: Delegated browser task, agent task, run, job.
+
+**Private chat**:
+A chat started from a private window. Nothing from it is kept after the private windows close.
+
+**Agent memory**:
+Facts uw's agent has learned about the user, such as which bank they use. The user can read, edit, and clear them.
+
+**Approval**:
+The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none.
+
+**Outside agent**:
+An AI agent running outside uw, such as Claude Code or Codex, that the user lets work in uw's tabs.
 
 **Site customization**:
 A user-requested change to a website's appearance or behavior.

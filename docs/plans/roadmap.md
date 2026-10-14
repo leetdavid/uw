@@ -49,6 +49,16 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T39 | The logo as the app icon | in review | 8/10 | The Dock, Finder, and the app switcher show the uw logo as a layered macOS icon that follows the system's light and dark icon styles, per [App icon](../logo.md#app-icon). `pnpm run icon` compiles it from the logo files and `uw-branding.patch` points the app bundle at the result. Agreed on 2026-10-14. Logos inside the browser and uw's own Clear and Tinted styles are left out. Done when the built `uw.app` holds the two icon files, macOS returns the logo as the app's icon, and the user has seen it in the Dock. The built app holds both files, byte for byte, and macOS returns the logo for it in the Default style. The other icon styles were only rendered with Xcode, not seen on the built app. The user has not seen it in the Dock yet. |
 | T40 | Suggest a name in the task menu | in review | 8/10 | A "Suggest a name" row under the name field of a task's menu asks the language model to name the task from its tabs, per the [agreed scope](automatic-organization.md#agreed-scope). The user asked for the button on 2026-10-14; its place and its rules are uw's choices and open to review. The design is the frames "Suggest a name: the task menu" and "Suggest a name: every state" on the canvas page "Automatic organization". Done when `AutomaticOrganizerBrowserTest.SuggestANameNamesTheTaskFromItsTabs`, `SuggestANameWaitsForTheLanguageModel`, and `SuggestANameSaysWhenNoNameCame` pass and a screenshot of the menu matches the design. They pass against a test server, and headless screenshots of the menu at rest, while asking with the row dimmed, and after a failure match the design in light mode. Not checked: the menu in dark mode and a real language model's answer. Nobody has clicked it in a real window yet. |
 | T41 | The address bar shows `uw://` | in review | 8/10 | Every [uw page](../CONTEXT.md#language) shows `uw://` in place of `chrome://` in the address bar, also while the address is edited, and copying the whole address gives the `uw://` form. Typing either form opens the page. Agreed on 2026-10-14. Inside the browser the pages keep their `chrome://` address, so the suggestion list, hover text, bookmarks, and text inside pages still say `chrome://`. `UwSchemeBrowserTest.*` passes with new cases for settings opened by its command, a typed `chrome://` address, a copy, a new tab, and a web address. A screenshot of the settings window shows `uw://settings/uwOrganization`. |
+| T43 | Agent engine spike | in review | 6/10 | A browser test drives Chromium's agent engine (`chrome/browser/actor`) from uw, without Gemini's panel, in a background tab: navigate, read, click, and type, while the selected tab stays selected. First stage of [agent chats](agent-chats.md#stages). It passes: see the [findings](../research/agent-engine-spike.md). Started before the [sorting bar](agent-chats.md#before-v2-the-sorting-bar) was met, at the user's request. |
+| T44 | Agent model setting | backlog | 8/10 | An "Agent model" connection on the settings page, starting as a copy of the language model, with a check for tool calls and images. |
+| T45 | Agent tools | backlog | 5/10 | `browser/agent/` tools over the engine, each taking and returning JSON: open a child tab, navigate, read, click, type, scroll, wait. |
+| T46 | Agent loop | backlog | 5/10 | The model and the tools in turn until the chat is answered, tested with scripted tool calls from the test model server. |
+| T47 | Chat page | backlog | 5/10 | `uw://chat` from a menu command, with the agent's tabs nested under it. The first stage to try end to end. |
+| T48 | Approvals | backlog | 4/10 | Approve before each change and sign-in, from the model's word and from what uw can detect. |
+| T49 | Ask box on the new tab page | backlog | 6/10 | Search or Ask. Ask starts a chat. |
+| T50 | Chats list and collapsing a chat | backlog | 5/10 | A Chats section in the sidebar with running and unread states, and collapsing a chat's child tabs. |
+| T51 | Scheduled chats | backlog | 5/10 | Scheduled chats under the watch rules, replacing page watches. |
+| T52 | Private chats | backlog | 6/10 | A chat from a private window keeps nothing after the private windows close. |
 
 ## 1. Choose the browser foundation
 
@@ -72,11 +82,11 @@ Done when the tab tree supports task regrouping and extraction into separate gro
 
 Clutter removal can follow tab organization. Its order relative to the other later additions remains open.
 
-## 4. Add download naming and page watches
+## 4. Add download naming
 
-Deliver [download naming](../product.md#download-name-suggestions) and [page watches](../product.md#scheduled-page-watches).
+Deliver [download naming](../product.md#download-name-suggestions). Page watches moved to v2 as [scheduled chats](../product.md#scheduled-chats) on 2026-10-14.
 
-Done when naming follows the user's preferences and downloads still work when inference fails. Verify session reuse, the sign-in-required status, scheduled checks, the selected reporting mode, visible failures, and the [agreed app availability and catch-up behavior](../product.md#scheduled-page-watches).
+Done when naming follows the user's preferences and downloads still work when inference fails.
 
 ## 5. Add prompt-built extensions
 
@@ -84,9 +94,11 @@ Complete one coding-tool integration before adding the others. Deliver the promp
 
 Done when a user can generate a page modification, inspect its site access, enable it, refine it, and restore a prior version. Measure browsing performance with generated extensions active.
 
-## Future: delegated browser tasks
+## v2: agent chats
 
-[Agent-controlled browser tasks](../product.md#delegated-browser-tasks) are agreed future direction. Define their product behavior before scheduling implementation.
+[Chats](../product.md#chats) and scheduled chats, agreed on 2026-10-14. The [agent chats plan](agent-chats.md) has the releases and stages, T43 to T52 on the board.
+
+Done when the plan's [acceptance checks](agent-chats.md#acceptance-checks-for-v20) pass and the user has handed real errands to a chat.
 
 ## Later: terminal tabs
 
@@ -131,12 +143,13 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Organization undo](../product.md#organization-undo) | 7/10 | Reverse related tree changes as one operation while preserving page state, selection, and manual-correction behavior. |
 | [Sidebar organization menu](../product.md#organization-controls) | 8/10 | Expose organization commands and global timed, next-launch, and indefinite pause controls through native button/menu controls. |
 | [Learning from manual adjustments](../product.md#automatic-tab-organization) | 8/10 | The first release preserves each corrected tab or branch while its activity stays the same. Broader learning is deferred. |
-| [Scheduled page watches with catch-up](../product.md#scheduled-page-watches) | 6/10 | Signed-in session reuse and dependable change detection across changing websites. |
-| [Watch reporting and notifications](../product.md#scheduled-page-watches) | 8/10 | Native notifications, history, and per-watch mute use established patterns once results are dependable. |
+| [Scheduled chats with catch-up](../product.md#scheduled-chats) | 5/10 | Signed-in session reuse, dependable change detection across changing websites, and approvals that wait while the user is away. |
+| [Scheduled chat reporting and notifications](../product.md#scheduled-chats) | 8/10 | Native notifications, history, and per-schedule mute use established patterns once results are dependable. |
 | [Page prompts and element selection](../product.md#prompt-built-extensions) | 8/10 | Selecting and describing the intended page content. |
 | [Prompt-built extensions and site customization](../product.md#prompt-built-extensions) | 5/10 | Generating working changes across different sites and coding tools. |
 | [Customization persistence and controls](../product.md#prompt-built-extensions) | 8/10 | Remember enabled changes across visits and expose per-site editing and removal. |
-| [Open-ended agent automation](../product.md#delegated-browser-tasks) | 3/10 | Arbitrary multi-step tasks are hard to complete and verify consistently. |
+| [Agent chats, v2.0](agent-chats.md) | 4/10 | Arbitrary multi-step tasks are hard to complete and verify consistently. Chromium's agent engine is internal and changes with each update. The [engine spike](../research/agent-engine-spike.md) passed, which raised it from 3/10. |
+| [Outside agents](agent-chats.md#releases) | 5/10 | uw's own tool server for Claude Code and other agents, on the same tools and approvals as chats. |
 | [Terminal tab](terminal-tab.md) | 6/10 | The first uw page outside settings, a pre-1.0 dependency whose JavaScript has [gaps uw's page must cover](../research/terminal-spike.md#gaps-uw-has-to-cover), and a close warning on four closing paths. The [spike](../research/terminal-spike.md) removed the WebAssembly and shell-start risks. |
 | [Terminal commands from other sources](../product.md#terminal-tabs) | 4/10 | Pages and other parts of uw asking to run a command with the user's approval. The prompt and what is remembered are undecided, and a mistake gives a website the shell. |
 | [Native libghostty terminal](../research/native-libghostty-terminal.md) | 3/10 | A tab whose content is a native view, on an embedding API not described as stable. A guess until a trial. |

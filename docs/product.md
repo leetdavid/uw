@@ -97,7 +97,9 @@ Show the active provider and model. Explain which features a model supports. If 
 
 Local mode keeps inference local. Sending page content to a remote provider requires a user-selected remote feature or automation.
 
-## Scheduled page watches
+## Scheduled chats
+
+Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). The watch rules below carry over to every scheduled chat. A step that needs approval waits and sends a notification.
 
 Let users choose a page, describe what to watch, and set a schedule. Support daily, weekly, and specific-time schedules with an explicit timezone.
 
@@ -141,16 +143,21 @@ Agreed future direction: other parts of uw, and pages the user allows, may ask t
 
 Agreed future direction: explore [full libghostty in a native view](research/native-libghostty-terminal.md) once the first version works.
 
-## Delegated browser tasks
+## Chats
 
-Agreed future direction: let an agent take control of the browser for open-ended automation. Support any browser task the agent can perform, including retrieving information and taking actions that change things. Tasks are not limited to a predefined catalog.
+Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent browses for the user in a [chat](CONTEXT.md#language). It handles any request it can carry out, including retrieving information and taking actions that change things.
+
+- A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
+- The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in.
+- [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
 
 Example use cases:
 
 - Check whether the latest deployment for the user's personal organization on Vercel succeeded.
 - Retrieve logs for the most recent crash on Railway.
+- Cancel unused subscriptions and request refunds.
 
-How users define tasks and how agents report progress and completion remain open.
+The [agent chats plan](plans/agent-chats.md) has the full scope, releases, and stages.
 
 ## Prompt-built extensions
 
