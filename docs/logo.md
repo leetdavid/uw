@@ -90,6 +90,8 @@ pnpm run icon
 - It uses Google Chrome. Pass `--browser <path>` for another. The built uw does not work: its headless screenshot hangs.
 - It cuts each logo file into a tile image and a mark image along markers in the SVG: `id="shadow"`, `id="art"`, `class="ground"`, `id="mark"`, and `id="ring"`. Keep them when editing the files.
 
+macOS caches app icons. If a rebuilt app still shows the old one, run `touch` on the `.app` folder, then quit and reopen the app.
+
 ## Not decided
 
 - Logos inside the browser, such as the About page. They are still Chromium's.
