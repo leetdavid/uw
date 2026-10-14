@@ -21,6 +21,7 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
 - [Terminal tab plan](plans/terminal-tab.md): a shell in a regular tab drawn by ghostty-web, the spike that comes first, stages, and acceptance checks.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
+- [Terminal spike](research/terminal-spike.md): what ghostty-web and a browser-started shell did in the two checks, and the gaps uw has to cover.
 - [Native libghostty terminal research](research/native-libghostty-terminal.md): what a native Ghostty view would need and when to reopen it.
 - [ADR 0001: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
 - [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.

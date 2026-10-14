@@ -1,8 +1,8 @@
 # Terminal tab
 
-Status: scope agreed on 2026-10-14. Only the [spike](#spike) is approved to build. The other stages wait for approval once the spike's findings are in.
+Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The other stages still wait for approval.
 
-Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. No Chromium page of this kind at the pinned revision was found to run WebAssembly. ghostty-web is at 0.4.0. The close warning touches four of Chromium's closing paths.
+Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started by `posix_spawn` behaves.
 
 The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-terminal-draws-with-ghostty-web.md). The agreed product behavior is in [Product](../product.md#terminal-tabs). The tab's look and the settings section still need a "Terminal" page on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs). Nothing is drawn there yet.
 
@@ -32,11 +32,15 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 - `components/terminal/` holds the shell host. It opens a pseudo-terminal, starts the shell, reads and writes, resizes, reports the folder and the running command, and kills the shell. It has no `//chrome/browser` dependency and its own unit tests. `chromeos/process_proxy` is the model. It cannot be used directly because `//chromeos` asserts `is_chromeos`.
 - The shell host runs in the browser process. Every byte to the shell passes through one function there. Stage two adds its approval step at that function, with no change to the page.
-- `browser/resources/uw_terminal/` and `browser/ui/webui/uw_terminal/` hold the page and its Mojo link. The page's content security policy allows WebAssembly and loosens nothing else.
-- ghostty-web is pinned to an exact version in `package.json`, and `pnpm-lock.yaml` holds its integrity hash. The prepare step copies its script and `.wasm` file into the page's resources. An update is a deliberate version bump.
+- `browser/resources/uw_terminal/` and `browser/ui/webui/uw_terminal/` hold the page and its Mojo link. The page's content security policy adds `'wasm-unsafe-eval'` to `script-src` and loosens nothing else.
+- ghostty-web is pinned to an exact version in `package.json`, and `pnpm-lock.yaml` holds its integrity hash. The prepare step copies `ghostty-web.js` into the page's resources. The `.wasm` file is built into that script. An update is a deliberate version bump.
+- A key listener on the page, in the capture phase, keeps Cmd combinations, Ctrl+Tab, and Ctrl+` away from ghostty-web without cancelling them, and sends Esc and the letter for Option with a letter. ghostty-web alone types a Cmd shortcut's letter into the shell.
+- The page never writes an empty chunk, sets scrollback as a byte budget, and replaces ghostty-web's `window.open` call for a link with a request to the browser.
 - A Cmd-clicked link asks the browser to open a tab with the terminal tab as its source. The [tab tree](native-tab-tree.md) already nests a tab under its source.
+- The shell host starts the shell with `posix_spawn`, as a session leader that opens the terminal itself. Chromium's `base::LaunchProcess` cannot give a shell a controlling terminal on macOS.
 - A shell is busy when the foreground process group of its pseudo-terminal is not the shell's own.
 - The folder is read from the shell's process and saved with the tab's session data, the same route parent links take.
+- A shell host is destroyed off the main thread. On macOS that can block for up to two seconds.
 - Terminal tabs are marked not auto-discardable, the flag Chromium's discard policy already checks.
 - New commands reuse uw's command numbers and add no `IDC_` value.
 
@@ -44,8 +48,8 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 Each stage is a ticket on the [board](roadmap.md#board).
 
-1. T32: the spike below.
-2. T33: shell host with unit tests.
+1. T32: the spike below. It left `components/terminal/shell_host` and its unit tests.
+2. T33: the rest of the shell host: reading output on a task runner, writes that never block, closing off the main thread, and the login shell's environment.
 3. T34: the terminal page, its link to the shell host, the opening controls, and the organizer leaving it alone.
 4. T35: links open as child tabs.
 5. T36: the busy terminal warning.
@@ -59,7 +63,7 @@ Two checks, about a day. Neither changes the browser's interface or its resource
 1. ghostty-web runs in a local test page served with the content security policy a `uw://` page would have, opened in headless uw. It is fed recorded output from `vim` and `htop`, a color test, and one large burst of output. Pass: the screen matches what Ghostty draws for the same input, the page stays responsive during the burst, and the only policy change needed is allowing WebAssembly.
 2. The shell host is written as a C++ class with a unit test. Pass: the test starts a shell, sends a command, reads its output, resizes, sees the new size from inside the shell, and finds no process left after closing.
 
-Findings go in `docs/research/terminal-spike.md`. The spike also answers the first three [open questions](#open-questions).
+The [findings](../research/terminal-spike.md) say what passed, what was not checked, and what uw's page has to cover.
 
 ## Acceptance checks
 
@@ -82,9 +86,10 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 
 ## Open questions
 
-- How the prepare step feeds ghostty-web's script and `.wasm` file into Chromium's page build.
-- Whether ghostty-web 0.4.0 finds links in output and reports a click on one, or uw has to.
-- Whether ghostty-web's drawing and typing speed are good enough for daily use.
+- How the prepare step feeds `ghostty-web.js` into Chromium's page build. The spike showed that one file is enough. It did not try the build.
+- Where the tab's title comes from. ghostty-web reports a title the shell sets only when the whole escape sequence arrives in one string. Proposal: the folder and the running command, which the shell host already reports. This would change the title rule in the scope above, so it needs a decision.
+- Whether the browser runs a shortcut that the page's key listener leaves alone. This needs a real key press in a browser test.
+- Whether typing feels fast enough by hand. Output speed is: 20 MB drew in under a second.
 - What carries the folder when a closed terminal tab is reopened with Cmd-Shift-T. uw's saved tab data does not come back on that path today. It must not be the address.
 - What Cmd-R does in a terminal tab. Proposal: nothing.
 - Whether terminal tabs open in Incognito and Guest windows.
