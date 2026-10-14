@@ -5,20 +5,25 @@
 
 #include <fcntl.h>
 #include <libproc.h>
+#include <pwd.h>
 #include <signal.h>
 #include <spawn.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <xlocale.h>
 
+#include <algorithm>
 #include <array>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "base/compiler_specific.h"
 #include "base/containers/heap_array.h"
 #include "base/files/file_util.h"
+#include "base/i18n/rtl.h"
 #include "base/memory/ptr_util.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/environment_internal.h"
@@ -117,7 +122,44 @@ pid_t Spawn(const ShellHost::Options& options, const char* terminal_name) {
   return result == 0 ? pid : -1;
 }
 
+// The user's language and region as a locale the C library knows, with UTF-8
+// text. Without one, programs in the shell treat every character outside
+// ASCII as unprintable.
+std::string Utf8Locale() {
+  std::string name = base::i18n::GetConfiguredLocale();
+  std::ranges::replace(name, '-', '_');
+  name += ".UTF-8";
+  const locale_t known = newlocale(LC_ALL_MASK, name.c_str(), nullptr);
+  if (!known) {
+    return "en_US.UTF-8";
+  }
+  freelocale(known);
+  return name;
+}
+
 }  // namespace
+
+// static
+ShellHost::Options ShellHost::ForUser() {
+  Options options;
+  options.shell = base::FilePath("/bin/zsh");
+  options.folder = base::GetHomeDir();
+  passwd user;
+  passwd* found = nullptr;
+  std::array<char, 4096> text;
+  if (getpwuid_r(getuid(), &user, text.data(), text.size(), &found) == 0 &&
+      found && found->pw_shell && !std::string_view(found->pw_shell).empty()) {
+    options.shell = base::FilePath(found->pw_shell);
+  }
+  options.environment["SHELL"] = options.shell.value();
+  const std::unique_ptr<base::Environment> environment =
+      base::Environment::Create();
+  if (!environment->HasVar("LC_ALL") && !environment->HasVar("LC_CTYPE") &&
+      !environment->HasVar("LANG")) {
+    options.environment["LANG"] = Utf8Locale();
+  }
+  return options;
+}
 
 // static
 std::unique_ptr<ShellHost> ShellHost::Start(const Options& options) {
@@ -154,8 +196,18 @@ ShellHost::~ShellHost() {
   base::EnsureProcessTerminated(std::move(shell_));
 }
 
-bool ShellHost::Write(std::string_view bytes) {
-  return base::WriteFileDescriptor(terminal_.get(), bytes);
+size_t ShellHost::Write(std::string_view bytes) {
+  size_t written = 0;
+  while (written < bytes.size()) {
+    const std::string_view rest = bytes.substr(written);
+    const ssize_t count =
+        HANDLE_EINTR(write(terminal_.get(), rest.data(), rest.size()));
+    if (count <= 0) {
+      break;
+    }
+    written += static_cast<size_t>(count);
+  }
+  return written;
 }
 
 bool ShellHost::Resize(int columns, int rows) {

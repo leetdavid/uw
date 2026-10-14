@@ -1,6 +1,6 @@
 # Terminal tab
 
-Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The other stages still wait for approval.
+Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. Building the shell host and the page, T33 and T34, was approved the same day. T35 to T38 still wait for approval.
 
 Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started by `posix_spawn` behaves.
 
@@ -40,7 +40,9 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - The shell host starts the shell with `posix_spawn`, as a session leader that opens the terminal itself. Chromium's `base::LaunchProcess` cannot give a shell a controlling terminal on macOS.
 - A shell is busy when the foreground process group of its pseudo-terminal is not the shell's own.
 - The folder is read from the shell's process and saved with the tab's session data, the same route parent links take.
-- A shell host is destroyed off the main thread. On macOS that can block for up to two seconds.
+- Each shell lives on a sequence of its own, behind `ShellSession`. Ending a shell can block for up to two seconds on macOS, and that must not hold up the window or another terminal.
+- The page acknowledges each piece of output before the next is read, so a command that prints faster than the page draws is slowed down.
+- The shell is the one in the user's account record, started as a login shell. uw sets `LANG` to the browser's language with UTF-8 when it has no locale of its own, as it does when started from the Finder.
 - Terminal tabs are marked not auto-discardable, the flag Chromium's discard policy already checks.
 - New commands reuse uw's command numbers and add no `IDC_` value.
 

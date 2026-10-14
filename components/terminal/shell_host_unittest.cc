@@ -14,7 +14,9 @@
 #include <string_view>
 
 #include "base/containers/span.h"
+#include "base/environment.h"
 #include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/process_handle.h"
 #include "base/strings/string_number_conversions.h"
@@ -54,13 +56,13 @@ class ShellHostTest : public testing::Test {
         base::TimeTicks::Now() + TestTimeouts::action_timeout();
     while (output.find(marker) == std::string::npos &&
            base::TimeTicks::Now() < deadline) {
-      pollfd waiting = {shell.output_fd(), POLLIN, 0};
+      pollfd waiting = {shell.terminal_fd(), POLLIN, 0};
       if (HANDLE_EINTR(poll(&waiting, 1, 50)) <= 0) {
         continue;
       }
       std::array<char, 4096> buffer;
       const ssize_t count =
-          HANDLE_EINTR(read(shell.output_fd(), buffer.data(), buffer.size()));
+          HANDLE_EINTR(read(shell.terminal_fd(), buffer.data(), buffer.size()));
       if (count <= 0) {
         break;
       }
@@ -74,9 +76,13 @@ class ShellHostTest : public testing::Test {
   // shell computes the end marker, so the echo of the typed line never
   // matches it.
   std::string Run(ShellHost& shell, std::string_view command) {
-    EXPECT_TRUE(shell.Write(command));
-    EXPECT_TRUE(shell.Write("; echo end-$((40+2))\n"));
+    Type(shell, command);
+    Type(shell, "; echo end-$((40+2))\n");
     return ReadUntil(shell, "end-42\r\n");
+  }
+
+  void Type(ShellHost& shell, std::string_view keys) {
+    EXPECT_EQ(shell.Write(keys), keys.size());
   }
 
   bool WaitUntilGone(base::ProcessId pid) {
@@ -146,17 +152,17 @@ TEST_F(ShellHostTest, NamesARunningCommandAndNothingAtThePrompt) {
   std::unique_ptr<ShellHost> shell = StartShell();
   ASSERT_TRUE(shell);
   EXPECT_FALSE(shell->RunningCommand());
-  ASSERT_TRUE(shell->Write("sleep 300\n"));
+  Type(*shell, "sleep 300\n");
   EXPECT_TRUE(WaitUntilRunning(*shell, "sleep"));
 }
 
 TEST_F(ShellHostTest, CtrlCInterruptsARunningCommand) {
   std::unique_ptr<ShellHost> shell = StartShell();
   ASSERT_TRUE(shell);
-  ASSERT_TRUE(shell->Write("sleep 300\n"));
+  Type(*shell, "sleep 300\n");
   ASSERT_TRUE(WaitUntilRunning(*shell, "sleep"));
-  ASSERT_TRUE(shell->Write("\x03"));
-  ASSERT_TRUE(shell->Write("echo status-$?-$((40+2))\n"));
+  Type(*shell, "\x03");
+  Type(*shell, "echo status-$?-$((40+2))\n");
   EXPECT_NE(ReadUntil(*shell, "-42\r\n").find("status-130-42"),
             std::string::npos);
   EXPECT_FALSE(shell->RunningCommand());
@@ -172,7 +178,7 @@ TEST_F(ShellHostTest, ClosingEndsTheShellAndTheCommandItRuns) {
       std::string_view(output).substr(at, output.find(' ', at) - at),
       &background))
       << output;
-  ASSERT_TRUE(shell->Write("sleep 300\n"));
+  Type(*shell, "sleep 300\n");
   ASSERT_TRUE(WaitUntilRunning(*shell, "sleep"));
   const base::ProcessId shell_pid = shell->pid();
 
@@ -180,6 +186,35 @@ TEST_F(ShellHostTest, ClosingEndsTheShellAndTheCommandItRuns) {
 
   EXPECT_TRUE(WaitUntilGone(shell_pid));
   EXPECT_TRUE(WaitUntilGone(background));
+}
+
+TEST_F(ShellHostTest, TakesOnlyWhatTheTerminalHasRoomFor) {
+  std::unique_ptr<ShellHost> shell = StartShell();
+  ASSERT_TRUE(shell);
+  Type(*shell, "sleep 300\n");
+  ASSERT_TRUE(WaitUntilRunning(*shell, "sleep"));
+  // Nothing reads these lines, so the terminal fills up.
+  std::string paste;
+  for (int line = 0; line < 1000; ++line) {
+    paste += std::string(99, 'x') + "\n";
+  }
+  EXPECT_LT(shell->Write(paste), paste.size());
+}
+
+TEST_F(ShellHostTest, TheUsersShellExistsAndStartsAtHomeWithUtf8Text) {
+  const ShellHost::Options options = ShellHost::ForUser();
+  EXPECT_TRUE(base::PathExists(options.shell));
+  EXPECT_TRUE(options.login);
+  EXPECT_EQ(options.folder, base::GetHomeDir());
+  EXPECT_EQ(options.environment.at("SHELL"), options.shell.value());
+  const std::unique_ptr<base::Environment> environment =
+      base::Environment::Create();
+  if (!environment->HasVar("LANG") && !environment->HasVar("LC_ALL") &&
+      !environment->HasVar("LC_CTYPE")) {
+    EXPECT_TRUE(options.environment.at("LANG").ends_with(".UTF-8"));
+  } else {
+    EXPECT_FALSE(options.environment.contains("LANG"));
+  }
 }
 
 }  // namespace

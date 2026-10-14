@@ -4,6 +4,8 @@
 #ifndef UW_COMPONENTS_TERMINAL_SHELL_HOST_H_
 #define UW_COMPONENTS_TERMINAL_SHELL_HOST_H_
 
+#include <stddef.h>
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,6 +33,10 @@ class ShellHost {
     base::EnvironmentMap environment;
   };
 
+  // The user's login shell in their home folder, with a UTF-8 locale when
+  // this process has none. uw started from the Finder has none.
+  static Options ForUser();
+
   // Null when the terminal or the shell could not be started.
   static std::unique_ptr<ShellHost> Start(const Options& options);
 
@@ -38,12 +44,13 @@ class ShellHost {
   ShellHost& operator=(const ShellHost&) = delete;
   ~ShellHost();
 
-  // Readable when the shell has written output. Reads from it never block.
-  int output_fd() const { return terminal_.get(); }
+  // Readable when the shell has written output, and writable when it can
+  // take more input. Reads and writes never block.
+  int terminal_fd() const { return terminal_.get(); }
 
-  // Sends `bytes` to the shell as if typed. False when the terminal did not
-  // take all of them.
-  bool Write(std::string_view bytes);
+  // Sends `bytes` to the shell as if typed and returns how many the terminal
+  // took. It takes fewer when the shell is not reading fast enough.
+  size_t Write(std::string_view bytes);
 
   bool Resize(int columns, int rows);
 

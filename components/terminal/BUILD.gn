@@ -4,13 +4,19 @@ source_set("terminal") {
   sources = [
     "shell_host.cc",
     "shell_host.h",
+    "shell_session.cc",
+    "shell_session.h",
   ]
   public_deps = [ "//base" ]
+  deps = [ "//base:i18n" ]
 }
 
 source_set("unit_tests") {
   testonly = true
-  sources = [ "shell_host_unittest.cc" ]
+  sources = [
+    "shell_host_unittest.cc",
+    "shell_session_unittest.cc",
+  ]
   deps = [
     ":terminal",
     "//base",

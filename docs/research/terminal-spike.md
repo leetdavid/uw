@@ -85,8 +85,7 @@ Eight `ShellHostTest` cases cover the same list as the probe, against `/bin/sh`.
 
 ## What is left
 
-- **Destroying a shell host can block for up to two seconds on macOS.** Chromium's `EnsureProcessTerminated` says so. T33 has to close shells off the main thread.
-- **Not checked:** the environment a shell gets when uw is started from the Finder, where `LANG` and `PATH` may be bare, and which app macOS names in a privacy prompt raised by a command in the shell.
+- **Not checked:** which app macOS names in a privacy prompt raised by a command in the shell.
 
 ## Answers to the plan's open questions
 

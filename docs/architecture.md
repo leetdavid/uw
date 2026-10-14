@@ -58,7 +58,7 @@ The organization pause is global. It supports one hour, until next launch, and i
 
 ## Terminal
 
-A [terminal tab](CONTEXT.md#language) is a `uw://terminal` page drawn by ghostty-web. A shell host in the browser process runs the shell, and every byte to the shell passes through one function there. See [ADR 0004](adr/0004-the-terminal-draws-with-ghostty-web.md) and the [plan](plans/terminal-tab.md). Only the plan's spike is approved to build.
+A [terminal tab](CONTEXT.md#language) is a `uw://terminal` page drawn by ghostty-web. A shell host in the browser process runs the shell, and every byte to the shell passes through one function there. See [ADR 0004](adr/0004-the-terminal-draws-with-ghostty-web.md) and the [plan](plans/terminal-tab.md). The shell host and the page are being built. The plan's later stages wait for approval.
 
 ## Shared pinned tabs
 
