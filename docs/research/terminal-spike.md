@@ -18,7 +18,7 @@ The test page was served from `127.0.0.1` with the default content security poli
 
 | Question | Finding |
 | --- | --- |
-| Policy | With the default policy the page fails with a `script-src` violation on `wasm-eval`. Adding `'wasm-unsafe-eval'` to `script-src` is the only change needed. Trusted Types stayed enforced with no violation. |
+| Policy | With the default policy the page fails with a `script-src` violation on `wasm-eval`. Adding `'wasm-unsafe-eval'` to `script-src` was the only change the test page needed. Trusted Types stayed enforced with no violation. The real `uw://terminal` page also needed `data:` in `connect-src`: ghostty-web reads its WebAssembly with `fetch()` from a `data:` address, and a Chromium page limits `connect-src`, which the test page's policy left out. |
 | Files | The `.wasm` file is built into `ghostty-web.js` as base64. The page ran with that one file present and nothing else from the package. |
 | `vim` | Recorded output at 100 by 30 drew correctly with syntax colors. 29 of 30 rows matched tmux's reading of the same bytes. The other row was noise in the reference. |
 | `htop` | 30 of 30 rows matched tmux's reading. Meters and the header bar drew correctly. |

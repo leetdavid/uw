@@ -1,0 +1,13 @@
+# Opening a terminal tab and telling one from a page tab.
+source_set("terminal") {
+  sources = [
+    "terminal_tab.cc",
+    "terminal_tab.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/ui/browser_window",
+    "//content/public/common",
+    "//url",
+  ]
+}

@@ -1,0 +1,42 @@
+# The uw://terminal page. ghostty-web draws the terminal: its one script comes
+# from the npm package as shipped, through the link that preparation makes at
+# //uw/ghostty-web.
+import("//ui/webui/resources/tools/build_webui.gni")
+import("//ui/webui/resources/tools/generate_grd.gni")
+
+assert(!is_android)
+
+generate_grd("ghostty_web_grdp") {
+  grd_prefix = "uw_terminal"
+  out_grd = "$target_gen_dir/ghostty_web_resources.grdp"
+  input_files = [ "ghostty-web.js" ]
+  input_files_base_dir = rebase_path("//uw/ghostty-web/dist", "//")
+}
+
+build_webui("build") {
+  grd_prefix = "uw_terminal"
+
+  static_files = [
+    "favicon.svg",
+    "terminal.html",
+  ]
+  ts_files = [ "terminal.ts" ]
+
+  ts_deps = [
+    "//ui/webui/resources/js:build_ts",
+    "//ui/webui/resources/mojo:build_ts",
+  ]
+  ts_definitions = [ "//uw/ghostty-web/dist/index.d.ts" ]
+  ts_path_mappings =
+      [ "/ghostty-web.js|" +
+        rebase_path("//uw/ghostty-web/dist/index.d.ts", target_gen_dir) ]
+
+  mojo_files_deps =
+      [ "//uw/browser/ui/webui/uw_terminal:mojo_bindings_ts__generator" ]
+  mojo_files = [ "$root_gen_dir/uw/browser/ui/webui/uw_terminal/uw_terminal.mojom-webui.ts" ]
+
+  extra_grdp_deps = [ ":ghostty_web_grdp" ]
+  extra_grdp_files = [ "$target_gen_dir/ghostty_web_resources.grdp" ]
+
+  webui_context_type = "trusted"
+}

@@ -1,0 +1,58 @@
+# The uw://terminal page's browser side: its controller and the handler that
+# runs the shell.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_terminal.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_terminal") {
+  sources = [
+    "uw_terminal_handler.cc",
+    "uw_terminal_handler.h",
+    "uw_terminal_ui.cc",
+    "uw_terminal_ui.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//base",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//ui/webui",
+    "//uw/browser/terminal",
+    "//uw/components/terminal",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//components/performance_manager",
+    "//content/public/common",
+    "//services/network/public/mojom",
+    "//ui/base",
+    "//uw/browser/resources/uw_terminal:resources",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [
+    "uw_terminal_browsertest.cc",
+    "uw_terminal_menu_browsertest.mm",
+  ]
+  deps = [
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//ui/events:dom_keycode_converter",
+    "//ui/events:test_support",
+    "//url",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/terminal",
+  ]
+}

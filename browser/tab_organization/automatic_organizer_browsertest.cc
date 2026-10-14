@@ -9,6 +9,7 @@
 
 #include "base/callback_list.h"
 #include "base/command_line.h"
+#include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -17,6 +18,7 @@
 #include "base/json/json_writer.h"
 #include "base/run_loop.h"
 #include "base/strings/string_split.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
@@ -72,6 +74,7 @@
 #include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/name_lock.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
@@ -1889,6 +1892,40 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   WaitForPageText(link);
   EXPECT_TRUE(Requests().empty());
   EXPECT_FALSE(link->GetGroup());
+}
+
+// A terminal tab is never asked about and never named in a request, and it
+// stays where it is when the tabs around it move.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATerminalTabIsLeftOutOfRequestsAndMoves) {
+  // zsh finds none of the user's startup files there.
+  base::Environment::Create()->SetVar("ZDOTDIR", "/var/empty");
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  chrome::ExecuteCommand(browser(), kNewTerminalCommand);
+  tabs::TabInterface* terminal = tabs()->GetActiveTab();
+  ASSERT_TRUE(content::WaitForLoadStop(terminal->GetContents()));
+  ASSERT_TRUE(controller()->Nest(Id(terminal)));
+  ASSERT_EQ(controller()->tree().Find(Id(terminal))->parent, Id(page));
+  ASSERT_EQ(terminal->GetGroup(), task);
+  // Once its shell is at a prompt, the tab is named after its folder.
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return terminal->GetContents()->GetTitle() != u"Terminal"; }));
+  const std::string name =
+      base::UTF16ToUTF8(terminal->GetContents()->GetTitle());
+
+  UseDecisionModel(DecisionProvider::kJev);
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.1));
+  Browse(page, "weather");
+  ASSERT_TRUE(SettleAfter(1));
+
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_EQ(terminal->GetGroup(), task);
+  ASSERT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(Requests()[0].body.find("Title: " + name), std::string::npos);
+  EXPECT_EQ(Requests()[0].body.find("\"" + name + "\""), std::string::npos);
+  EXPECT_EQ(Requests()[0].body.find("terminal"), std::string::npos);
 }
 
 }  // namespace

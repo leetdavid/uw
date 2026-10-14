@@ -490,8 +490,8 @@ const TEST_SUITES = {
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
     "UwOrganizationPageBrowserTest.*",
-    "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "UwSchemeBrowserTest.*",
-    "AgentEngineBrowserTest.*",
+    "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "UwSchemeBrowserTest.*", "UwTerminalBrowserTest.*",
+    "UwTerminalMenuBrowserTest.*", "AgentEngineBrowserTest.*",
   ],
 } as const;
 

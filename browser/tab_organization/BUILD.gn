@@ -31,6 +31,7 @@ source_set("tab_organization") {
     "//services/network/public/cpp",
     "//ui/base",
     "//ui/menus",
+    "//uw/browser/terminal",
   ]
 }
 
@@ -64,6 +65,7 @@ source_set("browser_tests") {
     "//ui/events:test_support",
     "//ui/views:test_support",
     "//url",
+    "//uw/browser/terminal",
     "//uw/browser/ui/views/tab_organization",
   ]
 }

@@ -35,6 +35,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/terminal/terminal_tab.h"
 
 namespace uw {
 namespace {
@@ -261,9 +262,18 @@ void AutomaticOrganizer::Scan() {
     if (contents->IsLoading() && (!entry || entry->GetTitle().empty())) {
       continue;
     }
+    const GURL& url = contents->GetLastCommittedURL();
+    // A terminal tab is never asked about, and nothing about it is kept, so
+    // no request can name it.
+    if (IsTerminalUrl(url)) {
+      if (pages_.erase(page.id)) {
+        kept_.erase(page.id);
+        CancelRequestsFor(page.id);
+      }
+      continue;
+    }
     Activity& activity = pages_[page.id];
     const bool first_sight = activity.revision == 0;
-    const GURL& url = contents->GetLastCommittedURL();
     // A tab shows something else when its title changes or it goes to another
     // site. A new path or new parameters under the same title are the same
     // page to the organizer: web apps keep their state in the address.
@@ -641,6 +651,11 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
   for (const PageId& id : tree.BranchOf(top)) {
     const auto activity = pages_.find(id);
     if (activity == pages_.end()) {
+      // A terminal tab stays where it is when the tabs around it move.
+      const tabs::TabInterface* tab = controller_->TabFor(id);
+      if (tab && IsTerminalUrl(tab->GetContents()->GetLastCommittedURL())) {
+        tabs[id].placed = true;
+      }
       continue;
     }
     TabAnswer& tab = tabs[id];

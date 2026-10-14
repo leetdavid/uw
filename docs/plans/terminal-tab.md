@@ -1,6 +1,6 @@
 # Terminal tab
 
-Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. Building the shell host and the page, T33 and T34, was approved the same day. T35 to T38 still wait for approval.
+Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval.
 
 Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started by `posix_spawn` behaves.
 
@@ -32,10 +32,14 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 - `components/terminal/` holds the shell host. It opens a pseudo-terminal, starts the shell, reads and writes, resizes, reports the folder and the running command, and kills the shell. It has no `//chrome/browser` dependency and its own unit tests. `chromeos/process_proxy` is the model. It cannot be used directly because `//chromeos` asserts `is_chromeos`.
 - The shell host runs in the browser process. Every byte to the shell passes through one function there. Stage two adds its approval step at that function, with no change to the page.
-- `browser/resources/uw_terminal/` and `browser/ui/webui/uw_terminal/` hold the page and its Mojo link. The page's content security policy adds `'wasm-unsafe-eval'` to `script-src` and loosens nothing else.
-- ghostty-web is pinned to an exact version in `package.json`, and `pnpm-lock.yaml` holds its integrity hash. The prepare step copies `ghostty-web.js` into the page's resources. The `.wasm` file is built into that script. An update is a deliberate version bump.
-- A key listener on the page, in the capture phase, keeps Cmd combinations, Ctrl+Tab, and Ctrl+` away from ghostty-web without cancelling them, and sends Esc and the letter for Option with a letter. ghostty-web alone types a Cmd shortcut's letter into the shell.
-- The page never writes an empty chunk, sets scrollback as a byte budget, and replaces ghostty-web's `window.open` call for a link with a request to the browser.
+- `browser/resources/uw_terminal/` and `browser/ui/webui/uw_terminal/` hold the page and its Mojo link. The page's content security policy adds `'wasm-unsafe-eval'` to `script-src` and `data:` to `connect-src`, where ghostty-web reads its WebAssembly. It loosens nothing else.
+- ghostty-web is pinned to an exact version in `package.json`, and `pnpm-lock.yaml` holds its integrity hash. The prepare step links the installed package into the checkout at `//uw/ghostty-web`, as it links `browser/` and `components/`. The page build packs `dist/ghostty-web.js` as shipped and takes the page's types from `dist/index.d.ts`. The `.wasm` file is built into that script. An update is a deliberate version bump.
+- A key listener on the page, in the capture phase, keeps Cmd combinations, Ctrl+Tab, and Ctrl+` away from ghostty-web without cancelling them. For Option with a key it sends Esc and the key's own character on the user's keyboard layout, which the Keyboard Map API gives. ghostty-web alone types a Cmd shortcut's letter into the shell.
+- The page never writes an empty chunk and sets scrollback as a byte budget: 10 MB, Ghostty's own default. For T35 it replaces ghostty-web's `window.open` call for a link with a request to the browser.
+- Cmd-C and the Edit menu copy the terminal's selection. Dropped text is pasted. A dropped file is ignored, so it cannot replace the page.
+- When the shell exits, its tab closes. A shell that cannot start leaves the tab open with a line saying so.
+- The tab's icon is a dark rounded square with a prompt in it.
+- Until T38, the terminal takes the page card's colors from the `uw-arc-style` guide on the Doop canvas, light or dark with the system, with the task colors as its palette. These are uw's choices and open to review.
 - A Cmd-clicked link asks the browser to open a tab with the terminal tab as its source. The [tab tree](native-tab-tree.md) already nests a tab under its source.
 - The shell host starts the shell with `posix_spawn`, as a session leader that opens the terminal itself. Chromium's `base::LaunchProcess` cannot give a shell a controlling terminal on macOS.
 - A shell is busy when the foreground process group of its pseudo-terminal is not the shell's own.
@@ -88,10 +92,11 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 
 ## Open questions
 
-- How the prepare step feeds `ghostty-web.js` into Chromium's page build. The spike showed that one file is enough. It did not try the build.
 - Where the tab's title comes from. ghostty-web reports a title the shell sets only when the whole escape sequence arrives in one string. Proposal: the folder and the running command, which the shell host already reports. This would change the title rule in the scope above, so it needs a decision.
-- Whether the browser runs a shortcut that the page's key listener leaves alone. This needs a real key press in a browser test.
+- Whether the browser runs a shortcut that the page's key listener leaves alone. The listener leaves Ctrl+` alone and the File menu carries it, but macOS runs a menu shortcut only for the window in front, which a headless test does not have. It needs a check by hand.
 - Whether typing feels fast enough by hand. Output speed is: 20 MB drew in under a second.
 - What carries the folder when a closed terminal tab is reopened with Cmd-Shift-T. uw's saved tab data does not come back on that path today. It must not be the address.
-- What Cmd-R does in a terminal tab. Proposal: nothing.
+- What Cmd-R does in a terminal tab. Today it reloads the page, which ends the shell and starts a new one. Proposal: nothing.
+- How a new theme reaches an open terminal. ghostty-web 0.4.0 cannot change a terminal's colors once it has opened, so a terminal keeps the light or dark colors it opened with. Check 8 holds for the font and its size, but not yet for the theme.
+- Whether a selection should go to the clipboard as soon as it is made. ghostty-web does that, unlike most Mac terminals, and uw leaves it so for now.
 - Whether terminal tabs open in Incognito and Guest windows.

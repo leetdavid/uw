@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "base/files/file_path.h"
+#include "base/functional/bind.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/test/run_until.h"
@@ -33,7 +34,10 @@ class ShellSessionTest : public testing::Test, public ShellSession::Client {
     options.login = false;
     options.folder = base::FilePath("/usr");
     options.environment["PS1"] = std::string(kPrompt);
-    session_ = std::make_unique<ShellSession>(options, this);
+    session_ = std::make_unique<ShellSession>(
+        base::BindOnce([](ShellHost::Options options) { return options; },
+                       options),
+        this);
   }
 
   // ShellSession::Client:
@@ -47,7 +51,10 @@ class ShellSessionTest : public testing::Test, public ShellSession::Client {
   void OnShellFolderChanged(const base::FilePath& folder) override {
     folder_ = folder;
   }
-  void OnShellExited() override { exited_ = true; }
+  void OnShellExited(bool started) override {
+    exited_ = true;
+    started_ = started;
+  }
 
   [[nodiscard]] bool WaitFor(std::string_view marker) {
     return base::test::RunUntil(
@@ -69,6 +76,7 @@ class ShellSessionTest : public testing::Test, public ShellSession::Client {
   base::FilePath folder_;
   bool acks_ = true;
   bool exited_ = false;
+  bool started_ = false;
 };
 
 TEST_F(ShellSessionTest, RunsACommandAndDeliversItsOutput) {
@@ -143,6 +151,7 @@ TEST_F(ShellSessionTest, ReportsThatTheShellExited) {
   ASSERT_TRUE(WaitFor(kPrompt));
   session_->Write("exit\n");
   EXPECT_TRUE(base::test::RunUntil([&] { return exited_; }));
+  EXPECT_TRUE(started_);
 }
 
 TEST_F(ShellSessionTest, ReportsAnExitWhileACommandStillHoldsTheTerminal) {
@@ -157,6 +166,7 @@ TEST_F(ShellSessionTest, ReportsAnExitWhileACommandStillHoldsTheTerminal) {
 TEST_F(ShellSessionTest, ReportsAShellThatCannotStart) {
   StartShell("/nonexistent/shell");
   EXPECT_TRUE(base::test::RunUntil([&] { return exited_; }));
+  EXPECT_FALSE(started_);
 }
 
 TEST_F(ShellSessionTest, ClosingEndsTheShell) {

@@ -1,10 +1,15 @@
-/** Expose product source to GN without copying or owning the source files. */
+/** Expose product source and pinned packages to GN without copying or owning the files. */
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const MARKER = ".uw-source-links";
 const MARKER_TEXT = "uw browser managed source links\n";
-const DIRECTORIES = ["browser", "components"] as const;
+/** The name GN sees under src/uw, and what it links to in this repository. */
+const LINKS = {
+  browser: "browser",
+  components: "components",
+  "ghostty-web": "node_modules/ghostty-web",
+} as const;
 
 export class SourceLinks {
   readonly root: string;
@@ -25,8 +30,9 @@ export class SourceLinks {
     for (const name of readdirSync(this.root)) {
       if (name === MARKER) continue;
       const path = join(this.root, name);
-      if (!DIRECTORIES.some((directory) => directory === name) || !lstatSync(path).isSymbolicLink() ||
-          resolve(this.root, readlinkSync(path)) !== resolve(this.repository, name)) {
+      const target = (LINKS as Record<string, string>)[name];
+      if (!target || !lstatSync(path).isSymbolicLink() ||
+          resolve(this.root, readlinkSync(path)) !== resolve(this.repository, target)) {
         throw new Error(`${path} differs from the managed source link. Preserve it before preparing uw.`);
       }
     }
@@ -34,22 +40,24 @@ export class SourceLinks {
 
   prepare(): void {
     this.check();
-    for (const name of DIRECTORIES) {
-      if (!existsSync(join(this.repository, name))) throw new Error(`Missing product source: ${name}`);
+    for (const target of Object.values(LINKS)) {
+      if (!existsSync(join(this.repository, target))) {
+        throw new Error(`Missing product source: ${target}. Packages come from pnpm install.`);
+      }
     }
     if (!existsSync(this.root)) {
       mkdirSync(this.root);
       writeFileSync(join(this.root, MARKER), MARKER_TEXT);
     }
     const present = new Set(readdirSync(this.root));
-    for (const name of DIRECTORIES) {
-      if (!present.has(name)) symlinkSync(resolve(this.repository, name), join(this.root, name), "dir");
+    for (const [name, target] of Object.entries(LINKS)) {
+      if (!present.has(name)) symlinkSync(resolve(this.repository, target), join(this.root, name), "dir");
     }
   }
 
   verify(): void {
     this.check();
-    if (!DIRECTORIES.every((name) => existsSync(join(this.root, name)))) {
+    if (!Object.keys(LINKS).every((name) => existsSync(join(this.root, name)))) {
       throw new Error("Product source links are missing. Run pnpm run prepare:chromium.");
     }
   }

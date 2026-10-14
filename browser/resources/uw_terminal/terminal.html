@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <title>Terminal</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+      html,
+      body {
+        background: #fff;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background: #1c1b26;
+        }
+      }
+
+      #terminal {
+        box-sizing: border-box;
+        caret-color: transparent;
+        height: 100%;
+        outline: none;
+        padding: 8px 0 8px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="terminal"></div>
+    <script type="module" src="/terminal.js"></script>
+  </body>
+</html>

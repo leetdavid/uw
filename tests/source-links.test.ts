@@ -12,7 +12,9 @@ function fixture(t: TestContext) {
   const source = join(root, "src");
   const repository = join(root, "product");
   mkdirSync(source); mkdirSync(repository);
-  for (const name of ["browser", "components"]) mkdirSync(join(repository, name));
+  for (const name of ["browser", "components", "node_modules/ghostty-web"]) {
+    mkdirSync(join(repository, name), { recursive: true });
+  }
   const file = join(repository, "browser", "feature.cc");
   writeFileSync(file, "product source\n");
   return { source, repository, file, links: new SourceLinks(source, repository) };
@@ -23,6 +25,8 @@ test("source links are repeatable and reflect product edits without copying", (t
   f.links.prepare(); f.links.prepare(); f.links.verify();
   writeFileSync(f.file, "edited product source\n");
   assert.equal(readFileSync(join(f.source, "uw/browser/feature.cc"), "utf8"), "edited product source\n");
+  writeFileSync(join(f.repository, "node_modules/ghostty-web/package.json"), "{}");
+  assert.equal(readFileSync(join(f.source, "uw/ghostty-web/package.json"), "utf8"), "{}");
   f.links.remove();
   assert.equal(existsSync(join(f.source, "uw")), false);
   assert.equal(readFileSync(f.file, "utf8"), "edited product source\n");

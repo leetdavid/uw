@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..14bd93286358384ccfd17c0ef55d221e200ed7ae 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..46521be3f5e487a436771c9ba49c1b5e6c76c699 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,41 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,43 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -50,6 +50,8 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..14bd93286358384ccfd17c0ef55d221e
 +      <message name="IDS_UW_NAME_LOCK" desc="Tooltip of the small lock on a task in the tab sidebar. The lock shows that the user typed the task's name, so uw does not rename the task. uw is the product name and stays lowercase.">Named by you. Click to let uw rename this task.</message>
 +      <message name="IDS_UW_SUGGEST_NAME" desc="Row in a task's menu, under the field that holds the task's name. A click asks the language model for a name for the task.">Suggest a name</message>
 +      <message name="IDS_UW_SUGGESTING_NAME" desc="Text of the Suggest a name row in a task's menu while the language model is asked for a name.">Suggesting a name…</message>
++      <message name="IDS_UW_NEW_TERMINAL" desc="Menu item that opens a tab with the user's shell in it.">New terminal</message>
++      <message name="IDS_UW_TERMINAL_NO_SHELL" desc="Shown in a terminal tab when the user's shell could not be started.">uw could not start your shell.</message>
 +      <message name="IDS_UW_SUGGEST_NAME_FAILED" desc="Text of the Suggest a name row in a task's menu after the language model gave no name that could be used.">Could not suggest a name</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
@@ -533,18 +535,19 @@ index ab919030ae2fbd70240f192e1a7060776530523a..91eca2cc713d27a3669dda6499f7ee58
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..5842222862285c65b71c2e04f7665588698f8835 100644
+index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..6f7f985af757b30e42af853dda4107591b47912b 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -143,6 +143,7 @@
+@@ -143,6 +143,8 @@
  #include "ui/base/ui_base_features.h"
  #include "ui/base/window_open_disposition.h"
  #include "ui/events/keycodes/keyboard_codes.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/terminal/terminal_tab.h"
  
  #if !BUILDFLAG(IS_ANDROID)
  #include "chrome/browser/devtools/devtools_policy_dialog.h"
-@@ -1397,7 +1398,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1397,7 +1399,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
                                      TabGroupShortcut::kCloseTabGroup);
        break;
      case IDC_CREATE_NEW_TAB_GROUP:
@@ -555,7 +558,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..5842222862285c65b71c2e04f7665588
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kCreateNewTabGroup);
        break;
-@@ -1406,6 +1409,11 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1406,6 +1410,14 @@ void BrowserCommandController::HandleCommandWithDisposition(
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kAddNewTabToGroup);
        break;
@@ -564,15 +567,19 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..5842222862285c65b71c2e04f7665588
 +        organizer->Undo();
 +      }
 +      break;
++    case uw::kNewTerminalCommand:
++      uw::OpenTerminalTab(browser_);
++      break;
      case IDC_GROUP_UNGROUPED_TABS:
        GroupAllUngroupedTabs(browser_);
        base::RecordAction(
-@@ -1731,6 +1739,8 @@ void BrowserCommandController::InitCommandState() {
+@@ -1731,6 +1743,9 @@ void BrowserCommandController::InitCommandState() {
    command_updater_->UpdateCommandEnabled(IDC_GROUP_UNGROUPED_TABS, true);
    command_updater_->UpdateCommandEnabled(IDC_ADD_NEW_TAB_RECENT_GROUP, true);
    command_updater_->UpdateCommandEnabled(IDC_UNFOCUS_TAB_GROUP, true);
 +  command_updater_->UpdateCommandEnabled(uw::TabOrganizationController::kUndo,
 +                                         true);
++  command_updater_->UpdateCommandEnabled(uw::kNewTerminalCommand, true);
  
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);

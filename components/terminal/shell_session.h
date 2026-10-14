@@ -7,6 +7,7 @@
 #include <string>
 
 #include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/threading/sequence_bound.h"
@@ -26,15 +27,17 @@ class ShellSession {
     // draws is slowed down instead of filling memory.
     virtual void OnShellOutput(std::string text) = 0;
     virtual void OnShellFolderChanged(const base::FilePath& folder) = 0;
-    // The shell has ended or could not start. Nothing follows.
-    virtual void OnShellExited() = 0;
+    // Nothing follows. `started` is false for a shell that could not start.
+    virtual void OnShellExited(bool started) = 0;
 
    protected:
     virtual ~Client() = default;
   };
 
-  // `client` outlives the session.
-  ShellSession(const ShellHost::Options& options, Client* client);
+  // `options` runs on the shell's sequence, where reading the user's account
+  // holds nothing up. `client` outlives the session.
+  ShellSession(base::OnceCallback<ShellHost::Options()> options,
+               Client* client);
   ShellSession(const ShellSession&) = delete;
   ShellSession& operator=(const ShellSession&) = delete;
   ~ShellSession();
@@ -50,7 +53,7 @@ class ShellSession {
 
   void OnOutput(std::string text);
   void OnFolderChanged(const base::FilePath& folder);
-  void OnExited();
+  void OnExited(bool started);
 
   const raw_ptr<Client> client_;
   base::SequenceBound<Core> core_;

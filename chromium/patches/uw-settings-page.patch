@@ -185,21 +185,35 @@ index 63c989a76dadc13953e35513998e83326ee3612b..d2070ed7553a2c14367577a16e9bee3e
        <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
          Use graphics acceleration when available
 diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-index 8a0281a596af3532fa6342b5653f93e913261023..1a378c8c1cdeae405a891da8efc4da0e8c249c99 100644
+index 8a0281a596af3532fa6342b5653f93e913261023..e5b820e7701836ba1ef54fa63e6e38b9393a1a55 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -223,6 +223,10 @@
+@@ -223,6 +223,12 @@
  #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
  #endif
  
 +#if !BUILDFLAG(IS_CHROMEOS)
 +#include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
++#include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
++#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
 +#endif
 +
  namespace chrome::internal {
  
  using content::RegisterWebUIControllerInterfaceBinder;
-@@ -676,6 +680,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -361,6 +367,11 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+                                          WhatsNewUI>(map);
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+ 
++#if !BUILDFLAG(IS_CHROMEOS)
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::TerminalHandlerFactory,
++                                         uw::UwTerminalUI>(map);
++#endif
++
+ #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+   RegisterWebUIControllerInterfaceBinder<
+       feature_showcase::mojom::DefaultBrowserPageHandlerFactory,
+@@ -676,6 +687,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
  #if !BUILDFLAG(IS_CHROMEOS)
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()
@@ -208,14 +222,15 @@ index 8a0281a596af3532fa6342b5653f93e913261023..1a378c8c1cdeae405a891da8efc4da0e
        .Add<batch_upload_promo::mojom::PageHandlerFactory>()
        .Add<customize_color_scheme_mode::mojom::
 diff --git a/chrome/browser/resources/BUILD.gn b/chrome/browser/resources/BUILD.gn
-index e66dc00a9a34f11922e90ce88a7f03070fc65bed..e8a57d3131b6c08c6615577c625c55f778cd228a 100644
+index e66dc00a9a34f11922e90ce88a7f03070fc65bed..074058d2f917418a0d25c613267e402411d451cc 100644
 --- a/chrome/browser/resources/BUILD.gn
 +++ b/chrome/browser/resources/BUILD.gn
-@@ -104,6 +104,7 @@ group("resources") {
+@@ -104,6 +104,8 @@ group("resources") {
        "webui_toolbar_shared:resources",
        "whats_new:resources",
        "//components/browser_apis/tab_strip/resources",
 +      "//uw/browser/resources/uw_organization:resources",
++      "//uw/browser/resources/uw_terminal:resources",
      ]
      if (is_chrome_branded) {
        public_deps += [
@@ -401,12 +416,13 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -1332,7 +1332,8 @@ static_library("ui") {
+@@ -1332,7 +1332,9 @@ static_library("ui") {
  
      # Non-android deps for "ui" target.
      deps += [
        "//uw/browser/tab_organization",
 +      "//uw/browser/ui/webui/uw_organization:mojo_bindings",
++      "//uw/browser/ui/webui/uw_terminal",
        ":accelerator_table",
        ":browser_actions",
        ":browser_select_file_dialog_controller",
@@ -563,16 +579,21 @@ index 595b377b5091b584e7347ee0d05f73d6f997823e..ed7f52de0bafa10f890ba92d6ae93e29
    tsconfig_base = "tsconfig_base.json"
    composite = true
 diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
-index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..408ed932e177a61646d345648e649f7d8d6ec335 100644
+index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..3caa9a15cc423b980220d127a50bb8f99edd83d5 100644
 --- a/tools/gritsettings/resource_ids.spec
 +++ b/tools/gritsettings/resource_ids.spec
-@@ -1789,6 +1789,11 @@
+@@ -1789,6 +1789,16 @@
      "includes": [10140],
    },
  
 +  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_organization/resources.grd": {
 +    "META": {"sizes": {"includes": [10],}},
 +    "includes": [10240],
++  },
++
++  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_terminal/resources.grd": {
++    "META": {"sizes": {"includes": [10],}},
++    "includes": [10260],
 +  },
 +
    "<(SHARED_INTERMEDIATE_DIR)/THIS_IS_A_PLACEHOLDER.grd": {

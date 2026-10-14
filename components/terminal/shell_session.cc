@@ -58,17 +58,18 @@ class ShellSession::Core {
  public:
   using OutputCallback = base::RepeatingCallback<void(std::string)>;
   using FolderCallback = base::RepeatingCallback<void(const base::FilePath&)>;
+  using ExitCallback = base::OnceCallback<void(bool)>;
 
-  Core(const ShellHost::Options& options,
+  Core(base::OnceCallback<ShellHost::Options()> options,
        OutputCallback on_output,
        FolderCallback on_folder,
-       base::OnceClosure on_exit)
+       ExitCallback on_exit)
       : on_output_(std::move(on_output)),
         on_folder_(std::move(on_folder)),
         on_exit_(std::move(on_exit)),
-        shell_(ShellHost::Start(options)) {
+        shell_(ShellHost::Start(std::move(options).Run())) {
     if (!shell_) {
-      std::move(on_exit_).Run();
+      std::move(on_exit_).Run(false);
       return;
     }
     WatchOutput();
@@ -150,12 +151,12 @@ class ShellSession::Core {
     writable_.reset();
     folder_timer_.Stop();
     shell_.reset();
-    std::move(on_exit_).Run();
+    std::move(on_exit_).Run(true);
   }
 
   const OutputCallback on_output_;
   const FolderCallback on_folder_;
-  base::OnceClosure on_exit_;
+  ExitCallback on_exit_;
   std::unique_ptr<ShellHost> shell_;
   std::unique_ptr<base::FileDescriptorWatcher::Controller> readable_;
   std::unique_ptr<base::FileDescriptorWatcher::Controller> writable_;
@@ -168,7 +169,8 @@ class ShellSession::Core {
   base::OneShotTimer folder_timer_;
 };
 
-ShellSession::ShellSession(const ShellHost::Options& options, Client* client)
+ShellSession::ShellSession(base::OnceCallback<ShellHost::Options()> options,
+                           Client* client)
     : client_(client) {
   // One sequence for each shell: ending a shell can take two seconds, and
   // that must not hold up another terminal.
@@ -176,7 +178,7 @@ ShellSession::ShellSession(const ShellHost::Options& options, Client* client)
       base::ThreadPool::CreateSequencedTaskRunner(
           {base::MayBlock(), base::TaskPriority::USER_BLOCKING,
            base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN}),
-      options,
+      std::move(options),
       base::BindPostTaskToCurrentDefault(base::BindRepeating(
           &ShellSession::OnOutput, weak_factory_.GetWeakPtr())),
       base::BindPostTaskToCurrentDefault(base::BindRepeating(
@@ -207,8 +209,8 @@ void ShellSession::OnFolderChanged(const base::FilePath& folder) {
   client_->OnShellFolderChanged(folder);
 }
 
-void ShellSession::OnExited() {
-  client_->OnShellExited();
+void ShellSession::OnExited(bool started) {
+  client_->OnShellExited(started);
 }
 
 }  // namespace uw
