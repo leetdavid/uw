@@ -72,6 +72,12 @@ constexpr char kHelpers[] = R"(
 constexpr char kChatDecision[] =
     R"({\"task\":\"none\",\"confidence\":0.9,\"new_task\":0.1})";
 
+// What a model that calls tools answers when asked to open a page.
+constexpr char kToolCall[] =
+    R"({"choices":[{"message":{"role":"assistant","tool_calls":[)"
+    R"({"id":"call_1","type":"function","function":{"name":"open",)"
+    R"("arguments":"{\"url\":\"https://example.com\"}"}}]}}]})";
+
 // What a model that thinks first answers when its thinking used up the whole
 // token limit.
 constexpr char kThinkingRanOut[] =
@@ -634,6 +640,59 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                       "await until(() => part('resume').disabled);"
                       "return true;"));
   EXPECT_EQ(ReadPauseState(prefs()), PauseMode::kOff);
+}
+
+// The agent model passes its test only by calling a tool.
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheAgentModelMustCallATool) {
+  models_.Answer("/v1/chat/completions", kToolCall);
+  OpenPage();
+  Choose("agentKind", Number(ConnectionMode::kOpenAiCompatible));
+  Type("agentEndpoint", Endpoint());
+  Type("agentModel", "claude-sonnet-5-5");
+  Type("agentKey", "agent-key");
+
+  EXPECT_THAT(TestConnection("agent"),
+              testing::StartsWith("Works. claude-sonnet-5-5 answered in "));
+  EXPECT_THAT(TextOf("agentTestDetail"),
+              testing::HasSubstr("\"name\": \"open\""));
+
+  models_.Answer("/v1/chat/completions", ChatAnswer("Opened it."));
+  EXPECT_EQ(TestConnection("agent"),
+            "claude-sonnet-5-5 answered without calling a tool. Chats need a "
+            "model that calls tools.");
+  EXPECT_EQ(prefs()->GetString(kAgentModelPref), "");
+}
+
+// Saving stores the agent model beside the others. Its test does not decide
+// whether automatic organization is on, and until one is saved chats use the
+// language model.
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheAgentModelIsSavedOnItsOwnTerms) {
+  // Without a decision model the language model places tabs, and the agent
+  // model gets the same answer, which calls no tool.
+  models_.Answer("/v1/chat/completions", ChatAnswer(kChatDecision));
+  OpenPage();
+  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
+  Type("languageEndpoint", Endpoint());
+  Type("languageModel", "deepseek-flash");
+  Type("languageKey", "chat-key");
+  ASSERT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
+  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "deepseek-flash");
+  EXPECT_EQ(ValueOf("agentModel"), "");
+
+  Choose("agentKind", Number(ConnectionMode::kOpenAiCompatible));
+  Type("agentEndpoint", Endpoint());
+  Type("agentModel", "claude-sonnet-5-5");
+  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
+
+  EXPECT_TRUE(OrganizationReady(prefs()));
+  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "claude-sonnet-5-5");
+  // It reaches the language model's endpoint, so it took a copy of its key.
+  EXPECT_EQ(ApiKeyStore().GetKey(kAgentKeyAccount), "chat-key");
+  EXPECT_EQ(TextOf("agentTestStatus"),
+            "claude-sonnet-5-5 answered without calling a tool. Chats need a "
+            "model that calls tools.");
 }
 
 }  // namespace

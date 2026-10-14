@@ -54,9 +54,17 @@ inline constexpr char kDecisionModelPref[] = "uw.organization.decision.model";
 inline constexpr char kDecisionKeyAccountPref[] =
     "uw.organization.decision.key_account";
 
-// Keychain accounts holding the two API keys.
+// The model behind chats. Until the user saves one, chats use the language
+// model's connection.
+inline constexpr char kAgentModePref[] = "uw.agent.mode";
+inline constexpr char kAgentEndpointPref[] = "uw.agent.endpoint";
+inline constexpr char kAgentModelPref[] = "uw.agent.model";
+inline constexpr char kAgentKeyAccountPref[] = "uw.agent.key_account";
+
+// Keychain accounts holding the API keys.
 inline constexpr char kLanguageKeyAccount[] = "organization";
 inline constexpr char kDecisionKeyAccount[] = "decision";
+inline constexpr char kAgentKeyAccount[] = "agent";
 
 inline constexpr char kJevDefaultEndpoint[] = "https://api.typesafe.ai/v1";
 inline constexpr char kJevDefaultModel[] = "jev-latest";
@@ -112,6 +120,8 @@ enum class PauseMode {
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry);
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs);
+// The language model's connection until an agent model is saved.
+AiConnectionConfig ReadAgentModelConfig(const PrefService* prefs);
 // Fills in the provider's default endpoint and model where none is saved.
 DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
 

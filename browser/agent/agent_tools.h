@@ -48,9 +48,6 @@ class AgentTools {
 
   void Call(std::string_view tool, const base::DictValue& args, Done done);
 
-  // The tools as a model is told about them, in chat-completions form.
-  static base::ListValue Schemas();
-
  private:
   struct Tab {
     tabs::TabHandle handle;

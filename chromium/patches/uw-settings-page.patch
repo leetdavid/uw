@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..d2070ed7553a2c14367577a16e9bee3eb8e5c10a 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..2a37ea31646e2eda805e80a1969139a4bf0c3be3 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,181 @@
+@@ -3904,6 +3904,190 @@
          System
        </message>
      </if>
@@ -59,6 +59,12 @@ index 63c989a76dadc13953e35513998e83326ee3612b..d2070ed7553a2c14367577a16e9bee3e
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE" desc="Explains what the language model does.">
 +        Names a task when it starts, and again when the decision model finds the task has outgrown that name. uw keeps a name you typed. Leave the model empty to go without names.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_AGENT_TITLE" desc="Heading of the settings for the model behind chats with uw's agent.">
++        Agent model
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_AGENT_NOTE" desc="Explains what the agent model does and what it needs.">
++        Runs chats. It needs a model that calls tools. Until you save one, chats use the language model.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_CONNECTION" desc="Label of the language model connection choice.">
 +        Connection
@@ -128,6 +134,9 @@ index 63c989a76dadc13953e35513998e83326ee3612b..d2070ed7553a2c14367577a16e9bee3e
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE" desc="Result of a connection test when the model answered in a form uw cannot use.">
 +        <ph name="MODEL">$1<ex>llama3.2</ex></ph> answered, but not in the form uw needs. The details show its answer.
++      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_TOOL_CALL" desc="Result of a connection test when the agent model answered without calling a tool.">
++        <ph name="MODEL">$1<ex>llama3.2</ex></ph> answered without calling a tool. Chats need a model that calls tools.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_DETAILS" desc="Label that opens the request and the answer of the last connection test.">
 +        Details

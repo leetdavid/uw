@@ -67,7 +67,7 @@ void AgentLoop::AskModel() {
     return;
   }
   const std::optional<std::string> body =
-      BuildAgentRequestBody(model_.model, messages_, AgentTools::Schemas());
+      BuildAgentRequestBody(model_.model, messages_, AgentToolSchemas());
   if (!body || !model_.url.is_valid()) {
     Finish(Failed("No agent model is set."));
     return;

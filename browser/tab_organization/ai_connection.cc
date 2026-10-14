@@ -47,6 +47,11 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kDecisionEndpointPref, std::string());
   registry->RegisterStringPref(kDecisionModelPref, std::string());
   registry->RegisterStringPref(kDecisionKeyAccountPref, std::string());
+  registry->RegisterIntegerPref(kAgentModePref,
+                                static_cast<int>(ConnectionMode::kOllama));
+  registry->RegisterStringPref(kAgentEndpointPref, std::string());
+  registry->RegisterStringPref(kAgentModelPref, std::string());
+  registry->RegisterStringPref(kAgentKeyAccountPref, std::string());
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));
   registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);
@@ -64,6 +69,21 @@ AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
   config.endpoint = prefs->GetString(kOrganizationEndpointPref);
   config.model = prefs->GetString(kOrganizationModelPref);
   config.key_account = prefs->GetString(kOrganizationKeyAccountPref);
+  return config;
+}
+
+AiConnectionConfig ReadAgentModelConfig(const PrefService* prefs) {
+  if (!prefs || prefs->GetString(kAgentModelPref).empty()) {
+    return ReadAiConnectionConfig(prefs);
+  }
+  AiConnectionConfig config;
+  config.mode = prefs->GetInteger(kAgentModePref) ==
+                        static_cast<int>(ConnectionMode::kOpenAiCompatible)
+                    ? ConnectionMode::kOpenAiCompatible
+                    : ConnectionMode::kOllama;
+  config.endpoint = prefs->GetString(kAgentEndpointPref);
+  config.model = prefs->GetString(kAgentModelPref);
+  config.key_account = prefs->GetString(kAgentKeyAccountPref);
   return config;
 }
 

@@ -4,8 +4,9 @@
 
 /**
  * @fileoverview uw settings: the decision model and the language model behind
- * automatic tab organization, how eagerly it moves tabs, the global pause
- * controls, and the window tint. API keys stay in the macOS Keychain; the page
+ * automatic tab organization, the agent model behind chats, how eagerly
+ * automatic organization moves tabs, the global pause controls, and the
+ * window tint. API keys stay in the macOS Keychain; the page
  * only learns whether one is stored.
  */
 
@@ -21,11 +22,18 @@ import {getCss as getMdSelectLitCss} from 'chrome://resources/cr_elements/md_sel
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
+import {ConnectionSlot} from './uw_organization.mojom-webui.js';
 import type {Connection, ConnectionInput, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
-type ConnectionName = 'decision'|'language';
+type ConnectionName = 'decision'|'language'|'agent';
+
+const SLOTS: Record<ConnectionName, ConnectionSlot> = {
+  decision: ConnectionSlot.kDecision,
+  language: ConnectionSlot.kLanguage,
+  agent: ConnectionSlot.kAgent,
+};
 
 interface ConnectionForm {
   kind: number;
@@ -165,6 +173,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     return {
       decision_: {type: Object},
       language_: {type: Object},
+      agent_: {type: Object},
       saved_: {type: Object},
       saveStatus_: {type: String},
       saveError_: {type: Boolean},
@@ -178,6 +187,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
 
   protected accessor decision_: ConnectionForm = emptyForm();
   protected accessor language_: ConnectionForm = emptyForm();
+  protected accessor agent_: ConnectionForm = emptyForm();
   // The connections as last saved, for the status line.
   protected accessor saved_: {decisionKind: number, languageModel: string} =
       {decisionKind: NO_DECISION_MODEL, languageModel: ''};
@@ -202,12 +212,14 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   }
 
   private form_(name: ConnectionName): ConnectionForm {
-    return name === 'decision' ? this.decision_ : this.language_;
+    return name === 'decision' ? this.decision_ :
+        name === 'language'   ? this.language_ :
+                                  this.agent_;
   }
 
   private takesKey_(name: ConnectionName): boolean {
     return name === 'decision' ? this.decision_.kind !== NO_DECISION_MODEL :
-                                 this.language_.kind !== OLLAMA;
+                                 this.form_(name).kind !== OLLAMA;
   }
 
   protected cards_(): ConnectionCard[] {
@@ -240,6 +252,19 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
         form: this.language_,
         takesEndpoint: true,
         takesKey: this.takesKey_('language'),
+      },
+      {
+        name: 'agent',
+        title: this.i18n_('uwOrganizationAgentTitle'),
+        kindLabel: this.i18n_('uwOrganizationConnection'),
+        kinds: [
+          {value: 0, label: this.i18n_('uwOrganizationOllama')},
+          {value: 1, label: compatible},
+        ],
+        note: this.i18n_('uwOrganizationAgentNote'),
+        form: this.agent_,
+        takesEndpoint: true,
+        takesKey: this.takesKey_('agent'),
       },
     ];
   }
@@ -289,8 +314,10 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     const form = {...this.form_(name), ...changes};
     if (name === 'decision') {
       this.decision_ = form;
-    } else {
+    } else if (name === 'language') {
       this.language_ = form;
+    } else {
+      this.agent_ = form;
     }
   }
 
@@ -326,7 +353,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     const name = this.connectionOf_(e);
     this.update_(name, {modelsStatus: this.i18n_('uwOrganizationLoading')});
     const response = await this.browserProxy_.loadModels(
-        name === 'decision',
+        SLOTS[name],
         inputFrom(this.form_(name), this.takesKey_(name)));
     if (!response.ok || response.models.length === 0) {
       this.update_(name, {
@@ -368,7 +395,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.showTest_(
         name,
         await this.browserProxy_.testConnection(
-            name === 'decision',
+            SLOTS[name],
             inputFrom(this.form_(name), this.takesKey_(name)),
             this.decision_.kind !== NO_DECISION_MODEL));
   }
@@ -382,10 +409,12 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.saveStatus_ = this.i18n_('uwOrganizationChecking');
     const result = await this.browserProxy_.save(
         inputFrom(this.decision_, this.takesKey_('decision')),
-        inputFrom(this.language_, this.takesKey_('language')));
+        inputFrom(this.language_, this.takesKey_('language')),
+        inputFrom(this.agent_, this.takesKey_('agent')));
     await this.refresh_();
     this.showTest_('decision', result.decision);
     this.showTest_('language', result.language);
+    this.showTest_('agent', result.agent);
     this.saving_ = false;
     this.saveError_ = !result.enabled;
     if (result.enabled) {
@@ -531,6 +560,10 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.language_ = {
       ...formFrom('language', state.language),
       models: this.language_.models,
+    };
+    this.agent_ = {
+      ...formFrom('agent', state.agent),
+      models: this.agent_.models,
     };
     this.saved_ = {
       decisionKind: state.decision.kind,

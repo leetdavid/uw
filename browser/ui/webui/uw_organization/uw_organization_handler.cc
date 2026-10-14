@@ -35,6 +35,7 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
+#include "uw/components/agent/agent_protocol.h"
 #include "uw/components/look/tint.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -83,6 +84,27 @@ std::string StoredKey(const std::string& account) {
   return account.empty()
              ? std::string()
              : ApiKeyStore().GetKey(account).value_or(std::string());
+}
+
+// The key an agent model at `endpoint` uses when none was typed: its own,
+// or the language model's while both connections reach the same place.
+std::string StoredAgentKey(const PrefService* prefs,
+                           const std::string& endpoint) {
+  const std::string own = StoredKey(kAgentKeyAccount);
+  return !own.empty() || endpoint != ReadAiConnectionConfig(prefs).endpoint
+             ? own
+             : StoredKey(kLanguageKeyAccount);
+}
+
+// The key a request to an agent model as entered carries.
+std::string AgentKeyFor(const PrefService* prefs,
+                        bool takes_key,
+                        const mojom::ConnectionInput& connection) {
+  if (!takes_key) {
+    return std::string();
+  }
+  return connection.api_key.empty() ? StoredAgentKey(prefs, connection.endpoint)
+                                    : connection.api_key;
 }
 
 mojom::ConnectionPtr ConnectionState(int32_t kind,
@@ -167,6 +189,8 @@ std::string ProviderMessage(const std::string& body) {
 
 struct UwOrganizationHandler::ConnectionTest {
   std::string model;
+  // What the summary says of an answer that `reads` rejects.
+  int unusable = IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE;
   GURL url;
   // Kept until the answer arrives, to keep it out of what the page shows.
   std::string key;
@@ -226,6 +250,27 @@ ConnectionTest LanguageTest(const AiConnectionConfig& config,
   return test;
 }
 
+// An agent model is asked to open a page, and passes when it calls a tool.
+ConnectionTest AgentTest(const AiConnectionConfig& config, std::string key) {
+  ConnectionTest test;
+  test.model = config.model;
+  test.key = std::move(key);
+  test.unusable = IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_TOOL_CALL;
+  if (IsValidProviderEndpoint(config.endpoint) &&
+      (config.mode == ConnectionMode::kOllama || !test.key.empty())) {
+    test.url = ChatCompletionsUrl(config.endpoint);
+    base::ListValue messages;
+    messages.Append(UserMessage("Open https://example.com in a new tab."));
+    test.body =
+        BuildAgentRequestBody(config.model, messages, AgentToolSchemas());
+  }
+  test.reads = base::BindRepeating([](const std::string& body) {
+    const std::optional<ModelTurn> turn = ParseAgentResponse(body);
+    return turn && !turn->calls.empty();
+  });
+  return test;
+}
+
 // Says in one sentence how a test went, and lists what came back and what
 // was sent. The answer comes first because it is what explains a failure.
 mojom::TestResultPtr Describe(const ConnectionTest& test,
@@ -250,8 +295,7 @@ mojom::TestResultPtr Describe(const ConnectionTest& test,
       summary += u" " + base::UTF8ToUTF16(message);
     }
   } else if (!test.reads.Run(outcome.body)) {
-    summary = l10n_util::GetStringFUTF16(
-        IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE, model);
+    summary = l10n_util::GetStringFUTF16(test.unusable, model);
   } else {
     result->ok = true;
     summary =
@@ -308,6 +352,8 @@ void UwOrganizationHandler::AddLoadTimeData(
        IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_TITLE},
       {"uwOrganizationLanguageNote",
        IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE},
+      {"uwOrganizationAgentTitle", IDS_UW_SETTINGS_ORGANIZATION_AGENT_TITLE},
+      {"uwOrganizationAgentNote", IDS_UW_SETTINGS_ORGANIZATION_AGENT_NOTE},
       {"uwOrganizationConnection", IDS_UW_SETTINGS_ORGANIZATION_CONNECTION},
       {"uwOrganizationOllama", IDS_UW_SETTINGS_ORGANIZATION_OLLAMA},
       {"uwOrganizationEndpoint", IDS_UW_SETTINGS_ORGANIZATION_ENDPOINT},
@@ -381,13 +427,17 @@ void UwOrganizationHandler::GetState(GetStateCallback callback) {
   state->language =
       ConnectionState(static_cast<int32_t>(language.mode), language.endpoint,
                       language.model, language.key_account);
+  state->agent = ConnectionState(prefs->GetInteger(kAgentModePref),
+                                 prefs->GetString(kAgentEndpointPref),
+                                 prefs->GetString(kAgentModelPref),
+                                 prefs->GetString(kAgentKeyAccountPref));
   state->enabled = OrganizationReady(prefs);
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   state->thresholds = CurrentThresholds();
   std::move(callback).Run(std::move(state));
 }
 
-void UwOrganizationHandler::LoadModels(bool decision,
+void UwOrganizationHandler::LoadModels(mojom::ConnectionSlot slot,
                                        mojom::ConnectionInputPtr connection,
                                        LoadModelsCallback callback) {
   callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
@@ -396,13 +446,16 @@ void UwOrganizationHandler::LoadModels(bool decision,
       !IsValidProviderEndpoint(connection->endpoint)) {
     return;
   }
+  const bool decision = slot == mojom::ConnectionSlot::kDecision;
   const bool takes_key =
       decision || ModeFromInt(connection->kind) != ConnectionMode::kOllama;
+  std::string key =
+      slot == mojom::ConnectionSlot::kAgent
+          ? AgentKeyFor(profile_->GetPrefs(), takes_key, *connection)
+          : KeyFor(decision ? kDecisionKeyAccount : kLanguageKeyAccount,
+                   takes_key, connection->api_key);
   models_request_ =
-      Client(ModelsUrl(connection->endpoint),
-             KeyFor(decision ? kDecisionKeyAccount : kLanguageKeyAccount,
-                    takes_key, connection->api_key),
-             std::string());
+      Client(ModelsUrl(connection->endpoint), std::move(key), std::string());
   models_request_->SendGet(
       base::BindOnce(&UwOrganizationHandler::OnModelsLoaded,
                      weak_factory_.GetWeakPtr(), std::move(callback)));
@@ -424,7 +477,7 @@ void UwOrganizationHandler::OnModelsLoaded(LoadModelsCallback callback,
   std::move(callback).Run(std::move(result));
 }
 
-void UwOrganizationHandler::TestConnection(bool decision,
+void UwOrganizationHandler::TestConnection(mojom::ConnectionSlot slot,
                                            mojom::ConnectionInputPtr connection,
                                            bool names_only,
                                            TestConnectionCallback callback) {
@@ -433,7 +486,7 @@ void UwOrganizationHandler::TestConnection(bool decision,
   if (profile_->IsOffTheRecord()) {
     return;
   }
-  if (decision) {
+  if (slot == mojom::ConnectionSlot::kDecision) {
     DecisionModelConfig config;
     config.provider = ProviderFromInt(connection->kind);
     config.endpoint = connection->endpoint;
@@ -450,6 +503,15 @@ void UwOrganizationHandler::TestConnection(bool decision,
   config.mode = ModeFromInt(connection->kind);
   config.endpoint = connection->endpoint;
   config.model = connection->model;
+  if (slot == mojom::ConnectionSlot::kAgent) {
+    RunTest(kAgentSlot,
+            AgentTest(config, AgentKeyFor(profile_->GetPrefs(),
+                                          config.mode ==
+                                              ConnectionMode::kOpenAiCompatible,
+                                          *connection)),
+            std::move(callback));
+    return;
+  }
   RunTest(kLanguageSlot,
           LanguageTest(config,
                        KeyFor(kLanguageKeyAccount,
@@ -461,6 +523,7 @@ void UwOrganizationHandler::TestConnection(bool decision,
 
 void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
                                  mojom::ConnectionInputPtr language,
+                                 mojom::ConnectionInputPtr agent,
                                  SaveCallback callback) {
   for (std::unique_ptr<RemoteModelClient>& test : tests_) {
     test.reset();
@@ -476,11 +539,16 @@ void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
   }
   StoreDecision(*decision);
   StoreLanguage(*language);
+  StoreAgent(*agent);
   const DecisionModelConfig decides = ReadDecisionModelConfig(prefs);
   const AiConnectionConfig names = ReadAiConnectionConfig(prefs);
+  const AiConnectionConfig chats = ReadAgentModelConfig(prefs);
   const bool has_decision = decides.provider != DecisionProvider::kNone;
   const bool has_language = !names.model.empty();
-  save_tests_left_ = (has_decision ? 1 : 0) + (has_language ? 1 : 0);
+  // Chats left on the language model need no test of their own.
+  const bool has_agent = !prefs->GetString(kAgentModelPref).empty();
+  save_tests_left_ =
+      (has_decision ? 1 : 0) + (has_language ? 1 : 0) + (has_agent ? 1 : 0);
   if (save_tests_left_ == 0) {
     std::move(save_callback_).Run(std::move(save_result_));
     return;
@@ -497,6 +565,11 @@ void UwOrganizationHandler::Save(mojom::ConnectionInputPtr decision,
                          /*names_only=*/has_decision),
             base::BindOnce(&UwOrganizationHandler::OnSaveTested,
                            weak_factory_.GetWeakPtr(), kLanguageSlot));
+  }
+  if (has_agent) {
+    RunTest(kAgentSlot, AgentTest(chats, StoredKey(chats.key_account)),
+            base::BindOnce(&UwOrganizationHandler::OnSaveTested,
+                           weak_factory_.GetWeakPtr(), kAgentSlot));
   }
 }
 
@@ -522,6 +595,25 @@ void UwOrganizationHandler::StoreLanguage(const mojom::ConnectionInput& input) {
       kOrganizationKeyAccountPref,
       StoreKey(kLanguageKeyAccount, mode == ConnectionMode::kOpenAiCompatible,
                input.api_key));
+}
+
+// An agent model with no model name of its own leaves chats on the language
+// model. One that reaches the language model's endpoint without a key of
+// its own takes a copy of that key.
+void UwOrganizationHandler::StoreAgent(const mojom::ConnectionInput& input) {
+  PrefService* prefs = profile_->GetPrefs();
+  const ConnectionMode mode = ModeFromInt(input.kind);
+  const bool own = !input.model.empty();
+  prefs->SetInteger(kAgentModePref, static_cast<int>(mode));
+  prefs->SetString(kAgentEndpointPref, own ? input.endpoint : std::string());
+  prefs->SetString(kAgentModelPref, input.model);
+  const bool takes_key = own && mode == ConnectionMode::kOpenAiCompatible;
+  std::string typed = input.api_key;
+  if (takes_key && typed.empty() && StoredKey(kAgentKeyAccount).empty()) {
+    typed = StoredAgentKey(prefs, input.endpoint);
+  }
+  prefs->SetString(kAgentKeyAccountPref,
+                   StoreKey(kAgentKeyAccount, takes_key, typed));
 }
 
 void UwOrganizationHandler::RunTest(Slot slot,
@@ -556,8 +648,17 @@ void UwOrganizationHandler::OnTested(Slot slot,
 
 void UwOrganizationHandler::OnSaveTested(Slot slot,
                                          mojom::TestResultPtr result) {
-  (slot == kDecisionSlot ? save_result_->decision : save_result_->language) =
-      std::move(result);
+  switch (slot) {
+    case kDecisionSlot:
+      save_result_->decision = std::move(result);
+      break;
+    case kLanguageSlot:
+      save_result_->language = std::move(result);
+      break;
+    case kAgentSlot:
+      save_result_->agent = std::move(result);
+      break;
+  }
   if (--save_tests_left_ > 0) {
     return;
   }

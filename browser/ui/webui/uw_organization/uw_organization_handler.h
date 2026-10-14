@@ -48,15 +48,16 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
 
   // mojom::OrganizationHandler:
   void GetState(GetStateCallback callback) override;
-  void LoadModels(bool decision,
+  void LoadModels(mojom::ConnectionSlot slot,
                   mojom::ConnectionInputPtr connection,
                   LoadModelsCallback callback) override;
-  void TestConnection(bool decision,
+  void TestConnection(mojom::ConnectionSlot slot,
                       mojom::ConnectionInputPtr connection,
                       bool names_only,
                       TestConnectionCallback callback) override;
   void Save(mojom::ConnectionInputPtr decision,
             mojom::ConnectionInputPtr language,
+            mojom::ConnectionInputPtr agent,
             SaveCallback callback) override;
   void TurnOff(TurnOffCallback callback) override;
   void SetPause(int32_t mode, SetPauseCallback callback) override;
@@ -68,12 +69,13 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
 
  private:
   // One test runs per connection at a time.
-  enum Slot { kDecisionSlot = 0, kLanguageSlot = 1 };
+  enum Slot { kDecisionSlot = 0, kLanguageSlot = 1, kAgentSlot = 2 };
 
   mojom::ThresholdsPtr CurrentThresholds() const;
   mojom::TintStatePtr CurrentTint() const;
   void StoreDecision(const mojom::ConnectionInput& input);
   void StoreLanguage(const mojom::ConnectionInput& input);
+  void StoreAgent(const mojom::ConnectionInput& input);
   void OnModelsLoaded(LoadModelsCallback callback,
                       RemoteModelClient::Outcome outcome);
   // Sends `test` and answers `done` with what it found. A newer test of
@@ -94,7 +96,7 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::OrganizationHandler> receiver_;
   std::unique_ptr<RemoteModelClient> models_request_;
-  std::array<std::unique_ptr<RemoteModelClient>, 2> tests_;
+  std::array<std::unique_ptr<RemoteModelClient>, 3> tests_;
   int save_tests_left_ = 0;
   mojom::SaveResultPtr save_result_;
   SaveCallback save_callback_;

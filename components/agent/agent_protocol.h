@@ -28,6 +28,8 @@ struct ModelTurn {
   std::vector<ToolCall> calls;
 };
 
+// The tools of browser/agent/agent_tools.h as a model is told about them.
+base::ListValue AgentToolSchemas();
 // The instructions every chat starts with.
 base::DictValue AgentInstructions();
 base::DictValue UserMessage(std::string_view text);

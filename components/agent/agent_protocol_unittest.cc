@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "base/json/json_reader.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -34,6 +35,20 @@ TEST(AgentProtocolTest, ARequestCarriesTheConversationAndTheTools) {
             "Is the Vercel deploy green?");
   EXPECT_EQ(request->FindList("tools")->size(), 1u);
   EXPECT_FALSE(BuildAgentRequestBody("", messages, tools));
+}
+
+TEST(AgentProtocolTest, DescribesEveryTool) {
+  const base::ListValue tools = AgentToolSchemas();
+
+  std::vector<std::string> names;
+  for (const base::Value& tool : tools) {
+    const base::DictValue& function = *tool.GetDict().FindDict("function");
+    names.push_back(*function.FindString("name"));
+    EXPECT_FALSE(function.FindString("description")->empty());
+    EXPECT_EQ(*function.FindDict("parameters")->FindString("type"), "object");
+  }
+  EXPECT_EQ(names, (std::vector<std::string>{"open", "navigate", "read",
+                                             "click", "type"}));
 }
 
 TEST(AgentProtocolTest, ReadsToolCalls) {

@@ -4,18 +4,19 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {ConnectionInput, ModelsResult, PauseResult, SaveResult, State, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
+import type {ConnectionInput, ConnectionSlot, ModelsResult, PauseResult, SaveResult, State, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
   getState(): Promise<State>;
-  loadModels(decision: boolean, connection: ConnectionInput):
+  loadModels(slot: ConnectionSlot, connection: ConnectionInput):
       Promise<ModelsResult>;
   testConnection(
-      decision: boolean, connection: ConnectionInput,
+      slot: ConnectionSlot, connection: ConnectionInput,
       namesOnly: boolean): Promise<TestResult>;
-  save(decision: ConnectionInput, language: ConnectionInput):
-      Promise<SaveResult>;
+  save(
+      decision: ConnectionInput, language: ConnectionInput,
+      agent: ConnectionInput): Promise<SaveResult>;
   turnOff(): Promise<void>;
   setPause(mode: number): Promise<PauseResult>;
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
@@ -33,19 +34,21 @@ export class UwOrganizationBrowserProxyImpl implements
     return this.handler.getState().then(response => response.state);
   }
 
-  loadModels(decision: boolean, connection: ConnectionInput) {
-    return this.handler.loadModels(decision, connection)
+  loadModels(slot: ConnectionSlot, connection: ConnectionInput) {
+    return this.handler.loadModels(slot, connection)
         .then(response => response.result);
   }
 
   testConnection(
-      decision: boolean, connection: ConnectionInput, namesOnly: boolean) {
-    return this.handler.testConnection(decision, connection, namesOnly)
+      slot: ConnectionSlot, connection: ConnectionInput, namesOnly: boolean) {
+    return this.handler.testConnection(slot, connection, namesOnly)
         .then(response => response.result);
   }
 
-  save(decision: ConnectionInput, language: ConnectionInput) {
-    return this.handler.save(decision, language)
+  save(
+      decision: ConnectionInput, language: ConnectionInput,
+      agent: ConnectionInput) {
+    return this.handler.save(decision, language, agent)
         .then(response => response.result);
   }
 
