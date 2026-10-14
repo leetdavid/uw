@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <title>New chat</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+      :root {
+        --page: #ffffff;
+        --text: #1e1b2e;
+        --text2: #4a4760;
+        --muted: #77748c;
+        --field: #f2f1f8;
+        --line: rgba(30, 27, 46, 0.12);
+        --primary: #3b5bdb;
+        --warn-fill: #fdf0e4;
+        --warn-text: #7a3d07;
+        --error: #d93025;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --page: #1c1b26;
+          --text: #edebf7;
+          --text2: #b9b5cc;
+          --muted: #8e8aa6;
+          --field: #2a2838;
+          --line: rgba(255, 255, 255, 0.12);
+          --primary: #9db0ff;
+          --warn-fill: #3a2a1a;
+          --warn-text: #fcad70;
+          --error: #f28b82;
+        }
+      }
+
+      html,
+      body {
+        background: var(--page);
+        color: var(--text);
+        font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Inter",
+            "Segoe UI", sans-serif;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 56px 0;
+      }
+
+      #log,
+      .ungated,
+      form {
+        max-width: 640px;
+      }
+
+      .ungated {
+        background: var(--warn-fill);
+        border-radius: 10px;
+        color: var(--warn-text);
+        font-size: 12px;
+        margin: 0 0 20px;
+        padding: 10px 12px;
+      }
+
+      #log p {
+        margin: 0 0 12px;
+        white-space: pre-wrap;
+      }
+
+      #log .mine {
+        background: var(--field);
+        border-radius: 14px 14px 4px 14px;
+        margin-left: auto;
+        max-width: 440px;
+        padding: 10px 14px;
+        width: fit-content;
+      }
+
+      #log .step {
+        color: var(--text2);
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+
+      #log .step.error,
+      #log .failed {
+        color: var(--error);
+      }
+
+      #working {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      form {
+        display: flex;
+        gap: 8px;
+        padding: 12px 56px 16px;
+      }
+
+      textarea {
+        background: var(--page);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        color: var(--text);
+        flex: 1;
+        font: inherit;
+        padding: 12px 16px;
+        resize: none;
+      }
+
+      button {
+        background: var(--primary);
+        border: 0;
+        border-radius: 12px;
+        color: #fff;
+        font: inherit;
+        font-weight: 500;
+        padding: 0 18px;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="ungated">
+        This chat clicks and types without asking. Try it only on sites
+        where a stray click does no harm.
+      </p>
+      <div id="log"></div>
+      <p id="working" hidden>Working…</p>
+    </main>
+    <form id="composer">
+      <textarea id="message" rows="2" aria-label="Message"
+          placeholder="Ask the agent to find or do something"></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+    <script type="module" src="/chat.js"></script>
+  </body>
+</html>

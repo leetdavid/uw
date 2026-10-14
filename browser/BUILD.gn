@@ -5,6 +5,7 @@ group("browser_tests") {
     "tab_organization:browser_tests",
     "ui:browser_tests",
     "ui/look:browser_tests",
+    "ui/webui/uw_chat:browser_tests",
     "ui/webui/uw_organization:browser_tests",
     "ui/webui/uw_terminal:browser_tests",
   ]

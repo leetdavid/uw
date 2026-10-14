@@ -1,0 +1,62 @@
+# The uw://chat page's browser side: its controller and the handler that runs
+# the agent.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_chat.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_chat") {
+  sources = [
+    "uw_chat_handler.cc",
+    "uw_chat_handler.h",
+    "uw_chat_ui.cc",
+    "uw_chat_ui.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//base",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//ui/webui",
+    "//uw/browser/agent",
+    "//uw/browser/agent:chat_tab",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//components/performance_manager",
+    "//components/tabs:public",
+    "//content/public/common",
+    "//uw/browser/resources/uw_chat:resources",
+    "//uw/browser/tab_organization:ai_connection",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "uw_chat_browsertest.cc" ]
+  deps = [
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser/actor",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+    "//url",
+    "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:test_support",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/tab_organization:test_support",
+  ]
+}

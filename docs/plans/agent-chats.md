@@ -12,7 +12,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - Every tab is a tab: the organizer may move a chat tab like any other.
 - The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in. Page text never counts as the user's instruction.
 - Until approvals land in T48, the chat page has no approval gate. The user tries it only on sites where a stray click does no harm. Decided on 2026-10-15.
-- Settings get an "Agent model" connection beside the decision and language models. It starts as a copy of the language model. uw checks that the model takes tool calls and images.
+- Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now.
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
 - [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification.
 - A [private chat](../CONTEXT.md#language) keeps nothing after the private windows close.
@@ -54,13 +54,13 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that pass on their own.
 
 1. T43: engine spike. A browser test drives the engine from uw in a background tab: navigate, read the page, click, and type, while the selected tab stays selected. It passed; see the [findings](../research/agent-engine-spike.md).
-2. T44: Agent model setting and its capability check on the settings page. The user can set it and test it in the app.
+2. T44: Agent model setting and its capability check on the settings page. The user can set it and test it in the app. The card shares the page's Save button; the agent's test never turns automatic organization on or off. An agent model at the language model's endpoint, saved without a key, takes a copy of that key.
 3. T45: agent tools over the engine, with a browser test per tool. Built: `AgentToolsBrowserTest.*` and `PageTextTest.*`.
 4. T46: agent loop. A browser test drives it with scripted tool calls from the test model server. Built: `AgentLoopBrowserTest.*` and `AgentProtocolTest.*`.
-5. T47: chat page, opened from a menu command. The agent's tabs nest under it. This is the first stage the user can try end to end.
+5. T47: chat page, opened from "New chat" in the File menu and the sidebar's "+" menu, or from `uw://chat`. The agent's tabs nest under it, and the first message names the tab. A banner says the chat clicks and types without asking until T48. This is the first stage the user can try end to end.
 6. T48: approvals.
 7. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-8. T50: Chats list in the sidebar, and collapsing a chat's child tabs. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+8. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
 9. T51: scheduled chats.
 10. T52: private chats.
 

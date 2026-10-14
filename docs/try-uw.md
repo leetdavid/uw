@@ -100,12 +100,22 @@ Open `uw://settings/uwOrganization` and scroll to `Window tint`. Click a color, 
 
 Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac in light mode and indigo in dark mode.
 
+### Chats
+
+A chat clicks and types without asking for approval, which comes later. Try it only on sites where a stray click does no harm.
+
+1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
+2. Choose `New chat` from the File menu or the sidebar's `+` menu, or type `uw://chat`.
+3. Ask for something, such as "What is the top story on Hacker News?"
+
+Expected result: the chat tab takes your first message as its title. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a line in the chat, then the answer. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
+
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
-- Chats, scheduled chats, and prompt-built site customizations.
+- Approvals in chats, the Chats list, scheduled chats, and prompt-built site customizations.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem

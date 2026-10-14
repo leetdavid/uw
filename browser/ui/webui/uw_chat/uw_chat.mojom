@@ -1,0 +1,36 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+interface ChatHandlerFactory {
+  CreateHandler(pending_remote<ChatPage> page,
+                pending_receiver<ChatHandler> handler);
+};
+
+interface ChatHandler {
+  // The user's next message. Ignored while the agent is working.
+  Send(string text);
+};
+
+// Matches uw::AgentLoop::Step::Kind.
+enum StepKind {
+  kTool,
+  kAnswer,
+  kFailed,
+};
+
+// One step of the agent's work.
+struct Step {
+  StepKind kind;
+  // For a tool: its name, and what it was asked and answered, as JSON.
+  string tool;
+  string args;
+  string result;
+  // The agent's answer, or what went wrong.
+  string text;
+};
+
+interface ChatPage {
+  OnStep(Step step);
+};

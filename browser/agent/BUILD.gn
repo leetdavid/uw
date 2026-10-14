@@ -30,6 +30,30 @@ source_set("agent") {
   ]
 }
 
+# What the browser's commands need to open a chat.
+source_set("chat_tab") {
+  sources = [
+    "chat_tab.cc",
+    "chat_tab.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/ui/browser_window",
+    "//content/public/common",
+    "//url",
+  ]
+}
+
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "scripted_model.cc",
+    "scripted_model.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//net:test_support" ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -40,6 +64,7 @@ source_set("browser_tests") {
   ]
   deps = [
     ":agent",
+    ":test_support",
     "//base",
     "//base/test:test_support",
     "//chrome/browser/actor",

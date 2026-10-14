@@ -1,32 +1,35 @@
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..821561fb2e5eca658325c933eaddad81473b1180 100644
+index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..d6ee66182b27facdd709e9cc759f3bbcebdf14ab 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,7 @@
+@@ -69,6 +69,8 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
++#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +402,7 @@ void RegisterChromeWebUIConfigs() {
+@@ -401,6 +403,8 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwTerminalUIConfig>());
++  map.AddWebUIConfig(std::make_unique<uw::UwChatUIConfig>());
  #endif  // BUILDFLAG(IS_ANDROID)
  
  #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OPENBSD)
 diff --git a/chrome/chrome_paks.gni b/chrome/chrome_paks.gni
-index 7274b66570dd11e3e6899974ef0f1307697f22c6..906d52d22a23d32e05a323fffd4be0edd7f42d43 100644
+index 7274b66570dd11e3e6899974ef0f1307697f22c6..07c66042d3fe7b17bfac4fcb15ec3a726bcdb1c3 100644
 --- a/chrome/chrome_paks.gni
 +++ b/chrome/chrome_paks.gni
-@@ -256,6 +256,7 @@ template("chrome_extra_paks") {
+@@ -256,6 +256,8 @@ template("chrome_extra_paks") {
          "$root_gen_dir/chrome/webui_browser_resources.pak",
          "$root_gen_dir/chrome/webui_gallery_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_resources.pak",
 +        "$root_gen_dir/chrome/uw_terminal_resources.pak",
++        "$root_gen_dir/chrome/uw_chat_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_shared_resources.pak",
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
@@ -83,7 +86,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..2113f1a02095125e41fd2b2fef7ce001
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f0b001e8ac51746b58b280ec0ab9ddca0f47410a 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..fe6f79498034969711971d80e95d0ba6076c5926 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -94,27 +97,31 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f0b001e8ac51746b58b280ec0ab9ddca
  #include "build/branding_buildflags.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/browser/browser_features.h"
-@@ -28,6 +29,9 @@
+@@ -28,6 +29,10 @@
  #include "ui/base/l10n/l10n_util.h"
  #import "ui/base/l10n/l10n_util_mac.h"
  #include "ui/strings/grit/ui_strings.h"
 +#include "uw/browser/tab_organization/commands.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/agent/chat_tab.h"
 +#include "uw/browser/terminal/terminal_tab.h"
  
  #if !defined(__MAC_27_0)
  
-@@ -136,6 +140,9 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
+@@ -136,6 +141,12 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
                Item(IDS_NEW_TAB_MAC)
                    .command_id(IDC_NEW_TAB)
                    .remove_if(is_pwa),
 +              Item(IDS_UW_NEW_TERMINAL)
 +                  .command_id(uw::kNewTerminalCommand)
 +                  .remove_if(is_pwa),
++              Item(IDS_UW_NEW_CHAT)
++                  .command_id(uw::kNewChatCommand)
++                  .remove_if(is_pwa),
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
-@@ -583,12 +590,85 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +594,85 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -200,7 +207,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f0b001e8ac51746b58b280ec0ab9ddca
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +724,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +728,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,
@@ -209,22 +216,24 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f0b001e8ac51746b58b280ec0ab9ddca
             &BuildHelpMenu,
         }) {
 diff --git a/chrome/browser/ui/views/tabs/new_tab_button.cc b/chrome/browser/ui/views/tabs/new_tab_button.cc
-index b316adf2f9b6facc57dab99083b3015ecb9c0f71..b8c498a4d31e33899d9c4427a9c19d9448e00853 100644
+index b316adf2f9b6facc57dab99083b3015ecb9c0f71..223b60634e62555a71835cec86d3281be10358a7 100644
 --- a/chrome/browser/ui/views/tabs/new_tab_button.cc
 +++ b/chrome/browser/ui/views/tabs/new_tab_button.cc
-@@ -23,6 +23,7 @@
+@@ -23,6 +23,8 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/ui_base_features.h"
  #include "ui/views/view_class_properties.h"
++#include "uw/browser/agent/chat_tab.h"
 +#include "uw/browser/terminal/terminal_tab.h"
  
  DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(NewTabButtonMenuModel, kNewTab);
  DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(NewTabButtonMenuModel, kNewTabInGroup);
-@@ -81,6 +82,7 @@ NewTabButtonMenuModel::NewTabButtonMenuModel(BrowserWindowInterface* browser)
+@@ -81,6 +83,8 @@ NewTabButtonMenuModel::NewTabButtonMenuModel(BrowserWindowInterface* browser)
    // Build the menu.
    AddItemWithStringId(IDC_NEW_TAB, IDS_NEW_TAB);
    SetElementIdentifierAt(GetIndexOfCommandId(IDC_NEW_TAB).value(), kNewTab);
 +  AddItemWithStringId(uw::kNewTerminalCommand, IDS_UW_NEW_TERMINAL);
++  AddItemWithStringId(uw::kNewChatCommand, IDS_UW_NEW_CHAT);
    AddNewTabInGroupItem();
  
    AddSeparator(ui::NORMAL_SEPARATOR);
