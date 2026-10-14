@@ -117,3 +117,18 @@ index d5d9a14c8d3d56a2dbae8e4353f943fd5c970b58..945b70854e2d038a279c60f5862579e5
    bool devtools_url = (scheme == kDevToolsScheme);
    if (chrome_url || devtools_url || url::IsStandard(scheme)) {
      // Replace the about: scheme with the chrome: scheme.
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
+index 35dbfda4249c6d7266b2f5684a34bee1085168f1..a67008a56e98fff3d24ad78937d3c2015d76dd0b 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
+@@ -199,6 +199,10 @@ void MultiContentsViewMiniToolbar::UpdateContents() {
+             url_formatter::kFormatUrlOmitHTTPS |
+             url_formatter::kFormatUrlTrimAfterHost,
+         base::UnescapeRule::SPACES, nullptr, nullptr, nullptr);
++    // uw:// is the shown form of chrome:// (see uw::HandleUwSchemeRewrite).
++    if (domain.starts_with(u"chrome://")) {
++      domain.replace(0, 6, u"uw");
++    }
+   }
+   domain_label_->SetText(domain);
+   domain_label_->SetElideBehavior(domain_url.IsStandard() &&

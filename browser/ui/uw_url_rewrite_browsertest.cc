@@ -11,12 +11,17 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/split_tabs/split_tab_visual_data.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
@@ -24,11 +29,14 @@
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/clipboard/clipboard_buffer.h"
 #include "ui/base/clipboard/test/clipboard_test_util.h"
 #include "ui/touch_selection/touch_editing_controller.h"
+#include "ui/views/controls/label.h"
 #include "url/gurl.h"
+#include "url/url_constants.h"
 
 namespace uw {
 namespace {
@@ -133,6 +141,27 @@ IN_PROC_BROWSER_TEST_F(UwSchemeBrowserTest, AWebAddressIsShownAsItIs) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), page));
 
   EXPECT_EQ(address_bar()->GetText(), base::UTF8ToUTF16(page.GetContent()));
+}
+
+// The footer on the unfocused side of a split names a uw page by its uw://
+// address, as the address bar does.
+IN_PROC_BROWSER_TEST_F(UwSchemeBrowserTest, ASplitFooterShowsTheUwAddress) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("uw://version")));
+  chrome::AddTabAt(browser(), GURL(url::kAboutBlankURL), -1, true);
+  TabStripModel* tabs = browser()->tab_strip_model();
+  tabs->AddToNewSplit({0}, split_tabs::SplitTabVisualData(),
+                      split_tabs::SplitTabCreatedSource::kToolbarButton);
+  MultiContentsView* split =
+      BrowserView::GetBrowserViewForBrowser(browser())->multi_contents_view();
+  ASSERT_TRUE(split);
+
+  std::vector<std::u16string> footers;
+  for (int side : {0, 1}) {
+    footers.push_back(std::u16string(split->mini_toolbar_for_testing(side)
+                                         ->domain_label_for_testing()
+                                         ->GetText()));
+  }
+  EXPECT_THAT(footers, testing::Contains(u"uw://version"));
 }
 
 }  // namespace
