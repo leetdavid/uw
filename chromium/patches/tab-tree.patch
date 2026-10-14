@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..d316b3ced3987994e5e9029386f03a4fc96c0a0c 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..14bd93286358384ccfd17c0ef55d221e200ed7ae 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,38 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,41 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -48,6 +48,9 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..d316b3ced3987994e5e9029386f03a4f
 +      <message name="IDS_UW_ACTIVITY_CONFIDENCE_HINT" desc="Tooltip of the confidence bar on the sidebar card.">The model's confidence was <ph name="VALUE">$1<ex>0.39</ex></ph>. uw acts at <ph name="NEEDED">$2<ex>0.90</ex></ph> or more.</message>
 +      <message name="IDS_UW_ACTIVITY_SOURCE" desc="Last line of the sidebar card: the model that answered and how many seconds it took.">Answered by <ph name="MODEL">$1<ex>jev-latest</ex></ph> in <ph name="SECONDS">$2<ex>0.4</ex></ph> s</message>
 +      <message name="IDS_UW_NAME_LOCK" desc="Tooltip of the small lock on a task in the tab sidebar. The lock shows that the user typed the task's name, so uw does not rename the task. uw is the product name and stays lowercase.">Named by you. Click to let uw rename this task.</message>
++      <message name="IDS_UW_SUGGEST_NAME" desc="Row in a task's menu, under the field that holds the task's name. A click asks the language model for a name for the task.">Suggest a name</message>
++      <message name="IDS_UW_SUGGESTING_NAME" desc="Text of the Suggest a name row in a task's menu while the language model is asked for a name.">Suggesting a name…</message>
++      <message name="IDS_UW_SUGGEST_NAME_FAILED" desc="Text of the Suggest a name row in a task's menu after the language model gave no name that could be used.">Could not suggest a name</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
@@ -614,3 +617,24 @@ index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..84722bf8122b6941f3494dad5d41abf3
  
    new_tab_button_pressed_subscription_ =
        new_tab_button->RegisterWillInvokeActionCallback(
+diff --git a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
+index a6c53969ea00adc6c6ca3b6c1f3611003b626650..770d0a6d622beb92bc6d281f7fd04930d161d66d 100644
+--- a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
++++ b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
+@@ -3,6 +3,7 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.h"
++#include "uw/browser/ui/views/tab_organization/suggest_name_item.h"
+ 
+ #include <memory>
+ #include <optional>
+@@ -562,6 +563,8 @@ void TabGroupEditorBubbleView::RebuildMenuContents() {
+ 
+   title_field_ = AddChildView(title_field ? std::move(title_field)
+                                           : BuildTitleField(title_at_opening_));
++  AddChildView(std::make_unique<uw::SuggestNameItem>(browser_, group_,
++                                                     GetControlInsets()));
+   color_selector_ = AddChildView(BuildColorPicker());
+   AddChildView(BuildSeparator());
+ 

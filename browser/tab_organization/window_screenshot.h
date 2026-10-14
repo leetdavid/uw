@@ -10,6 +10,10 @@
 
 class Browser;
 
+namespace views {
+class Widget;
+}
+
 namespace uw {
 
 // The whole window of `browser` at 1280 by 800, as it is drawn once its
@@ -20,6 +24,9 @@ SkBitmap CaptureWindow(Browser* browser);
 // UW_SCREENSHOT_DIR environment variable names, so looks can be reviewed
 // without opening a window. Does nothing when the variable is not set.
 void SaveWindowScreenshot(Browser* browser, const std::string& name);
+
+// Saves `widget`, such as an open menu, the same way.
+void SaveWidgetScreenshot(views::Widget* widget, const std::string& name);
 
 }  // namespace uw
 

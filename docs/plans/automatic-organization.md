@@ -26,6 +26,13 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - The [task naming call](../CONTEXT.md#language) holds the tab that triggered it and the titles of up to 20 other tabs in the task. For a new task those are the tabs that move with it.
 - uw never replaces a name the user typed. It saves the names it gave with the tabs of the task, in the session, so it still knows them after a restart. The user asked for this on 2026-10-12. A tab or window brought back with "Reopen closed tab" does not carry that data, so a task that comes back that way keeps its name.
 - A task whose name the user typed shows a [name lock](../CONTEXT.md#language): a small lock at the end of its row in the sidebar. A click on it hands the name back to uw. The lock goes, the task keeps the name, and uw treats that name as one it gave, so it is replaced once the task has outgrown it. Renaming the task locks it again. A task with the provisional name shows no lock, and no task does while automatic organization is off. The user asked for a "manual" indicator and a click back to "auto" on 2026-10-13. The lock icon, its place on the row, and keeping the name on hand-back are uw's choices and open to review.
+- A task's menu has a "Suggest a name" row under the name field. A click asks the language model to name the task now. The user asked for a button that suggests a name on 2026-10-14. Its place in the menu and the rules below are uw's choices and open to review.
+  - The request holds the title and address of the first tab in the task and the titles of up to 20 other tabs in it. It holds no page excerpt.
+  - The name fills the field and the task takes it as a name uw gave. It shows no name lock, and uw replaces it once the task has outgrown it. It also replaces a name the user typed, because the user asked.
+  - While the model is asked, the row reads "Suggesting a name…" and takes no click, and the task's row shows the spinner. The menu can close; the name still arrives.
+  - When no name comes of it, the task keeps its name and the row reads "Could not suggest a name" until the menu closes. Its tooltip gives the HTTP status or network error. A click asks again.
+  - The row is hidden without a language model and in a private window.
+  - It works while automatic organization is paused or off. This is the one request uw sends then, and only on a click.
 - Naming moves nothing and is not an undo step.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
 - "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
@@ -201,7 +208,7 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - Placing a moved branch under a page in the destination task.
 - Automatic merging and whole-window reorganization passes. A single branch leaving its task is in scope; splitting a task into several is not.
 - User-directed proposals and "Reorganize all tabs".
-- Renaming a task whose name the user typed, unless they hand it back with the name lock, and renaming without a decision model.
+- Renaming a task whose name the user typed, unless they hand it back with the name lock or click "Suggest a name". Automatic renaming without a decision model.
 - Automatic tab closing and suspension.
 - The 200 ms placement budget in [Product](../product.md#organization-latency). Measure first.
 
@@ -211,6 +218,7 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - `components/tab_organization/placement` turns a decision into what uw does: nothing, a suggestion, a move, or a name for the task. `Place` is a plain function of one answer, where the branch sits, and the three thresholds. `PlaceBranch` is a plain function of the tab tree and the answers about the tabs of one branch. Chat requests allow 4096 answer tokens, because some chat models think before they answer and that thinking counts against the limit. Parsing is strict, so a malformed response can never move a tab.
 - `browser/tab_organization/tab_organization_controller` keeps the name uw gave each task and writes it into the session data of every tab in the task, beside the tab's parent link.
 - `browser/ui/views/tab_organization/name_lock` is the lock on a task's row. Chromium's task header creates one per task; it shows and hides itself as the controller and the on/off setting change.
+- `browser/ui/views/tab_organization/suggest_name_item` is the "Suggest a name" row. Chromium's task menu creates one under its name field. The organizer keeps this request apart from the ones about a tab, so a tab that changes, or a pause, does not drop it.
 - `browser/tab_organization/automatic_organizer` is owned by the window. It watches titles and URLs, sends the requests, keeps the answers, and carries out what `PlaceBranch` says through the window controller. An answer counts only while its tab is unchanged since the request.
 - The organizer keeps the latest automatic change as a notice for the sidebar message.
 - Excerpts reuse upstream content extraction (`components/content_extraction/content/browser/inner_text.h`).
@@ -263,6 +271,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 32. A new task appears before its name: the tabs are in a task called `New task`, its row shows the spinner, and the card waits. A tab opened from it lands in the task and sends no second naming request. Undo during the wait takes the tabs back and drops the request. `AutomaticOrganizerBrowserTest.ANewTaskStartsBeforeItsName` checks it.
 33. When the name arrives, the task takes it, the spinner goes, and the card says "Created task <name>" with Undo. `AutomaticOrganizerBrowserTest.JevDecidesAndTheLanguageModelNamesTheNewTask` checks it.
 34. A feed page stays in the Scratchpad when a tab opened from it starts a task, and does not start a task itself whatever its other scores. The request carries the question. `AutomaticOrganizerBrowserTest.AFeedStaysWhenATabOpenedFromItStartsATask` and `PlacementTest.AHubIsNeverMadeIntoATask` check it.
+35. With a language model set, a task's menu shows "Suggest a name". A click sends one naming call that lists the task's tabs, while automatic organization is paused too. The name lands in the field and on the task without a lock, in place of a name the user typed. While the model is asked, the row reads "Suggesting a name…", takes no click, and no second request goes out. A failed call leaves the name alone, and the row says so with the reason in its tooltip. Without a language model the row is hidden. `AutomaticOrganizerBrowserTest.SuggestANameNamesTheTaskFromItsTabs`, `SuggestANameWaitsForTheLanguageModel`, and `SuggestANameSaysWhenNoNameCame` check it.
 
 ## Later stages
 

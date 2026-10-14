@@ -140,9 +140,11 @@ size_t AutomaticOrganizer::pending_requests() const {
   return static_cast<size_t>(
       std::ranges::count_if(
           pages_, [](const auto& entry) { return entry.second.asking; }) +
-      std::ranges::count_if(requests_, [](const auto& entry) {
-        return !entry.second.request.naming.body.empty();
-      }));
+      std::ranges::count_if(requests_,
+                            [](const auto& entry) {
+                              return !entry.second.request.naming.body.empty();
+                            }) +
+      asked_names_.size());
 }
 
 bool AutomaticOrganizer::IsNaming(const std::string& task) const {
@@ -152,6 +154,48 @@ bool AutomaticOrganizer::IsNaming(const std::string& task) const {
 base::CallbackListSubscription AutomaticOrganizer::ObserveNaming(
     base::RepeatingClosure callback) {
   return naming_changed_.Add(std::move(callback));
+}
+
+bool AutomaticOrganizer::CanSuggestName() const {
+  return !profile()->IsOffTheRecord() &&
+         IsComplete(ReadAiConnectionConfig(profile()->GetPrefs()));
+}
+
+void AutomaticOrganizer::SuggestName(const std::string& task,
+                                     NameFailedCallback on_failed) {
+  if (!CanSuggestName() || IsNaming(task)) {
+    return;
+  }
+  // The request describes the first tab of the task and lists the others.
+  const Page* first = nullptr;
+  Request request;
+  for (const Page& page : controller_->tree().pages()) {
+    const auto activity = pages_.find(page.id);
+    if (page.task == task && activity != pages_.end() &&
+        !activity->second.title.empty()) {
+      first = &page;
+      request.context.title = base::UTF16ToUTF8(activity->second.title);
+      request.context.url = activity->second.url.spec();
+      request.context.source_description = "no source tab";
+      break;
+    }
+  }
+  std::unique_ptr<RemoteModelClient> client =
+      first ? PrepareNaming(request, MemberTitles(*first)) : nullptr;
+  if (!client) {
+    std::move(on_failed).Run(std::u16string());
+    return;
+  }
+  RemoteModelClient* sender = client.get();
+  asked_names_[task] = AskedName{std::move(client), std::move(request.naming),
+                                 std::move(on_failed)};
+  UpdateNaming();
+  sender->Send(base::BindOnce(&AutomaticOrganizer::OnAskedName,
+                              weak_factory_.GetWeakPtr(), task));
+}
+
+base::WeakPtr<AutomaticOrganizer> AutomaticOrganizer::AsWeakPtr() {
+  return weak_factory_.GetWeakPtr();
 }
 
 void AutomaticOrganizer::DispatchNowForTesting() {
@@ -800,6 +844,31 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   }
 }
 
+void AutomaticOrganizer::OnAskedName(const std::string& task,
+                                     RemoteModelClient::Outcome outcome) {
+  auto found = asked_names_.extract(task);
+  if (found.empty()) {
+    return;
+  }
+  AskedName asked = std::move(found.mapped());
+  UpdateNaming();
+  const std::optional<std::u16string> name =
+      outcome.ok ? ParseNamingResponse(outcome.body) : std::nullopt;
+  const std::u16string reason =
+      outcome.ok ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_ANSWER_UNREADABLE)
+                 : l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_REQUEST_FAILED,
+                                              FailureReason(outcome));
+  asked.exchange.took = base::TimeTicks::Now() - asked.exchange.sent_at;
+  asked.exchange.answer = std::move(outcome);
+  LogOrganizerExchange("name", asked.exchange,
+                       name ? "named" : "no usable name");
+  if (name) {
+    controller_->NameTask(task, *name);
+  } else {
+    std::move(asked.on_failed).Run(reason);
+  }
+}
+
 void AutomaticOrganizer::Placed(const std::vector<PageId>& pages,
                                 Event::Kind kind,
                                 const Request& by) {
@@ -904,6 +973,9 @@ void AutomaticOrganizer::UpdateNaming() {
     if (!pending.request.naming.body.empty()) {
       naming.insert(pending.request.task);
     }
+  }
+  for (const auto& [task, asked] : asked_names_) {
+    naming.insert(task);
   }
   if (naming != naming_) {
     naming_ = std::move(naming);

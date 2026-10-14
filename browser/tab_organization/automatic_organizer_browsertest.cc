@@ -35,6 +35,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.h"
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/os_crypt/common/os_crypt_switches.h"
 #include "components/prefs/pref_service.h"
@@ -53,12 +54,15 @@
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/controls/button/label_button.h"
+#include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_utils.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/widget/widget_delegate.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -71,6 +75,7 @@
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/name_lock.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
+#include "uw/browser/ui/views/tab_organization/suggest_name_item.h"
 #include "uw/components/tab_organization/placement.h"
 
 namespace uw {
@@ -196,6 +201,51 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   NamingSpinner* SpinnerOf(const tab_groups::TabGroupId& group) {
     return FindOnRow<NamingSpinner>(
         BrowserView::GetBrowserViewForBrowser(browser()), group);
+  }
+
+  // Opens the menu of the task `group`, as its row's menu button does.
+  std::unique_ptr<views::Widget> OpenMenuOf(
+      const tab_groups::TabGroupId& group) {
+    return TabGroupEditorBubbleView::Show(browser(), group, NameLockOf(group),
+                                          std::nullopt, false);
+  }
+
+  // The "Suggest a name" row of an open task menu.
+  static SuggestNameItem* SuggestItemOf(views::Widget* menu) {
+    for (views::View* row :
+         menu->widget_delegate()->GetContentsView()->children()) {
+      if (SuggestNameItem* item = views::AsViewClass<SuggestNameItem>(row)) {
+        return item;
+      }
+    }
+    return nullptr;
+  }
+
+  static std::u16string TextOf(SuggestNameItem* item) {
+    return std::u16string(item->button()->GetText());
+  }
+
+  // The name in the field of an open task menu.
+  static std::u16string NameFieldOf(views::Widget* menu) {
+    return std::u16string(
+        views::AsViewClass<views::Textfield>(
+            menu->widget_delegate()->GetInitiallyFocusedView())
+            ->GetText());
+  }
+
+  // A window with one task named `name` that holds the pages "flights" and
+  // "hotels". Automatic organization is paused, so only a request the user
+  // asks for goes out.
+  tab_groups::TabGroupId PausedTask(const std::u16string& name) {
+    SetPauseState(prefs(), PauseMode::kIndefinite);
+    Browse(InitialTab(), "flights");
+    tabs::TabInterface* second = NewTab();
+    Browse(second, "hotels");
+    const std::optional<tab_groups::TabGroupId> task =
+        controller()->MoveToNewTask({Id(InitialTab()), Id(second)}, name);
+    CHECK(task);
+    base::RunLoop().RunUntilIdle();
+    return *task;
   }
 
   template <typename Mark>
@@ -1729,6 +1779,103 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Browse(link, "hotels");
   ASSERT_TRUE(SettleAfter(1));
   EXPECT_EQ(link->GetGroup(), task);
+}
+
+// "Suggest a name" in a task's menu asks the language model for a name from
+// the tabs the task holds, while automatic organization is paused too. The
+// name lands in the field and on the task as one uw gave, in place of the
+// name the user had typed.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       SuggestANameNamesTheTaskFromItsTabs) {
+  UseLanguageModel();
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  ASSERT_TRUE(NameLockOf(task)->GetVisible());
+
+  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+  SuggestNameItem* item = SuggestItemOf(menu.get());
+  ASSERT_TRUE(item);
+  ASSERT_TRUE(item->GetVisible());
+  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_EQ(NameFieldOf(menu.get()), u"Lisbon");
+  SaveWidgetScreenshot(menu.get(), "suggest-a-name");
+
+  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TitleOf(task) == u"Plan Lisbon trip"; }));
+  ASSERT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(Requests()[0].path, "/v1/chat/completions");
+  EXPECT_NE(Requests()[0].body.find("Title: flights\\n"), std::string::npos);
+  EXPECT_NE(Requests()[0].body.find("- hotels"), std::string::npos);
+  EXPECT_EQ(NameFieldOf(menu.get()), u"Plan Lisbon trip");
+  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_TRUE(item->button()->GetEnabled());
+  EXPECT_TRUE(controller()->HasGeneratedName(task.ToString()));
+  EXPECT_FALSE(NameLockOf(task)->GetVisible());
+  EXPECT_EQ(organizer()->pending_requests(), 0u);
+}
+
+// The row is only there with a language model to ask. While the model is
+// asked the row says so and takes no click, the task's row shows its
+// spinner, and no second request goes out.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       SuggestANameWaitsForTheLanguageModel) {
+  UseDecisionModel(DecisionProvider::kJev);
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  {
+    std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+    ASSERT_TRUE(SuggestItemOf(menu.get()));
+    EXPECT_FALSE(SuggestItemOf(menu.get())->GetVisible());
+  }
+
+  UseLanguageModel();
+  Hold("/v1/chat/completions");
+  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+  SuggestNameItem* item = SuggestItemOf(menu.get());
+  ASSERT_TRUE(item);
+  ASSERT_TRUE(item->GetVisible());
+  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
+  EXPECT_EQ(TextOf(item), u"Suggesting a name\u2026");
+  EXPECT_FALSE(item->button()->GetEnabled());
+  EXPECT_TRUE(organizer()->IsNaming(task.ToString()));
+  EXPECT_TRUE(SpinnerOf(task)->spinning());
+  ASSERT_TRUE(base::test::RunUntil([&] { return Requests().size() == 1u; }));
+  SaveWidgetScreenshot(menu.get(), "suggesting-a-name");
+  SaveWindowScreenshot(browser(), "suggesting-a-name-window");
+
+  organizer()->SuggestName(task.ToString(), base::DoNothing());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(TitleOf(task), u"Lisbon");
+}
+
+// When no name comes of it the row says so, with the reason in its tooltip,
+// and the task keeps its name as the user's. A click asks again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       SuggestANameSaysWhenNoNameCame) {
+  UseLanguageModel();
+  Fail("/v1/chat/completions", 401);
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+
+  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+  SuggestNameItem* item = SuggestItemOf(menu.get());
+  ASSERT_TRUE(item);
+  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TextOf(item) == u"Could not suggest a name"; }));
+  EXPECT_EQ(item->button()->GetTooltipText(), u"The request failed: HTTP 401");
+  EXPECT_TRUE(item->button()->GetEnabled());
+  EXPECT_EQ(TitleOf(task), u"Lisbon");
+  EXPECT_TRUE(controller()->HasManualName(task.ToString()));
+  SaveWidgetScreenshot(menu.get(), "could-not-suggest-a-name");
+
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TitleOf(task) == u"Plan Lisbon trip"; }));
+  EXPECT_EQ(Requests().size(), 2u);
+  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_TRUE(item->button()->GetTooltipText().empty());
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

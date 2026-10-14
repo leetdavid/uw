@@ -112,6 +112,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
   bool IsNaming(const std::string& task) const;
   // Runs when such a request starts or ends.
   base::CallbackListSubscription ObserveNaming(base::RepeatingClosure callback);
+  // True when the user can ask for a name: there is a language model, and
+  // the window is not a private one. Automatic organization need not be on.
+  bool CanSuggestName() const;
+  // Asks the language model to name `task` now, from the tabs it holds. The
+  // user asked, so the name replaces one they typed, and it is uw's from then
+  // on. `on_failed` runs when no name came of it, with the reason when there
+  // is one to give.
+  using NameFailedCallback = base::OnceCallback<void(const std::u16string&)>;
+  void SuggestName(const std::string& task, NameFailedCallback on_failed);
+  base::WeakPtr<AutomaticOrganizer> AsWeakPtr();
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
   // or moved since. The acceptance goes to the organizer log as an example
@@ -187,6 +197,12 @@ class AutomaticOrganizer : public TabStripModelObserver {
     Request request;
     std::optional<std::u16string> task_name;
   };
+  // A name the user asked for, on its way.
+  struct AskedName {
+    std::unique_ptr<RemoteModelClient> client;
+    OrganizerExchange exchange;
+    NameFailedCallback on_failed;
+  };
 
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
 
@@ -230,6 +246,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
             AnswerHandler on_answer);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
+  void OnAskedName(const std::string& task, RemoteModelClient::Outcome outcome);
   // Decides about the branch `page` is in from the answers kept about its
   // tabs, and carries that out. It waits while a request about one of those
   // tabs is out, and first asks about the tabs nobody asked about when
@@ -294,6 +311,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::map<PageId, Kept> kept_;
   // Top pages of the branches whose unasked tabs are being asked about.
   std::set<PageId> asked_;
+  // The names the user asked for, by task.
+  std::map<std::string, AskedName> asked_names_;
   // Tasks the language model is being asked to name.
   std::set<std::string> naming_;
   base::RepeatingClosureList naming_changed_;

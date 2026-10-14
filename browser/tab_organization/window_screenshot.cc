@@ -11,6 +11,7 @@
 #include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/functional/function_ref.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/test_future.h"
@@ -77,6 +78,23 @@ SkBitmap CaptureSettled(views::Widget* widget) {
   return pixels;
 }
 
+// Writes `pixels` as <name>.png into the folder for screenshots, when there
+// is one.
+void Save(base::FunctionRef<SkBitmap()> pixels, const std::string& name) {
+  const std::optional<std::string> folder =
+      base::Environment::Create()->GetVar(kFolderVariable);
+  if (!folder || folder->empty()) {
+    return;
+  }
+  const std::optional<std::vector<uint8_t>> png =
+      gfx::PNGCodec::EncodeBGRASkBitmap(pixels(),
+                                        /*discard_transparency=*/false);
+  ASSERT_TRUE(png);
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  ASSERT_TRUE(base::WriteFile(
+      base::FilePath(*folder).AppendASCII(name + ".png"), *png));
+}
+
 }  // namespace
 
 SkBitmap CaptureWindow(Browser* browser) {
@@ -87,18 +105,11 @@ SkBitmap CaptureWindow(Browser* browser) {
 }
 
 void SaveWindowScreenshot(Browser* browser, const std::string& name) {
-  const std::optional<std::string> folder =
-      base::Environment::Create()->GetVar(kFolderVariable);
-  if (!folder || folder->empty()) {
-    return;
-  }
-  const std::optional<std::vector<uint8_t>> png =
-      gfx::PNGCodec::EncodeBGRASkBitmap(CaptureWindow(browser),
-                                        /*discard_transparency=*/false);
-  ASSERT_TRUE(png);
-  base::ScopedAllowBlockingForTesting allow_blocking;
-  ASSERT_TRUE(base::WriteFile(
-      base::FilePath(*folder).AppendASCII(name + ".png"), *png));
+  Save([&] { return CaptureWindow(browser); }, name);
+}
+
+void SaveWidgetScreenshot(views::Widget* widget, const std::string& name) {
+  Save([&] { return CaptureSettled(widget); }, name);
 }
 
 }  // namespace uw
