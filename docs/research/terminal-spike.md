@@ -10,7 +10,7 @@ ghostty-web 0.4.0 is good enough to build on, and a shell started the way a brow
 | --- | --- |
 | 1. ghostty-web under the policy of a `uw://` page | Passed, with gaps |
 | 2. Shell host: the system calls | Passed in a standalone probe, 29 of 30 runs |
-| 2. Shell host: the class and its unit tests | Passed: 8 of 8 `ShellHostTest` cases, and 200 of 200 when repeated 25 times. They ran in a test binary linked by hand, not through the normal build. See [what is left](#what-is-left) |
+| 2. Shell host: the class and its unit tests | Passed: 8 of 8 `ShellHostTest` cases in `unit_tests`, and 200 of 200 when repeated 25 times |
 
 ## Check 1: ghostty-web in a page
 
@@ -81,13 +81,10 @@ What the probe settled:
 
 `components/terminal/shell_host` starts a shell, writes to it, resizes it, names the running command, reads the shell's folder, and ends the shell when destroyed. Reading its output on a task runner is left for T33.
 
-Eight `ShellHostTest` cases cover the same list as the probe, against `/bin/sh`. All eight pass, and all 200 runs passed when repeated 25 times at four jobs.
-
-The build could not regenerate its files that night, because of an unrelated build-file change in progress in the same working tree. So the two files were compiled with the flags of uw's existing unit tests, unsafe-buffer checks included, and linked with the objects of the existing `unit_tests` binary into a separately named binary. That binary was deleted afterwards.
+Eight `ShellHostTest` cases cover the same list as the probe, against `/bin/sh`. All eight pass in `unit_tests`, and all 200 runs passed when repeated 25 times at four jobs. `pnpm run verify` runs them with the other focused unit tests.
 
 ## What is left
 
-- **Run `ShellHostTest.*` through the normal build.** `components/BUILD.gn` lists the terminal tests, so `pnpm run verify` picks them up once the build regenerates.
 - **Destroying a shell host can block for up to two seconds on macOS.** Chromium's `EnsureProcessTerminated` says so. T33 has to close shells off the main thread.
 - **Not checked:** the environment a shell gets when uw is started from the Finder, where `LANG` and `PATH` may be bare, and which app macOS names in a privacy prompt raised by a command in the shell.
 
