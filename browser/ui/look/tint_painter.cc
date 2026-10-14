@@ -6,6 +6,7 @@
 #include <cmath>
 #include <numbers>
 
+#include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
@@ -13,6 +14,10 @@
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/view.h"
 #include "uw/components/look/tint.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "uw/browser/ui/look/window_buttons.h"
+#endif
 
 namespace uw {
 namespace {
@@ -44,6 +49,12 @@ void PaintTint(gfx::Canvas* canvas,
                  std::lround(middle_y + down * length / 2)),
       tint.start, tint.end));
   canvas->DrawRect(view->GetLocalBounds(), flags);
+#if BUILDFLAG(IS_MAC)
+  // A dark tint already shows the inactive window buttons.
+  if (TextColorOn(tint) == kDarkTextOnTint) {
+    PaintWindowButtonDots(canvas, view, kDarkTextOnTint);
+  }
+#endif
 }
 
 }  // namespace uw
