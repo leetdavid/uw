@@ -21,6 +21,8 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [Automatic organization plan](plans/automatic-organization.md): the tab-filing loop, the decision model and language model, and acceptance checks.
 - [Agent chats plan](plans/agent-chats.md): chats with a built-in agent, scheduled chats, approvals, releases, and stages.
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
+- [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
+- [Command bar plan](plans/command-bar.md): one panel on Cmd+T and Cmd+L for commands, tasks, tabs, and the web, in three stages.
 - [Terminal tab plan](plans/terminal-tab.md): a shell in a regular tab drawn by ghostty-web, the spike that comes first, stages, and acceptance checks.
 - [Chromium tab API research](research/chromium-tab-api-research.md): reusable controls, integration points, and constraints at the pinned revision.
 - [Terminal spike](research/terminal-spike.md): what ghostty-web and a browser-started shell did in the two checks, and the gaps uw has to cover.
@@ -29,6 +31,7 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.
 - [ADR 0003: a decision model sits beside the language model](adr/0003-decision-model-beside-the-language-model.md): which providers decide tab placement and how.
 - [ADR 0004: the terminal draws with ghostty-web in a page](adr/0004-the-terminal-draws-with-ghostty-web.md): why a terminal tab is a page and not a native Ghostty view.
+- [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
 
 ## Status
 

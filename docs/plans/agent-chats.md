@@ -57,8 +57,8 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 4. T46: agent loop. A browser test drives it with scripted tool calls from the test model server.
 5. T47: chat page, opened from a menu command. The agent's tabs nest under it. This is the first stage the user can try end to end.
 6. T48: approvals.
-7. T49: Ask box on the new tab page.
-8. T50: Chats list in the sidebar, and collapsing a chat's child tabs.
+7. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+8. T50: Chats list in the sidebar, and collapsing a chat's child tabs. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
 9. T51: scheduled chats.
 10. T52: private chats.
 

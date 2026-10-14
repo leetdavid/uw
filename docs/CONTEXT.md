@@ -31,6 +31,14 @@ A terminal tab whose shell is running a command.
 A page that is part of the browser, such as settings. Its address starts with `uw://`.
 _Avoid_: Chrome page, internal page, WebUI page.
 
+**Command bar**:
+uw's popup for opening pages and running commands from the keyboard. It searches commands, tasks, open tabs, history, bookmarks, and the web.
+_Avoid_: Palette, command palette, launcher, omnibox.
+
+**Result menu**:
+The list of things the user can do with one command bar result, such as switching to a tab, closing it, or copying its link.
+_Avoid_: Action panel, actions.
+
 **Home URL**:
 The saved starting address a pinned tab returns to when reset.
 
@@ -44,7 +52,8 @@ A temporary view opened from a pinned tab for a page outside the pin's site. Pro
 The arrangement of regular tabs within one browser window: the Scratchpad, the tab groups, and regular tabs nested under parent tabs.
 
 **Tab branch**:
-A tab together with all its descendant tabs.
+A tab together with all its descendant tabs. It is the only level below a task.
+_Avoid_: Subtask, subgroup, nested task.
 
 **Parent tab**:
 A regular tab with child tabs beneath it in the tab tree.

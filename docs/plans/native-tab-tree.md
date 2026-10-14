@@ -24,7 +24,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 ## Non-goals
 
 - Tasks inside tasks.
-- Nesting a tab by dragging it. Drags reorder; the menu commands nest.
+- Nesting a tab by dragging it. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse) adds it.
 - Moving a branch between windows as one unit.
 - Shared live pins. They stay in the later pin work.
 

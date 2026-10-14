@@ -51,7 +51,11 @@ Other day-one browser workflow requirements remain open.
 
 Agreed: use [automatic tab organization](#automatic-tab-organization) to help track the current task and its tabs. This replaces the earlier Arc-style workspace proposal, which did not solve the user's task-tracking problem.
 
-Proposed: suspend inactive tabs when appropriate, restore sessions reliably, and provide keyboard shortcuts for common browsing actions.
+Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
+
+Agreed on 2026-10-14: every command has a menu bar entry and a key, and the tab tree works with the mouse alone. Tasks do not nest: a [tab branch](CONTEXT.md#language) is the only level below a task. Branches collapse, and dragging nests them. The [keyboard and mouse plan](plans/keyboard-and-mouse.md) has the keys and the details.
+
+Agreed on 2026-10-14: a [command bar](CONTEXT.md#language) replaces typing in the address bar. Cmd+T, Cmd+L, and a click on the address open it. It finds commands, tasks, open tabs, history, bookmarks, and the web, and offers "Ask uw" to start a chat. Text typed there reaches a model only when the user picks a row that asks one. See the [command bar plan](plans/command-bar.md) and [ADR 0005](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md).
 
 ### Pinned tabs
 

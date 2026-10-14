@@ -9,7 +9,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 ## Scope
 
 - A [terminal tab](../CONTEXT.md#language) runs the user's login shell, started as a login shell in their home folder.
-- It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would.
+- It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#terminal-key) makes Ctrl+` go to the task's terminal and back, and moves New terminal to Ctrl+Shift+`.
 - It sits in tasks and nests like any regular tab. The organizer never moves it, never asks a model about it, and never lists it among a task's tabs in a request.
 - Text reaches the shell only from the user's keyboard, paste, or drop. The address never carries a command.
 - Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+`.

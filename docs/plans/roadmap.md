@@ -57,9 +57,23 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T47 | Chat page | backlog | 5/10 | `uw://chat` from a menu command, with the agent's tabs nested under it. The first stage to try end to end. |
 | T48 | Approvals | backlog | 4/10 | Approve before each change and sign-in, from the model's word and from what uw can detect. |
 | T49 | Ask box on the new tab page | backlog | 6/10 | Search or Ask. Ask starts a chat. |
-| T50 | Chats list and collapsing a chat | backlog | 5/10 | A Chats section in the sidebar with running and unread states, and collapsing a chat's child tabs. |
+| T50 | Chats list and collapsing a chat | backlog | 5/10 | A Chats section in the sidebar with running and unread states, and collapsing a chat's child tabs, which uses the branch collapse of T57. |
 | T51 | Scheduled chats | backlog | 5/10 | Scheduled chats under the watch rules, replacing page watches. |
 | T52 | Private chats | backlog | 6/10 | A chat from a private window keeps nothing after the private windows close. |
+| T53 | Menu bar entries and Ctrl+Cmd keys | backlog | 8/10 | Every uw command in the Tab menu or a new Tasks menu with its key, per the [keyboard and mouse plan](keyboard-and-mouse.md). Keys shown in context menus. Waits for approval. |
+| T54 | Ctrl+` goes to the task's terminal | backlog | 7/10 | Ctrl+` selects the task's last-used terminal tab or opens one, and returns to the tab before it. Ctrl+Shift+` opens a new terminal. Waits for approval. |
+| T55 | Dragging a parent carries its branch | backlog | 7/10 | Option-drag moves the tab alone. Waits for approval. |
+| T56 | Sideways drag sets the depth | backlog | 5/10 | The dragged tab's indent follows the pointer. Needs a design on the Doop canvas first. Waits for approval. |
+| T57 | Branch collapse | backlog | 4/10 | Chevron, hidden-tab count, Ctrl+Cmd+., and Chromium's collapsed-group rules. T50 reuses it. Needs a design first. Waits for approval. |
+| T58 | Mouse actions and their settings | backlog | 6/10 | Option-click to close a branch, a + on a task row, double-click empty space, and middle-click to close a task, each with a switch. Needs a design first. Waits for approval. |
+| T59 | The sidebar as a keyboard tree | backlog | 5/10 | Ctrl+Cmd+L focuses the tab list, the arrow keys walk the tree, and VoiceOver reads each level. Waits for approval. |
+| T60 | Command bar spike | backlog | 6/10 | A top-chrome WebUI panel opens on Cmd+T without creating a tab and lists suggestions from Chromium's searchbox handler, per the [command bar plan](command-bar.md). Proposed, not agreed. Waits for approval. |
+| T61 | Command bar on Cmd+T | backlog | 4/10 | Commands, tasks, tabs, history, bookmarks, and web search, the best match first, and recent items before typing. Needs a design first. Waits for approval. |
+| T62 | Cmd+L and the address click open the command bar | backlog | 3/10 | Keeps the address bar's habits the plan lists. Waits for approval. |
+| T63 | Result menu and fallbacks | backlog | 6/10 | Cmd+K on a result, Search the web, and Ask uw, which waits for T47. Waits for approval. |
+| T64 | Tab search opens the command bar | backlog | 7/10 | Cmd+Shift+A narrows it to tabs and hides Chromium's tab search popup. Waits for approval. |
+| T65 | Aliases and recorded keys | backlog | 6/10 | Short words and keys for commands, kept per profile. Waits for approval. |
+| T66 | Math, currency, and translation | backlog | 7/10 | Local math, the European Central Bank's daily rates, and translation by the language model only when picked. Waits for approval. |
 
 ## 1. Choose the browser foundation
 
@@ -100,6 +114,12 @@ Done when a user can generate a page modification, inspect its site access, enab
 [Chats](../product.md#chats) and scheduled chats, agreed on 2026-10-14. The [agent chats plan](agent-chats.md) has the releases and stages, T43 to T52 on the board.
 
 Done when the plan's [acceptance checks](agent-chats.md#acceptance-checks-for-v20) pass and the user has handed real errands to a chat.
+
+## Keyboard, mouse, and the command bar
+
+Agreed on 2026-10-14. Build the [keyboard and mouse plan](keyboard-and-mouse.md) first, T53 to T59, then the [command bar plan](command-bar.md), T60 to T66.
+
+Done when both plans' acceptance checks pass and the user browses a day without reaching for a command that has no key.
 
 ## Later: terminal tabs
 
@@ -154,6 +174,8 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Terminal tab](terminal-tab.md) | 6/10 | The first uw page outside settings, a pre-1.0 dependency whose JavaScript has [gaps uw's page must cover](../research/terminal-spike.md#gaps-uw-has-to-cover), and a close warning on four closing paths. The [spike](../research/terminal-spike.md) removed the WebAssembly and shell-start risks. |
 | [Terminal commands from other sources](../product.md#terminal-tabs) | 4/10 | Pages and other parts of uw asking to run a command with the user's approval. The prompt and what is remembered are undecided, and a mistake gives a website the shell. |
 | [Native libghostty terminal](../research/native-libghostty-terminal.md) | 3/10 | A tab whose content is a native view, on an embedding API not described as stable. A guess until a trial. |
+| [Keyboard and mouse](keyboard-and-mouse.md) | 5/10 | Menu entries and keys are routine. Branch collapse hides single rows in a strip that only hides whole groups. |
+| [Command bar](command-bar.md) | 3/10 | It takes over Cmd+T, Cmd+L, and the address, so it must keep the address bar's habits. Chromium's searchbox handler supplies history, bookmarks, and search. |
 | [Recommended filenames and naming preferences](../product.md#download-name-suggestions) | 8/10 | Bounded settings; useful names depend on accurate context. |
 | [Clutter-removal options page](../product.md#ad-blocking-and-privacy) | 9/10 | Clear, independent settings; removal behaviors scored separately. |
 | [Ad blocking](../product.md#ad-blocking-and-privacy) | 8/10 | Established filter lists, with site compatibility work. |
