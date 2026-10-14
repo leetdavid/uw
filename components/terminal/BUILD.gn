@@ -1,0 +1,20 @@
+# The shell behind a terminal tab. No browser dependencies, so it is tested
+# without a window.
+source_set("terminal") {
+  sources = [
+    "shell_host.cc",
+    "shell_host.h",
+  ]
+  public_deps = [ "//base" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "shell_host_unittest.cc" ]
+  deps = [
+    ":terminal",
+    "//base",
+    "//base/test:test_support",
+    "//testing/gtest",
+  ]
+}
