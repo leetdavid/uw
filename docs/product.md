@@ -137,7 +137,7 @@ Use ordinary page comparisons where sufficient and AI when interpretation is nee
 Agreed on 2026-10-14, as a later addition outside the minimum usable version:
 
 - A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
-- The organizer never moves a terminal tab and sends nothing about it to a model.
+- The organizer files a terminal tab like any other tab. A model gets its title and the shell's folder, never what the shell printed. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
 - In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
 - Closing a busy terminal asks first, however it is closed.
 

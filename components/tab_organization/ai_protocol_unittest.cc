@@ -259,6 +259,23 @@ BranchContext LisbonContext() {
   return context;
 }
 
+TEST_F(AiProtocolTest, ATerminalIsDescribedByItsFolder) {
+  BranchContext context;
+  context.title = "pnpm build";
+  context.url = "chrome://terminal/";
+  context.source_description = "no source tab";
+  context.folder = "~/dev/uw";
+  auto state = BuildDecisionRequestBody(DecisionFormat::kSystemOne, "jev",
+                                        context, {{"task-1", "Build uw"}});
+  ASSERT_TRUE(state);
+  EXPECT_NE(state->find("Folder: ~/dev/uw"), std::string::npos);
+  EXPECT_EQ(state->find("Page excerpt"), std::string::npos);
+  auto chat = BuildClassificationRequestBody("test-model", context,
+                                             {{"task-1", "Build uw"}});
+  ASSERT_TRUE(chat);
+  EXPECT_NE(chat->find(R"(\"folder\":\"~/dev/uw\")"), std::string::npos);
+}
+
 TEST_F(AiProtocolTest, DecisionsRequestAsksWhichTaskAndWhatElse) {
   auto body = BuildDecisionRequestBody(
       DecisionFormat::kDecisions, "gpt-6-luna", LisbonContext(),

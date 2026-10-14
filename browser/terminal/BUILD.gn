@@ -7,6 +7,7 @@ source_set("terminal") {
   deps = [
     "//base",
     "//chrome/browser/ui/browser_window",
+    "//content/public/browser",
     "//content/public/common",
     "//url",
   ]

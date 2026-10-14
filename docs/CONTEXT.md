@@ -21,7 +21,7 @@ A hazed placeholder where a pinned page's live session is currently displayed in
 A page tab or terminal tab in a window's tab tree.
 
 **Terminal tab**:
-A regular tab that shows a shell instead of a web page. The organizer never moves it and sends nothing about it to a model.
+A regular tab that shows a shell instead of a web page.
 _Avoid_: Console, shell tab.
 
 **Busy terminal**:

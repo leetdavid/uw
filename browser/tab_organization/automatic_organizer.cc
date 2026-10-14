@@ -7,6 +7,7 @@
 #include <functional>
 #include <utility>
 
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/strings/string_number_conversions.h"
@@ -43,6 +44,19 @@ namespace {
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
 
 using Kind = AutomaticOrganizer::Event::Kind;
+
+// A folder as a shell prompt shows it, with the home folder as ~.
+std::string ShortFolder(const base::FilePath& folder) {
+  const base::FilePath home = base::GetHomeDir();
+  if (folder == home) {
+    return "~";
+  }
+  base::FilePath rest;
+  if (home.AppendRelativePath(folder, &rest)) {
+    return "~/" + rest.AsUTF8Unsafe();
+  }
+  return folder.AsUTF8Unsafe();
+}
 
 // The word the organizer log uses for how a request ended.
 const char* ResultName(Kind kind) {
@@ -263,28 +277,32 @@ void AutomaticOrganizer::Scan() {
       continue;
     }
     const GURL& url = contents->GetLastCommittedURL();
-    // A terminal tab is never asked about, and nothing about it is kept, so
-    // no request can name it.
-    if (IsTerminalUrl(url)) {
-      if (pages_.erase(page.id)) {
-        kept_.erase(page.id);
-        CancelRequestsFor(page.id);
-      }
+    const bool terminal = IsTerminalUrl(url);
+    const base::FilePath folder =
+        terminal ? TerminalFolder(contents) : base::FilePath();
+    // A terminal tab is looked at once its shell has said where it is.
+    if (terminal && folder.empty()) {
       continue;
     }
     Activity& activity = pages_[page.id];
     const bool first_sight = activity.revision == 0;
     // A tab shows something else when its title changes or it goes to another
     // site. A new path or new parameters under the same title are the same
-    // page to the organizer: web apps keep their state in the address.
+    // page to the organizer: web apps keep their state in the address. A
+    // shell sets a new title for every command, so a terminal tab shows
+    // something else only in another folder.
     const bool same_page =
-        !first_sight && activity.title == contents->GetTitle() &&
-        (activity.url == url || url::IsSameOriginWith(activity.url, url));
+        !first_sight &&
+        (terminal ? activity.folder == folder
+                  : activity.title == contents->GetTitle() &&
+                        (activity.url == url ||
+                         url::IsSameOriginWith(activity.url, url)));
     activity.url = url;
+    activity.folder = folder;
+    activity.title = contents->GetTitle();
     if (same_page) {
       continue;
     }
-    activity.title = contents->GetTitle();
     ++activity.revision;
     activity.asking = false;
     activity.placed = false;
@@ -335,6 +353,16 @@ void AutomaticOrganizer::Dispatch() {
     content::WebContents* contents = tab ? tab->GetContents() : nullptr;
     content::RenderFrameHost* frame =
         contents ? contents->GetPrimaryMainFrame() : nullptr;
+    // A terminal tab is described by its title and folder, never by what
+    // the shell has printed.
+    if (frame && IsTerminalUrl(activity.url)) {
+      activity.asking = true;
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&AutomaticOrganizer::Ask, weak_factory_.GetWeakPtr(),
+                         id, activity.revision, std::string()));
+      continue;
+    }
     if (!frame || !activity.url.SchemeIsHTTPOrHTTPS()) {
       // Nothing is asked about this page, so its branch need not wait for it.
       ScheduleSettle();
@@ -358,6 +386,12 @@ void AutomaticOrganizer::OnExcerpt(
         base::CollapseWhitespaceASCII(result->inner_text, true),
         kMaxExcerptLength, &excerpt);
   }
+  Ask(page, revision, std::move(excerpt));
+}
+
+void AutomaticOrganizer::Ask(PageId page,
+                             uint64_t revision,
+                             std::string excerpt) {
   if (SendDecision(page, revision, std::move(excerpt))) {
     return;
   }
@@ -403,6 +437,7 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
           ? "no source tab"
           : "opened from \"" + base::UTF16ToUTF8(parent->second.title) + "\"";
   request.context.excerpt = std::move(excerpt);
+  request.context.folder = ShortFolder(activity->second.folder);
   request.in_unnamed_task = !request.task.empty() && !Named(request.task);
 
   std::vector<std::pair<std::string, std::string>> tasks;
@@ -651,11 +686,6 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
   for (const PageId& id : tree.BranchOf(top)) {
     const auto activity = pages_.find(id);
     if (activity == pages_.end()) {
-      // A terminal tab stays where it is when the tabs around it move.
-      const tabs::TabInterface* tab = controller_->TabFor(id);
-      if (tab && IsTerminalUrl(tab->GetContents()->GetLastCommittedURL())) {
-        tabs[id].placed = true;
-      }
       continue;
     }
     TabAnswer& tab = tabs[id];

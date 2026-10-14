@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "base/callback_list.h"
+#include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
@@ -134,6 +135,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   struct Activity {
     std::u16string title;
     GURL url;
+    // Where the shell of a terminal tab is. Empty for a page.
+    base::FilePath folder;
     uint64_t revision = 0;
     // The revision already sent, or skipped because the user placed the page.
     uint64_t requested = 0;
@@ -217,6 +220,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void OnExcerpt(PageId page,
                  uint64_t revision,
                  std::unique_ptr<content_extraction::InnerTextResult> result);
+  void Ask(PageId page, uint64_t revision, std::string excerpt);
   // False when no request went out.
   bool SendDecision(const PageId& page, uint64_t revision, std::string excerpt);
   // The titles of the other tabs that make up the task `page` is in. In a

@@ -10,7 +10,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 - A [terminal tab](../CONTEXT.md#language) runs the user's login shell, started as a login shell in their home folder.
 - It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#terminal-key) makes Ctrl+` go to the task's terminal and back, and moves New terminal to Ctrl+Shift+`.
-- It sits in tasks and nests like any regular tab. The organizer never moves it, never asks a model about it, and never lists it among a task's tabs in a request.
+- It sits in tasks and nests like any regular tab, and the organizer files it like one. A request describes it by its title and the shell's folder, never by what the shell printed. Moving to another folder asks again; a new title alone does not, since the shell sets one for every command. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
 - Text reaches the shell only from the user's keyboard, paste, or drop. The address never carries a command.
 - Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+`.
 - The tab's title is the one the shell sets, otherwise the folder's name. The terminal resizes with the window.
@@ -56,7 +56,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 1. T32: the spike below. It left `components/terminal/shell_host` and its unit tests.
 2. T33: the rest of the shell host: reading output on a task runner, writes that never block, closing off the main thread, and the login shell's environment.
-3. T34: the terminal page, its link to the shell host, the opening controls, and the organizer leaving it alone.
+3. T34: the terminal page, its link to the shell host, the opening controls, and the organizer filing it by title and folder.
 4. T35: links open as child tabs.
 5. T36: the busy terminal warning.
 6. T37: restore in the same folder.
@@ -75,7 +75,7 @@ The [findings](../research/terminal-spike.md) say what passed, what was not chec
 
 1. Ctrl+` opens a terminal tab below the active tab's branch with a prompt in the user's home folder.
 2. `vim`, `htop`, and a 24-bit color test draw correctly, and still do after the window is resized.
-3. With automatic organization on, opening and using a terminal tab sends no request that mentions it.
+3. With automatic organization on, a new terminal tab is filed like a page. Its request carries the title and a `Folder:` line, and nothing the shell printed. `AutomaticOrganizerBrowserTest.ATerminalTabIsFiledByItsTitleAndFolder` checks it.
 4. A page, an extension, and a `uw://terminal` address with extra text cannot put a character into the shell.
 5. Cmd-click on a printed `http://localhost` address opens it indented under the terminal tab.
 6. Each of Cmd-W, "Close branch", closing the window, and Cmd-Q asks before killing a running `sleep 600`, and none asks for an idle prompt.

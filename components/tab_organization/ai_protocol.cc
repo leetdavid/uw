@@ -27,7 +27,8 @@ namespace {
 constexpr char kSystemPrompt[] =
     "You organize browser tabs into browsing tasks. The user message "
     "describes one tab with its title, URL, source-tab relationship, an "
-    "optional readable-text excerpt, and the user's tasks.\n"
+    "optional readable-text excerpt or a terminal's folder, and the user's "
+    "tasks.\n"
     "Respond with only a JSON object in this exact shape:\n"
     "{\"task\": \"<task key>\" | \"none\", \"confidence\": <number 0..1>, "
     "\"new_task\": <number 0..1>, \"name\": \"<short task name>\"}\n"
@@ -156,6 +157,9 @@ std::string DescribeBranch(const BranchContext& context) {
                      "\nSource: " + context.source_description;
   if (!context.excerpt.empty()) {
     text += "\nPage excerpt: " + context.excerpt;
+  }
+  if (!context.folder.empty()) {
+    text += "\nFolder: " + context.folder;
   }
   return text;
 }
@@ -463,6 +467,9 @@ std::optional<std::string> BuildClassificationRequestBody(
   description.Set("source", context.source_description);
   if (!context.excerpt.empty()) {
     description.Set("excerpt", context.excerpt);
+  }
+  if (!context.folder.empty()) {
+    description.Set("folder", context.folder);
   }
   base::ListValue tasks;
   for (const auto& [key, name] : task_options) {

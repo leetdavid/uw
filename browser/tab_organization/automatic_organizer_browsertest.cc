@@ -1894,38 +1894,32 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(link->GetGroup());
 }
 
-// A terminal tab is never asked about and never named in a request, and it
-// stays where it is when the tabs around it move.
+// A terminal tab is filed like any tab. A request describes it by its title
+// and its shell's folder, never by what the shell printed.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       ATerminalTabIsLeftOutOfRequestsAndMoves) {
-  // zsh finds none of the user's startup files there.
+                       ATerminalTabIsFiledByItsTitleAndFolder) {
+  // zsh finds none of the user's startup files there, so it sets no title.
   base::Environment::Create()->SetVar("ZDOTDIR", "/var/empty");
   const auto [ungrouped, task] = OneTask();
-  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
-  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  UseDecisionModel(DecisionProvider::kJev);
+  Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.97));
+
   chrome::ExecuteCommand(browser(), kNewTerminalCommand);
   tabs::TabInterface* terminal = tabs()->GetActiveTab();
   ASSERT_TRUE(content::WaitForLoadStop(terminal->GetContents()));
-  ASSERT_TRUE(controller()->Nest(Id(terminal)));
-  ASSERT_EQ(controller()->tree().Find(Id(terminal))->parent, Id(page));
-  ASSERT_EQ(terminal->GetGroup(), task);
   // Once its shell is at a prompt, the tab is named after its folder.
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return terminal->GetContents()->GetTitle() != u"Terminal"; }));
   const std::string name =
       base::UTF16ToUTF8(terminal->GetContents()->GetTitle());
-
-  UseDecisionModel(DecisionProvider::kJev);
-  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.1));
-  Browse(page, "weather");
   ASSERT_TRUE(SettleAfter(1));
 
-  EXPECT_FALSE(page->GetGroup());
   EXPECT_EQ(terminal->GetGroup(), task);
-  ASSERT_EQ(Requests().size(), 1u);
-  EXPECT_EQ(Requests()[0].body.find("Title: " + name), std::string::npos);
-  EXPECT_EQ(Requests()[0].body.find("\"" + name + "\""), std::string::npos);
-  EXPECT_EQ(Requests()[0].body.find("terminal"), std::string::npos);
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_NE(requests[0].body.find("Title: " + name), std::string::npos);
+  EXPECT_NE(requests[0].body.find("Folder: ~"), std::string::npos);
+  EXPECT_EQ(requests[0].body.find("Page excerpt"), std::string::npos);
 }
 
 }  // namespace

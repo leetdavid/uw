@@ -12,6 +12,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/terminal/shell_host.h"
 
 namespace uw {
@@ -72,6 +73,7 @@ void UwTerminalHandler::OnShellOutput(std::string text) {
 }
 
 void UwTerminalHandler::OnShellFolderChanged(const base::FilePath& folder) {
+  SetTerminalFolder(contents_, folder);
   page_->SetFolder(folder.BaseName().AsUTF8Unsafe());
 }
 

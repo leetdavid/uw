@@ -34,12 +34,14 @@ extern const size_t kMaxExcerptLength;
 extern const size_t kMaxNamingTitles;
 
 // Metadata sent for one tab branch. `excerpt` is short readable page text.
-// `title` must be non-empty.
+// `folder` is where a terminal tab's shell is, sent instead of anything the
+// terminal shows. `title` must be non-empty.
 struct BranchContext {
   std::string title;
   std::string url;
   std::string source_description;
   std::string excerpt;
+  std::string folder;
 };
 
 // Builds an OpenAI-compatible chat-completions request body. `task_options`
