@@ -3,6 +3,7 @@
 
 #include "uw/browser/agent/agent_tools.h"
 
+#include <initializer_list>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -52,7 +53,80 @@ std::string Refusal(const actor::mojom::ActionResult& result) {
              : result.message;
 }
 
+base::DictValue Tool(std::string_view name,
+                     std::string_view description,
+                     base::DictValue properties,
+                     base::ListValue required) {
+  return base::DictValue()
+      .Set("type", "function")
+      .Set("function",
+           base::DictValue()
+               .Set("name", name)
+               .Set("description", description)
+               .Set("parameters", base::DictValue()
+                                      .Set("type", "object")
+                                      .Set("properties", std::move(properties))
+                                      .Set("required", std::move(required))));
+}
+
+base::DictValue Parameter(std::string_view type, std::string_view description) {
+  return base::DictValue().Set("type", type).Set("description", description);
+}
+
+base::ListValue Names(std::initializer_list<std::string_view> names) {
+  base::ListValue list;
+  for (std::string_view name : names) {
+    list.Append(name);
+  }
+  return list;
+}
+
 }  // namespace
+
+// static
+base::ListValue AgentTools::Schemas() {
+  const auto tab = [] {
+    return Parameter("integer", "The number of one of your tabs.");
+  };
+  const auto element = [] {
+    return Parameter("integer",
+                     "The element's number in your latest reading of the tab.");
+  };
+  base::ListValue tools;
+  tools.Append(
+      Tool("open",
+           "Opens a web page in a new tab under this chat, in the background. "
+           "Answers with the tab's number.",
+           base::DictValue().Set(
+               "url", Parameter("string", "An http or https address.")),
+           Names({"url"})));
+  tools.Append(
+      Tool("navigate", "Loads another address in one of your tabs.",
+           base::DictValue()
+               .Set("tab", tab())
+               .Set("url", Parameter("string", "An http or https address.")),
+           Names({"tab", "url"})));
+  tools.Append(
+      Tool("read",
+           "Reads one of your tabs: its title, address, and text. Each link, "
+           "field, and button is numbered, like [3].",
+           base::DictValue().Set("tab", tab()), Names({"tab"})));
+  tools.Append(
+      Tool("click", "Clicks an element of one of your tabs.",
+           base::DictValue().Set("tab", tab()).Set("element", element()),
+           Names({"tab", "element"})));
+  tools.Append(
+      Tool("type",
+           "Types into a field of one of your tabs, replacing what is in it.",
+           base::DictValue()
+               .Set("tab", tab())
+               .Set("element", element())
+               .Set("text", Parameter("string", "What to type."))
+               .Set("enter",
+                    Parameter("boolean", "Whether to press Enter afterwards.")),
+           Names({"tab", "element", "text"})));
+  return tools;
+}
 
 AgentTools::AgentTools(tabs::TabInterface& chat) : chat_(chat.GetHandle()) {
   actor::ActorKeyedService* engine = actor::ActorKeyedService::Get(
