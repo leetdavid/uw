@@ -39,6 +39,8 @@ Agreed before v2 started. The [organizer](automatic-organization.md) in-review t
 
 ## Design
 
+The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs: a chat at work, an approval, the Ask box on the new tab page, and every state of a chat row with the schedule popover. They are proposals until built.
+
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages.
 - **Tools.** `browser/agent/` holds uw's tools over the engine: open a child tab, navigate, read a page, click, type, scroll, and wait. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls.
 - **Agent loop.** It runs in the browser process. It reuses the model connection and Keychain code in `browser/tab_organization/`, which moves to a shared place when the agent becomes its second user.
