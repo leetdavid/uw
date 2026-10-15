@@ -279,7 +279,7 @@ void AgentTools::Click(const base::DictValue& args, Done done) {
   Act(std::make_unique<actor::ClickToolRequest>(
           tab->handle, actor::DomNode{element->node_id, element->document},
           actor::mojom::ClickType::kLeft, actor::mojom::ClickCount::kSingle),
-      base::DictValue(), std::move(done));
+      base::DictValue().Set("element", element->name), std::move(done));
 }
 
 void AgentTools::Type(const base::DictValue& args, Done done) {
@@ -298,7 +298,7 @@ void AgentTools::Type(const base::DictValue& args, Done done) {
           tab->handle, actor::DomNode{element->node_id, element->document},
           *text, args.FindBool("enter").value_or(false),
           actor::TypeToolRequest::Mode::kReplace),
-      base::DictValue(), std::move(done));
+      base::DictValue().Set("element", element->name), std::move(done));
 }
 
 AgentTools::Tab* AgentTools::TabFrom(const base::DictValue& args,

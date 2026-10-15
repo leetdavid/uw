@@ -342,11 +342,11 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
   EXPECT_EQ(Ask(chat, "Book a tour for Ada"), "Booked the tour for Ada.");
   SaveWindowScreenshot(browser(), "chat");
 
-  EXPECT_EQ(
-      Steps(chat),
-      (std::vector<std::string>{
-          "Opened " + form + " in tab 1", "Read Book a tour in tab 1",
-          "Typed into element 1 in tab 1", "Clicked element 2 in tab 1"}));
+  EXPECT_EQ(Steps(chat),
+            (std::vector<std::string>{
+                "Opened " + form + " in tab 1", "Read Book a tour in tab 1",
+                "Typed into text field \"Your name\" in tab 1",
+                "Clicked button \"Send\" in tab 1"}));
   EXPECT_EQ(chat->GetTitle(), u"Book a tour for Ada");
   EXPECT_EQ(tabs()->GetActiveWebContents(), chat);
   tabs::TabInterface* agent_tab = nullptr;
@@ -637,7 +637,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {
   SaveWindowScreenshot(browser(), "chat-cards");
   EXPECT_EQ(Lines(chat, ".tab-title"), std::vector<std::string>{"Book a tour"});
   EXPECT_EQ(Lines(chat, ".tab-doing"),
-            std::vector<std::string>{"Clicked element 2 in tab 1"});
+            std::vector<std::string>{"Clicked button \"Send\" in tab 1"});
 
   ClickFor(chat, "data-tab", "1");
   EXPECT_TRUE(base::test::RunUntil([&] {

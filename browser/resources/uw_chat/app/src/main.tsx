@@ -125,9 +125,9 @@ function describe(step: Step): string {
     case "read":
       return `Read ${result.title || result.url} in tab ${args.tab}`;
     case "click":
-      return `Clicked element ${args.element} in tab ${args.tab}`;
+      return `Clicked ${result.element ?? `element ${args.element}`} in tab ${args.tab}`;
     case "type":
-      return `Typed into element ${args.element} in tab ${args.tab}`;
+      return `Typed into ${result.element ?? `element ${args.element}`} in tab ${args.tab}`;
     case "recall":
       return `Looked again at ${result.result?.title || `step ${args.step}`}`;
     case "skill":
