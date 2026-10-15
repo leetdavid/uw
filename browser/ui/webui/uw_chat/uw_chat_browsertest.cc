@@ -12,6 +12,8 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
@@ -165,6 +167,30 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
   ASSERT_TRUE(tree);
   EXPECT_EQ(tree->tree().Find(*tree->IdFor(agent_tab))->parent,
             *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
+}
+
+// Chromium's task icon brings Gemini's button with it, and Gemini is not
+// available in uw: clicking that button aborted the browser.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ARunningChatShowsNoGeminiButton) {
+  UseAgentModel();
+  const std::string form =
+      embedded_https_test_server().GetURL("shop.test", "/form").spec();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", form)))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "click", base::DictValue().Set("tab", 1).Set("element", 2)))),
+       ScriptedModel::Answer("Clicked Send.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(Ask(chat, "Click Send"), "Clicked Send.");
+
+  views::LabelButton* gemini = BrowserView::GetBrowserViewForBrowser(browser())
+                                   ->toolbar()
+                                   ->GetGlicButton();
+  EXPECT_FALSE(gemini && gemini->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {
