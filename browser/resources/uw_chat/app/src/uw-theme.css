@@ -85,6 +85,8 @@
   --info: #9db0ff;
   --success: #81c995;
   --warning: #fcad70;
+  --hover: rgb(255 255 255 / 0.06);
+  --active: rgb(255 255 255 / 0.1);
   --selected: #3a3850;
   --surface-1: #1c1b26;
   --surface-2: #211f2c;
