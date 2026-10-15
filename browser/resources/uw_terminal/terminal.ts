@@ -134,6 +134,15 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
     event.stopPropagation();
     return;
   }
+  // Shift+Enter sends what Option+Enter does, which Claude Code reads as a new
+  // line. ghostty-web would send Enter.
+  if (event.key === 'Enter' && event.shiftKey && !event.ctrlKey &&
+      !event.altKey && !event.isComposing) {
+    event.stopPropagation();
+    event.preventDefault();
+    handler.write('\x1b\r');
+    return;
+  }
   // Option is Alt: the shell gets Esc and the key's own character, not the
   // symbol macOS makes of the two.
   const key = event.altKey && !event.ctrlKey ? layout?.get(event.code) : '';

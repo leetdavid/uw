@@ -213,6 +213,23 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, KeysTheBrowserKeepsStayOutOfIt) {
       "^[bx\n");
 }
 
+// Shift+Enter sends Esc and Enter, as Option+Enter does.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, ShiftEnterSendsOptionEnter) {
+  OpenTerminal();
+  Type(u"cd " + Folder() + u" && cat -v > keys\r");
+  // The file appears once cat has started.
+  WaitForFile("keys", [](const std::string&) { return true; });
+  Type(u"x");
+  content::SimulateKeyPress(contents(), ui::DomKey::ENTER, ui::DomCode::ENTER,
+                            ui::VKEY_RETURN, false, /*shift=*/true, false,
+                            false);
+  Press('d', ui::DomCode::US_D, ui::VKEY_D, /*control=*/true, false, false);
+  EXPECT_EQ(
+      WaitForFile("keys",
+                  [](const std::string& text) { return text.ends_with('\n'); }),
+      "x^[\n");
+}
+
 // A program that asks for the mouse, as a TUI does, gets each click.
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
                        AProgramThatAsksForTheMouseGetsClicks) {
