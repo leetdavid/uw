@@ -38,7 +38,7 @@ All of these are in ghostty-web's JavaScript, not in Ghostty's core.
 | Gap | What uw's page does about it |
 | --- | --- |
 | A Cmd shortcut types its letter into the shell. Cmd-T sent `t`. | A key listener in the capture phase stops Cmd combinations before ghostty-web sees them and does not cancel them. Tried in the page: nothing reached the shell and the event was left for the browser. |
-| Ctrl+Tab and Ctrl+` are encoded and sent to the shell. | The same listener stops them. |
+| Ctrl+Tab and Ctrl+\` are encoded and sent to the shell. | The same listener stops them. |
 | Option-B sends `b`, not Esc `b`. | The same listener sends Esc and the letter. Tried: Option-B and Option-F sent the right bytes. |
 | `write('')` throws a `RangeError`. | Never pass an empty chunk. |
 | A title change fires only when the whole escape sequence arrives in one string. Bytes never fire it, and neither does a sequence split across two writes. | Do not rely on it. Take the title from the folder and the running command, which the shell host already reports. |

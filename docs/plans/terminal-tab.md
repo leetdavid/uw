@@ -9,10 +9,10 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 ## Scope
 
 - A [terminal tab](../CONTEXT.md#language) runs the user's login shell, started as a login shell in their home folder.
-- It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#terminal-key) makes Ctrl+` go to the task's terminal and back, and moves New terminal to Ctrl+Shift+`.
+- It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+\`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#terminal-key) makes Ctrl+\` go to the task's terminal and back, and moves New terminal to Ctrl+Shift+\`.
 - It sits in tasks and nests like any regular tab, and the organizer files it like one. A request describes it by its title and the shell's folder, never by what the shell printed. Moving to another folder asks again; a new title alone does not, since the shell sets one for every command. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
 - Text reaches the shell only from the user's keyboard, paste, or drop. The address never carries a command.
-- Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+`. Shift+Enter sends what Option+Enter does, so Claude Code starts a new line instead of sending the prompt. Changed on 2026-10-15. Before, it sent Enter.
+- Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+\`. Shift+Enter sends what Option+Enter does, so Claude Code starts a new line instead of sending the prompt. Changed on 2026-10-15. Before, it sent Enter.
 - The tab's title is the one the shell sets, otherwise the folder's name. The terminal resizes with the window.
 - Cmd-click on an `http` or `https` address the shell printed opens it as a child tab of the terminal tab.
 - Closing a [busy terminal](../CONTEXT.md#language) asks first. This covers closing the tab, closing its branch or task, closing the window, and quitting uw. One dialog names every command that would be killed. An idle shell closes without a question, and closing the tab kills the shell.
@@ -26,7 +26,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - Commands from any source but the user. That is [stage two](#later-stages).
 - Find in terminal, split panes, and scrollback saved across a restart.
 - A switch for the Option key, and reading the user's Ghostty config.
-- A key lock that sends Ctrl+Tab and Ctrl+` to the shell. Revisit it if a program the user runs needs a key uw keeps.
+- A key lock that sends Ctrl+Tab and Ctrl+\` to the shell. Revisit it if a program the user runs needs a key uw keeps.
 
 ## Design
 
@@ -34,7 +34,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - The shell host runs in the browser process. Every byte to the shell passes through one function there. Stage two adds its approval step at that function, with no change to the page.
 - `browser/resources/uw_terminal/` and `browser/ui/webui/uw_terminal/` hold the page and its Mojo link. The page's content security policy adds `'wasm-unsafe-eval'` to `script-src` and `data:` to `connect-src`, where ghostty-web reads its WebAssembly. It loosens nothing else.
 - ghostty-web is pinned to an exact version in `package.json`, and `pnpm-lock.yaml` holds its integrity hash. The prepare step links the installed package into the checkout at `//uw/ghostty-web`, as it links `browser/` and `components/`. The page build packs `dist/ghostty-web.js` as shipped and takes the page's types from `dist/index.d.ts`. The `.wasm` file is built into that script. An update is a deliberate version bump. uw pins the prerelease `0.4.0-next.20.g1858a59`, because 0.4.0 sends no clicks to a program that asks for the mouse, such as a TUI.
-- A key listener on the page, in the capture phase, keeps Cmd combinations, Ctrl+Tab, and Ctrl+` away from ghostty-web without cancelling them. For Option with a key it sends Esc and the key's own character on the user's keyboard layout, which the Keyboard Map API gives. ghostty-web alone types a Cmd shortcut's letter into the shell.
+- A key listener on the page, in the capture phase, keeps Cmd combinations, Ctrl+Tab, and Ctrl+\` away from ghostty-web without cancelling them. For Option with a key it sends Esc and the key's own character on the user's keyboard layout, which the Keyboard Map API gives. ghostty-web alone types a Cmd shortcut's letter into the shell.
 - The page never writes an empty chunk and sets scrollback as a byte budget: 10 MB, Ghostty's own default. For T35 it replaces ghostty-web's `window.open` call for a link with a request to the browser.
 - Cmd-C and the Edit menu copy the terminal's selection. Dropped text is pasted.
 - A pasted or dropped file types its path, with a backslash before each character the shell treats specially, as Ghostty does. Several files are separated by spaces. Changed on 2026-10-15 at the user's request. Before, a dropped file was ignored.
@@ -76,7 +76,7 @@ The [findings](../research/terminal-spike.md) say what passed, what was not chec
 
 ## Acceptance checks
 
-1. Ctrl+` opens a terminal tab below the active tab's branch with a prompt in the user's home folder.
+1. Ctrl+\` opens a terminal tab below the active tab's branch with a prompt in the user's home folder.
 2. `vim`, `htop`, and a 24-bit color test draw correctly, and still do after the window is resized.
 3. With automatic organization on, a new terminal tab is filed like a page. Its request carries the title and a `Folder:` line, and nothing the shell printed. `AutomaticOrganizerBrowserTest.ATerminalTabIsFiledByItsTitleAndFolder` checks it.
 4. A page, an extension, and a `uw://terminal` address with extra text cannot put a character into the shell.
@@ -96,7 +96,7 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 ## Open questions
 
 - Where the tab's title comes from. ghostty-web reports a title the shell sets only when the whole escape sequence arrives in one string. Proposal: the folder and the running command, which the shell host already reports. This would change the title rule in the scope above, so it needs a decision.
-- Whether the browser runs a shortcut that the page's key listener leaves alone. The listener leaves Ctrl+` alone and the File menu carries it, but macOS runs a menu shortcut only for the window in front, which a headless test does not have. It needs a check by hand.
+- Whether the browser runs a shortcut that the page's key listener leaves alone. The listener leaves Ctrl+\` alone and the File menu carries it, but macOS runs a menu shortcut only for the window in front, which a headless test does not have. It needs a check by hand.
 - Whether typing feels fast enough by hand. Output speed is: 20 MB drew in under a second.
 - What carries the folder when a closed terminal tab is reopened with Cmd-Shift-T. uw's saved tab data does not come back on that path today. It must not be the address.
 - What Cmd-R does in a terminal tab. Today it reloads the page, which ends the shell and starts a new one. Proposal: nothing.

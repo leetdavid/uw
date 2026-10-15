@@ -33,15 +33,15 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Confirm the organizer's suggestion | Ctrl+Cmd+Return | button on the activity card |
 | Undo tab organization | Option+Cmd+Z | exists |
 | Focus the sidebar | Ctrl+Cmd+L | new |
-| Go to this task's terminal, and back | Ctrl+` | changes. Today it opens a new terminal. |
-| New terminal | Ctrl+Shift+` | new |
+| Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
+| New terminal | Ctrl+Shift+\` | new |
 | Move to task, pause, organizer activity, Suggest a name | menu, and the command bar later | no key |
 
 ### Terminal key
 
-- Ctrl+` selects the terminal tab used last in the current task, or in the Scratchpad when the selected tab is ungrouped. With none there, it opens one where a blank new tab would open.
-- Pressed in a terminal tab, Ctrl+` returns to the tab selected before it.
-- Ctrl+Shift+` always opens a new terminal tab.
+- Ctrl+\` selects the terminal tab used last in the current task, or in the Scratchpad when the selected tab is ungrouped. With none there, it opens one where a blank new tab would open.
+- Pressed in a terminal tab, Ctrl+\` returns to the tab selected before it.
+- Ctrl+Shift+\` always opens a new terminal tab.
 
 ### New child tab
 
@@ -118,7 +118,7 @@ Once the command bar lands, the "+" and the double-click open it instead of a bl
 Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible change need a design first.
 
 1. T53: menu bar entries and Ctrl+Cmd keys.
-2. T54: Ctrl+` toggles to the task's terminal.
+2. T54: Ctrl+\` toggles to the task's terminal.
 3. T55: dragging a parent carries its branch.
 4. T56: sideways drag sets the depth. Design first.
 5. T57: branch collapse, with its key. Design first.
@@ -133,7 +133,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 
 1. Each key in the [table](#keys) runs its command in a headless window through a real key event. With a terminal tab selected it is checked by hand: a headless window sends a key the focused page left alone back into the page, not to the browser.
 2. The Tab and Tasks menus list every command with its key. Help → Search finds "Move to Scratchpad".
-3. In a task with a terminal tab, Ctrl+` selects it and a second press returns to the page. In a task without one, Ctrl+` opens one below the active tab's branch. Ctrl+Shift+` opens a second one.
+3. In a task with a terminal tab, Ctrl+\` selects it and a second press returns to the page. In a task without one, Ctrl+\` opens one below the active tab's branch. Ctrl+Shift+\` opens a second one.
 4. Dragging a parent moves its branch with its nesting intact. Option-drag moves the parent alone and its children move up one level.
 5. A tab dropped with the pointer to the right becomes a child of the tab above. Dropped with the pointer at the left, it sits at the task's top level.
 6. A collapsed branch hides its children and shows their count. Ctrl+Tab skips them. Cmd+1 to 9 onto a hidden tab expands the branch. Closing the collapsed parent shows its children one level up. The collapse survives a restart, and an organizer move leaves it collapsed.
@@ -148,4 +148,4 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 
 - Whether window manager apps on the user's Mac already take Ctrl+Cmd with the arrows. Check by hand before T53 ships.
 - What sideways drags do in horizontal tabs. Proposal: they are off there. Collapse was settled with T57: see [Branches with the mouse](#branches-with-the-mouse).
-- Where Ctrl+` returns to when the tab selected before the terminal has closed. Proposal: the tab above the terminal.
+- Where Ctrl+\` returns to when the tab selected before the terminal has closed. Proposal: the tab above the terminal.
