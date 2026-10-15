@@ -502,6 +502,7 @@ export class Chromium {
     const release = this.holdWindowVm();
     const results = mkdtempSync(join(tmpdir(), "uw-window-tests-"));
     try {
+      this.runtime.log(`Starting the ${WINDOW_VM} VM`);
       this.startWindowVm(results);
       try { this.runInWindowVm(args); } finally { this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 }); }
     } finally {
@@ -557,6 +558,7 @@ export class Chromium {
 
   private runInWindowVm(args: readonly string[]): void {
     const ip = this.capture(["tart", "ip", WINDOW_VM, "--wait", "180"], { timeout: 200_000 });
+    this.runtime.log(`Waiting for admin to log in at ${ip}`);
     this.waitForLogin(ip);
     const build = this.guest(ip, "sw_vers -buildVersion");
     const pinned = /_([0-9A-Z]+)_Restore\.ipsw$/.exec(this.pins.macos_vm_ipsw)![1];
@@ -588,7 +590,8 @@ export class Chromium {
     const bridge = this.runtime.addresses().find((local) => sameNetwork(ip, local));
     const command = [
       "ssh", ...(bridge ? ["-b", bridge.address] : []), "-i", this.windowKey(), "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no",
-      "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=10", `admin@${ip}`, script,
+      "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=10",
+      "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4", `admin@${ip}`, script,
     ];
     if (!inherit) return this.capture(command, { timeout: 120_000 });
     this.run(command, this.layout.source);
