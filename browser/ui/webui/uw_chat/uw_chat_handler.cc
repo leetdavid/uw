@@ -245,8 +245,10 @@ void UwChatHandler::Send(const std::string& text) {
     return;
   }
   if (!agent_ && !Start()) {
+    unsent_ = text;
     return;
   }
+  unsent_.reset();
   agent_->SetSkills(EnabledSkills());
   if (title_.empty()) {
     title_ = text;
@@ -274,6 +276,27 @@ void UwChatHandler::Resume() {
   Log(base::DictValue().Set("kind", "resumed"));
   agent_->Resume();
   Save();
+}
+
+void UwChatHandler::TryAgain() {
+  if (!loaded_ || Working()) {
+    return;
+  }
+  if (std::optional<std::string> text = std::exchange(unsent_, {})) {
+    Send(*text);
+    return;
+  }
+  const base::DictValue* last =
+      log_.empty() ? nullptr : log_.back().GetIfDict();
+  const std::string* kind = last ? last->FindString("kind") : nullptr;
+  if (!kind || *kind != "failed" || !skills_loaded_) {
+    return;
+  }
+  if (!agent_ && !Start()) {
+    return;
+  }
+  agent_->SetSkills(EnabledSkills());
+  agent_->TryAgain();
 }
 
 void UwChatHandler::OpenChat(const std::string& id) {

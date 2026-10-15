@@ -10,6 +10,7 @@ import {
   useState,
   type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group";
@@ -104,6 +105,8 @@ export interface AskUserQuestionsProps
   onComplete?: (answers: Record<string, AskUserAnswer>) => void;
   onSkip?: (questionId: string, currentIndex: number) => void;
   skipLabel?: string;
+  /** Shown in the header in place of "Question 1 of 3". */
+  label?: ReactNode;
   /** Pins the flow to one step of the size ladder (default 36px, compact
    *  28px — see /docs/sizes). Omitted, it follows the surrounding
    *  SizeProvider. */
@@ -149,6 +152,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
       onComplete,
       onSkip,
       skipLabel = "Skip",
+      label,
       size,
       className,
       ...rest
@@ -1235,7 +1239,11 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
           )}
         >
           <span>
-            Question {safeIndex + 1} of {total}
+            {label ?? (
+              <>
+                Question {safeIndex + 1} of {total}
+              </>
+            )}
           </span>
         </div>
 

@@ -29,6 +29,7 @@ Added on 2026-10-15:
 - The chat page is a React page built from [Fluid Functionalism](https://github.com/mickadesign/fluid-functionalism)'s components, styled after the [canvas](../../AGENTS.md#designs) style guide. It is redesigned on the canvas first and built once the user signs off.
 - The agent can use [skills](../CONTEXT.md#language) in the SKILL.md format: from uw's skills folder, from `~/.agents/skills`, and ones the agent writes in a chat after the user approves. All start on, and the chat page can turn each one off. A skill's scripts do not run.
 - The model gets a small context and can still reach everything; see [Context](#context).
+- A new chat opens on "What should the agent do?" with three requests to try, and a click puts one in the composer. For now they are the [product's examples](../product.md#chats). Later the language model writes them once a day from the titles of recent chats and the most-visited sites of the past week (T84). Agreed on 2026-10-15.
 - The agent's answers are drawn as Markdown: headings, lists, tables, task lists, quotes, code with colors for about a dozen languages, and links. A link opens as a child tab under the chat and is selected; Cmd-click opens it in the background. Only `http` and `https` links work. The user's own messages stay plain text.
 - [Agent memory](../CONTEXT.md#language), in v2.1, follows a plain-sentence model: the agent reads every memory at the start of a request, keeps and forgets them without asking, and each change is a line under its answer with Edit and Undo. A switch in the composer keeps one chat out of memory. Memories stay on this Mac, are never taken from page text, and never hold passwords, card numbers, or account numbers. A private chat keeps none. The rest waits for the user's research into how memory is stored.
 
@@ -94,10 +95,11 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 11. T72: skills.
 12. T48: approvals.
 13. T75: Markdown answers.
-14. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-15. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-16. T51: scheduled chats.
-17. T52: private chats.
+14. T83: the chat page brought to the "(Fluid)" designs: steps, the chat's state, the empty chat, and the approval and failure cards.
+15. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+16. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+17. T51: scheduled chats.
+18. T52: private chats.
 
 ## Acceptance checks for v2.0
 

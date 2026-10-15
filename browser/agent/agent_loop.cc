@@ -114,6 +114,15 @@ void AgentLoop::Resume() {
       "and do not repeat a step that may already have happened.");
 }
 
+void AgentLoop::TryAgain() {
+  if (working_) {
+    return;
+  }
+  working_ = true;
+  turns_ = 0;
+  AskModel();
+}
+
 void AgentLoop::AskModel() {
   if (++turns_ > kMaxTurns) {
     Finish(Failed(base::StrCat({"The agent stopped after ",

@@ -2,7 +2,14 @@
 // The uw://chat page: one chat with uw's agent. Built from Fluid
 // Functionalism's parts; see the "(Fluid)" frames on the canvas page
 // "Agent chats".
-import { Fragment, StrictMode, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  StrictMode,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import {
@@ -52,6 +59,7 @@ import {
   ThinkingSteps,
   ThinkingStepsContent,
 } from "@/components/ui/thinking-steps";
+import { fontWeights } from "@/lib/font-weight";
 import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import {
@@ -118,34 +126,96 @@ const ANSWER_PARTS: Components = {
     ),
 };
 
-// One step in plain words, as the chat and its tests show it.
-function describe(step: Step): string {
+// Requests a new chat suggests: the product's examples, until the language
+// model writes them from the user's own chats and browsing (T84).
+const SUGGESTIONS = [
+  "Did my last Vercel deploy pass?",
+  "Get the logs of the latest crash on Railway",
+  "Find subscriptions I could cancel",
+];
+
+// How long the agent has worked on the current request, as the chat's
+// header says it.
+function workingFor(since: number): string {
+  const minutes = Math.floor((Date.now() - since) / 60_000);
+  return minutes < 1 ? "Working" : `Working · ${minutes} min`;
+}
+
+// A page's address as a step names it: its site and path, without the
+// scheme, the port, or a closing slash.
+function shortAddress(url: string): string {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return (hostname.replace(/^www\./, "") + pathname).replace(/\/$/, "");
+  } catch {
+    return url;
+  }
+}
+
+// One step in plain words, with what it acted on in bold, as the chat and
+// its tests show it.
+function describe(step: Step): ReactNode {
   const args = JSON.parse(step.args);
   const result = JSON.parse(step.result);
   if (result.error) {
     return `${step.tool}: ${result.error}`;
   }
+  const element = result.element ?? `element ${args.element}`;
   switch (step.tool) {
     case "open":
-      return `Opened ${args.url} in tab ${result.tab}`;
+      return (
+        <>
+          Opened <b>{shortAddress(args.url)}</b> in tab {result.tab}
+        </>
+      );
     case "navigate":
-      return `Went to ${args.url} in tab ${args.tab}`;
+      return (
+        <>
+          Went to <b>{shortAddress(args.url)}</b> in tab {args.tab}
+        </>
+      );
     case "read":
-      return `Read ${result.title || result.url} in tab ${args.tab}`;
+      return (
+        <>
+          Read <b>{result.title || shortAddress(result.url)}</b> in tab{" "}
+          {args.tab}
+        </>
+      );
     case "click":
-      return `Clicked ${result.element ?? `element ${args.element}`} in tab ${args.tab}`;
+      return (
+        <>
+          Clicked <b>{element}</b> in tab {args.tab}
+        </>
+      );
     case "type":
-      return `Typed into ${result.element ?? `element ${args.element}`} in tab ${args.tab}`;
+      return (
+        <>
+          Typed into <b>{element}</b> in tab {args.tab}
+        </>
+      );
     case "recall":
-      return `Looked again at ${result.result?.title || `step ${args.step}`}`;
+      return (
+        <>
+          Looked again at <b>{result.result?.title || `step ${args.step}`}</b>
+        </>
+      );
     case "skill":
-      return args.file
-        ? `Read ${args.file} of the ${args.name} skill`
-        : `Used the ${args.name} skill`;
+      return args.file ? (
+        <>
+          Read <b>{args.file}</b> of the {args.name} skill
+        </>
+      ) : (
+        <>
+          Used the <b>{args.name}</b> skill
+        </>
+      );
     case "save_skill":
-      return result.saved
-        ? `Saved the ${args.name} skill`
-        : `Did not save the ${args.name} skill`;
+      return (
+        <>
+          {result.saved ? "Saved" : "Did not save"} the <b>{args.name}</b>{" "}
+          skill
+        </>
+      );
     default:
       return step.tool;
   }
@@ -180,16 +250,37 @@ function group(lines: Step[]): Step[][] {
   return groups;
 }
 
-function StepLine({ step }: { step: Step }) {
+// Steps read as quiet lines under the conversation, so the answer stands out:
+// muted, with only what a step acted on in the text color.
+function StepText({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="text-muted-foreground [&_b]:text-foreground [&_b]:[font-variation-settings:'wght'_550,'opsz'_18]"
+      style={{ fontVariationSettings: fontWeights.normal }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function StepLine({ step, last }: { step: Step; last: boolean }) {
   if (step.kind === StepKind.kResumed) {
-    return <ThinkingStep className="step" icon="play" label="Continued" />;
+    return (
+      <ThinkingStep
+        className="step"
+        icon="play"
+        isLast={last}
+        label={<StepText>Continued</StepText>}
+      />
+    );
   }
   const failed = Boolean(JSON.parse(step.result).error);
   return (
     <ThinkingStep
       className={failed ? "step error text-destructive" : "step"}
       icon={failed ? "x" : (TOOL_ICONS[step.tool] ?? "dot")}
-      label={describe(step)}
+      isLast={last}
+      label={failed ? describe(step) : <StepText>{describe(step)}</StepText>}
     />
   );
 }
@@ -198,10 +289,12 @@ function Line({
   line,
   last,
   onContinue,
+  onTryAgain,
 }: {
   line: Step;
   last: boolean;
   onContinue: () => void;
+  onTryAgain: () => void;
 }) {
   switch (line.kind) {
     case StepKind.kUser:
@@ -236,6 +329,19 @@ function Line({
       return (
         <Banner status="error">
           <BannerTitle className="failed">{line.text}</BannerTitle>
+          {last && (
+            <BannerActions>
+              <BannerAction id="try-again" variant="primary" onClick={onTryAgain}>
+                Try again
+              </BannerAction>
+              <BannerAction
+                id="model-settings"
+                onClick={() => open("chrome://settings/uwOrganization")}
+              >
+                Model settings
+              </BannerAction>
+            </BannerActions>
+          )}
         </Banner>
       );
     case StepKind.kStopped:
@@ -343,6 +449,7 @@ function ChatList({
         </SidebarMenu>
         <SidebarInput
           aria-label="Search chats"
+          className="bg-accent"
           placeholder="Search chats"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -581,11 +688,9 @@ function ApprovalCard({ approval }: { approval: Approval }) {
     );
   };
   return (
-    <div id="approval" className="flex flex-col gap-1.5">
-      <div className="px-1 text-xs text-muted-foreground">
-        {approval.site} · Tab {approval.tab}
-      </div>
+    <div id="approval">
       <AskUserQuestions
+        label={`${approval.site} · Tab ${approval.tab}`}
         questions={[
           {
             id: "approval",
@@ -628,8 +733,8 @@ function tabOf(step: Step): number {
 }
 
 // What the agent last did in each of its tabs, in the chat's words.
-function lastSteps(lines: Step[]): Map<number, string> {
-  const last = new Map<number, string>();
+function lastSteps(lines: Step[]): Map<number, ReactNode> {
+  const last = new Map<number, ReactNode>();
   for (const line of lines) {
     const number = tabOf(line);
     if (number) {
@@ -650,7 +755,7 @@ function TabCard({
   current: boolean;
   working: boolean;
   waiting: boolean;
-  doing: string;
+  doing: ReactNode;
 }) {
   return (
     <button
@@ -683,7 +788,7 @@ function TabCard({
             <Loader2 className="size-3 shrink-0 animate-spin" />
           )}
           {waiting && <span className="size-1.5 shrink-0 rounded-full bg-warning" />}
-          <span className="tab-doing truncate">
+          <span className="tab-doing truncate [&_b]:font-normal">
             {tab.closed ? "Closed" : waiting ? "Waits for your approval" : doing}
           </span>
           <span className="ml-auto shrink-0">Tab {tab.number}</span>
@@ -821,8 +926,19 @@ function Chat() {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
   const [working, setWorking] = useState(false);
+  const [since, setSince] = useState(0);
+  const [, setNow] = useState(0);
   const [draft, setDraft] = useState("");
   const end = useRef<HTMLDivElement>(null);
+
+  // Keeps the header's minutes current while the agent works.
+  useEffect(() => {
+    if (!working) {
+      return;
+    }
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
+  }, [working]);
 
   useEffect(() => {
     const listeners = [
@@ -912,6 +1028,7 @@ function Chat() {
     ]);
     setDraft("");
     setWorking(true);
+    setSince(Date.now());
     chatHandler.send(message);
   };
 
@@ -921,10 +1038,44 @@ function Chat() {
       { kind: StepKind.kResumed, tool: "", args: "", result: "", text: "" },
     ]);
     setWorking(true);
+    setSince(Date.now());
     chatHandler.resume();
   };
 
+  const tryAgain = () => {
+    setWorking(true);
+    setSince(Date.now());
+    chatHandler.tryAgain();
+  };
+
   const groups = group(lines);
+  const title = lines.find((line) => line.kind === StepKind.kUser)?.text;
+  const stopped = !working && lines.at(-1)?.kind === StepKind.kStopped;
+  const state = approval
+    ? "Waits for your approval"
+    : working
+      ? workingFor(since)
+      : stopped
+        ? "Stopped"
+        : "";
+  const composer = (
+    <>
+      <InputMessage
+        value={draft}
+        onValueChange={setDraft}
+        onSend={send}
+        disabled={!opened}
+        status={working ? "streaming" : "idle"}
+        placeholder="Reply to the agent"
+        placeholderSuggestion={title ? undefined : SUGGESTIONS[0]}
+        suggestions={title ? undefined : SUGGESTIONS.slice(1)}
+        textareaProps={{ id: "message", "aria-label": "Message" }}
+      />
+      <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">
+        Changes on a site wait for your approval
+      </p>
+    </>
+  );
   return (
     <SidebarProvider persist={false} width="15rem" className="h-full">
       <ChatList
@@ -938,18 +1089,48 @@ function Chat() {
       {view === "skills" && (
         <SkillsView skills={skills} folder={skillsFolder} onToggle={toggleSkill} />
       )}
-      <div className={cn("flex min-w-0 flex-1 flex-col", view === "skills" && "hidden")}>
+      <div className={cn("flex min-w-0 flex-1 flex-col", !title && "justify-center", view === "skills" && "hidden")}>
       {agentTabs.length > 0 && (
         <TabStrip tabs={agentTabs} current={currentTab} sideBySide={sideBySide} />
       )}
-      <main className="flex-1 overflow-y-auto">
+      {title && (
+        <header className="mx-auto flex w-full max-w-[720px] items-center gap-2.5 px-7 pt-4">
+          <h1 id="chat-title" className="truncate text-base font-semibold">
+            {title}
+          </h1>
+          {state && (
+            <span
+              id="chat-state"
+              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-accent px-2.5 text-xs text-muted-foreground"
+            >
+              {approval ? (
+                <span className="size-1.5 rounded-full bg-warning" />
+              ) : working ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Pause className="size-3" />
+              )}
+              {state}
+            </span>
+          )}
+        </header>
+      )}
+      {!title && (
+        <div id="start" className="px-7 pb-5 text-center">
+          <h1 className="text-xl font-semibold">What should the agent do?</h1>
+          <p className="mt-1 text-muted-foreground">
+            It works in tabs under this chat and never takes your selection.
+          </p>
+        </div>
+      )}
+      <main className={cn("flex-1 overflow-y-auto", !title && "hidden")}>
         <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
           {groups.map((run, index) =>
             isStep(run[0]!) ? (
               <ThinkingSteps key={index} className="w-full">
                 <ThinkingStepsContent>
                   {run.map((step, at) => (
-                    <StepLine key={at} step={step} />
+                    <StepLine key={at} step={step} last={at === run.length - 1} />
                   ))}
                 </ThinkingStepsContent>
               </ThinkingSteps>
@@ -959,6 +1140,7 @@ function Chat() {
                   line={run[0]!}
                   last={index === groups.length - 1 && !working}
                   onContinue={resume}
+                  onTryAgain={tryAgain}
                 />
               </Fragment>
             ),
@@ -971,26 +1153,19 @@ function Chat() {
           <div ref={end} />
         </div>
       </main>
-      <div className="mx-auto w-full max-w-[720px] px-7 pb-4">
+      <div
+        className={cn(
+          "mx-auto w-full px-7",
+          title ? "max-w-[720px] pb-3" : "max-w-[600px] pb-24",
+        )}
+      >
         {usingSkill(lines) && (
           <div className="mb-2 inline-flex h-6 items-center gap-1.5 rounded-md bg-accent px-2 text-xs text-muted-foreground">
             <Sparkles className="size-3" />
             Using {usingSkill(lines)}
           </div>
         )}
-        <InputMessage
-          value={draft}
-          onValueChange={setDraft}
-          onSend={send}
-          disabled={!opened}
-          status={working ? "streaming" : "idle"}
-          placeholder={
-            lines.length
-              ? "Reply to the agent"
-              : "Ask the agent to find or do something"
-          }
-          textareaProps={{ id: "message", "aria-label": "Message" }}
-        />
+        {composer}
       </div>
       </div>
       {agentTabs.length > 0 && view === "chat" && (

@@ -331,7 +331,7 @@ type StepStatus = "complete" | "active" | "pending";
 interface ThinkingStepProps {
   icon?: IconName;
   showIcon?: boolean;
-  label: string;
+  label: ReactNode;
   description?: string;
   status?: StepStatus;
   delay?: number;

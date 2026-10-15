@@ -74,6 +74,8 @@ class AgentLoop {
   void Send(std::string_view text);
   // Picks the chat up again after uw quit while the agent was working.
   void Resume();
+  // Asks the model again after its request failed, with the chat as it is.
+  void TryAgain();
   bool working() const { return working_; }
   // The skills the agent may load from now on.
   void SetSkills(const std::vector<Skill>& skills);

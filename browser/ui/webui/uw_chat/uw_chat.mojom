@@ -13,6 +13,9 @@ interface ChatHandler {
   Send(string text);
   // Picks up a chat that stopped before it finished.
   Resume();
+  // Tries the failed request again: the message that could not be sent, or
+  // the model's turn that failed.
+  TryAgain();
   // Goes to the tab of the chat `id`, or reopens it in a new tab.
   OpenChat(string id);
   // Opens a new chat in a tab of its own.

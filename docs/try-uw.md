@@ -140,7 +140,9 @@ A chat asks before it changes anything on a site: a card in the chat names the s
 2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
 
-Expected result: the chat tab takes your first message as its title. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a line in the chat, such as `Clicked button "Send" in tab 1`, then the answer. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
+A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others.
+
+Expected result: the chat tab takes your first message as its title, and the chat's heading shows it with what the chat is doing: `Working`, then minutes, or `Waits for your approval`. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a quiet line with what it acted on in bold, such as `Clicked button "Send" in tab 1`, then the answer. When the model request fails, `Try again` asks once more without a new message, and `Model settings` opens uw's settings. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
 
 Chats are saved after every step. Quit uw in the middle of one and start it again with "Continue where you left off" set at `chrome://settings/onStartup`. Expected result: the chat tab comes back with everything it showed and the line `Stopped before it finished` with `Continue`. Continue goes on in the same agent tabs.
 

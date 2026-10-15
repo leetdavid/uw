@@ -59,6 +59,7 @@ class UwChatHandler : public mojom::ChatHandler,
   // mojom::ChatHandler:
   void Send(const std::string& text) override;
   void Resume() override;
+  void TryAgain() override;
   void OpenChat(const std::string& id) override;
   void NewChat() override;
   void DeleteChat(const std::string& id) override;
@@ -151,6 +152,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // What the user sent before the skills were read, to send once they are.
   std::optional<std::string> waiting_message_;
   bool waiting_resume_ = false;
+  // The message that could not be sent because the chat had no agent, for
+  // Try again.
+  std::optional<std::string> unsent_;
   // The skill the agent asked to save, and its answer.
   base::DictValue proposed_skill_;
   base::OnceCallback<void(base::DictValue)> skill_answer_;

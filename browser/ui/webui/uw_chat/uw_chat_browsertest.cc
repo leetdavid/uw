@@ -368,9 +368,14 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
 
   EXPECT_EQ(Steps(chat),
             (std::vector<std::string>{
-                "Opened " + form + " in tab 1", "Read Book a tour in tab 1",
+                "Opened shop.test/form in tab 1", "Read Book a tour in tab 1",
                 "Typed into text field \"Your name\" in tab 1",
                 "Clicked button \"Send\" in tab 1"}));
+  // Only what each step acted on stands out.
+  EXPECT_EQ(Lines(chat, ".step b"),
+            (std::vector<std::string>{"shop.test/form", "Book a tour",
+                                      "text field \"Your name\"",
+                                      "button \"Send\""}));
   EXPECT_EQ(chat->GetTitle(), u"Book a tour for Ada");
   EXPECT_EQ(tabs()->GetActiveWebContents(), chat);
   tabs::TabInterface* agent_tab = nullptr;
@@ -486,7 +491,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AStoppedChatGoesOnWithContinue) {
   // The agent works on in the tab it had before uw quit.
   ASSERT_EQ(Steps(chat).size(), 3u);
   EXPECT_EQ(Steps(chat)[1], "Continued");
-  EXPECT_EQ(Steps(chat)[2], "Went to " + Form() + " in tab 1");
+  EXPECT_EQ(Steps(chat)[2], "Went to shop.test/form in tab 1");
   EXPECT_THAT(model_.Requests()[0],
               ::testing::HasSubstr("uw quit while you were working"));
   EXPECT_EQ(Lines(chat, ".stopped"),
@@ -826,6 +831,9 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PlacingAnOrderWaitsForApproval) {
   // The page's note does not stop uw from asking.
   EXPECT_THAT(Approval(chat),
               ::testing::HasSubstr("Click button \"Place order\"?"));
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.getElementById('chat-state').textContent"),
+            "Waits for your approval");
   SaveWindowScreenshot(browser(), "approval");
   EXPECT_EQ(Ordered(chat), "");
   EXPECT_TRUE(base::test::RunUntil([&] {
@@ -969,6 +977,101 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {
   EXPECT_EQ(Ask(chat, "Book a tour for Ada"),
             "Set an agent model on uw's settings page first.");
   EXPECT_TRUE(model_.Requests().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ANewChatSuggestsRequests) {
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(
+      content::EvalJs(chat, "document.querySelector('#start h1').textContent"),
+      "What should the agent do?");
+  SaveWindowScreenshot(browser(), "chat-start");
+
+  // A suggestion under the composer fills it in.
+  EXPECT_EQ(content::EvalJs(
+                chat,
+                "document.querySelector('[role=option]').click();"
+                "new Promise(resolve => {"
+                "  const check = () => document.getElementById('message').value"
+                "      ? resolve(document.getElementById('message').value)"
+                "      : setTimeout(check, 20);"
+                "  check();"
+                "});"),
+            "Get the logs of the latest crash on Railway");
+
+  // Tab takes the one in the empty field.
+  EXPECT_EQ(content::EvalJs(
+                chat,
+                "const field = document.getElementById('message');"
+                "Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+                "    'value').set.call(field, '');"
+                "field.dispatchEvent(new Event('input', {bubbles: true}));"
+                "new Promise(resolve => setTimeout(() => {"
+                "  field.dispatchEvent(new KeyboardEvent('keydown',"
+                "      {key: 'Tab', bubbles: true}));"
+                "  setTimeout(() => resolve(field.value), 50);"
+                "}, 50));"),
+            "Did my last Vercel deploy pass?");
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheHeaderSaysWhatTheChatIsDoing) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  EXPECT_EQ(content::EvalJs(
+                chat,
+                "new Promise(resolve => {"
+                "  const check = () => document.getElementById('chat-state')"
+                "      ? resolve(document.getElementById('chat-state')"
+                "            .textContent)"
+                "      : setTimeout(check, 20);"
+                "  check();"
+                "});"),
+            "Working");
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.getElementById('chat-title').textContent"),
+            "Find a tour");
+  EXPECT_EQ(content::EvalJs(chat, "Boolean(document.getElementById('start'))"),
+            false);
+  SaveWindowScreenshot(browser(), "chat-working");
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TryAgainAsksTheModelAgain) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Too busy.")}, 503);
+  content::WebContents* chat = OpenChat();
+  EXPECT_THAT(Ask(chat, "Find a tour"),
+              ::testing::StartsWith("The model request failed: HTTP 503"));
+  SaveWindowScreenshot(browser(), "chat-failed");
+
+  model_.Script({ScriptedModel::Answer("Found one.")});
+  EXPECT_EQ(UntilTheEnd(chat, "document.getElementById('try-again').click();"),
+            "Found one.");
+  // The message reached the model once, also in the request tried again.
+  const std::string request = model_.Requests().back();
+  size_t times = 0;
+  for (size_t at = request.find("Find a tour"); at != std::string::npos;
+       at = request.find("Find a tour", at + 1)) {
+    ++times;
+  }
+  EXPECT_EQ(times, 1u);
+  EXPECT_EQ(Lines(chat, ".mine"), std::vector<std::string>{"Find a tour"});
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       TryAgainSendsTheMessageOnceThereIsAModel) {
+  model_.Script({ScriptedModel::Answer("Booked.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Book a tour for Ada"),
+            "Set an agent model on uw's settings page first.");
+
+  UseAgentModel();
+  EXPECT_EQ(UntilTheEnd(chat, "document.getElementById('try-again').click();"),
+            "Booked.");
+  EXPECT_EQ(Lines(chat, ".mine"),
+            std::vector<std::string>{"Book a tour for Ada"});
+  EXPECT_EQ(model_.Requests().size(), 1u);
 }
 
 }  // namespace
