@@ -59,9 +59,9 @@ document.addEventListener('visibilitychange', () => {
 
 // The browser holds keys until the field takes focus, so the field gives it up
 // whenever the panel goes and takes it again each time the panel shows. It
-// waits for a frame: until the shown page draws, Blink drops keys.
-window.addEventListener(
-    'focus', () => requestAnimationFrame(() => field.focus()));
+// waits one task: during the window's focus event the browser has not yet heard
+// which frame has focus, and ignores the field's.
+window.addEventListener('focus', () => setTimeout(() => field.focus()));
 window.addEventListener('blur', () => field.blur());
 if (document.hasFocus()) {
   field.focus();

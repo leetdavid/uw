@@ -10,11 +10,11 @@ Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.
 | Suggestions come from Chromium's searchbox handler | Passed: `TypingListsSuggestions` gets rows back for typed text |
 | The settings switch turns it off and Cmd+T opens a blank tab again | Passed: `TurnedOffCmdTOpensATab`, `TurningItOffClosesIt`, and `UwOrganizationPageBrowserTest.TheCommandBarSwitchStartsOnAndTurnsItOff` |
 | Escape closes it and opens nothing | Passed in a real window: `MANUAL_EscapeClosesItAndOpensNothing`, and by hand |
-| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys is built and not yet checked in a real window. See [below](#keys-typed-right-after-cmdt). |
+| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys is built; the real-window check is pending. See [below](#keys-typed-right-after-cmdt). |
 
 ## Keys typed right after Cmd+T
 
-`MANUAL_KeysTypedRightAfterCmdTLand` posts Cmd+T and "github" through the app's event queue in a real window. The panel shows and becomes the key window at once, but the field stays empty: every key arrives before the page has focus, and the page drops it.
+`MANUAL_KeysTypedRightAfterCmdTLand` posts Cmd+T and "github" through the app's event queue in a real window. The panel shows and becomes the key window at once, but the field stays empty: every key arrives before the page can take it.
 
 A temporary build waited a set time between Cmd+T and the first key, three runs each:
 
@@ -28,19 +28,26 @@ The user typed by hand right after Cmd+T and every letter landed. A fast typist 
 
 ### Holding keys
 
-Built on 2026-10-15 in `browser/ui/views/command_bar/command_bar.cc`. From Cmd+T, the page's `PreHandleKeyboardEvent` keeps each key down instead of sending it. When the page reports a focused field, the browser sends each held key down and its character, as macOS would have. After one second it sends them anyway.
+Built on 2026-10-15 in `browser/ui/views/command_bar/command_bar.cc`. From Cmd+T, the page's `PreHandleKeyboardEvent` keeps each key down instead of sending it. When the page reports a focused field, the browser sends each held key down and its character, as macOS would have. If the browser refuses a key, that key and the ones after it stay held and are tried again a frame later. After one second the browser stops holding.
+
+A key reaches the field only when both of these are true:
+
+- **The field has focus.** The page focuses it one task after the window's `focus` event. During that event, Blink has not yet told the browser which frame has focus, so the browser ignores the field's focus (`FocusController::SetFocusedFrame`, `WebContentsImpl::OnFocusedElementChangedInFrame`).
+- **The browser accepts input for the page.** After a page loads, the browser refuses its input until the page's first frame is on screen. `RenderInputRouter::FilterInputEvent` answers `kNoConsumerExists` while the input router is off, and `RenderWidgetHostImpl::OnRenderFrameMetadataChangedAfterActivation` turns it on. The command bar's page loads hidden, so the first time the panel shows, its keys are refused until its first frame, some tens of milliseconds after Cmd+T. That matches the gaps above. A refused key comes back at once, and `RenderWidgetHost::InputEventObserver` sees it.
 
 What the work found, in the order it was tried:
 
-1. **Focusing the field in the window's `focus` event.** The test failed 100 of 100 runs at 800 ms, and the keys landed only when the one-second fallback let them go. Blink fires that event before it tells the browser which frame has focus, so the browser ignored the field's focus (`FocusController::SetFocusedFrame`, `WebContentsImpl::OnFocusedElementChangedInFrame`).
-2. **Focusing it one task later.** The browser then hears of the focus, about 3 ms after Cmd+T in a headless run. One real-window run still failed at 800 ms, so the field's focus comes before the page can take keys. Blink drops input while a page's main-frame updates are deferred ("We don't want users interacting with stuff they can't see", `WidgetInputHandlerManager`), and a page shown again draws its first frame some tens of milliseconds later. That fits the timings above. No run has confirmed it.
-3. **Focusing it on the first frame.** The page now focuses its field in `requestAnimationFrame`, which runs only once frames are drawn. Not yet run in a real window.
+1. **Focusing the field in the window's `focus` event.** Failed 100 of 100 real-window runs at 800 ms. The browser never heard of the focus, and the keys landed only when the one-second fallback sent them.
+2. **Focusing it one task later.** Failed one real-window run.
+3. **Focusing it on the next animation frame.** Tried on the theory that Blink drops input until a shown page draws. Failed 3 of 3. Blink drops input itself (`WidgetInputHandlerManager`) only around a page load, so the theory was wrong.
+4. **Logging a real-window run.** In 3 runs, all six keys were held, the page reported its focused field about 12 ms after Cmd+T, and the browser refused each key as it was sent. The page saw no key events at all.
+5. **Trying refused keys again a frame later.** Passes the headless tests. Not yet run in a real window.
 
 Also found:
 
 - **Test keys skip the browser's hook.** `content::SimulateKeyPress` marks its keys `skip_if_unhandled`, so they never reach `PreHandleKeyboardEvent`. That is also why Escape sent that way never closed the panel.
-- **Headless cannot check it.** In 30 headless runs the held keys never landed, even after the fallback. The likely reason is that a headless panel does not draw, so Blink drops the keys. A headless test of the hold was written and removed.
-- **Real-window runs are the user's.** A 100-run loop in a real window on 2026-10-15 put windows on the user's screen for four minutes while they worked. A hook now blocks `--headful-mode` and `--run-manual` for agents.
+- **Headless cannot check it.** A headless panel never draws, so the browser never accepts input for its page. A headless test of the hold was written and removed.
+- **Real-window runs are the user's.** A 100-run loop in a real window on 2026-10-15 put windows on the user's screen for four minutes while they worked. A hook now blocks `--headful-mode` and `--run-manual` for agents. Every real-window check since was a short run the user started.
 
 ## What the spike found
 
@@ -52,5 +59,5 @@ Also found:
 
 ## Still open
 
-- Whether keys typed right after Cmd+T land with the frame-based release: `MANUAL_KeysTypedRightAfterCmdTLand` in a real window, run by the user.
+- Whether keys typed right after Cmd+T land now that refused keys are tried again: `MANUAL_KeysTypedRightAfterCmdTLand` in a real window, run by the user.
 - The 100 ms target from Cmd+T to the panel on screen. Not measured.

@@ -6,6 +6,7 @@
 #import <AppKit/AppKit.h>
 
 #include <string>
+#include <string_view>
 
 #include "base/run_loop.h"
 #include "base/task/sequenced_task_runner.h"
@@ -130,22 +131,27 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
   EXPECT_EQ(tabs, browser()->tab_strip_model()->count());
 }
 
-// Keys typed right after Cmd+T, before the panel has drawn, land in its field
-// in order. They must land before the browser's one-second fallback lets held
-// keys go, so the page's own signal is what released them.
+// Keys typed right after Cmd+T land in its field in order: the first time,
+// before the panel's page has drawn and while the browser refuses its keys, and
+// again once it has. They must land well inside the one second the browser
+// holds keys for.
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
                        MANUAL_KeysTypedRightAfterCmdTLand) {
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
 
-  Queue(ui::VKEY_T, NSEventModifierFlagCommand);
-  for (ui::KeyboardCode key : {ui::VKEY_G, ui::VKEY_I, ui::VKEY_T, ui::VKEY_H,
-                               ui::VKEY_U, ui::VKEY_B}) {
-    Queue(key, 0);
-  }
+  for (std::string_view word : {"github", "uw"}) {
+    Queue(ui::VKEY_T, NSEventModifierFlagCommand);
+    for (char letter : word) {
+      Queue(static_cast<ui::KeyboardCode>(ui::VKEY_A + letter - 'a'), 0);
+    }
 
-  EXPECT_TRUE(
-      Eventually([&] { return Field() == "github"; }, base::Milliseconds(800)))
-      << "The field holds: " << Field();
+    EXPECT_TRUE(
+        Eventually([&] { return Field() == word; }, base::Milliseconds(800)))
+        << "The field holds: " << Field();
+
+    Queue(ui::VKEY_ESCAPE, 0);
+    ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TypingListsSuggestions) {

@@ -4,8 +4,9 @@
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 
 #include <utility>
-#include <vector>
 
+#include "base/auto_reset.h"
+#include "base/containers/circular_deque.h"
 #include "base/functional/bind.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -39,15 +40,21 @@ namespace {
 
 constexpr gfx::Size kSize(640, 360);
 constexpr int kTopInset = 96;
-// Keys go to the page after this even if its field never reported focus.
+// A key the browser refused is tried again after about one frame.
+constexpr base::TimeDelta kRetry = base::Milliseconds(16);
+// The browser stops holding keys after this, even if the page never reported
+// focus or kept refusing them.
 constexpr base::TimeDelta kLongestHold = base::Seconds(1);
 
 }  // namespace
 
 // The command bar's page. Between the panel showing and its field taking
 // focus, the page drops keys, so the browser holds them and hands them over in
-// order once the field has focus.
-class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI> {
+// order once the field has focus. Until the page's first frame is on screen,
+// the browser also refuses keys for it, so a refused key stays held and is
+// tried again a frame later.
+class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
+                         public content::RenderWidgetHost::InputEventObserver {
  public:
   explicit Page(Profile* profile)
       : WebUIContentsWrapperT(GURL(kCommandBarUrl),
@@ -57,15 +64,16 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI> {
   void HoldKeys() {
     held_.clear();
     holding_ = true;
-    release_.Start(FROM_HERE, kLongestHold,
-                   base::BindOnce(&Page::ReleaseKeys, base::Unretained(this)));
+    give_up_at_ = base::TimeTicks::Now() + kLongestHold;
+    next_send_.Start(FROM_HERE, kLongestHold,
+                     base::BindOnce(&Page::SendKeys, base::Unretained(this)));
   }
 
   // WebUIContentsWrapper:
   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
       content::WebContents* source,
       const input::NativeWebKeyboardEvent& event) override {
-    if (holding_ &&
+    if (holding_ && !sending_ &&
         event.GetType() == input::NativeWebKeyboardEvent::Type::kRawKeyDown &&
         event.windows_key_code != ui::VKEY_ESCAPE) {
       held_.push_back(event);
@@ -73,40 +81,77 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI> {
     }
     return WebUIContentsWrapperT::PreHandleKeyboardEvent(source, event);
   }
+  bool HandleKeyboardEvent(
+      content::WebContents* source,
+      const input::NativeWebKeyboardEvent& event) override {
+    // While held keys are sent, only a key the browser refused comes back
+    // here. It stays held for the next try.
+    return sending_ ||
+           WebUIContentsWrapperT::HandleKeyboardEvent(source, event);
+  }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
     if (details.editable_level != content::EditableLevel::kNotEditable) {
-      ReleaseKeys();
+      SendKeys();
+    }
+  }
+
+  // content::RenderWidgetHost::InputEventObserver:
+  void OnInputEventAck(const content::RenderWidgetHost& widget,
+                       blink::mojom::InputEventResultSource source,
+                       blink::mojom::InputEventResultState state,
+                       const blink::WebInputEvent& event) override {
+    if (source == blink::mojom::InputEventResultSource::kBrowser &&
+        state == blink::mojom::InputEventResultState::kNoConsumerExists) {
+      refused_ = true;
     }
   }
 
  private:
-  // Sends each held key down, and its character, as macOS would have.
-  void ReleaseKeys() {
+  // Sends each held key down, and its character, as macOS would have, up to
+  // the first key the browser refuses.
+  void SendKeys() {
     if (!holding_) {
       return;
     }
-    holding_ = false;
-    release_.Stop();
-    std::vector<input::NativeWebKeyboardEvent> held = std::exchange(held_, {});
-    if (web_contents()->GetVisibility() == content::Visibility::HIDDEN) {
-      return;
-    }
-    content::RenderWidgetHost* widget =
-        web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost();
-    for (input::NativeWebKeyboardEvent& event : held) {
-      widget->ForwardKeyboardEvent(event);
-      if (event.text[0] >= ' ') {
-        event.SetType(input::NativeWebKeyboardEvent::Type::kChar);
-        event.skip_if_unhandled = true;
+    next_send_.Stop();
+    if (web_contents()->GetVisibility() != content::Visibility::HIDDEN) {
+      content::RenderWidgetHost* widget =
+          web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost();
+      base::AutoReset<bool> sending(&sending_, true);
+      refused_ = false;
+      widget->AddInputEventObserver(this);
+      while (!held_.empty()) {
+        input::NativeWebKeyboardEvent event = held_.front();
         widget->ForwardKeyboardEvent(event);
+        if (refused_) {
+          break;
+        }
+        held_.pop_front();
+        if (event.text[0] >= ' ') {
+          event.SetType(input::NativeWebKeyboardEvent::Type::kChar);
+          event.skip_if_unhandled = true;
+          widget->ForwardKeyboardEvent(event);
+        }
+      }
+      widget->RemoveInputEventObserver(this);
+      if (refused_ && base::TimeTicks::Now() < give_up_at_) {
+        next_send_.Start(
+            FROM_HERE, kRetry,
+            base::BindOnce(&Page::SendKeys, base::Unretained(this)));
+        return;
       }
     }
+    held_.clear();
+    holding_ = false;
   }
 
   bool holding_ = false;
-  std::vector<input::NativeWebKeyboardEvent> held_;
-  base::OneShotTimer release_;
+  bool sending_ = false;
+  bool refused_ = false;
+  base::circular_deque<input::NativeWebKeyboardEvent> held_;
+  base::TimeTicks give_up_at_;
+  base::OneShotTimer next_send_;
 };
 
 DEFINE_USER_DATA(CommandBar);
