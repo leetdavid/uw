@@ -1,0 +1,21 @@
+# The AI providers the user saves once, and the model choices that pick from
+# them. See docs/plans/ai-providers.md.
+source_set("ai_providers") {
+  sources = [
+    "providers.cc",
+    "providers.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "providers_unittest.cc" ]
+  deps = [
+    ":ai_providers",
+    "//base",
+    "//components/prefs:test_support",
+    "//testing/gtest",
+  ]
+}
