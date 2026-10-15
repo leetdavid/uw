@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <variant>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -28,37 +29,62 @@ TabOrganizationController* ControllerFor(TabCollectionNode* node) {
                : nullptr;
 }
 
-// The tab `child` shows, or null when it shows something else.
-const tabs::TabInterface* TabShownBy(TabCollectionNode* parent,
-                                     const views::View* child) {
+const tabs::TabInterface* TabOf(const TabCollectionNode& node) {
+  return std::get<tabs::ConstDanglingUntriagedTabInterface>(
+             node.GetNodeData())
+      .get();
+}
+
+// The tabs `child` shows: one for a tab's row, the pair for a split's row,
+// and none for anything else.
+std::vector<const tabs::TabInterface*> TabsShownBy(TabCollectionNode* parent,
+                                                   const views::View* child) {
+  std::vector<const tabs::TabInterface*> shown;
   if (!parent) {
-    return nullptr;
+    return shown;
   }
   for (const auto& node : parent->children()) {
-    if (node->view() == child && node->type() == TabCollectionNode::Type::TAB) {
-      return std::get<tabs::ConstDanglingUntriagedTabInterface>(
-                 node->GetNodeData())
-          .get();
+    if (node->view() != child) {
+      continue;
+    }
+    if (node->type() == TabCollectionNode::Type::TAB) {
+      shown.push_back(TabOf(*node));
+    } else if (node->type() == TabCollectionNode::Type::SPLIT) {
+      for (const auto& half : node->children()) {
+        if (half->type() == TabCollectionNode::Type::TAB) {
+          shown.push_back(TabOf(*half));
+        }
+      }
     }
   }
-  return nullptr;
+  return shown;
 }
 
 }  // namespace
 
 int TabIndentFor(TabCollectionNode* parent, const views::View* child) {
-  const tabs::TabInterface* tab = TabShownBy(parent, child);
+  const std::vector<const tabs::TabInterface*> shown =
+      TabsShownBy(parent, child);
   const TabOrganizationController* controller = ControllerFor(parent);
-  return tab && controller
-             ? std::min(controller->DepthFor(tab), kMaxIndentLevels) *
-                   kIndentPerLevel
-             : 0;
+  if (shown.empty() || !controller) {
+    return 0;
+  }
+  // A split's row sits where the shallower of its pair would.
+  int depth = kMaxIndentLevels;
+  for (const tabs::TabInterface* tab : shown) {
+    depth = std::min(depth, controller->DepthFor(tab));
+  }
+  return depth * kIndentPerLevel;
 }
 
 bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child) {
-  const tabs::TabInterface* tab = TabShownBy(parent, child);
+  const std::vector<const tabs::TabInterface*> shown =
+      TabsShownBy(parent, child);
   const TabOrganizationController* controller = ControllerFor(parent);
-  return tab && controller && controller->IsHidden(tab);
+  return !shown.empty() && controller &&
+         std::ranges::all_of(shown, [&](const tabs::TabInterface* tab) {
+           return controller->IsHidden(tab);
+         });
 }
 
 base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,

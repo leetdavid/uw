@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
@@ -28,6 +29,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -39,6 +41,7 @@
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/label.h"
@@ -471,6 +474,41 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   base::RunLoop().RunUntilIdle();
   rows = TabRows();
   EXPECT_EQ(rows[1]->GetBoundsInScreen().x(), rows[0]->GetBoundsInScreen().x());
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ASplitRowSitsWhereItsShallowerTabWould) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  tabs::TabInterface* grandchild = OpenLinkFrom(child);
+  OpenLinkFrom(child);
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(child));
+  tabs()->ExecuteAddToNewSplitCommand(tabs()->GetIndexOfTab(grandchild),
+                                      split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(child->GetSplit());
+  base::RunLoop().RunUntilIdle();
+
+  const std::vector<views::View*> splits = ViewsOfClass("SplitTabView");
+  // Top to bottom, and the split's halves left to right.
+  std::vector<views::View*> rows = TabRows();
+  std::ranges::sort(rows, {}, [](views::View* row) {
+    const gfx::Rect bounds = row->GetBoundsInScreen();
+    return std::pair(bounds.y(), bounds.x());
+  });
+  ASSERT_EQ(splits.size(), 1u);
+  ASSERT_EQ(rows.size(), 4u);
+  const int left = rows[0]->GetBoundsInScreen().x();
+  EXPECT_EQ(splits[0]->GetBoundsInScreen().x(), left + 16);
+  // The pair's other child still nests under it.
+  EXPECT_EQ(rows[3]->GetBoundsInScreen().x(), left + 32);
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  Collapse(page);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !ViewsOfClass("SplitTabView")[0]->GetVisible(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

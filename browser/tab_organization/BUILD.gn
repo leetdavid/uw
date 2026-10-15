@@ -69,6 +69,7 @@ source_set("browser_tests") {
     "//components/content_extraction/content/browser",
     "//components/os_crypt/common:switches",
     "//components/prefs",
+    "//components/split_tabs",
     "//components/tab_groups",
     "//content/public/browser",
     "//content/test:test_support",
