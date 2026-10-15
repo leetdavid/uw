@@ -1,6 +1,6 @@
 # Themes
 
-Status: scope agreed on 2026-10-16. Not built. The designs come first, T93, and the user signs them off before T94 to T97.
+Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T94 to T97 are next. Not built.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Gradients, black dark mode, and the saved theme reuse the tint code that exists. The picker is the risk: a color field with dots to drag is a custom control.
 
@@ -31,7 +31,7 @@ Defaults, proposed by uw and accepted on 2026-10-16:
 
 ## Design
 
-On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Themes", drawn on 2026-10-16 and waiting for the user's sign-off:
+On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Themes", drawn and signed off on 2026-10-16:
 
 - "Theme picker: light": the picker over a lilac-to-sky window.
 - "Dark mode: black": the black window and the chat page on Vercel's neutral blacks.
@@ -64,4 +64,4 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Open questions
 
-None yet. The darkening of theme colors in dark mode is drawn as 14% lightness and waits for sign-off with the rest.
+None.
