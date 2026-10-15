@@ -19,10 +19,12 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
+#include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
@@ -793,14 +795,14 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   OpenLinkFrom(page);
   const auto label = [&] {
     ui::SimpleMenuModel menu(nullptr);
-    controller()->AppendCommands(&menu, {Id(page)});
+    controller()->AddCommands(&menu, {Id(page)});
     return menu.GetLabelAt(
         menu.GetIndexOfCommandId(TabOrganizationController::kToggleBranch)
             .value());
   };
-  EXPECT_EQ(label(), u"Collapse branch");
+  EXPECT_EQ(label(), u"Collapse Branch");
   Collapse(page);
-  EXPECT_EQ(label(), u"Expand branch");
+  EXPECT_EQ(label(), u"Expand Branch");
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
@@ -808,10 +810,59 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ui::SimpleMenuModel menu(nullptr);
   menu.AddItem(TabStripModel::CommandNewTabToRight, u"New tab below");
   menu.AddItem(TabStripModel::CommandReload, u"Reload");
-  controller()->AppendCommands(&menu, {Id(InitialTab())});
+  controller()->AddCommands(&menu, {Id(InitialTab())});
   EXPECT_EQ(menu.GetIndexOfCommandId(TabOrganizationController::kNewChildTab),
             1u);
-  EXPECT_EQ(menu.GetLabelAt(1), u"New child tab");
+  EXPECT_EQ(menu.GetLabelAt(1), u"New Child Tab");
+}
+
+// Chromium's tab menu gets uw's items beside the ones they go with: the moves
+// after Move to task, the tree's commands after them, and Close branch under
+// Close tab. Chromium's own new-group and remove-from-group items are gone.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheTabMenuKeepsMovesTreeCommandsAndClosesTogether) {
+  tabs::TabInterface* plan = InitialTab();
+  tabs::TabInterface* trip = NewTab();
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(plan)}, u"Plan"));
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(trip)}, u"Trip"));
+
+  TabMenuModel menu(nullptr, browser()->GetFeatures().tab_menu_model_delegate(),
+                    tabs(), tabs()->GetIndexOfTab(plan));
+  controller()->AddCommands(&menu, {Id(plan)});
+  std::vector<int> order;
+  for (size_t i = 0; i < menu.GetItemCount(); ++i) {
+    order.push_back(menu.GetCommandIdAt(i));
+  }
+  const auto at = [&](int command) {
+    return std::ranges::find(order, command) - order.begin();
+  };
+  const auto has = [&](int command) {
+    return std::ranges::find(order, command) != order.end();
+  };
+  const int window = has(TabStripModel::CommandMoveToExistingWindow)
+                         ? TabStripModel::CommandMoveToExistingWindow
+                         : TabStripModel::CommandMoveTabsToNewWindow;
+
+  EXPECT_EQ(at(TabOrganizationController::kNewChildTab),
+            at(TabStripModel::CommandNewTabToRight) + 1);
+  EXPECT_EQ(at(TabOrganizationController::kNewTask),
+            at(TabStripModel::CommandAddToExistingGroup) + 1);
+  EXPECT_EQ(at(TabOrganizationController::kScratchpad),
+            at(TabOrganizationController::kNewTask) + 1);
+  EXPECT_EQ(at(window), at(TabOrganizationController::kScratchpad) + 1);
+  EXPECT_LT(at(window), at(TabOrganizationController::kNest));
+  EXPECT_EQ(at(TabOrganizationController::kOutdent),
+            at(TabOrganizationController::kNest) + 1);
+  EXPECT_EQ(at(TabOrganizationController::kToggleBranch),
+            at(TabOrganizationController::kOutdent) + 1);
+  EXPECT_EQ(at(TabOrganizationController::kUndo),
+            at(TabOrganizationController::kToggleBranch) + 1);
+  EXPECT_LT(at(TabOrganizationController::kUndo),
+            at(TabStripModel::CommandReload));
+  EXPECT_EQ(at(TabOrganizationController::kCloseBranch),
+            at(TabStripModel::CommandCloseTab) + 1);
+  EXPECT_FALSE(has(TabStripModel::CommandAddToNewGroup));
+  EXPECT_FALSE(has(TabStripModel::CommandRemoveFromGroup));
 }
 
 // The right-clicked tab decides where the new tab goes, not the selected one.

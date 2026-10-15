@@ -296,7 +296,7 @@ index cdc7c0f..a260033 100644
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..e8b6a9b7c48a2fdf32c91b912623f8cf4cee4c2f 100644
+index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..b7608137f3d1b553faf545585a5c559d7fb2c7eb 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 @@ -3,6 +3,7 @@
@@ -307,15 +307,14 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..e8b6a9b7c48a2fdf32c91b912623f8cf
  
  #include <variant>
  
-@@ -452,6 +453,13 @@ void TabStripCollectionController::ShowTabContextMenu(
+@@ -452,6 +453,12 @@ void TabStripCollectionController::ShowTabContextMenu(
        browser_view_->browser()->GetFeatures().tab_menu_model_delegate(), model_,
        tab_index.value());
  
 +  if (auto* organizer =
 +          uw::TabOrganizationController::From(browser_view_->browser());
 +      organizer && organizer->IdFor(tab)) {
-+    model->AddSeparator(ui::NORMAL_SEPARATOR);
-+    organizer->AppendCommands(model.get(), organizer->SelectionFor(tab));
++    organizer->AddCommands(model.get(), organizer->SelectionFor(tab));
 +  }
 +
    CHECK(browser_view_->tab_strip_view());

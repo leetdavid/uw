@@ -72,26 +72,71 @@ bool TabOrganizationController::IsCommand(int command) {
   return command >= kNewTask && command <= kLastCommand;
 }
 
-void TabOrganizationController::AppendCommands(
+void TabOrganizationController::AddCommands(
     ui::SimpleMenuModel* menu,
     const std::vector<PageId>& ids) const {
-  if (const std::optional<size_t> below =
-          menu->GetIndexOfCommandId(TabStripModel::CommandNewTabToRight)) {
-    menu->InsertItemAt(*below + 1, kNewChildTab,
-                       l10n_util::GetStringUTF16(IDS_UW_NEW_CHILD_TAB));
+  // The labels are title case, as Chromium's are in menus on the Mac.
+  // Chromium's own items for these repeat Move to new task and Move to
+  // Scratchpad.
+  for (int command : {TabStripModel::CommandAddToNewGroup,
+                      TabStripModel::CommandRemoveFromGroup}) {
+    if (const std::optional<size_t> index =
+            menu->GetIndexOfCommandId(command)) {
+      menu->RemoveItemAt(*index);
+    }
   }
-  menu->AddItem(kNewTask, l10n_util::GetStringUTF16(IDS_UW_NEW_TASK));
-  menu->AddItem(kScratchpad,
-                l10n_util::GetStringUTF16(IDS_UW_MOVE_TO_SCRATCHPAD));
-  menu->AddItem(kNest, l10n_util::GetStringUTF16(IDS_UW_NEST_BRANCH));
-  menu->AddItem(kOutdent, l10n_util::GetStringUTF16(IDS_UW_OUTDENT_BRANCH));
-  menu->AddItem(
-      kToggleBranch,
-      l10n_util::GetStringUTF16(CollapsesBranches(ids) ? IDS_UW_COLLAPSE_BRANCH
-                                                       : IDS_UW_EXPAND_BRANCH));
-  menu->AddItem(kUndo, l10n_util::GetStringUTF16(IDS_UW_UNDO_ORGANIZATION));
-  menu->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu->AddItem(kCloseBranch, l10n_util::GetStringUTF16(IDS_UW_CLOSE_BRANCH));
+  // The first of `commands` the menu has.
+  const auto find =
+      [menu](std::initializer_list<int> commands) -> std::optional<size_t> {
+    for (int command : commands) {
+      if (const std::optional<size_t> index =
+              menu->GetIndexOfCommandId(command)) {
+        return index;
+      }
+    }
+    return std::nullopt;
+  };
+  const auto insert = [menu](size_t& at, int command, int string) {
+    menu->InsertItemAt(at++, command, l10n_util::GetStringUTF16(string));
+  };
+
+  if (const std::optional<size_t> below =
+          find({TabStripModel::CommandNewTabToRight})) {
+    size_t at = *below + 1;
+    insert(at, kNewChildTab, IDS_UW_NEW_CHILD_TAB_MAC);
+  }
+
+  // The moves sit after Move to task and before Move to another window. The
+  // tree's own commands follow them.
+  const auto window = [&] {
+    return find({TabStripModel::CommandMoveToExistingWindow,
+                 TabStripModel::CommandMoveTabsToNewWindow});
+  };
+  const std::optional<size_t> to_task =
+      find({TabStripModel::CommandAddToExistingGroup});
+  size_t at = to_task ? *to_task + 1 : window().value_or(menu->GetItemCount());
+  insert(at, kNewTask, IDS_UW_MOVE_TO_NEW_TASK_MAC);
+  insert(at, kScratchpad, IDS_UW_MOVE_TO_SCRATCHPAD_MAC);
+  if (const std::optional<size_t> moves_window = window()) {
+    at = std::max(at, *moves_window + 1);
+  }
+  menu->InsertSeparatorAt(at++, ui::NORMAL_SEPARATOR);
+  insert(at, kNest, IDS_UW_NEST_BRANCH_MAC);
+  insert(at, kOutdent, IDS_UW_OUTDENT_BRANCH_MAC);
+  insert(at, kToggleBranch,
+         CollapsesBranches(ids) ? IDS_UW_COLLAPSE_BRANCH_MAC
+                                : IDS_UW_EXPAND_BRANCH_MAC);
+  insert(at, kUndo, IDS_UW_UNDO_ORGANIZATION_MAC);
+
+  // Close branch sits under Close tab.
+  if (const std::optional<size_t> close =
+          find({TabStripModel::CommandCloseTab})) {
+    at = *close + 1;
+  } else {
+    menu->AddSeparator(ui::NORMAL_SEPARATOR);
+    at = menu->GetItemCount();
+  }
+  insert(at, kCloseBranch, IDS_UW_CLOSE_BRANCH_MAC);
 }
 
 TabOrganizationController* TabOrganizationController::From(

@@ -59,9 +59,11 @@ class TabOrganizationController : public TabStripModelObserver,
   };
   static bool IsCommand(int command);
 
-  // Adds the commands to the menu of a tab whose commands act on `ids`.
-  void AppendCommands(ui::SimpleMenuModel* menu,
-                      const std::vector<PageId>& ids) const;
+  // Adds the commands to the menu of a tab whose commands act on `ids`, each
+  // beside the Chromium items it goes with, per the tab menu of the keyboard
+  // and mouse plan.
+  void AddCommands(ui::SimpleMenuModel* menu,
+                   const std::vector<PageId>& ids) const;
 
   explicit TabOrganizationController(BrowserWindowInterface* window);
   ~TabOrganizationController() override;

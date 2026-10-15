@@ -27,7 +27,7 @@ All of these are manual tests. Record anything that differs from the expected re
 ### Tasks are tab groups
 
 1. Open three disposable tabs with Cmd-T.
-2. Right-click one and choose `Move to new task`.
+2. Right-click one and choose `Move to New Task`.
 
 Expected result: the tab moves into a new tab group named `New task`, above the ungrouped tabs and after any other task. The group shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the group as you would in Chromium.
 
@@ -42,10 +42,10 @@ Expected result: the new tab opens directly below its source, indented one level
 
 Right-click a tab that opened other tabs.
 
-- `Move to new task` and `Move to Scratchpad` move the tab together with the tabs it opened.
-- `Nest under previous tab` and `Move up one level` change which tab it sits under.
-- `Close branch` closes the tab and everything it opened.
-- `Undo tab organization` reverses the last of these moves. It does not reopen closed pages.
+- `Move to New Task` and `Move to Scratchpad` move the tab together with the tabs it opened.
+- `Nest Under Previous Tab` and `Move Up One Level` change which tab it sits under.
+- `Close Branch`, under `Close`, closes the tab and everything it opened.
+- `Undo Tab Organization` reverses the last of these moves. It does not reopen closed pages.
 
 ### Keys and the Tasks menu
 
@@ -63,7 +63,7 @@ Expected result: each key does what its menu item says. A page that uses the sam
 Open a few links from one page with Cmd-click, so they sit under it.
 
 - Point at the page's tab. Its favicon turns into a chevron. Click the chevron: the tabs under it hide and the row ends in their number.
-- Ctrl+Cmd+. does the same for the selected tab, and `Collapse branch` in a tab's right-click menu for that tab. Each turns into `Expand` once the branch is collapsed.
+- Ctrl+Cmd+. does the same for the selected tab, and `Collapse Branch` in a tab's right-click menu for that tab. Each turns into `Expand Branch` once the branch is collapsed.
 - Ctrl+Tab skips the hidden tabs. Collapsing the branch of the tab you are on selects the page at its top.
 - Cmd-click another link on the page: the new tab stays hidden and the number goes up, with no spinner while it loads. A link opened in front expands the branch.
 - Quit and reopen uw with "Continue where you left off": the branch is still collapsed.
@@ -72,9 +72,9 @@ Expected result: the hidden tabs stay open and come back in place. Closing the c
 
 ### New child tab
 
-Right-click a tab that has children but is not selected, and choose `New child tab`, under `New tab below`.
+Right-click a tab that has children but is not selected, and choose `New Child Tab`, under `New Tab Below`.
 
-Expected result: a blank tab opens, selected, one level under that tab and above its other children. Ctrl+Cmd+T and `New Child Tab` in the Tab menu do the same for the selected tab. `New tab below` opens below the right-clicked tab and its children, at its level.
+Expected result: a blank tab opens, selected, one level under that tab and above its other children. Ctrl+Cmd+T and `New Child Tab` in the Tab menu do the same for the selected tab. `New Tab Below` opens below the right-clicked tab and its children, at its level.
 
 ### Organize button
 
