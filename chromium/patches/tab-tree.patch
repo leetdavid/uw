@@ -854,3 +854,18 @@ index 6641560e2f254670b98975cfd02c81c3ed5ceea7..beb765161ab646d0a1400122df19462c
    if (TabView().glic_tab_underline_view_) {
      const gfx::Rect glic_bounds =
          gfx::Rect(0, 0, 2 * glic::TabUnderlineView::kEffectThickness, height);
+diff --git a/ui/views/view.cc b/ui/views/view.cc
+index a66de0ebb69849292242b5efb637e807345a5cf0..bd5eef180ea4aea103786fe8a1f7ebe04e05efbd 100644
+--- a/ui/views/view.cc
++++ b/ui/views/view.cc
+@@ -2573,6 +2573,10 @@ void View::DestroyLayerImpl(LayerChangeNotifyBehavior notify_parents) {
+     ReorderLayers();
+   }
+ 
++  // uw: the child layers now hang off an ancestor's layer, so they follow
++  // this view's visibility themselves instead of through its layer.
++  UpdateLayerVisibility();
++
+   UpdateChildLayerBounds(CalculateOffsetToAncestorWithLayer(nullptr));
+ 
+   SchedulePaint();

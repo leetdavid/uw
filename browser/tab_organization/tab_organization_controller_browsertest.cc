@@ -30,6 +30,8 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
+#include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
@@ -564,6 +566,38 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   chrome::SelectPreviousTab(browser());
   EXPECT_EQ(tabs()->GetActiveTab(), page);
   EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+}
+
+// A tab opened into a collapsed branch fades in on a layer of its own while
+// it is already hidden. Its spinner must stay hidden once that layer goes.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ATabLoadingInACollapsedBranchShowsNoSpinner) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  tabs::TabInterface* page = InitialTab();
+  OpenLinkFrom(page);
+  Collapse(page);
+  OpenLinkFrom(page, embedded_test_server()->GetURL("/hung"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !ViewsOfClass("ThrobberView").empty() &&
+           std::ranges::none_of(TabRows(), [](views::View* row) {
+             return row->layer() != nullptr;
+           });
+  }));
+  SaveWindowScreenshot(browser(), "branch-collapsed-loading");
+  for (views::View* row : TabRows()) {
+    if (row->GetVisible()) {
+      continue;
+    }
+    const std::function<void(views::View*)> expect_hidden =
+        [&](views::View* view) {
+          EXPECT_FALSE(view->layer() && view->layer()->IsVisible())
+              << view->GetClassName();
+          for (views::View* child : view->children()) {
+            expect_hidden(child);
+          }
+        };
+    expect_hidden(row);
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
