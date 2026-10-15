@@ -146,6 +146,48 @@ The browser tests run in Chromium's headless mode, so they open no windows and n
 
 To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, a suggestion with its Confirm button, and the settings page with its models, a failed connection test with its details, and its tint control.
 
+## Real-window tests
+
+A few browser tests need a real window, because a headless window never takes keyboard focus. Their names start with `MANUAL_`. `pnpm run window-tests` runs them in a macOS VM that has no window on your screen, so they never take your screen or focus:
+
+```sh
+pnpm run window-tests
+pnpm run window-tests --gtest_filter='CommandBarBrowserTest.MANUAL_*' --gtest_repeat=100
+```
+
+Build `browser_tests` first. The command starts the `uw-window-tests` VM, runs the tests in it against your `.chromium/src`, and stops the VM. A second run waits for the first. Options other than `--checkout-dir` go to `browser_tests`; without a `--gtest_filter`, it runs every `MANUAL_` test. With `UW_SCREENSHOT_DIR` set, screenshots land in that folder. If a test crashes, the output names a folder holding its crash report.
+
+### Set up the VM once
+
+The VM uses [Tart](https://tart.run). It takes about 60 GB of disk, and 4 CPUs and 8 GB of memory while it runs.
+
+1. Install Tart. On 2026-10-16 `brew install cirruslabs/cli/tart` failed with current Homebrew, so unpack the [release](https://github.com/cirruslabs/tart/releases) instead:
+
+   ```sh
+   curl -LO https://github.com/cirruslabs/tart/releases/download/2.32.1/tart.tar.gz
+   tar -xzf tart.tar.gz && mv tart.app ~/Applications/
+   ln -s ~/Applications/tart.app/Contents/MacOS/tart ~/.local/bin/tart
+   ```
+
+2. Create the VM from the macOS installer pinned in [`chromium/pins.json`](chromium/pins.json). The download is about 27 GB:
+
+   ```sh
+   tart create --from-ipsw "$(node -p 'require("./chromium/pins.json").macos_vm_ipsw')" uw-window-tests
+   tart set uw-window-tests --cpu 4 --memory 8192
+   ```
+
+3. Open it once with `tart run uw-window-tests`. In its window, finish macOS setup with the account `admin` and password `admin`, then in System Settings turn on **Remote Login** (General > Sharing) and **Automatic login** as `admin` (Users & Groups).
+
+4. Give the command its own SSH key, and keep the VM's screen awake:
+
+   ```sh
+   ssh-keygen -t ed25519 -N '' -f ~/.ssh/uw-window-tests
+   ssh-copy-id -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)"
+   ssh -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)" 'echo admin | sudo -S pmset -a sleep 0 displaysleep 0'
+   ```
+
+5. Shut the VM down from its Apple menu.
+
 ## Build inputs and updates
 
 - [`chromium/pins.json`](chromium/pins.json) pins Chromium, `depot_tools`, and the SDK requirement.

@@ -19,6 +19,7 @@
     "launch:nolog": "launch() { pnpm --silent run launch:check \"$1\" && if [ \"$1\" = -y ]; then shift; fi && env -i open -n \"$(pnpm --silent run chromium root)/src/out/uw/uw.app\" --args --user-data-dir=\"$HOME/Library/Application Support/uw-dev\" \"$@\"; }; launch",
     "smoke": "node scripts/chromium.ts smoke",
     "verify": "node scripts/chromium.ts verify",
+    "window-tests": "node scripts/chromium.ts window-tests",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
     "check": "pnpm run typecheck && pnpm test"

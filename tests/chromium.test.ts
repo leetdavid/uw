@@ -7,13 +7,14 @@ import { test } from "node:test";
 import type { TestContext } from "node:test";
 import {
   BuildError, CHROMIUM_URL, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, REPO,
-  SYNC_STAMP, layoutAt, loadPins, requireOwnedRoot,
+  SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot,
 } from "../scripts/chromium.ts";
 import type { CommandOptions, Pins, Runtime } from "../scripts/chromium.ts";
 
 const pins: Pins = {
   version: "1.2.3.4", chromium_revision: "a".repeat(40),
   depot_tools_revision: "b".repeat(40), macos_sdk_min: "26.5",
+  macos_vm_ipsw: "https://updates.cdn-apple.com/fixture/UniversalMac_27.0.1_26A434_Restore.ipsw",
 };
 
 function temporary(t: TestContext): string {
@@ -43,6 +44,10 @@ class Fixture {
   extraRoots: string[] = [];
   omitSourceRoot = false;
   dom = '<html><body data-uw-smoke="passed"></body></html>';
+  readonly started: (readonly string[])[] = [];
+  vms = [{ Name: WINDOW_VM, State: "stopped" }];
+  guestBuild = "26A434";
+  failWindowTests = false;
 
   constructor(t: TestContext) {
     this.layout = layoutAt(join(temporary(t), "checkout"));
@@ -50,6 +55,7 @@ class Fixture {
       platform: "darwin", arch: "arm64", nodeVersion: "24.13.0", memoryBytes: 16 * GIB,
       env: {}, freeBytes: () => this.free, log: (line) => this.messages.push(line),
       run: (command, options = {}) => this.execute(command, options),
+      start: (command) => this.started.push(command),
     };
     this.browser = new Chromium(this.layout, pins, this.runtime);
   }
@@ -136,6 +142,15 @@ class Fixture {
         return "";
       }
     }
+    if (program === "tart") {
+      if (operation === "list") return JSON.stringify(this.vms);
+      return operation === "ip" ? "192.168.64.2" : "";
+    }
+    if (program === "ssh") {
+      if (command.at(-1) === "sw_vers -buildVersion") return this.guestBuild;
+      if (options.inherit && this.failWindowTests) throw new BuildError("browser_tests failed");
+      return "";
+    }
     if (basename(program) === "gn") return "";
     if (basename(program) === "autoninja") {
       mkdirSync(dirname(this.layout.binary), { recursive: true }); writeFileSync(this.layout.binary, "browser fixture"); return "";
@@ -151,7 +166,7 @@ test("repository pins are valid and invalid pins fail before commands", (t) => {
   const path = join(temporary(t), "pins.json");
   for (const invalid of [
     { chromium_revision: "main" }, { depot_tools_revision: "latest" },
-    { version: 123 }, { macos_sdk_min: "latest" }, { extra: "value" },
+    { version: 123 }, { macos_sdk_min: "latest" }, { macos_vm_ipsw: "latest" }, { extra: "value" },
   ]) {
     writeFileSync(path, JSON.stringify({ ...pins, ...invalid }));
     assert.throws(() => loadPins(path), BuildError);
@@ -230,6 +245,62 @@ test("changed pins and interrupted sync cannot build against a stale stamp", (t)
   f.failSync = true;
   assert.throws(() => f.browser.sync(2), /sync interrupted/);
   assert.throws(() => f.browser.build(2), /Sync has not completed/);
+});
+
+test("a new VM pin keeps a synced checkout buildable", (t) => {
+  const f = new Fixture(t);
+  f.browser.sync(2);
+  const moved = new Chromium(f.layout, { ...pins, macos_vm_ipsw: pins.macos_vm_ipsw.replace("26A434", "26B100") }, f.runtime);
+  moved.build(2);
+});
+
+function windowFixture(t: TestContext): Fixture {
+  const f = new Fixture(t);
+  const tests = join(f.layout.source, "out/uw/browser_tests");
+  mkdirSync(dirname(tests), { recursive: true });
+  writeFileSync(tests, "browser_tests fixture");
+  const home = temporary(t);
+  mkdirSync(join(home, ".ssh"));
+  writeFileSync(join(home, ".ssh", WINDOW_VM), "key fixture");
+  f.runtime.env.HOME = home;
+  return f;
+}
+
+function windowTestRun(f: Fixture): string {
+  return f.calls.find(({ options }) => options.inherit)!.command.at(-1)!;
+}
+
+test("window tests run browser_tests in the VM and always stop it", (t) => {
+  const f = windowFixture(t);
+  f.browser.windowTests([]);
+  assert.deepEqual(f.started[0]!.slice(0, 4), ["tart", "run", WINDOW_VM, "--no-graphics"]);
+  assert.ok(f.started[0]!.includes(`--dir=src:${f.layout.source}:ro`));
+  assert.match(windowTestRun(f), /browser_tests --run-manual --headful-mode '--gtest_filter=\*\.MANUAL_\*'$/);
+  assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
+  assert.equal(existsSync(join(f.layout.root, ".uw-window-tests.lock")), false);
+
+  f.failWindowTests = true;
+  f.calls.length = 0;
+  assert.throws(() => f.browser.windowTests(["--gtest_filter=A.MANUAL_B", "--gtest_repeat=100"]), /browser_tests failed/);
+  assert.match(windowTestRun(f), /--headful-mode '--gtest_filter=A\.MANUAL_B' '--gtest_repeat=100'$/);
+  assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
+});
+
+test("window tests refuse a VM on another macOS build", (t) => {
+  const f = windowFixture(t);
+  f.guestBuild = "25A100";
+  assert.throws(() => f.browser.windowTests([]), /runs macOS build 25A100; chromium\/pins\.json pins 26A434/);
+  assert.equal(f.calls.some(({ options }) => options.inherit), false);
+  assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
+});
+
+test("window tests point to the setup when the VM or its key is missing", (t) => {
+  const f = windowFixture(t);
+  rmSync(join(f.runtime.env.HOME!, ".ssh", WINDOW_VM));
+  assert.throws(() => f.browser.windowTests([]), /SSH key .+ is missing\. Set it up as README\.md#real-window-tests/);
+  f.vms = [];
+  assert.throws(() => f.browser.windowTests([]), /uw-window-tests VM is missing/);
+  assert.equal(f.started.length, 0);
 });
 
 test("incomplete upstream bootstrap stops before source download", (t) => {
@@ -326,7 +397,7 @@ function invoke(...args: string[]) {
 }
 
 test("every command's help has examples", () => {
-  for (const command of [[], ["root"], ["doctor"], ["sync"], ["prepare"], ["build"], ["smoke"], ["verify"]]) {
+  for (const command of [[], ["root"], ["doctor"], ["sync"], ["prepare"], ["build"], ["smoke"], ["verify"], ["window-tests"]]) {
     const result = invoke(...command, "--help");
     assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /Examples:/);
   }

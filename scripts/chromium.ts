@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Build uw from pinned Chromium source with upstream tools. */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   accessSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync,
@@ -25,12 +25,16 @@ const DEPENDENCY_HISTORY = ".uw-dependencies.json";
 const ROOT_PREFIX = "UW_CHECKOUT_ROOT=";
 const OUTPUT = "out/uw";
 export const GIB = 1024 ** 3;
+export const WINDOW_VM = "uw-window-tests";
+const GUEST_SHARES = "/Volumes/My Shared Files";
+const GUEST_CRASH_REPORTS = "~/Library/Logs/DiagnosticReports/browser_tests-*.ips";
 
 export interface Pins {
   version: string;
   chromium_revision: string;
   depot_tools_revision: string;
   macos_sdk_min: string;
+  macos_vm_ipsw: string;
 }
 
 export interface Layout {
@@ -53,6 +57,7 @@ export type Runner = (command: readonly string[], options?: CommandOptions) => s
 
 export interface Runtime {
   run: Runner;
+  start: (command: readonly string[]) => void;
   env: NodeJS.ProcessEnv;
   platform: string;
   arch: string;
@@ -96,7 +101,8 @@ export function execute(command: readonly string[], options: CommandOptions = {}
 
 export function nativeRuntime(): Runtime {
   return {
-    run: execute, env: { ...process.env }, platform: process.platform, arch: process.arch,
+    run: execute, start: ([program, ...args]) => spawn(program!, args, { stdio: "ignore" }).unref(),
+    env: { ...process.env }, platform: process.platform, arch: process.arch,
     nodeVersion: process.versions.node, memoryBytes: totalmem(), log: console.log,
     freeBytes: (path) => { const stat = statfsSync(path); return stat.bavail * stat.bsize; },
   };
@@ -131,6 +137,7 @@ export function loadPins(path = join(REPO, "chromium/pins.json")): Pins {
     chromium_revision: /^[0-9a-f]{40}$/,
     depot_tools_revision: /^[0-9a-f]{40}$/,
     macos_sdk_min: /^\d+\.\d+(?:\.\d+)?$/,
+    macos_vm_ipsw: /^https:\/\/updates\.cdn-apple\.com\/\S+_[0-9A-Z]+_Restore\.ipsw$/,
   };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw) ||
       Object.keys(raw).sort().join() !== Object.keys(patterns).sort().join()) {
@@ -145,7 +152,12 @@ export function loadPins(path = join(REPO, "chromium/pins.json")): Pins {
   return {
     version: field("version"), chromium_revision: field("chromium_revision"),
     depot_tools_revision: field("depot_tools_revision"), macos_sdk_min: field("macos_sdk_min"),
+    macos_vm_ipsw: field("macos_vm_ipsw"),
   };
+}
+
+function syncStamp({ version, chromium_revision, depot_tools_revision, macos_sdk_min }: Pins): string {
+  return JSON.stringify({ version, chromium_revision, depot_tools_revision, macos_sdk_min });
 }
 
 function atLeast(version: string, minimum: string): boolean {
@@ -321,7 +333,7 @@ export class Chromium {
   verifyCheckout(requireSynced = true): void {
     requireOwnedRoot(this.layout);
     const stamp = join(this.layout.root, SYNC_STAMP);
-    if (requireSynced && (!existsSync(stamp) || readFileSync(stamp, "utf8") !== JSON.stringify(this.pins))) {
+    if (requireSynced && (!existsSync(stamp) || readFileSync(stamp, "utf8") !== syncStamp(this.pins))) {
       throw new BuildError("Sync has not completed for the current pins. Run sync before building.");
     }
     this.verifyConfig();
@@ -416,7 +428,7 @@ export class Chromium {
     this.rememberRoots([...knownRoots, ...this.dependencyRoots()]);
     this.patches.apply();
     this.sources.prepare();
-    writeFileSync(join(this.layout.root, SYNC_STAMP), JSON.stringify(this.pins));
+    writeFileSync(join(this.layout.root, SYNC_STAMP), syncStamp(this.pins));
     this.runtime.log(`Synced Chromium ${this.pins.version} at ${this.pins.chromium_revision}`);
   }
 
@@ -480,6 +492,117 @@ export class Chromium {
     }
     this.runtime.log("PASS: build, smoke test, and the focused Chromium test suites");
   }
+
+  windowTests(args: readonly string[]): void {
+    const tests = join(this.layout.source, OUTPUT, "browser_tests");
+    if (!existsSync(tests)) throw new BuildError(`${tests} is missing. Build browser_tests first.`);
+    this.requireWindowVm();
+    const release = this.holdWindowVm();
+    const results = mkdtempSync(join(tmpdir(), "uw-window-tests-"));
+    try {
+      this.startWindowVm(results);
+      try { this.runInWindowVm(args); } finally { this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 }); }
+    } finally {
+      release();
+      if (readdirSync(results).length) this.runtime.log(`Crash reports from the VM: ${results}`);
+      else rmSync(results, { recursive: true, force: true });
+    }
+  }
+
+  private windowKey(): string {
+    return join(this.runtime.env.HOME ?? homedir(), ".ssh", WINDOW_VM);
+  }
+
+  private requireWindowVm(): void {
+    const setup = "Set it up as README.md#real-window-tests describes.";
+    try { this.capture(["tart", "--version"]); } catch { throw new BuildError(`Tart is not installed. ${setup}`); }
+    if (!this.windowVmState()) throw new BuildError(`The ${WINDOW_VM} VM is missing. ${setup}`);
+    if (!existsSync(this.windowKey())) throw new BuildError(`The SSH key ${this.windowKey()} is missing. ${setup}`);
+  }
+
+  private windowVmState(): string | undefined {
+    const vms = JSON.parse(this.capture(["tart", "list", "--format", "json"])) as { Name: string; State: string }[];
+    return vms.find(({ Name }) => Name === WINDOW_VM)?.State;
+  }
+
+  private holdWindowVm(): () => void {
+    const lock = join(this.layout.root, ".uw-window-tests.lock");
+    let waiting = false;
+    for (;;) {
+      try {
+        writeFileSync(lock, String(process.pid), { flag: "wx" });
+        return () => rmSync(lock, { force: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+      const owner = lockOwner(lock);
+      if (!owner) { pause(200); continue; }
+      if (!running(owner)) { rmSync(lock, { force: true }); continue; }
+      if (!waiting) this.runtime.log(`Waiting for another window-tests run (process ${owner}) to finish`);
+      waiting = true;
+      pause(5_000);
+    }
+  }
+
+  private startWindowVm(results: string): void {
+    if (this.windowVmState() === "running") this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 });
+    const screenshots = this.runtime.env.UW_SCREENSHOT_DIR;
+    this.runtime.start([
+      "tart", "run", WINDOW_VM, "--no-graphics", `--dir=src:${this.layout.source}:ro`, `--dir=results:${results}`,
+      ...(screenshots ? [`--dir=shots:${resolve(screenshots)}`] : []),
+    ]);
+  }
+
+  private runInWindowVm(args: readonly string[]): void {
+    const ip = this.capture(["tart", "ip", WINDOW_VM, "--wait", "180"], { timeout: 200_000 });
+    const build = this.guest(ip, "sw_vers -buildVersion");
+    const pinned = /_([0-9A-Z]+)_Restore\.ipsw$/.exec(this.pins.macos_vm_ipsw)![1];
+    if (build !== pinned) {
+      throw new BuildError(`The ${WINDOW_VM} VM runs macOS build ${build}; chromium/pins.json pins ${pinned}. ` +
+        "Recreate it as README.md#real-window-tests describes.");
+    }
+    this.guest(ip, `rm -f ${GUEST_CRASH_REPORTS}`);
+    try {
+      this.guest(ip, windowTestCommand(args, Boolean(this.runtime.env.UW_SCREENSHOT_DIR)), true);
+    } finally {
+      this.guest(ip, `cp ${GUEST_CRASH_REPORTS} ${quote(`${GUEST_SHARES}/results`)} 2>/dev/null; true`);
+    }
+  }
+
+  private guest(ip: string, script: string, inherit = false): string {
+    const command = [
+      "ssh", "-i", this.windowKey(), "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no",
+      "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectionAttempts=60", `admin@${ip}`, script,
+    ];
+    if (!inherit) return this.capture(command, { timeout: 120_000 });
+    this.run(command, this.layout.source);
+    return "";
+  }
+}
+
+function quote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function windowTestCommand(args: readonly string[], screenshots: boolean): string {
+  const filter = args.some((arg) => arg.startsWith("--gtest_filter")) ? [] : ["--gtest_filter=*.MANUAL_*"];
+  return [
+    `cd ${quote(`${GUEST_SHARES}/src`)} &&`,
+    ...(screenshots ? [`UW_SCREENSHOT_DIR=${quote(`${GUEST_SHARES}/shots`)}`] : []),
+    `./${OUTPUT}/browser_tests`, "--run-manual", "--headful-mode", ...[...filter, ...args].map(quote),
+  ].join(" ");
+}
+
+function lockOwner(lock: string): number {
+  try { return Number(readFileSync(lock, "utf8")) || 0; } catch { return 0; }
+}
+
+function running(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+function pause(milliseconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
 const TEST_SUITES = {
@@ -506,18 +629,34 @@ const descriptions = {
   build: "Prepare uw customizations, generate build files, and compile the chrome target.",
   smoke: "Verify the built version and run an isolated headless JavaScript/DOM check.",
   verify: "Build, smoke-test, and run the focused Chromium unit and browser test suites.",
+  "window-tests": `Run the browser tests that need a real window in the ${WINDOW_VM} VM, off your screen.`,
 } as const;
 
 function help(command?: keyof typeof descriptions): string {
-  const usage = command ?? "<root|doctor|sync|prepare|build|smoke|verify>";
+  const usage = command ?? "<root|doctor|sync|prepare|build|smoke|verify|window-tests>";
   return `${command ? descriptions[command] : "Build uw from pinned Chromium source with upstream tools."}\n\n` +
     `Usage: node scripts/chromium.ts ${usage} [options]\n` +
     "  --checkout-dir PATH  Dedicated root; defaults to UW_CHROMIUM_ROOT or .chromium/\n" +
     (takesJobs(command) ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
     (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
+    (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs *.MANUAL_*\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
-    `  node scripts/chromium.ts ${command ?? "sync"} --checkout-dir /Volumes/Build/uw-chromium\n`;
+    (command === "window-tests"
+      ? "  node scripts/chromium.ts window-tests --gtest_filter='CommandBarBrowserTest.MANUAL_*' --gtest_repeat=100\n"
+      : `  node scripts/chromium.ts ${command ?? "sync"} --checkout-dir /Volumes/Build/uw-chromium\n`);
+}
+
+function splitPassedArgs(args: readonly string[]): [string[], string[]] {
+  const own: string[] = [];
+  const passed: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (arg === "--checkout-dir") own.push(arg, args[++index] ?? "");
+    else if (arg.startsWith("--checkout-dir=") || arg === "--help" || arg === "-h") own.push(arg);
+    else passed.push(arg);
+  }
+  return [own, passed];
 }
 
 function takesJobs(command?: string): boolean {
@@ -540,10 +679,11 @@ export function main(argv = process.argv.slice(2)): number {
   try {
     if (!argv.length || argv[0] === "--help" || argv[0] === "-h") { console.log(help()); return 0; }
     const command = argv[0];
-    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, prepare, build, smoke, or verify. Use --help for examples.", 2);
+    if (!command || !Object.hasOwn(descriptions, command)) throw new BuildError("Choose root, doctor, sync, prepare, build, smoke, verify, or window-tests. Use --help for examples.", 2);
     const name = command as keyof typeof descriptions;
+    const [own, passed] = name === "window-tests" ? splitPassedArgs(argv.slice(1)) : [argv.slice(1), []];
     const { values, positionals } = parseArgs({
-      args: argv.slice(1), strict: true, allowPositionals: false,
+      args: own, strict: true, allowPositionals: false,
       options: {
         help: { type: "boolean", short: "h" }, "checkout-dir": { type: "string" },
         ...(takesJobs(name) ? { jobs: { type: "string" as const } } : {}),
@@ -563,6 +703,7 @@ export function main(argv = process.argv.slice(2)): number {
     if (name === "build") chromium.build(jobs);
     if (name === "smoke") chromium.smoke(timeout);
     if (name === "verify") chromium.verify(jobs, timeout);
+    if (name === "window-tests") chromium.windowTests(passed);
     return 0;
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
