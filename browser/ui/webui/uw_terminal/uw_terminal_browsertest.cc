@@ -216,11 +216,16 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, KeysTheBrowserKeepsStayOutOfIt) {
 // A program that asks for the mouse, as a TUI does, gets each click.
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
                        AProgramThatAsksForTheMouseGetsClicks) {
-  OpenTerminal();
+  content::WebContents* terminal = OpenTerminal();
   Type(u"cd " + Folder() +
-       u" && printf '\\033[?1000h\\033[?1006h' && cat -v > clicks\r");
-  // The file appears once cat has started.
+       u" && printf '\\033[?1000h\\033[?1006h\\033]0;mouse\\007' && "
+       u"cat -v > clicks\r");
+  // The file appears once cat has started. The title follows the request for
+  // the mouse, so it shows once the page has read it.
   WaitForFile("clicks", [](const std::string&) { return true; });
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return terminal->GetTitle() == u"mouse";
+  })) << terminal->GetTitle();
   content::SimulateMouseClickAt(
       contents(), 0, blink::WebMouseEvent::Button::kLeft, gfx::Point(100, 60));
   Type(u"\r");
