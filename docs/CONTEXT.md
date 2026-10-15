@@ -7,9 +7,9 @@ Terms used in the product docs.
 **Browsing task**:
 The immediate activity the user is pursuing with a set of tabs. A broader project can contain several browsing tasks; this is the level of user intent that tab organization tries to infer.
 
-**Tab group**:
-A native Chromium tab group holding the regular tabs of one browsing task in one window. Tab groups do not nest. Also called a task.
-_Avoid_: Workspace, space.
+**Task**:
+The regular tabs of one browsing task in one window, shown as a folder in the sidebar. Tasks do not nest. uw says "task" wherever it shows one, in menus, tooltips, and VoiceOver. Underneath, a task is a Chromium tab group; say "tab group" only for that mechanism.
+_Avoid_: Group, tab group, task group, workspace, space.
 
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared across windows in its browser profile.
@@ -53,7 +53,7 @@ The scheme and registrable domain of a pin's home URL. Navigation inside that si
 A temporary view opened from a pinned tab for a page outside the pin's site. Promoting it creates a regular tab in Scratchpad.
 
 **Tab tree**:
-The arrangement of regular tabs within one browser window: the Scratchpad, the tab groups, and regular tabs nested under parent tabs.
+The arrangement of regular tabs within one browser window: the Scratchpad, the tasks, and regular tabs nested under parent tabs.
 
 **Tab branch**:
 A tab together with all its descendant tabs. It is the only level below a task.
@@ -69,19 +69,19 @@ A regular tab nested directly under a parent tab, in its parent's tab branch and
 The tab whose page is currently displayed in a browser window.
 
 **Ungrouped tab**:
-A tab currently outside all tab groups. Its relationship to a browsing task may still be unclear.
+A tab currently outside every task, so in the Scratchpad. Its relationship to a browsing task may still be unclear.
 
 **Scratchpad**:
-The always-visible section holding ungrouped regular tabs and candidate branches in one window. It is not a browsing task or tab group.
+The always-visible section holding ungrouped regular tabs and candidate branches in one window. It is not a task.
 
 **Manual adjustment**:
-A user-made change to tab grouping, ordering, or a task group's name.
+A user-made change to tab grouping, ordering, or a task's name.
 
 **Task extraction**:
-Separating a tab branch or selected tabs into a task group of their own.
+Separating a tab branch or selected tabs into a task of their own.
 
 **Organization action**:
-A set of related changes to the tab tree, such as creating a task group and moving tabs into it, treated as one operation.
+A set of related changes to the tab tree, such as creating a task and moving tabs into it, treated as one operation.
 
 **Task proposal**:
 The organizer's suggestion that a set of tabs represents a separate browsing task.

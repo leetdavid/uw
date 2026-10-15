@@ -67,7 +67,9 @@ Agreed scope: the first tab-management release focuses on organization. Infer th
 
 Agreed:
 
-- Use tree-style tabs, inspired by [Horse Browser](research/horse-tab-organization-research.md). A task group is a native Chromium tab group. Task groups do not nest. Individual page tabs can have child tabs. Changed on 2026-10-11; see [ADR 0002](adr/0002-tasks-are-native-tab-groups.md).
+- Use tree-style tabs, inspired by [Horse Browser](research/horse-tab-organization-research.md). A [task](CONTEXT.md#language) is a native Chromium tab group. Tasks do not nest. Individual page tabs can have child tabs. Changed on 2026-10-11; see [ADR 0002](adr/0002-tasks-are-native-tab-groups.md).
+- uw says "task" wherever it shows one: the task's menu, the tab menu, the new-tab menu, the menu bar, tooltips, and VoiceOver. Chromium's items that repeat a uw command are removed: "Add tab to new group" and "Group Tab" repeat "Move to new task", and "Remove from group" repeats "Move to Scratchpad". "Ungroup" becomes "Move tabs to Scratchpad", and "Add tab to group" becomes "Move to task". Chromium's own pages, such as history and tab search, keep their wording for now. Agreed on 2026-10-15.
+- A closed task is not saved. Cmd+Shift+T brings back a task just closed, as it does a tab. Chromium's saved tab groups, their "Tab groups" menu, and the note that groups save automatically are removed, since the organizer starts tasks on its own and the saved list would only grow. Agreed on 2026-10-15.
 - Preserve standard link navigation. Same-tab navigation stays in the current tab; a link opened as a new tab becomes a child of its source tab, including through Cmd-click or middle-click. Intent-based organization can later move it.
 - Agreed: a lone new tab without a source link, such as Cmd+T, opens directly beneath the previously active tab as its sibling. Restored sessions and bulk opens keep their saved placement.
 - Closing a regular tab closes only that page. Its children move up one level, preserving their order and remaining descendants. A separate "Close branch" action closes the selected branch and all its descendants.
@@ -138,7 +140,7 @@ Agreed: once a task is known, give its group a short, action-oriented name descr
 
 Agreed on 2026-10-12: the model that decides placement also decides when a task needs a name or a new one. The language model writes the name and is asked only then. See the [name check](plans/automatic-organization.md#name-check).
 
-Agreed on 2026-10-13: a new task does not wait for its name. Its tabs move at once into a task with the provisional name, and the task takes its name when the language model answers. Until then a spinner shows on the task's row and the activity card says a name is being asked for.
+Agreed on 2026-10-13: a new task does not wait for its name. Its tabs move at once into a task with the provisional name, and the task takes its name when the language model answers. Until then a spinner shows on the task's row.
 
 ### Group order
 
@@ -156,7 +158,11 @@ Agreed: expose organization controls through a custom button menu inside the tab
 
 Built: an "Organize" pill at the foot of the sidebar. Its menu has "New task", "Undo tab organization", the pause choices, "Show organizer activity", and "Tab organization settings". Tab and branch actions such as "Move to new task" and "Close branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize menu when they are built.
 
+Agreed on 2026-10-15: the [new button](plans/keyboard-and-mouse.md#new-button), a "+" with a menu, sits beside Organize and replaces the "+" under the tab list.
+
 Agreed: provide global pause choices for automatic organization: "Pause for 1 hour", "Pause until next launch", and "Pause indefinitely", plus "Resume automatic organization". Pausing stops automatic placements and task proposals across all windows, including application of pending automatic results. Manual tree controls and explicitly requested "Reorganize all tabs" remain available. An explicit reorganization still targets the current window.
+
+While automatic organization is off, the settings page hides the pause choices and the menus gray them out. Agreed on 2026-10-15.
 
 The first release supports these three pause choices only. The one-hour pause expires automatically. "Until next launch" resets when uw next starts. "Indefinitely" remains in effect until the user resumes automation.
 

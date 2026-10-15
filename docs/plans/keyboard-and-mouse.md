@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -23,8 +23,8 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Move branch up or down among its siblings | Ctrl+Cmd+↑ / ↓ | Chromium's Ctrl+Shift+PgUp/PgDn, which a terminal tab takes |
 | Collapse or expand branch | Ctrl+Cmd+. | new |
 | Close branch | Option+Cmd+W | menu only |
-| New task | Ctrl+Cmd+P | exists |
-| Move to new task | Ctrl+Cmd+N | menu only |
+| New task | Ctrl+Cmd+N | changes. Was Chromium's Ctrl+Cmd+P, which is removed. |
+| Move to new task | Shift+Ctrl+Cmd+N | changes. Was Ctrl+Cmd+N. |
 | Move to Scratchpad | Ctrl+Cmd+S | menu only |
 | Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | new. Selects the tab last used in that task. |
 | Go to the Scratchpad | Ctrl+Cmd+0 | new |
@@ -57,6 +57,30 @@ Agreed on 2026-10-15, at the user's request.
 - Terminal and chat tabs can have children like any tab.
 - A child made this way, or with "Nest under previous tab", stays with its parent. See [Branch moves](automatic-organization.md#branch-moves).
 - Once the command bar lands, the command opens it instead of a blank tab, per the [command bar plan](command-bar.md#opening-it).
+
+### Tab menu
+
+Agreed on 2026-10-15. A tab's right-click menu groups moves together, tree commands together, and every close at the end:
+
+1. New tab below, New child tab, and Chromium's split view items.
+2. Move to task ▸ (its list ends with New task), Move to new task, Move to Scratchpad, and Move to another window ▸.
+3. Nest under previous tab, Move up one level, Collapse branch, and Undo tab organization.
+4. Reload, Duplicate, Pin, and Mute site.
+5. Chromium's Read later and Send to your devices.
+6. Switch to horizontal tabs.
+7. Close tab, Close branch, Close other tabs, and Close tabs below.
+
+Chromium's "Add tab to new group" and "Remove from group" are left out: see [Product](../product.md#automatic-tab-organization).
+
+### New button
+
+Agreed on 2026-10-15.
+
+- A split button, "+" and "▾", sits beside the Organize button at the foot of the sidebar. The "+" under the tab list goes away.
+- A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
+- A click on "▾" opens a menu with each item's key: New tab, New task, New chat, New terminal, and New split view.
+- A collapsed sidebar hides Organize and "▾" and keeps a lone "+" at its foot. A right-click on it opens the same menu.
+- The design goes on the canvas before it is built.
 
 ### Branches with the mouse
 
@@ -127,6 +151,9 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 7. T59: the sidebar as a keyboard tree.
 8. T73: New child tab, its key, and "New tab below" by the right-clicked tab.
 9. T74: children nested by hand stay with their parent.
+10. T87: the tab menu in the agreed order.
+11. T88: the new button. Design first.
+12. T90: Ctrl+Cmd+N for New task and Shift+Ctrl+Cmd+N for Move to new task.
 
 T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
@@ -142,6 +169,9 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 8. Ctrl+Cmd+L focuses the tab list. The arrow keys walk the tree as described, and Esc returns focus to the page. The accessibility tree gives each tab row its level.
 9. "New child tab" on a tab that is not selected and has children opens a selected blank tab directly under it, above those children. Ctrl+Cmd+T does the same for the selected tab. "New tab below" on a tab that is not selected opens below that tab's branch.
 10. A child nested by hand moves with its parent when the organizer moves the branch, and is not filed alone when its page changes. A child opened from a link still can be. The hold survives a restart and ends when the parent closes.
+11. A tab's right-click menu lists its items in the order of [Tab menu](#tab-menu), with no "Add tab to new group" or "Remove from group".
+12. A click on the foot's "+" does what Cmd+T does, "▾" lists its five items with their keys, and the tab list has no "+". A collapsed sidebar shows a lone "+" whose right-click opens the same menu.
+13. Ctrl+Cmd+N opens a new task, Shift+Ctrl+Cmd+N moves the selected branch to a new task, and Ctrl+Cmd+P does nothing.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 

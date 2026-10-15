@@ -31,7 +31,7 @@ Agreed on 2026-10-12:
 - **Tab rows.** 34px tall with a 10px radius. The active tab is a card. Other tabs have no background until hovered.
 - **Favorites.** Pinned tabs are tiles, four per row, 44px tall with a 12px radius.
 - **Tasks.** A tab group header is a folder row: a folder icon in the group's color, the name in semibold, and a chevron. It keeps Chromium's collapse, rename, color, and drag.
-- **Sidebar foot.** The Organize button is a pill. The automatic-move message is a small card above it.
+- **Sidebar foot.** The Organize button is a pill, with the [new button](keyboard-and-mouse.md#new-button) beside it. The automatic-move message is a small card above them. The new button was added on 2026-10-15.
 - **Toolbar.** 44px tall, on the card.
 
 ## Non-goals
