@@ -58,6 +58,9 @@ _Avoid_: Subtask, subgroup, nested task.
 **Parent tab**:
 A regular tab with child tabs beneath it in the tab tree.
 
+**Child tab**:
+A regular tab nested directly under a parent tab, in its parent's tab branch and task. A child the user nested by hand stays with its parent; a child opened from a link can leave for another task.
+
 **Selected tab**:
 The tab whose page is currently displayed in a browser window.
 
