@@ -176,17 +176,25 @@ The VM uses [Tart](https://tart.run). It takes about 60 GB of disk, and 4 CPUs a
    tart set uw-window-tests --cpu 4 --memory 8192
    ```
 
-3. Open it once with `tart run uw-window-tests`. In its window, finish macOS setup with the account `admin` and password `admin`, then in System Settings turn on **Remote Login** (General > Sharing) and **Automatic login** as `admin` (Users & Groups).
+3. Open it once with `tart run uw-window-tests`. In its window, finish macOS setup with the account `admin` and password `admin`, and decline FileVault. Then turn on **Remote Login** in System Settings > General > Sharing. This is the only time the VM needs a window.
 
-4. Give the command its own SSH key, and keep the VM's screen awake:
+4. Give the command its own SSH key, then turn on automatic login and turn off sleep and the screen lock. `sysadminctl -autologin` fails on macOS 27 (error 22), so the saved-password file is written directly; its bytes encode `admin`. `192.168.64.1` is the Mac's address on the VM network:
 
    ```sh
+   vm() { ssh -b 192.168.64.1 -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)" "$@"; }
    ssh-keygen -t ed25519 -N '' -f ~/.ssh/uw-window-tests
-   ssh-copy-id -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)"
-   ssh -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)" 'echo admin | sudo -S pmset -a sleep 0 displaysleep 0'
+   ssh-copy-id -o BindAddress=192.168.64.1 -i ~/.ssh/uw-window-tests admin@"$(tart ip uw-window-tests)"
+   vm 'echo admin | sudo -S sh -c "echo 00000000: 1ced 3f4a bcbc ba2c caca 4e82 | xxd -r - /etc/kcpassword && chmod 600 /etc/kcpassword && defaults write /Library/Preferences/com.apple.loginwindow autoLoginUser admin && pmset -a sleep 0 displaysleep 0"'
+   vm 'sysadminctl -screenLock off -password admin'
+   vm 'echo admin | sudo -S shutdown -h now'
    ```
 
-5. Shut the VM down from its Apple menu.
+A VPN that sends every local network to your router, such as Tailscale with an exit node and LAN access on, also sends the VM's network there. The command and the steps above connect from the Mac's own address on that network, so they still reach the VM. The VM then has no internet, which the tests don't need, but macOS setup stalls on its Screen Time page. To give the VM internet during setup, point the route back at the VM; the VPN puts its route back the next time the VM starts:
+
+```sh
+sudo route -n delete -net 192.168.64.0/24
+sudo route -n add -net 192.168.64.0/24 -interface 192.168.64.1 -cloning
+```
 
 ## Build inputs and updates
 

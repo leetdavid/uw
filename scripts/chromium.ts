@@ -7,7 +7,7 @@ import {
   accessSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync,
   readdirSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir, totalmem } from "node:os";
+import { homedir, networkInterfaces, tmpdir, totalmem } from "node:os";
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -64,6 +64,7 @@ export interface Runtime {
   nodeVersion: string;
   memoryBytes: number;
   freeBytes: (path: string) => number;
+  addresses: () => { address: string; netmask: string }[];
   log: (message: string) => void;
 }
 
@@ -105,6 +106,7 @@ export function nativeRuntime(): Runtime {
     env: { ...process.env }, platform: process.platform, arch: process.arch,
     nodeVersion: process.versions.node, memoryBytes: totalmem(), log: console.log,
     freeBytes: (path) => { const stat = statfsSync(path); return stat.bavail * stat.bsize; },
+    addresses: () => Object.values(networkInterfaces()).flatMap((list) => list ?? []).filter(({ family }) => family === "IPv4"),
   };
 }
 
@@ -570,14 +572,20 @@ export class Chromium {
   }
 
   private guest(ip: string, script: string, inherit = false): string {
+    const bridge = this.runtime.addresses().find((local) => sameNetwork(ip, local));
     const command = [
-      "ssh", "-i", this.windowKey(), "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no",
+      "ssh", ...(bridge ? ["-b", bridge.address] : []), "-i", this.windowKey(), "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no",
       "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectionAttempts=60", `admin@${ip}`, script,
     ];
     if (!inherit) return this.capture(command, { timeout: 120_000 });
     this.run(command, this.layout.source);
     return "";
   }
+}
+
+function sameNetwork(ip: string, { address, netmask }: { address: string; netmask: string }): boolean {
+  const number = (value: string) => value.split(".").reduce((total, part) => total * 256 + Number(part), 0);
+  return (number(ip) & number(netmask)) === (number(address) & number(netmask));
 }
 
 function quote(value: string): string {
