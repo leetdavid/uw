@@ -158,7 +158,7 @@ Agreed: expose organization controls through a custom button menu inside the tab
 
 Built: an "Organize" pill at the foot of the sidebar. Its menu has "New task", "Undo tab organization", the pause choices, "Show organizer activity", and "Tab organization settings". Tab and branch actions such as "Move to new task" and "Close branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize menu when they are built.
 
-Agreed on 2026-10-15: the [new button](plans/keyboard-and-mouse.md#new-button), a "+" with a menu, sits beside Organize and replaces the "+" under the tab list.
+Agreed on 2026-10-15: the [new button](plans/keyboard-and-mouse.md#new-button), a "+" with a menu, sits at the right end of the sidebar's foot, across from Organize, and replaces the "+" under the tab list.
 
 Agreed: provide global pause choices for automatic organization: "Pause for 1 hour", "Pause until next launch", and "Pause indefinitely", plus "Resume automatic organization". Pausing stops automatic placements and task proposals across all windows, including application of pending automatic results. Manual tree controls and explicitly requested "Reorganize all tabs" remain available. An explicit reorganization still targets the current window.
 

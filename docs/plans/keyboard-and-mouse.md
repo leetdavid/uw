@@ -76,11 +76,11 @@ Chromium's "Add tab to new group" and "Remove from group" are left out: see [Pro
 
 Agreed on 2026-10-15.
 
-- A split button, "+" and "▾", sits beside the Organize button at the foot of the sidebar. The "+" under the tab list goes away.
+- A split button, "+" and "▾", sits at the right end of the sidebar's foot, with the Organize button at the left. The "+" under the tab list goes away.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
-- A click on "▾" opens a menu with each item's key: New tab, New task, New chat, New terminal, and New split view.
+- A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and New split view.
 - A collapsed sidebar hides Organize and "▾" and keeps a lone "+" at its foot. A right-click on it opens the same menu.
-- The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user has not signed off yet.
+- The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user signed off the same day once the button moved from beside Organize to the right end.
 
 ### Branches with the mouse
 
