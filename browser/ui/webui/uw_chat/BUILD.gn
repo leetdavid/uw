@@ -29,7 +29,9 @@ source_set("uw_chat") {
     "//components/tabs:public",
     "//content/public/common",
     "//uw/browser/resources/uw_chat:resources",
+    "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/components/agent",
   ]
 }
 
@@ -40,6 +42,7 @@ source_set("browser_tests") {
   deps = [
     "//base",
     "//base/test:test_support",
+    "//chrome/browser",
     "//chrome/browser/actor",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile",
@@ -53,6 +56,7 @@ source_set("browser_tests") {
     "//testing/gmock",
     "//testing/gtest",
     "//url",
+    "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/agent:test_support",
     "//uw/browser/tab_organization",

@@ -16,6 +16,8 @@
 namespace uw {
 namespace {
 
+constexpr char kHang[] = "(hang)";
+
 std::string Choice(base::DictValue message) {
   base::ListValue choices;
   choices.Append(base::DictValue().Set("message", std::move(message)));
@@ -73,6 +75,11 @@ std::string ScriptedModel::Answer(std::string_view text) {
       base::DictValue().Set("role", "assistant").Set("content", text));
 }
 
+// static
+std::string ScriptedModel::Hang() {
+  return kHang;
+}
+
 std::unique_ptr<net::test_server::HttpResponse> ScriptedModel::Serve(
     const net::test_server::HttpRequest& request) {
   if (request.relative_url != "/v1/chat/completions") {
@@ -80,6 +87,9 @@ std::unique_ptr<net::test_server::HttpResponse> ScriptedModel::Serve(
   }
   base::AutoLock lock(lock_);
   requests_.push_back(request.content);
+  if (!replies_.empty() && replies_.front() == kHang) {
+    return std::make_unique<net::test_server::HungResponse>();
+  }
   auto response = std::make_unique<net::test_server::BasicHttpResponse>();
   response->set_code(static_cast<net::HttpStatusCode>(status_));
   response->set_content_type("application/json");

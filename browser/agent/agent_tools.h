@@ -48,6 +48,11 @@ class AgentTools {
 
   void Call(std::string_view tool, const base::DictValue& args, Done done);
 
+  // The agent's open tabs by their numbers.
+  std::map<int, tabs::TabInterface*> OpenTabs() const;
+  // Gives the agent `tab` back as tab `number`, as it was before uw quit.
+  void Adopt(int number, tabs::TabInterface& tab);
+
  private:
   struct Tab {
     tabs::TabHandle handle;

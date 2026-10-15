@@ -3,6 +3,7 @@
 
 #include "uw/components/agent/agent_context.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -147,6 +148,48 @@ TEST_F(AgentContextTest, AFailedReadingIsLeftAsItIs) {
   context_.ShortenAll();
 
   EXPECT_THAT(Request(), HasSubstr("That tab is closed."));
+}
+
+TEST_F(AgentContextTest, ASavedContextComesBackTheSame) {
+  context_.AddUser("Book a tour");
+  context_.AddAssistant(
+      {"", {{"call_1", "read", R"({"tab":1})"}, {"call_2", "read", "{}"}}});
+  context_.AddResult("call_1", "read", Tab(1), Reading("Tours start at noon"));
+  context_.AddResult("call_2", "read", Tab(1), Reading("Tours start at one"));
+  const std::string before = Request();
+
+  std::unique_ptr<AgentContext> loaded =
+      AgentContext::FromValue(context_.ToValue());
+
+  ASSERT_TRUE(loaded);
+  EXPECT_EQ(loaded->Request("agent", 200000), before);
+  EXPECT_EQ(*loaded->Recall(base::DictValue().Set("step", 1))
+                 .FindStringByDottedPath("result.text"),
+            "Tours start at noon");
+  EXPECT_EQ(loaded->AddResult("call_3", "open", base::DictValue(), Tab(2)), 3);
+  EXPECT_FALSE(AgentContext::FromValue(base::DictValue()));
+  EXPECT_FALSE(AgentContext::FromValue(context_.ToValue().Set(
+      "results",
+      base::ListValue().Append(base::DictValue().Set("tool", "read")))));
+}
+
+TEST_F(AgentContextTest, AQuitAnswersTheCallsItCutShort) {
+  context_.AddUser("Book a tour");
+  context_.AddAssistant({"",
+                         {{"call_1", "type", R"({"tab":1,"element":2})"},
+                          {"call_2", "click", R"({"tab":1,"element":3})"}}});
+  context_.AddResult("call_1", "type", base::DictValue(), base::DictValue());
+
+  context_.CloseOpenCalls("uw quit first.");
+  context_.CloseOpenCalls("uw quit first.");
+
+  const std::vector<base::DictValue> contents = ToolContents();
+  ASSERT_EQ(contents.size(), 2u);
+  EXPECT_EQ(*contents[1].FindString("error"), "uw quit first.");
+  const base::DictValue recalled =
+      context_.Recall(base::DictValue().Set("step", 2));
+  EXPECT_EQ(*recalled.FindString("tool"), "click");
+  EXPECT_EQ(recalled.FindIntByDottedPath("args.element"), 3);
 }
 
 }  // namespace

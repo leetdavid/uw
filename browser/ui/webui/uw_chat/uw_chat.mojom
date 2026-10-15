@@ -11,13 +11,21 @@ interface ChatHandlerFactory {
 interface ChatHandler {
   // The user's next message. Ignored while the agent is working.
   Send(string text);
+  // Picks up a chat that stopped before it finished.
+  Resume();
 };
 
-// Matches uw::AgentLoop::Step::Kind.
+// The kinds of uw::AgentLoop::Step, and the other lines a saved chat holds.
 enum StepKind {
   kTool,
   kAnswer,
   kFailed,
+  // A message from the user.
+  kUser,
+  // The chat stopped before it finished: uw quit, or its tab closed.
+  kStopped,
+  // The user picked it up again.
+  kResumed,
 };
 
 // One step of the agent's work.
@@ -27,10 +35,13 @@ struct Step {
   string tool;
   string args;
   string result;
-  // The agent's answer, or what went wrong.
+  // The agent's answer, what went wrong, or the user's message.
   string text;
 };
 
 interface ChatPage {
+  // The chat is ready: its id for the page's address, its title, and every
+  // line it holds so far.
+  OnOpened(string id, string title, array<Step> lines);
   OnStep(Step step);
 };

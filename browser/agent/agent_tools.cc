@@ -3,11 +3,13 @@
 
 #include "uw/browser/agent/agent_tools.h"
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/to_string.h"
@@ -94,6 +96,27 @@ void AgentTools::Call(std::string_view tool,
     std::move(done).Run(
         Error(base::StrCat({"There is no tool called ", tool, "."})));
   }
+}
+
+std::map<int, tabs::TabInterface*> AgentTools::OpenTabs() const {
+  std::map<int, tabs::TabInterface*> open;
+  for (const auto& [number, tab] : tabs_) {
+    if (tabs::TabInterface* opened = tab.handle.Get()) {
+      open[number] = opened;
+    }
+  }
+  return open;
+}
+
+void AgentTools::Adopt(int number, tabs::TabInterface& tab) {
+  if (!engine_ || !engine_->GetTask(task_) || tabs_.contains(number)) {
+    return;
+  }
+  tabs_[number].handle = tab.GetHandle();
+  next_tab_ = std::max(next_tab_, number + 1);
+  engine_->GetTask(task_)->AddTab(tab.GetHandle(),
+                                  /*stop_task_on_detach=*/false,
+                                  base::DoNothing());
 }
 
 void AgentTools::Open(const base::DictValue& args, Done done) {

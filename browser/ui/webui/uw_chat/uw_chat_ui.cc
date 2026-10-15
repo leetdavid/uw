@@ -37,6 +37,8 @@ void UwChatUI::BindInterface(
 void UwChatUI::CreateHandler(
     mojo::PendingRemote<mojom::ChatPage> page,
     mojo::PendingReceiver<mojom::ChatHandler> handler) {
+  // A reload lets go of the chat before the page takes it again.
+  handler_.reset();
   handler_ = std::make_unique<UwChatHandler>(
       web_ui()->GetWebContents(), std::move(page), std::move(handler));
 }

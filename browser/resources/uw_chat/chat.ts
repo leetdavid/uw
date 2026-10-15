@@ -23,6 +23,9 @@ function add(kind: string, text: string) {
   line.scrollIntoView({block: 'end'});
 }
 
+// Nothing can be sent until the chat is loaded.
+send.disabled = true;
+
 function setWorking(on: boolean) {
   working.hidden = !on;
   send.disabled = on;
@@ -53,7 +56,7 @@ function describe(step: Step): string {
   }
 }
 
-page.onStep.addListener((step: Step) => {
+function show(step: Step) {
   switch (step.kind) {
     case StepKind.kTool:
       add(JSON.parse(step.result).error ? 'step error' : 'step',
@@ -61,12 +64,56 @@ page.onStep.addListener((step: Step) => {
       break;
     case StepKind.kAnswer:
       add('answer', step.text);
-      setWorking(false);
       break;
     case StepKind.kFailed:
       add('failed', step.text);
-      setWorking(false);
       break;
+    case StepKind.kUser:
+      add('mine', step.text);
+      break;
+    case StepKind.kStopped:
+      add('stopped', 'Stopped before it finished.');
+      break;
+    case StepKind.kResumed:
+      add('step', 'Continued');
+      break;
+  }
+}
+
+// Picks up a chat that stopped, from the button after its last line.
+function offerToContinue() {
+  const button = document.createElement('button');
+  button.id = 'continue';
+  button.type = 'button';
+  button.textContent = 'Continue';
+  button.addEventListener('click', () => {
+    button.remove();
+    show({kind: StepKind.kResumed} as Step);
+    setWorking(true);
+    handler.resume();
+  });
+  log.lastElementChild!.append(button);
+}
+
+page.onOpened.addListener((id: string, title: string, lines: Step[]) => {
+  // The chat's id in the address lets session restore reopen this chat.
+  if (location.pathname !== `/${id}`) {
+    history.replaceState(null, '', `/${id}`);
+  }
+  if (title) {
+    document.title = title;
+  }
+  lines.forEach(show);
+  if (lines.at(-1)?.kind === StepKind.kStopped) {
+    offerToContinue();
+  }
+  setWorking(false);
+});
+
+page.onStep.addListener((step: Step) => {
+  show(step);
+  if (step.kind !== StepKind.kTool) {
+    setWorking(false);
   }
 });
 
@@ -80,6 +127,7 @@ form.addEventListener('submit', (e: Event) => {
   if (!log.querySelector('.mine')) {
     document.title = text;
   }
+  document.getElementById('continue')?.remove();
   add('mine', text);
   field.value = '';
   setWorking(true);

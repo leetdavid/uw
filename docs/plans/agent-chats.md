@@ -23,7 +23,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 Added on 2026-10-15:
 
 - uw saves each chat after every step. A chat is kept until the user deletes it from the Chats list; clearing browsing data leaves it alone. Private chats are never saved.
-- After a crash, a chat that was running comes back with its tabs, marked "Stopped when uw quit", with Continue. It never repeats a step by itself.
+- After a crash, a chat that was running comes back with its tabs, marked "Stopped before it finished", with Continue. It never repeats a step by itself. The same happens when its tab closed or reloaded mid-run.
 - The chat page lists the chats on its left. Clicking one goes to its tab, or reopens the tab if it was closed. The Chats list in the sidebar stays as well.
 - The chat page shows a card for each of the agent's tabs: its title, what the agent is doing there, and a screenshot from after the last step. Clicking a card goes to the tab. "Side by side" puts the chat and the agent's current tab in Chromium's split view.
 - The chat page is a React page built from [Fluid Functionalism](https://github.com/mickadesign/fluid-functionalism)'s components, styled after the [canvas](../../AGENTS.md#designs) style guide. It is redesigned on the canvas first and built once the user signs off.
@@ -57,7 +57,7 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 - **Reading a page.** `components/agent/page_text.h` turns Chromium's annotated page content into lines of text. Each link, field, and button gets a number, such as `[2] button "Send"`, and the agent clicks or types by that number. A password's value is never shown, and ads are left out.
 - **Agent loop.** `browser/agent/agent_loop.h` runs in the browser process. It sends the conversation and the tools to the model in chat-completions form (`components/agent/agent_protocol.h`), runs the tools the model calls, and repeats until the model answers without a tool. It stops a chat that takes 40 turns without an answer. It reuses `RemoteModelClient` from `browser/tab_organization/`; that code and the Keychain code move to a shared place with T44, when the agent also needs the settings.
 - **Chat page.** `uw://chat` is a WebUI page. T47 built it in plain TypeScript, like `uw://terminal`; T70 rebuilds it in React with Fluid Functionalism, bundled by a pnpm script into files the WebUI serves.
-- **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. Its messages, steps, and every tool result in full are written to the profile folder after each step.
+- **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. `browser/agent/chat_file.h` writes it to `uw_chats/<id>.json` in the profile folder after each step, replacing the file in one step: the lines the page shows, the model's context with every tool result in full, and the agent's tabs by the tab tree's page ids. A step cut short is told to the model as one that may or may not have happened. Nothing is saved in a private window.
 - **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
 - **Approvals.** uw asks before every step the model marks as a change. It also asks before steps it can detect on its own: submitting a form, filling a password, and filling payment fields.
 

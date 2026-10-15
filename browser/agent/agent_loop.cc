@@ -38,14 +38,20 @@ AgentLoop::Step Failed(std::string text) {
 
 }  // namespace
 
-AgentLoop::AgentLoop(tabs::TabInterface& chat, AgentModel model, OnStep on_step)
+AgentLoop::AgentLoop(tabs::TabInterface& chat,
+                     AgentModel model,
+                     OnStep on_step,
+                     std::unique_ptr<AgentContext> context,
+                     base::RepeatingClosure on_change)
     : tools_(chat),
       model_(std::move(model)),
       on_step_(std::move(on_step)),
       loader_(chat.GetBrowserWindowInterface()
                   ->GetProfile()
                   ->GetDefaultStoragePartition()
-                  ->GetURLLoaderFactoryForBrowserProcess()) {}
+                  ->GetURLLoaderFactoryForBrowserProcess()),
+      context_(context ? std::move(context) : std::make_unique<AgentContext>()),
+      on_change_(std::move(on_change)) {}
 
 AgentLoop::~AgentLoop() = default;
 
@@ -55,8 +61,15 @@ void AgentLoop::Send(std::string_view text) {
   }
   working_ = true;
   turns_ = 0;
-  context_.AddUser(text);
+  context_->AddUser(text);
   AskModel();
+}
+
+void AgentLoop::Resume() {
+  Send(
+      "uw quit while you were working and has started again. Your tabs may "
+      "have reloaded or closed. Check where things stand before you go on, "
+      "and do not repeat a step that may already have happened.");
 }
 
 void AgentLoop::AskModel() {
@@ -67,7 +80,7 @@ void AgentLoop::AskModel() {
     return;
   }
   const std::optional<std::string> body =
-      context_.Request(model_.model, kMaxRequestLength);
+      context_->Request(model_.model, kMaxRequestLength);
   if (!body || !model_.url.is_valid()) {
     Finish(Failed("No agent model is set."));
     return;
@@ -97,7 +110,8 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
     Finish(Failed("The model's answer could not be read."));
     return;
   }
-  context_.AddAssistant(*turn);
+  context_->AddAssistant(*turn);
+  on_change_.Run();
   if (turn->calls.empty()) {
     Step answer;
     answer.kind = Step::Kind::kAnswer;
@@ -125,7 +139,7 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     return;
   }
   if (call.name == "recall") {
-    base::DictValue recalled = context_.Recall(*args);
+    base::DictValue recalled = context_->Recall(*args);
     OnTool(std::move(turn), index, std::move(*args), std::move(recalled));
     return;
   }
@@ -141,8 +155,8 @@ void AgentLoop::OnTool(ModelTurn turn,
                        base::DictValue args,
                        base::DictValue result) {
   const ToolCall& call = turn.calls[index];
-  context_.AddResult(call.id, call.name, args, result);
   Step step;
+  step.number = context_->AddResult(call.id, call.name, args, result);
   step.kind = Step::Kind::kTool;
   step.tool = call.name;
   step.args = std::move(args);
@@ -152,7 +166,7 @@ void AgentLoop::OnTool(ModelTurn turn,
 }
 
 void AgentLoop::Finish(Step step) {
-  context_.ShortenAll();
+  context_->ShortenAll();
   working_ = false;
   on_step_.Run(step);
 }

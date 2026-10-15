@@ -5,6 +5,7 @@
 #define UW_COMPONENTS_AGENT_AGENT_CONTEXT_H_
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -25,6 +26,10 @@ class AgentContext {
   AgentContext& operator=(const AgentContext&) = delete;
   ~AgentContext();
 
+  // A context saved by ToValue(), or null when `saved` is not one.
+  static std::unique_ptr<AgentContext> FromValue(const base::DictValue& saved);
+  base::DictValue ToValue() const;
+
   void AddUser(std::string_view text);
   void AddAssistant(const ModelTurn& turn);
   // Records what a tool answered to the call `call_id` and returns its step
@@ -37,6 +42,9 @@ class AgentContext {
   base::DictValue Recall(const base::DictValue& args) const;
   // Shortens every long result, for when the model has answered.
   void ShortenAll();
+  // Answers each tool call of the model's last turn that has no result yet
+  // with `error`. A model refuses a request with an unanswered call.
+  void CloseOpenCalls(std::string_view error);
 
   // The request for `model`. Shortens the oldest long results until it fits
   // in `max_length` characters, or nothing is left to shorten.

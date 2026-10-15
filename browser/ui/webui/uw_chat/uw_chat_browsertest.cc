@@ -6,8 +6,11 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/run_loop.h"
+#include "base/test/run_until.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -24,6 +27,7 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -84,39 +88,81 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   content::WebContents* OpenChat() {
     chrome::ExecuteCommand(browser(), kNewChatCommand);
     content::WebContents* chat = tabs()->GetActiveWebContents();
-    EXPECT_TRUE(content::WaitForLoadStop(chat));
-    EXPECT_EQ(chat->GetLastCommittedURL().spec(), "chrome://chat/");
+    WaitForChat(chat);
     return chat;
+  }
+
+  // The chat tab that session restore brought back, once its chat is loaded.
+  content::WebContents* RestoredChat() {
+    content::WebContents* chat = nullptr;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      for (int i = 0; i < tabs()->count(); ++i) {
+        if (tabs()->GetWebContentsAt(i)->GetVisibleURL().host() == "chat") {
+          chat = tabs()->GetWebContentsAt(i);
+        }
+      }
+      return chat != nullptr;
+    }));
+    WaitForChat(chat);
+    return chat;
+  }
+
+  // Waits until the page has its chat, which puts the chat's id in the page's
+  // address.
+  void WaitForChat(content::WebContents* chat) {
+    EXPECT_TRUE(content::WaitForLoadStop(chat));
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return ChatFile::IsChatId(chat->GetLastCommittedURL().path().substr(1));
+    }));
+  }
+
+  // Runs `script` and returns the next line that ends the agent's turn.
+  std::string UntilTheEnd(content::WebContents* chat,
+                          const std::string& script) {
+    return content::EvalJs(
+               chat,
+               "const ends = () => document.querySelectorAll('.answer, "
+               ".failed');"
+               "const before = ends().length;" +
+                   script +
+                   "new Promise(resolve => {"
+                   "  const check = () => ends().length > before"
+                   "      ? resolve(ends()[ends().length - 1].textContent)"
+                   "      : setTimeout(check, 20);"
+                   "  check();"
+                   "});")
+        .ExtractString();
   }
 
   // Sends `text` and returns the line that ends the agent's turn.
   std::string Ask(content::WebContents* chat, const std::string& text) {
-    return content::EvalJs(
-               chat,
-               content::JsReplace(
-                   "document.getElementById('message').value = $1;"
-                   "document.getElementById('composer').requestSubmit();"
-                   "new Promise(resolve => {"
-                   "  const check = () => {"
-                   "    const end = document.querySelector('.answer, .failed');"
-                   "    end ? resolve(end.textContent) : setTimeout(check, 20);"
-                   "  };"
-                   "  check();"
-                   "});",
-                   text))
-        .ExtractString();
+    return UntilTheEnd(
+        chat, content::JsReplace(
+                  "document.getElementById('message').value = $1;"
+                  "document.getElementById('composer').requestSubmit();",
+                  text));
+  }
+
+  std::vector<std::string> Lines(content::WebContents* chat,
+                                 std::string_view selector) {
+    std::vector<std::string> lines;
+    for (const base::Value& line :
+         content::EvalJs(
+             chat, content::JsReplace("[...document.querySelectorAll($1)]"
+                                      "    .map(line => line.textContent)",
+                                      selector))
+             .ExtractList()) {
+      lines.push_back(line.GetString());
+    }
+    return lines;
   }
 
   std::vector<std::string> Steps(content::WebContents* chat) {
-    std::vector<std::string> steps;
-    for (const base::Value& step :
-         content::EvalJs(chat,
-                         "[...document.querySelectorAll('.step')]"
-                         "    .map(line => line.textContent)")
-             .ExtractList()) {
-      steps.push_back(step.GetString());
-    }
-    return steps;
+    return Lines(chat, ".step");
+  }
+
+  std::string Form() {
+    return embedded_https_test_server().GetURL("shop.test", "/form").spec();
   }
 
   ScriptedModel model_{*embedded_test_server()};
@@ -191,6 +237,89 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ARunningChatShowsNoGeminiButton) {
                                    ->toolbar()
                                    ->GetGlicButton();
   EXPECT_FALSE(gemini && gemini->GetVisible());
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PRE_AChatComesBackAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Form())))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Answer("The tour form asks for your name.")});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_EQ(Ask(chat, "What does the tour form ask?"),
+            "The tour form asks for your name.");
+  // Lets the session take the tabs' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatComesBackAfterARestart) {
+  content::WebContents* chat = RestoredChat();
+
+  EXPECT_EQ(chat->GetTitle(), u"What does the tour form ask?");
+  EXPECT_EQ(Lines(chat, ".mine"),
+            std::vector<std::string>{"What does the tour form ask?"});
+  ASSERT_EQ(Steps(chat).size(), 2u);
+  EXPECT_EQ(Steps(chat)[1], "Read Book a tour in tab 1");
+  EXPECT_EQ(Lines(chat, ".answer"),
+            std::vector<std::string>{"The tour form asks for your name."});
+
+  // The model still knows the chat, with the page it read shortened.
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Only your name.")});
+  EXPECT_EQ(Ask(chat, "Anything else?"), "Only your name.");
+  ASSERT_EQ(model_.Requests().size(), 1u);
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("What does the tour form ask?"));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("Call recall with step 2"));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PRE_AStoppedChatGoesOnWithContinue) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Form())))),
+       ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "document.getElementById('message').value = 'Book a tour for Ada';"
+      "document.getElementById('composer').requestSubmit();"));
+  // uw quits while the model thinks about its second step.
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 2; }));
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AStoppedChatGoesOnWithContinue) {
+  content::WebContents* chat = RestoredChat();
+  ASSERT_EQ(Lines(chat, ".stopped"),
+            std::vector<std::string>{"Stopped before it finished.Continue"});
+
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "navigate", base::DictValue().Set("tab", 1).Set("url", Form())))),
+       ScriptedModel::Answer("Back on the form.")});
+  EXPECT_EQ(UntilTheEnd(chat, "document.getElementById('continue').click();"),
+            "Back on the form.");
+
+  // The agent works on in the tab it had before uw quit.
+  ASSERT_EQ(Steps(chat).size(), 3u);
+  EXPECT_EQ(Steps(chat)[1], "Continued");
+  EXPECT_EQ(Steps(chat)[2], "Went to " + Form() + " in tab 1");
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("uw quit while you were working"));
+  EXPECT_EQ(Lines(chat, ".stopped"),
+            std::vector<std::string>{"Stopped before it finished."});
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {

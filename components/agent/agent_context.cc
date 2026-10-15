@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -27,6 +28,55 @@ AgentContext::AgentContext() {
 }
 
 AgentContext::~AgentContext() = default;
+
+// static
+std::unique_ptr<AgentContext> AgentContext::FromValue(
+    const base::DictValue& saved) {
+  const base::ListValue* messages = saved.FindList("messages");
+  const base::ListValue* results = saved.FindList("results");
+  if (!messages || messages->empty() || !results ||
+      !std::ranges::all_of(*messages, &base::Value::is_dict)) {
+    return nullptr;
+  }
+  auto context = std::make_unique<AgentContext>();
+  // The instructions of this version of uw, not the saved ones.
+  base::ListValue kept = messages->Clone();
+  kept[0] = base::Value(AgentInstructions());
+  context->messages_ = std::move(kept);
+  for (const base::Value& entry : *results) {
+    const base::DictValue* result = entry.GetIfDict();
+    const std::string* tool = result ? result->FindString("tool") : nullptr;
+    const base::DictValue* args = result ? result->FindDict("args") : nullptr;
+    const base::DictValue* value =
+        result ? result->FindDict("result") : nullptr;
+    const std::optional<int> message =
+        result ? result->FindInt("message") : std::nullopt;
+    if (!tool || !args || !value || !message || *message < 1 ||
+        static_cast<size_t>(*message) >= messages->size()) {
+      return nullptr;
+    }
+    context->results_.push_back(
+        {static_cast<int>(context->results_.size()) + 1, *tool, args->Clone(),
+         value->Clone(), static_cast<size_t>(*message),
+         result->FindBool("shortened").value_or(false)});
+  }
+  return context;
+}
+
+base::DictValue AgentContext::ToValue() const {
+  base::ListValue results;
+  for (const Result& result : results_) {
+    results.Append(base::DictValue()
+                       .Set("tool", result.tool)
+                       .Set("args", result.args.Clone())
+                       .Set("result", result.result.Clone())
+                       .Set("message", static_cast<int>(result.message))
+                       .Set("shortened", result.shortened));
+  }
+  return base::DictValue()
+      .Set("messages", messages_.Clone())
+      .Set("results", std::move(results));
+}
 
 void AgentContext::AddUser(std::string_view text) {
   messages_.Append(UserMessage(text));
@@ -83,6 +133,50 @@ void AgentContext::ShortenAll() {
   for (Result& result : results_) {
     if (!result.shortened && CanShorten(result)) {
       Shorten(result);
+    }
+  }
+}
+
+void AgentContext::CloseOpenCalls(std::string_view error) {
+  size_t turn = messages_.size();
+  while (turn > 0) {
+    const std::string* role = messages_[turn - 1].GetDict().FindString("role");
+    if (role && *role == "assistant") {
+      break;
+    }
+    if (!role || *role != "tool") {
+      return;
+    }
+    --turn;
+  }
+  const base::ListValue* calls =
+      turn == 0 ? nullptr
+                : messages_[turn - 1].GetDict().FindList("tool_calls");
+  if (!calls) {
+    return;
+  }
+  const base::ListValue open = calls->Clone();
+  for (const base::Value& entry : open) {
+    const base::DictValue* call = entry.GetIfDict();
+    const std::string* id = call ? call->FindString("id") : nullptr;
+    const std::string* name =
+        call ? call->FindStringByDottedPath("function.name") : nullptr;
+    const std::string* arguments =
+        call ? call->FindStringByDottedPath("function.arguments") : nullptr;
+    if (!id || !name) {
+      continue;
+    }
+    const bool answered = std::any_of(
+        messages_.begin() + turn, messages_.end(), [&](const base::Value& m) {
+          const std::string* answers = m.GetDict().FindString("tool_call_id");
+          return answers && *answers == *id;
+        });
+    if (!answered) {
+      AddResult(*id, *name,
+                base::JSONReader::ReadDict(arguments ? *arguments : "",
+                                           base::JSON_PARSE_RFC)
+                    .value_or(base::DictValue()),
+                base::DictValue().Set("error", error));
     }
   }
 }

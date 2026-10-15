@@ -122,6 +122,8 @@ A chat clicks and types without asking for approval, which comes later. Try it o
 
 Expected result: the chat tab takes your first message as its title. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a line in the chat, then the answer. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
 
+Chats are saved after every step. Quit uw in the middle of one and start it again with "Continue where you left off" set at `chrome://settings/onStartup`. Expected result: the chat tab comes back with everything it showed and the line `Stopped before it finished` with `Continue`. Continue goes on in the same agent tabs. A chat whose tab you closed cannot be reopened yet.
+
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.

@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
@@ -42,7 +43,9 @@ class AgentLoop {
   struct Step {
     enum class Kind { kTool, kAnswer, kFailed };
     Kind kind = Kind::kFailed;
-    // For a tool: its name, what the model asked, and what the tool answered.
+    // For a tool: its step number, its name, what the model asked, and what
+    // the tool answered.
+    int number = 0;
     std::string tool;
     base::DictValue args;
     base::DictValue result;
@@ -51,14 +54,24 @@ class AgentLoop {
   };
   using OnStep = base::RepeatingCallback<void(const Step&)>;
 
-  AgentLoop(tabs::TabInterface& chat, AgentModel model, OnStep on_step);
+  // Goes on from `context` when there is one. `on_change` runs when the
+  // model's turn arrives, before its tools run, so the turn can be saved.
+  AgentLoop(tabs::TabInterface& chat,
+            AgentModel model,
+            OnStep on_step,
+            std::unique_ptr<AgentContext> context = nullptr,
+            base::RepeatingClosure on_change = base::DoNothing());
   AgentLoop(const AgentLoop&) = delete;
   AgentLoop& operator=(const AgentLoop&) = delete;
   ~AgentLoop();
 
   // Sends the user's next message. Does nothing while the agent works.
   void Send(std::string_view text);
+  // Picks the chat up again after uw quit while the agent was working.
+  void Resume();
   bool working() const { return working_; }
+  const AgentContext& context() const { return *context_; }
+  AgentTools& tools() { return tools_; }
 
  private:
   void AskModel();
@@ -74,7 +87,8 @@ class AgentLoop {
   const AgentModel model_;
   const OnStep on_step_;
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
-  AgentContext context_;
+  const std::unique_ptr<AgentContext> context_;
+  const base::RepeatingClosure on_change_;
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;
