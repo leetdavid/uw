@@ -7,6 +7,13 @@ import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import { ChevronRight, Plus } from "lucide-react";
+import {
+  Banner,
+  BannerAction,
+  BannerActions,
+  BannerDescription,
+  BannerTitle,
+} from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { AddProviderDialog } from "./add-provider";
 import { ModelChip } from "./model-chip";
@@ -20,6 +27,7 @@ import {
   ModelSlot,
   ProviderFormat,
   TestOutcome,
+  UpgradeNotice,
   providersHandler,
   type ModelList,
   type Provider,
@@ -84,7 +92,9 @@ function TestLine({
   if (!result) {
     return (
       <p role="status" className="text-[12.5px] text-muted-foreground">
-        {tested ? "Passed its test." : "Not tested yet."}
+        {tested
+          ? "Passed its test."
+          : "Not tested yet. Automatic organization waits until it passes."}
       </p>
     );
   }
@@ -110,6 +120,42 @@ function TestLine({
         </pre>
       )}
     </div>
+  );
+}
+
+// Shown once, after the first launch that turned the saved connections into
+// providers.
+function UpgradeBanner({
+  notice,
+  onDismiss,
+}: {
+  notice: UpgradeNotice;
+  onDismiss: () => void;
+}) {
+  if (notice === UpgradeNotice.kNone) {
+    return null;
+  }
+  const failed = notice === UpgradeNotice.kFailed;
+  return (
+    <Banner status={failed ? "warning" : "info"} contrast="high" className="mt-4">
+      <BannerTitle>
+        {failed
+          ? "uw could not move your saved keys."
+          : "Your saved connections are providers now."}
+      </BannerTitle>
+      <BannerDescription>
+        {failed
+          ? "Your old settings stay as they were. Add your providers here with their keys; uw tries the move again at the next launch."
+          : notice === UpgradeNotice.kMerged
+            ? "The organizer and chats use the same models as before. Connections with the same address and key share one provider."
+            : "The organizer and chats use the same models as before."}
+      </BannerDescription>
+      <BannerActions>
+        <BannerAction variant="primary" onClick={onDismiss}>
+          Got it
+        </BannerAction>
+      </BannerActions>
+    </Banner>
   );
 }
 
@@ -155,6 +201,13 @@ function ProvidersList({
       <p className="mt-1 text-[13.5px] text-muted-foreground">
         Add each provider once. Every model in uw comes from one of them.
       </p>
+      <UpgradeBanner
+        notice={data.upgradeNotice}
+        onDismiss={async () => {
+          await providersHandler.dismissUpgradeNotice();
+          onChanged();
+        }}
+      />
 
       <h2 className="mb-2 mt-[22px] flex h-[30px] items-center text-[13px] font-semibold">
         Models
@@ -299,6 +352,7 @@ function Providers() {
         [ModelSlot.kAgent]: state.agent,
       },
       lists: old?.lists ?? {},
+      upgradeNotice: state.upgradeNotice,
     }));
   }, []);
 

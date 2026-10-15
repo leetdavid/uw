@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..a7503c91dc7958c8a089c76d99554a192376fa9c 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..579e47e5c5df25060eb72cca47349040fe0cd46f 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,199 @@
+@@ -3904,6 +3904,106 @@
          System
        </message>
      </if>
@@ -21,8 +21,11 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7503c91dc7958c8a089c76d99554a19
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_PAUSED" desc="Status line when automatic organization is paused.">
 +        Automatic organization is paused
 +      </message>
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_WAITING" desc="Status line when automatic organization is on but waits for its models.">
++        Automatic organization is waiting
++      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT" desc="Hint under the status line when automatic organization is off.">
-+        Save and validate a model below to turn it on.
++        Turn it on to file each tab branch into a task. Its models are picked on AI providers.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES" desc="Says which model decides tab placement.">
 +        <ph name="MODEL">$1<ex>Jev</ex></ph> decides where tabs go.
@@ -33,119 +36,23 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7503c91dc7958c8a089c76d99554a19
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES_AND_NAMES" desc="Says which model both decides tab placement and names new tasks.">
 +        <ph name="MODEL">$1<ex>llama3.2</ex></ph> decides where tabs go and names new tasks.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_TITLE" desc="Heading of the decision model settings.">
-+        Decision model
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_NO_MODEL" desc="Says what automatic organization waits for when it has no model.">
++        Pick a language model or a decision model on AI providers.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_NOTE" desc="Explains what the decision model does.">
-+        Decides whether a tab belongs to one of your tasks, starts a new one, or goes to the Scratchpad, and whether a task has outgrown the name uw gave it. It answers with a choice and a confidence, never text. With None, the language model decides where tabs go.
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_LANGUAGE_TEST" desc="Says what automatic organization waits for when its language model has not passed a test.">
++        Test the language model on AI providers. Automatic organization starts once it passes.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER" desc="Label of the decision model provider choice.">
-+        Provider
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_DECISION_TEST" desc="Says what automatic organization waits for when its decision model has not passed a test.">
++        Test the decision model on AI providers. Automatic organization starts once it passes.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_NONE" desc="Decision model provider choice: no decision model.">
-+        None
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_TITLE" desc="Title of the row that opens the uw://providers page.">
++        AI providers
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_JEV" desc="Decision model provider choice. Jev is a product name.">
-+        Jev
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDER_OPENAI" desc="Decision model provider choice. A product name.">
-+        OpenAI Decisions API
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_OPENAI_COMPATIBLE" desc="Choice for an endpoint that follows the OpenAI API at another address.">
-+        OpenAI-compatible
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_TITLE" desc="Heading of the language model settings.">
-+        Language model
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_NOTE" desc="Explains what the language model does.">
-+        Names a task when it starts, and again when the decision model finds the task has outgrown that name. uw keeps a name you typed. Leave the model empty to go without names.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_AGENT_TITLE" desc="Heading of the settings for the model behind chats with uw's agent.">
-+        Agent model
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_AGENT_NOTE" desc="Explains what the agent model does and what it needs.">
-+        Runs chats. It needs a model that calls tools. Until you save one, chats use the language model.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_CONNECTION" desc="Label of the language model connection choice.">
-+        Connection
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_OLLAMA" desc="Language model connection choice. Ollama is a product name.">
-+        Ollama
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_ENDPOINT" desc="Label of a model endpoint field.">
-+        Endpoint
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODEL" desc="Label of a model name field.">
-+        Model
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOAD_MODELS" desc="Button that fetches the model list of an endpoint.">
-+        Load available models
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LOADING" desc="Status while the model list loads.">
-+        Loading models…
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_LOADED" desc="Status after the model list loads.">
-+        Models found: <ph name="COUNT">$1<ex>3</ex></ph>
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_ERROR" desc="Status when the model list could not be loaded.">
-+        Could not load models
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_MODELS_EMPTY" desc="Status when the endpoint lists no models.">
-+        No models found
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY" desc="Label of an API key field.">
-+        API key
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_KEY_SAVED" desc="Note that an API key is stored in the macOS Keychain.">
-+        Saved in Keychain
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_NO_KEY" desc="Note that no API key is stored.">
-+        No API key saved
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_SAVE" desc="Button that saves the model settings and checks each connection.">
-+        Save and validate
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_CHECKING" desc="Status while the connections are checked.">
-+        Checking…
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_VALIDATED" desc="Status after every connection validated.">
-+        Validated. Automatic organization is on.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR" desc="Status after a save when the decision model failed its test. The test result is shown in the decision model section above.">
-+        The decision model did not pass its test. See its result above.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR" desc="Status after a save when the language model failed its test. The test result is shown in the language model section above.">
-+        The language model did not pass its test. See its result above.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST" desc="Button that sends one test request to a model connection as entered, without saving it.">
-+        Test connection
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_PASSED" desc="Result of a connection test that worked.">
-+        Works. <ph name="MODEL">$1<ex>jev-latest</ex></ph> answered in <ph name="SECONDS">$2<ex>1.4</ex></ph> seconds.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_INCOMPLETE" desc="Result of a connection test that could not be sent.">
-+        Not ready to test. Check the endpoint, the model, and the API key. The endpoint must start with https, or with http for this computer.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_RESPONSE" desc="Result of a connection test when the provider sent no answer. ERROR is a network error code.">
-+        No answer from <ph name="HOST">$1<ex>api.typesafe.ai</ex></ph> (<ph name="ERROR">$2<ex>ERR_TIMED_OUT</ex></ph>).
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_HTTP_ERROR" desc="Result of a connection test when the provider answered with an HTTP error status. The provider's own error message may follow this sentence.">
-+        <ph name="HOST">$1<ex>api.typesafe.ai</ex></ph> answered with HTTP <ph name="STATUS">$2<ex>401</ex></ph>.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_UNUSABLE" desc="Result of a connection test when the model answered in a form uw cannot use.">
-+        <ph name="MODEL">$1<ex>llama3.2</ex></ph> answered, but not in the form uw needs. The details show its answer.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_NO_TOOL_CALL" desc="Result of a connection test when the agent model answered without calling a tool.">
-+        <ph name="MODEL">$1<ex>llama3.2</ex></ph> answered without calling a tool. Chats need a model that calls tools.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TEST_DETAILS" desc="Label that opens the request and the answer of the last connection test.">
-+        Details
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET" desc="Status when a save has no model to validate.">
-+        Choose a decision model or enter a language model first.
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_NOTE" desc="Under the title of the row that opens the uw://providers page.">
++        Models and keys moved to their own page
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
-+        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models above. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too. API keys stay in the macOS Keychain.
++        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models picked on AI providers. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_MOVE" desc="Label of the slider that sets how sure a model must be before a tab moves into a task or out of one.">
 +        Move a tab

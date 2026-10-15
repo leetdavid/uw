@@ -47,6 +47,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace uw {
 namespace {
@@ -109,12 +110,12 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   TabStripModel* tabs() { return browser()->tab_strip_model(); }
 
   void UseAgentModel() {
-    PrefService* prefs = browser()->GetProfile()->GetPrefs();
-    prefs->SetInteger(kAgentModePref,
-                      static_cast<int>(ConnectionMode::kOllama));
-    prefs->SetString(kAgentEndpointPref,
-                     embedded_test_server()->GetURL("/v1").spec());
-    prefs->SetString(kAgentModelPref, "test-agent");
+    PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Test server";
+    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    SetChoice(prefs, ModelSlot::kAgent, AddProvider(prefs, provider),
+              "test-agent");
   }
 
   content::WebContents* OpenChat() {
@@ -975,7 +976,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {
   content::WebContents* chat = OpenChat();
 
   EXPECT_EQ(Ask(chat, "Book a tour for Ada"),
-            "Set an agent model on uw's settings page first.");
+            "Pick a model on AI providers first.");
   EXPECT_TRUE(model_.Requests().empty());
 }
 
@@ -1064,7 +1065,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   model_.Script({ScriptedModel::Answer("Booked.")});
   content::WebContents* chat = OpenChat();
   ASSERT_EQ(Ask(chat, "Book a tour for Ada"),
-            "Set an agent model on uw's settings page first.");
+            "Pick a model on AI providers first.");
 
   UseAgentModel();
   EXPECT_EQ(UntilTheEnd(chat, "document.getElementById('try-again').click();"),

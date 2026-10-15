@@ -79,6 +79,7 @@
 #include "uw/browser/ui/views/tab_organization/name_lock.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/ui/views/tab_organization/suggest_name_item.h"
+#include "uw/components/ai_providers/providers.h"
 #include "uw/components/tab_organization/placement.h"
 
 namespace uw {
@@ -148,25 +149,35 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
 
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
 
-  void UseDecisionModel(DecisionProvider provider) {
-    ASSERT_TRUE(ApiKeyStore().SetKey(kDecisionKeyAccount, "decision-key"));
-    prefs()->SetInteger(kDecisionProviderPref, static_cast<int>(provider));
-    prefs()->SetString(kDecisionEndpointPref,
-                       embedded_test_server()->GetURL("/v1").spec());
-    prefs()->SetString(kDecisionModelPref, "decision-model");
-    prefs()->SetString(kDecisionKeyAccountPref, kDecisionKeyAccount);
+  // Picks `model` at a provider at the test server that speaks `format`, as
+  // uw://providers saves it once the model passed its test, and turns
+  // automatic organization on.
+  void UseModel(ModelSlot slot,
+                ProviderFormat format,
+                const std::string& model,
+                const std::string& key) {
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = model;
+    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    provider.format = format;
+    provider.id = AddProvider(*prefs(), provider);
+    provider.key_account = KeyAccountFor(provider.id);
+    ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, key));
+    UpdateProvider(*prefs(), provider);
+    SetChoice(*prefs(), slot, provider.id, model);
+    MarkTested(*prefs(), slot, *ReadChoice(*prefs(), slot));
     prefs()->SetBoolean(kOrganizationEnabledPref, true);
   }
 
+  // Jev speaks System One; the OpenAI Decisions API and compatible gateways
+  // speak Decisions.
+  void UseDecisionModel(ProviderFormat format) {
+    UseModel(ModelSlot::kDecision, format, "decision-model", "decision-key");
+  }
+
   void UseLanguageModel() {
-    ASSERT_TRUE(ApiKeyStore().SetKey(kLanguageKeyAccount, "language-key"));
-    prefs()->SetInteger(kOrganizationModePref,
-                        static_cast<int>(ConnectionMode::kOpenAiCompatible));
-    prefs()->SetString(kOrganizationEndpointPref,
-                       embedded_test_server()->GetURL("/v1").spec());
-    prefs()->SetString(kOrganizationModelPref, "language-model");
-    prefs()->SetString(kOrganizationKeyAccountPref, kLanguageKeyAccount);
-    prefs()->SetBoolean(kOrganizationEnabledPref, true);
+    UseModel(ModelSlot::kLanguage, ProviderFormat::kChatCompletions,
+             "language-model", "language-key");
   }
 
   TabOrganizationController* controller() {
@@ -443,7 +454,7 @@ class OrganizerLogBrowserTest : public AutomaticOrganizerBrowserTest {
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        DecisionModelFilesALinkedTabIntoItsTask) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
 
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
@@ -479,7 +490,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        JevDecidesAndTheLanguageModelNamesTheNewTask) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
@@ -530,7 +541,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // tabs back and drops the request for the name.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ANewTaskStartsBeforeItsName) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Hold("/v1/chat/completions");
@@ -582,7 +593,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        DecisionModelAloneCreatesAnUnnamedTask) {
-  UseDecisionModel(DecisionProvider::kOpenAi);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer("none", 0.93, 0.8));
 
   tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
@@ -613,7 +624,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        UnsureAndFailedAnswersLeaveTheTabWhereItIs) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
@@ -656,7 +667,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TheSidebarSaysWhenAModelIsAskedAndThenClears) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   // What the card showed as each step was reported.
   std::vector<AutomaticOrganizer::Event::Kind> kinds;
@@ -687,7 +698,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TheCardFitsInACrowdedSidebar) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   BrowserView::GetBrowserViewForBrowser(browser())->GetWidget()->SetBounds(
       gfx::Rect(0, 0, 1000, 600));
@@ -730,7 +741,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        EveryRequestAndItsAnswerIsWritten) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
@@ -771,7 +782,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        AConfirmedSuggestionMovesTheTabAndIsLogged) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
@@ -821,7 +832,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   const auto [ungrouped, task] = OneTask();
   tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   ASSERT_EQ(in_task->GetGroup(), task);
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
   tabs::TabInterface* link = OpenLinkFrom(in_task, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
@@ -871,7 +882,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ATabThatClearlyStartsATaskLeavesForItsOwn) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8));
   Answer("/v1/chat/completions", ChatAnswer("Compare laptops"));
@@ -895,7 +906,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // and they leave together, with one request for a name.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ABranchThatFitsNoTaskLeavesTogether) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Research Warp"));
@@ -971,7 +982,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   const auto [ungrouped, task] = OneTask();
   tabs::TabInterface* in_task = tabs()->GetTabAtIndex(0);
   ASSERT_EQ(in_task->GetGroup(), task);
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.95));
   AnswerAbout("weather", SystemOneAnswer("none", 0.97, 0.1));
   AnswerAbout("radar", SystemOneAnswer("none", 0.6, 0.1));
@@ -1007,7 +1018,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // and the feed stays in the Scratchpad.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AFeedStaysWhenATabOpenedFromItStartsATask) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   AnswerAbout("feed", SystemOneAnswer("none", 0.99, 0.9, std::nullopt,
                                       /*hub=*/0.97));
   AnswerAbout("article", SystemOneAnswer("none", 0.99, 0.9, std::nullopt,
@@ -1039,7 +1050,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   tabs::TabInterface* leaves = OpenLinkFrom(page, "radar");
   ASSERT_EQ(leaves->GetGroup(), task);
 
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.1));
   AnswerAbout("hotels", SystemOneAnswer(task.ToString(), 0.95));
   organizer()->DispatchNowForTesting();
@@ -1072,7 +1083,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ATaskWithoutANameIsNotOfferedAndKeepsItsTabs) {
   OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
   tabs::TabInterface* opened = tabs()->GetActiveTab();
@@ -1112,7 +1123,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // name, the next tab in the task that changes asks again, one-off or not.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ATaskWithoutANameIsNamedWhenATabStartsIt) {
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   UseLanguageModel();
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
@@ -1175,7 +1186,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 // change to a one-off.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ANameThatFailedIsAskedForAgain) {
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   UseLanguageModel();
   Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.97));
   Fail("/v1/chat/completions", 401);
@@ -1200,26 +1211,27 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AMockKeychainRunLeavesTheUsersKeysAlone) {
   ApiKeyStore keys;
+  const std::string account = KeyAccountFor("openai");
   {
     // The user's own browser runs without the switch.
     base::test::ScopedCommandLine their_run;
     their_run.GetProcessCommandLine()->RemoveSwitch(
         os_crypt::switches::kUseMockKeychain);
-    ASSERT_TRUE(keys.SetKey(kLanguageKeyAccount, "their-key"));
+    ASSERT_TRUE(keys.SetKey(account, "their-key"));
   }
 
-  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
-  ASSERT_TRUE(keys.SetKey(kLanguageKeyAccount, "test-key"));
-  EXPECT_EQ(keys.GetKey(kLanguageKeyAccount), "test-key");
-  EXPECT_TRUE(keys.DeleteKey(kLanguageKeyAccount));
-  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
+  EXPECT_FALSE(keys.GetKey(account));
+  ASSERT_TRUE(keys.SetKey(account, "test-key"));
+  EXPECT_EQ(keys.GetKey(account), "test-key");
+  EXPECT_TRUE(keys.DeleteKey(account));
+  EXPECT_FALSE(keys.GetKey(account));
 
   base::test::ScopedCommandLine their_run;
   their_run.GetProcessCommandLine()->RemoveSwitch(
       os_crypt::switches::kUseMockKeychain);
-  EXPECT_EQ(keys.GetKey(kLanguageKeyAccount), "their-key");
-  EXPECT_TRUE(keys.DeleteKey(kLanguageKeyAccount));
-  EXPECT_FALSE(keys.GetKey(kLanguageKeyAccount));
+  EXPECT_EQ(keys.GetKey(account), "their-key");
+  EXPECT_TRUE(keys.DeleteKey(account));
+  EXPECT_FALSE(keys.GetKey(account));
 }
 
 // A tab that no longer matches the name of its task has either left the task
@@ -1227,7 +1239,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // which, and only a name uw gave is replaced.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ATaskThatOutgrowsItsNameIsRenamed) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
@@ -1310,7 +1322,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 // while automatic organization is off.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OnlyANameTheUserTypedIsLocked) {
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
   base::RunLoop().RunUntilIdle();
   const std::optional<tab_groups::TabGroupId> task =
@@ -1340,7 +1352,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // renames the task once it has outgrown that name.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AClickOnTheLockHandsTheNameBack) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
@@ -1385,7 +1397,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
       controller()->MoveToNewTask({Id(InitialTab())}, u"Mine");
   ASSERT_TRUE(mine);
 
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Compare Baixa hotels"));
@@ -1428,7 +1440,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   }
   ASSERT_TRUE(restored);
   ASSERT_TRUE(own);
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer(named->ToString(), 0.95, 0.0, 0.1));
   OpenLinkFrom(restored, "alfama");
@@ -1458,7 +1470,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // own, and the name check does not hold it back.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AChildTabBreaksOutOfItsParentsTask) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
@@ -1503,7 +1515,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        EachThresholdSetsHowSureOneKindOfAnswerMustBe) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.75));
 
@@ -1545,7 +1557,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // nor start a task on these answers, and still renames the task.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TheRenameThresholdIsItsOwn) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
@@ -1572,7 +1584,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        OnlyANewTitleOrAnotherSiteAsksAgain) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
@@ -1622,7 +1634,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        APinnedTabIsNeverAskedAbout) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.99));
 
   // Pinning a tab drops the request that was out for it.
@@ -1652,7 +1664,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AConfirmedNewTaskIsNamedByTheLanguageModel) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.6));
@@ -1675,7 +1687,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ASuggestionForAChangedTabIsNotCarriedOut) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
@@ -1692,7 +1704,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AManualMoveBeforeTheAnswerWins) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.99));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
 
@@ -1710,7 +1722,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AManualMoveHidesTheMessage) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
   tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
   ASSERT_TRUE(SettleAfter(1));
@@ -1768,7 +1780,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        PauseStopsRequestsUntilResumed) {
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
   SetPauseState(prefs(), PauseMode::kIndefinite);
 
@@ -1823,7 +1835,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // spinner, and no second request goes out.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        SuggestANameWaitsForTheLanguageModel) {
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
   {
     std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
@@ -1883,7 +1895,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OrganizationOffSendsNothing) {
-  UseDecisionModel(DecisionProvider::kOpenAiCompatible);
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   prefs()->SetBoolean(kOrganizationEnabledPref, false);
   Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.99));
 
@@ -1901,7 +1913,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   // zsh finds none of the user's startup files there, so it sets no title.
   base::Environment::Create()->SetVar("ZDOTDIR", "/var/empty");
   const auto [ungrouped, task] = OneTask();
-  UseDecisionModel(DecisionProvider::kJev);
+  UseDecisionModel(ProviderFormat::kSystemOne);
   Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.97));
 
   chrome::ExecuteCommand(browser(), kNewTerminalCommand);
@@ -1920,6 +1932,108 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(requests[0].body.find("Title: " + name), std::string::npos);
   EXPECT_NE(requests[0].body.find("Folder: ~"), std::string::npos);
   EXPECT_EQ(requests[0].body.find("Page excerpt"), std::string::npos);
+}
+
+// Before uw://providers, settings saved a language, a decision, and an agent
+// connection. The first window of the build that has the page turns them
+// into providers, and the organizer goes on with the same models.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       SavedConnectionsBecomeProvidersOnce) {
+  ApiKeyStore keys;
+  const std::string address = embedded_test_server()->GetURL("/v1").spec();
+  ASSERT_TRUE(keys.SetKey("organization", "shared-key"));
+  ASSERT_TRUE(keys.SetKey("agent", "shared-key"));
+  ASSERT_TRUE(keys.SetKey("decision", "jev-key"));
+  prefs()->SetInteger(kOrganizationModePref, 1);
+  prefs()->SetString(kOrganizationEndpointPref, address);
+  prefs()->SetString(kOrganizationModelPref, "language-model");
+  prefs()->SetString(kOrganizationKeyAccountPref, "organization");
+  prefs()->SetInteger(kAgentModePref, 1);
+  prefs()->SetString(kAgentEndpointPref, address);
+  prefs()->SetString(kAgentModelPref, "agent-model");
+  prefs()->SetString(kAgentKeyAccountPref, "agent");
+  prefs()->SetInteger(kDecisionProviderPref, 1);
+  prefs()->SetString(kDecisionKeyAccountPref, "decision");
+  prefs()->SetBoolean(kOrganizationEnabledPref, true);
+
+  MoveConnectionsToProviders(prefs());
+
+  // The language and agent connections shared an address and a key.
+  const std::vector<Provider> providers = ReadProviders(*prefs());
+  ASSERT_EQ(providers.size(), 2u);
+  EXPECT_EQ(providers[0].preset, ProviderPreset::kCustom);
+  EXPECT_EQ(providers[0].name, "127.0.0.1");
+  EXPECT_EQ(providers[0].address, address);
+  EXPECT_EQ(keys.GetKey(providers[0].key_account), "shared-key");
+  EXPECT_EQ(providers[1].preset, ProviderPreset::kJev);
+  EXPECT_EQ(keys.GetKey(providers[1].key_account), "jev-key");
+
+  // Automatic organization was on, so its models had passed their tests.
+  const ModelChoice language = *ReadChoice(*prefs(), ModelSlot::kLanguage);
+  EXPECT_EQ(language.provider_id, providers[0].id);
+  EXPECT_EQ(language.model, "language-model");
+  EXPECT_TRUE(language.tested);
+  const ModelChoice decision = *ReadChoice(*prefs(), ModelSlot::kDecision);
+  EXPECT_EQ(decision.provider_id, providers[1].id);
+  EXPECT_EQ(decision.model, "jev-latest");
+  EXPECT_TRUE(decision.tested);
+  EXPECT_EQ(ReadChoice(*prefs(), ModelSlot::kAgent)->model, "agent-model");
+  EXPECT_TRUE(OrganizationReady(prefs()));
+  EXPECT_EQ(ReadDecisionModelConfig(prefs()).format,
+            DecisionFormat::kSystemOne);
+  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "agent-model");
+
+  // The old connections and their Keychain accounts are gone, so a second
+  // run changes nothing.
+  EXPECT_EQ(prefs()->GetString(kOrganizationModelPref), "");
+  EXPECT_EQ(prefs()->GetInteger(kDecisionProviderPref), 0);
+  EXPECT_EQ(prefs()->GetString(kAgentEndpointPref), "");
+  for (const char* account : {"organization", "agent", "decision"}) {
+    EXPECT_FALSE(keys.GetKey(account)) << account;
+  }
+  EXPECT_EQ(prefs()->GetInteger(kUpgradeNoticePref),
+            static_cast<int>(UpgradeNotice::kMerged));
+  MoveConnectionsToProviders(prefs());
+  EXPECT_EQ(ReadProviders(*prefs()).size(), 2u);
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ANewWindowMovesTheSavedConnections) {
+  prefs()->SetString(kOrganizationEndpointPref, "http://localhost:11434/v1");
+  prefs()->SetString(kOrganizationModelPref, "llama3.2");
+
+  CreateBrowser(browser()->GetProfile());
+
+  const std::vector<Provider> providers = ReadProviders(*prefs());
+  ASSERT_EQ(providers.size(), 1u);
+  EXPECT_EQ(providers[0].preset, ProviderPreset::kOllama);
+  EXPECT_EQ(providers[0].key_account, "");
+  // Automatic organization was off, so nothing says the model passed a test.
+  EXPECT_FALSE(ReadChoice(*prefs(), ModelSlot::kLanguage)->tested);
+  EXPECT_EQ(prefs()->GetInteger(kUpgradeNoticePref),
+            static_cast<int>(UpgradeNotice::kMoved));
+}
+
+// A model picked on uw://providers waits for its test before automatic
+// organization sends it anything.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ANewlyPickedModelWaitsForItsTest) {
+  Answer("/v1/chat/completions",
+         ChatAnswer(R"({\"task\":\"none\",\"confidence\":0.9,)"
+                    R"(\"new_task\":0.95,\"task_name\":\"Plan a trip\"})"));
+  UseLanguageModel();
+  const ModelChoice picked = *ReadChoice(*prefs(), ModelSlot::kLanguage);
+  SetChoice(*prefs(), ModelSlot::kLanguage, picked.provider_id, "other-model");
+  EXPECT_FALSE(OrganizationReady(prefs()));
+  EXPECT_EQ(UntestedModel(prefs()), ModelSlot::kLanguage);
+
+  Browse(InitialTab(), "flights");
+  ASSERT_TRUE(SettleAfter(0));
+  EXPECT_TRUE(Requests().empty());
+
+  MarkTested(*prefs(), ModelSlot::kLanguage,
+             *ReadChoice(*prefs(), ModelSlot::kLanguage));
+  EXPECT_TRUE(OrganizationReady(prefs()));
 }
 
 }  // namespace

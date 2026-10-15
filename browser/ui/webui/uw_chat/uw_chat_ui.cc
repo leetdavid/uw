@@ -23,7 +23,7 @@ UwChatUI::UwChatUI(content::WebUI* web_ui) : ui::MojoWebUIController(web_ui) {
       contents->GetBrowserContext(), kChatHost);
   webui::SetupWebUIDataSource(source, kUwChatResources, IDR_UW_CHAT_CHAT_HTML);
   // The page's default policy lets one fixed style of Radix's scroll area
-  // through and refuses every other HTML string; see chat.js.
+  // through and refuses every other HTML string; see trusted-types.ts.
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
   // Memory saver would end the chat with the page while the agent works.

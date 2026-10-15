@@ -4,20 +4,12 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {ConnectionInput, ConnectionSlot, ModelsResult, PauseResult, SaveResult, State, TestResult, Thresholds, TintState} from './uw_organization.mojom-webui.js';
+import type {PauseResult, State, Thresholds, TintState} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
   getState(): Promise<State>;
-  loadModels(slot: ConnectionSlot, connection: ConnectionInput):
-      Promise<ModelsResult>;
-  testConnection(
-      slot: ConnectionSlot, connection: ConnectionInput,
-      namesOnly: boolean): Promise<TestResult>;
-  save(
-      decision: ConnectionInput, language: ConnectionInput,
-      agent: ConnectionInput): Promise<SaveResult>;
-  turnOff(): Promise<void>;
+  setEnabled(on: boolean): Promise<State>;
   setPause(mode: number): Promise<PauseResult>;
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
   getTint(): Promise<TintState>;
@@ -35,26 +27,8 @@ export class UwOrganizationBrowserProxyImpl implements
     return this.handler.getState().then(response => response.state);
   }
 
-  loadModels(slot: ConnectionSlot, connection: ConnectionInput) {
-    return this.handler.loadModels(slot, connection)
-        .then(response => response.result);
-  }
-
-  testConnection(
-      slot: ConnectionSlot, connection: ConnectionInput, namesOnly: boolean) {
-    return this.handler.testConnection(slot, connection, namesOnly)
-        .then(response => response.result);
-  }
-
-  save(
-      decision: ConnectionInput, language: ConnectionInput,
-      agent: ConnectionInput) {
-    return this.handler.save(decision, language, agent)
-        .then(response => response.result);
-  }
-
-  turnOff() {
-    return this.handler.turnOff();
+  setEnabled(on: boolean) {
+    return this.handler.setEnabled(on).then(response => response.state);
   }
 
   setPause(mode: number) {

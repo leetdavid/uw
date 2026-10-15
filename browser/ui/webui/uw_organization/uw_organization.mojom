@@ -3,18 +3,6 @@
 
 module uw.mojom;
 
-// One model connection as the settings page shows it. An API key never goes
-// back to the page; only whether one is stored.
-struct Connection {
-  // uw::DecisionProvider for the decision model, uw::ConnectionMode for the
-  // language model.
-  int32 kind;
-  string endpoint;
-  string model;
-  bool has_key;
-};
-
-// How readily uw moves a tab on a model's answer.
 // How sure a model must be before uw moves a tab, starts a task, or renames
 // one. See uw::Thresholds.
 struct Thresholds {
@@ -23,60 +11,28 @@ struct Thresholds {
   double rename;
 };
 
-// Which connection a request is about.
-enum ConnectionSlot {
-  kDecision,
-  kLanguage,
-  // The model behind chats.
-  kAgent,
+// Why automatic organization does not run while it is turned on. The models
+// are picked and tested on uw://providers.
+enum Waiting {
+  kNothing,
+  // Neither a language model nor a decision model is picked.
+  kNoModel,
+  kLanguageTest,
+  kDecisionTest,
 };
 
 struct State {
-  Connection decision;
-  Connection language;
-  // Empty until an agent model is saved. Chats use the language model until
-  // then.
-  Connection agent;
+  // Whether the user turned automatic organization on.
   bool enabled;
+  Waiting waiting;
+  // The models the status line names. Empty when that model is not set.
+  string decision_model;
+  string language_model;
   // Matches uw::PauseMode.
   int32 pause_mode;
   Thresholds thresholds;
   // Whether Cmd+T opens the command bar.
   bool command_bar;
-};
-
-// One connection as the user entered it. An empty key keeps the stored one.
-struct ConnectionInput {
-  int32 kind;
-  string endpoint;
-  string model;
-  string api_key;
-};
-
-// What one test request to a connection found.
-struct TestResult {
-  bool ok;
-  // One sentence for the user.
-  string summary;
-  // What uw sent and what came back: the request, the HTTP status or the
-  // network error, and the start of the provider's answer. Never an API key.
-  string detail;
-};
-
-struct SaveResult {
-  // True when at least one connection is set and every set connection
-  // passed its test. Automatic organization is on exactly then.
-  bool enabled;
-  // Null when that connection is not set.
-  TestResult? decision;
-  TestResult? language;
-  // Its test does not decide whether automatic organization is on.
-  TestResult? agent;
-};
-
-struct ModelsResult {
-  bool ok;
-  array<string> models;
 };
 
 struct PauseResult {
@@ -95,25 +51,7 @@ struct TintState {
 // Profile-scoped backend for the uw page of chrome://settings.
 interface OrganizationHandler {
   GetState() => (State state);
-  // Lists the models of a connection as entered. `slot` says which
-  // connection it is, so an empty key can fall back to the stored one.
-  LoadModels(ConnectionSlot slot, ConnectionInput connection)
-      => (ModelsResult result);
-  // Tests one connection as entered and saves nothing. `names_only` asks a
-  // language model for a task name alone, which is its whole job beside a
-  // decision model; otherwise it is asked to place a tab. An agent model is
-  // asked to call a tool.
-  TestConnection(ConnectionSlot slot, ConnectionInput connection,
-                 bool names_only)
-      => (TestResult result);
-  // Turns automatic organization off, stores the three connections, then
-  // tests each one that is set.
-  Save(ConnectionInput decision, ConnectionInput language,
-       ConnectionInput agent)
-      => (SaveResult result);
-  // Turns automatic organization off and leaves both connections as saved.
-  // Save turns it on again.
-  TurnOff() => ();
+  SetEnabled(bool on) => (State state);
   SetPause(int32 mode) => (PauseResult result);
   // Takes effect with the next answer. A value outside the range counts as
   // the nearest one in it. Returns what was stored.

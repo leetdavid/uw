@@ -1,6 +1,6 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). Not built.
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15; T78 and T79 are not built.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss.
 
@@ -44,7 +44,7 @@ Effort levels show in lower case, as each provider names them. A thin line in th
 Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that pass on their own.
 
 1. T76: the design on the canvas: `uw://providers` with its states, adding a provider, and the model and effort chips with their menus. Signed off on 2026-10-15.
-2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings.
+2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15. Until T78, uw reaches every language model over chat completions; until T79, the page shows no effort chips and no tool calls per model. The shared code has not moved out of `browser/tab_organization/` yet; it moves with the format adapters in T78.
 3. T78: the Anthropic Messages and OpenAI Responses formats.
 4. T79: the model catalog, and the model and effort chips in the chat composer.
 

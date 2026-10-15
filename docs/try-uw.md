@@ -86,9 +86,17 @@ Click `Organize` at the foot of the sidebar.
 - `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
 - `Tab organization settings` opens the settings page.
 
+### AI providers
+
+Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, and Custom. uw lists the provider's models before it adds it, and the key goes to the Keychain. Then pick a language model, a decision model, or both, and an agent model for chats. Click a provider to see its address, key, format, and models, or to remove it.
+
+Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. A newly picked model says `Not tested yet`. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
+
+Until the Anthropic Messages and OpenAI Responses formats land, uw reaches every language model over chat completions, including OpenAI's and Anthropic's. Tool calls and effort levels per model are not shown yet.
+
 ### Automatic organization
 
-Save and validate a decision model, a language model, or both at `uw://settings/uwOrganization`. `Test connection` checks one model by itself without saving, and `Details` shows what the model answered and what uw sent. The switch at the top of the page turns automatic organization off and on again. Then open a link in a new tab.
+Pick and test a decision model, a language model, or both at `uw://providers`. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says what it still waits for, such as a model that has not passed its test. Then open a link in a new tab.
 
 Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button.
 
@@ -136,13 +144,13 @@ Expected result: suggestions from your history, bookmarks, and search show in th
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.
 
-1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test connection` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
+1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
 2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
 
 A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others.
 
-Expected result: the chat tab takes your first message as its title, and the chat's heading shows it with what the chat is doing: `Working`, then minutes, or `Waits for your approval`. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a quiet line with what it acted on in bold, such as `Clicked button "Send" in tab 1`, then the answer. When the model request fails, `Try again` asks once more without a new message, and `Model settings` opens uw's settings. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
+Expected result: the chat tab takes your first message as its title, and the chat's heading shows it with what the chat is doing: `Working`, then minutes, or `Waits for your approval`. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a quiet line with what it acted on in bold, such as `Clicked button "Send" in tab 1`, then the answer. When the model request fails, `Try again` asks once more without a new message, and `AI providers` opens `uw://providers`. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
 
 Chats are saved after every step. Quit uw in the middle of one and start it again with "Continue where you left off" set at `chrome://settings/onStartup`. Expected result: the chat tab comes back with everything it showed and the line `Stopped before it finished` with `Continue`. Continue goes on in the same agent tabs.
 

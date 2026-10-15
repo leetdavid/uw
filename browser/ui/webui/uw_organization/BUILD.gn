@@ -1,6 +1,5 @@
 # Mojo backend for the uw organization section of chrome://settings.
-# Profile-scoped (prefs plus the profile Keychain slot); it never touches
-# window state.
+# Profile-scoped (prefs and the theme color); it never touches window state.
 import("//mojo/public/tools/bindings/mojom.gni")
 
 mojom("mojo_bindings") {
@@ -24,13 +23,10 @@ source_set("uw_organization_handler") {
     "//chrome/browser/profiles:profile",
     "//chrome/browser/themes",
     "//components/prefs",
-    "//net",
     "//skia",
     "//ui/base",
     "//ui/base/mojom",
-    "//url",
     "//uw/browser/tab_organization:ai_connection",
-    "//uw/components/agent",
     "//uw/components/look",
     "//uw/components/tab_organization",
   ]
@@ -51,7 +47,6 @@ source_set("browser_tests") {
     "//chrome/test:test_support",
     "//components/prefs",
     "//content/test:test_support",
-    "//net:test_support",
     "//skia",
     "//testing/gmock",
     "//testing/gtest",
@@ -61,6 +56,7 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
+    "//uw/components/ai_providers",
     "//uw/components/look",
   ]
 }

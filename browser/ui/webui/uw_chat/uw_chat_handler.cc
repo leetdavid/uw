@@ -543,7 +543,7 @@ bool UwChatHandler::Start() {
   const AiConnectionConfig config = ReadAgentModelConfig(
       Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs());
   if (!IsComplete(config)) {
-    page_->OnStep(Failed("Set an agent model on uw's settings page first."));
+    page_->OnStep(Failed("Pick a model on AI providers first."));
     return false;
   }
   AgentModel model;

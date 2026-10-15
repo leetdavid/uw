@@ -55,12 +55,13 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
                  PickModelCallback callback) override;
   void ClearModel(mojom::ModelSlot slot, ClearModelCallback callback) override;
   void TestModel(mojom::ModelSlot slot, TestModelCallback callback) override;
+  void DismissUpgradeNotice(DismissUpgradeNoticeCallback callback) override;
 
  private:
   // A request the page waits on. Several model lists can be on their way at
   // once, one per provider.
   void Send(const GURL& url,
-            const Provider& provider,
+            RemoteModelClient::KeyHeader key_header,
             std::string key,
             std::optional<std::string> body,
             RemoteModelClient::ResultCallback done);

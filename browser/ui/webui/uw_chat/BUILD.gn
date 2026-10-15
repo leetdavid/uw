@@ -79,5 +79,6 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
+    "//uw/components/ai_providers",
   ]
 }

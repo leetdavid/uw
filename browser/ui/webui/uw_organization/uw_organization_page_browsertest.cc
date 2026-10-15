@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license.
 
 #include <string>
-#include <vector>
 
 #include "base/strings/strcat.h"
-#include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/run_until.h"
@@ -19,10 +17,9 @@
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "net/test/embedded_test_server/embedded_test_server.h"
-#include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
@@ -30,10 +27,8 @@
 #include "ui/gfx/color_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
-#include "uw/browser/tab_organization/model_test_server.h"
-#include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/components/ai_providers/providers.h"
 #include "uw/components/look/tint.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -70,35 +65,10 @@ constexpr char kHelpers[] = R"(
   const text = (id) => part(id).textContent.trim();
 )";
 
-constexpr char kChatDecision[] =
-    R"({\"task\":\"none\",\"confidence\":0.9,\"new_task\":0.1})";
-
-// What a model that calls tools answers when asked to open a page.
-constexpr char kToolCall[] =
-    R"({"choices":[{"message":{"role":"assistant","tool_calls":[)"
-    R"({"id":"call_1","type":"function","function":{"name":"open",)"
-    R"("arguments":"{\"url\":\"https://example.com\"}"}}]}}]})";
-
-// What a model that thinks first answers when its thinking used up the whole
-// token limit.
-constexpr char kThinkingRanOut[] =
-    R"({"choices":[{"finish_reason":"length","message":{"role":"assistant",)"
-    R"("content":"","reasoning_content":"The tab is a connectivity"}}]})";
-
-// Drives the real settings page against a local server that plays the model
-// providers.
+// Drives the real uw page of chrome://settings.
 class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
-  void SetUpOnMainThread() override {
-    HeadlessModeBrowserTest::SetUpOnMainThread();
-    ASSERT_TRUE(embedded_test_server()->Start());
-  }
-
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
-
-  std::string Endpoint() {
-    return embedded_test_server()->GetURL("/v1").spec();
-  }
 
   static std::string String(int id) { return l10n_util::GetStringUTF8(id); }
 
@@ -112,87 +82,22 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
   void OpenPage() {
     ASSERT_TRUE(ui_test_utils::NavigateToURL(
         browser(), GURL("chrome://settings/uwOrganization")));
-    // The endpoint is filled in once the page has loaded the saved state.
-    ASSERT_EQ(true, Run("await until(() => part('languageEndpoint')?.value);"
+    // The thresholds show once the page has loaded the saved state.
+    ASSERT_EQ(true, Run("await until(() => part('moveThreshold'));"
                         "return true;"));
-  }
-
-  template <typename Kind>
-  static std::string Number(Kind kind) {
-    return base::NumberToString(static_cast<int>(kind));
-  }
-
-  void Choose(const std::string& id, const std::string& value) {
-    ASSERT_EQ(true, Run(content::JsReplace(
-                        "const select = part($1); select.value = $2;"
-                        "select.dispatchEvent(new Event('change'));"
-                        "await page().updateComplete; return true;",
-                        id, value)));
-  }
-
-  void Type(const std::string& id, const std::string& value) {
-    ASSERT_EQ(true, Run(content::JsReplace(
-                        "part($1).value = $2;"
-                        "await part($1).updateComplete;"
-                        "await page().updateComplete; return true;",
-                        id, value)));
-  }
-
-  std::string ValueOf(const std::string& id) {
-    return Run(content::JsReplace("return part($1).value;", id))
-        .ExtractString();
   }
 
   std::string TextOf(const std::string& id) {
     return Run(content::JsReplace("return text($1);", id)).ExtractString();
   }
 
-  // Clicks `button` and returns the text of `status` once it stops showing
-  // `busy`.
-  std::string ClickAndWait(const std::string& button,
-                           const std::string& status,
-                           int busy) {
-    return Run(content::JsReplace(
-                   "part($1).click(); await page().updateComplete;"
-                   "return await until(() => text($2) !== $3 && text($2));",
-                   button, status, String(busy)))
-        .ExtractString();
-  }
-
-  std::string Save() {
-    return ClickAndWait("saveButton", "saveStatus",
-                        IDS_UW_SETTINGS_ORGANIZATION_CHECKING);
-  }
-
-  // Clicks "Test connection" on the `connection` card and returns its result.
-  std::string TestConnection(const std::string& connection) {
-    return ClickAndWait(connection + "Test", connection + "TestStatus",
-                        IDS_UW_SETTINGS_ORGANIZATION_CHECKING);
-  }
-
-  bool ToggleIsOn() {
-    return Run("return part('enabledToggle').checked;").ExtractBool();
-  }
-
-  // Clicks the switch at the top of the page and returns what the save
-  // status says once the connections have been tested. The switch reports a
-  // click a moment later, so the old status is cleared first.
-  std::string TurnOn() {
-    return Run(content::JsReplace(
-                   "page().saveStatus_ = ''; await page().updateComplete;"
-                   "part('enabledToggle').click();"
-                   "return await until(() => text('saveStatus') !== $1 &&"
-                   "                         text('saveStatus'));",
-                   String(IDS_UW_SETTINGS_ORGANIZATION_CHECKING)))
-        .ExtractString();
-  }
-
-  void TurnOff() {
-    ASSERT_EQ(true, Run(content::JsReplace(
+  // Clicks the automatic organization switch and waits for the status line
+  // to change.
+  void ClickSwitch() {
+    ASSERT_EQ(true, Run("const before = text('status');"
                         "part('enabledToggle').click();"
-                        "await until(() => text('status') === $1);"
-                        "return true;",
-                        String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF))));
+                        "await until(() => text('status') !== before);"
+                        "return true;"));
   }
 
   ThemeService* theme() {
@@ -209,331 +114,56 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
     return base::StringPrintf("#%02X%02X%02X", SkColorGetR(color),
                               SkColorGetG(color), SkColorGetB(color));
   }
-
-  std::vector<std::string> RequestPaths() {
-    std::vector<std::string> paths;
-    for (const ModelRequest& request : models_.Requests()) {
-      paths.push_back(request.method + " " + request.path);
-    }
-    return paths;
-  }
-
-  ScopedMemoryKeychain keychain_;
-  ModelTestServer models_{embedded_test_server()};
 };
 
+// The models are picked and tested on uw://providers. The switch turns
+// automatic organization on, and the status says what it still waits for.
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       JevAndALanguageModelValidate) {
-  models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
-  models_.Answer("/v1/chat/completions", ChatAnswer("Check connection"));
+                       TheSwitchWaitsForAPickedAndTestedModel) {
   OpenPage();
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
+  EXPECT_EQ(TextOf("statusDetail"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT));
 
-  Choose("decisionKind", Number(DecisionProvider::kJev));
-  EXPECT_EQ(ValueOf("decisionEndpoint"), kJevDefaultEndpoint);
-  EXPECT_EQ(ValueOf("decisionModel"), kJevDefaultModel);
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionKey", "jev-key");
-  EXPECT_EQ(ValueOf("languageEndpoint"), kOllamaDefaultEndpoint);
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "llama3.2");
+  ClickSwitch();
+  EXPECT_TRUE(prefs()->GetBoolean(kOrganizationEnabledPref));
+  EXPECT_EQ(TextOf("status"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_WAITING));
+  EXPECT_EQ(TextOf("statusDetail"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_WAITING_NO_MODEL));
 
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_TRUE(OrganizationReady(prefs()));
-  const DecisionModelConfig decision = ReadDecisionModelConfig(prefs());
-  EXPECT_EQ(decision.provider, DecisionProvider::kJev);
-  EXPECT_EQ(decision.endpoint, Endpoint());
-  EXPECT_EQ(decision.model, kJevDefaultModel);
-  EXPECT_EQ(ApiKeyStore().GetKey(kDecisionKeyAccount), "jev-key");
-  EXPECT_EQ(prefs()->GetString(kDecisionEndpointPref).find("jev-key"),
-            std::string::npos);
-  EXPECT_EQ(ValueOf("decisionKey"), "");
+  const std::string ollama =
+      AddProvider(*prefs(), PresetProvider(ProviderPreset::kOllama));
+  SetChoice(*prefs(), ModelSlot::kLanguage, ollama, "llama3.2");
+  OpenPage();
+  EXPECT_EQ(TextOf("statusDetail"),
+            String(IDS_UW_SETTINGS_ORGANIZATION_WAITING_LANGUAGE_TEST));
+  EXPECT_FALSE(OrganizationReady(prefs()));
 
-  const std::vector<ModelRequest> requests = models_.Requests();
-  ASSERT_EQ(requests.size(), 2u);
-  for (const ModelRequest& request : requests) {
-    EXPECT_EQ(request.method, "POST");
-    EXPECT_EQ(request.authorization,
-              request.path == "/v1/systemone" ? "Bearer jev-key" : "");
-  }
+  MarkTested(*prefs(), ModelSlot::kLanguage,
+             *ReadChoice(*prefs(), ModelSlot::kLanguage));
+  OpenPage();
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON));
-  EXPECT_EQ(TextOf("statusDetail"),
-            "Jev decides where tabs go. llama3.2 names new tasks.");
-  EXPECT_THAT(TextOf("decisionTestStatus"),
-              testing::StartsWith("Works. jev-latest answered in "));
-  EXPECT_THAT(TextOf("languageTestStatus"),
-              testing::StartsWith("Works. llama3.2 answered in "));
-  SaveWindowScreenshot(browser(), "settings");
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       EachConnectionIsTestedByItselfAndSavesNothing) {
-  models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
-  models_.Answer("/v1/chat/completions", kThinkingRanOut);
-  OpenPage();
-  Choose("decisionKind", Number(DecisionProvider::kJev));
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionKey", "jev-key");
-  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "deepseek-flash");
-  Type("languageKey", "chat-key");
-
-  EXPECT_THAT(TestConnection("decision"),
-              testing::StartsWith("Works. jev-latest answered in "));
-  EXPECT_EQ(RequestPaths(), std::vector<std::string>{"POST /v1/systemone"});
-  EXPECT_THAT(
-      TextOf("decisionTestDetail"),
-      testing::AllOf(testing::HasSubstr("POST " + Endpoint() + "/systemone"),
-                     testing::HasSubstr("HTTP 200"),
-                     testing::HasSubstr("\"choice\": \"scratchpad\"")));
-
-  EXPECT_EQ(TestConnection("language"),
-            "deepseek-flash answered, but not in the form uw needs. The "
-            "details show its answer.");
-  EXPECT_THAT(
-      TextOf("languageTestDetail"),
-      testing::AllOf(
-          testing::HasSubstr("POST " + Endpoint() + "/chat/completions"),
-          testing::HasSubstr("\"max_tokens\": 4096"),
-          testing::HasSubstr("HTTP 200"),
-          testing::HasSubstr("\"finish_reason\": \"length\"")));
-  ASSERT_EQ(true, Run("part('languageTestDetails').open = true;"
-                      "part('languageTestDetails').scrollIntoView("
-                      "    {block: 'center'});"
-                      "await page().updateComplete; return true;"));
-  SaveWindowScreenshot(browser(), "settings-test");
-
-  models_.Answer("/v1/chat/completions", ChatAnswer("Check connection"));
-  EXPECT_THAT(TestConnection("language"),
-              testing::StartsWith("Works. deepseek-flash answered in "));
-  EXPECT_EQ(RequestPaths(),
-            (std::vector<std::string>{"POST /v1/systemone",
-                                      "POST /v1/chat/completions",
-                                      "POST /v1/chat/completions"}));
-
-  EXPECT_EQ(prefs()->GetInteger(kDecisionProviderPref),
-            static_cast<int>(DecisionProvider::kNone));
-  EXPECT_EQ(prefs()->GetString(kOrganizationModelPref), "");
-  EXPECT_FALSE(ApiKeyStore().GetKey(kDecisionKeyAccount));
-  EXPECT_FALSE(ApiKeyStore().GetKey(kLanguageKeyAccount));
-  EXPECT_FALSE(OrganizationReady(prefs()));
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       AFailedTestSaysWhyAndNeverShowsTheKey) {
-  models_.Fail(
-      "/v1/chat/completions", 402,
-      R"({"error":{"message":"Insufficient Balance for key chat-key"}})");
-  OpenPage();
-  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "gpt-house");
-  Type("languageKey", "chat-key");
-
-  EXPECT_EQ(TestConnection("language"),
-            "127.0.0.1 answered with HTTP 402. Insufficient Balance for key "
-            "<api key>");
-  EXPECT_THAT(TextOf("languageTestDetail"),
-              testing::AllOf(testing::HasSubstr("HTTP 402"),
-                             testing::Not(testing::HasSubstr("chat-key"))));
-
-  models_.Redirect("/v1/chat/completions", "https://elsewhere.example/v1");
-  EXPECT_EQ(TestConnection("language"),
-            "No answer from 127.0.0.1 (ERR_UNSAFE_REDIRECT).");
-
-  Type("languageEndpoint", "http://example.com/v1");
-  EXPECT_EQ(TestConnection("language"),
-            String(IDS_UW_SETTINGS_ORGANIZATION_TEST_INCOMPLETE));
-  EXPECT_EQ(models_.Requests().size(), 2u);
-
-  // What api.typesafe.ai answered to a wrong key on 2026-10-12.
-  models_.Fail(
-      "/v1/systemone", 401,
-      R"({"detail":{"error_type":"authentication_error","message":)"
-      R"("Cannot authenticate with the server. Please check your API key )"
-      R"(and try again."}})");
-  Choose("decisionKind", Number(DecisionProvider::kJev));
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionKey", "wrong-key");
-  EXPECT_EQ(TestConnection("decision"),
-            "127.0.0.1 answered with HTTP 401. Cannot authenticate with the "
-            "server. Please check your API key and try again.");
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       OpenAiDecisionsValidatesWithoutALanguageModel) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
-  OpenPage();
-  Choose("decisionKind", Number(DecisionProvider::kOpenAi));
-  EXPECT_EQ(ValueOf("decisionEndpoint"), kOpenAiDefaultEndpoint);
-  EXPECT_EQ(ValueOf("decisionModel"), kOpenAiDecisionsDefaultModel);
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionKey", "openai-key");
-
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
+  EXPECT_EQ(
+      TextOf("statusDetail"),
+      l10n_util::GetStringFUTF8(
+          IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES_AND_NAMES, u"llama3.2"));
   EXPECT_TRUE(OrganizationReady(prefs()));
-  EXPECT_EQ(ReadDecisionModelConfig(prefs()).provider,
-            DecisionProvider::kOpenAi);
-  EXPECT_EQ(RequestPaths(), std::vector<std::string>{"POST /v1/decisions"});
-  EXPECT_EQ(TextOf("statusDetail"),
-            "OpenAI Decisions API decides where tabs go.");
-}
+  SaveWindowScreenshot(browser(), "settings-organization");
 
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       OpenAiCompatibleDecisionModelValidates) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.7, 0.7));
-  OpenPage();
-  Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
-  EXPECT_EQ(ValueOf("decisionEndpoint"), "");
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionModel", "house-decider");
-  Type("decisionKey", "house-key");
-
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  const DecisionModelConfig decision = ReadDecisionModelConfig(prefs());
-  EXPECT_EQ(decision.provider, DecisionProvider::kOpenAiCompatible);
-  EXPECT_EQ(decision.model, "house-decider");
-  const std::vector<ModelRequest> requests = models_.Requests();
-  ASSERT_EQ(requests.size(), 1u);
-  EXPECT_EQ(requests[0].authorization, "Bearer house-key");
-  EXPECT_NE(requests[0].body.find("house-decider"), std::string::npos);
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       LanguageModelAloneDecidesAndNames) {
-  models_.Answer("/v1/chat/completions", ChatAnswer(kChatDecision));
-  OpenPage();
-  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "gpt-house");
-  Type("languageKey", "chat-key");
-
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_TRUE(OrganizationReady(prefs()));
-  const std::vector<ModelRequest> requests = models_.Requests();
-  ASSERT_EQ(requests.size(), 1u);
-  EXPECT_EQ(requests[0].path, "/v1/chat/completions");
-  EXPECT_EQ(requests[0].authorization, "Bearer chat-key");
-  EXPECT_EQ(TextOf("statusDetail"),
-            "gpt-house decides where tabs go and names new tasks.");
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       AFailedSaveTurnsOrganizationOff) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
-  OpenPage();
-  Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionModel", "house-decider");
-  Type("decisionKey", "house-key");
-  ASSERT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  ASSERT_TRUE(OrganizationReady(prefs()));
-
-  models_.Answer("/v1/decisions", R"({"answers":[{"type":"refusal"}]})");
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR));
+  ClickSwitch();
+  EXPECT_FALSE(prefs()->GetBoolean(kOrganizationEnabledPref));
   EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
-  EXPECT_EQ(TextOf("decisionTestStatus"),
-            "house-decider answered, but not in the form uw needs. The "
-            "details show its answer.");
-  EXPECT_THAT(TextOf("decisionTestDetail"), testing::HasSubstr("refusal"));
-  EXPECT_EQ(TextOf("languageTestStatus"), "");
-
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "missing-model");
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR) + " " +
-                        String(IDS_UW_SETTINGS_ORGANIZATION_LANGUAGE_ERROR));
-  EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_EQ(TextOf("languageTestStatus"), "127.0.0.1 answered with HTTP 404.");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheSwitchTurnsOrganizationOffAndOnAgain) {
-  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
+                       TheProvidersRowOpensUwProviders) {
   OpenPage();
-  EXPECT_FALSE(ToggleIsOn());
-  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET));
-  EXPECT_FALSE(ToggleIsOn());
-  EXPECT_FALSE(OrganizationReady(prefs()));
-
-  Choose("decisionKind", Number(DecisionProvider::kOpenAiCompatible));
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionModel", "house-decider");
-  Type("decisionKey", "house-key");
-  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_TRUE(ToggleIsOn());
-  EXPECT_TRUE(OrganizationReady(prefs()));
-  EXPECT_EQ(models_.Requests().size(), 1u);
-
-  // Off sends nothing and keeps the connection.
-  TurnOff();
-  EXPECT_FALSE(ToggleIsOn());
-  EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_EQ(TextOf("saveStatus"), "");
-  EXPECT_EQ(ReadDecisionModelConfig(prefs()).model, "house-decider");
-  EXPECT_EQ(ApiKeyStore().GetKey(kDecisionKeyAccount), "house-key");
-  EXPECT_EQ(models_.Requests().size(), 1u);
-
-  // On tests the connection again.
-  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_TRUE(ToggleIsOn());
-  EXPECT_TRUE(OrganizationReady(prefs()));
-  EXPECT_EQ(models_.Requests().size(), 2u);
-
-  // A connection that stopped working keeps it off, and the switch goes back.
-  TurnOff();
-  models_.Fail("/v1/decisions", 500, "{}");
-  EXPECT_EQ(TurnOn(), String(IDS_UW_SETTINGS_ORGANIZATION_DECISION_ERROR));
-  EXPECT_FALSE(ToggleIsOn());
-  EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_EQ(TextOf("decisionTestStatus"), "127.0.0.1 answered with HTTP 500.");
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       NothingSetCannotTurnOrganizationOn) {
-  OpenPage();
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_NOTHING_SET));
-  EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_TRUE(models_.Requests().empty());
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       ModelListLoadsWithGetAndFillsTheModel) {
-  models_.Answer("/v1/models",
-                 R"({"data":[{"id":"llama3.2"},{"id":"qwen3"}]})");
-  models_.Answer("/v1/chat/completions", ChatAnswer(kChatDecision));
-  OpenPage();
-  Type("languageEndpoint", Endpoint());
-  EXPECT_EQ(ClickAndWait("languageLoadModels", "languageModelsStatus",
-                         IDS_UW_SETTINGS_ORGANIZATION_LOADING),
-            "Models found: 2");
-  EXPECT_EQ(RequestPaths(), std::vector<std::string>{"GET /v1/models"});
-  EXPECT_EQ(ValueOf("languageModelSelect"), "llama3.2");
-
-  Choose("languageModelSelect", "qwen3");
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_EQ(ReadAiConnectionConfig(prefs()).model, "qwen3");
-}
-
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       JevModelListLoadsInTypeSafesShape) {
-  models_.Answer("/v1/models",
-                 R"({"models":[{"name":"jev-latest","description":"Latest"},)"
-                 R"({"name":"jev-preview","description":"Preview"}]})");
-  OpenPage();
-  Choose("decisionKind", Number(DecisionProvider::kJev));
-  Type("decisionEndpoint", Endpoint());
-  Type("decisionKey", "jev-key");
-  EXPECT_EQ(ClickAndWait("decisionLoadModels", "decisionModelsStatus",
-                         IDS_UW_SETTINGS_ORGANIZATION_LOADING),
-            "Models found: 2");
-  EXPECT_EQ(ValueOf("decisionModelSelect"), "jev-latest");
-
-  const std::vector<ModelRequest> requests = models_.Requests();
-  ASSERT_EQ(requests.size(), 1u);
-  EXPECT_EQ(requests[0].method, "GET");
-  EXPECT_EQ(requests[0].authorization, "Bearer jev-key");
+  content::WebContentsAddedObserver opened;
+  ASSERT_EQ(true, Run("part('providersLink').click(); return true;"));
+  content::WebContents* providers = opened.GetWebContents();
+  EXPECT_TRUE(content::WaitForLoadStop(providers));
+  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
@@ -641,59 +271,6 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                       "await until(() => part('resume').disabled);"
                       "return true;"));
   EXPECT_EQ(ReadPauseState(prefs()), PauseMode::kOff);
-}
-
-// The agent model passes its test only by calling a tool.
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheAgentModelMustCallATool) {
-  models_.Answer("/v1/chat/completions", kToolCall);
-  OpenPage();
-  Choose("agentKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("agentEndpoint", Endpoint());
-  Type("agentModel", "claude-sonnet-5-5");
-  Type("agentKey", "agent-key");
-
-  EXPECT_THAT(TestConnection("agent"),
-              testing::StartsWith("Works. claude-sonnet-5-5 answered in "));
-  EXPECT_THAT(TextOf("agentTestDetail"),
-              testing::HasSubstr("\"name\": \"open\""));
-
-  models_.Answer("/v1/chat/completions", ChatAnswer("Opened it."));
-  EXPECT_EQ(TestConnection("agent"),
-            "claude-sonnet-5-5 answered without calling a tool. Chats need a "
-            "model that calls tools.");
-  EXPECT_EQ(prefs()->GetString(kAgentModelPref), "");
-}
-
-// Saving stores the agent model beside the others. Its test does not decide
-// whether automatic organization is on, and until one is saved chats use the
-// language model.
-IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheAgentModelIsSavedOnItsOwnTerms) {
-  // Without a decision model the language model places tabs, and the agent
-  // model gets the same answer, which calls no tool.
-  models_.Answer("/v1/chat/completions", ChatAnswer(kChatDecision));
-  OpenPage();
-  Choose("languageKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("languageEndpoint", Endpoint());
-  Type("languageModel", "deepseek-flash");
-  Type("languageKey", "chat-key");
-  ASSERT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "deepseek-flash");
-  EXPECT_EQ(ValueOf("agentModel"), "");
-
-  Choose("agentKind", Number(ConnectionMode::kOpenAiCompatible));
-  Type("agentEndpoint", Endpoint());
-  Type("agentModel", "claude-sonnet-5-5");
-  EXPECT_EQ(Save(), String(IDS_UW_SETTINGS_ORGANIZATION_VALIDATED));
-
-  EXPECT_TRUE(OrganizationReady(prefs()));
-  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "claude-sonnet-5-5");
-  // It reaches the language model's endpoint, so it took a copy of its key.
-  EXPECT_EQ(ApiKeyStore().GetKey(kAgentKeyAccount), "chat-key");
-  EXPECT_EQ(TextOf("agentTestStatus"),
-            "claude-sonnet-5-5 answered without calling a tool. Chats need a "
-            "model that calls tools.");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

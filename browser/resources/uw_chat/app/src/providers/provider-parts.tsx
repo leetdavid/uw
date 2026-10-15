@@ -5,6 +5,7 @@ import {
   ModelSlot,
   ProviderFormat,
   ProviderPreset,
+  UpgradeNotice,
   type ModelChoice,
   type ModelList,
   type Provider,
@@ -101,6 +102,7 @@ export interface PageData {
   providers: Provider[];
   choices: Record<ModelSlot, ModelChoice | null>;
   lists: Record<string, ModelList | undefined>;
+  upgradeNotice: UpgradeNotice;
 }
 
 export function providerOf(data: PageData, choice: ModelChoice | null) {

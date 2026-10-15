@@ -51,12 +51,22 @@ struct ModelChoice {
   bool tested;
 };
 
+// Matches uw::UpgradeNotice.
+enum UpgradeNotice {
+  kNone,
+  kMoved,
+  kMerged,
+  kFailed,
+};
+
 struct ProvidersState {
   array<Provider> providers;
   ModelChoice? language;
   ModelChoice? decision;
   // Null while chats use the language model.
   ModelChoice? agent;
+  // What the page says once after the saved connections became providers.
+  UpgradeNotice upgrade_notice;
 };
 
 // A provider as the user enters it in the Add provider dialog. A preset
@@ -125,4 +135,5 @@ interface ProvidersHandler {
   // Sends the language or decision model one small request. A pass marks
   // the model tested.
   TestModel(ModelSlot slot) => (ModelTestResult result);
+  DismissUpgradeNotice() => ();
 };

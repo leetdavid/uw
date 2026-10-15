@@ -1,7 +1,7 @@
-/// <reference types="trusted-types" />
 // The uw://chat page: one chat with uw's agent. Built from Fluid
 // Functionalism's parts; see the "(Fluid)" frames on the canvas page
 // "Agent chats".
+import "@/trusted-types";
 import {
   Fragment,
   StrictMode,
@@ -334,11 +334,8 @@ function Line({
               <BannerAction id="try-again" variant="primary" onClick={onTryAgain}>
                 Try again
               </BannerAction>
-              <BannerAction
-                id="model-settings"
-                onClick={() => open("chrome://settings/uwOrganization")}
-              >
-                Model settings
+              <BannerAction id="providers" onClick={() => open("chrome://providers/")}>
+                AI providers
               </BannerAction>
             </BannerActions>
           )}
@@ -1182,20 +1179,6 @@ function Chat() {
     </SidebarProvider>
   );
 }
-
-// Radix's scroll area, under Fluid's sidebar, writes this one style through
-// innerHTML. The page's Trusted Types rule refuses HTML strings, so the
-// default policy lets this one through and still refuses the rest.
-const RADIX_SCROLL_AREA_STYLE =
-  "[data-radix-scroll-area-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}[data-radix-scroll-area-viewport]::-webkit-scrollbar{display:none}";
-window.trustedTypes?.createPolicy("default", {
-  createHTML: (html: string) => {
-    if (html !== RADIX_SCROLL_AREA_STYLE) {
-      throw new TypeError("The chat page writes no HTML strings.");
-    }
-    return html;
-  },
-});
 
 // Fluid's parts read dark mode from a class on the root element.
 const dark = matchMedia("(prefers-color-scheme: dark)");

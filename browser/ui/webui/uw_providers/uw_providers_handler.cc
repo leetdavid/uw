@@ -32,6 +32,7 @@ namespace uw {
 
 struct UwProvidersHandler::ModelTest {
   GURL url;
+  std::string key_account;
   std::optional<std::string> body;
   base::RepeatingCallback<bool(const std::string&)> reads;
 };
@@ -174,36 +175,39 @@ mojom::ModelListPtr ModelListFrom(RemoteModelClient::Outcome outcome) {
   return list;
 }
 
-// A language model passes when it answers with text, a decision model when
-// it answers with a choice. Until uw speaks Anthropic Messages and OpenAI
-// Responses, every language model is reached over chat completions.
+// Sent to the slot's model as automatic organization reaches it. A language
+// model passes when it answers with text, a decision model when it answers
+// with a choice. Until uw speaks Anthropic Messages and OpenAI Responses,
+// every language model is reached over chat completions.
 UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
-                                      const Provider& provider,
-                                      const std::string& model) {
+                                      const PrefService& prefs) {
   UwProvidersHandler::ModelTest test;
   if (slot == ModelSlot::kDecision) {
-    const DecisionFormat format =
-        DecisionFormatOf(provider) == ProviderFormat::kSystemOne
-            ? DecisionFormat::kSystemOne
-            : DecisionFormat::kDecisions;
-    std::string base = provider.address;
-    base::TrimString(base, "/", &base);
-    test.url =
-        GURL(base + (format == DecisionFormat::kSystemOne ? "/systemone"
-                                                          : "/decisions"));
-    test.body = BuildDecisionRequestBody(format, model, CheckContext(), {});
+    const DecisionModelConfig config = ReadDecisionModelConfig(&prefs);
+    if (!IsComplete(config)) {
+      return test;
+    }
+    test.url = DecisionUrl(config);
+    test.key_account = config.key_account;
+    test.body = BuildDecisionRequestBody(config.format, config.model,
+                                         CheckContext(), {});
     test.reads = base::BindRepeating(
         [](DecisionFormat format, const std::string& body) {
           return ParseDecisionResponse(format, body, /*has_tasks=*/false)
               .has_value();
         },
-        format);
+        config.format);
+    return test;
+  }
+  const AiConnectionConfig config = ReadAiConnectionConfig(&prefs);
+  if (!IsComplete(config)) {
     return test;
   }
   base::ListValue messages;
   messages.Append(UserMessage("Say hello in one word."));
-  test.url = ChatCompletionsUrl(provider.address);
-  test.body = BuildAgentRequestBody(model, messages, base::ListValue());
+  test.url = ChatCompletionsUrl(config.endpoint);
+  test.key_account = config.key_account;
+  test.body = BuildAgentRequestBody(config.model, messages, base::ListValue());
   test.reads = base::BindRepeating([](const std::string& body) {
     const std::optional<ModelTurn> turn = ParseAgentResponse(body);
     return turn && !turn->text.empty();
@@ -229,6 +233,8 @@ void UwProvidersHandler::GetState(GetStateCallback callback) {
   state->language = PageChoice(prefs, ModelSlot::kLanguage);
   state->decision = PageChoice(prefs, ModelSlot::kDecision);
   state->agent = PageChoice(prefs, ModelSlot::kAgent);
+  state->upgrade_notice =
+      static_cast<mojom::UpgradeNotice>(prefs.GetInteger(kUpgradeNoticePref));
   std::move(callback).Run(std::move(state));
 }
 
@@ -242,8 +248,9 @@ void UwProvidersHandler::ListModels(const std::string& provider_id,
       !IsValidProviderEndpoint(provider->address)) {
     return;
   }
-  Send(ModelsUrl(provider->address), *provider, StoredKey(*provider),
-       std::nullopt, base::BindOnce(&ModelListFrom).Then(std::move(callback)));
+  Send(ModelsUrl(provider->address), KeyHeaderFor(*provider),
+       StoredKey(*provider), std::nullopt,
+       base::BindOnce(&ModelListFrom).Then(std::move(callback)));
 }
 
 void UwProvidersHandler::ListModelsAt(mojom::NewProviderPtr input,
@@ -255,8 +262,8 @@ void UwProvidersHandler::ListModelsAt(mojom::NewProviderPtr input,
       !IsValidProviderEndpoint(provider.address)) {
     return;
   }
-  Send(ModelsUrl(provider.address), provider, input->api_key, std::nullopt,
-       base::BindOnce(&ModelListFrom).Then(std::move(callback)));
+  Send(ModelsUrl(provider.address), KeyHeaderFor(provider), input->api_key,
+       std::nullopt, base::BindOnce(&ModelListFrom).Then(std::move(callback)));
 }
 
 void UwProvidersHandler::AddProvider(mojom::NewProviderPtr input,
@@ -321,33 +328,34 @@ void UwProvidersHandler::TestModel(mojom::ModelSlot page_slot,
   const PrefService& prefs = *profile_->GetPrefs();
   const ModelSlot slot = SlotFrom(page_slot);
   const std::optional<ModelChoice> choice = ReadChoice(prefs, slot);
-  const std::optional<Provider> provider =
-      choice ? FindProvider(prefs, choice->provider_id) : std::nullopt;
-  auto incomplete = mojom::ModelTestResult::New();
-  incomplete->outcome = mojom::TestOutcome::kIncomplete;
-  incomplete->model = choice ? choice->model : std::string();
-  if (!provider || slot == ModelSlot::kAgent || profile_->IsOffTheRecord() ||
-      !ServesSlot(*provider, slot) ||
-      !IsValidProviderEndpoint(provider->address)) {
+  ModelTest test = TestFor(slot, prefs);
+  if (!choice || !test.body || slot == ModelSlot::kAgent ||
+      profile_->IsOffTheRecord()) {
+    auto incomplete = mojom::ModelTestResult::New();
+    incomplete->outcome = mojom::TestOutcome::kIncomplete;
+    incomplete->model = choice ? choice->model : std::string();
     std::move(callback).Run(std::move(incomplete));
     return;
   }
-  ModelTest test = TestFor(slot, *provider, choice->model);
-  if (!test.body) {
-    std::move(callback).Run(std::move(incomplete));
-    return;
-  }
-  std::string key = StoredKey(*provider);
+  std::string key = test.key_account.empty()
+                        ? std::string()
+                        : ApiKeyStore().GetKey(test.key_account).value_or("");
   const GURL url = test.url;
   const std::optional<std::string> body = test.body;
-  Send(url, *provider, key, body,
+  Send(url, RemoteModelClient::KeyHeader::kBearer, key, body,
        base::BindOnce(&UwProvidersHandler::OnTested, weak_factory_.GetWeakPtr(),
                       slot, *choice, std::move(test), key,
                       base::TimeTicks::Now(), std::move(callback)));
 }
 
+void UwProvidersHandler::DismissUpgradeNotice(
+    DismissUpgradeNoticeCallback callback) {
+  profile_->GetPrefs()->ClearPref(kUpgradeNoticePref);
+  std::move(callback).Run();
+}
+
 void UwProvidersHandler::Send(const GURL& url,
-                              const Provider& provider,
+                              RemoteModelClient::KeyHeader key_header,
                               std::string key,
                               std::optional<std::string> body,
                               RemoteModelClient::ResultCallback done) {
@@ -356,7 +364,7 @@ void UwProvidersHandler::Send(const GURL& url,
       profile_->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess(),
       url, std::move(key), body.value_or(std::string()), kProviderTimeout,
-      KeyHeaderFor(provider));
+      key_header);
   RemoteModelClient* sender = client.get();
   requests_[request] = std::move(client);
   auto answered =

@@ -120,13 +120,15 @@ AutomaticOrganizer::AutomaticOrganizer(BrowserWindowInterface* window,
       controller_(controller),
       tabs_(window->GetTabStripModel()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
+  // An off-the-record profile writes its prefs to memory only, so the move
+  // waits for a normal window.
+  if (!profile()->IsOffTheRecord()) {
+    MoveConnectionsToProviders(profile()->GetPrefs());
+  }
   prefs_.Init(profile()->GetPrefs());
-  for (const char* pref :
-       {kOrganizationEnabledPref, kOrganizationPauseModePref,
-        kOrganizationPauseUntilPref, kOrganizationModePref,
-        kOrganizationEndpointPref, kOrganizationModelPref,
-        kOrganizationKeyAccountPref, kDecisionProviderPref,
-        kDecisionEndpointPref, kDecisionModelPref, kDecisionKeyAccountPref}) {
+  for (const char* pref : {kOrganizationEnabledPref, kOrganizationPauseModePref,
+                           kOrganizationPauseUntilPref, kProvidersPref,
+                           kLanguageChoicePref, kDecisionChoicePref}) {
     prefs_.Add(pref, base::BindRepeating(&AutomaticOrganizer::OnConfigChanged,
                                          base::Unretained(this)));
   }
@@ -425,8 +427,7 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
   request.task = page->task;
   request.task_title = controller_->TaskTitle(page->task);
   request.parent = page->parent;
-  request.format =
-      decides ? FormatFor(decision.provider) : DecisionFormat::kChat;
+  request.format = decides ? decision.format : DecisionFormat::kChat;
   request.context.url = activity->second.url.spec();
   request.context.title = activity->second.title.empty()
                               ? request.context.url
