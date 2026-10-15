@@ -26,7 +26,7 @@ Agreed on 2026-10-12:
 - **Window tint.** The frame, the sidebar, and the area around the page share one gradient. It runs from the picked color to the same color with its hue turned by 40 degrees.
 - **Text on the tint.** Text and icons are near-black or white, whichever has more contrast with the tint. Fills and the active tab change strength the same way.
 - **Readable tints.** Text keeps at least a 4.5:1 contrast ratio everywhere on the tint. A mid-tone color cannot do that, so uw makes it lighter or darker, whichever takes the smaller change, and keeps its hue.
-- **Default tints.** Lilac to sky in light mode, indigo to slate in dark mode, until the user picks a color.
+- **Default tints.** Lilac to sky in light mode, indigo to slate in dark mode, until the user picks a color. Changing: the [themes plan](themes.md), agreed on 2026-10-16, makes the tint a theme of up to three colors and dark mode black.
 - **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint.
 - **Tab rows.** 34px tall with a 10px radius. The active tab is a card. Other tabs have no background until hovered.
 - **Favorites.** Pinned tabs are tiles, four per row, 44px tall with a 12px radius.

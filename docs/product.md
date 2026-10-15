@@ -30,7 +30,7 @@ Agreed: keep uw branding minimal and use native vertical tabs by default. Preser
 
 Agreed on 2026-10-14, for now: the logo is the two-ink double u in [Logo](logo.md). It is the app icon on macOS. Logos inside the browser are still Chromium's.
 
-Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. The tint is a two-color gradient that the user can change on uw's settings page, with a light and a dark default. Text on the tint turns white or near-black, whichever reads better, and a color that would leave it hard to read is made lighter or darker. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups. The [plan](plans/arc-style-look.md) has the details.
+Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. The tint is a two-color gradient that the user can change on uw's settings page, with a light and a dark default. Text on the tint turns white or near-black, whichever reads better, and a color that would leave it hard to read is made lighter or darker. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups. The [plan](plans/arc-style-look.md) has the details. Changed on 2026-10-16: the tint becomes a [theme](plans/themes.md), as in Arc: up to three colors with intensity and grain, picked over the window, one per profile. Dark mode is black by default, with a switch to show the theme instead.
 
 Agreed: manual setup is acceptable for the first usable version. Automatic browser-data import is not required for that version.
 
