@@ -3,13 +3,19 @@
 
 #include "uw/browser/ui/look/tint_painter.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <numbers>
 #include <vector>
 
+#include "base/no_destructor.h"
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
+#include "cc/paint/paint_image.h"
 #include "cc/paint/paint_shader.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkMatrix.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
@@ -31,6 +37,49 @@ namespace {
 // The gradient runs mostly downward and a little toward the trailing edge,
 // like `linear-gradient(160deg, ...)` in the designs.
 constexpr double kAngle = 160.0 * std::numbers::pi / 180.0;
+
+// Full grain is gray noise around middle gray, as in the designs, multiplied
+// over the tint at 35%, one noise dot per screen pixel.
+constexpr float kFullGrainOpacity = 0.35f;
+constexpr int kGrainTileSize = 128;
+constexpr uint8_t kGrainDarkest = 90;
+constexpr uint8_t kGrainLightest = 166;
+
+// A tile of gray noise. Noise has no pattern, so the tiles meet without seams.
+const cc::PaintImage& GrainTile() {
+  static const base::NoDestructor<cc::PaintImage> tile([] {
+    SkBitmap bitmap;
+    bitmap.allocN32Pixels(kGrainTileSize, kGrainTileSize);
+    uint32_t state = 0x9E3779B9;
+    for (int y = 0; y < kGrainTileSize; ++y) {
+      for (int x = 0; x < kGrainTileSize; ++x) {
+        state = state * 1664525 + 1013904223;
+        const uint8_t gray =
+            kGrainDarkest +
+            (state >> 24) % (kGrainLightest - kGrainDarkest + 1);
+        *bitmap.getAddr32(x, y) = SkPreMultiplyARGB(0xFF, gray, gray, gray);
+      }
+    }
+    bitmap.setImmutable();
+    return cc::PaintImage::CreateFromBitmap(std::move(bitmap));
+  }());
+  return *tile;
+}
+
+// Multiplies grain over `view` at `grain` percent of full strength.
+void PaintGrain(gfx::Canvas* canvas, const views::View* view, int grain) {
+  if (grain <= 0) {
+    return;
+  }
+  const SkMatrix pixels =
+      SkMatrix::Scale(1 / canvas->image_scale(), 1 / canvas->image_scale());
+  cc::PaintFlags flags;
+  flags.setShader(cc::PaintShader::MakeImage(GrainTile(), SkTileMode::kRepeat,
+                                             SkTileMode::kRepeat, &pixels));
+  flags.setBlendMode(SkBlendMode::kMultiply);
+  flags.setAlphaf(kFullGrainOpacity * std::min(grain, kFullGrain) / kFullGrain);
+  canvas->DrawRect(view->GetLocalBounds(), flags);
+}
 
 }  // namespace
 
@@ -69,6 +118,7 @@ void PaintTint(gfx::Canvas* canvas,
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
       SkTileMode::kClamp));
   canvas->DrawRect(view->GetLocalBounds(), flags);
+  PaintGrain(canvas, view, ReadTheme(prefs, std::nullopt).grain);
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.
   if (TextColorOn(tint) == kDarkTextOnTint) {

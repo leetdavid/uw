@@ -14,6 +14,7 @@ namespace uw {
 
 inline constexpr size_t kMaxThemeColors = 3;
 inline constexpr int kFullIntensity = 100;
+inline constexpr int kFullGrain = 100;
 
 // A profile's theme, as the picker sets it.
 struct Theme {

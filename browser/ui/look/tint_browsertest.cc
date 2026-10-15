@@ -306,6 +306,30 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TwoProfilesKeepTwoThemes) {
   EXPECT_EQ(Color(other, ui::kColorFrameActive), kWine);
 }
 
+// Grain shows on the window around the card and never on the card.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, GrainCoversTheWindowAndNotTheCard) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  const auto roughness = [](const SkBitmap& window, int x, int y) {
+    int most = 0;
+    for (int step = 0; step < 40; ++step) {
+      most = std::max(most, Gap(window.getColor(x + step, y),
+                                window.getColor(x + step + 1, y)));
+    }
+    return most;
+  };
+  const SkBitmap smooth = CaptureWindow(browser());
+  const int middle = smooth.height() / 2;
+  EXPECT_LE(roughness(smooth, 20, middle), 2);
+
+  Theme grainy;
+  grainy.grain = kFullGrain;
+  SetTheme(browser()->GetProfile(), grainy);
+  const SkBitmap rough = CaptureWindow(browser());
+  EXPECT_GE(roughness(rough, 20, middle), 8);
+  EXPECT_LE(roughness(rough, rough.width() * 3 / 5, middle), 1);
+  SaveWindowScreenshot(browser(), "theme-grain");
+}
+
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {
   EXPECT_FALSE(
       g_browser_process->local_state()->GetBoolean(prefs::kGlassFrameEnabled));

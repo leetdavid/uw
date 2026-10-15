@@ -1,6 +1,6 @@
 # Themes
 
-Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T95, black dark mode, and T94, the saved theme, are built and in review. T96 and T97 are next.
+Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T94, T95, and T97, the saved theme, black dark mode, and grain, are built and in review. T96, the picker, is next.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Gradients, black dark mode, and the saved theme reuse the tint code that exists. The picker is the risk: a color field with dots to drag is a custom control.
 
