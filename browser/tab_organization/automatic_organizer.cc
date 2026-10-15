@@ -33,8 +33,9 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/page_transition_types.h"
 #include "url/origin.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
 
@@ -123,7 +124,11 @@ AutomaticOrganizer::AutomaticOrganizer(BrowserWindowInterface* window,
   // An off-the-record profile writes its prefs to memory only, so the move
   // waits for a normal window.
   if (!profile()->IsOffTheRecord()) {
-    MoveConnectionsToProviders(profile()->GetPrefs());
+    // Saving a connection tested it, and automatic organization was on only
+    // while every saved one passed.
+    MoveConnectionsToProviders(
+        profile()->GetPrefs(),
+        profile()->GetPrefs()->GetBoolean(kOrganizationEnabledPref));
   }
   prefs_.Init(profile()->GetPrefs());
   for (const char* pref : {kOrganizationEnabledPref, kOrganizationPauseModePref,

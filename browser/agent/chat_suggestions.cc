@@ -22,8 +22,9 @@
 #include "content/public/browser/storage_partition.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/components/agent/suggestions.h"
 
 namespace uw {

@@ -1,8 +1,8 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#ifndef UW_BROWSER_TAB_ORGANIZATION_SCOPED_MEMORY_KEYCHAIN_H_
-#define UW_BROWSER_TAB_ORGANIZATION_SCOPED_MEMORY_KEYCHAIN_H_
+#ifndef UW_BROWSER_AI_PROVIDERS_SCOPED_MEMORY_KEYCHAIN_H_
+#define UW_BROWSER_AI_PROVIDERS_SCOPED_MEMORY_KEYCHAIN_H_
 
 #include <memory>
 
@@ -22,4 +22,4 @@ class ScopedMemoryKeychain {
 
 }  // namespace uw
 
-#endif  // UW_BROWSER_TAB_ORGANIZATION_SCOPED_MEMORY_KEYCHAIN_H_
+#endif  // UW_BROWSER_AI_PROVIDERS_SCOPED_MEMORY_KEYCHAIN_H_

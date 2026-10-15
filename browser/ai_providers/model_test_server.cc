@@ -1,7 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/tab_organization/model_test_server.h"
+#include "uw/browser/ai_providers/model_test_server.h"
 
 #include <algorithm>
 #include <utility>

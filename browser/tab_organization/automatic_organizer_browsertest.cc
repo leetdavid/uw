@@ -67,11 +67,12 @@
 #include "ui/views/widget/widget_delegate.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/model_test_server.h"
+#include "uw/browser/ai_providers/models.h"
+#include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
-#include "uw/browser/tab_organization/model_test_server.h"
 #include "uw/browser/tab_organization/organizer_log.h"
-#include "uw/browser/tab_organization/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -1995,7 +1996,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   prefs()->SetString(kDecisionKeyAccountPref, "decision");
   prefs()->SetBoolean(kOrganizationEnabledPref, true);
 
-  MoveConnectionsToProviders(prefs());
+  MoveConnectionsToProviders(prefs(), /*tested=*/true);
 
   // The language and agent connections shared an address and a key.
   const std::vector<Provider> providers = ReadProviders(*prefs());
@@ -2032,7 +2033,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   }
   EXPECT_EQ(prefs()->GetInteger(kUpgradeNoticePref),
             static_cast<int>(UpgradeNotice::kMerged));
-  MoveConnectionsToProviders(prefs());
+  MoveConnectionsToProviders(prefs(), /*tested=*/true);
   EXPECT_EQ(ReadProviders(*prefs()).size(), 2u);
 }
 

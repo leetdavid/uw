@@ -1,7 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 
 #include "base/functional/bind.h"
 #include "base/location.h"

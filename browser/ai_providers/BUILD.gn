@@ -1,0 +1,51 @@
+# The AI providers as the browser reaches them: the models picked on
+# uw://providers, their keys in the Keychain, and requests to them. Chats and
+# the organizer both use it. See docs/plans/ai-providers.md.
+source_set("ai_providers") {
+  sources = [
+    "api_key_store.h",
+    "models.cc",
+    "models.h",
+    "remote_model_client.cc",
+    "remote_model_client.h",
+  ]
+  if (is_mac) {
+    # macOS Keychain storage. The first release targets macOS desktop.
+    sources += [ "api_key_store_mac.mm" ]
+  } else {
+    # In-memory fallback so non-macOS builds link. Secrets never leave the
+    # process and never touch disk.
+    sources += [ "api_key_store_stub.cc" ]
+  }
+  public_deps = [
+    "//base",
+    "//url",
+    "//uw/components/ai_providers",
+    "//uw/components/tab_organization",
+  ]
+  deps = [
+    "//components/os_crypt/common:switches",
+    "//components/prefs",
+    "//crypto",
+    "//net",
+    "//services/network/public/cpp",
+    "//services/network/public/mojom",
+  ]
+}
+
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "model_test_server.cc",
+    "model_test_server.h",
+    "scoped_memory_keychain.h",
+    "scoped_memory_keychain.mm",
+  ]
+  deps = [
+    "//base",
+    "//crypto",
+    "//net:test_support",
+    "//testing/gtest",
+    "//url",
+  ]
+}

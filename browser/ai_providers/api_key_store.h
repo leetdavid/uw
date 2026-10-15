@@ -1,8 +1,8 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#ifndef UW_BROWSER_TAB_ORGANIZATION_API_KEY_STORE_H_
-#define UW_BROWSER_TAB_ORGANIZATION_API_KEY_STORE_H_
+#ifndef UW_BROWSER_AI_PROVIDERS_API_KEY_STORE_H_
+#define UW_BROWSER_AI_PROVIDERS_API_KEY_STORE_H_
 
 #include <optional>
 #include <string>
@@ -31,4 +31,4 @@ class ApiKeyStore {
 
 }  // namespace uw
 
-#endif  // UW_BROWSER_TAB_ORGANIZATION_API_KEY_STORE_H_
+#endif  // UW_BROWSER_AI_PROVIDERS_API_KEY_STORE_H_

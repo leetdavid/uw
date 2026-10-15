@@ -20,7 +20,7 @@
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
-#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/skills.h"

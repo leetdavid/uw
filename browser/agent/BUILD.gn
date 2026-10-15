@@ -20,6 +20,7 @@ source_set("agent") {
     "//components/tabs:public",
     "//url",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ai_providers",
     "//uw/components/agent",
   ]
   deps = [

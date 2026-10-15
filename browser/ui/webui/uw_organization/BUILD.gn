@@ -27,6 +27,7 @@ source_set("uw_organization_handler") {
     "//ui/base",
     "//ui/base/mojom",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ai_providers",
     "//uw/components/look",
     "//uw/components/tab_organization",
   ]

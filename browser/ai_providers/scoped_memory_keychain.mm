@@ -1,7 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/tab_organization/scoped_memory_keychain.h"
+#include "uw/browser/ai_providers/scoped_memory_keychain.h"
 
 #include <Security/Security.h>
 

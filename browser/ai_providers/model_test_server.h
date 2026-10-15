@@ -1,8 +1,8 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#ifndef UW_BROWSER_TAB_ORGANIZATION_MODEL_TEST_SERVER_H_
-#define UW_BROWSER_TAB_ORGANIZATION_MODEL_TEST_SERVER_H_
+#ifndef UW_BROWSER_AI_PROVIDERS_MODEL_TEST_SERVER_H_
+#define UW_BROWSER_AI_PROVIDERS_MODEL_TEST_SERVER_H_
 
 #include <map>
 #include <memory>
@@ -90,4 +90,4 @@ class ModelTestServer {
 
 }  // namespace uw
 
-#endif  // UW_BROWSER_TAB_ORGANIZATION_MODEL_TEST_SERVER_H_
+#endif  // UW_BROWSER_AI_PROVIDERS_MODEL_TEST_SERVER_H_

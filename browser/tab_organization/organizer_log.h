@@ -10,7 +10,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "url/gurl.h"
-#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 
 namespace uw {
 

@@ -20,6 +20,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+#include "uw/browser/ai_providers/models.h"
 // //chrome/browser depends on this target, so it cannot depend back.
 #include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
@@ -49,8 +50,8 @@
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/components/agent/agent_context.h"
 

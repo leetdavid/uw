@@ -35,8 +35,8 @@ Effort levels show in lower case, as each provider names them. A thin line in th
 
 - **Page.** `uw://providers` is a second page in the React package of the chat page, `browser/resources/uw_chat/app`, with its own entry in `app/bundle.ts`, per [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md). Its chips are the same components as the chat composer's.
 - **Storage.** The providers live in profile preferences: an id, the preset, a name, the address, and the format. Each key sits in Keychain under one account per provider. The model catalog is a file in the profile.
-- **Formats.** One plain shape of words, tool calls, and tool results goes in; each format's adapter, beside `components/agent/agent_protocol.h`, turns it into that format and back. What a provider sends that uw does not read, such as Anthropic's signed thinking, is sent back only to the provider that sent it, and is dropped when a chat switches provider.
-- **Shared code.** `RemoteModelClient`, the Keychain store, and the connection preferences move out of `browser/tab_organization/` to a shared folder, since chats and the organizer both use them.
+- **Formats.** Requests keep the shape of chat completions, which is what the organizer, chats, and suggestions already build. Each format's adapter in `components/ai_providers/` turns such a request into its own format and its answer back into chat completions' shape, so the code that reads answers stays as it is. The organizer's placement and naming requests go through the same adapters. What a provider sends that uw does not read, such as Anthropic's signed thinking or OpenAI's sealed reasoning, rides along on the answer, is saved with the chat, goes back only to the address that sent it, and is dropped when a chat switches provider. Requests over OpenAI Responses send `store: false`, so OpenAI keeps nothing. Changed on 2026-10-16 from adapters beside `components/agent/agent_protocol.h`, since the organizer uses them too.
+- **Shared code.** `RemoteModelClient`, the Keychain store, and the model choices as requests need them move out of `browser/tab_organization/` to `browser/ai_providers/`, since chats and the organizer both use them. The organizer's own settings stay in `ai_connection.h`.
 - **Icons.** Provider icons come from `@lobehub/icons-static-svg` (MIT, no dependencies), which has OpenAI, Anthropic, OpenRouter, Vercel, and Ollama. Jev and Custom get a plain icon.
 
 ## Stages
@@ -45,7 +45,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 1. T76: the design on the canvas: `uw://providers` with its states, adding a provider, and the model and effort chips with their menus. Signed off on 2026-10-15.
 2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15. Until T78, uw reaches every language model over chat completions; until T79, the page shows no effort chips and no tool calls per model. The shared code has not moved out of `browser/tab_organization/` yet; it moves with the format adapters in T78.
-3. T78: the Anthropic Messages and OpenAI Responses formats.
+3. T78: the Anthropic Messages and OpenAI Responses formats. Started on 2026-10-16. Live calls over each format are for the user to check: the tests play the providers with a local server.
 4. T79: the model catalog, and the model and effort chips in the chat composer.
 
 ## Acceptance checks

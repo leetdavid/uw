@@ -6,7 +6,7 @@
 // so builds link and Ollama (keyless) works everywhere. Secrets never leave
 // the process and never touch disk or prefs.
 
-#include "uw/browser/tab_organization/api_key_store.h"
+#include "uw/browser/ai_providers/api_key_store.h"
 
 #include <map>
 #include <mutex>

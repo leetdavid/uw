@@ -13,7 +13,7 @@
 #include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
-#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 #include "uw/components/ai_providers/providers.h"
 

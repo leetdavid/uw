@@ -21,6 +21,7 @@ source_set("uw_providers") {
     "//mojo/public/cpp/bindings",
     "//ui/webui",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ai_providers",
     "//uw/components/ai_providers",
   ]
   deps = [
@@ -54,6 +55,8 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//url",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
     "//uw/browser/tab_organization:test_support",
     "//uw/components/ai_providers",
   ]

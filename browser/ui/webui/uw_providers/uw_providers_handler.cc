@@ -23,8 +23,9 @@
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "net/base/net_errors.h"
 #include "url/gurl.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/browser/tab_organization/api_key_store.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 

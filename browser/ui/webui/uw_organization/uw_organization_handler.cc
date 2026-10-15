@@ -18,6 +18,7 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/webui/web_ui_util.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/components/look/tint.h"
 #include "uw/components/tab_organization/placement.h"

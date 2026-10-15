@@ -20,9 +20,9 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
-#include "uw/browser/tab_organization/api_key_store.h"
-#include "uw/browser/tab_organization/model_test_server.h"
-#include "uw/browser/tab_organization/scoped_memory_keychain.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/model_test_server.h"
+#include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/components/ai_providers/providers.h"
 

@@ -1,8 +1,8 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#ifndef UW_BROWSER_TAB_ORGANIZATION_REMOTE_MODEL_CLIENT_H_
-#define UW_BROWSER_TAB_ORGANIZATION_REMOTE_MODEL_CLIENT_H_
+#ifndef UW_BROWSER_AI_PROVIDERS_REMOTE_MODEL_CLIENT_H_
+#define UW_BROWSER_AI_PROVIDERS_REMOTE_MODEL_CLIENT_H_
 
 #include <memory>
 #include <optional>
@@ -77,4 +77,4 @@ class RemoteModelClient {
 
 }  // namespace uw
 
-#endif  // UW_BROWSER_TAB_ORGANIZATION_REMOTE_MODEL_CLIENT_H_
+#endif  // UW_BROWSER_AI_PROVIDERS_REMOTE_MODEL_CLIENT_H_

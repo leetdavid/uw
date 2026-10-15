@@ -20,6 +20,7 @@ source_set("tab_organization") {
   ]
   deps = [
     ":ai_connection",
+    "//uw/browser/ai_providers",
     "//base:i18n",
     "//chrome:strings",
     "//chrome/browser/profiles:profile",
@@ -58,6 +59,8 @@ source_set("browser_tests") {
   ]
   deps = [
     ":ai_connection",
+    "//uw/browser/ai_providers:test_support",
+    "//uw/browser/ai_providers",
     ":tab_organization",
     ":test_support",
     "//base",
@@ -90,10 +93,6 @@ source_set("browser_tests") {
 source_set("test_support") {
   testonly = true
   sources = [
-    "model_test_server.cc",
-    "model_test_server.h",
-    "scoped_memory_keychain.h",
-    "scoped_memory_keychain.mm",
     "window_screenshot.cc",
     "window_screenshot.h",
   ]
@@ -102,8 +101,6 @@ source_set("test_support") {
     "//base/test:test_support",
     "//chrome/browser/ui",
     "//components/viz/common",
-    "//crypto",
-    "//net:test_support",
     "//skia",
     "//testing/gtest",
     "//ui/compositor",
@@ -118,31 +115,14 @@ source_set("ai_connection") {
   sources = [
     "ai_connection.cc",
     "ai_connection.h",
-    "api_key_store.h",
-    "remote_model_client.cc",
-    "remote_model_client.h",
   ]
-  if (is_mac) {
-    # macOS Keychain storage. The first release targets macOS desktop.
-    sources += [ "api_key_store_mac.mm" ]
-  } else {
-    # In-memory fallback so non-macOS builds link. Secrets never leave the
-    # process and never touch disk.
-    sources += [ "api_key_store_stub.cc" ]
-  }
   public_deps = [
     "//base",
     "//uw/components/tab_organization",
   ]
   deps = [
-    "//components/os_crypt/common:switches",
     "//components/pref_registry",
     "//components/prefs",
-    "//crypto",
-    "//net",
-    "//services/network/public/cpp",
-    "//services/network/public/mojom",
-    "//url",
-    "//uw/components/ai_providers",
+    "//uw/browser/ai_providers",
   ]
 }

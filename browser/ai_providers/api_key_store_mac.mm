@@ -1,11 +1,11 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/tab_organization/api_key_store.h"
-
-#include <map>
+#include "uw/browser/ai_providers/api_key_store.h"
 
 #include <Security/Security.h>
+
+#include <map>
 
 #include "base/apple/scoped_cftyperef.h"
 #include "base/command_line.h"
@@ -56,9 +56,8 @@ std::optional<std::string> ApiKeyStore::GetKey(const std::string& account) {
     const auto key = keys->find(account);
     return key == keys->end() ? std::nullopt : std::optional(key->second);
   }
-  auto result =
-      crypto::apple::KeychainV2::GetInstance().FindGenericPassword(
-          service_name_, account);
+  auto result = crypto::apple::KeychainV2::GetInstance().FindGenericPassword(
+      service_name_, account);
   if (!result.has_value()) {
     return std::nullopt;
   }
@@ -80,9 +79,8 @@ bool ApiKeyStore::DeleteKey(const std::string& account) {
   if (!query) {
     return false;
   }
-  base::apple::ScopedCFTypeRef<CFStringRef> service(
-      CFStringCreateWithCString(kCFAllocatorDefault, service_name_.c_str(),
-                                kCFStringEncodingUTF8));
+  base::apple::ScopedCFTypeRef<CFStringRef> service(CFStringCreateWithCString(
+      kCFAllocatorDefault, service_name_.c_str(), kCFStringEncodingUTF8));
   base::apple::ScopedCFTypeRef<CFStringRef> account_ref(
       CFStringCreateWithCString(kCFAllocatorDefault, account.c_str(),
                                 kCFStringEncodingUTF8));

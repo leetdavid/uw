@@ -17,7 +17,7 @@
 #include "base/task/cancelable_task_tracker.h"
 #include "base/time/time.h"
 #include "components/history/core/browser/history_types.h"
-#include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 
 class Profile;
 
