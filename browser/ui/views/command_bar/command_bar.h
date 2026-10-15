@@ -13,7 +13,6 @@
 
 class BrowserWindowInterface;
 class WebUIBubbleDialogView;
-class WebUIContentsWrapper;
 
 namespace content {
 class WebContents;
@@ -42,12 +41,14 @@ class CommandBar {
   content::WebContents* page() const;
 
  private:
+  class Page;
+
   void OnSettingChanged();
   void Show();
 
   const raw_ptr<BrowserWindowInterface> window_;
   PrefChangeRegistrar setting_;
-  std::unique_ptr<WebUIContentsWrapper> contents_;
+  std::unique_ptr<Page> contents_;
   base::WeakPtr<WebUIBubbleDialogView> bubble_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;
 };

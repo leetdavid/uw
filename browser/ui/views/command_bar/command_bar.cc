@@ -4,8 +4,11 @@
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 
 #include <utility>
+#include <vector>
 
 #include "base/functional/bind.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_dialog_view.h"
@@ -13,7 +16,15 @@
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_wrapper.h"
 #include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/input/native_web_keyboard_event.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/focused_node_details.h"
+#include "content/public/browser/keyboard_event_processing_result.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/visibility.h"
+#include "content/public/browser/web_contents.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/bubble/bubble_border.h"
@@ -28,8 +39,75 @@ namespace {
 
 constexpr gfx::Size kSize(640, 360);
 constexpr int kTopInset = 96;
+// Keys go to the page after this even if its field never reported focus.
+constexpr base::TimeDelta kLongestHold = base::Seconds(1);
 
 }  // namespace
+
+// The command bar's page. Between the panel showing and its field taking
+// focus, the page drops keys, so the browser holds them and hands them over in
+// order once the field has focus.
+class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI> {
+ public:
+  explicit Page(Profile* profile)
+      : WebUIContentsWrapperT(GURL(kCommandBarUrl),
+                              profile,
+                              IDS_UW_COMMAND_BAR) {}
+
+  void HoldKeys() {
+    held_.clear();
+    holding_ = true;
+    release_.Start(FROM_HERE, kLongestHold,
+                   base::BindOnce(&Page::ReleaseKeys, base::Unretained(this)));
+  }
+
+  // WebUIContentsWrapper:
+  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
+      content::WebContents* source,
+      const input::NativeWebKeyboardEvent& event) override {
+    if (holding_ &&
+        event.GetType() == input::NativeWebKeyboardEvent::Type::kRawKeyDown &&
+        event.windows_key_code != ui::VKEY_ESCAPE) {
+      held_.push_back(event);
+      return content::KeyboardEventProcessingResult::HANDLED;
+    }
+    return WebUIContentsWrapperT::PreHandleKeyboardEvent(source, event);
+  }
+  void OnFocusChangedInPage(
+      const content::FocusedNodeDetails& details) override {
+    if (details.editable_level != content::EditableLevel::kNotEditable) {
+      ReleaseKeys();
+    }
+  }
+
+ private:
+  // Sends each held key down, and its character, as macOS would have.
+  void ReleaseKeys() {
+    if (!holding_) {
+      return;
+    }
+    holding_ = false;
+    release_.Stop();
+    std::vector<input::NativeWebKeyboardEvent> held = std::exchange(held_, {});
+    if (web_contents()->GetVisibility() == content::Visibility::HIDDEN) {
+      return;
+    }
+    content::RenderWidgetHost* widget =
+        web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost();
+    for (input::NativeWebKeyboardEvent& event : held) {
+      widget->ForwardKeyboardEvent(event);
+      if (event.text[0] >= ' ') {
+        event.SetType(input::NativeWebKeyboardEvent::Type::kChar);
+        event.skip_if_unhandled = true;
+        widget->ForwardKeyboardEvent(event);
+      }
+    }
+  }
+
+  bool holding_ = false;
+  std::vector<input::NativeWebKeyboardEvent> held_;
+  base::OneShotTimer release_;
+};
 
 DEFINE_USER_DATA(CommandBar);
 
@@ -73,8 +151,7 @@ void CommandBar::OnSettingChanged() {
   const bool on =
       window_->GetProfile()->GetPrefs()->GetBoolean(kCommandBarEnabledPref);
   if (on && !contents_) {
-    contents_ = std::make_unique<WebUIContentsWrapperT<UwCommandBarUI>>(
-        GURL(kCommandBarUrl), window_->GetProfile(), IDS_UW_COMMAND_BAR);
+    contents_ = std::make_unique<Page>(window_->GetProfile());
     webui::SetBrowserWindowInterface(contents_->web_contents(), window_);
   } else if (!on && contents_) {
     if (bubble_) {
@@ -98,6 +175,7 @@ void CommandBar::Show() {
   view->web_view()->SetPreferredSize(kSize);
   bubble_ = view->GetWeakPtr();
   views::BubbleDialogDelegateView::CreateBubble(std::move(view));
+  contents_->HoldKeys();
   bubble_->ShowUI();
 }
 

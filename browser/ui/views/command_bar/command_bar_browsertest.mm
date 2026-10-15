@@ -68,16 +68,18 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
     loop.Run();
   }
 
-  // Asks the page every 20 ms for up to two seconds.
+  // Asks the page every 20 ms until `within` has passed.
   template <typename Condition>
-  bool Eventually(Condition condition) {
-    for (int i = 0; i < 100; ++i) {
+  bool Eventually(Condition condition,
+                  base::TimeDelta within = base::Seconds(2)) {
+    const base::TimeTicks deadline = base::TimeTicks::Now() + within;
+    while (base::TimeTicks::Now() < deadline) {
       if (condition()) {
         return true;
       }
       Wait(base::Milliseconds(20));
     }
-    return false;
+    return condition();
   }
 };
 
@@ -129,7 +131,8 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
 }
 
 // Keys typed right after Cmd+T, before the panel has drawn, land in its field
-// in order.
+// in order. They must land before the browser's one-second fallback lets held
+// keys go, so the page's own signal is what released them.
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
                        MANUAL_KeysTypedRightAfterCmdTLand) {
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
@@ -140,7 +143,8 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
     Queue(key, 0);
   }
 
-  EXPECT_TRUE(Eventually([&] { return Field() == "github"; }))
+  EXPECT_TRUE(
+      Eventually([&] { return Field() == "github"; }, base::Milliseconds(800)))
       << "The field holds: " << Field();
 }
 

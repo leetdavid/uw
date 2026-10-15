@@ -16,6 +16,8 @@ source_set("command_bar") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/views/bubble",
     "//chrome/browser/ui/webui/top_chrome",
+    "//components/input",
+    "//content/public/browser",
     "//ui/gfx",
     "//ui/views",
     "//url",
