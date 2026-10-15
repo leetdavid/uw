@@ -114,7 +114,7 @@ Expected result: the window around the page card becomes a gradient that starts 
 
 ### Chats
 
-A chat clicks and types without asking for approval, which comes later. Try it only on sites where a stray click does no harm.
+A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button and before typing a password or payment details, and the agent marks other changes. Nothing on a page can answer for you.
 
 1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
 2. Choose `New chat` from the File menu or the sidebar's `+` menu, or type `uw://chat`.

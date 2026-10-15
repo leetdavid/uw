@@ -18,6 +18,13 @@ namespace uw {
 struct PageElement {
   int node_id = 0;
   std::string document;
+  // How the reading names it, such as `button "Send"`.
+  std::string name;
+  // Clicking it submits a form.
+  bool submits = false;
+  // What typing into it fills when that is "a password" or "payment
+  // details". Empty for any other field.
+  std::string fills;
 
   bool operator==(const PageElement&) const = default;
 };

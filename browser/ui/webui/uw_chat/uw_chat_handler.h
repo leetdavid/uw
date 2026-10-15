@@ -67,6 +67,8 @@ class UwChatHandler : public mojom::ChatHandler,
   void GetSkills(GetSkillsCallback callback) override;
   void SetSkillOn(const std::string& name, bool on) override;
   void AnswerSkill(bool save) override;
+  void AnswerApproval(mojom::ApprovalChoice choice,
+                      const std::string& note) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -108,6 +110,10 @@ class UwChatHandler : public mojom::ChatHandler,
   void AskToSaveSkill(base::DictValue args,
                       base::OnceCallback<void(base::DictValue)> answer);
   void OnSkillWritten(bool written);
+  // A step the user must approve: shows the page the approval card and
+  // answers once the user does.
+  void AskApproval(AgentTools::Approval approval,
+                   base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer);
 
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::ChatPage> page_;
@@ -147,6 +153,8 @@ class UwChatHandler : public mojom::ChatHandler,
   // The skill the agent asked to save, and its answer.
   base::DictValue proposed_skill_;
   base::OnceCallback<void(base::DictValue)> skill_answer_;
+  // The answer to the step that waits for the user's approval.
+  base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval_answer_;
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::WeakPtrFactory<UwChatHandler> weak_factory_{this};

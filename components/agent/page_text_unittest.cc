@@ -94,7 +94,34 @@ TEST_F(PageTextTest, NumbersFieldsAndButtonsInPageOrder) {
             "[2] button \"Send\"\n"
             "We ship in two days.\n");
   EXPECT_THAT(page.elements,
-              ElementsAre(PageElement{5, "main"}, PageElement{7, "main"}));
+              ElementsAre(PageElement{5, "main", "text field \"Your name\""},
+                          PageElement{7, "main", "button \"Send\""}));
+}
+
+TEST_F(PageTextTest, ItMarksWhatNeedsTheUsersApproval) {
+  proto::ContentNode* form = Add(root(), proto::CONTENT_ATTRIBUTE_FORM);
+  AddControl(form, proto::FORM_CONTROL_TYPE_INPUT_PASSWORD, 2)
+      ->set_field_name("password");
+  proto::FormControlData* card =
+      AddControl(form, proto::FORM_CONTROL_TYPE_INPUT_TEXT, 3);
+  card->set_field_name("card number");
+  card->add_coarse_autofill_field_type(
+      proto::COARSE_AUTOFILL_FIELD_TYPE_CREDIT_CARD);
+  AddControl(form, proto::FORM_CONTROL_TYPE_BUTTON_SUBMIT, 4)
+      ->set_field_name("Pay");
+  // A button outside any form submits nothing.
+  AddControl(root(), proto::FORM_CONTROL_TYPE_BUTTON_SUBMIT, 5)
+      ->set_field_name("Menu");
+
+  const PageText page = Describe();
+
+  ASSERT_EQ(page.elements.size(), 4u);
+  EXPECT_EQ(page.elements[0].fills, "a password");
+  EXPECT_EQ(page.elements[1].fills, "payment details");
+  EXPECT_FALSE(page.elements[1].submits);
+  EXPECT_TRUE(page.elements[2].submits);
+  EXPECT_EQ(page.elements[2].name, "button \"Pay\"");
+  EXPECT_FALSE(page.elements[3].submits);
 }
 
 TEST_F(PageTextTest, AFieldIsNamedByItsLabel) {
@@ -163,7 +190,8 @@ TEST_F(PageTextTest, AClickableAreaIsReadThroughTheLinksInIt) {
             "[1] link \"Read more\"\n"
             "[2] clickable \"Open menu\"\n");
   EXPECT_THAT(page.elements,
-              ElementsAre(PageElement{6, "main"}, PageElement{8, "main"}));
+              ElementsAre(PageElement{6, "main", "link \"Read more\""},
+                          PageElement{8, "main", "clickable \"Open menu\""}));
 }
 
 TEST_F(PageTextTest, AFrameNamesItsOwnDocument) {
@@ -181,7 +209,8 @@ TEST_F(PageTextTest, AFrameNamesItsOwnDocument) {
   const PageText page = Describe();
 
   EXPECT_EQ(page.text, "[1] button \"Pay\"\n");
-  EXPECT_THAT(page.elements, ElementsAre(PageElement{3, "frame"}));
+  EXPECT_THAT(page.elements,
+              ElementsAre(PageElement{3, "frame", "button \"Pay\""}));
 }
 
 TEST_F(PageTextTest, AdsAreLeftOut) {

@@ -36,6 +36,25 @@ bool IsButton(proto::FormControlType type) {
   }
 }
 
+bool IsSubmit(proto::FormControlType type) {
+  return type == proto::FORM_CONTROL_TYPE_BUTTON_SUBMIT ||
+         type == proto::FORM_CONTROL_TYPE_INPUT_SUBMIT ||
+         type == proto::FORM_CONTROL_TYPE_INPUT_IMAGE;
+}
+
+// What typing into a field fills, when the user must approve it.
+std::string_view Fills(const proto::FormControlData& control) {
+  if (control.form_control_type() == proto::FORM_CONTROL_TYPE_INPUT_PASSWORD) {
+    return "a password";
+  }
+  for (int type : control.coarse_autofill_field_type()) {
+    if (type == proto::COARSE_AUTOFILL_FIELD_TYPE_CREDIT_CARD) {
+      return "payment details";
+    }
+  }
+  return "";
+}
+
 // What the agent is told a form control is. Empty for a control it cannot
 // use, which is then read as plain content.
 std::string_view Kind(proto::FormControlType type) {
@@ -172,7 +191,11 @@ class Writer {
       }
       return;
     }
+    const bool form =
+        attributes.attribute_type() == proto::CONTENT_ATTRIBUTE_FORM;
+    forms_ += form;
     WalkChildren(node, document);
+    forms_ -= form;
   }
 
   PageText Take() && { return std::move(page_); }
@@ -199,24 +222,27 @@ class Writer {
 
   void Element(const proto::ContentNode& node, const std::string& document) {
     const proto::ContentAttributes& attributes = node.content_attributes();
-    page_.elements.push_back(
-        {attributes.common_ancestor_dom_node_id(), document});
-    std::string line =
-        base::StrCat({"[", base::NumberToString(page_.elements.size()), "] "});
+    PageElement element{attributes.common_ancestor_dom_node_id(), document};
+    std::string more;
     if (attributes.attribute_type() == proto::CONTENT_ATTRIBUTE_ANCHOR) {
-      base::StrAppend(&line, {"link \"", Label(node), "\""});
+      element.name = base::StrCat({"link \"", Label(node), "\""});
       if (!attributes.anchor_data().url().empty()) {
-        base::StrAppend(&line, {" to ", attributes.anchor_data().url()});
+        more = base::StrCat({" to ", attributes.anchor_data().url()});
       }
     } else if (attributes.attribute_type() ==
                proto::CONTENT_ATTRIBUTE_FORM_CONTROL) {
       const proto::FormControlData& control = attributes.form_control_data();
-      base::StrAppend(&line, {Kind(control.form_control_type()), " \"",
-                              Label(node), "\"", Value(control)});
+      element.name = base::StrCat(
+          {Kind(control.form_control_type()), " \"", Label(node), "\""});
+      more = Value(control);
+      element.submits = forms_ > 0 && IsSubmit(control.form_control_type());
+      element.fills = Fills(control);
     } else {
-      base::StrAppend(&line, {"clickable \"", Label(node), "\""});
+      element.name = base::StrCat({"clickable \"", Label(node), "\""});
     }
-    Line(line);
+    page_.elements.push_back(element);
+    Line(base::StrCat({"[", base::NumberToString(page_.elements.size()), "] ",
+                       element.name, more}));
   }
 
   // The words that name a link, field, or button.
@@ -277,6 +303,8 @@ class Writer {
   }
 
   const size_t max_length_;
+  // How many forms the walk is inside.
+  int forms_ = 0;
   std::map<int, std::string> labels_;
   bool full_ = false;
   PageText page_;

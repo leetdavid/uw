@@ -94,6 +94,8 @@ mojom::ChatState StateFor(ChatIndex::State state) {
       return mojom::ChatState::kDone;
     case ChatIndex::State::kRunning:
       return mojom::ChatState::kRunning;
+    case ChatIndex::State::kWaiting:
+      return mojom::ChatState::kWaiting;
     case ChatIndex::State::kStopped:
       return mojom::ChatState::kStopped;
     case ChatIndex::State::kUnread:
@@ -401,6 +403,28 @@ void UwChatHandler::AnswerSkill(bool save) {
                      weak_factory_.GetWeakPtr()));
 }
 
+void UwChatHandler::AnswerApproval(mojom::ApprovalChoice choice,
+                                   const std::string& note) {
+  if (!approval_answer_) {
+    return;
+  }
+  AgentLoop::ApprovalAnswer answer;
+  answer.note = note;
+  switch (choice) {
+    case mojom::ApprovalChoice::kApprove:
+      answer.choice = AgentLoop::ApprovalAnswer::Choice::kApprove;
+      break;
+    case mojom::ApprovalChoice::kDecline:
+      answer.choice = AgentLoop::ApprovalAnswer::Choice::kDecline;
+      break;
+    case mojom::ApprovalChoice::kStop:
+      answer.choice = AgentLoop::ApprovalAnswer::Choice::kStop;
+      break;
+  }
+  std::move(approval_answer_).Run(std::move(answer));
+  UpdateIndex();
+}
+
 void UwChatHandler::OnChatsChanged() {
   ChatIndex* index = index_observation_.GetSource();
   if (!index || !index->loaded()) {
@@ -493,6 +517,8 @@ bool UwChatHandler::Start() {
       base::BindRepeating(&UwChatHandler::Save, base::Unretained(this)));
   agent_->SetSkillSaver(base::BindRepeating(&UwChatHandler::AskToSaveSkill,
                                             base::Unretained(this)));
+  agent_->SetApprover(
+      base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   if (TabOrganizationController* tree =
           TabOrganizationController::From(tab->GetBrowserWindowInterface())) {
     for (const auto& [number, page] : saved_tabs_) {
@@ -779,6 +805,15 @@ void UwChatHandler::AskToSaveSkill(
   skill_answer_ = std::move(answer);
 }
 
+void UwChatHandler::AskApproval(
+    AgentTools::Approval approval,
+    base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
+  approval_answer_ = std::move(answer);
+  page_->OnApproval(mojom::Approval::New(approval.tab, approval.site,
+                                         approval.action, approval.reason));
+  UpdateIndex();
+}
+
 void UwChatHandler::OnSkillWritten(bool written) {
   if (!skill_answer_) {
     return;
@@ -804,7 +839,9 @@ void UwChatHandler::UpdateIndex() {
       log_.empty() ? nullptr : log_.back().GetIfDict();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
   ChatIndex::State state = ChatIndex::State::kDone;
-  if (Working()) {
+  if (approval_answer_) {
+    state = ChatIndex::State::kWaiting;
+  } else if (Working()) {
     state = ChatIndex::State::kRunning;
   } else if (kind && *kind == "stopped") {
     state = ChatIndex::State::kStopped;

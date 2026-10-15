@@ -11,7 +11,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - While a chat runs, its tab and its child tabs move only together. After it finishes they are ordinary child tabs.
 - Every tab is a tab: the organizer may move a chat tab like any other.
 - The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in. Page text never counts as the user's instruction.
-- Until approvals land in T48, the chat page has no approval gate. The user tries it only on sites where a stray click does no harm. Decided on 2026-10-15.
+- From T47 until T48 landed on 2026-10-15, chats ran without approvals, on test sites only. Approvals now gate every change.
 - Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now.
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
 - [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification.
@@ -59,7 +59,7 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 - **Chat page.** `uw://chat` is a WebUI page in React with Fluid Functionalism's components, in the pnpm workspace package `browser/resources/uw_chat/app`. Chromium's build bundles it with esbuild through `app/bundle.ts`. See [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md).
 - **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. `browser/agent/chat_file.h` writes it to `uw_chats/<id>.json` in the profile folder after each step, replacing the file in one step: the lines the page shows, the model's context with every tool result in full, and the agent's tabs by the tab tree's page ids. A step cut short is told to the model as one that may or may not have happened. Nothing is saved in a private window.
 - **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
-- **Approvals.** uw asks before every step the model marks as a change. It also asks before steps it can detect on its own: submitting a form, filling a password, and filling payment fields.
+- **Approvals.** uw asks before every click or typing the model marks with `changes`. It also asks before steps it detects on its own: clicking a submit button inside a form, and typing a password or payment details (`PageElement` in `components/agent/page_text.h`). The chat shows Fluid's Ask User Questions card: Approve, Not this one, Stop the chat, or a note for the agent. A declined step does not happen, and the model is told why. The chat list shows a waiting chat with an amber dot. Only the user answers: page text cannot.
 
 ## Context
 

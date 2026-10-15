@@ -202,11 +202,49 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
                        std::move(turn), index, std::move(asked)));
     return;
   }
-  const std::string name = call.name;
-  base::DictValue asked = args->Clone();
-  tools_.Call(name, *args,
+  if (approve_) {
+    if (std::optional<AgentTools::Approval> approval =
+            tools_.ApprovalFor(call.name, *args)) {
+      approve_.Run(
+          std::move(*approval),
+          base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
+                         std::move(turn), index, std::move(*args)));
+      return;
+    }
+  }
+  CallTool(std::move(turn), index, std::move(*args));
+}
+
+void AgentLoop::CallTool(ModelTurn turn, size_t index, base::DictValue args) {
+  const std::string name = turn.calls[index].name;
+  base::DictValue asked = args.Clone();
+  tools_.Call(name, args,
               base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
                              std::move(turn), index, std::move(asked)));
+}
+
+void AgentLoop::OnApproval(ModelTurn turn,
+                           size_t index,
+                           base::DictValue args,
+                           ApprovalAnswer answer) {
+  switch (answer.choice) {
+    case ApprovalAnswer::Choice::kApprove:
+      CallTool(std::move(turn), index, std::move(args));
+      return;
+    case ApprovalAnswer::Choice::kDecline: {
+      base::DictValue result =
+          Error("The user did not approve this step, so it did not happen.");
+      if (!answer.note.empty()) {
+        result.Set("user_said", answer.note);
+      }
+      OnTool(std::move(turn), index, std::move(args), std::move(result));
+      return;
+    }
+    case ApprovalAnswer::Choice::kStop:
+      context_->CloseOpenCalls("The user stopped the chat.");
+      Finish(Failed("You stopped the chat."));
+      return;
+  }
 }
 
 void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {

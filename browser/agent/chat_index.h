@@ -30,7 +30,7 @@ namespace uw {
 // chat files.
 class ChatIndex : public base::SupportsUserData::Data {
  public:
-  enum class State { kDone, kRunning, kStopped, kUnread };
+  enum class State { kDone, kRunning, kWaiting, kStopped, kUnread };
 
   struct Entry {
     std::string id;

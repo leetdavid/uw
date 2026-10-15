@@ -12,6 +12,10 @@ import {
   BannerActions,
   BannerTitle,
 } from "@/components/ui/banner";
+import {
+  AskUserQuestions,
+  type AskUserAnswer,
+} from "@/components/ui/ask-user-questions";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage } from "@/components/ui/input-message";
@@ -41,6 +45,7 @@ import {
 import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import {
+  ApprovalChoice,
   ChatState,
   chatHandler,
   chatPage,
@@ -48,6 +53,7 @@ import {
   SkillSource,
   StepKind,
   type AgentTab,
+  type Approval,
   type ChatSummary,
   type SkillInfo,
   type SkillProposal,
@@ -180,15 +186,24 @@ const Running: IconComponent = ({ className, ...props }) => (
   <Loader2 {...props} className={cn(className, "animate-spin")} />
 );
 
+const Waiting: IconComponent = ({ className }) => (
+  <span className={cn(className, "flex items-center justify-center")}>
+    <span className="size-1.5 rounded-full bg-warning" />
+  </span>
+);
+
 // How a row in the chat list shows its chat's state: a spinner while the
-// agent works, a pause sign once it stopped early, a filled dot for an
-// answer not yet seen, and a ring for the rest.
+// agent works, an amber dot while a step waits for approval, a pause sign
+// once it stopped early, a filled dot for an answer not yet seen, and a ring
+// for the rest.
 function rowState(
   state: ChatState,
 ): Pick<SidebarMenuButtonProps, "icon" | "status"> {
   switch (state) {
     case ChatState.kRunning:
       return { icon: Running };
+    case ChatState.kWaiting:
+      return { icon: Waiting };
     case ChatState.kStopped:
       return { icon: Pause };
     case ChatState.kUnread:
@@ -201,6 +216,7 @@ function rowState(
 const STATE_NAMES: Record<ChatState, string> = {
   [ChatState.kDone]: "done",
   [ChatState.kRunning]: "running",
+  [ChatState.kWaiting]: "waiting",
   [ChatState.kStopped]: "stopped",
   [ChatState.kUnread]: "unread",
 };
@@ -467,6 +483,44 @@ function SkillProposalCard({ proposal }: { proposal: SkillProposal }) {
   );
 }
 
+// A step that waits for the user. Nothing on a page can answer it.
+function ApprovalCard({ approval }: { approval: Approval }) {
+  const answer = (given: AskUserAnswer | undefined) => {
+    const choice = given?.selectedIds[0];
+    chatHandler.answerApproval(
+      choice === "approve"
+        ? ApprovalChoice.kApprove
+        : choice === "stop"
+          ? ApprovalChoice.kStop
+          : ApprovalChoice.kDecline,
+      given?.otherText ?? "",
+    );
+  };
+  return (
+    <div id="approval" className="flex flex-col gap-1.5">
+      <div className="px-1 text-xs text-muted-foreground">
+        {approval.site} · Tab {approval.tab}
+      </div>
+      <AskUserQuestions
+        questions={[
+          {
+            id: "approval",
+            title: `${approval.action}?`,
+            options: [
+              { id: "approve", title: "Approve", description: approval.reason },
+              { id: "decline", title: "Not this one" },
+              { id: "stop", title: "Stop the chat" },
+            ],
+            allowOther: true,
+            otherPlaceholder: "Tell the agent why, or what to do instead",
+          },
+        ]}
+        onComplete={(answers) => answer(answers.approval)}
+      />
+    </div>
+  );
+}
+
 // The skill the agent loaded since the user's last message, if any.
 function usingSkill(lines: Step[]): string {
   let name = "";
@@ -505,11 +559,13 @@ function TabCard({
   tab,
   current,
   working,
+  waiting,
   doing,
 }: {
   tab: AgentTab;
   current: boolean;
   working: boolean;
+  waiting: boolean;
   doing: string;
 }) {
   return (
@@ -539,11 +595,12 @@ function TabCard({
           <span className="tab-title truncate">{tab.title || tab.url}</span>
         </div>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-          {current && working && !tab.closed && (
+          {current && working && !waiting && !tab.closed && (
             <Loader2 className="size-3 shrink-0 animate-spin" />
           )}
+          {waiting && <span className="size-1.5 shrink-0 rounded-full bg-warning" />}
           <span className="tab-doing truncate">
-            {tab.closed ? "Closed" : doing}
+            {tab.closed ? "Closed" : waiting ? "Waits for your approval" : doing}
           </span>
           <span className="ml-auto shrink-0">Tab {tab.number}</span>
         </div>
@@ -574,12 +631,15 @@ function AgentTabs({
   tabs,
   current,
   working,
+  waiting,
   sideBySide,
   lines,
 }: {
   tabs: AgentTab[];
   current: number;
   working: boolean;
+  // The tab whose step waits for approval, or 0.
+  waiting: number;
   sideBySide: boolean;
   lines: Step[];
 }) {
@@ -604,6 +664,7 @@ function AgentTabs({
           tab={tab}
           current={tab.number === current}
           working={working}
+          waiting={tab.number === waiting}
           doing={doing.get(tab.number) ?? ""}
         />
       ))}
@@ -673,6 +734,7 @@ function Chat() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [skillsFolder, setSkillsFolder] = useState("");
   const [proposal, setProposal] = useState<SkillProposal | null>(null);
+  const [approval, setApproval] = useState<Approval | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
   const [working, setWorking] = useState(false);
   const [draft, setDraft] = useState("");
@@ -707,7 +769,9 @@ function Chat() {
       chatPage.onSkillProposal.addListener((asked: SkillProposal) =>
         setProposal(asked),
       ),
+      chatPage.onApproval.addListener((asked: Approval) => setApproval(asked)),
       chatPage.onStep.addListener((step: Step) => {
+        setApproval(null);
         if (step.tool === "save_skill") {
           setProposal(null);
         }
@@ -796,12 +860,6 @@ function Chat() {
       )}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
-          <Banner status="warning" className="ungated">
-            <BannerTitle>
-              This chat clicks and types without asking. Try it only on sites
-              where a stray click does no harm.
-            </BannerTitle>
-          </Banner>
           {groups.map((run, index) =>
             isStep(run[0]!) ? (
               <ThinkingSteps key={index} className="w-full">
@@ -822,7 +880,10 @@ function Chat() {
             ),
           )}
           {proposal && <SkillProposalCard proposal={proposal} />}
-          {working && !proposal && <ThinkingIndicator id="working" />}
+          {approval && <ApprovalCard approval={approval} />}
+          {working && !proposal && !approval && (
+            <ThinkingIndicator id="working" />
+          )}
           <div ref={end} />
         </div>
       </main>
@@ -853,6 +914,7 @@ function Chat() {
           tabs={agentTabs}
           current={currentTab}
           working={working}
+          waiting={approval?.tab ?? 0}
           sideBySide={sideBySide}
           lines={lines}
         />

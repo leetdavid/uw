@@ -30,6 +30,8 @@ std::string_view NameOf(ChatIndex::State state) {
       return "done";
     case ChatIndex::State::kRunning:
       return "running";
+    case ChatIndex::State::kWaiting:
+      return "waiting";
     case ChatIndex::State::kStopped:
       return "stopped";
     case ChatIndex::State::kUnread:
@@ -37,10 +39,10 @@ std::string_view NameOf(ChatIndex::State state) {
   }
 }
 
-// A chat that was running when the index was last written stopped when uw
-// quit.
+// A chat that was running, or waiting for an approval, when the index was
+// last written stopped when uw quit.
 ChatIndex::State StateFrom(std::string_view name) {
-  if (name == "running" || name == "stopped") {
+  if (name == "running" || name == "waiting" || name == "stopped") {
     return ChatIndex::State::kStopped;
   }
   return name == "unread" ? ChatIndex::State::kUnread : ChatIndex::State::kDone;

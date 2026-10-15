@@ -98,6 +98,47 @@ void AgentTools::Call(std::string_view tool,
   }
 }
 
+std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
+    std::string_view tool,
+    const base::DictValue& args) {
+  if (tool != "click" && tool != "type") {
+    return std::nullopt;
+  }
+  std::string error;
+  Tab* tab = TabFrom(args, error);
+  const PageElement* element = tab ? ElementFrom(*tab, args, error) : nullptr;
+  if (!element) {
+    // The step fails on its own.
+    return std::nullopt;
+  }
+  Approval approval;
+  if (tool == "click" && element->submits) {
+    approval.reason = "It submits a form.";
+  } else if (tool == "type" && !element->fills.empty()) {
+    approval.reason = base::StrCat({"It fills in ", element->fills, "."});
+  } else if (args.FindBool("changes").value_or(false)) {
+    approval.reason = "The agent says this changes something.";
+  } else {
+    return std::nullopt;
+  }
+  approval.tab = *args.FindInt("tab");
+  approval.site =
+      tab->handle.Get()->GetContents()->GetLastCommittedURL().host();
+  const std::string* text = args.FindString("text");
+  if (tool == "click") {
+    approval.action = base::StrCat({"Click ", element->name});
+  } else if (text && element->fills.empty()) {
+    approval.action =
+        base::StrCat({"Type \"", *text, "\" into ", element->name});
+  } else {
+    approval.action = base::StrCat({"Type into ", element->name});
+  }
+  if (tool == "type" && args.FindBool("enter").value_or(false)) {
+    base::StrAppend(&approval.action, {" and press Enter"});
+  }
+  return approval;
+}
+
 std::map<int, tabs::TabInterface*> AgentTools::OpenTabs() const {
   std::map<int, tabs::TabInterface*> open;
   for (const auto& [number, tab] : tabs_) {

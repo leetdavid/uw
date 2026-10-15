@@ -48,6 +48,20 @@ class AgentTools {
 
   void Call(std::string_view tool, const base::DictValue& args, Done done);
 
+  // A step the user must approve first: its tab and site, what it does, and
+  // why it needs approval.
+  struct Approval {
+    int tab = 0;
+    std::string site;
+    std::string action;
+    std::string reason;
+  };
+  // What a call to `tool` with `args` needs approved: clicking a button
+  // that submits a form, typing a password or payment details, and any click
+  // or typing the model marks with "changes". Nothing for any other step.
+  std::optional<Approval> ApprovalFor(std::string_view tool,
+                                      const base::DictValue& args);
+
   // The agent's open tabs by their numbers.
   std::map<int, tabs::TabInterface*> OpenTabs() const;
   // Gives the agent `tab` back as tab `number`, as it was before uw quit.

@@ -84,6 +84,19 @@ class AgentLoop {
   void SetSkillSaver(SaveSkill save_skill) {
     save_skill_ = std::move(save_skill);
   }
+  // The user's answer to a step that needs approval. A decline may carry a
+  // note for the model.
+  struct ApprovalAnswer {
+    enum class Choice { kApprove, kDecline, kStop };
+    Choice choice = Choice::kDecline;
+    std::string note;
+  };
+  // Asks the user to approve a step and answers. Without one, every step
+  // runs.
+  using Approve =
+      base::RepeatingCallback<void(AgentTools::Approval,
+                                   base::OnceCallback<void(ApprovalAnswer)>)>;
+  void SetApprover(Approve approve) { approve_ = std::move(approve); }
   const AgentContext& context() const { return *context_; }
   AgentTools& tools() { return tools_; }
 
@@ -92,6 +105,11 @@ class AgentLoop {
   void OnModel(RemoteModelClient::Outcome outcome);
   void RunCall(ModelTurn turn, size_t index);
   void LoadSkill(ModelTurn turn, size_t index, base::DictValue args);
+  void CallTool(ModelTurn turn, size_t index, base::DictValue args);
+  void OnApproval(ModelTurn turn,
+                  size_t index,
+                  base::DictValue args,
+                  ApprovalAnswer answer);
   void OnTool(ModelTurn turn,
               size_t index,
               base::DictValue args,
@@ -107,6 +125,7 @@ class AgentLoop {
   // Each skill's SKILL.md by the skill's name.
   std::map<std::string, base::FilePath> skills_;
   SaveSkill save_skill_;
+  Approve approve_;
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;

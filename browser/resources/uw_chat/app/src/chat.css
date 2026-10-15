@@ -80,6 +80,19 @@
     --color-tint: var(--tint);
     --color-focus-ring: var(--focus-ring);
     --overlay: var(--overlay);
+  @keyframes spinner-move {
+  to {
+    stroke-dashoffset: -100;
+        }
+    }
+  @keyframes spinner-dash {
+  0%, 100% {
+    stroke-dasharray: 15 85;
+        }
+  50% {
+    stroke-dasharray: 40 60;
+        }
+    }
 }
 
 :root {
@@ -481,4 +494,7 @@
     display: none;
         }
     }
+}
+  html.transitioning *, html.transitioning *::before, html.transitioning *::after {
+    transition: border-radius 180ms ease-in-out, background-color 180ms ease-in-out, color 180ms ease-in-out, border-color 180ms ease-in-out, fill 180ms ease-in-out, stroke 180ms ease-in-out !important;
 }

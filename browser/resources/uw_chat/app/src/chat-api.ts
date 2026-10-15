@@ -1,6 +1,7 @@
 // The chat page's line to the browser, uw_chat.mojom. The bundle step points
 // "uw-chat-mojom" at the bindings the build generates.
 import {
+  ApprovalChoice,
   ChatHandlerFactory,
   ChatHandlerRemote,
   ChatPageCallbackRouter,
@@ -10,14 +11,22 @@ import {
 } from "uw-chat-mojom";
 import type {
   AgentTab,
+  Approval,
   ChatSummary,
   SkillInfo,
   SkillProposal,
   Step,
 } from "uw-chat-mojom";
 
-export { ChatState, SkillSource, StepKind };
-export type { AgentTab, ChatSummary, SkillInfo, SkillProposal, Step };
+export { ApprovalChoice, ChatState, SkillSource, StepKind };
+export type {
+  AgentTab,
+  Approval,
+  ChatSummary,
+  SkillInfo,
+  SkillProposal,
+  Step,
+};
 
 export const chatPage = new ChatPageCallbackRouter();
 export const chatHandler = new ChatHandlerRemote();
