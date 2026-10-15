@@ -29,7 +29,9 @@ All of these are manual tests. Record anything that differs from the expected re
 1. Open three disposable tabs with Cmd-T.
 2. Right-click one and choose `Move to New Task`.
 
-Expected result: the tab moves into a new tab group named `New task`, above the ungrouped tabs and after any other task. The group shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the group as you would in Chromium.
+Expected result: the tab moves into a new task named `New task`, above the ungrouped tabs and after any other task. The task shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the task as you would a tab group in Chromium.
+
+Open the task's menu with the button on its row. Expected result: it says task, never group: `New Tab in Task`, `Move Task to New Window`, `Move Tabs to Scratchpad`, and `Close Task`, with no `Delete` and no note that groups save. In a tab's right-click menu, `Move to Task` lists the tasks. Close a task, quit, and start uw again: ⋮ has no `Tab groups` menu and the closed task is not offered anywhere. Cmd+Shift+T still brings back a task you just closed.
 
 ### Link parentage and ordinary close
 
@@ -80,7 +82,8 @@ Expected result: a blank tab opens, selected, one level under that tab and above
 
 Click `Organize` at the foot of the sidebar.
 
-- `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+N do the same. Cmd-T still opens a tab beside the current one, inside its task.
+- `New task` opens a new tab in a new task of its own. Ctrl+Cmd+N does the same. Cmd-T still opens a tab beside the current one, inside its task.
+- The new button sits at the right end of the foot. Its `+` does what Cmd-T does. Its `▾` lists `New Tab`, `New Task`, `New Chat`, `New Terminal`, and `New Split View`, each with its key. There is no `+` under the tab list. Collapse the sidebar: a lone `+` stays at its foot, and a right-click on it opens the same menu.
 - `Undo tab organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
 - The pause items stop and resume automatic organization. While automatic organization is off they are grayed out, and the settings page hides them.
 - `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
@@ -132,13 +135,13 @@ Expected result: the window around the page card becomes a gradient that starts 
 
 ### Terminal tabs
 
-Choose `New terminal` from the File menu, press Ctrl+\`, or right-click the sidebar's `+` and choose `New terminal`.
+Choose `New Terminal` from the File menu or the new button's `▾` menu, or press Ctrl+\`.
 
 Expected result: a tab opens with your login shell in it, named after the shell's folder. Cmd shortcuts, Ctrl+Tab, and Ctrl+\` go to uw, not the shell, and Option works as Alt. A pasted or dropped file types its quoted path. A pasted image is saved to a temporary file, and its path is typed. The organizer files a terminal tab by its title and folder, never by what the shell printed.
 
 ### Command bar
 
-With `Cmd+T opens the command bar` on, Cmd-T, File → New Tab, and `New Tab` in the `+` menu open a panel over the page instead of a tab. Type a few letters.
+With `Cmd+T opens the command bar` on, Cmd-T, File → New Tab, and the new button's `+` open a panel over the page instead of a tab. Type a few letters.
 
 Expected result: suggestions from your history, bookmarks, and search show in the panel. Escape closes it and opens nothing. Picking a suggestion does not open a page yet, and a key pressed within about 40 ms of Cmd-T can be lost. Turn the switch off and Cmd-T opens a blank tab again, in every window at once.
 
@@ -147,7 +150,7 @@ Expected result: suggestions from your history, bookmarks, and search show in th
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.
 
 1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
-2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
+2. Choose `New Chat` from the File menu or the new button's `▾` menu, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
 
 A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others. With a language model on `uw://providers`, the language model writes them once a day from your recent chats and most-visited sites, and the chat after the one that asked shows them. Before that, and in a private window, the chat suggests the product's examples.
@@ -165,6 +168,7 @@ On the right, a card for each of the agent's tabs shows a picture of the tab aft
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
+- [Themes](plans/themes.md): the picker, themes of more than one color, grain, and black dark mode.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.

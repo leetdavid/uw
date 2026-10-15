@@ -95,7 +95,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..eaeca40aabe4b7f1c65264218ba869a9c19e4f74 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..d68d59e655e0fba834b907d4114b638209c051dc 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -130,7 +130,20 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..eaeca40aabe4b7f1c65264218ba869a9
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
-@@ -583,12 +594,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -562,12 +573,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+                   .command_id(IDC_PIN_TARGET_TAB)
+                   .is_alternate()
+                   .key_equivalent(@"", NSEventModifierFlagOption),
+-              Item(IDS_GROUP_TAB_MAC)
+-                  .command_id(IDC_WINDOW_GROUP_TAB),
+-              Item(IDS_GROUP_TARGET_TAB_MAC)
+-                  .command_id(IDC_GROUP_TARGET_TAB)
+-                  .is_alternate()
+-                  .key_equivalent(@"", NSEventModifierFlagOption),
+               Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
+                   .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
+               Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
+@@ -583,12 +588,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -220,7 +233,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..eaeca40aabe4b7f1c65264218ba869a9
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +732,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +726,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,

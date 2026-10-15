@@ -31,6 +31,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
+#include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 
@@ -64,14 +65,23 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
                           base::Unretained(this))));
   card_->Hide();
 
-  button_ = AddChildView(std::make_unique<views::MdTextButton>(
+  // Organize at the left, the new button at the right end.
+  row_ = AddChildView(std::make_unique<views::FlexLayoutView>());
+  row_->SetOrientation(views::LayoutOrientation::kHorizontal);
+  row_->SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
+  row_->SetProperty(views::kMarginsKey,
+                    gfx::Insets::TLBR(kRowSpacing, 0, 0, 0));
+  button_ = row_->AddChildView(std::make_unique<views::MdTextButton>(
       base::BindRepeating(&OrganizeBar::ShowMenu, base::Unretained(this)),
       l10n_util::GetStringUTF16(IDS_UW_ORGANIZE)));
   StyleAsPill(button_);
-  button_->SetProperty(views::kCrossAxisAlignmentKey,
-                       views::LayoutAlignment::kStart);
-  button_->SetProperty(views::kMarginsKey,
-                       gfx::Insets::TLBR(kRowSpacing, 0, 0, 0));
+  spacer_ = row_->AddChildView(std::make_unique<views::View>());
+  spacer_->SetProperty(
+      views::kFlexBehaviorKey,
+      views::FlexSpecification(views::LayoutOrientation::kHorizontal,
+                               views::MinimumFlexSizeRule::kScaleToZero,
+                               views::MaximumFlexSizeRule::kUnbounded));
+  new_button_ = row_->AddChildView(std::make_unique<NewButton>(window_));
 
   if (AutomaticOrganizer* organizer = AutomaticOrganizer::From(window_)) {
     event_subscription_ = organizer->ObserveEvents(base::BindRepeating(
@@ -145,7 +155,16 @@ bool OrganizeBar::GetAcceleratorForCommandId(
 }
 
 void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
-  SetVisible(state == tabs::VerticalTabStripCollapseState::kExpanded);
+  collapsed_ = state != tabs::VerticalTabStripCollapseState::kExpanded;
+  // The narrow sidebar keeps only the new button's "+", centered.
+  button_->SetVisible(!collapsed_);
+  spacer_->SetVisible(!collapsed_);
+  row_->SetMainAxisAlignment(collapsed_ ? views::LayoutAlignment::kCenter
+                                        : views::LayoutAlignment::kStart);
+  new_button_->SetCompact(collapsed_);
+  if (collapsed_) {
+    HideCard();
+  }
 }
 
 void OrganizeBar::ShowMenu() {
@@ -197,7 +216,7 @@ void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
     failing_ = failed;
   }
   const bool details = ShowsActivityDetails();
-  if (!details && !changed && !first_failure) {
+  if (collapsed_ || (!details && !changed && !first_failure)) {
     return;
   }
   card_->Show(event, details);

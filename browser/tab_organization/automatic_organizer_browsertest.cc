@@ -57,6 +57,7 @@
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/label_button.h"
+#include "ui/views/controls/styled_label.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/views_test_utils.h"
@@ -2103,5 +2104,38 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(requests[1].body.find(R"("system":)"), std::string::npos);
 }
 
+// Every label and button text in `view`.
+void CollectTexts(const views::View* view, std::vector<std::u16string>& texts) {
+  if (const auto* button = views::AsViewClass<views::LabelButton>(view)) {
+    texts.emplace_back(button->GetText());
+  } else if (const auto* label = views::AsViewClass<views::Label>(view)) {
+    texts.emplace_back(label->GetText());
+  } else if (const auto* styled =
+                 views::AsViewClass<views::StyledLabel>(view)) {
+    texts.emplace_back(styled->GetText());
+  }
+  for (const views::View* child : view->children()) {
+    CollectTexts(child, texts);
+  }
+}
+
+// A task's menu says "task" and never "group". It offers no Delete and no
+// note that tasks save, since uw keeps no closed tasks.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheTaskMenuSaysTaskAndKeepsNoClosedTasks) {
+  const auto [ungrouped, task] = OneTask();
+  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+  std::vector<std::u16string> texts;
+  CollectTexts(menu->widget_delegate()->GetContentsView(), texts);
+  EXPECT_THAT(texts, testing::IsSupersetOf(
+                         {u"New Tab in Task", u"Move Task to New Window",
+                          u"Move Tabs to Scratchpad", u"Close Task"}));
+  EXPECT_THAT(texts, testing::Not(testing::Contains(u"Delete Task")));
+  for (const std::u16string& text : texts) {
+    EXPECT_EQ(text.find(u"group"), std::u16string::npos) << text;
+    EXPECT_EQ(text.find(u"Group"), std::u16string::npos) << text;
+  }
+  SaveWidgetScreenshot(menu.get(), "task-menu");
+}
 }  // namespace
 }  // namespace uw

@@ -9,21 +9,16 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..4e7e9e2bb9a2452148a311e8926ba30fd6a2f157 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..1eeaba199faa7da1ceda852abcd7397e94b8093b 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,74 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,68 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
 +      <message name="IDS_UW_SCRATCHPAD" desc="Label above the tabs that belong to no task.">Scratchpad</message>
 +      <message name="IDS_UW_ORGANIZE" desc="Tab sidebar button that opens the organization menu.">Organize</message>
-+      <message name="IDS_UW_NEW_TASK" desc="Moves the selected tab branches to a new task.">Move to new task</message>
 +      <message name="IDS_UW_UNTITLED_TASK" desc="Name of a new task before it is renamed.">New task</message>
-+      <message name="IDS_UW_MOVE_TO_SCRATCHPAD" desc="Removes the selected tab branches from their task.">Move to Scratchpad</message>
-+      <message name="IDS_UW_NEST_BRANCH" desc="Makes a tab a child of the tab above it.">Nest under previous tab</message>
-+      <message name="IDS_UW_OUTDENT_BRANCH" desc="Moves a tab up one nesting level.">Move up one level</message>
-+      <message name="IDS_UW_CLOSE_BRANCH" desc="Closes a tab and every tab nested under it.">Close branch</message>
 +      <message name="IDS_UW_UNDO_ORGANIZATION" desc="Reverses one tab organization action.">Undo tab organization</message>
 +      <message name="IDS_UW_AUTO_MOVED_TASK" desc="Sidebar message after automatic organization moves a tab into a task.">Moved to <ph name="TASK_NAME">$1<ex>Research</ex></ph></message>
 +      <message name="IDS_UW_AUTO_CREATED_TASK" desc="Sidebar message after automatic organization starts a task.">Created task <ph name="TASK_NAME">$1<ex>Plan Lisbon trip</ex></ph></message>
@@ -36,7 +31,6 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..4e7e9e2bb9a2452148a311e8926ba30f
 +      <message name="IDS_UW_OPEN_NEW_TASK" desc="Organize menu item that opens a new tab in a new task.">New task</message>
 +      <message name="IDS_UW_SHOW_ACTIVITY" desc="Organize menu item that shows or hides what each automatic organization request did.">Show organizer activity</message>
 +      <message name="IDS_UW_ACTIVITY_ASKING" desc="Headline of the sidebar card while a model decides where a tab belongs.">Asking <ph name="MODEL">$1<ex>jev-latest</ex></ph></message>
-+      <message name="IDS_UW_ACTIVITY_NAMING" desc="Headline of the sidebar card while a model names a new task.">Asking <ph name="MODEL">$1<ex>llama3.2</ex></ph> for a name</message>
 +      <message name="IDS_UW_ACTIVITY_LEFT" desc="Headline of the sidebar card when the model chose to leave a tab in place.">Left where it is</message>
 +      <message name="IDS_UW_ACTIVITY_NEEDS_NAME" desc="Headline of the sidebar card when the model found that the task a tab is in needs a name, and a name is being asked for.">Naming the task</message>
 +      <message name="IDS_UW_ACTIVITY_UNSURE" desc="Headline of the sidebar card when the model suggested a destination without enough confidence. CHOICE is a task name, or the words for a new task.">Suggested <ph name="CHOICE">$1<ex>Plan Lisbon trip</ex></ph></message>
@@ -50,8 +44,9 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..4e7e9e2bb9a2452148a311e8926ba30f
 +      <message name="IDS_UW_NAME_LOCK" desc="Tooltip of the small lock on a task in the tab sidebar. The lock shows that the user typed the task's name, so uw does not rename the task. uw is the product name and stays lowercase.">Named by you. Click to let uw rename this task.</message>
 +      <message name="IDS_UW_SUGGEST_NAME" desc="Row in a task's menu, under the field that holds the task's name. A click asks the language model for a name for the task.">Suggest a name</message>
 +      <message name="IDS_UW_SUGGESTING_NAME" desc="Text of the Suggest a name row in a task's menu while the language model is asked for a name.">Suggesting a name…</message>
-+      <message name="IDS_UW_NEW_TERMINAL" desc="Menu item that opens a tab with the user's shell in it.">New terminal</message>
-+      <message name="IDS_UW_NEW_CHAT" desc="Menu item that opens a chat with uw's agent, which browses for the user.">New chat</message>
++      <message name="IDS_UW_NEW_TERMINAL" desc="In Title Case: Menu item that opens a tab with the user's shell in it.">New Terminal</message>
++      <message name="IDS_UW_NEW_CHAT" desc="In Title Case: Menu item that opens a chat with uw's agent, which browses for the user.">New Chat</message>
++      <message name="IDS_UW_MORE_NEW_ITEMS" desc="Tooltip of the caret on the sidebar's new button, which opens a menu of new tabs, tasks, chats, terminals, and split views.">More new items</message>
 +      <message name="IDS_UW_TERMINAL_NO_SHELL" desc="Shown in a terminal tab when the user's shell could not be started.">uw could not start your shell.</message>
 +      <message name="IDS_UW_SUGGEST_NAME_FAILED" desc="Text of the Suggest a name row in a task's menu after the language model gave no name that could be used.">Could not suggest a name</message>
 +      <message name="IDS_UW_TASKS_MENU_MAC" desc="In Title Case: The title of the Mac menu that holds the task commands. A task is a group of tabs for one piece of work.">Tasks</message>
@@ -81,12 +76,255 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..4e7e9e2bb9a2452148a311e8926ba30f
 +      <message name="IDS_UW_COLLAPSE_BRANCH_MAC" desc="In Title Case: Hides the tabs nested under the selected tab in the tab sidebar.">Collapse Branch</message>
 +      <message name="IDS_UW_EXPAND_BRANCH_MAC" desc="In Title Case: Shows the tabs nested under the selected tab again in the tab sidebar.">Expand Branch</message>
 +      <message name="IDS_UW_HIDDEN_TABS" desc="Tooltip of the number at the end of a tab in the tab sidebar whose nested tabs are hidden.">{COUNT, plural, =1 {1 hidden tab} other {# hidden tabs}}</message>
-+      <message name="IDS_UW_NEW_CHILD_TAB" desc="Tab menu item that opens a blank tab nested directly under this tab.">New child tab</message>
 +      <message name="IDS_UW_NEW_CHILD_TAB_MAC" desc="In Title Case: Opens a blank tab nested directly under the selected tab.">New Child Tab</message>
 +      <message name="IDS_UW_COMMAND_BAR" desc="Name of uw's command bar in the task manager. The command bar is a panel for opening pages and running commands from the keyboard.">Command bar</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
+@@ -1778,7 +1840,7 @@ are declared in tools/grit/grit_args.gni.
+           R&amp;eopen closed window
+         </message>
+         <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
+-          Reopen closed group
++          Reopen closed task
+         </message>
+         <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
+           Reopen closed split view
+@@ -1831,7 +1893,7 @@ are declared in tools/grit/grit_args.gni.
+           R&amp;eopen Closed Window
+         </message>
+         <message name="IDS_REOPEN_GROUP" desc="In Title Case: The text label of the Reopen Closed Group menu item">
+-          Reopen Closed Group
++          Reopen Closed Task
+         </message>
+         <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
+           Reopen Closed Split View
+@@ -11140,7 +11202,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+         Find your reading list and bookmarks in Bookmarks and Lists
+       </message>
+       <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
+-        Unnamed group - <ph name="GROUP_CONTENT_STRING">$1<ex>"New Tab" and one other</ex></ph>
++        Unnamed task - <ph name="GROUP_CONTENT_STRING">$1<ex>"New Tab" and one other</ex></ph>
+       </message>
+       <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
+         <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
+@@ -12077,9 +12139,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           other {Add tabs to reading list}}
+         </message>
+         <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+-          {NUM_TABS, plural,
+-          =1 {Add tab to group}
+-          other {Add tabs to group}}
++          {NUM_TABS, plural, =1 {Move to task} other {Move to task}}
+         </message>
+         <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+           {NUM_TABS, plural,
+@@ -12099,7 +12159,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Move tab into split view
+         </message>
+         <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
+-          New group
++          New task
+         </message>
+         <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
+           Remove from group
+@@ -12193,9 +12253,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           other {Add Tabs to Reading List}}
+         </message>
+         <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+-          {NUM_TABS, plural,
+-          =1 {Add Tab to Group}
+-          other {Add Tabs to Group}}
++          {NUM_TABS, plural, =1 {Move to Task} other {Move to Task}}
+         </message>
+         <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+           {NUM_TABS, plural,
+@@ -12215,7 +12273,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Move Tab into Split View
+         </message>
+         <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
+-          New Group
++          New Task
+         </message>
+         <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
+           Remove From Group
+@@ -12720,7 +12778,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+ 
+       <!-- Tab Group Editor Bubble -->
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
+-          Tab-group title
++          Task name
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
+           {MEMBER_COUNT, plural,
+@@ -12730,22 +12788,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+       </message>
+       <if expr="not use_titlecase">
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
+-          New tab in group
++          New tab in task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HOME" desc="Home option in tab group bubble">
+           Home
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNGROUP" desc="The label of the tab group header context menu item for ungrouping the current group.">
+-          Ungroup
++          Move tabs to Scratchpad
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_FOCUS_GROUP" desc="The label for focus group in the tab group editor bubble.">
+-          Focus group
++          Focus task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNFOCUS_GROUP" desc="The label for unfocus group in the tab group editor bubble.">
+-          Unfocus group
++          Unfocus task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_SHARE_GROUP" desc="The label of the tab group header context menu item for sharing the current group.">
+-          Share group
++          Share task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
+           Recent activity
+@@ -12754,16 +12812,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Manage sharing
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
+-          Close group
++          Close task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HIDE_GROUP" desc="The label of the tab group header context menu item for hiding a saved group into the bookmarks bar.">
+           Hide group
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP" desc="The label of the tab group header context menu item for deleting all tabs in the current group.">
+-          Delete group
++          Delete task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_MOVE_GROUP_TO_NEW_WINDOW" desc="The label of the tab group header context menu item for moving the entire group to a new window.">
+-          Move group to new window
++          Move task to new window
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
+           Open group in new window
+@@ -12781,28 +12839,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Send feedback
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
+-          Name this group
++          Name this task
+         </message>
+       </if>
+ 
+       <if expr="use_titlecase">
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="In Title Case: The label of the tab group header context menu item for adding a new tab into the current group.">
+-          New Tab in Group
++          New Tab in Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HOME" desc="Home option in tab group bubble">
+           Home
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNGROUP" desc="In Title Case: The label of the tab group header context menu item for ungrouping the current group.">
+-          Ungroup
++          Move Tabs to Scratchpad
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_FOCUS_GROUP" desc="The label for focus group in the tab group editor bubble.">
+-          Focus Group
++          Focus Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNFOCUS_GROUP" desc="The label for unfocus group in the tab group editor bubble.">
+-          Unfocus Group
++          Unfocus Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_SHARE_GROUP" desc="The label of the tab group header context menu item for sharing the current group.">
+-          Share Group
++          Share Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
+           Recent Activity
+@@ -12811,16 +12869,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Manage Sharing
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="In Title Case: The label of the tab group header context menu item for closing all tabs in the current group.">
+-          Close Group
++          Close Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HIDE_GROUP" desc="The label of the tab group header context menu item for hiding a saved group into the bookmarks bar.">
+           Hide Group
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP" desc="The label of the tab group header context menu item for deleting all tabs in the current group.">
+-          Delete Group
++          Delete Task
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_MOVE_GROUP_TO_NEW_WINDOW" desc="In Title Case: The label of the tab group header context menu item for moving the entire group to a new window.">
+-          Move Group to New Window
++          Move Task to New Window
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="In Title Case: The label of the saved tab group button context menu item for opening the entire group in a new window.">
+           Open Group in New Window
+@@ -12838,7 +12896,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           Send Feedback
+         </message>
+         <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="In Title Case: The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
+-          Name This Group
++          Name This Task
+         </message>
+       </if>
+ 
+@@ -16925,10 +16983,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+         <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
+       </message>
+       <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
+-        <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Part of unnamed group
++        <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Part of unnamed task
+       </message>
+       <message name="IDS_TAB_AX_LABEL_NAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has been named by the user. Example: 'Google Search - Part of group MyGroupName'">
+-        <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Part of group <ph name="GROUP_NAME">$2</ph>
++        <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Part of task <ph name="GROUP_NAME">$2</ph>
+       </message>
+       <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
+         <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
+@@ -16949,10 +17007,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+         </message>
+       </if>
+       <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
+-       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> unnamed group - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$3</ph>
++       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> unnamed task - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$3</ph>
+       </message>
+       <message name="IDS_GROUP_AX_LABEL_NAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has been named by the user gets focused but is not visually rendered. Example: 'Group MyGroupName - Google Search and 3 other tabs - Collapsed'">
+-       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> group <ph name="GROUP_NAME">$2</ph> - <ph name="GROUP_CONTENTS">$3<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$4</ph>
++       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> task <ph name="GROUP_NAME">$2</ph> - <ph name="GROUP_CONTENTS">$3<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$4</ph>
+       </message>
+       <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
+         Collapsed
+@@ -16997,16 +17055,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+         Tab moved to end of tabstrip
+       </message>
+       <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
+-        Tab moved into unnamed group - <ph name="GROUP_CONTENTS">$1<ex>Google Search and 3 other tabs</ex></ph>
++        Tab moved into unnamed task - <ph name="GROUP_CONTENTS">$1<ex>Google Search and 3 other tabs</ex></ph>
+       </message>
+       <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_NAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with a title">
+-        Tab moved into group <ph name="GROUP_NAME">$1</ph> - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph>
++        Tab moved into task <ph name="GROUP_NAME">$1</ph> - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph>
+       </message>
+       <message name="IDS_TAB_AX_ANNOUNCE_TAB_REMOVED_FROM_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being removed from a tab group with no title">
+-        Tab removed from unnamed group - <ph name="GROUP_CONTENTS">$1<ex>Google Search and 3 other tabs</ex></ph>
++        Tab removed from unnamed task - <ph name="GROUP_CONTENTS">$1<ex>Google Search and 3 other tabs</ex></ph>
+       </message>
+       <message name="IDS_TAB_AX_ANNOUNCE_TAB_REMOVED_FROM_NAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being removed from a tab group with a title">
+-        Tab removed from group <ph name="GROUP_NAME">$1</ph> - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph>
++        Tab removed from task <ph name="GROUP_NAME">$1</ph> - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph>
+       </message>
+       <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
+           Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
+@@ -19308,7 +19366,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
+         Select any text or image to ask Gemini
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">
+-        Ask Gemini about this group
++        Ask Gemini about this task
+       </message>
+       <message name="IDS_COPIED_TO_CLIPBOARD_TOAST_BODY" desc="Text on a toast notification that is shown when an item has been copied to clipboard.">
+         Copied to clipboard
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e..54b0c39 100644
 --- a/chrome/browser/ui/BUILD.gn
@@ -724,27 +962,20 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..45d5b12834a23592c90f50d1c72bc506
      return MainMenuCommand(cmdNum);
  
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
-index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..84722bf8122b6941f3494dad5d41abf3017bddad 100644
+index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..dce44bd6668be9a13ab9c72123eb81e1e927dfd9 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
-@@ -18,6 +18,7 @@
- #include "ui/views/actions/action_view_controller.h"
- #include "ui/views/controls/menu/menu_runner.h"
- #include "ui/views/view_class_properties.h"
-+#include "uw/browser/ui/views/tab_organization/new_task_button.h"
- 
- VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
-     tabs::VerticalTabStripStateController* state_controller,
-@@ -35,6 +36,7 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
+@@ -35,6 +35,8 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
        GetLayoutConstant(LayoutConstant::kVerticalTabStripNewTabButtonSize),
        GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
    new_tab_button->set_context_menu_controller(this);
-+  uw::OpenNewTaskFrom(new_tab_button.get(), browser_);
++  // uw's new button at the foot of the sidebar takes its place.
++  new_tab_button->SetVisible(false);
  
    new_tab_button_pressed_subscription_ =
        new_tab_button->RegisterWillInvokeActionCallback(
 diff --git a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
-index a6c53969ea00adc6c6ca3b6c1f3611003b626650..770d0a6d622beb92bc6d281f7fd04930d161d66d 100644
+index a6c53969ea00adc6c6ca3b6c1f3611003b626650..1abd2d46e83c17b2718568be4101bbd7be8ef34e 100644
 --- a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
 +++ b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
 @@ -3,6 +3,7 @@
@@ -755,7 +986,20 @@ index a6c53969ea00adc6c6ca3b6c1f3611003b626650..770d0a6d622beb92bc6d281f7fd04930
  
  #include <memory>
  #include <optional>
-@@ -562,6 +563,8 @@ void TabGroupEditorBubbleView::RebuildMenuContents() {
+@@ -462,10 +463,9 @@ std::u16string TabGroupEditorBubbleView::GetTextForCloseButton() const {
+   return l10n_util::GetStringUTF16(IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP);
+ }
+ 
++// uw keeps no closed tasks, so the menu offers nothing for saved ones.
+ bool TabGroupEditorBubbleView::CanSaveGroups() const {
+-  return browser_->GetProfile()->IsRegularProfile() &&
+-         tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+-             browser_->GetProfile());
++  return false;
+ }
+ 
+ bool TabGroupEditorBubbleView::CanShareGroups() const {
+@@ -562,6 +562,8 @@ void TabGroupEditorBubbleView::RebuildMenuContents() {
  
    title_field_ = AddChildView(title_field ? std::move(title_field)
                                            : BuildTitleField(title_at_opening_));
@@ -911,3 +1155,59 @@ index a66de0ebb69849292242b5efb637e807345a5cf0..bd5eef180ea4aea103786fe8a1f7ebe0
    UpdateChildLayerBounds(CalculateOffsetToAncestorWithLayer(nullptr));
  
    SchedulePaint();
+diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
+index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..1b003b2191a7b5e805f401bde0eeee41e5a5ef1c 100644
+--- a/chrome/browser/ui/toolbar/app_menu_model.cc
++++ b/chrome/browser/ui/toolbar/app_menu_model.cc
+@@ -2319,18 +2319,7 @@ void AppMenuModel::Build() {
+         kBookmarksMenuItem);
+   }
+ 
+-  if (browser_->GetProfile()->IsRegularProfile()) {
+-    auto saved_tab_groups_model = std::make_unique<ui::SimpleMenuModel>(this);
+-    sub_menus_.push_back(std::move(saved_tab_groups_model));
+-    AddSubMenuWithStringIdAndVectorIcon(
+-        this, kSavedTabGroupsMenuPlaceholder, IDS_SAVED_TAB_GROUPS_MENU,
+-        sub_menus_.back().get(),
+-        features::IsRoundedIconsEnabled() ? kGridViewIcon
+-                                          : kSavedTabGroupBarEverythingOldIcon);
+-    SetElementIdentifierAt(
+-        GetIndexOfCommandId(kSavedTabGroupsMenuPlaceholder).value(),
+-        kTabGroupsMenuItem);
+-  }
++  // uw keeps no closed tasks, so there is no menu of saved ones.
+ 
+   // Extensions sub menu.
+   if (ArePromotionsEnabled() &&
+diff --git a/components/saved_tab_groups/public/features.cc b/components/saved_tab_groups/public/features.cc
+index 92cd0265bd2c34ff2aecfc357ce39557de338a27..01cfdad1d505a52e58afdcc95cc9e1273d01719f 100644
+--- a/components/saved_tab_groups/public/features.cc
++++ b/components/saved_tab_groups/public/features.cc
+@@ -64,12 +64,9 @@ bool DeferMediaLoadInBackgroundTab() {
+   return data_sharing::features::IsDataSharingFunctionalityEnabled();
+ }
+ 
++// uw keeps no closed tasks: each start clears the ones closed before it.
+ bool ShouldForceRemoveClosedTabGroupsOnStartup() {
+-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+-  return base::FeatureList::IsEnabled(kForceRemoveClosedTabGroupsOnStartup);
+-#else
+-  return false;
+-#endif
++  return true;
+ }
+ 
+ bool IsTabTitleSanitizationEnabled() {
+diff --git a/components/bookmarks/browser/bookmark_utils.cc b/components/bookmarks/browser/bookmark_utils.cc
+index d8f32a1ca60e441fd998fbb05e3df7aeb1fd8dd6..ed003ac952f2729b20db09a8e607ea7dcf6a0728 100644
+--- a/components/bookmarks/browser/bookmark_utils.cc
++++ b/components/bookmarks/browser/bookmark_utils.cc
+@@ -464,7 +464,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+       prefs::kShowAppsShortcutInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+-      prefs::kShowTabGroupsInBookmarkBar, true,
++      prefs::kShowTabGroupsInBookmarkBar, false,
+       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+   registry->RegisterBooleanPref(
+       prefs::kShowManagedBookmarksInBookmarkBar, true,

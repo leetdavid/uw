@@ -13,10 +13,12 @@
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
+#include "base/uuid.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
@@ -31,6 +33,9 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "components/saved_tab_groups/public/saved_tab_group.h"
+#include "components/saved_tab_groups/public/saved_tab_group_tab.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
@@ -546,7 +551,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       ShortcutAndPlusButtonOpenATabInANewTask) {
+                       TheShortcutOpensATabInANewTask) {
   tabs::TabInterface* page = InitialTab();
   const std::optional<tab_groups::TabGroupId> plan =
       controller()->MoveToNewTask({Id(page)}, u"Plan");
@@ -558,22 +563,8 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(by_shortcut->GetGroup());
   EXPECT_NE(by_shortcut->GetGroup(), plan);
   EXPECT_EQ(TitleOf(*by_shortcut->GetGroup()), u"New task");
-
-  const std::vector<views::View*> foot =
-      ViewsOfClass("VerticalTabStripBottomContainer");
-  ASSERT_EQ(foot.size(), 1u);
-  views::Button* plus = views::Button::AsButton(foot[0]->children().front());
-  ASSERT_TRUE(plus);
-  EXPECT_EQ(plus->GetTooltipText(), u"New task");
-  views::test::ButtonTestApi(plus).NotifyDefaultMouseClick();
-  tabs::TabInterface* by_button = tabs()->GetActiveTab();
-  ASSERT_NE(by_button, by_shortcut);
-  ASSERT_TRUE(by_button->GetGroup());
-  EXPECT_NE(by_button->GetGroup(), plan);
-  EXPECT_NE(by_button->GetGroup(), by_shortcut->GetGroup());
-  EXPECT_EQ(TitleOf(*by_button->GetGroup()), u"New task");
   EXPECT_EQ(page->GetGroup(), plan);
-  EXPECT_EQ(controller()->tree().Tasks().size(), 3u);
+  EXPECT_EQ(controller()->tree().Tasks().size(), 2u);
 }
 
 // Switching tab orientation rebuilds the sidebar views. The window-owned
@@ -973,5 +964,52 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   CloseAllBrowsers();
 }
 
+// Waits until the tab group sync service has loaded its saved groups.
+void WaitUntilSavedGroupsLoad(tab_groups::TabGroupSyncService* service) {
+  class Loaded : public tab_groups::TabGroupSyncService::Observer {
+   public:
+    void OnInitialized() override { done = true; }
+    bool done = false;
+  } loaded;
+  service->AddObserver(&loaded);
+  EXPECT_TRUE(base::test::RunUntil([&] { return loaded.done; }));
+  service->RemoveObserver(&loaded);
+  base::RunLoop().RunUntilIdle();
+}
+
+bool KeepsAClosedTask(const tab_groups::TabGroupSyncService* service) {
+  return std::ranges::any_of(service->GetAllGroups(), [](const auto& group) {
+    return !group.local_group_id().has_value();
+  });
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PRE_AClosedTaskIsClearedOnTheNextStart) {
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  WaitUntilSavedGroupsLoad(service);
+  const base::Uuid saved = base::Uuid::GenerateRandomV4();
+  service->AddGroup(tab_groups::SavedTabGroup(
+      u"Plan", tab_groups::TabGroupColorId::kBlue,
+      {tab_groups::SavedTabGroupTab(GURL("https://example.com/"), u"Example",
+                                    saved, 0)},
+      std::nullopt, saved));
+  ASSERT_TRUE(base::test::RunUntil([&] { return KeepsAClosedTask(service); }));
+  base::RunLoop().RunUntilIdle();
+}
+
+// Chromium keeps a closed task as a saved group. uw clears those when it
+// starts, so none is ever offered again.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       AClosedTaskIsClearedOnTheNextStart) {
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  WaitUntilSavedGroupsLoad(service);
+  EXPECT_FALSE(KeepsAClosedTask(service));
+}
 }  // namespace
 }  // namespace uw

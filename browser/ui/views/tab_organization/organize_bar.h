@@ -34,12 +34,14 @@ class MenuRunner;
 namespace uw {
 
 class ActivityCard;
+class NewButton;
 
 // Sits at the foot of the tab sidebar. Holds the Organize button with its
-// menu. Above it, a card shows when a model is being asked about a tab, and
-// names the task after each automatic move, with an Undo button. With "Show
-// organizer activity" on, the card also shows what every answer was. It never
-// takes focus by itself.
+// menu, and the new button at the right end. Above them, a card names the
+// task after each automatic move, with an Undo button, and says when a
+// request fails. With "Show organizer activity" on, the card also shows each
+// request and what every answer was. It never takes focus by itself. The
+// narrow sidebar keeps only the new button's "+".
 class OrganizeBar : public views::FlexLayoutView,
                     public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(OrganizeBar, views::FlexLayoutView)
@@ -64,6 +66,7 @@ class OrganizeBar : public views::FlexLayoutView,
 
   bool card_visible() const;
   const ActivityCard* card() const { return card_; }
+  NewButton* new_button() { return new_button_; }
   // Reverses the last organization action and puts the card away.
   void Undo();
   // Carries out the suggestion the card shows.
@@ -87,6 +90,10 @@ class OrganizeBar : public views::FlexLayoutView,
   const raw_ptr<BrowserWindowInterface> window_;
   raw_ptr<ActivityCard> card_ = nullptr;
   raw_ptr<views::MdTextButton> button_ = nullptr;
+  raw_ptr<views::FlexLayoutView> row_ = nullptr;
+  raw_ptr<views::View> spacer_ = nullptr;
+  raw_ptr<NewButton> new_button_ = nullptr;
+  bool collapsed_ = false;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
