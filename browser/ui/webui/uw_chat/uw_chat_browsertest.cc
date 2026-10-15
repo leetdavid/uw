@@ -5,9 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
+#include "base/threading/thread_restrictions.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
@@ -114,8 +117,8 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     const std::string id =
         content::EvalJs(chat,
                         "new Promise(resolve => {"
-                        "  const check = () => document.body.dataset.chat"
-                        "      ? resolve(document.body.dataset.chat)"
+                        "  const check = () => document.body.dataset.chatId"
+                        "      ? resolve(document.body.dataset.chatId)"
                         "      : setTimeout(check, 20);"
                         "  check();"
                         "});")
@@ -178,6 +181,47 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
 
   std::vector<std::string> Steps(content::WebContents* chat) {
     return Lines(chat, ".step");
+  }
+
+  // The id of the chat a page shows, or nothing before the page has one.
+  static std::string IdOf(content::WebContents* chat) {
+    const std::string_view path = chat->GetLastCommittedURL().path();
+    return path.empty() ? std::string() : std::string(path.substr(1));
+  }
+
+  // Waits until the chat list in `chat` has `count` rows, then returns their
+  // titles from the top.
+  std::vector<std::string> ChatList(content::WebContents* chat, int count) {
+    EXPECT_TRUE(content::ExecJs(
+        chat, content::JsReplace(
+                  "new Promise(resolve => {"
+                  "  const check = () =>"
+                  "      document.querySelectorAll('button[data-chat]').length"
+                  "          === $1"
+                  "          ? resolve() : setTimeout(check, 20);"
+                  "  check();"
+                  "});",
+                  count)));
+    std::vector<std::string> titles;
+    for (const base::Value& title :
+         content::EvalJs(chat,
+                         "[...document.querySelectorAll('button[data-chat]')]"
+                         "    .map(row => row.dataset.title)")
+             .ExtractList()) {
+      titles.push_back(title.GetString());
+    }
+    return titles;
+  }
+
+  // Clicks the element of `chat` that `selector` finds for the chat `id`.
+  static void ClickFor(content::WebContents* chat,
+                       std::string_view attribute,
+                       const std::string& id) {
+    EXPECT_TRUE(content::ExecJs(
+        chat, content::JsReplace(
+                  "document.querySelector('[' + $1 + '=\"' + $2 + '\"]')"
+                  "    .click();",
+                  attribute, id)));
   }
 
   std::string Form() {
@@ -355,6 +399,73 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePageRunsWithoutConsoleErrors) {
 
   EXPECT_EQ(Ask(chat, "Hello"), "Hello.");
   EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheChatListGoesToAChatsTab) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("At noon.")});
+  content::WebContents* first = OpenChat();
+  ASSERT_EQ(Ask(first, "When does the tour start?"), "At noon.");
+  model_.Script({ScriptedModel::Answer("Two hours.")});
+  content::WebContents* second = OpenChat();
+  ASSERT_EQ(Ask(second, "How long is it?"), "Two hours.");
+
+  EXPECT_EQ(ChatList(second, 2),
+            (std::vector<std::string>{"How long is it?",
+                                      "When does the tour start?"}));
+  ClickFor(second, "data-chat", IdOf(first));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return tabs()->GetActiveWebContents() == first; }));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AClosedChatOpensAgainFromTheList) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("At noon.")});
+  content::WebContents* first = OpenChat();
+  ASSERT_EQ(Ask(first, "When does the tour start?"), "At noon.");
+  const std::string id = IdOf(first);
+  content::WebContents* second = OpenChat();
+  tabs::TabInterface::GetFromContents(first)->Close();
+
+  ASSERT_EQ(ChatList(second, 1),
+            std::vector<std::string>{"When does the tour start?"});
+  ClickFor(second, "data-chat", id);
+
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return IdOf(tabs()->GetActiveWebContents()) == id; }));
+  content::WebContents* reopened = tabs()->GetActiveWebContents();
+  WaitForChat(reopened);
+  EXPECT_EQ(Lines(reopened, ".mine"),
+            std::vector<std::string>{"When does the tour start?"});
+  EXPECT_EQ(Lines(reopened, ".answer"), std::vector<std::string>{"At noon."});
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, DeletingAChatClosesItsTab) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("At noon.")});
+  content::WebContents* first = OpenChat();
+  ASSERT_EQ(Ask(first, "When does the tour start?"), "At noon.");
+  const std::string id = IdOf(first);
+  model_.Script({ScriptedModel::Answer("Two hours.")});
+  content::WebContents* second = OpenChat();
+  ASSERT_EQ(Ask(second, "How long is it?"), "Two hours.");
+  ASSERT_EQ(ChatList(second, 2).size(), 2u);
+  const int before = tabs()->count();
+
+  ClickFor(second, "data-delete", id);
+
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return tabs()->count() == before - 1; }));
+  EXPECT_EQ(ChatList(second, 1), std::vector<std::string>{"How long is it?"});
+  const base::FilePath file = browser()
+                                  ->GetProfile()
+                                  ->GetPath()
+                                  .AppendASCII("uw_chats")
+                                  .AppendASCII(id + ".json");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    return !base::PathExists(file);
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {

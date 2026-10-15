@@ -25,7 +25,11 @@ source_set("uw_chat") {
   ]
   deps = [
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/tab_list",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
     "//components/performance_manager",
+    "//ui/base",
     "//components/tabs:public",
     "//content/public/common",
     "//uw/browser/resources/uw_chat:resources",

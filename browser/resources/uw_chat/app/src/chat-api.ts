@@ -4,12 +4,13 @@ import {
   ChatHandlerFactory,
   ChatHandlerRemote,
   ChatPageCallbackRouter,
+  ChatState,
   StepKind,
 } from "uw-chat-mojom";
-import type { Step } from "uw-chat-mojom";
+import type { ChatSummary, Step } from "uw-chat-mojom";
 
-export { StepKind };
-export type { Step };
+export { ChatState, StepKind };
+export type { ChatSummary, Step };
 
 export const chatPage = new ChatPageCallbackRouter();
 export const chatHandler = new ChatHandlerRemote();

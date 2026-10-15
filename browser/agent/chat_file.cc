@@ -19,19 +19,9 @@
 namespace uw {
 namespace {
 
-// One sequence for every chat, so a page that loads a chat again reads it
-// after the writes before.
-const scoped_refptr<base::SequencedTaskRunner>& FileSequence() {
-  static base::NoDestructor<scoped_refptr<base::SequencedTaskRunner>> sequence(
-      base::ThreadPool::CreateSequencedTaskRunner(
-          {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
-           base::TaskShutdownBehavior::BLOCK_SHUTDOWN}));
-  return *sequence;
-}
-
 base::FilePath PathFor(const base::FilePath& profile_path,
                        std::string_view id) {
-  return profile_path.AppendASCII("uw_chats")
+  return ChatFile::FolderFor(profile_path)
       .AppendASCII(base::StrCat({id, ".json"}));
 }
 
@@ -55,9 +45,23 @@ std::string ChatFile::NewChatId() {
   return base::Uuid::GenerateRandomV4().AsLowercaseString();
 }
 
+// static
+base::FilePath ChatFile::FolderFor(const base::FilePath& profile_path) {
+  return profile_path.AppendASCII("uw_chats");
+}
+
+// static
+const scoped_refptr<base::SequencedTaskRunner>& ChatFile::Sequence() {
+  static base::NoDestructor<scoped_refptr<base::SequencedTaskRunner>> sequence(
+      base::ThreadPool::CreateSequencedTaskRunner(
+          {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+           base::TaskShutdownBehavior::BLOCK_SHUTDOWN}));
+  return *sequence;
+}
+
 ChatFile::ChatFile(const base::FilePath& profile_path, std::string_view id)
-    : writer_(PathFor(profile_path, id), FileSequence()) {
-  FileSequence()->PostTask(
+    : writer_(PathFor(profile_path, id), Sequence()) {
+  Sequence()->PostTask(
       FROM_HERE, base::BindOnce(base::IgnoreResult(&base::CreateDirectory),
                                 writer_.path().DirName()));
 }
@@ -65,7 +69,7 @@ ChatFile::ChatFile(const base::FilePath& profile_path, std::string_view id)
 ChatFile::~ChatFile() = default;
 
 void ChatFile::Load(Loaded done) {
-  FileSequence()->PostTaskAndReplyWithResult(
+  Sequence()->PostTaskAndReplyWithResult(
       FROM_HERE, base::BindOnce(&Read, writer_.path()), std::move(done));
 }
 

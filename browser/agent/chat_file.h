@@ -11,6 +11,8 @@
 #include "base/files/file_path.h"
 #include "base/files/important_file_writer.h"
 #include "base/functional/callback.h"
+#include "base/memory/scoped_refptr.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 
 namespace uw {
@@ -25,6 +27,11 @@ class ChatFile {
   // A chat's id is a lowercase GUID.
   static bool IsChatId(std::string_view id);
   static std::string NewChatId();
+  // Where a profile keeps its chats.
+  static base::FilePath FolderFor(const base::FilePath& profile_path);
+  // The one sequence that reads and writes chats, so a page that loads a
+  // chat again reads it after the writes before.
+  static const scoped_refptr<base::SequencedTaskRunner>& Sequence();
 
   ChatFile(const base::FilePath& profile_path, std::string_view id);
   ChatFile(const ChatFile&) = delete;

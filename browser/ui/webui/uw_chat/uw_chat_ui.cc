@@ -11,6 +11,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 
@@ -21,6 +22,10 @@ UwChatUI::UwChatUI(content::WebUI* web_ui) : ui::MojoWebUIController(web_ui) {
   content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
       contents->GetBrowserContext(), kChatHost);
   webui::SetupWebUIDataSource(source, kUwChatResources, IDR_UW_CHAT_CHAT_HTML);
+  // The page's default policy lets one fixed style of Radix's scroll area
+  // through and refuses every other HTML string; see chat.js.
+  source->OverrideContentSecurityPolicy(
+      network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
   // Memory saver would end the chat with the page while the agent works.
   performance_manager::PageLiveStateDecorator::SetIsAutoDiscardable(contents,
                                                                     false);

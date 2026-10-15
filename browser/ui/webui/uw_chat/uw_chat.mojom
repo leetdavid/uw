@@ -13,6 +13,12 @@ interface ChatHandler {
   Send(string text);
   // Picks up a chat that stopped before it finished.
   Resume();
+  // Goes to the tab of the chat `id`, or reopens it in a new tab.
+  OpenChat(string id);
+  // Opens a new chat in a tab of its own.
+  NewChat();
+  // Deletes the chat `id` and closes its tab.
+  DeleteChat(string id);
 };
 
 // The kinds of uw::AgentLoop::Step, and the other lines a saved chat holds.
@@ -39,9 +45,28 @@ struct Step {
   string text;
 };
 
+// What the chat list shows beside a chat. Matches uw::ChatIndex::State.
+enum ChatState {
+  kDone,
+  kRunning,
+  kStopped,
+  kUnread,
+};
+
+// A saved chat, for the chat list.
+struct ChatSummary {
+  string id;
+  string title;
+  // When it last changed, in milliseconds since the Unix epoch.
+  double updated;
+  ChatState state;
+};
+
 interface ChatPage {
   // The chat is ready: its id for the page's address, its title, and every
   // line it holds so far.
   OnOpened(string id, string title, array<Step> lines);
   OnStep(Step step);
+  // Every saved chat, newest first, whenever the list changes.
+  OnChats(array<ChatSummary> chats);
 };
