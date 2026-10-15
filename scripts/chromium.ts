@@ -486,7 +486,7 @@ const TEST_SUITES = {
   unit_tests: [
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
-    "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*",
+    "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
