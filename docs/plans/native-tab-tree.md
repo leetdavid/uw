@@ -11,10 +11,10 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - A task is a native Chromium tab group. Chromium supplies its header, collapse, rename, color, drag, and session restore.
 - Ungrouped regular tabs are the [Scratchpad](../product.md#scratchpad). They carry a "Scratchpad" label and stay below every task. Changed on 2026-10-13.
 - Tasks are listed in the order they were started. A new task comes after every other task. Agreed on 2026-10-13.
-- A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch.
+- A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch. "New tab below" and "New child tab" in a tab's right-click menu go by that tab: see [New child tab](keyboard-and-mouse.md#new-child-tab).
 - Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
 - Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
-- Tab menu commands: "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
+- Tab menu commands: "New child tab", "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
 - An "Organize" button at the foot of the sidebar opens a menu: "New task", "Undo tab organization", the pause controls, "Show organizer activity", and the settings page.
 - "New task" opens a new tab in a new task of its own, named `New task`. The sidebar's "+" button and Ctrl+Cmd+P do the same; that shortcut is Chromium's own for a new tab group. Cmd-T still opens a tab beside the active tab, in its task. Agreed on 2026-10-12.
 - [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.

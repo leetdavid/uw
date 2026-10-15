@@ -1,6 +1,6 @@
 # Command bar
 
-Status: scope agreed on 2026-10-14. Nothing is built yet. Each ticket waits for approval. It comes after the [keyboard and mouse plan](keyboard-and-mouse.md), whose commands it runs.
+Status: scope agreed on 2026-10-14. Nothing is built yet. T60 starts once T73 and T74 of the [keyboard and mouse plan](keyboard-and-mouse.md), whose commands it runs, are built. Agreed on 2026-10-15. The other tickets wait for approval.
 
 Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later stages are smaller: 6/10 and 7/10.
 
@@ -12,6 +12,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 
 - The [command bar](../CONTEXT.md#language) is a panel centered over the page card. The page dims a little behind it.
 - Cmd+T and File → New Tab open it to open a new page. Escape creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
+- "New child tab" and Ctrl+Cmd+T open it too. A page picked from it opens as the first child of that tab, per [New child tab](keyboard-and-mouse.md#new-child-tab). Agreed on 2026-10-15.
 - Cmd+L, and a click on the address in the toolbar, open it filled with the current address, selected. A page picked from it loads in the current tab. The lock, star, and zoom icons beside the address keep their own clicks.
 - Cmd+Shift+A opens it narrowed to open and recently closed tabs. Chromium's tab search popup and its toolbar button are hidden.
 - Commands run on the tab that was selected when the command bar opened.

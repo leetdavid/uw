@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. The other tickets wait for approval. The [command bar](command-bar.md) follows this plan and runs the commands it defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -19,6 +19,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | --- | --- | --- |
 | Nest under previous tab | Ctrl+Cmd+→ | menu only |
 | Move up one level | Ctrl+Cmd+← | menu only |
+| New child tab | Ctrl+Cmd+T | new |
 | Move branch up or down among its siblings | Ctrl+Cmd+↑ / ↓ | Chromium's Ctrl+Shift+PgUp/PgDn, which a terminal tab takes |
 | Collapse or expand branch | Ctrl+Cmd+. | new |
 | Close branch | Option+Cmd+W | menu only |
@@ -41,6 +42,20 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 - Ctrl+` selects the terminal tab used last in the current task, or in the Scratchpad when the selected tab is ungrouped. With none there, it opens one where a blank new tab would open.
 - Pressed in a terminal tab, Ctrl+` returns to the tab selected before it.
 - Ctrl+Shift+` always opens a new terminal tab.
+
+### New child tab
+
+Agreed on 2026-10-15, at the user's request.
+
+- "New child tab" in a tab's right-click menu sits under "New tab below". It opens a blank tab, selects it, and places it first under that tab: one level deeper, above the tab's other children. A link opened from the tab later still goes after its last child.
+- The Tab menu entry and Ctrl+Cmd+T do the same for the selected tab.
+- "New tab below" opens below the right-clicked tab's branch, at its level. Today it opens below the selected tab's branch.
+- With several tabs selected, it opens one child, under the tab that was right-clicked.
+- The child is in its parent's task, or in the Scratchpad. Selecting it expands a collapsed parent. Organization undo does not remove it.
+- It is off for pinned tabs. In horizontal tabs it opens right after its parent and keeps the parent link.
+- Terminal and chat tabs can have children like any tab.
+- A child made this way, or with "Nest under previous tab", stays with its parent. See [Branch moves](automatic-organization.md#branch-moves).
+- Once the command bar lands, the command opens it instead of a blank tab, per the [command bar plan](command-bar.md#opening-it).
 
 ### Branches with the mouse
 
@@ -95,6 +110,8 @@ Once the command bar lands, the "+" and the double-click open it instead of a bl
 - Both vertical layouts that `tab-tree.patch` changes give a hidden row no height. The tab row places the chevron and the count from `browser/ui/views/tab_organization/branch_toggle`.
 - `TabStripModel::IsTabCollapsed` also asks `HiddenTabs`, which the controller provides through the window. Ctrl+Tab and the choice of the next tab after a close already skip collapsed groups through it.
 - The mouse switches are profile prefs read by the views they change.
+- "New child tab" is a `TabOrganizationController::Command`. The page tree places the new tab as the first child.
+- `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
 
 ## Stages
 
@@ -107,6 +124,10 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 5. T57: branch collapse, with its key. Design first.
 6. T58: mouse actions and their settings. Design first.
 7. T59: the sidebar as a keyboard tree.
+8. T73: New child tab, its key, and "New tab below" by the right-clicked tab.
+9. T74: children nested by hand stay with their parent.
+
+T73 and T74 are built next, then the command bar, then the other stages. Changed on 2026-10-15.
 
 ## Acceptance checks
 
@@ -118,6 +139,8 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 6. A collapsed branch hides its children and shows their count. Ctrl+Tab skips them. Cmd+1 to 9 onto a hidden tab expands the branch. Closing the collapsed parent shows its children one level up. The collapse survives a restart, and an organizer move leaves it collapsed.
 7. Each mouse action works, and does nothing once its switch is off.
 8. Ctrl+Cmd+L focuses the tab list. The arrow keys walk the tree as described, and Esc returns focus to the page. The accessibility tree gives each tab row its level.
+9. "New child tab" on a tab that is not selected and has children opens a selected blank tab directly under it, above those children. Ctrl+Cmd+T does the same for the selected tab. "New tab below" on a tab that is not selected opens below that tab's branch.
+10. A child nested by hand moves with its parent when the organizer moves the branch, and is not filed alone when its page changes. A child opened from a link still can be. The hold survives a restart and ends when the parent closes.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 

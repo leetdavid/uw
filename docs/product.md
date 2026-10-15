@@ -242,7 +242,7 @@ Agreed:
 - Each regular tab has one home position in the hierarchy. Separate tabs showing the same page may belong to different task groups.
 - Preserve the user's expanded/collapsed group choices. The organizer does not change them when tasks switch.
 - When a selected tab moves into a collapsed task group, keep the group collapsed and show a brief destination cue rather than changing the user's expansion choice.
-- Let the user change grouping and ordering. Manual placement takes priority while the tab serves the same browsing task. A later clear change of activity makes the tab eligible for automatic regrouping again; ordinary navigation within the same task preserves the correction.
+- Let the user change grouping and ordering. Manual placement takes priority while the tab serves the same browsing task. A later clear change of activity makes the tab eligible for automatic regrouping again; ordinary navigation within the same task preserves the correction. Exception: a child tab the user nested by hand stays under its parent until the user moves it or the parent closes. Agreed on 2026-10-15.
 - For the first release, treat a manual correction as applying only to that tab or branch while its activity remains the same. Do not infer a broader placement rule from one correction.
 - Provide a "Reorganize all tabs" button for an additional on-demand AI pass across all tabs in the current window, including the current task group.
 
