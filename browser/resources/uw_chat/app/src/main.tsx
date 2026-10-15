@@ -126,9 +126,9 @@ const ANSWER_PARTS: Components = {
     ),
 };
 
-// Requests a new chat suggests: the product's examples, until the language
-// model writes them from the user's own chats and browsing (T84).
-const SUGGESTIONS = [
+// The product's examples, which a new chat suggests until the language model
+// has written suggestions from the user's own chats and sites.
+const EXAMPLES = [
   "Did my last Vercel deploy pass?",
   "Get the logs of the latest crash on Railway",
   "Find subscriptions I could cancel",
@@ -926,6 +926,7 @@ function Chat() {
   const [since, setSince] = useState(0);
   const [, setNow] = useState(0);
   const [draft, setDraft] = useState("");
+  const [suggestions, setSuggestions] = useState(EXAMPLES);
   const end = useRef<HTMLDivElement>(null);
 
   // Keeps the header's minutes current while the agent works.
@@ -980,6 +981,11 @@ function Chat() {
     ];
     connect();
     loadSkills();
+    chatHandler.getSuggestions().then(({ suggestions }) => {
+      if (suggestions.length) {
+        setSuggestions(suggestions);
+      }
+    });
     return () => listeners.forEach((id) => chatPage.removeListener(id));
   }, []);
 
@@ -1064,8 +1070,8 @@ function Chat() {
         disabled={!opened}
         status={working ? "streaming" : "idle"}
         placeholder="Reply to the agent"
-        placeholderSuggestion={title ? undefined : SUGGESTIONS[0]}
-        suggestions={title ? undefined : SUGGESTIONS.slice(1)}
+        placeholderSuggestion={title ? undefined : suggestions[0]}
+        suggestions={title ? undefined : suggestions.slice(1)}
         textareaProps={{ id: "message", "aria-label": "Message" }}
       />
       <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">

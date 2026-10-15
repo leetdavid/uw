@@ -66,6 +66,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void ShowTab(int32_t number) override;
   void SetSideBySide(bool on, int32_t number) override;
   void GetSkills(GetSkillsCallback callback) override;
+  void GetSuggestions(GetSuggestionsCallback callback) override;
   void SetSkillOn(const std::string& name, bool on) override;
   void OpenSkillsFolder() override;
   void AnswerSkill(bool save) override;

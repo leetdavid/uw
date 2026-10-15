@@ -148,7 +148,7 @@ A chat asks before it changes anything on a site: a card in the chat names the s
 2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
 
-A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others.
+A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others. With a language model on `uw://providers`, the language model writes them once a day from your recent chats and most-visited sites, and the chat after the one that asked shows them. Before that, and in a private window, the chat suggests the product's examples.
 
 Expected result: the chat tab takes your first message as its title, and the chat's heading shows it with what the chat is doing: `Working`, then minutes, or `Waits for your approval`. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a quiet line with what it acted on in bold, such as `Clicked button "Send" in tab 1`, then the answer. When the model request fails, `Try again` asks once more without a new message, and `AI providers` opens `uw://providers`. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
 

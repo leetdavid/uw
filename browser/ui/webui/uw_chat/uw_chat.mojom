@@ -29,6 +29,9 @@ interface ChatHandler {
   SetSideBySide(bool on, int32 number);
   // Every skill the agent can use, and the folder that holds uw's own.
   GetSkills() => (array<SkillInfo> skills, string folder);
+  // What a new chat suggests, written by the language model from recent
+  // chats and sites. Empty until there are some.
+  GetSuggestions() => (array<string> suggestions);
   // Turns the skill `name` on or off for every chat.
   SetSkillOn(string name, bool on);
   // Shows uw's skills folder in Finder, making it first if need be.

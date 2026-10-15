@@ -29,6 +29,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "components/optimization_guide/core/filters/optimization_hints_component_update_listener.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
@@ -41,6 +42,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/chat_file.h"
+#include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -1012,6 +1014,55 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ANewChatSuggestsRequests) {
                 "  setTimeout(() => resolve(field.value), 50);"
                 "}, 50));"),
             "Did my last Vercel deploy pass?");
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       SuggestionsComeFromRecentChatsAndSites) {
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  Provider provider = PresetProvider(ProviderPreset::kCustom);
+  provider.name = "Test server";
+  provider.address = embedded_test_server()->GetURL("/v1").spec();
+  SetChoice(prefs, ModelSlot::kLanguage, AddProvider(prefs, provider),
+            "test-model");
+  model_.Script({ScriptedModel::Answer(
+      R"(["Check my Vercel deploys", "Find the Railway crash logs", )"
+      R"("Book the Alfama tour again"])")});
+  ChatIndex* index = ChatIndex::For(browser()->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return index->loaded(); }));
+  index->Update({.id = "0b3c5c43-2b8f-4f53-9f43-3d1f1d0f6a10",
+                 .title = "Did the Vercel deploy pass?",
+                 .updated = base::Time::Now()});
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(Form())));
+
+  // The first chat suggests the examples while the model is asked.
+  OpenChat();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    return base::PathExists(
+        ChatFile::FolderFor(browser()->GetProfile()->GetPath())
+            .AppendASCII("suggestions.json"));
+  }));
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("Did the Vercel deploy pass?"));
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("Book a tour (shop.test/form)"));
+
+  // The next chat suggests what the model wrote.
+  content::WebContents* chat = OpenChat();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Lines(chat, "[role=option]") ==
+           std::vector<std::string>{"Find the Railway crash logs",
+                                    "Book the Alfama tour again"};
+  }));
+  EXPECT_EQ(content::EvalJs(
+                chat,
+                "const field = document.getElementById('message');"
+                "field.dispatchEvent(new KeyboardEvent('keydown',"
+                "    {key: 'Tab', bubbles: true}));"
+                "new Promise(resolve => setTimeout(() => resolve(field.value),"
+                "    50));"),
+            "Check my Vercel deploys");
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheHeaderSaysWhatTheChatIsDoing) {

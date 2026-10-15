@@ -47,6 +47,7 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/api_key_store.h"
@@ -403,6 +404,16 @@ void UwChatHandler::OpenSkillsFolder() {
             }
           },
           weak_factory_.GetWeakPtr()));
+}
+
+void UwChatHandler::GetSuggestions(GetSuggestionsCallback callback) {
+  ChatSuggestions* suggestions = ChatSuggestions::For(
+      Profile::FromBrowserContext(contents_->GetBrowserContext()));
+  if (!suggestions) {
+    std::move(callback).Run({});
+    return;
+  }
+  suggestions->Get(std::move(callback));
 }
 
 void UwChatHandler::GetSkills(GetSkillsCallback callback) {
