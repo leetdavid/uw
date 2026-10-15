@@ -182,18 +182,24 @@ bool OrganizeBar::ShowsActivityDetails() const {
       kOrganizationShowActivityPref);
 }
 
-// A request on its way and a change that can be undone always show. What
-// else a model answered shows only with "Show organizer activity" on.
+// A change that can be undone always shows, and so does the first failed
+// request after one that worked. The rest, and the model's numbers, show
+// only with "Show organizer activity" on.
 void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
   const bool asking =
       event.kind == Kind::kAsking || event.kind == Kind::kNaming;
   const bool changed =
       event.kind == Kind::kMoved || event.kind == Kind::kCreated;
-  if (!asking && !changed && !ShowsActivityDetails()) {
-    HideCard();
+  const bool failed = event.kind == Kind::kRequestFailed;
+  const bool first_failure = failed && !failing_;
+  if (!asking) {
+    failing_ = failed;
+  }
+  const bool details = ShowsActivityDetails();
+  if (!details && !changed && !first_failure) {
     return;
   }
-  card_->Show(event);
+  card_->Show(event, details);
   card_timer_.Start(
       FROM_HERE,
       asking                        ? kAskingDuration

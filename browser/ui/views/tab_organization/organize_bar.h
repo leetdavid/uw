@@ -91,6 +91,8 @@ class OrganizeBar : public views::FlexLayoutView,
   std::unique_ptr<views::MenuRunner> menu_runner_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
   base::OneShotTimer card_timer_;
+  // The last answer was a failed request, so the next failure stays quiet.
+  bool failing_ = false;
   base::CallbackListSubscription collapse_subscription_;
   base::CallbackListSubscription event_subscription_;
   base::CallbackListSubscription manual_move_subscription_;

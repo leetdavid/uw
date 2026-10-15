@@ -98,11 +98,11 @@ Until the Anthropic Messages and OpenAI Responses formats land, uw reaches every
 
 Pick and test a decision model, a language model, or both at `uw://providers`. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says what it still waits for, such as a model that has not passed its test. Then open a link in a new tab.
 
-Expected result: a line such as `Asking jev-latest about Hotels in Lisbon…` shows above `Organize` while the model is asked. When the model is confident, the tab moves into a task. A message such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with an `Undo` button.
+Expected result: when the model is confident, the tab moves into a task. A card such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with the tab's title and an `Undo` button. Nothing shows while the model is asked, and nothing when it leaves the tab where it is. If a request fails, the card says so once, such as `The request failed: HTTP 401`, and stays quiet about failures until a request works again. With `Show organizer activity` on, the card also shows each request on its way and the model's numbers.
 
 Then press Cmd-T inside a named task and go to a page that has nothing to do with it.
 
-Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard. A page that clearly starts something of its own moves at once into a task called `New task`, after every other task. A spinner turns on that task's row and the card says `Asking … for a name`. When the name arrives the task takes it and the card says `Created task …` with `Undo`. Tabs nested under the page go with it, except ones that still fit the old task.
+Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard. A page that clearly starts something of its own moves at once into a task called `New task`, after every other task. A spinner turns on that task's row, and with `Show organizer activity` on the card says `Naming the task`. When the name arrives the task takes it and the card says `Created task …` with `Undo`. Tabs nested under the page go with it, except ones that still fit the old task.
 
 Then choose `New task` from the `Organize` menu and open a page in it.
 

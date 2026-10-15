@@ -466,9 +466,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_EQ(bar()->card()->headline(), u"Moved to Plan Lisbon trip");
   EXPECT_EQ(bar()->card()->page(), u"lisbon");
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.95 of 0.90");
-  EXPECT_TRUE(
-      bar()->card()->source().starts_with(u"Answered by decision-model in "));
+  EXPECT_EQ(bar()->card()->confidence(), u"");
+  EXPECT_EQ(bar()->card()->source(), u"");
   EXPECT_TRUE(bar()->card()->offers_undo());
   EXPECT_FALSE(bar()->card()->waiting());
   SaveWindowScreenshot(browser(), "automatic-move");
@@ -509,7 +508,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(tabs()->GetIndexOfTab(initial), 1);
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_EQ(bar()->card()->headline(), u"Created task Plan Lisbon trip");
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.75");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
   EXPECT_TRUE(bar()->card()->offers_undo());
 
   const std::vector<ModelRequest> requests = Requests();
@@ -543,6 +542,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ANewTaskStartsBeforeItsName) {
   UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
   Hold("/v1/chat/completions");
 
@@ -558,8 +558,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(SpinnerOf(*task)->spinning());
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_TRUE(bar()->card()->waiting());
-  EXPECT_EQ(bar()->card()->headline(), u"Asking language-model for a name");
+  EXPECT_EQ(bar()->card()->headline(), u"Naming the task");
   EXPECT_EQ(bar()->card()->page(), u"lisbon");
+  EXPECT_EQ(bar()->card()->source(), u"Asking language-model");
   SaveWindowScreenshot(browser(), "naming-a-new-task");
 
   tabs::TabInterface* opened = OpenLinkFrom(link, "hotels");
@@ -665,9 +666,10 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       TheSidebarSaysWhenAModelIsAskedAndThenClears) {
+                       WithActivityTheCardShowsTheRequestAndThenItsAnswer) {
   const auto [ungrouped, task] = OneTask();
   UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
   // What the card showed as each step was reported.
   std::vector<AutomaticOrganizer::Event::Kind> kinds;
@@ -685,12 +687,48 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
   EXPECT_EQ(kinds, (std::vector{AutomaticOrganizer::Event::Kind::kAsking,
                                 AutomaticOrganizer::Event::Kind::kUnsure}));
-  EXPECT_EQ(shown, (std::vector{true, false}));
-  EXPECT_EQ(waiting, (std::vector{true, true}));
-  EXPECT_EQ(bar()->card()->headline(), u"Asking decision-model");
+  EXPECT_EQ(shown, (std::vector{true, true}));
+  EXPECT_EQ(waiting, (std::vector{true, false}));
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested Plan Lisbon trip");
   EXPECT_EQ(bar()->card()->page(), u"lisbon");
+}
+
+// Without "Show organizer activity", the card says nothing while a model is
+// asked or when it leaves a tab where it is. Of several failed requests in a
+// row only the first shows, until a request works again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ByDefaultTheCardShowsOnlyMovesAndTheFirstFailure) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Fail("/v1/decisions", 401);
+  std::vector<bool> shown;
+  const base::CallbackListSubscription events = organizer()->ObserveEvents(
+      base::BindLambdaForTesting([&](const AutomaticOrganizer::Event&) {
+        shown.push_back(bar()->card_visible());
+      }));
+
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(shown, (std::vector{false, true}));
+  EXPECT_EQ(bar()->card()->headline(), u"The request failed: HTTP 401");
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+
+  Browse(link, "museums");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.5));
+  Browse(link, "hotels");
+  ASSERT_TRUE(SettleAfter(3));
+  EXPECT_EQ(bar()->card()->page(), u"lisbon");
+
+  Fail("/v1/decisions", 401);
+  Browse(link, "weather");
+  ASSERT_TRUE(SettleAfter(4));
+  ASSERT_TRUE(bar()->card_visible());
+  EXPECT_EQ(bar()->card()->headline(), u"The request failed: HTTP 401");
+  EXPECT_EQ(bar()->card()->page(), u"weather");
   EXPECT_EQ(bar()->card()->source(), u"");
-  EXPECT_FALSE(bar()->card_visible());
 }
 
 // A sidebar full of tabs leaves the card exactly its own height. Nothing in
@@ -850,7 +888,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   ASSERT_TRUE(bar()->card_visible());
   EXPECT_EQ(bar()->card()->headline(), u"Moved to Scratchpad");
   EXPECT_EQ(bar()->card()->page(), u"weather");
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.97 of 0.90");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
   EXPECT_TRUE(bar()->card()->offers_undo());
 
   // Only the tab a link opened is described as coming from its parent.
@@ -896,7 +934,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(blank->GetGroup(), task);
   EXPECT_EQ(TitleOf(*blank->GetGroup()), u"Compare laptops");
   EXPECT_EQ(bar()->card()->headline(), u"Created task Compare laptops");
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.80 of 0.75");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
 }
 
 // The case from the user's log: a search that has nothing to do with the
@@ -948,7 +986,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_EQ(bar()->card()->headline(), u"Created task Print slippers");
   EXPECT_EQ(bar()->card()->page(), u"slippers");
   // The result decided it: the search alone scored 0.20.
-  EXPECT_EQ(bar()->card()->confidence(), u"Confidence 0.90 of 0.75");
+  EXPECT_EQ(bar()->card()->confidence(), u"");
 
   // The search was compared with the tabs that make up the task, not with
   // the result the model had put outside it.

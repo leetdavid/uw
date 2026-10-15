@@ -42,7 +42,8 @@ class ActivityCard : public views::FlexLayoutView {
   ActivityCard& operator=(const ActivityCard&) = delete;
   ~ActivityCard() override;
 
-  void Show(const AutomaticOrganizer::Event& event);
+  // With `details`, the card also names the model and shows its confidence.
+  void Show(const AutomaticOrganizer::Event& event, bool details);
   // Puts the card away and stops its spinner and its moving bar.
   void Hide();
 

@@ -89,14 +89,13 @@ std::u16string Headline(const Event& event) {
   switch (event.kind) {
     case Kind::kAsking:
       return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING, event.model);
-    case Kind::kNaming:
-      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_NAMING, event.detail);
     case Kind::kMoved:
       return l10n_util::GetStringFUTF16(IDS_UW_AUTO_MOVED_TASK, event.detail);
     case Kind::kCreated:
       return l10n_util::GetStringFUTF16(IDS_UW_AUTO_CREATED_TASK, event.detail);
     case Kind::kLeft:
       return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_LEFT);
+    case Kind::kNaming:
     case Kind::kNeedsName:
       return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEEDS_NAME);
     case Kind::kUnsure:
@@ -198,7 +197,7 @@ ActivityCard::ActivityCard(base::RepeatingClosure undo,
 
 ActivityCard::~ActivityCard() = default;
 
-void ActivityCard::Show(const Event& event) {
+void ActivityCard::Show(const Event& event, bool details) {
   const bool waits = Waits(event.kind);
   const bool has_confidence = HasConfidence(event.kind);
   throbber_->SetVisible(waits);
@@ -213,10 +212,15 @@ void ActivityCard::Show(const Event& event) {
   headline_->SetText(Headline(event));
   page_->SetText(event.page);
 
-  // A request that failed may never have been answered.
-  source_->SetVisible(!waits && event.kind != Kind::kRequestFailed);
-  source_->SetText(l10n_util::GetStringFUTF16(
-      IDS_UW_ACTIVITY_SOURCE, event.model, Number(event.took.InSecondsF(), 1)));
+  // A request that failed may never have been answered. While a name is
+  // asked for, the line names the language model.
+  source_->SetVisible(details && event.kind != Kind::kAsking &&
+                      event.kind != Kind::kRequestFailed);
+  source_->SetText(
+      event.kind == Kind::kNaming
+          ? l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING, event.detail)
+          : l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_SOURCE, event.model,
+                                       Number(event.took.InSecondsF(), 1)));
 
   const std::u16string value = Number(event.confidence, 2);
   const std::u16string needed = Number(event.needed, 2);
@@ -224,10 +228,10 @@ void ActivityCard::Show(const Event& event) {
       has_confidence ? l10n_util::GetStringFUTF16(
                            IDS_UW_ACTIVITY_CONFIDENCE_HINT, value, needed)
                      : std::u16string(headline_->GetText());
-  meter_->SetVisible(waits || has_confidence);
+  meter_->SetVisible(details && (waits || has_confidence));
   meter_->SetValue(waits ? kStillWaiting : event.confidence);
   meter_->GetViewAccessibility().SetName(hint);
-  confidence_->SetVisible(has_confidence);
+  confidence_->SetVisible(details && has_confidence);
   confidence_->SetText(
       l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_CONFIDENCE, value, needed));
   confidence_->SetCustomTooltipText(hint);
