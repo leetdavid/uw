@@ -25,6 +25,9 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     min-height: var(--cr-section-min-height);
     padding: 8px 0;
   }
+  .uw-row.uw-wrap {
+    flex-wrap: wrap;
+  }
   .uw-row[hidden] {
     display: none;
   }
@@ -245,7 +248,7 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwOrganizationPauseTitle')}</h2>
-    <div class="uw-row">
+    <div class="uw-row uw-wrap">
       <cr-button id="pause1Hour" @click="${this.onPause1HourClick_}"
           ?disabled="${this.pauseMode_ === 1}">
         ${this.i18n_('uwOrganizationPause1Hour')}
