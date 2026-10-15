@@ -9,6 +9,7 @@
 #include "components/prefs/pref_service.h"
 #include "net/base/url_util.h"
 #include "url/gurl.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace uw {
 namespace {
@@ -57,6 +58,7 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));
   registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);
+  RegisterProviderPrefs(registry);
 }
 
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {

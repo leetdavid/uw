@@ -1,0 +1,359 @@
+// uw://providers: the AI providers the user saves once, and the language,
+// decision, and agent models that pick from them. Built from Fluid
+// Functionalism's parts; see the "(Fluid)" frames on the canvas page "AI
+// providers" and docs/plans/ai-providers.md.
+import "@/trusted-types";
+import { StrictMode, useCallback, useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { MotionConfig } from "motion/react";
+import { ChevronRight, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AddProviderDialog } from "./add-provider";
+import { ModelChip } from "./model-chip";
+import { ProviderPage } from "./provider-page";
+import {
+  FORMAT_NAMES,
+  ProviderTile,
+  type PageData,
+} from "./provider-parts";
+import {
+  ModelSlot,
+  ProviderFormat,
+  TestOutcome,
+  providersHandler,
+  type ModelList,
+  type Provider,
+  type ModelTestResult,
+} from "./providers-api";
+
+// The short names the provider list shows.
+const FORMAT_BADGES: Record<ProviderFormat, string> = {
+  [ProviderFormat.kChatCompletions]: "Chat completions",
+  [ProviderFormat.kAnthropicMessages]: "Messages",
+  [ProviderFormat.kOpenAiResponses]: "Responses",
+  [ProviderFormat.kOpenAiDecisions]: "Decisions",
+  [ProviderFormat.kSystemOne]: "System One",
+};
+
+const ROWS = [
+  {
+    slot: ModelSlot.kLanguage,
+    name: "Language model",
+    what: "Names tasks. Places tabs when no decision model is set.",
+  },
+  {
+    slot: ModelSlot.kDecision,
+    name: "Decision model",
+    optional: true,
+    what: "Decides where a tab goes.",
+  },
+  {
+    slot: ModelSlot.kAgent,
+    name: "Agent model",
+    what: "New chats start on it.",
+  },
+];
+
+// One sentence about a test. A decision model answers with a choice, a
+// language model with text.
+function testSentence(slot: ModelSlot, result: ModelTestResult) {
+  switch (result.outcome) {
+    case TestOutcome.kPassed:
+      return `${result.model} answered in ${result.seconds.toFixed(1)} s.`;
+    case TestOutcome.kIncomplete:
+      return "Pick a model whose provider has its key first.";
+    case TestOutcome.kNoResponse:
+      return `No answer from ${result.host}: ${result.netError}.`;
+    case TestOutcome.kHttpError:
+      return `${result.host} answered HTTP ${result.httpStatus}. ${result.providerMessage}`.trim();
+    case TestOutcome.kUnusable:
+      return `${result.model} answered, but not with ${slot === ModelSlot.kDecision ? "a choice" : "text"}.`;
+  }
+}
+
+function TestLine({
+  slot,
+  tested,
+  result,
+}: {
+  slot: ModelSlot;
+  tested: boolean;
+  result?: ModelTestResult;
+}) {
+  const [details, setDetails] = useState(false);
+  if (!result) {
+    return (
+      <p role="status" className="text-[12.5px] text-muted-foreground">
+        {tested ? "Passed its test." : "Not tested yet."}
+      </p>
+    );
+  }
+  const passed = result.outcome === TestOutcome.kPassed;
+  return (
+    <div role="status" className="text-[12.5px]">
+      <span className={passed ? "text-success" : "text-destructive"}>
+        {passed ? "✓ " : "✕ "}
+        {testSentence(slot, result)}
+      </span>
+      {result.detail && (
+        <button
+          type="button"
+          className="ml-2 font-medium text-info"
+          onClick={() => setDetails(!details)}
+        >
+          Details
+        </button>
+      )}
+      {details && (
+        <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-[11.5px] text-muted-foreground">
+          {result.detail}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function ProviderStatus({ provider, list }: { provider: Provider; list?: ModelList }) {
+  if (!list) {
+    return <span className="text-muted-foreground">Listing models…</span>;
+  }
+  const dot = list.ok ? "bg-success" : "bg-destructive";
+  return (
+    <span className="flex min-w-0 items-center gap-[7px] text-[12.5px] text-muted-foreground">
+      <i className={`size-[7px] shrink-0 rounded-full ${dot}`} />
+      <span className="truncate" title={list.ok ? undefined : list.error}>
+        {!list.ok ? list.error : provider.hasKey ? "Key in Keychain" : "No key"}
+      </span>
+    </span>
+  );
+}
+
+function ProvidersList({
+  data,
+  onChanged,
+}: {
+  data: PageData;
+  onChanged: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [tests, setTests] = useState<Partial<Record<ModelSlot, ModelTestResult>>>({});
+  const [testing, setTesting] = useState<ModelSlot | null>(null);
+
+  const test = async (slot: ModelSlot) => {
+    setTesting(slot);
+    const { result } = await providersHandler.testModel(slot);
+    setTests((old) => ({ ...old, [slot]: result }));
+    setTesting(null);
+    onChanged();
+  };
+  const forget = (slot: ModelSlot) =>
+    setTests(({ [slot]: _, ...rest }) => rest);
+
+  return (
+    <>
+      <h1 className="text-[20px] font-semibold tracking-[-0.01em]">AI providers</h1>
+      <p className="mt-1 text-[13.5px] text-muted-foreground">
+        Add each provider once. Every model in uw comes from one of them.
+      </p>
+
+      <h2 className="mb-2 mt-[22px] flex h-[30px] items-center text-[13px] font-semibold">
+        Models
+      </h2>
+      <div className="overflow-hidden rounded-xl border border-border">
+        {ROWS.map(({ slot, name, optional, what }) => {
+          const choice = data.choices[slot];
+          const testable = slot !== ModelSlot.kAgent && choice;
+          return (
+            <div
+              key={slot}
+              role="group"
+              aria-label={name}
+              className="border-border px-4 py-3 [&+&]:border-t"
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)_232px_76px] items-center gap-2.5">
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold">
+                    {name}
+                    {optional && (
+                      <span className="pl-1 text-[12px] font-normal text-muted-foreground">
+                        Optional
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
+                    {what}
+                  </div>
+                </div>
+                <ModelChip
+                  slot={slot}
+                  data={data}
+                  onPick={async (provider, model) => {
+                    await providersHandler.pickModel(slot, provider.id, model);
+                    forget(slot);
+                    onChanged();
+                  }}
+                  onClear={async () => {
+                    await providersHandler.clearModel(slot);
+                    forget(slot);
+                    onChanged();
+                  }}
+                />
+                {testable ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={testing === slot}
+                    onClick={() => test(slot)}
+                  >
+                    Test
+                  </Button>
+                ) : (
+                  <span />
+                )}
+              </div>
+              {testable && (
+                <div className="mt-1.5">
+                  <TestLine slot={slot} tested={choice.tested} result={tests[slot]} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mb-2 mt-[22px] flex h-[30px] items-center gap-2">
+        <h2 className="text-[13px] font-semibold">Providers</h2>
+        <span className="text-muted-foreground">{data.providers.length}</span>
+        <Button
+          size="sm"
+          leadingIcon={Plus}
+          className="ml-auto"
+          onClick={() => setAdding(true)}
+        >
+          Add provider
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border">
+        {!data.providers.length && (
+          <p className="px-4 py-3 text-muted-foreground">
+            No provider yet. Add one to pick its models.
+          </p>
+        )}
+        {data.providers.map((provider) => {
+          const list = data.lists[provider.id];
+          return (
+            <a
+              key={provider.id}
+              href={`/${encodeURIComponent(provider.id)}`}
+              className="grid h-[54px] grid-cols-[32px_minmax(0,1fr)_128px_92px_132px_16px] items-center gap-3 border-border pl-3 pr-3.5 [&+&]:border-t"
+            >
+              <ProviderTile preset={provider.preset} />
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-semibold">{provider.name}</div>
+                <div className="mt-px truncate text-[12px] text-muted-foreground">
+                  {provider.address.replace(/^https?:\/\//, "")}
+                </div>
+              </div>
+              <span
+                title={FORMAT_NAMES[provider.format]}
+                className="justify-self-start whitespace-nowrap rounded-md bg-muted px-[7px] py-[3px] text-[12px] text-muted-foreground"
+              >
+                {FORMAT_BADGES[provider.format]}
+              </span>
+              <span className="text-[12.5px] tabular-nums text-muted-foreground">
+                {list?.ok
+                  ? `${list.models.length} model${list.models.length === 1 ? "" : "s"}`
+                  : ""}
+              </span>
+              <ProviderStatus provider={provider} list={list} />
+              <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
+            </a>
+          );
+        })}
+      </div>
+      <p className="mt-2.5 text-[12px] text-muted-foreground">
+        Keys stay in the macOS Keychain. Each feature sends its requests only to
+        the provider of the model it uses.
+      </p>
+      <AddProviderDialog
+        open={adding}
+        onOpenChange={setAdding}
+        providers={data.providers}
+        onAdded={onChanged}
+      />
+    </>
+  );
+}
+
+function Providers() {
+  const [data, setData] = useState<PageData | null>(null);
+  const id = decodeURIComponent(location.pathname.slice(1));
+
+  const refresh = useCallback(async () => {
+    const { state } = await providersHandler.getState();
+    setData((old) => ({
+      providers: state.providers,
+      choices: {
+        [ModelSlot.kLanguage]: state.language,
+        [ModelSlot.kDecision]: state.decision,
+        [ModelSlot.kAgent]: state.agent,
+      },
+      lists: old?.lists ?? {},
+    }));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // Lists each provider's models once; the list says whether it answers.
+  const providerIds = data?.providers.map((provider) => provider.id).join(" ");
+  useEffect(() => {
+    for (const providerId of providerIds?.split(" ").filter(Boolean) ?? []) {
+      setData((old) => {
+        if (!old || providerId in old.lists) {
+          return old;
+        }
+        providersHandler.listModels(providerId).then(({ list }) =>
+          setData((now) =>
+            now && { ...now, lists: { ...now.lists, [providerId]: list } },
+          ),
+        );
+        return { ...old, lists: { ...old.lists, [providerId]: undefined } };
+      });
+    }
+  }, [providerIds]);
+
+  const provider = data?.providers.find((each) => each.id === id);
+  useEffect(() => {
+    document.title = provider ? `${provider.name} – AI providers` : "AI providers";
+  }, [provider]);
+
+  return (
+    <main className="min-h-full overflow-auto pb-10 pt-[26px]">
+      <div className="mx-auto w-[740px] max-w-[calc(100%-32px)]">
+        {data &&
+          (provider ? (
+            <ProviderPage provider={provider} data={data} onChanged={refresh} />
+          ) : (
+            <ProvidersList data={data} onChanged={refresh} />
+          ))}
+      </div>
+    </main>
+  );
+}
+
+// Fluid's parts read dark mode from a class on the root element.
+const dark = matchMedia("(prefers-color-scheme: dark)");
+const followScheme = () =>
+  document.documentElement.classList.toggle("dark", dark.matches);
+followScheme();
+dark.addEventListener("change", followScheme);
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <MotionConfig reducedMotion="user">
+      <Providers />
+    </MotionConfig>
+  </StrictMode>,
+);

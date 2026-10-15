@@ -1,0 +1,128 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+// Matches uw::ProviderFormat.
+enum ProviderFormat {
+  kChatCompletions,
+  kAnthropicMessages,
+  kOpenAiResponses,
+  kOpenAiDecisions,
+  kSystemOne,
+};
+
+// Matches uw::ProviderPreset.
+enum ProviderPreset {
+  kCustom,
+  kOpenAi,
+  kAnthropic,
+  kOpenRouter,
+  kVercelAiGateway,
+  kOllama,
+  kJev,
+};
+
+// Matches uw::ModelSlot.
+enum ModelSlot {
+  kLanguage,
+  kDecision,
+  kAgent,
+};
+
+// A saved provider as the page shows it. Its key never reaches the page.
+struct Provider {
+  string id;
+  ProviderPreset preset;
+  string name;
+  string address;
+  ProviderFormat format;
+  bool has_key;
+  // Whether it can serve the language and agent models.
+  bool serves_language;
+  // Whether it can serve the decision model.
+  bool serves_decisions;
+};
+
+struct ModelChoice {
+  string provider_id;
+  string model;
+  // Whether the model passed a test since it was picked.
+  bool tested;
+};
+
+struct ProvidersState {
+  array<Provider> providers;
+  ModelChoice? language;
+  ModelChoice? decision;
+  // Null while chats use the language model.
+  ModelChoice? agent;
+};
+
+// A provider as the user enters it in the Add provider dialog. A preset
+// brings its own name, address, and format.
+struct NewProvider {
+  ProviderPreset preset;
+  string name;
+  string address;
+  ProviderFormat format;
+  // Empty for a provider that takes none.
+  string api_key;
+};
+
+struct ModelList {
+  bool ok;
+  // Without embedding, speech, image, and moderation models.
+  array<string> models;
+  // What went wrong when `ok` is false, in the provider's words when it
+  // gave any.
+  string error;
+};
+
+enum TestOutcome {
+  kPassed,
+  // The model, its provider, or the provider's key is missing.
+  kIncomplete,
+  kNoResponse,
+  kHttpError,
+  // The model answered with something other than text or a choice.
+  kUnusable,
+};
+
+// What one test request found. The page writes the sentence.
+struct ModelTestResult {
+  TestOutcome outcome;
+  string model;
+  string host;
+  int32 http_status;
+  // A net error such as ERR_CONNECTION_REFUSED.
+  string net_error;
+  // The provider's own words about an error, when its answer has any.
+  string provider_message;
+  double seconds;
+  // What uw sent and what came back. Never an API key.
+  string detail;
+};
+
+// Profile-scoped backend of uw://providers.
+interface ProvidersHandler {
+  GetState() => (ProvidersState state);
+  ListModels(string provider_id) => (ModelList list);
+  // Lists the models at an address before the provider is added.
+  ListModelsAt(NewProvider provider) => (ModelList list);
+  // Returns the new provider's id, or nothing when its address is not
+  // usable.
+  AddProvider(NewProvider provider) => (string? id);
+  // An empty key is ignored.
+  ReplaceKey(string provider_id, string api_key) => ();
+  // Removes its key from the Keychain. Model choices that used it stay, and
+  // wait for the user to pick another model.
+  RemoveProvider(string provider_id) => ();
+  // Ignored when the provider cannot serve that slot.
+  PickModel(ModelSlot slot, string provider_id, string model) => ();
+  // Leaves the decision model unset, or chats on the language model.
+  ClearModel(ModelSlot slot) => ();
+  // Sends the language or decision model one small request. A pass marks
+  // the model tested.
+  TestModel(ModelSlot slot) => (ModelTestResult result);
+};

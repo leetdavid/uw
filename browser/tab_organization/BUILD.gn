@@ -141,5 +141,6 @@ source_set("ai_connection") {
     "//services/network/public/cpp",
     "//services/network/public/mojom",
     "//url",
+    "//uw/components/ai_providers",
   ]
 }

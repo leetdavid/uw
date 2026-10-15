@@ -1,5 +1,6 @@
-# The uw://chat page: one chat with uw's agent. The page is a React app in
-# app/, built from Fluid Functionalism's parts. app/bundle.ts checks its types,
+# The uw://chat page, one chat with uw's agent, and uw://providers, the AI
+# providers. Both pages are one React app in app/, built from Fluid
+# Functionalism's parts. app/bundle.ts checks its types,
 # bundles it with Chromium's node, and puts the page's files in one folder;
 # the bundle carries the page's mojo bindings.
 import("//third_party/node/node.gni")
@@ -11,9 +12,17 @@ assert(!is_android)
 app_dir = "$target_gen_dir/app"
 app_files = [
   "chat.html",
+  "providers.html",
   "favicon.svg",
+  "plug.svg",
   "chat.js",
+  "providers.js",
   "chat.css",
+  "icons/openai.svg",
+  "icons/anthropic.svg",
+  "icons/openrouter.svg",
+  "icons/vercel.svg",
+  "icons/ollama.svg",
   "inter-latin.woff2",
   "inter-latin-ext.woff2",
 ]
@@ -23,7 +32,9 @@ node("app") {
   inputs = [
     "app/bundle.ts",
     "chat.html",
+    "providers.html",
     "favicon.svg",
+    "plug.svg",
   ]
   outputs = []
   foreach(file, app_files) {
@@ -33,6 +44,7 @@ node("app") {
   deps = [
     "//ui/webui/resources/mojo:build_ts",
     "//uw/browser/ui/webui/uw_chat:mojo_bindings_ts__generator",
+    "//uw/browser/ui/webui/uw_providers:mojo_bindings_ts__generator",
   ]
   args = [
     rebase_path("app/bundle.ts", root_build_dir),

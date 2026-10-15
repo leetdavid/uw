@@ -1,4 +1,4 @@
-// Builds the uw://chat page for Chromium's build: checks its types, bundles
+// Builds the uw://chat and uw://providers pages for Chromium's build: checks its types, bundles
 // its script, writes its stylesheet, and puts them in one folder with the
 // page's HTML, icon, and fonts. GN runs it with Chromium's
 // node from the build directory:
@@ -26,6 +26,7 @@ if (!values.out || !values.gen || !values.depfile) {
 const out = resolve(values.out);
 const gen = resolve(values.gen);
 const mojom = join(gen, "uw/browser/ui/webui/uw_chat/uw_chat.mojom-webui.ts");
+const providersMojom = join(gen, "uw/browser/ui/webui/uw_providers/uw_providers.mojom-webui.ts");
 mkdirSync(out, { recursive: true });
 
 // The app's own settings, plus the generated bindings and the types of
@@ -39,10 +40,11 @@ writeFileSync(
       paths: {
         "@/*": [join(app, "src/*")],
         "uw-chat-mojom": [mojom],
+        "uw-providers-mojom": [providersMojom],
         "//resources/*": [join(gen, "ui/webui/resources/tsc/*")],
       },
     },
-    include: [join(app, "src"), mojom],
+    include: [join(app, "src"), mojom, providersMojom],
   }),
 );
 execFileSync(process.execPath, [join(modules, "typescript/bin/tsc"), "-p", tsconfig], {
@@ -50,8 +52,11 @@ execFileSync(process.execPath, [join(modules, "typescript/bin/tsc"), "-p", tscon
 });
 
 const bundled = await esbuild.build({
-  entryPoints: [join(app, "src/main.tsx")],
-  outfile: join(out, "chat.js"),
+  entryPoints: {
+    chat: join(app, "src/main.tsx"),
+    providers: join(app, "src/providers/main.tsx"),
+  },
+  outdir: out,
   bundle: true,
   format: "esm",
   minify: true,
@@ -66,6 +71,7 @@ const bundled = await esbuild.build({
       name: "uw-chat",
       setup(build) {
         build.onResolve({ filter: /^uw-chat-mojom$/ }, () => ({ path: mojom }));
+        build.onResolve({ filter: /^uw-providers-mojom$/ }, () => ({ path: providersMojom }));
         build.onResolve({ filter: /^shiki$/ }, () => ({
           path: join(app, "src/code-languages.ts"),
         }));
@@ -98,8 +104,17 @@ execFileSync(
 );
 
 const page = dirname(app);
-for (const file of ["chat.html", "favicon.svg"]) {
+for (const file of ["chat.html", "providers.html", "favicon.svg", "plug.svg"]) {
   copyFileSync(join(page, file), join(out, file));
+}
+
+// The providers' icons, from @lobehub/icons-static-svg.
+mkdirSync(join(out, "icons"), { recursive: true });
+for (const icon of ["openai", "anthropic", "openrouter", "vercel", "ollama"]) {
+  copyFileSync(
+    join(modules, "@lobehub/icons-static-svg/icons", `${icon}.svg`),
+    join(out, "icons", `${icon}.svg`),
+  );
 }
 
 const fonts = join(modules, "@fontsource-variable/inter/files");

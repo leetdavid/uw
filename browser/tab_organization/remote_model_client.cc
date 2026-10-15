@@ -53,12 +53,14 @@ RemoteModelClient::RemoteModelClient(
     GURL endpoint,
     std::string api_key,
     std::string request_body,
-    base::TimeDelta timeout)
+    base::TimeDelta timeout,
+    KeyHeader key_header)
     : loader_factory_(std::move(loader_factory)),
       endpoint_(std::move(endpoint)),
       api_key_(std::move(api_key)),
       request_body_(std::move(request_body)),
-      timeout_(timeout) {}
+      timeout_(timeout),
+      key_header_(key_header) {}
 
 RemoteModelClient::~RemoteModelClient() = default;
 
@@ -80,10 +82,15 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
     resource->headers.SetHeader(net::HttpRequestHeaders::kContentType,
                                 "application/json");
   }
-  // Ollama connections carry no key and send no Authorization header.
+  // Ollama connections carry no key and send no key header.
   if (!api_key_.empty()) {
-    resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
-                                "Bearer " + api_key_);
+    if (key_header_ == KeyHeader::kAnthropic) {
+      resource->headers.SetHeader("x-api-key", api_key_);
+      resource->headers.SetHeader("anthropic-version", "2023-06-01");
+    } else {
+      resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
+                                  "Bearer " + api_key_);
+    }
     // Drop the secret from memory as soon as the header is set.
     api_key_.assign(api_key_.size(), '\0');
     api_key_.clear();

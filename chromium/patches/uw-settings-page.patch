@@ -203,10 +203,10 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7503c91dc7958c8a089c76d99554a19
        <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
          Use graphics acceleration when available
 diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-index 8a0281a596af3532fa6342b5653f93e913261023..c6b9bcb92178c2363bd24095538c5b00761eb324 100644
+index 8a0281a596af3532fa6342b5653f93e913261023..dd8b512c518030a915c1714b056e36dd2f352e65 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -223,6 +223,15 @@
+@@ -223,6 +223,17 @@
  #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
  #endif
  
@@ -214,6 +214,8 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c6b9bcb92178c2363bd24095538c5b00
 +#include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
 +#include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
++#include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
++#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
@@ -222,7 +224,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c6b9bcb92178c2363bd24095538c5b00
  namespace chrome::internal {
  
  using content::RegisterWebUIControllerInterfaceBinder;
-@@ -361,6 +370,13 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -361,6 +372,15 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
                                           WhatsNewUI>(map);
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
  
@@ -231,12 +233,14 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c6b9bcb92178c2363bd24095538c5b00
 +                                         uw::UwTerminalUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ChatHandlerFactory,
 +                                         uw::UwChatUI>(map);
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::ProvidersHandler,
++                                         uw::UwProvidersUI>(map);
 +#endif
 +
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
    RegisterWebUIControllerInterfaceBinder<
        feature_showcase::mojom::DefaultBrowserPageHandlerFactory,
-@@ -393,7 +409,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -393,7 +413,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
  
    RegisterWebUIControllerInterfaceBinder<searchbox::mojom::PageHandlerFactory,
                                           NewTabPageUI, OmniboxPopupUI,
@@ -246,7 +250,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c6b9bcb92178c2363bd24095538c5b00
  
    RegisterWebUIControllerInterfaceBinder<
        omnibox_everywhere_debug::mojom::PageHandlerFactory, OmniboxEverywhereUI>(
-@@ -676,6 +693,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -676,6 +697,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
  #if !BUILDFLAG(IS_CHROMEOS)
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()
@@ -451,13 +455,14 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -1332,7 +1332,12 @@ static_library("ui") {
+@@ -1332,7 +1332,13 @@ static_library("ui") {
 
      # Non-android deps for "ui" target.
      deps += [
        "//uw/browser/tab_organization",
 +      "//uw/browser/ui/webui/uw_chat",
 +      "//uw/browser/ui/webui/uw_organization:mojo_bindings",
++      "//uw/browser/ui/webui/uw_providers",
 +      "//uw/browser/ui/webui/uw_terminal",
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/webui/uw_command_bar",
@@ -617,7 +622,7 @@ index 595b377b5091b584e7347ee0d05f73d6f997823e..ed7f52de0bafa10f890ba92d6ae93e29
    tsconfig_base = "tsconfig_base.json"
    composite = true
 diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
-index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..17aefffe8847baa0e8d8f82de82f83d516ca1d85 100644
+index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..4472e761199b8cdc52e8ac42a0d5ec5ec2fef072 100644
 --- a/tools/gritsettings/resource_ids.spec
 +++ b/tools/gritsettings/resource_ids.spec
 @@ -1789,6 +1789,26 @@
@@ -635,7 +640,7 @@ index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..17aefffe8847baa0e8d8f82de82f83d5
 +  },
 +
 +  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_chat/resources.grd": {
-+    "META": {"sizes": {"includes": [10],}},
++    "META": {"sizes": {"includes": [20],}},
 +    "includes": [10280],
 +  },
 +

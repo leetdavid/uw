@@ -40,12 +40,16 @@ class RemoteModelClient {
   };
   using ResultCallback = base::OnceCallback<void(Outcome)>;
 
+  // How the key travels. Anthropic takes it in its own header.
+  enum class KeyHeader { kBearer, kAnthropic };
+
   RemoteModelClient(
       scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
       GURL endpoint,
       std::string api_key,
       std::string request_body,
-      base::TimeDelta timeout);
+      base::TimeDelta timeout,
+      KeyHeader key_header = KeyHeader::kBearer);
   ~RemoteModelClient();
   RemoteModelClient(const RemoteModelClient&) = delete;
   RemoteModelClient& operator=(const RemoteModelClient&) = delete;
@@ -65,6 +69,7 @@ class RemoteModelClient {
   std::string api_key_;
   std::string request_body_;
   base::TimeDelta timeout_;
+  KeyHeader key_header_;
   ResultCallback callback_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
   base::WeakPtrFactory<RemoteModelClient> weak_factory_{this};

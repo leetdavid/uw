@@ -1,0 +1,60 @@
+# The uw://providers page's browser side. Its page is built with the chat
+# page; see //uw/browser/resources/uw_chat.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_providers.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_providers") {
+  sources = [
+    "uw_providers_handler.cc",
+    "uw_providers_handler.h",
+    "uw_providers_ui.cc",
+    "uw_providers_ui.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//base",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//ui/webui",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/components/ai_providers",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//components/prefs",
+    "//content/public/common",
+    "//net",
+    "//url",
+    "//uw/browser/resources/uw_chat:resources",
+    "//uw/components/agent",
+    "//uw/components/tab_organization",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "uw_providers_browsertest.cc" ]
+  deps = [
+    ":uw_providers",
+    "//base",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+    "//url",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/components/ai_providers",
+  ]
+}

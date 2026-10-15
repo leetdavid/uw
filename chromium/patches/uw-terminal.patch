@@ -1,23 +1,25 @@
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..61311b3c1afd09bc5e90da1cc47623b6f57fe937 100644
+index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..a06919f3a70085ed0ab6022e40310a16381e97a5 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,9 @@
+@@ -69,6 +69,10 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
++#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +404,9 @@ void RegisterChromeWebUIConfigs() {
+@@ -401,6 +405,10 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwTerminalUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwChatUIConfig>());
++  map.AddWebUIConfig(std::make_unique<uw::UwProvidersUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwCommandBarUIConfig>());
  #endif  // BUILDFLAG(IS_ANDROID)
  
