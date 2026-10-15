@@ -89,7 +89,7 @@ The [upstream Chromium baseline](../../README.md#upstream-baseline) built and pa
 
 Validate the source-customization approach for the [initial platform](../product.md#minimum-usable-version). Establish the security-update path with a patch-update trial and measure a performance baseline. Check compatibility with the [required extensions](../product.md#required-extensions), ad blocking, download hooks, and session persistence.
 
-Done when the [architecture](../architecture.md#code-organization) has measured evidence that the approach supports the headline features and manageable Chromium updates.
+Done when the [architecture](../architecture.md#code-organization) has measured evidence that the approach supports the [main features](../product.md#main-features) and manageable Chromium updates.
 
 ## 2. Make the browser usable daily
 

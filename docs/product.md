@@ -1,10 +1,22 @@
 # Product
 
-The headline features are agreed. Detailed feature behavior below is proposed unless marked agreed.
+The [main features](#main-features) are agreed. Detailed feature behavior below is proposed unless marked agreed.
 
 ## Goal
 
 Make everyday browsing easier to manage, automate, and customize.
+
+## Main features
+
+Agreed on 2026-10-15: uw is built around three features. Each has its own section below.
+
+| Feature | What it does | When |
+| --- | --- | --- |
+| [Automatic tab organization](#automatic-tab-organization) | Files tabs into tasks as the user browses. | Minimum usable version |
+| [Agent automation](#agent-automation) | An agent browses and carries out requests for the user. | v2 |
+| [Integrations](#integrations) | Brings tools from the user's computer into uw, starting with a terminal tab. | Later addition |
+
+The [board](plans/roadmap.md#board) shows what is built for each.
 
 ## Audience
 
@@ -46,166 +58,6 @@ Other day-one browser workflow requirements remain open.
 - Agreed highest priority: the browser must not get in the user's way. Browsing and deliberate user actions take priority over automation. AI work must not interrupt or stall navigation, typing, tab switching, or tab manipulation.
 - Keep the user in control. Automatic changes should be understandable and reversible.
 - Measure performance against a [repeatable baseline](architecture.md#performance).
-
-## Browser experience
-
-Agreed: use [automatic tab organization](#automatic-tab-organization) to help track the current task and its tabs. This replaces the earlier Arc-style workspace proposal, which did not solve the user's task-tracking problem.
-
-Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
-
-Agreed on 2026-10-14: every command has a menu bar entry and a key, and the tab tree works with the mouse alone. Tasks do not nest: a [tab branch](CONTEXT.md#language) is the only level below a task. Branches collapse, and dragging nests them. The [keyboard and mouse plan](plans/keyboard-and-mouse.md) has the keys and the details.
-
-Agreed on 2026-10-14: a [command bar](CONTEXT.md#language) replaces typing in the address bar. Cmd+T, Cmd+L, and a click on the address open it. It finds commands, tasks, open tabs, history, bookmarks, and the web, and offers "Ask uw" to start a chat. Text typed there reaches a model only when the user picks a row that asks one. See the [command bar plan](plans/command-bar.md) and [ADR 0005](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md).
-
-### Pinned tabs
-
-Agreed: show pinned tabs as compact icons at the top of the sidebar, inspired by Arc's Favorites and Chrome's vertical-tab pin area. Each pin has a saved home URL it returns to when reset.
-
-Agreed: each pin represents one continuing live page session shared across windows. Selecting it in another window continues its current navigation and in-progress page state, including an unfinished form or comment. Ordinary navigation does not replace the saved home URL.
-
-Agreed: only one window displays a pinned page session at a time. Selecting the pin in another window transfers the live page there. The previous window retains a hazed, inactive pinned view rather than a second live copy. Selecting that inactive view transfers the live page back.
-
-Agreed: pins are shared across all windows in one browser profile and separate between profiles.
-
-Agreed: Cmd-W while the pinned page itself is active is a no-op. It does not close the page or window, remove the pin, return the page to its home URL, or affect its state in other windows.
-
-Agreed: double-clicking a pinned icon or choosing "Reset to home" from its context menu returns the pinned page to its saved home URL.
-
-Agreed: "Replace home URL with current" changes the saved home URL without navigation. "Edit home URL" changes the saved home URL and immediately navigates the live pinned page there.
-
-Agreed: a pin's site is the saved home URL's scheme and registrable domain. Same-site navigation stays in the pinned page session. A link that would leave the site opens in a temporary Peek preview. Closing the preview leaves the pinned page unchanged; promoting the preview creates a regular tab in Scratchpad.
-
-Agreed: unpinning removes the icon and inactive pinned views across the profile. The live page remains open as a regular tab in the window currently displaying it.
-
-Agreed: closing the window that displays a pinned page detaches its live session from that window without discarding it. Selecting the pin in another open window restores the same page state there.
-
-Agreed: pinned page sessions remain live when the last browser window closes while uw remains running. Opening a new window restores their exact state, subject to measured resource limits.
-
-Agreed: after the user quits uw, the next launch opens a new tab and offers a "Restore tabs" popup. Do not automatically restore the prior session. Accepting restoration restores pinned pages at their last live URLs and Chromium-recoverable session state alongside regular tabs. Dismissing it leaves the new tab open; pins remain available in the sidebar.
-
-## AI connections
-
-Agreed setup: when the user first enables an AI feature, ask them to choose a connection mode. Ordinary browsing works without AI setup.
-
-Agreed: require an explicit "Enable Jev tab classification" choice before sending intent context to Jev. Until it is enabled, leave tabs in Scratchpad rather than automatically classifying them.
-
-| Mode | Expected behavior |
-| --- | --- |
-| Managed local model | uw recommends a model for the device, shows the download size, and downloads and manages it after the user chooses it. |
-| Ollama | Connect to an Ollama endpoint and choose an available model. |
-| Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom OpenAI-compatible endpoints. |
-
-Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
-
-Show the active provider and model. Explain which features a model supports. If it lacks a required capability, offer a supported choice rather than silently switching providers.
-
-Local mode keeps inference local. Sending page content to a remote provider requires a user-selected remote feature or automation.
-
-## Scheduled chats
-
-Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). The watch rules below carry over to every scheduled chat. A step that needs approval waits and sends a notification.
-
-Let users choose a page, describe what to watch, and set a schedule. Support daily, weekly, and specific-time schedules with an explicit timezone.
-
-Agreed use case: check sites for updates, such as price changes.
-
-Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
-
-Agreed reporting: let users choose a mode per watch.
-
-| Mode | Behavior |
-| --- | --- |
-| Condition-based alerts, default | Notify when the user's condition matches. |
-| Scheduled summaries | Report watched-page updates on a chosen schedule. Summaries can cover multiple watched pages. |
-
-Agreed delivery: keep results and history in uw. Send native macOS notifications for matching alerts and scheduled summaries. Let users mute notifications per watch while checks and history continue.
-
-In alert mode, successful checks with no matching result stay in watch history without interrupting the user.
-
-Agreed availability: watches continue while the uw app is running, even with all windows closed. Quitting uw stops checks. After checks are missed because uw was quit or the Mac was asleep or off, run one catch-up check when uw can next run. Show the actual check time.
-
-Other proposed behavior:
-
-- Check the page and compare it with the previous successful result.
-- Show the last result, next scheduled run, and any failure.
-- Allow editing, pausing, and deletion.
-
-Use ordinary page comparisons where sufficient and AI when interpretation is needed.
-
-## Terminal tabs
-
-Agreed on 2026-10-14, as a later addition outside the minimum usable version:
-
-- A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
-- The organizer files a terminal tab like any other tab. A model gets its title and the shell's folder, never what the shell printed. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
-- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
-- Closing a busy terminal asks first, however it is closed.
-
-The [terminal tab plan](plans/terminal-tab.md) has the full scope and what is left out.
-
-Agreed future direction: other parts of uw, and pages the user allows, may ask to run a command in a terminal, and each needs the user's approval. The prompt and what uw remembers are open.
-
-Agreed future direction: explore [full libghostty in a native view](research/native-libghostty-terminal.md) once the first version works.
-
-## Chats
-
-Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent browses for the user in a [chat](CONTEXT.md#language). It handles any request it can carry out, including retrieving information and taking actions that change things.
-
-- A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
-- The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in.
-- [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
-
-Example use cases:
-
-- Check whether the latest deployment for the user's personal organization on Vercel succeeded.
-- Retrieve logs for the most recent crash on Railway.
-- Cancel unused subscriptions and request refunds.
-
-The [agent chats plan](plans/agent-chats.md) has the full scope, releases, and stages.
-
-## Prompt-built extensions
-
-Agreed scope: support broad website customization, including layout changes, theme overrides, and changes to site behavior. The limits of customization remain open.
-
-Agreed creation methods:
-
-- Describe a page-level change, such as "give this site a dark theme and make articles wider."
-- Select an element and prompt with that selection as context, such as "hide this sidebar" or "make this table sortable."
-
-Connect to coding tools such as OpenCode, Claude Code, and Codex to generate a browser extension. These connections are separate from the browser's inference provider settings.
-
-Agreed persistence: enabled customizations reapply across visits and browser restarts. A per-site list lets users edit, disable, or remove them.
-
-The proposed flow is prompt, generate, inspect the change and site permissions, try it on the target page, then enable it. Prompt refinement and version rollback remain proposed.
-
-Keep generated source available to the user. Use Chromium's extension model where supported by the chosen integration.
-
-## Ad blocking and privacy
-
-Agreed: the first clutter-removal release includes an options page with separate controls for:
-
-- Ad blocking.
-- Tracker blocking.
-- "Apply cookie preferences": when enabled, default to rejecting optional cookies and keeping necessary ones.
-- Social button removal.
-- Newsletter-popup dismissal.
-- Autoplay blocking.
-- Hiding floating chat widgets and sticky promotions.
-- Suppressing site notification requests.
-
-Agreed: support per-site overrides for cleanup settings.
-
-Agreed defaults: enable ad blocking, tracker blocking, and "Apply cookie preferences". All other cleanup controls start disabled.
-
-How per-site overrides take precedence remains open.
-
-Other proposed privacy behavior:
-
-- Use maintained filter lists for blocking.
-- Show what was blocked.
-- Provide private browsing and clear controls for cookies, site permissions, and browsing data.
-- Keep private sessions out of persistent AI history and scheduled watches. Explicit AI requests in private sessions follow the selected provider's data handling.
-- Make any telemetry opt-in and keep page content out of it.
 
 ## Automatic tab organization
 
@@ -319,6 +171,174 @@ Agreed: Jev receives no intent context until the user enables Jev tab classifica
 Agreed: after opt-in, Jev receives title, URL, and source-tab relationship for the initial pass, then a short readable-text excerpt for the later pass. Show this exact scope during enablement.
 
 Agreed for the [automatic organization MVP](plans/automatic-organization.md): each classification request contains titles, URLs, source-tab relationships, current task names, and a short readable-text excerpt. The settings page shows this exact scope before the user enables automatic organization.
+
+## Agent automation
+
+uw's agent carries out requests in the browser. A chat runs a request when the user asks; a scheduled chat runs one again on a schedule.
+
+### Chats
+
+Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent browses for the user in a [chat](CONTEXT.md#language). It handles any request it can carry out, including retrieving information and taking actions that change things.
+
+- A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
+- The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in.
+- [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
+
+Example use cases:
+
+- Check whether the latest deployment for the user's personal organization on Vercel succeeded.
+- Retrieve logs for the most recent crash on Railway.
+- Cancel unused subscriptions and request refunds.
+
+The [agent chats plan](plans/agent-chats.md) has the full scope, releases, and stages.
+
+### Scheduled chats
+
+Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). The watch rules below carry over to every scheduled chat. A step that needs approval waits and sends a notification.
+
+Let users choose a page, describe what to watch, and set a schedule. Support daily, weekly, and specific-time schedules with an explicit timezone.
+
+Agreed use case: check sites for updates, such as price changes.
+
+Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
+
+Agreed reporting: let users choose a mode per watch.
+
+| Mode | Behavior |
+| --- | --- |
+| Condition-based alerts, default | Notify when the user's condition matches. |
+| Scheduled summaries | Report watched-page updates on a chosen schedule. Summaries can cover multiple watched pages. |
+
+Agreed delivery: keep results and history in uw. Send native macOS notifications for matching alerts and scheduled summaries. Let users mute notifications per watch while checks and history continue.
+
+In alert mode, successful checks with no matching result stay in watch history without interrupting the user.
+
+Agreed availability: watches continue while the uw app is running, even with all windows closed. Quitting uw stops checks. After checks are missed because uw was quit or the Mac was asleep or off, run one catch-up check when uw can next run. Show the actual check time.
+
+Other proposed behavior:
+
+- Check the page and compare it with the previous successful result.
+- Show the last result, next scheduled run, and any failure.
+- Allow editing, pausing, and deletion.
+
+Use ordinary page comparisons where sufficient and AI when interpretation is needed.
+
+## Integrations
+
+Integrations bring tools from the user's computer into uw. The terminal tab is the first. A file explorer may follow; nothing about it is decided.
+
+### Terminal tabs
+
+Agreed on 2026-10-14, as a later addition outside the minimum usable version:
+
+- A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
+- The organizer files a terminal tab like any other tab. A model gets its title and the shell's folder, never what the shell printed. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
+- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
+- Closing a busy terminal asks first, however it is closed.
+
+The [terminal tab plan](plans/terminal-tab.md) has the full scope and what is left out.
+
+Agreed future direction: other parts of uw, and pages the user allows, may ask to run a command in a terminal, and each needs the user's approval. The prompt and what uw remembers are open.
+
+Agreed future direction: explore [full libghostty in a native view](research/native-libghostty-terminal.md) once the first version works.
+
+## Browser experience
+
+Agreed: use [automatic tab organization](#automatic-tab-organization) to help track the current task and its tabs. This replaces the earlier Arc-style workspace proposal, which did not solve the user's task-tracking problem.
+
+Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
+
+Agreed on 2026-10-14: every command has a menu bar entry and a key, and the tab tree works with the mouse alone. Tasks do not nest: a [tab branch](CONTEXT.md#language) is the only level below a task. Branches collapse, and dragging nests them. The [keyboard and mouse plan](plans/keyboard-and-mouse.md) has the keys and the details.
+
+Agreed on 2026-10-14: a [command bar](CONTEXT.md#language) replaces typing in the address bar. Cmd+T, Cmd+L, and a click on the address open it. It finds commands, tasks, open tabs, history, bookmarks, and the web, and offers "Ask uw" to start a chat. Text typed there reaches a model only when the user picks a row that asks one. See the [command bar plan](plans/command-bar.md) and [ADR 0005](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md).
+
+### Pinned tabs
+
+Agreed: show pinned tabs as compact icons at the top of the sidebar, inspired by Arc's Favorites and Chrome's vertical-tab pin area. Each pin has a saved home URL it returns to when reset.
+
+Agreed: each pin represents one continuing live page session shared across windows. Selecting it in another window continues its current navigation and in-progress page state, including an unfinished form or comment. Ordinary navigation does not replace the saved home URL.
+
+Agreed: only one window displays a pinned page session at a time. Selecting the pin in another window transfers the live page there. The previous window retains a hazed, inactive pinned view rather than a second live copy. Selecting that inactive view transfers the live page back.
+
+Agreed: pins are shared across all windows in one browser profile and separate between profiles.
+
+Agreed: Cmd-W while the pinned page itself is active is a no-op. It does not close the page or window, remove the pin, return the page to its home URL, or affect its state in other windows.
+
+Agreed: double-clicking a pinned icon or choosing "Reset to home" from its context menu returns the pinned page to its saved home URL.
+
+Agreed: "Replace home URL with current" changes the saved home URL without navigation. "Edit home URL" changes the saved home URL and immediately navigates the live pinned page there.
+
+Agreed: a pin's site is the saved home URL's scheme and registrable domain. Same-site navigation stays in the pinned page session. A link that would leave the site opens in a temporary Peek preview. Closing the preview leaves the pinned page unchanged; promoting the preview creates a regular tab in Scratchpad.
+
+Agreed: unpinning removes the icon and inactive pinned views across the profile. The live page remains open as a regular tab in the window currently displaying it.
+
+Agreed: closing the window that displays a pinned page detaches its live session from that window without discarding it. Selecting the pin in another open window restores the same page state there.
+
+Agreed: pinned page sessions remain live when the last browser window closes while uw remains running. Opening a new window restores their exact state, subject to measured resource limits.
+
+Agreed: after the user quits uw, the next launch opens a new tab and offers a "Restore tabs" popup. Do not automatically restore the prior session. Accepting restoration restores pinned pages at their last live URLs and Chromium-recoverable session state alongside regular tabs. Dismissing it leaves the new tab open; pins remain available in the sidebar.
+
+## AI connections
+
+Agreed setup: when the user first enables an AI feature, ask them to choose a connection mode. Ordinary browsing works without AI setup.
+
+Agreed: require an explicit "Enable Jev tab classification" choice before sending intent context to Jev. Until it is enabled, leave tabs in Scratchpad rather than automatically classifying them.
+
+| Mode | Expected behavior |
+| --- | --- |
+| Managed local model | uw recommends a model for the device, shows the download size, and downloads and manages it after the user chooses it. |
+| Ollama | Connect to an Ollama endpoint and choose an available model. |
+| Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom OpenAI-compatible endpoints. |
+
+Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
+
+Show the active provider and model. Explain which features a model supports. If it lacks a required capability, offer a supported choice rather than silently switching providers.
+
+Local mode keeps inference local. Sending page content to a remote provider requires a user-selected remote feature or automation.
+
+## Prompt-built extensions
+
+Agreed scope: support broad website customization, including layout changes, theme overrides, and changes to site behavior. The limits of customization remain open.
+
+Agreed creation methods:
+
+- Describe a page-level change, such as "give this site a dark theme and make articles wider."
+- Select an element and prompt with that selection as context, such as "hide this sidebar" or "make this table sortable."
+
+Connect to coding tools such as OpenCode, Claude Code, and Codex to generate a browser extension. These connections are separate from the browser's inference provider settings.
+
+Agreed persistence: enabled customizations reapply across visits and browser restarts. A per-site list lets users edit, disable, or remove them.
+
+The proposed flow is prompt, generate, inspect the change and site permissions, try it on the target page, then enable it. Prompt refinement and version rollback remain proposed.
+
+Keep generated source available to the user. Use Chromium's extension model where supported by the chosen integration.
+
+## Ad blocking and privacy
+
+Agreed: the first clutter-removal release includes an options page with separate controls for:
+
+- Ad blocking.
+- Tracker blocking.
+- "Apply cookie preferences": when enabled, default to rejecting optional cookies and keeping necessary ones.
+- Social button removal.
+- Newsletter-popup dismissal.
+- Autoplay blocking.
+- Hiding floating chat widgets and sticky promotions.
+- Suppressing site notification requests.
+
+Agreed: support per-site overrides for cleanup settings.
+
+Agreed defaults: enable ad blocking, tracker blocking, and "Apply cookie preferences". All other cleanup controls start disabled.
+
+How per-site overrides take precedence remains open.
+
+Other proposed privacy behavior:
+
+- Use maintained filter lists for blocking.
+- Show what was blocked.
+- Provide private browsing and clear controls for cookies, site permissions, and browsing data.
+- Keep private sessions out of persistent AI history and scheduled watches. Explicit AI requests in private sessions follow the selected provider's data handling.
+- Make any telemetry opt-in and keep page content out of it.
 
 ## Download name suggestions
 

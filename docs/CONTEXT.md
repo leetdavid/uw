@@ -20,6 +20,10 @@ A hazed placeholder where a pinned page's live session is currently displayed in
 **Regular tab**:
 A page tab or terminal tab in a window's tab tree.
 
+**Integration**:
+A tool from the user's computer that uw brings into the browser, such as the shell in a terminal tab.
+_Avoid_: Plugin, extension.
+
 **Terminal tab**:
 A regular tab that shows a shell instead of a web page.
 _Avoid_: Console, shell tab.

@@ -9,7 +9,7 @@
 
 <p align="center"><strong>ur web, ur way</strong></p>
 
-uw browser is a Chromium-based browser in early development. The build tooling applies minimal uw branding and enables Chromium's native vertical tabs by default. [Verification status](#verification-status) records what has been built and tested. Later product features remain planned.
+uw browser is a Chromium-based browser for macOS in early development. Its main features are [automatic tab organization](docs/product.md#automatic-tab-organization), [agent automation](docs/product.md#agent-automation), and [integrations](docs/product.md#integrations) such as a terminal tab. [Verification status](#verification-status) records what has been built and tested.
 
 [Product docs and roadmap](docs/README.md)
 

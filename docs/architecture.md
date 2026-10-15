@@ -83,7 +83,7 @@ These describe responsibilities, not a required package or service layout.
 
 Run model inference and background page checks outside the UI process. Limit the concurrency of background work, prioritize foreground browsing, and release idle model resources. Chats the user starts are their own requests and have no cap; see [agent chats](plans/agent-chats.md#agreed-scope). Do not keep every watched page open between runs.
 
-Establish a stock Chromium baseline on the same hardware and test pages. Measure startup, tab switching, active and suspended-tab memory, idle CPU, and energy use. Repeat with local inference and page watches running.
+Establish a stock Chromium baseline on the same hardware and test pages. Measure startup, tab switching, active and suspended-tab memory, idle CPU, and energy use. Repeat with local inference and scheduled chats running.
 
 Tab classification has an [agreed latency budget](product.md#organization-latency). Define its measurement conditions and benchmark the actual pipeline. Set other performance budgets after the first baseline, and record test conditions.
 
