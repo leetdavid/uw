@@ -9,7 +9,7 @@ So uw downloads the catalog from `https://models.dev/api.json` the first time th
 - A model the catalog marks without tool calls is shown, dimmed, and cannot run a chat. It can still name tasks.
 - Ollama is not in the catalog. Its own `/api/show` says whether a model calls tools and thinks.
 - The catalog gives some models only an on/off switch or a token budget instead of named levels. uw treats them as having no effort levels, and they run without thinking. These are older models, such as claude-sonnet-4-5.
-- A model the catalog does not know gets its format's usual levels: `low`, `medium`, and `high` over chat completions. The levels over Anthropic Messages and OpenAI Responses are an [open question](../plans/ai-providers.md#open-questions).
+- A model the catalog does not know gets its format's usual levels: `low`, `medium`, and `high` over chat completions. Over Anthropic Messages and OpenAI Responses it has no effort levels and is sent no effort, so nothing is rejected; it can think once the catalog lists it.
 - A level a provider rejects shows the provider's error in the chat.
 
 Considered options: testing each model on first use (rejected: extra requests, a wait before the first message, and less accurate than the catalog); a copy shipped in the build as well (rejected: a build step and app size for the first launch only); a copy in the build only (rejected: a new model would show the wrong levels until a uw release).
