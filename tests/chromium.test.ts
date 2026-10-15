@@ -277,9 +277,9 @@ test("window tests run browser_tests in the VM and always stop it", (t) => {
   assert.deepEqual(f.started[0]!.slice(0, 4), ["tart", "run", WINDOW_VM, "--no-graphics"]);
   assert.ok(f.started[0]!.includes(`--dir=src:${f.layout.source}:ro`));
   assert.match(windowTestRun(f), /browser_tests --run-manual --headful-mode '--gtest_filter=\*\.MANUAL_\*'$/);
-  for (const { command } of f.calls.filter(({ command }) => command[0] === "ssh")) {
-    assert.deepEqual(command.slice(1, 3), ["-b", "192.168.64.1"]);
-  }
+  const guestCommands = f.calls.filter(({ command }) => command[0] === "ssh").map(({ command }) => command);
+  assert.match(guestCommands[0]!.at(-1)!, /who \| grep -q '\^admin  \*console'/);
+  for (const command of guestCommands) assert.deepEqual(command.slice(1, 3), ["-b", "192.168.64.1"]);
   assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
   assert.equal(existsSync(join(f.layout.root, ".uw-window-tests.lock")), false);
 

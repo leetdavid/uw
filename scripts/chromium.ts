@@ -27,7 +27,7 @@ const OUTPUT = "out/uw";
 export const GIB = 1024 ** 3;
 export const WINDOW_VM = "uw-window-tests";
 const GUEST_SHARES = "/Volumes/My Shared Files";
-const GUEST_CRASH_REPORTS = "~/Library/Logs/DiagnosticReports/browser_tests-*.ips";
+const GUEST_CRASH_REPORTS = "find ~/Library/Logs/DiagnosticReports -name 'browser_tests-*.ips'";
 
 export interface Pins {
   version: string;
@@ -557,17 +557,30 @@ export class Chromium {
 
   private runInWindowVm(args: readonly string[]): void {
     const ip = this.capture(["tart", "ip", WINDOW_VM, "--wait", "180"], { timeout: 200_000 });
+    this.waitForLogin(ip);
     const build = this.guest(ip, "sw_vers -buildVersion");
     const pinned = /_([0-9A-Z]+)_Restore\.ipsw$/.exec(this.pins.macos_vm_ipsw)![1];
     if (build !== pinned) {
       throw new BuildError(`The ${WINDOW_VM} VM runs macOS build ${build}; chromium/pins.json pins ${pinned}. ` +
         "Recreate it as README.md#real-window-tests describes.");
     }
-    this.guest(ip, `rm -f ${GUEST_CRASH_REPORTS}`);
+    this.guest(ip, `${GUEST_CRASH_REPORTS} -delete`);
     try {
       this.guest(ip, windowTestCommand(args, Boolean(this.runtime.env.UW_SCREENSHOT_DIR)), true);
     } finally {
-      this.guest(ip, `cp ${GUEST_CRASH_REPORTS} ${quote(`${GUEST_SHARES}/results`)} 2>/dev/null; true`);
+      this.guest(ip, `${GUEST_CRASH_REPORTS} -exec cp {} ${quote(`${GUEST_SHARES}/results`)} ';'`);
+    }
+  }
+
+  private waitForLogin(ip: string): void {
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      try { this.guest(ip, "who | grep -q '^admin  *console'"); return; } catch {
+        if (Date.now() > deadline) {
+          throw new BuildError(`The ${WINDOW_VM} VM did not log admin in within 5 minutes. Check its automatic login.`);
+        }
+      }
+      pause(3_000);
     }
   }
 
@@ -575,7 +588,7 @@ export class Chromium {
     const bridge = this.runtime.addresses().find((local) => sameNetwork(ip, local));
     const command = [
       "ssh", ...(bridge ? ["-b", bridge.address] : []), "-i", this.windowKey(), "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no",
-      "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectionAttempts=60", `admin@${ip}`, script,
+      "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=10", `admin@${ip}`, script,
     ];
     if (!inherit) return this.capture(command, { timeout: 120_000 });
     this.run(command, this.layout.source);
