@@ -120,6 +120,23 @@ TEST(PageTreeTest, LinkOpensAsLastChildWithoutBreakingOtherLinks) {
   EXPECT_FALSE(tree.SetParent(Id("link"), Id("unknown")));
 }
 
+TEST(PageTreeTest, NewChildTabOpensFirstUnderItsParent) {
+  PageTree tree = Seed();
+  std::vector<Page> strip = Strip(tree);
+  strip.push_back(P("new"));
+  tree.Adopt(strip, {});
+
+  EXPECT_TRUE(tree.OpenUnder(Id("new"), Id("flights")));
+  EXPECT_EQ(Render(tree),
+            (Lines{"flights@trip", "  new@trip", "  fare@trip", "hotels@trip",
+                   "gliner@models", "ollama@models", "news@-", "  show@-",
+                   "weather@-"}));
+  EXPECT_TRUE(tree.OpenUnder(Id("new"), Id("weather")));
+  EXPECT_EQ(Render(tree).back(), "  new@-");
+  EXPECT_FALSE(tree.OpenUnder(Id("weather"), Id("new")));
+  EXPECT_FALSE(tree.OpenUnder(Id("new"), Id("unknown")));
+}
+
 TEST(PageTreeTest, LinkIntoAnotherTaskTakesItsParentsTask) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.SetParent(Id("weather"), Id("fare")));

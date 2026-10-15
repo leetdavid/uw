@@ -54,7 +54,8 @@ class TabOrganizationController : public TabStripModelObserver,
     kMoveUp,
     kMoveDown,
     kToggleBranch,
-    kLastCommand = kToggleBranch,
+    kNewChildTab,
+    kLastCommand = kNewChildTab,
   };
   static bool IsCommand(int command);
 
@@ -90,6 +91,12 @@ class TabOrganizationController : public TabStripModelObserver,
   // The selected pages when `context` is selected or null; else `context`.
   std::vector<PageId> SelectionFor(
       const tabs::TabInterface* context = nullptr) const;
+  // The pages `command` acts on from the menu of `context`, or from the menu
+  // bar when `context` is null. "New child tab" takes one page, not the
+  // selection.
+  std::vector<PageId> TargetsFor(
+      int command,
+      const tabs::TabInterface* context = nullptr) const;
 
   bool CanExecute(int command, const std::vector<PageId>& ids) const;
   void Execute(int command, const std::vector<PageId>& ids);
@@ -111,6 +118,9 @@ class TabOrganizationController : public TabStripModelObserver,
                         const std::vector<PageId>& staying = {});
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
+  // Open a selected blank tab first under `id`, or below its branch.
+  void OpenChild(const PageId& id);
+  void OpenBelow(const PageId& id);
   // Swaps a branch with the sibling branch above or below it.
   bool MoveUp(const PageId& id);
   bool MoveDown(const PageId& id);
@@ -197,6 +207,8 @@ class TabOrganizationController : public TabStripModelObserver,
   // Expands every collapsed branch that holds the selected tab below its top
   // page.
   void RevealSelected();
+  // Opens a selected blank tab after `anchor` in the strip and returns it.
+  std::optional<PageId> OpenBlankTab(const PageId& anchor);
   // Takes each of `staying` out of the branches of `roots`.
   void LeaveBehind(const std::vector<PageId>& roots,
                    const std::vector<PageId>& staying);

@@ -128,6 +128,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
       {TabOrganizationController::kMoveDown, down, kCtrlCmd},
       {TabOrganizationController::kCloseBranch, @"w", kOptionCmd},
       {TabOrganizationController::kToggleBranch, @".", kCtrlCmd},
+      {TabOrganizationController::kNewChildTab, @"t", kCtrlCmd},
       {IDC_CREATE_NEW_TAB_GROUP, @"p", kCtrlCmd},
       {TabOrganizationController::kNewTask, @"n", kCtrlCmd},
       {TabOrganizationController::kScratchpad, @"s", kCtrlCmd},
@@ -193,6 +194,27 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, ArrowKeysNestAndMoveBranches) {
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{a, c, b}; }));
   EXPECT_EQ(tabs()->GetIndexOfTab(second), 2);
+}
+
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
+                       CtrlCmdTOpensAChildFirstUnderTheSelectedTab) {
+  tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
+  tabs::TabInterface* link = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  const std::string p = Id(parent).value();
+  const std::string l = Id(link).value();
+  const std::string o = Id(other).value();
+  Select(parent);
+
+  Press(ui::VKEY_T, kCtrlCmd);
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 4; }));
+  tabs::TabInterface* child = tabs()->GetActiveTab();
+  const std::string c = Id(child).value();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return Rows() == std::vector<std::string>{p, "  " + c, "  " + l, o};
+  }));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return tabs()->GetIndexOfTab(child) == 1; }));
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,

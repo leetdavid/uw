@@ -187,6 +187,17 @@ bool PageTree::OpenBeside(const PageId& id, const PageId& active) {
   return true;
 }
 
+bool PageTree::OpenUnder(const PageId& id, const PageId& parent) {
+  const Page* target = Find(parent);
+  if (!Find(id) || !target || Has(BranchOf(id), parent)) {
+    return false;
+  }
+  const std::string task = target->task;
+  std::vector<Page> branch = Detach(id);
+  Attach(std::move(branch), task, parent, EndOf({parent}));
+  return true;
+}
+
 bool PageTree::SetParent(const PageId& id, const PageId& parent) {
   const Page* target = Find(parent);
   if (!Find(id) || !target || Has(BranchOf(id), parent)) {

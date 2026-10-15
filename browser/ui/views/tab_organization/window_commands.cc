@@ -64,7 +64,7 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
     return false;
   }
   if (TabOrganizationController::IsCommand(command)) {
-    return controller->CanExecute(command, controller->SelectionFor());
+    return controller->CanExecute(command, controller->TargetsFor(command));
   }
   if (command >= kGoToTask1 && command <= kGoToTask9) {
     return static_cast<size_t>(command - kGoToTask1) <
@@ -104,7 +104,7 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
   TabOrganizationController* controller =
       TabOrganizationController::From(window);
   if (TabOrganizationController::IsCommand(command)) {
-    controller->Execute(command, controller->SelectionFor());
+    controller->Execute(command, controller->TargetsFor(command));
     return;
   }
   if (command >= kGoToTask1 && command <= kGoToTask9) {

@@ -8,6 +8,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/run_until.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
@@ -693,6 +694,19 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_EQ(TextOf("agentTestStatus"),
             "claude-sonnet-5-5 answered without calling a tool. Chats need a "
             "model that calls tools.");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheCommandBarSwitchStartsOnAndTurnsItOff) {
+  EXPECT_TRUE(prefs()->GetBoolean(kCommandBarEnabledPref));
+  OpenPage();
+  ASSERT_EQ(true, Run("const toggle = part('commandBarToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView(); toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !prefs()->GetBoolean(kCommandBarEnabledPref); }));
+  SaveWindowScreenshot(browser(), "settings-command-bar");
 }
 
 }  // namespace

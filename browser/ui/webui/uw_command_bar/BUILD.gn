@@ -1,0 +1,21 @@
+# The command bar page's browser side: its controller, which hands the page
+# Chromium's searchbox handler.
+source_set("uw_command_bar") {
+  sources = [
+    "uw_command_bar_ui.cc",
+    "uw_command_bar_ui.h",
+  ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/ui/webui/top_chrome",
+    "//components/omnibox/browser:mojo_bindings",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/webui/searchbox",
+    "//ui/webui",
+    "//uw/browser/resources/uw_command_bar:resources",
+  ]
+}

@@ -61,6 +61,9 @@ inline constexpr char kAgentEndpointPref[] = "uw.agent.endpoint";
 inline constexpr char kAgentModelPref[] = "uw.agent.model";
 inline constexpr char kAgentKeyAccountPref[] = "uw.agent.key_account";
 
+// Whether Cmd+T opens the command bar instead of a blank tab.
+inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
+
 // Keychain accounts holding the API keys.
 inline constexpr char kLanguageKeyAccount[] = "organization";
 inline constexpr char kDecisionKeyAccount[] = "decision";

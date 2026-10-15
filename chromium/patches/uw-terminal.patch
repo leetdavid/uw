@@ -1,40 +1,43 @@
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..d6ee66182b27facdd709e9cc759f3bbcebdf14ab 100644
+index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..61311b3c1afd09bc5e90da1cc47623b6f57fe937 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,8 @@
+@@ -69,6 +69,9 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
++#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +403,8 @@ void RegisterChromeWebUIConfigs() {
+@@ -401,6 +404,9 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwTerminalUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwChatUIConfig>());
++  map.AddWebUIConfig(std::make_unique<uw::UwCommandBarUIConfig>());
  #endif  // BUILDFLAG(IS_ANDROID)
  
  #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OPENBSD)
 diff --git a/chrome/chrome_paks.gni b/chrome/chrome_paks.gni
-index 7274b66570dd11e3e6899974ef0f1307697f22c6..07c66042d3fe7b17bfac4fcb15ec3a726bcdb1c3 100644
+index 7274b66570dd11e3e6899974ef0f1307697f22c6..ad58ba43d8160e5306c4d205730882c9319dee21 100644
 --- a/chrome/chrome_paks.gni
 +++ b/chrome/chrome_paks.gni
-@@ -256,6 +256,8 @@ template("chrome_extra_paks") {
+@@ -256,6 +256,9 @@ template("chrome_extra_paks") {
          "$root_gen_dir/chrome/webui_browser_resources.pak",
          "$root_gen_dir/chrome/webui_gallery_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_resources.pak",
 +        "$root_gen_dir/chrome/uw_terminal_resources.pak",
 +        "$root_gen_dir/chrome/uw_chat_resources.pak",
++        "$root_gen_dir/chrome/uw_command_bar_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_shared_resources.pak",
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 12d6be60e250efa15872027b297baab899e250c9..7293d1ff4d513faba8dd2eb583baedf2f78cd917 100644
+index 12d6be60e250efa15872027b297baab899e250c9..8942df6281a14598a40e66e9182a836e6f3e29f9 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -19,6 +19,9 @@
@@ -47,7 +50,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..7293d1ff4d513faba8dd2eb583baedf2
  
  namespace {
  
-@@ -42,6 +45,39 @@ const struct AcceleratorMapping {
+@@ -42,6 +45,41 @@ const struct AcceleratorMapping {
      {IDC_NEW_INCOGNITO_WINDOW, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
       ui::VKEY_N},
      {IDC_NEW_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_T},
@@ -64,6 +67,8 @@ index 12d6be60e250efa15872027b297baab899e250c9..7293d1ff4d513faba8dd2eb583baedf2
 +     ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_W},
 +    {uw::TabOrganizationController::kToggleBranch,
 +     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_OEM_PERIOD},
++    {uw::TabOrganizationController::kNewChildTab,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_T},
 +    {uw::TabOrganizationController::kNewTask,
 +     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_N},
 +    {uw::TabOrganizationController::kScratchpad,
@@ -88,7 +93,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..7293d1ff4d513faba8dd2eb583baedf2
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f23a77ef004de67cceda24209deb9ff42b7e1190 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..efb32e6b9b3201c1d908eaf93fb26761f5ad5ac0 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -123,10 +128,12 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f23a77ef004de67cceda24209deb9ff4
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
-@@ -583,12 +594,87 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +594,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
++              Item(IDS_UW_NEW_CHILD_TAB_MAC)
++                  .command_id(uw::TabOrganizationController::kNewChildTab),
 +              Item(IDS_UW_NEST_BRANCH_MAC)
 +                  .command_id(uw::TabOrganizationController::kNest),
 +              Item(IDS_UW_OUTDENT_BRANCH_MAC)
@@ -211,7 +218,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..f23a77ef004de67cceda24209deb9ff4
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +730,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +732,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,
@@ -273,3 +280,15 @@ index 371dda0a45c779bf905f43fea5b32e82d1173268..51475ec1cfac22a58bc6a6730a64ee37
  
    content::WebContents* scan_target =
        glic::GetGlicGuestWebContents(web_contents);
+diff --git a/tools/metrics/histograms/metadata/page/histograms.xml b/tools/metrics/histograms/metadata/page/histograms.xml
+index 7e8cb88ba8e66244a7552a1f1e1c62a1160b71c5..afdb1c3d8378b8560f49b1ff853aec743f182d6a 100644
+--- a/tools/metrics/histograms/metadata/page/histograms.xml
++++ b/tools/metrics/histograms/metadata/page/histograms.xml
+@@ -659,6 +659,7 @@ chromium-metrics-reviews@google.com.
+   <variant name=".TabSearch"/>
+   <variant name=".TabsFromOtherDevicesSidePanel"/>
+   <variant name=".UserEducation"/>
++  <variant name=".UwCommandBar"/>
+ </variants>
+ 
+ <!-- LINT.ThenChange(//tools/metrics/histograms/metadata/ui/histograms.xml:TopChromeWebUIName) -->

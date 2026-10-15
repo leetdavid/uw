@@ -66,6 +66,7 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void GetTint(GetTintCallback callback) override;
   void SetTint(const std::string& color, SetTintCallback callback) override;
   void ClearTint(ClearTintCallback callback) override;
+  void SetCommandBar(bool on, SetCommandBarCallback callback) override;
 
  private:
   // One test runs per connection at a time.

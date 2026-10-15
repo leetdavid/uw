@@ -63,6 +63,8 @@ class PageTree {
   bool OpenBeside(const PageId& id, const PageId& active);
   // A link opened in a new tab, or a restored link: last child of `parent`.
   bool SetParent(const PageId& id, const PageId& parent);
+  // A blank tab from "New child tab": first child of `parent`.
+  bool OpenUnder(const PageId& id, const PageId& parent);
   // Moves a branch to the end of an existing task, or of the Scratchpad when
   // `task` is empty, and detaches it from its parent.
   bool MoveToTask(const PageId& id, const std::string& task);

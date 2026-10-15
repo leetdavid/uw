@@ -23,6 +23,7 @@ export interface UwOrganizationBrowserProxy {
   getTint(): Promise<TintState>;
   setTint(color: string): Promise<TintState>;
   clearTint(): Promise<TintState>;
+  setCommandBar(on: boolean): Promise<void>;
 }
 
 export class UwOrganizationBrowserProxyImpl implements
@@ -75,6 +76,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   clearTint() {
     return this.handler.clearTint().then(response => response.tint);
+  }
+
+  async setCommandBar(on: boolean) {
+    await this.handler.setCommandBar(on);
   }
 
   static getInstance(): UwOrganizationBrowserProxy {

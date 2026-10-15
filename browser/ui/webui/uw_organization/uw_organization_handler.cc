@@ -399,6 +399,9 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationTintStatusAdjusted",
        IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED},
       {"uwOrganizationTintNote", IDS_UW_SETTINGS_ORGANIZATION_TINT_NOTE},
+      {"uwCommandBarTitle", IDS_UW_SETTINGS_COMMAND_BAR_TITLE},
+      {"uwCommandBarToggle", IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE},
+      {"uwCommandBarNote", IDS_UW_SETTINGS_COMMAND_BAR_NOTE},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
@@ -434,6 +437,7 @@ void UwOrganizationHandler::GetState(GetStateCallback callback) {
   state->enabled = OrganizationReady(prefs);
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   state->thresholds = CurrentThresholds();
+  state->command_bar = prefs->GetBoolean(kCommandBarEnabledPref);
   std::move(callback).Run(std::move(state));
 }
 
@@ -737,6 +741,12 @@ void UwOrganizationHandler::SetTint(const std::string& color,
 void UwOrganizationHandler::ClearTint(ClearTintCallback callback) {
   ThemeServiceFactory::GetForProfile(profile_)->SetUserColor(std::nullopt);
   std::move(callback).Run(CurrentTint());
+}
+
+void UwOrganizationHandler::SetCommandBar(bool on,
+                                          SetCommandBarCallback callback) {
+  profile_->GetPrefs()->SetBoolean(kCommandBarEnabledPref, on);
+  std::move(callback).Run();
 }
 
 mojom::TintStatePtr UwOrganizationHandler::CurrentTint() const {

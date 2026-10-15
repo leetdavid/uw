@@ -42,6 +42,7 @@ source_set("browser_tests") {
   sources = [ "uw_organization_page_browsertest.cc" ]
   deps = [
     "//base",
+    "//base/test:test_support",
     "//chrome:strings",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",

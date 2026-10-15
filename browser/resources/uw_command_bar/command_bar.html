@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <title>Command bar</title>
+    <style>
+      html,
+      body {
+        background: #fff;
+        color: #1e1b2e;
+        font: 14px system-ui, sans-serif;
+        margin: 0;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background: #1c1b26;
+          color: #edebf7;
+        }
+      }
+
+      #field {
+        background: transparent;
+        border: none;
+        box-sizing: border-box;
+        color: inherit;
+        font: inherit;
+        font-size: 18px;
+        outline: none;
+        padding: 14px 16px;
+        width: 100%;
+      }
+
+      #results {
+        list-style: none;
+        margin: 0;
+        padding: 0 0 8px;
+      }
+
+      #results li {
+        overflow: hidden;
+        padding: 6px 16px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #results li span {
+        opacity: 0.6;
+        padding-inline-start: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="field" autofocus spellcheck="false" autocomplete="off">
+    <ul id="results"></ul>
+    <script type="module" src="/command_bar.js"></script>
+  </body>
+</html>

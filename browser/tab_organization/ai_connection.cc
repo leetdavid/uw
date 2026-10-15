@@ -52,6 +52,7 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kAgentEndpointPref, std::string());
   registry->RegisterStringPref(kAgentModelPref, std::string());
   registry->RegisterStringPref(kAgentKeyAccountPref, std::string());
+  registry->RegisterBooleanPref(kCommandBarEnabledPref, true);
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));
   registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);

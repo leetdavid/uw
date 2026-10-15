@@ -182,6 +182,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       pauseMode_: {type: Number},
       thresholds_: {type: Object},
       tint_: {type: Object},
+      commandBar_: {type: Boolean},
     };
   }
 
@@ -199,6 +200,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   // Null until the saved thresholds have loaded.
   protected accessor thresholds_: Thresholds|null = null;
   protected accessor tint_: TintState = {picked: '', applied: ''};
+  protected accessor commandBar_: boolean = true;
   protected tintPresets_ = TINT_PRESETS;
   private browserProxy_ = UwOrganizationBrowserProxyImpl.getInstance();
 
@@ -530,6 +532,11 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.tint_ = await this.browserProxy_.clearTint();
   }
 
+  protected async onCommandBarChange_(e: CustomEvent<boolean>) {
+    this.commandBar_ = e.detail;
+    await this.browserProxy_.setCommandBar(e.detail);
+  }
+
   protected onPause1HourClick_() {
     this.setPause_(1);
   }
@@ -572,6 +579,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.enabled_ = state.enabled;
     this.pauseMode_ = state.pauseMode;
     this.thresholds_ = state.thresholds;
+    this.commandBar_ = state.commandBar;
     this.tint_ = await this.browserProxy_.getTint();
   }
 }

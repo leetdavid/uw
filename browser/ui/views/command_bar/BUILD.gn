@@ -1,0 +1,45 @@
+# The command bar's panel over the page card.
+source_set("command_bar") {
+  sources = [
+    "command_bar.cc",
+    "command_bar.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/prefs",
+    "//ui/base/unowned_user_data",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/bubble",
+    "//chrome/browser/ui/webui/top_chrome",
+    "//ui/gfx",
+    "//ui/views",
+    "//url",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ui/webui/uw_command_bar",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "command_bar_browsertest.mm" ]
+  deps = [
+    ":command_bar",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//ui/events:test_support",
+    "//uw/browser/tab_organization:ai_connection",
+  ]
+}

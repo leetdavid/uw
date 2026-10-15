@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -23,6 +24,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
@@ -48,6 +50,39 @@
 
 namespace uw {
 namespace {
+
+// Runs a tab's menu commands on the strip, as the tab strip does.
+class TabMenuDelegate : public TabContextMenuController::Delegate {
+ public:
+  explicit TabMenuDelegate(TabStripModel* tabs) : tabs_(tabs) {}
+
+  bool IsContextMenuCommandChecked(
+      TabStripModel::ContextMenuCommand command) override {
+    return false;
+  }
+  bool IsContextMenuCommandEnabled(
+      tabs::TabInterface* tab,
+      TabStripModel::ContextMenuCommand command) override {
+    return tabs_->IsContextMenuCommandEnabled(tabs_->GetIndexOfTab(tab),
+                                              command);
+  }
+  bool IsContextMenuCommandAlerted(
+      TabStripModel::ContextMenuCommand command) override {
+    return false;
+  }
+  void ExecuteContextMenuCommand(tabs::TabInterface* tab,
+                                 TabStripModel::ContextMenuCommand command,
+                                 int event_flags) override {
+    tabs_->ExecuteContextMenuCommand(tabs_->GetIndexOfTab(tab), command);
+  }
+  bool GetContextMenuAccelerator(int command,
+                                 ui::Accelerator* accelerator) override {
+    return false;
+  }
+
+ private:
+  const raw_ptr<TabStripModel> tabs_;
+};
 
 class TabOrganizationControllerBrowserTest
     : public headless::HeadlessModeBrowserTest {
@@ -728,6 +763,56 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(label(), u"Collapse branch");
   Collapse(page);
   EXPECT_EQ(label(), u"Expand branch");
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       NewChildTabSitsUnderNewTabBelow) {
+  ui::SimpleMenuModel menu(nullptr);
+  menu.AddItem(TabStripModel::CommandNewTabToRight, u"New tab below");
+  menu.AddItem(TabStripModel::CommandReload, u"Reload");
+  controller()->AppendCommands(&menu, {Id(InitialTab())});
+  EXPECT_EQ(menu.GetIndexOfCommandId(TabOrganizationController::kNewChildTab),
+            1u);
+  EXPECT_EQ(menu.GetLabelAt(1), u"New child tab");
+}
+
+// The right-clicked tab decides where the new tab goes, not the selected one.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheTabMenuOpensNewTabsByTheTabRightClicked) {
+  tabs::TabInterface* parent = InitialTab();
+  tabs::TabInterface* link = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  TabMenuDelegate delegate(tabs());
+  TabContextMenuController menu(parent->GetHandle(), &delegate);
+
+  ASSERT_TRUE(menu.IsCommandIdEnabled(TabOrganizationController::kNewChildTab));
+  menu.ExecuteCommand(TabOrganizationController::kNewChildTab, 0);
+  tabs::TabInterface* child = tabs()->GetActiveTab();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Strip(),
+            (std::vector<PageId>{Id(parent), Id(child), Id(link), Id(other)}));
+  EXPECT_EQ(controller()->tree().Find(Id(child))->parent, Id(parent));
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(other));
+  menu.ExecuteCommand(TabStripModel::CommandNewTabToRight, 0);
+  tabs::TabInterface* below = tabs()->GetActiveTab();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(parent), Id(child), Id(link),
+                                          Id(below), Id(other)}));
+  EXPECT_EQ(controller()->tree().Find(Id(below))->parent, PageId());
+  ExpectStripMatchesTree();
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ANewChildTabExpandsACollapsedParent) {
+  tabs::TabInterface* parent = InitialTab();
+  OpenLinkFrom(parent);
+  Collapse(parent);
+
+  controller()->Execute(TabOrganizationController::kNewChildTab, {Id(parent)});
+
+  EXPECT_FALSE(controller()->IsCollapsed(Id(parent)));
+  EXPECT_FALSE(controller()->IsHidden(Id(tabs()->GetActiveTab())));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

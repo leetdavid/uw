@@ -294,6 +294,19 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     </div>
     <div class="uw-note">${this.i18n_('uwOrganizationTintNote')}</div>
   </div>
+  <div class="uw-section">
+    <h2 class="uw-heading">${this.i18n_('uwCommandBarTitle')}</h2>
+    <div class="uw-row">
+      <div id="commandBarLabel" class="uw-field">
+        ${this.i18n_('uwCommandBarToggle')}
+      </div>
+      <cr-toggle id="commandBarToggle" aria-labelledby="commandBarLabel"
+          ?checked="${this.commandBar_}"
+          @change="${this.onCommandBarChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-note">${this.i18n_('uwCommandBarNote')}</div>
+  </div>
 </div>
 <!--_html_template_end_-->`;
   // clang-format on

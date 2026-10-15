@@ -19,6 +19,7 @@
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
@@ -31,6 +32,7 @@
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/menus/simple_menu_model.h"
+#include "url/gurl.h"
 
 namespace uw {
 namespace {
@@ -73,6 +75,11 @@ bool TabOrganizationController::IsCommand(int command) {
 void TabOrganizationController::AppendCommands(
     ui::SimpleMenuModel* menu,
     const std::vector<PageId>& ids) const {
+  if (const std::optional<size_t> below =
+          menu->GetIndexOfCommandId(TabStripModel::CommandNewTabToRight)) {
+    menu->InsertItemAt(*below + 1, kNewChildTab,
+                       l10n_util::GetStringUTF16(IDS_UW_NEW_CHILD_TAB));
+  }
   menu->AddItem(kNewTask, l10n_util::GetStringUTF16(IDS_UW_NEW_TASK));
   menu->AddItem(kScratchpad,
                 l10n_util::GetStringUTF16(IDS_UW_MOVE_TO_SCRATCHPAD));
@@ -221,6 +228,17 @@ std::vector<PageId> TabOrganizationController::SelectionFor(
   return selection;
 }
 
+std::vector<PageId> TabOrganizationController::TargetsFor(
+    int command,
+    const tabs::TabInterface* context) const {
+  if (command != kNewChildTab) {
+    return SelectionFor(context);
+  }
+  const std::optional<PageId> id =
+      IdFor(context ? context : tabs_->GetActiveTab());
+  return id ? std::vector<PageId>{*id} : std::vector<PageId>();
+}
+
 bool TabOrganizationController::CanExecute(
     int command,
     const std::vector<PageId>& ids) const {
@@ -232,6 +250,8 @@ bool TabOrganizationController::CanExecute(
     return false;
   }
   switch (command) {
+    case kNewChildTab:
+      return ids.size() == 1;
     case kNewTask:
       return tabs_->SupportsTabGroups();
     case kScratchpad:
@@ -263,6 +283,9 @@ void TabOrganizationController::Execute(int command,
     return;
   }
   switch (command) {
+    case kNewChildTab:
+      OpenChild(ids.front());
+      break;
     case kNewTask:
       MoveToNewTask(ids, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
       break;
@@ -370,6 +393,35 @@ bool TabOrganizationController::Nest(const PageId& id) {
   Apply();
   NotifyManualMove({id});
   return true;
+}
+
+void TabOrganizationController::OpenChild(const PageId& id) {
+  if (const std::optional<PageId> page = OpenBlankTab(id)) {
+    tree_.OpenUnder(*page, id);
+    RevealSelected();
+    ScheduleApply();
+    ScheduleUpdate();
+  }
+}
+
+void TabOrganizationController::OpenBelow(const PageId& id) {
+  if (const std::optional<PageId> page = OpenBlankTab(id)) {
+    tree_.OpenBeside(*page, id);
+    ScheduleApply();
+    ScheduleUpdate();
+  }
+}
+
+std::optional<PageId> TabOrganizationController::OpenBlankTab(
+    const PageId& anchor) {
+  tabs::TabInterface* tab = TabFor(anchor);
+  if (!tab) {
+    return std::nullopt;
+  }
+  content::WebContents* page =
+      chrome::AddAndReturnTabAt(window_, GURL(), tabs_->GetIndexOfTab(tab) + 1,
+                                /*foreground=*/true, tab->GetGroup());
+  return page ? IdFor(tabs_->GetTabForWebContents(page)) : std::nullopt;
 }
 
 bool TabOrganizationController::Outdent(const PageId& id) {
