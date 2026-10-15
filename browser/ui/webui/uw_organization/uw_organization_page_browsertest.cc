@@ -124,9 +124,12 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
   EXPECT_EQ(TextOf("statusDetail"),
             String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT));
+  EXPECT_EQ(true, Run("return part('pauseSection').hidden;"));
 
   ClickSwitch();
   EXPECT_TRUE(prefs()->GetBoolean(kOrganizationEnabledPref));
+  EXPECT_EQ(true, Run("await until(() => !part('pauseSection').hidden);"
+                      "return true;"));
   EXPECT_EQ(TextOf("status"),
             String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_WAITING));
   EXPECT_EQ(TextOf("statusDetail"),

@@ -28,6 +28,10 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   .uw-row.uw-wrap {
     flex-wrap: wrap;
   }
+  #providersLink,
+  #providersLink + .uw-row {
+    border-top: var(--cr-separator-line);
+  }
   .uw-row[hidden] {
     display: none;
   }
@@ -115,7 +119,7 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           @change="${this.onEnabledChange_}">
       </cr-toggle>
     </div>
-    <cr-link-row id="providersLink" external
+    <cr-link-row id="providersLink" external embedded
         label="${this.i18n_('uwOrganizationProvidersTitle')}"
         sub-label="${this.i18n_('uwOrganizationProvidersNote')}"
         @click="${this.onProvidersClick_}">
@@ -139,7 +143,7 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     </div>
     <div class="uw-note">${this.i18n_('uwOrganizationScope')}</div>
   </div>
-  <div class="uw-section">
+  <div id="pauseSection" class="uw-section" ?hidden="${!this.state_?.enabled}">
     <h2 class="uw-heading">${this.i18n_('uwOrganizationPauseTitle')}</h2>
     <div class="uw-row uw-wrap">
       <cr-button id="pause1Hour" @click="${this.onPause1HourClick_}"

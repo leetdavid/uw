@@ -12,6 +12,7 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/global_keyboard_shortcuts_mac.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
@@ -20,6 +21,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gtest_mac.h"
@@ -29,6 +31,7 @@
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/views/interaction/element_tracker_views.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
@@ -330,10 +333,19 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   EXPECT_FALSE(CanRunWindowCommand(browser(), kConfirmSuggestion));
   EXPECT_FALSE(CanRunWindowCommand(browser(), kResumeOrganization));
   EXPECT_FALSE(CanRunWindowCommand(browser(), kRenameTask));
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kPauseOrganizationForAnHour));
 
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetBoolean(kOrganizationEnabledPref, true);
+  EXPECT_TRUE(CanRunWindowCommand(browser(), kPauseOrganizationForAnHour));
   RunWindowCommand(browser(), kPauseOrganizationIndefinitely);
   EXPECT_TRUE(CanRunWindowCommand(browser(), kResumeOrganization));
   EXPECT_FALSE(CanRunWindowCommand(browser(), kPauseOrganizationIndefinitely));
+
+  // Turned off while paused, every pause item is gray, Resume too.
+  prefs->SetBoolean(kOrganizationEnabledPref, false);
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kResumeOrganization));
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kPauseOrganizationForAnHour));
 
   const bool shown = IsWindowCommandChecked(browser(), kShowOrganizerActivity);
   RunWindowCommand(browser(), kShowOrganizerActivity);

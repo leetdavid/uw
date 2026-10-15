@@ -1772,6 +1772,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OrganizeMenuUndoesPausesAndOpensSettings) {
+  prefs()->SetBoolean(kOrganizationEnabledPref, true);
   OneTask();
   ASSERT_TRUE(bar()->GetVisible());
   ASSERT_TRUE(bar()->IsCommandIdEnabled(OrganizeBar::kUndo));

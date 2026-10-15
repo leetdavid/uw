@@ -71,7 +71,10 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
            controller->tree().Tasks().size();
   }
   const AutomaticOrganizer* organizer = AutomaticOrganizer::From(window);
-  const PauseMode pause = ReadPauseState(window->GetProfile()->GetPrefs());
+  const PrefService* prefs = window->GetProfile()->GetPrefs();
+  const PauseMode pause = ReadPauseState(prefs);
+  // Pausing means nothing while automatic organization is off.
+  const bool on = prefs->GetBoolean(kOrganizationEnabledPref);
   switch (command) {
     case kGoToScratchpad:
       return std::ranges::any_of(
@@ -85,13 +88,13 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
     case kConfirmSuggestion:
       return organizer && organizer->HasSuggestion();
     case kPauseOrganizationForAnHour:
-      return pause != PauseMode::kTimed;
+      return on && pause != PauseMode::kTimed;
     case kPauseOrganizationUntilLaunch:
-      return pause != PauseMode::kUntilLaunch;
+      return on && pause != PauseMode::kUntilLaunch;
     case kPauseOrganizationIndefinitely:
-      return pause != PauseMode::kIndefinite;
+      return on && pause != PauseMode::kIndefinite;
     case kResumeOrganization:
-      return pause != PauseMode::kOff;
+      return on && pause != PauseMode::kOff;
     default:
       return true;
   }

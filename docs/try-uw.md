@@ -82,7 +82,7 @@ Click `Organize` at the foot of the sidebar.
 
 - `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+N do the same. Cmd-T still opens a tab beside the current one, inside its task.
 - `Undo tab organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
-- The pause items stop and resume automatic organization.
+- The pause items stop and resume automatic organization. While automatic organization is off they are grayed out, and the settings page hides them.
 - `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
 - `Tab organization settings` opens the settings page.
 
