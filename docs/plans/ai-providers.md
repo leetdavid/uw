@@ -19,7 +19,7 @@ Implementability: **6/10** using the [roadmap convention](roadmap.md#implementab
 - A chat whose model is no longer available says so on its chip and waits for the user to pick another. uw never switches a model on its own.
 - On the first launch of the build that has this page, each saved connection becomes a provider. Connections with the same address and key become one. The organizer and chats go on with the same models, and the old preferences and Keychain accounts are removed once the move has succeeded.
 - The organizer reads its two models from the providers. Nothing about how it organizes changes.
-- uw's settings section keeps automatic organization, the thresholds, pause, the tint, and the command bar switch, and links to `uw://providers`. The language, decision, and agent model cards leave it.
+- uw's settings section keeps automatic organization, the thresholds, pause, the tint, and the command bar switch, and links to `uw://providers`. The settings sidebar also lists "AI providers" under uw, with the external-link mark Extensions has; it opens `uw://providers` in a new tab. Agreed on 2026-10-16. The language, decision, and agent model cards leave it.
 
 ## Design
 

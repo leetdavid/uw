@@ -327,10 +327,30 @@ index 7b00df716ccbf2adc37f38fd2c71f9bdc1997c29..45ad069d886ebfc17d5b65a061629282
      <div slot="view" id="reset">
        <template is="dom-if" if="[[renderPlugin_(
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-index efde1c73dfca6509223b6a626ab426faeed9af76..75d5d51c0aa25c3683322e590ae9cbff516fd5d4 100644
+index efde1c73dfca6509223b6a626ab426faeed9af76..d80464f0e1faeeb14e73e7ad10386df400115e33 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-@@ -143,6 +143,15 @@
+@@ -17,7 +17,8 @@
+         min-width: fit-content;
+       }
+ 
+-      #extensionsLink > .cr-icon {
++      #extensionsLink > .cr-icon,
++      #uwProvidersLink > .cr-icon {
+         height: var(--cr-icon-size);
+         margin-inline-end: 14px;  /* 16px - 2px from margin for outline. */
+         width: var(--cr-icon-size);
+@@ -42,7 +43,8 @@
+     </style>
+ 
+     <div role="navigation">
+-      <cr-menu-selector id="menu" selectable="a:not(#extensionsLink)"
++      <cr-menu-selector id="menu"
++          selectable="a:not(#extensionsLink):not(#uwProvidersLink)"
+           attr-for-selected="href" on-iron-activate="onSelectorActivate_"
+           on-click="onLinkClick_" selected-attribute="selected">
+         <a role="menuitem"
+@@ -143,6 +145,23 @@
            $i18n{systemPageTitle}
            <cr-ripple></cr-ripple>
          </a>
@@ -343,11 +363,19 @@ index efde1c73dfca6509223b6a626ab426faeed9af76..75d5d51c0aa25c3683322e590ae9cbff
 +          $i18n{uwOrganizationPageTitle}
 +          <cr-ripple></cr-ripple>
 +        </a>
++        <a role="menuitem" id="uwProvidersLink" class="cr-nav-menu-item"
++            href="chrome://providers/" target="_blank"
++            hidden="[[!pageVisibility_.uwOrganization]]">
++          <cr-icon icon="settings20:data-connectors-system"></cr-icon>
++          <span>$i18n{uwOrganizationProvidersTitle}</span>
++          <div class="cr-icon icon-external"></div>
++          <cr-ripple></cr-ripple>
++        </a>
  </if>
          <a role="menuitem" id="reset" href="/reset"
              hidden="[[!pageVisibility_.reset]]" class="cr-nav-menu-item">
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.ts b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
-index 564554a675e1b9c16ecbd9414f14083ed1d024a3..de13d59ff1d514a50b75b18a2b83ce50bc893be6 100644
+index 564554a675e1b9c16ecbd9414f14083ed1d024a3..9085d33aa689cbbebb97c85014df208d0af87a19 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.ts
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
 @@ -58,6 +58,7 @@ const pathToActionMap: Map<string, string> = new Map([
@@ -358,6 +386,16 @@ index 564554a675e1b9c16ecbd9414f14083ed1d024a3..de13d59ff1d514a50b75b18a2b83ce50
    ['/reset', 'SettingsMenu_ResetClicked'],
    ['/help', 'SettingsMenu_AboutClicked'],
  ]);
+@@ -129,7 +130,8 @@ export class SettingsMenuElement extends SettingsMenuElementBase {
+    * accessibility purposes, taps are handled separately.
+    */
+   private onLinkClick_(event: Event) {
+-    if ((event.target as HTMLElement).matches('a:not(#extensionsLink)')) {
++    if ((event.target as HTMLElement)
++            .matches('a:not(#extensionsLink):not(#uwProvidersLink)')) {
+       event.preventDefault();
+     }
+   }
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
 --- a/chrome/browser/ui/BUILD.gn

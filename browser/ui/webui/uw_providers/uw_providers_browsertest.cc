@@ -319,5 +319,24 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
 }
 
+// The settings sidebar lists AI providers under uw, like Extensions, and
+// opens the page in a new tab.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       TheSettingsSidebarOpensAiProviders) {
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://settings/")));
+  content::WebContentsAddedObserver opened;
+  EXPECT_EQ("chrome://providers/",
+            Run("const find = (root) => root.querySelector('#uwProvidersLink')"
+                "    ?? all('*', root).map((element) => element.shadowRoot &&"
+                "        find(element.shadowRoot)).find(Boolean);"
+                "const link = await until(() => find(document));"
+                "link.click();"
+                "return link.getAttribute('href');"));
+  content::WebContents* providers = opened.GetWebContents();
+  EXPECT_TRUE(content::WaitForLoadStop(providers));
+  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
+}
+
 }  // namespace
 }  // namespace uw
