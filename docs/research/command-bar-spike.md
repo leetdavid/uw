@@ -10,7 +10,7 @@ Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.
 | Suggestions come from Chromium's searchbox handler | Passed: `TypingListsSuggestions` gets rows back for typed text |
 | The settings switch turns it off and Cmd+T opens a blank tab again | Passed: `TurnedOffCmdTOpensATab`, `TurningItOffClosesIt`, and `UwOrganizationPageBrowserTest.TheCommandBarSwitchStartsOnAndTurnsItOff` |
 | Escape closes it and opens nothing | Passed in a real window: `MANUAL_EscapeClosesItAndOpensNothing`, and by hand |
-| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys works: in a logged 100-run check on 2026-10-16, every key of all 200 panel opens landed in order. The two failing runs had keys and clicks from outside the test. The bar is 100 of 100. See [below](#keys-typed-right-after-cmdt). |
+| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys works: in a logged 100-run check on 2026-10-16, every key of all 200 panel opens landed in order. The two failing runs had keys and clicks from outside the test. It then passed 100 of 100 in T92's VM. See [below](#keys-typed-right-after-cmdt). |
 
 ## Keys typed right after Cmd+T
 
@@ -43,6 +43,7 @@ What the work found, in the order it was tried:
 4. **Logging a real-window run.** In 3 runs, all six keys were held, the page reported its focused field about 12 ms after Cmd+T, and the browser refused each key as it was sent. The page saw no key events at all.
 5. **Trying refused keys again a frame later.** Passed 10 of 10 real-window runs on 2026-10-16, each opening the panel twice: once before its page had drawn and once after. A 100-run check then passed 97: two runs had an empty field at 800 ms, one of them while another session built and ran tests, and one typed "githubg", a letter twice.
 6. **Logging 100 more runs.** 98 passed. Across all 200 panel opens no key was dropped, the browser refused exactly one key per run (on the first open, before the panel had drawn), the next try a frame later delivered it, and every key was in the field 16 to 130 ms after Cmd+T (31 ms typical). Each release came from the page's focus signal, never the one-second limit. Both failures were outside input: real keys ("t", "h", Shift, Backspace, with real key-ups at typing speed) reached the test window, and the panel then lost focus and closed, which clears the field. The person at the Mac was using it during the run. The earlier "githubg" and empty fields fit the same cause, but that run had no logs.
+7. **100 runs in a VM.** On 2026-10-16 the test passed 100 of 100 in T92's macOS VM (`pnpm run window-tests`), where nothing else types into the window. A run took about 2 seconds.
 
 Also found:
 
@@ -60,5 +61,4 @@ Also found:
 
 ## Still open
 
-- `MANUAL_KeysTypedRightAfterCmdTLand` in 100 of 100 real-window runs with nobody using the Mac, or in T92's VM. 98 of 100 passed on 2026-10-16 with the two failures caused by outside input.
 - The 100 ms target from Cmd+T to the panel on screen. Not measured.
