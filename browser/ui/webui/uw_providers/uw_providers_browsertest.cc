@@ -21,6 +21,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -31,6 +32,7 @@ namespace {
 
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
+using ::testing::IsEmpty;
 
 constexpr char kHelpers[] = R"(
   const until = (probe) => new Promise((resolve) => {
@@ -73,9 +75,20 @@ constexpr char kHelpers[] = R"(
   };
   const testLine = (slot) =>
       document.querySelector(`[aria-label="${slot}"] [role="status"]`);
+  // A model's row on its provider's page, as text.
+  const modelRow = (name) =>
+      withText('span', name)?.closest('.grid')?.textContent;
 )";
 
 constexpr char kTwoModels[] = R"({"data":[{"id":"chat-a"},{"id":"chat-b"}]})";
+
+// models.dev's catalog, cut down, and an OpenRouter list of its two models.
+constexpr char kCatalog[] = R"({"openrouter": {"models": {
+  "maker/thinker": {"tool_call": true, "reasoning_options":
+                        [{"type": "effort", "values": ["low", "high"]}]},
+  "maker/talker": {"tool_call": false}}}})";
+constexpr char kCatalogModels[] =
+    R"({"data":[{"id":"maker/thinker"},{"id":"maker/talker"}]})";
 
 // Drives the real uw://providers page against a local server that plays the
 // providers.
@@ -84,6 +97,8 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     ASSERT_TRUE(embedded_test_server()->Start());
+    CatalogStore::SetSourceForTesting(
+        embedded_test_server()->GetURL("/v1/catalog.json"));
   }
 
   PrefService& prefs() { return *browser()->GetProfile()->GetPrefs(); }
@@ -93,17 +108,29 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
 
   std::string Address() { return embedded_test_server()->GetURL("/v1").spec(); }
 
-  // A Custom provider at the test server, saved as the page saves one.
-  std::string AddTestServer(ProviderFormat format) {
-    Provider provider = PresetProvider(ProviderPreset::kCustom);
-    provider.name = "Test server";
-    provider.address = Address();
-    provider.format = format;
+  // Saves `provider` with a key, as the page saves one, and returns its id.
+  std::string Save(Provider provider) {
     provider.id = AddProvider(prefs(), provider);
     provider.key_account = KeyAccountFor(provider.id);
     EXPECT_TRUE(ApiKeyStore().SetKey(provider.key_account, "sk-test"));
     UpdateProvider(prefs(), provider);
     return provider.id;
+  }
+
+  // A Custom provider at the test server.
+  std::string AddTestServer(ProviderFormat format) {
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Test server";
+    provider.address = Address();
+    provider.format = format;
+    return Save(std::move(provider));
+  }
+
+  // A provider made from `preset`, played by the test server at `address`.
+  std::string AddPreset(ProviderPreset preset, const std::string& address) {
+    Provider provider = PresetProvider(preset);
+    provider.address = address;
+    return Save(std::move(provider));
   }
 
   // Opens uw://providers, or one provider's page, once it has drawn.
@@ -313,7 +340,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   SaveWindowScreenshot(browser(), "providers-menu");
 
   Open(id);
-  EXPECT_EQ(true, Run("await until(() => withText('div', 'chat-b'));"
+  EXPECT_EQ(true, Run("await until(() => modelRow('chat-b'));"
                       "return true;"));
   SaveWindowScreenshot(browser(), "provider");
   EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
@@ -358,6 +385,74 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   }
   EXPECT_THAT(
       keys, ElementsAre("GET /v1/models sk-test", "POST /v1/messages sk-test"));
+}
+
+// The provider's page says what the catalog knows of each model, and a
+// model that calls no tools cannot run chats.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       TheCatalogSaysWhatEachModelCanDo) {
+  const std::string id = AddPreset(ProviderPreset::kOpenRouter, Address());
+  models_.Answer("/v1/models", kCatalogModels);
+  models_.Answer("/v1/catalog.json", kCatalog);
+  Open(id);
+  EXPECT_EQ("maker/thinkerCalls toolslowhigh",
+            Run("return await until(() => modelRow('maker/thinker'));"));
+  EXPECT_EQ("maker/talkerNo tool callsNo effort levels",
+            Run("return await until(() => modelRow('maker/talker'));"));
+
+  Open();
+  EXPECT_EQ("No tool calls|",
+            Run("const menu = await openMenu('Agent model');"
+                "const note = (name) => item(name, menu)?.dataset.note ?? '';"
+                "await until(() => item('maker/talker', menu));"
+                "return note('maker/talker') + '|' + note('maker/thinker');"));
+}
+
+// An effort picked for the language model goes with its requests, in the
+// field its provider reads.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnEffortGoesWithTheModel) {
+  AddPreset(ProviderPreset::kOpenRouter, Address());
+  models_.Answer("/v1/models", kCatalogModels);
+  models_.Answer("/v1/catalog.json", kCatalog);
+  models_.Answer("/v1/chat/completions", ChatAnswer("Hello"));
+  Open();
+  Pick("Language model", "maker/thinker");
+  ASSERT_EQ(
+      true,
+      Run("const effort = () => document.querySelector("
+          "    '[aria-label=\"Language model\"] [aria-label=\"Effort\"]');"
+          "(await until(effort)).dispatchEvent(new PointerEvent("
+          "    'pointerdown', {bubbles: true, button: 0, pointerType: "
+          "'mouse'}));"
+          "(await until(() => all('[role=\"menu\"]')"
+          "    .map((menu) => item('high', menu)).find(Boolean)))"
+          "    .click();"
+          "await until(() => effort().textContent.includes('high'));"
+          "return true;"));
+  EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->effort, "high");
+
+  EXPECT_THAT(Test("Language model"), HasSubstr("maker/thinker answered in"));
+  std::string sent;
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.path == "/v1/chat/completions") {
+      sent = request.body;
+    }
+  }
+  EXPECT_THAT(sent, HasSubstr(R"("reasoning":{"effort":"high"})"));
+}
+
+// Ollama says itself whether a model calls tools and thinks.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, OllamaSaysWhatItsModelsCanDo) {
+  const std::string id =
+      AddPreset(ProviderPreset::kOllama,
+                embedded_test_server()->GetURL("/v1/ollama/v1").spec());
+  models_.Answer("/v1/ollama/v1/models", R"({"data":[{"id":"qwen3"}]})");
+  models_.Answer("/v1/ollama/api/show",
+                 R"({"capabilities":["completion","thinking"]})");
+  Open(id);
+  EXPECT_EQ("qwen3No tool callslowmediumhigh",
+            Run("return await until(() => modelRow('qwen3'));"));
+  EXPECT_THAT(RequestsTo("/v1/catalog.json"), IsEmpty());
 }
 
 }  // namespace

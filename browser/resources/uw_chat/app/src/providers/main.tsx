@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { AddProviderDialog } from "./add-provider";
-import { ModelChip } from "./model-chip";
+import { EffortChip, ModelChip } from "./model-chip";
 import { ProviderPage } from "./provider-page";
 import {
   FORMAT_NAMES,
   ProviderTile,
+  modelOf,
+  servesSlot,
   type PageData,
 } from "./provider-parts";
 import {
@@ -41,6 +43,14 @@ const FORMAT_BADGES: Record<ProviderFormat, string> = {
   [ProviderFormat.kOpenAiResponses]: "Responses",
   [ProviderFormat.kOpenAiDecisions]: "Decisions",
   [ProviderFormat.kSystemOne]: "System One",
+};
+
+// What the chip says while the slot is empty, and the menu row that empties
+// it. The language model has no such row.
+const UNSET: Record<ModelSlot, string | undefined> = {
+  [ModelSlot.kLanguage]: undefined,
+  [ModelSlot.kDecision]: "None",
+  [ModelSlot.kAgent]: "Same as the language model",
 };
 
 const ROWS = [
@@ -223,7 +233,7 @@ function ProvidersList({
               aria-label={name}
               className="border-border px-4 py-3 [&+&]:border-t"
             >
-              <div className="grid grid-cols-[minmax(0,1fr)_232px_76px] items-center gap-2.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_232px_118px_76px] items-center gap-2.5">
                 <div className="min-w-0">
                   <div className="text-[13.5px] font-semibold">
                     {name}
@@ -238,8 +248,14 @@ function ProvidersList({
                   </div>
                 </div>
                 <ModelChip
-                  slot={slot}
-                  data={data}
+                  choice={choice}
+                  providers={data.providers.filter((provider) =>
+                    servesSlot(provider, slot),
+                  )}
+                  lists={data.lists}
+                  unset={UNSET[slot]}
+                  needsTools={slot === ModelSlot.kAgent}
+                  className="w-full"
                   onPick={async (provider, model) => {
                     await providersHandler.pickModel(slot, provider.id, model);
                     forget(slot);
@@ -251,6 +267,19 @@ function ProvidersList({
                     onChanged();
                   }}
                 />
+                {slot === ModelSlot.kDecision ? (
+                  <span />
+                ) : (
+                  <EffortChip
+                    efforts={modelOf(data, choice)?.efforts ?? []}
+                    effort={choice?.effort ?? ""}
+                    className="w-full"
+                    onPick={async (effort) => {
+                      await providersHandler.setEffort(slot, effort);
+                      onChanged();
+                    }}
+                  />
+                )}
                 {testable ? (
                   <Button
                     size="sm"

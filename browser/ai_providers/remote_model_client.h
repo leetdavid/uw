@@ -14,6 +14,10 @@
 #include "url/gurl.h"
 #include "uw/components/ai_providers/providers.h"
 
+namespace uw {
+struct AiConnectionConfig;
+}
+
 namespace network {
 class SharedURLLoaderFactory;
 class SimpleURLLoader;
@@ -55,13 +59,12 @@ class RemoteModelClient {
   RemoteModelClient(const RemoteModelClient&) = delete;
   RemoteModelClient& operator=(const RemoteModelClient&) = delete;
 
-  // A request to the language model at the base address `endpoint`, which
-  // speaks `format`. `chat_body` is in chat completions' shape, and so is the
+  // A request to the language model in `model`, in its provider's format and
+  // at its effort. `chat_body` is in chat completions' shape, and so is the
   // body of a successful outcome. See uw/components/ai_providers/formats.h.
   static std::unique_ptr<RemoteModelClient> ForLanguageModel(
       scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
-      const std::string& endpoint,
-      ProviderFormat format,
+      const AiConnectionConfig& model,
       std::string api_key,
       const std::string& chat_body,
       base::TimeDelta timeout);
@@ -85,8 +88,10 @@ class RemoteModelClient {
   // Set for a language model that does not speak chat completions: its
   // answers are read back into that shape.
   std::optional<ProviderFormat> answer_format_;
-  // The base address the answer came from, which marks what it kept.
+  // The base address and the model the answer came from, which mark what it
+  // kept.
   std::string address_;
+  std::string model_;
   ResultCallback callback_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
   base::WeakPtrFactory<RemoteModelClient> weak_factory_{this};

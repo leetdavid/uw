@@ -49,6 +49,17 @@ struct ModelChoice {
   string model;
   // Whether the model passed a test since it was picked.
   bool tested;
+  // Empty for the provider's default.
+  string effort;
+};
+
+// A model as its provider lists it, with what the models.dev catalog, or
+// Ollama's own details, say it can do.
+struct Model {
+  string name;
+  bool calls_tools;
+  // Named as its provider names them. Empty when it takes none.
+  array<string> efforts;
 };
 
 // Matches uw::UpgradeNotice.
@@ -83,7 +94,7 @@ struct NewProvider {
 struct ModelList {
   bool ok;
   // Without embedding, speech, image, and moderation models.
-  array<string> models;
+  array<Model> models;
   // What went wrong when `ok` is false, in the provider's words when it
   // gave any.
   string error;
@@ -132,6 +143,8 @@ interface ProvidersHandler {
   PickModel(ModelSlot slot, string provider_id, string model) => ();
   // Leaves the decision model unset, or chats on the language model.
   ClearModel(ModelSlot slot) => ();
+  // One of the slot's model's levels, or empty for its provider's default.
+  SetEffort(ModelSlot slot, string effort) => ();
   // Sends the language or decision model one small request. A pass marks
   // the model tested.
   TestModel(ModelSlot slot) => (ModelTestResult result);

@@ -15,8 +15,9 @@
 namespace uw {
 namespace {
 
-// Anthropic needs a limit on every request; chats set none.
-constexpr int kAnthropicMaxTokens = 8192;
+// Anthropic needs a limit on every request; chats set none. Thinking counts
+// against it.
+constexpr int kAnthropicMaxTokens = 16000;
 
 std::string_view StringOr(const base::DictValue& dict,
                           std::string_view key,
@@ -25,12 +26,30 @@ std::string_view StringOr(const base::DictValue& dict,
   return value ? std::string_view(*value) : fallback;
 }
 
-// The kept parts of `message`, when `address` sent them in `format`.
+// The index of the user's latest message. What a provider kept goes back
+// only after it: earlier turns may have been shortened since, and a provider
+// that checks its thinking against the conversation refuses an edited one.
+size_t CurrentTurnStart(const base::ListValue& messages) {
+  size_t start = 0;
+  for (size_t i = 0; i < messages.size(); ++i) {
+    const base::DictValue* message = messages[i].GetIfDict();
+    if (message && message->FindString("role") &&
+        *message->FindString("role") == "user") {
+      start = i;
+    }
+  }
+  return start;
+}
+
+// The kept parts of `message`, when `model` at `address` sent them in
+// `format`. Another model, even at the same provider, may refuse them.
 const base::ListValue* KeptParts(const base::DictValue& message,
                                  ProviderFormat format,
-                                 std::string_view address) {
+                                 std::string_view address,
+                                 std::string_view model) {
   const base::DictValue* kept = message.FindDict(kKeptPartsKey);
   if (!kept || StringOr(*kept, "address") != address ||
+      StringOr(*kept, "model") != model ||
       kept->FindInt("format") != static_cast<int>(format)) {
     return nullptr;
   }
@@ -39,9 +58,11 @@ const base::ListValue* KeptParts(const base::DictValue& message,
 
 base::DictValue KeptPartsFrom(ProviderFormat format,
                               std::string_view address,
+                              std::string_view model,
                               base::ListValue items) {
   return base::DictValue()
       .Set("address", address)
+      .Set("model", model)
       .Set("format", static_cast<int>(format))
       .Set("items", std::move(items));
 }
@@ -123,8 +144,10 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
     out.Append(
         base::DictValue().Set("role", role).Set("content", std::move(blocks)));
   };
-  for (const base::Value& entry : messages ? *messages : empty) {
-    const base::DictValue* message = entry.GetIfDict();
+  const base::ListValue& all = messages ? *messages : empty;
+  const size_t turn = CurrentTurnStart(all);
+  for (size_t i = 0; i < all.size(); ++i) {
+    const base::DictValue* message = all[i].GetIfDict();
     if (!message) {
       continue;
     }
@@ -137,8 +160,10 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
       }
       add("user", std::move(blocks));
     } else if (role == "assistant") {
-      if (const base::ListValue* kept = KeptParts(
-              *message, ProviderFormat::kAnthropicMessages, address)) {
+      if (const base::ListValue* kept =
+              i > turn ? KeptParts(*message, ProviderFormat::kAnthropicMessages,
+                                   address, StringOr(chat, "model"))
+                       : nullptr) {
         blocks = kept->Clone();
       }
       if (!text.empty()) {
@@ -176,6 +201,11 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
       !system.empty()) {
     request.Set("system", std::move(system));
   }
+  // An effort level asks the model to think as much as it says.
+  if (const std::string* effort = chat.FindString("reasoning_effort")) {
+    request.Set("thinking", base::DictValue().Set("type", "adaptive"));
+    request.Set("output_config", base::DictValue().Set("effort", *effort));
+  }
   if (const base::ListValue* tools = chat.FindList("tools")) {
     base::ListValue converted;
     for (const base::Value& tool : *tools) {
@@ -206,8 +236,10 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
   const base::ListValue empty;
   const base::ListValue* messages = chat.FindList("messages");
   base::ListValue input;
-  for (const base::Value& entry : messages ? *messages : empty) {
-    const base::DictValue* message = entry.GetIfDict();
+  const base::ListValue& all = messages ? *messages : empty;
+  const size_t turn = CurrentTurnStart(all);
+  for (size_t i = 0; i < all.size(); ++i) {
+    const base::DictValue* message = all[i].GetIfDict();
     if (!message) {
       continue;
     }
@@ -217,7 +249,9 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
       input.Append(base::DictValue().Set("role", "user").Set("content", text));
     } else if (role == "assistant") {
       if (const base::ListValue* kept =
-              KeptParts(*message, ProviderFormat::kOpenAiResponses, address)) {
+              i > turn ? KeptParts(*message, ProviderFormat::kOpenAiResponses,
+                                   address, StringOr(chat, "model"))
+                       : nullptr) {
         for (const base::Value& item : *kept) {
           input.Append(item.Clone());
         }
@@ -262,6 +296,9 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
   if (std::optional<int> limit = chat.FindInt("max_tokens")) {
     request.Set("max_output_tokens", *limit);
   }
+  if (const std::string* effort = chat.FindString("reasoning_effort")) {
+    request.Set("reasoning", base::DictValue().Set("effort", *effort));
+  }
   if (const base::ListValue* tools = chat.FindList("tools")) {
     base::ListValue converted;
     for (const base::Value& tool : *tools) {
@@ -280,7 +317,8 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
 }
 
 std::optional<base::DictValue> AnthropicAnswer(const base::DictValue& answer,
-                                               std::string_view address) {
+                                               std::string_view address,
+                                               std::string_view model) {
   const base::ListValue* content = answer.FindList("content");
   if (!content) {
     return std::nullopt;
@@ -310,14 +348,15 @@ std::optional<base::DictValue> AnthropicAnswer(const base::DictValue& answer,
                     kept.empty()
                         ? base::DictValue()
                         : KeptPartsFrom(ProviderFormat::kAnthropicMessages,
-                                        address, std::move(kept)),
+                                        address, model, std::move(kept)),
                     stop == "tool_use"     ? "tool_calls"
                     : stop == "max_tokens" ? "length"
                                            : "stop");
 }
 
 std::optional<base::DictValue> ResponsesAnswer(const base::DictValue& answer,
-                                               std::string_view address) {
+                                               std::string_view address,
+                                               std::string_view model) {
   const base::ListValue* output = answer.FindList("output");
   if (!output) {
     return std::nullopt;
@@ -353,7 +392,7 @@ std::optional<base::DictValue> ResponsesAnswer(const base::DictValue& answer,
                     kept.empty()
                         ? base::DictValue()
                         : KeptPartsFrom(ProviderFormat::kOpenAiResponses,
-                                        address, std::move(kept)),
+                                        address, model, std::move(kept)),
                     cut_short     ? "length"
                     : calls_tools ? "tool_calls"
                                   : "stop");
@@ -372,6 +411,23 @@ std::string_view LanguageModelPath(ProviderFormat format) {
     case ProviderFormat::kSystemOne:
       return "/chat/completions";
   }
+}
+
+std::string WithEffort(std::string_view chat_body,
+                       ProviderPreset preset,
+                       std::string_view effort) {
+  std::optional<base::DictValue> chat =
+      base::JSONReader::ReadDict(chat_body, base::JSON_PARSE_RFC);
+  if (effort.empty() || !chat) {
+    return std::string(chat_body);
+  }
+  if (preset == ProviderPreset::kOpenRouter ||
+      preset == ProviderPreset::kVercelAiGateway) {
+    chat->Set("reasoning", base::DictValue().Set("effort", effort));
+  } else {
+    chat->Set("reasoning_effort", effort);
+  }
+  return Write(*chat).value_or(std::string(chat_body));
 }
 
 std::optional<std::string> RequestIn(ProviderFormat format,
@@ -403,7 +459,8 @@ std::optional<std::string> RequestIn(ProviderFormat format,
 
 std::optional<std::string> AnswerFrom(ProviderFormat format,
                                       std::string_view body,
-                                      std::string_view address) {
+                                      std::string_view address,
+                                      std::string_view model) {
   if (format != ProviderFormat::kAnthropicMessages &&
       format != ProviderFormat::kOpenAiResponses) {
     return std::string(body);
@@ -415,8 +472,8 @@ std::optional<std::string> AnswerFrom(ProviderFormat format,
   }
   std::optional<base::DictValue> chat =
       format == ProviderFormat::kAnthropicMessages
-          ? AnthropicAnswer(*answer, address)
-          : ResponsesAnswer(*answer, address);
+          ? AnthropicAnswer(*answer, address, model)
+          : ResponsesAnswer(*answer, address, model);
   return chat ? Write(*chat) : std::nullopt;
 }
 

@@ -7,6 +7,9 @@
 #include <string>
 #include <vector>
 
+#include "base/json/json_reader.h"
+#include "base/strings/string_util.h"
+#include "base/values.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "net/base/url_util.h"
@@ -144,8 +147,10 @@ AiConnectionConfig ConfigFor(const PrefService* prefs, ModelSlot slot) {
     return config;
   }
   config.endpoint = provider->address;
+  config.preset = provider->preset;
   config.format = *format;
   config.model = choice->model;
+  config.effort = choice->effort;
   config.key_account = provider->key_account;
   return config;
 }
@@ -295,6 +300,26 @@ bool IsComplete(const AiConnectionConfig& config) {
 
 bool IsComplete(const DecisionModelConfig& config) {
   return IsValidProviderEndpoint(config.endpoint) && !config.model.empty();
+}
+
+std::string ProviderMessage(const std::string& body) {
+  constexpr size_t kMaxMessageBytes = 200;
+  const std::optional<base::DictValue> parsed =
+      base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  if (!parsed) {
+    return std::string();
+  }
+  const std::string* message = nullptr;
+  for (const char* field : {"error", "detail", "message"}) {
+    const base::DictValue* nested = parsed->FindDict(field);
+    if (!message) {
+      message =
+          nested ? nested->FindString("message") : parsed->FindString(field);
+    }
+  }
+  return message ? std::string(
+                       base::TruncateUTF8ToByteSize(*message, kMaxMessageBytes))
+                 : std::string();
 }
 
 std::optional<ModelSlot> UntestedModel(const PrefService* prefs) {

@@ -4,6 +4,10 @@
 source_set("ai_providers") {
   sources = [
     "api_key_store.h",
+    "catalog_store.cc",
+    "catalog_store.h",
+    "model_lister.cc",
+    "model_lister.h",
     "models.cc",
     "models.h",
     "remote_model_client.cc",
@@ -24,8 +28,10 @@ source_set("ai_providers") {
     "//uw/components/tab_organization",
   ]
   deps = [
+    "//chrome/browser/profiles:profile",
     "//components/os_crypt/common:switches",
     "//components/prefs",
+    "//content/public/browser",
     "//crypto",
     "//net",
     "//services/network/public/cpp",

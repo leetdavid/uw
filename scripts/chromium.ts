@@ -609,7 +609,7 @@ const TEST_SUITES = {
   unit_tests: [
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
-    "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*",
+    "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*", "CatalogTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",

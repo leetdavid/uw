@@ -8,14 +8,12 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
-#include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/prefs/pref_service.h"
@@ -46,13 +44,7 @@ struct UwProvidersHandler::ModelTest {
 namespace {
 
 constexpr size_t kMaxDetailBytes = 6000;
-constexpr size_t kMaxProviderMessageBytes = 200;
 constexpr char kHiddenKey[] = "<api key>";
-
-// Parts of model names that are plainly not for chat.
-constexpr auto kNotForChat = base::MakeFixedFlatSet<std::string_view>(
-    {"embed", "tts", "whisper", "dall-e", "image", "moderation", "transcribe",
-     "speech", "rerank"});
 
 ModelSlot SlotFrom(mojom::ModelSlot slot) {
   switch (slot) {
@@ -83,12 +75,6 @@ Provider ProviderFrom(const mojom::NewProvider& input) {
   return provider;
 }
 
-RemoteModelClient::KeyHeader KeyHeaderFor(const Provider& provider) {
-  return provider.format == ProviderFormat::kAnthropicMessages
-             ? RemoteModelClient::KeyHeader::kAnthropic
-             : RemoteModelClient::KeyHeader::kBearer;
-}
-
 mojom::ProviderPtr PageProvider(const Provider& provider) {
   auto page = mojom::Provider::New();
   page->id = provider.id;
@@ -105,7 +91,7 @@ mojom::ProviderPtr PageProvider(const Provider& provider) {
 mojom::ModelChoicePtr PageChoice(const PrefService& prefs, ModelSlot slot) {
   const std::optional<ModelChoice> choice = ReadChoice(prefs, slot);
   return choice ? mojom::ModelChoice::New(choice->provider_id, choice->model,
-                                          choice->tested)
+                                          choice->tested, choice->effort)
                 : nullptr;
 }
 
@@ -133,50 +119,14 @@ std::string Readable(const std::string& text) {
       base::TruncateUTF8ToByteSize(indented.value_or(text), kMaxDetailBytes));
 }
 
-// The provider's own words about an error, when its answer has any. OpenAI
-// and DeepSeek send {"error": {"message": ...}}, TypeSafe sends
-// {"detail": {"message": ...}}, and Ollama sends {"error": "..."}.
-std::string ProviderMessage(const std::string& body) {
-  const std::optional<base::DictValue> parsed =
-      base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
-  if (!parsed) {
-    return std::string();
-  }
-  const std::string* message = nullptr;
-  for (const char* field : {"error", "detail", "message"}) {
-    const base::DictValue* nested = parsed->FindDict(field);
-    if (!message) {
-      message =
-          nested ? nested->FindString("message") : parsed->FindString(field);
-    }
-  }
-  return message ? std::string(base::TruncateUTF8ToByteSize(
-                       *message, kMaxProviderMessageBytes))
-                 : std::string();
-}
-
-mojom::ModelListPtr ModelListFrom(RemoteModelClient::Outcome outcome) {
+mojom::ModelListPtr PageList(ModelListing listing) {
   auto list = mojom::ModelList::New();
-  const std::optional<std::vector<std::u16string>> models =
-      outcome.ok ? ParseModelList(outcome.body) : std::nullopt;
-  if (!models) {
-    list->error =
-        outcome.net_error != net::OK
-            ? net::ErrorToShortString(outcome.net_error)
-            : base::StrCat({"HTTP ", base::NumberToString(outcome.http_status),
-                            " ", ProviderMessage(outcome.body)});
-    base::TrimWhitespaceASCII(list->error, base::TRIM_TRAILING, &list->error);
-    return list;
-  }
-  list->ok = true;
-  for (const std::u16string& model : *models) {
-    const std::string name = base::UTF16ToUTF8(model);
-    const std::string lower = base::ToLowerASCII(name);
-    if (std::ranges::none_of(kNotForChat, [&](std::string_view part) {
-          return lower.find(part) != std::string::npos;
-        })) {
-      list->models.push_back(name);
-    }
+  list->ok = listing.ok;
+  list->error = std::move(listing.error);
+  for (ListedModel& model : listing.models) {
+    list->models.push_back(
+        mojom::Model::New(std::move(model.name), model.abilities.calls_tools,
+                          std::move(model.abilities.efforts)));
   }
   return list;
 }
@@ -226,7 +176,9 @@ UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
 UwProvidersHandler::UwProvidersHandler(
     Profile* profile,
     mojo::PendingReceiver<mojom::ProvidersHandler> receiver)
-    : profile_(profile), receiver_(this, std::move(receiver)) {}
+    : profile_(profile),
+      receiver_(this, std::move(receiver)),
+      lister_(profile) {}
 
 UwProvidersHandler::~UwProvidersHandler() = default;
 
@@ -250,31 +202,22 @@ void UwProvidersHandler::ListModels(const std::string& provider_id,
       std::move(callback), mojom::ModelList::New());
   const std::optional<Provider> provider =
       FindProvider(*profile_->GetPrefs(), provider_id);
-  if (!provider || profile_->IsOffTheRecord() ||
-      !IsValidProviderEndpoint(provider->address)) {
+  if (!provider || profile_->IsOffTheRecord()) {
     return;
   }
-  Send(std::make_unique<RemoteModelClient>(
-           LoaderFactory(), ModelsUrl(provider->address), StoredKey(*provider),
-           std::string(), kProviderTimeout, KeyHeaderFor(*provider)),
-       /*post=*/false,
-       base::BindOnce(&ModelListFrom).Then(std::move(callback)));
+  lister_.List(*provider, StoredKey(*provider),
+               base::BindOnce(&PageList).Then(std::move(callback)));
 }
 
 void UwProvidersHandler::ListModelsAt(mojom::NewProviderPtr input,
                                       ListModelsAtCallback callback) {
   callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
       std::move(callback), mojom::ModelList::New());
-  const Provider provider = ProviderFrom(*input);
-  if (profile_->IsOffTheRecord() ||
-      !IsValidProviderEndpoint(provider.address)) {
+  if (profile_->IsOffTheRecord()) {
     return;
   }
-  Send(std::make_unique<RemoteModelClient>(
-           LoaderFactory(), ModelsUrl(provider.address), input->api_key,
-           std::string(), kProviderTimeout, KeyHeaderFor(provider)),
-       /*post=*/false,
-       base::BindOnce(&ModelListFrom).Then(std::move(callback)));
+  lister_.List(ProviderFrom(*input), input->api_key,
+               base::BindOnce(&PageList).Then(std::move(callback)));
 }
 
 void UwProvidersHandler::AddProvider(mojom::NewProviderPtr input,
@@ -334,6 +277,13 @@ void UwProvidersHandler::ClearModel(mojom::ModelSlot slot,
   std::move(callback).Run();
 }
 
+void UwProvidersHandler::SetEffort(mojom::ModelSlot slot,
+                                   const std::string& effort,
+                                   SetEffortCallback callback) {
+  uw::SetEffort(*profile_->GetPrefs(), SlotFrom(slot), effort);
+  std::move(callback).Run();
+}
+
 void UwProvidersHandler::TestModel(mojom::ModelSlot page_slot,
                                    TestModelCallback callback) {
   const PrefService& prefs = *profile_->GetPrefs();
@@ -353,9 +303,9 @@ void UwProvidersHandler::TestModel(mojom::ModelSlot page_slot,
                         : ApiKeyStore().GetKey(test.key_account).value_or("");
   std::unique_ptr<RemoteModelClient> client =
       test.language
-          ? RemoteModelClient::ForLanguageModel(
-                LoaderFactory(), test.language->endpoint, test.language->format,
-                key, *test.body, kProviderTimeout)
+          ? RemoteModelClient::ForLanguageModel(LoaderFactory(), *test.language,
+                                                key, *test.body,
+                                                kProviderTimeout)
           : std::make_unique<RemoteModelClient>(LoaderFactory(), test.url, key,
                                                 *test.body, kProviderTimeout);
   Send(std::move(client), /*post=*/true,

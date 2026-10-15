@@ -20,26 +20,35 @@ namespace uw {
 
 // What a provider sent that uw does not read, such as Anthropic's signed
 // thinking or OpenAI's sealed reasoning, rides on the assistant message under
-// this key: {"address": ..., "format": ..., "items": [...]}.
+// this key: {"address": ..., "model": ..., "format": ..., "items": [...]}.
 inline constexpr char kKeptPartsKey[] = "uw_kept";
 
 // The path under a provider's base address that takes language-model
 // requests in `format`.
 std::string_view LanguageModelPath(ProviderFormat format);
 
+// Asks for `effort` the way `preset` takes it over chat completions:
+// OpenRouter and Vercel's gateway nest it in "reasoning", others take
+// "reasoning_effort". RequestIn turns the latter into Anthropic's and
+// OpenAI's own fields. An empty `effort` leaves the request as it is.
+std::string WithEffort(std::string_view chat_body,
+                       ProviderPreset preset,
+                       std::string_view effort);
+
 // Turns a chat-completions request into one in `format`. The parts an earlier
-// answer kept go back only to `address`, the one that sent them, in the
+// answer kept go back only to the model that sent them, at `address`, in the
 // format they came in. Nothing for a body that is not such a request.
 std::optional<std::string> RequestIn(ProviderFormat format,
                                      std::string_view chat_body,
                                      std::string_view address);
 
 // Turns a successful answer in `format` into a chat-completions answer. What
-// uw does not read is kept on the message, marked with `address`. Nothing for
-// a body that is not such an answer.
+// uw does not read is kept on the message, marked with `address` and the
+// `model` that was asked. Nothing for a body that is not such an answer.
 std::optional<std::string> AnswerFrom(ProviderFormat format,
                                       std::string_view body,
-                                      std::string_view address);
+                                      std::string_view address,
+                                      std::string_view model);
 
 }  // namespace uw
 

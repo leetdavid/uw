@@ -69,20 +69,25 @@ RemoteModelClient::~RemoteModelClient() = default;
 // static
 std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
     scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
-    const std::string& endpoint,
-    ProviderFormat format,
+    const AiConnectionConfig& model,
     std::string api_key,
     const std::string& chat_body,
     base::TimeDelta timeout) {
+  const std::string& endpoint = model.endpoint;
+  const ProviderFormat format = model.format;
   auto client = std::make_unique<RemoteModelClient>(
       std::move(loader_factory), LanguageModelUrl(endpoint, format),
       std::move(api_key),
-      RequestIn(format, chat_body, endpoint).value_or(chat_body), timeout,
+      RequestIn(format, WithEffort(chat_body, model.preset, model.effort),
+                endpoint)
+          .value_or(chat_body),
+      timeout,
       format == ProviderFormat::kAnthropicMessages ? KeyHeader::kAnthropic
                                                    : KeyHeader::kBearer);
   if (format != ProviderFormat::kChatCompletions) {
     client->answer_format_ = format;
     client->address_ = endpoint;
+    client->model_ = model.model;
   }
   return client;
 }
@@ -163,7 +168,7 @@ void RemoteModelClient::OnComplete(std::optional<std::string> body) {
                outcome.http_status < 300;
   if (outcome.ok && answer_format_) {
     if (std::optional<std::string> chat =
-            AnswerFrom(*answer_format_, outcome.body, address_)) {
+            AnswerFrom(*answer_format_, outcome.body, address_, model_)) {
       outcome.body = std::move(*chat);
     }
   }

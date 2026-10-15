@@ -1,6 +1,6 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15 and T78 on 2026-10-16; T79 is not built.
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15 and T78 on 2026-10-16. T79 is in progress: the catalog and the providers page's effort chips were built on 2026-10-16, and the chat composer's chips are next.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss.
 
@@ -10,7 +10,7 @@ Implementability: **6/10** using the [roadmap convention](roadmap.md#implementab
 - The Add provider menu names OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, and Jev, each with its address and format filled in. Custom takes any address, and the user picks its format. Other providers work through OpenRouter, the AI Gateway, or Custom.
 - uw speaks three formats to language models: chat completions, Anthropic Messages, and OpenAI Responses. See [ADR 0007](../adr/0007-uw-speaks-three-wire-formats-to-language-models.md). The two decision formats of [ADR 0003](../adr/0003-decision-model-beside-the-language-model.md) stay.
 - `uw://providers` holds the provider list and three model choices: the [language model](../CONTEXT.md#language), the [decision model](../CONTEXT.md#language) (optional), and the [agent model](../CONTEXT.md#language). Until an agent model is picked, chats use the language model.
-- A model choice is a chip with the provider's icon and the model's name. Beside it, an [effort](../CONTEXT.md#language) chip lists that model's levels, named as the provider names them. The language model and the agent model get one; decision models and models without effort levels have none. A model the catalog gives only an on/off switch or a token budget, such as claude-sonnet-4-5, counts as having no levels and runs without thinking. Agreed on 2026-10-15: these are older models, so uw does not add a chip for them.
+- A model choice is a chip with the provider's icon and the model's name. Beside it, an [effort](../CONTEXT.md#language) chip lists that model's levels, named as the provider names them. The language model and the agent model get one; decision models and models without effort levels have none. A model the catalog gives only an on/off switch or a token budget, such as claude-sonnet-4-5, counts as having no levels and runs without thinking. Agreed on 2026-10-15: these are older models, so uw does not add a chip for them. Until the user picks a level, the chip says `default` and uw sends no effort, so the provider's own default applies.
 - The chat composer has the same two chips. The user can switch either one at any time, even in the middle of a chat, and the next request uses the new choice. Each saved chat keeps its own.
 - What a model can do comes from the model catalog, per [ADR 0008](../adr/0008-uw-reads-what-a-model-can-do-from-models-dev.md): whether it calls tools, and its effort levels. uw never sends a request just to test a model. Changed on 2026-10-15 from a test on first use, to follow OpenCode.
 - A model the catalog marks without tool calls shows dimmed in a chat's model menu and cannot run a chat. For Ollama, which the catalog does not cover, its own model details say whether a model calls tools and thinks. A model the catalog does not know is taken to call tools. Over chat completions it gets `low`, `medium`, and `high`; over Anthropic Messages and OpenAI Responses it has no effort chip and is sent no effort. When a provider rejects a request, the chat shows the provider's error.
@@ -44,9 +44,9 @@ Effort levels show in lower case, as each provider names them. A thin line in th
 Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that pass on their own.
 
 1. T76: the design on the canvas: `uw://providers` with its states, adding a provider, and the model and effort chips with their menus. Signed off on 2026-10-15.
-2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15. Until T79, the page shows no effort chips and no tool calls per model.
+2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15.
 3. T78: the Anthropic Messages and OpenAI Responses formats. Built on 2026-10-16, with the shared code moved to `browser/ai_providers/`. Live calls over each format are for the user to check: the tests play the providers with a local server.
-4. T79: the model catalog, and the model and effort chips in the chat composer.
+4. T79: the model catalog, and the model and effort chips in the chat composer. Built in part on 2026-10-16: the catalog, Ollama's model details, effort in each format, and the providers page's effort chips and per-model tool calls and levels.
 
 ## Acceptance checks
 

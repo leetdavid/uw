@@ -64,12 +64,7 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(embedded_https_test_server().Start());
     ASSERT_TRUE(embedded_test_server()->Start());
     chat_ = browser()->tab_strip_model()->GetActiveTab();
-    agent_ = std::make_unique<AgentLoop>(
-        *chat_,
-        AgentModel{embedded_test_server()->GetURL("/v1").spec(),
-                   ProviderFormat::kChatCompletions, "test-agent", "agent-key"},
-        base::BindRepeating(&AgentLoopBrowserTest::OnStep,
-                            base::Unretained(this)));
+    UseFormat(ProviderFormat::kChatCompletions);
   }
 
   void TearDownOnMainThread() override {
@@ -78,17 +73,20 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
-  // Sends `text` and waits until the agent answers or gives up.
   // Talks to the model in `format` from now on.
   void UseFormat(ProviderFormat format) {
+    AgentModel model;
+    model.connection.endpoint = embedded_test_server()->GetURL("/v1").spec();
+    model.connection.format = format;
+    model.connection.model = "test-agent";
+    model.api_key = "agent-key";
     agent_ = std::make_unique<AgentLoop>(
-        *chat_,
-        AgentModel{embedded_test_server()->GetURL("/v1").spec(), format,
-                   "test-agent", "agent-key"},
+        *chat_, std::move(model),
         base::BindRepeating(&AgentLoopBrowserTest::OnStep,
                             base::Unretained(this)));
   }
 
+  // Sends `text` and waits until the agent answers or gives up.
   const AgentLoop::Step& Ask(std::string_view text) {
     steps_.clear();
     agent_->Send(text);
@@ -279,7 +277,7 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
   const std::vector<std::string> requests = model_.Requests();
   ASSERT_EQ(requests.size(), 2u);
   EXPECT_THAT(requests[0], HasSubstr(R"("system":)"));
-  EXPECT_THAT(requests[0], HasSubstr(R"("max_tokens":8192)"));
+  EXPECT_THAT(requests[0], HasSubstr(R"("max_tokens":16000)"));
   EXPECT_THAT(requests[1], HasSubstr(R"("signature":"sig")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("type":"tool_result")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("tool_use_id":"toolu_1")"));

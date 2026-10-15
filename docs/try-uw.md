@@ -92,7 +92,9 @@ Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Verc
 
 Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. A newly picked model says `Not tested yet`. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
 
-uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions. Tool calls and effort levels per model are not shown yet.
+uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions.
+
+A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`. The chat composer has no model chips yet.
 
 ### Automatic organization
 

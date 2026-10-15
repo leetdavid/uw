@@ -9,6 +9,7 @@ import {
   UpgradeNotice,
 } from "uw-providers-mojom";
 import type {
+  Model,
   ModelChoice,
   ModelList,
   NewProvider,
@@ -18,6 +19,6 @@ import type {
 } from "uw-providers-mojom";
 
 export { ModelSlot, ProviderFormat, ProviderPreset, TestOutcome, UpgradeNotice };
-export type { ModelChoice, ModelList, NewProvider, Provider, ProvidersState, ModelTestResult };
+export type { Model, ModelChoice, ModelList, NewProvider, Provider, ProvidersState, ModelTestResult };
 
 export const providersHandler = ProvidersHandler.getRemote();

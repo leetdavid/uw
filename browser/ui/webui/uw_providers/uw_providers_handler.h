@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
+#include "uw/browser/ai_providers/model_lister.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 #include "uw/components/ai_providers/providers.h"
@@ -53,6 +54,9 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
                  const std::string& model,
                  PickModelCallback callback) override;
   void ClearModel(mojom::ModelSlot slot, ClearModelCallback callback) override;
+  void SetEffort(mojom::ModelSlot slot,
+                 const std::string& effort,
+                 SetEffortCallback callback) override;
   void TestModel(mojom::ModelSlot slot, TestModelCallback callback) override;
   void DismissUpgradeNotice(DismissUpgradeNoticeCallback callback) override;
 
@@ -76,6 +80,7 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
 
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::ProvidersHandler> receiver_;
+  ModelLister lister_;
   std::map<int, std::unique_ptr<RemoteModelClient>> requests_;
   int next_request_ = 0;
   base::WeakPtrFactory<UwProvidersHandler> weak_factory_{this};

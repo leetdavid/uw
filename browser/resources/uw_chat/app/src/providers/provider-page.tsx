@@ -2,7 +2,7 @@
 // the frame "Providers page: a provider open (Fluid)" on the canvas page
 // "AI providers".
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, Search, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputField, InputGroup } from "@/components/ui/input-group";
 import {
@@ -20,6 +20,17 @@ import {
 
 const FIRST_MODELS = 8;
 const SLOTS = [ModelSlot.kLanguage, ModelSlot.kDecision, ModelSlot.kAgent];
+
+// Where the tool calls and effort levels on the page come from.
+function abilitiesSource(preset: ProviderPreset) {
+  if (preset === ProviderPreset.kOllama) {
+    return "Tool calls and thinking come from Ollama's own model details.";
+  }
+  if (preset === ProviderPreset.kCustom) {
+    return "The models.dev catalog does not cover custom providers, so uw takes each model to call tools, with its format's usual effort levels.";
+  }
+  return "Tool calls and effort levels come from the models.dev catalog, which uw keeps on this Mac and refreshes once a day.";
+}
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -51,7 +62,7 @@ export function ProviderPage({
     usedBy.filter((slot) => data.choices[slot]?.model === model);
   const needle = query.trim().toLowerCase();
   const models = (list?.models ?? []).filter((model) =>
-    model.toLowerCase().includes(needle),
+    model.name.toLowerCase().includes(needle),
   );
   const shown = all || needle ? models : models.slice(0, FIRST_MODELS);
 
@@ -188,18 +199,46 @@ export function ProviderPage({
         )}
         {shown.map((model) => (
           <div
-            key={model}
-            className="flex h-[46px] items-center gap-2 border-border pl-4 pr-3 font-medium [&+&]:border-t"
+            key={model.name}
+            className="grid h-[46px] grid-cols-[minmax(0,1fr)_112px_292px] items-center gap-3 border-border pl-4 pr-3 [&+&]:border-t"
           >
-            <span className="truncate">{model}</span>
-            {usedFor(model).map((slot) => (
-              <span
-                key={slot}
-                className="shrink-0 rounded-md bg-[color-mix(in_srgb,var(--info)_8%,transparent)] px-1.5 py-0.5 text-[11.5px] text-info"
-              >
-                {SLOT_NAMES[slot]}
-              </span>
-            ))}
+            <span className="flex min-w-0 items-center gap-2 font-medium">
+              <span className="truncate">{model.name}</span>
+              {usedFor(model.name).map((slot) => (
+                <span
+                  key={slot}
+                  className="shrink-0 rounded-md bg-[color-mix(in_srgb,var(--info)_8%,transparent)] px-1.5 py-0.5 text-[11.5px] font-medium text-info"
+                >
+                  {SLOT_NAMES[slot]}
+                </span>
+              ))}
+            </span>
+            {provider.servesLanguage && (
+              <>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-muted-foreground">
+              {model.callsTools ? (
+                <Check aria-hidden className="size-3.5 text-success" />
+              ) : (
+                <X aria-hidden className="size-3.5 text-destructive" />
+              )}
+              {model.callsTools ? "Calls tools" : "No tool calls"}
+            </span>
+            <span className="flex flex-nowrap gap-1 overflow-hidden">
+              {model.efforts.length ? (
+                model.efforts.map((effort) => (
+                  <i
+                    key={effort}
+                    className="rounded-[5px] bg-muted px-1.5 py-0.5 text-[11.5px] not-italic text-muted-foreground"
+                  >
+                    {effort}
+                  </i>
+                ))
+              ) : (
+                <span className="text-[12px] text-muted-foreground">No effort levels</span>
+              )}
+            </span>
+              </>
+            )}
           </div>
         ))}
         {shown.length < models.length && (
@@ -212,6 +251,11 @@ export function ProviderPage({
           </button>
         )}
       </div>
+      {provider.servesLanguage && (
+        <p className="mt-2.5 text-[12px] leading-[1.45] text-muted-foreground">
+          {abilitiesSource(provider.preset)}
+        </p>
+      )}
     </>
   );
 }

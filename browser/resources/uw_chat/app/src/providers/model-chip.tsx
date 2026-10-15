@@ -1,8 +1,9 @@
 // A model choice: the provider's icon and the model's name. Its menu groups
-// the models by provider and has a search field. See the frame "Chat: model
-// and effort chips (Fluid)" on the canvas page "AI providers".
+// the models by provider and has a search field. Where a chat runs on the
+// model, one that calls no tools is shown but cannot be picked. See the frame
+// "Chat: model and effort chips (Fluid)" on the canvas page "AI providers".
 import { Fragment, useState, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Gauge } from "lucide-react";
 import {
   DropdownContent,
   DropdownEmpty,
@@ -14,46 +15,47 @@ import {
 } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
-import { ModelSlot, type Provider } from "./providers-api";
-import {
-  ProviderIcon,
-  providerOf,
-  servesSlot,
-  type PageData,
-} from "./provider-parts";
+import type { ModelList, Provider } from "./providers-api";
+import { ProviderIcon } from "./provider-parts";
 
-// What the chip says while the slot is empty, and the menu row that empties
-// it. The language model has no such row.
-const UNSET: Record<ModelSlot, string | null> = {
-  [ModelSlot.kLanguage]: null,
-  [ModelSlot.kDecision]: "None",
-  [ModelSlot.kAgent]: "Same as the language model",
-};
+// How many models a provider shows before the search narrows them.
+const FIRST_MODELS = 8;
+
+const CHIP =
+  "inline-flex h-[30px] min-w-0 items-center gap-[7px] rounded-lg bg-muted px-2 font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ModelChip({
-  slot,
-  data,
+  choice,
+  providers,
+  lists,
+  unset,
+  needsTools,
+  className,
   onPick,
   onClear,
 }: {
-  slot: ModelSlot;
-  data: PageData;
+  choice: { providerId: string; model: string } | null;
+  // The providers that can serve this choice.
+  providers: Provider[];
+  lists: Record<string, ModelList | undefined>;
+  // The row that empties the choice, and what the chip says then.
+  unset?: string;
+  // A chat runs on the model, so it has to call tools.
+  needsTools?: boolean;
+  className?: string;
   onPick: (provider: Provider, model: string) => void;
-  onClear: () => void;
+  onClear?: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const choice = data.choices[slot];
-  const chosen = providerOf(data, choice);
-  const unset = UNSET[slot];
-  const providers = data.providers.filter((provider) =>
-    servesSlot(provider, slot),
-  );
+  const chosen = choice
+    ? providers.find((provider) => provider.id === choice.providerId)
+    : undefined;
+  const needle = query.trim().toLowerCase();
 
   let index = 0;
   let checkedIndex: number | undefined;
   const rows: ReactNode[] = [];
-  const needle = query.trim().toLowerCase();
-  if (unset && !needle) {
+  if (unset && onClear && !needle) {
     if (!choice) {
       checkedIndex = index;
     }
@@ -69,9 +71,9 @@ export function ModelChip({
     );
   }
   for (const provider of providers) {
-    const list = data.lists[provider.id];
+    const list = lists[provider.id];
     const models = (list?.models ?? []).filter((model) =>
-      model.toLowerCase().includes(needle),
+      model.name.toLowerCase().includes(needle),
     );
     if (needle && !models.length) {
       continue;
@@ -90,24 +92,34 @@ export function ModelChip({
       rows.push(<DropdownEmpty key={`${provider.id}-error`}>{list.error}</DropdownEmpty>);
       continue;
     }
+    const shown = needle ? models : models.slice(0, FIRST_MODELS);
     rows.push(
       <Fragment key={`${provider.id}-models`}>
-        {models.map((model) => {
+        {shown.map((model) => {
           const checked =
-            choice?.providerId === provider.id && choice.model === model;
+            choice?.providerId === provider.id && choice.model === model.name;
           if (checked) {
             checkedIndex = index;
           }
+          const unusable = needsTools && !model.callsTools;
           return (
             <MenuItem
-              key={model}
+              key={model.name}
               index={index++}
-              label={model}
+              label={model.name}
               checked={checked}
-              onSelect={() => onPick(provider, model)}
+              disabled={unusable}
+              data-note={unusable ? "No tool calls" : undefined}
+              className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-destructive after:content-[attr(data-note)]"
+              onSelect={() => onPick(provider, model.name)}
             />
           );
         })}
+        {shown.length < models.length && (
+          <DropdownEmpty>
+            {models.length - shown.length} more · type to search
+          </DropdownEmpty>
+        )}
       </Fragment>,
     );
   }
@@ -118,15 +130,16 @@ export function ModelChip({
       </DropdownEmpty>,
     );
   }
+  const total = providers.reduce(
+    (sum, provider) => sum + (lists[provider.id]?.models.length ?? 0),
+    0,
+  );
 
   return (
     <DropdownMenu>
       <DropdownTrigger
         render={
-          <button
-            type="button"
-            className="inline-flex h-[30px] w-full min-w-0 items-center gap-[7px] rounded-lg bg-muted px-2 font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+          <button type="button" className={cn(CHIP, className)}>
             {chosen && <ProviderIcon preset={chosen.preset} />}
             <span
               className={cn(
@@ -141,16 +154,57 @@ export function ModelChip({
           </button>
         }
       />
-      <DropdownContent
-        checkedIndex={checkedIndex}
-        className="max-h-[360px] w-[280px]"
-      >
+      <DropdownContent checkedIndex={checkedIndex} className="max-h-[360px] w-[300px]">
         <DropdownSearch
           value={query}
           onValueChange={setQuery}
-          placeholder="Search models"
+          placeholder={total > FIRST_MODELS ? `Search ${total} models` : "Search models"}
         />
         {rows}
+      </DropdownContent>
+    </DropdownMenu>
+  );
+}
+
+// The levels of the chosen model, named as its provider names them, and the
+// provider's own default. Shows nothing for a model that takes no levels.
+export function EffortChip({
+  efforts,
+  effort,
+  className,
+  onPick,
+}: {
+  efforts: string[];
+  effort: string;
+  className?: string;
+  onPick: (effort: string) => void;
+}) {
+  if (!efforts.length) {
+    return null;
+  }
+  const levels = ["", ...efforts];
+  const checkedIndex = Math.max(0, levels.indexOf(effort));
+  return (
+    <DropdownMenu>
+      <DropdownTrigger
+        render={
+          <button type="button" aria-label="Effort" className={cn(CHIP, className)}>
+            <Gauge aria-hidden className="size-3.5 text-muted-foreground" />
+            <span className="flex-1 truncate text-left">{effort || "default"}</span>
+            <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
+          </button>
+        }
+      />
+      <DropdownContent checkedIndex={checkedIndex} className="w-[168px]">
+        {levels.map((level, index) => (
+          <MenuItem
+            key={level || "default"}
+            index={index}
+            label={level || "default"}
+            checked={index === checkedIndex}
+            onSelect={() => onPick(level)}
+          />
+        ))}
       </DropdownContent>
     </DropdownMenu>
   );

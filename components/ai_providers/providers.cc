@@ -26,6 +26,7 @@ constexpr char kKeyAccount[] = "key_account";
 constexpr char kProvider[] = "provider";
 constexpr char kModel[] = "model";
 constexpr char kTested[] = "tested";
+constexpr char kEffort[] = "effort";
 
 const char* ChoicePref(ModelSlot slot) {
   switch (slot) {
@@ -218,7 +219,9 @@ std::optional<ModelChoice> ReadChoice(const PrefService& prefs,
   if (!provider || provider->empty() || !model || model->empty()) {
     return std::nullopt;
   }
-  return ModelChoice{*provider, *model, dict.FindBool(kTested).value_or(false)};
+  const std::string* effort = dict.FindString(kEffort);
+  return ModelChoice{*provider, *model, dict.FindBool(kTested).value_or(false),
+                     effort ? *effort : std::string()};
 }
 
 void SetChoice(PrefService& prefs,
@@ -229,6 +232,12 @@ void SetChoice(PrefService& prefs,
                                       .Set(kProvider, provider_id)
                                       .Set(kModel, model)
                                       .Set(kTested, false));
+}
+
+void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort) {
+  if (ReadChoice(prefs, slot)) {
+    ScopedDictPrefUpdate(&prefs, ChoicePref(slot))->Set(kEffort, effort);
+  }
 }
 
 void ClearChoice(PrefService& prefs, ModelSlot slot) {

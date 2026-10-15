@@ -2,6 +2,8 @@
 # them, and the formats uw speaks to them. See docs/plans/ai-providers.md.
 source_set("ai_providers") {
   sources = [
+    "catalog.cc",
+    "catalog.h",
     "formats.cc",
     "formats.h",
     "providers.cc",
@@ -14,6 +16,7 @@ source_set("ai_providers") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "catalog_unittest.cc",
     "formats_unittest.cc",
     "providers_unittest.cc",
   ]
@@ -22,6 +25,7 @@ source_set("unit_tests") {
     "//base",
     "//base/test:test_support",
     "//components/prefs:test_support",
+    "//testing/gmock",
     "//testing/gtest",
   ]
 }

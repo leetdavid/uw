@@ -60,8 +60,11 @@ inline constexpr base::TimeDelta kProviderTimeout = base::Seconds(30);
 // A language or agent model as a request needs it.
 struct AiConnectionConfig {
   std::string endpoint;
+  ProviderPreset preset = ProviderPreset::kCustom;
   ProviderFormat format = ProviderFormat::kChatCompletions;
   std::string model;
+  // Empty for the provider's default.
+  std::string effort;
   // Keychain account id holding the API key; empty when there is none.
   std::string key_account;
 };
@@ -105,6 +108,11 @@ GURL DecisionUrl(const DecisionModelConfig& config);
 // True when the connection has everything a request needs.
 bool IsComplete(const AiConnectionConfig& config);
 bool IsComplete(const DecisionModelConfig& config);
+
+// The provider's own words about an error, when its answer has any. OpenAI
+// and DeepSeek send {"error": {"message": ...}}, TypeSafe sends
+// {"detail": {"message": ...}}, and Ollama sends {"error": "..."}.
+std::string ProviderMessage(const std::string& body);
 
 // The language or decision model that is picked but has not passed its test
 // since. Automatic organization waits for it.

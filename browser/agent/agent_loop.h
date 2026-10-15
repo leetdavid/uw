@@ -20,6 +20,7 @@
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
@@ -32,12 +33,9 @@ class SharedURLLoaderFactory;
 
 namespace uw {
 
-// The model a chat talks to: its provider's base address and format, its
-// name, and its key, which may be empty.
+// The model a chat talks to, and its key, which may be empty.
 struct AgentModel {
-  std::string endpoint;
-  ProviderFormat format = ProviderFormat::kChatCompletions;
-  std::string model;
+  AiConnectionConfig connection;
   std::string api_key;
 };
 

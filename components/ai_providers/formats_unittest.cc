@@ -15,9 +15,11 @@ namespace uw {
 namespace {
 
 constexpr char kAddress[] = "https://api.example.com/v1";
+constexpr char kModel[] = "a-model";
 
-// A chat in chat completions' shape: instructions, a question, a tool call
-// with what the provider kept, its result, and the answer.
+// A chat in chat completions' shape, in the middle of the agent's turn:
+// instructions, a question, a tool call with what the provider kept, and its
+// result.
 constexpr char kChat[] = R"({
   "model": "a-model",
   "messages": [
@@ -27,10 +29,10 @@ constexpr char kChat[] = R"({
      "tool_calls": [{"id": "call_1", "type": "function",
                      "function": {"name": "open",
                                   "arguments": "{\"url\":\"https://example.com\"}"}}],
-     "uw_kept": {"address": "https://api.example.com/v1", "format": FORMAT,
+     "uw_kept": {"address": "https://api.example.com/v1", "model": "a-model",
+                 "format": FORMAT,
                  "items": [KEPT]}},
-    {"role": "tool", "tool_call_id": "call_1", "content": "{\"ok\":true}"},
-    {"role": "user", "content": "Thanks"}
+    {"role": "tool", "tool_call_id": "call_1", "content": "{\"ok\":true}"}
   ],
   "tools": [{"type": "function",
              "function": {"name": "open", "description": "Opens a page.",
@@ -69,7 +71,7 @@ TEST(FormatsTest, AnthropicGetsBlocksAndItsThinkingBack) {
 
   EXPECT_EQ(request, base::test::ParseJsonDict(R"({
     "model": "a-model",
-    "max_tokens": 8192,
+    "max_tokens": 16000,
     "system": "Be brief.",
     "messages": [
       {"role": "user", "content": [{"type": "text", "text": "Open example.com"}]},
@@ -78,8 +80,7 @@ TEST(FormatsTest, AnthropicGetsBlocksAndItsThinkingBack) {
         {"type": "tool_use", "id": "call_1", "name": "open",
          "input": {"url": "https://example.com"}}]},
       {"role": "user", "content": [
-        {"type": "tool_result", "tool_use_id": "call_1", "content": "{\"ok\":true}"},
-        {"type": "text", "text": "Thanks"}]}
+        {"type": "tool_result", "tool_use_id": "call_1", "content": "{\"ok\":true}"}]}
     ],
     "tools": [{"name": "open", "description": "Opens a page.",
                "input_schema": {"type": "object"}}]
@@ -103,8 +104,7 @@ TEST(FormatsTest, ResponsesGetsItemsAndItsSealedReasoningBack) {
       {"type": "function_call", "call_id": "call_1", "name": "open",
        "arguments": "{\"url\":\"https://example.com\"}"},
       {"type": "function_call_output", "call_id": "call_1",
-       "output": "{\"ok\":true}"},
-      {"role": "user", "content": "Thanks"}
+       "output": "{\"ok\":true}"}
     ],
     "tools": [{"type": "function", "name": "open",
                "description": "Opens a page.",
@@ -113,7 +113,7 @@ TEST(FormatsTest, ResponsesGetsItemsAndItsSealedReasoningBack) {
 }
 
 TEST(FormatsTest, KeptPartsGoOnlyBackToWhereTheyCameFrom) {
-  // Another provider, or another format, never sees them.
+  // Another provider, another model, or another format never sees them.
   const base::DictValue elsewhere = Parsed(RequestIn(
       ProviderFormat::kAnthropicMessages,
       Chat(static_cast<int>(ProviderFormat::kAnthropicMessages), kThinking),
@@ -131,6 +131,19 @@ TEST(FormatsTest, KeptPartsGoOnlyBackToWhereTheyCameFrom) {
                 ->c_str(),
             std::string("tool_use"));
 
+  std::string other_model =
+      Chat(static_cast<int>(ProviderFormat::kAnthropicMessages), kThinking);
+  other_model.replace(other_model.find("\"a-model\""), 9, "\"b-model\"");
+  EXPECT_EQ(*(*Parsed(RequestIn(ProviderFormat::kAnthropicMessages, other_model,
+                                kAddress))
+                   .FindList("messages"))[1]
+                 .GetDict()
+                 .FindList("content")
+                 ->front()
+                 .GetDict()
+                 .FindString("type"),
+            "tool_use");
+
   const base::DictValue switched = Parsed(RequestIn(
       ProviderFormat::kOpenAiResponses,
       Chat(static_cast<int>(ProviderFormat::kAnthropicMessages), kThinking),
@@ -146,6 +159,24 @@ TEST(FormatsTest, KeptPartsGoOnlyBackToWhereTheyCameFrom) {
   EXPECT_FALSE((*chat.FindList("messages"))[2].GetDict().Find(kKeptPartsKey));
 }
 
+TEST(FormatsTest, KeptPartsStayInTheTurnThatMadeThem) {
+  // Once the user writes again, earlier turns may have been shortened, so
+  // what they kept stays behind.
+  std::string chat =
+      Chat(static_cast<int>(ProviderFormat::kAnthropicMessages), kThinking);
+  chat.insert(chat.find("\n  ],\n  \"tools\""),
+              R"(, {"role": "user", "content": "Thanks"})");
+  const base::DictValue request =
+      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, chat, kAddress));
+  EXPECT_EQ(*(*request.FindList("messages"))[1]
+                 .GetDict()
+                 .FindList("content")
+                 ->front()
+                 .GetDict()
+                 .FindString("type"),
+            "tool_use");
+}
+
 TEST(FormatsTest, AnAnthropicAnswerReadsAsChatCompletions) {
   const base::DictValue answer =
       Parsed(AnswerFrom(ProviderFormat::kAnthropicMessages, R"({
@@ -155,7 +186,7 @@ TEST(FormatsTest, AnAnthropicAnswerReadsAsChatCompletions) {
           {"type": "tool_use", "id": "toolu_1", "name": "open",
            "input": {"url": "https://example.com"}}],
         "stop_reason": "tool_use"})",
-                        kAddress));
+                        kAddress, kModel));
 
   EXPECT_EQ(answer, base::test::ParseJsonDict(R"({"choices": [{
     "finish_reason": "tool_calls",
@@ -165,7 +196,8 @@ TEST(FormatsTest, AnAnthropicAnswerReadsAsChatCompletions) {
       "tool_calls": [{"id": "toolu_1", "type": "function",
                       "function": {"name": "open",
                                    "arguments": "{\"url\":\"https://example.com\"}"}}],
-      "uw_kept": {"address": "https://api.example.com/v1", "format": 1,
+      "uw_kept": {"address": "https://api.example.com/v1", "model": "a-model",
+                  "format": 1,
                   "items": [{"type": "thinking", "thinking": "Open it.",
                              "signature": "sig"}]}}}]})"));
 }
@@ -178,14 +210,15 @@ TEST(FormatsTest, AResponsesAnswerReadsAsChatCompletions) {
           {"type": "reasoning", "id": "rs_1", "encrypted_content": "sealed"},
           {"type": "message", "role": "assistant",
            "content": [{"type": "output_text", "text": "Done."}]}]})",
-                        kAddress));
+                        kAddress, kModel));
 
   EXPECT_EQ(answer, base::test::ParseJsonDict(R"({"choices": [{
     "finish_reason": "stop",
     "message": {
       "role": "assistant",
       "content": "Done.",
-      "uw_kept": {"address": "https://api.example.com/v1", "format": 2,
+      "uw_kept": {"address": "https://api.example.com/v1", "model": "a-model",
+                  "format": 2,
                   "items": [{"type": "reasoning", "id": "rs_1",
                              "encrypted_content": "sealed"}]}}}]})"));
 }
@@ -194,20 +227,20 @@ TEST(FormatsTest, AnAnswerCutShortSaysSo) {
   EXPECT_EQ(
       *Parsed(AnswerFrom(ProviderFormat::kAnthropicMessages,
                          R"({"content": [], "stop_reason": "max_tokens"})",
-                         kAddress))
+                         kAddress, kModel))
            .FindList("choices")
            ->front()
            .GetDict()
            .FindString("finish_reason"),
       "length");
-  EXPECT_EQ(
-      *Parsed(AnswerFrom(ProviderFormat::kOpenAiResponses,
-                         R"({"status": "incomplete", "output": []})", kAddress))
-           .FindList("choices")
-           ->front()
-           .GetDict()
-           .FindString("finish_reason"),
-      "length");
+  EXPECT_EQ(*Parsed(AnswerFrom(ProviderFormat::kOpenAiResponses,
+                               R"({"status": "incomplete", "output": []})",
+                               kAddress, kModel))
+                 .FindList("choices")
+                 ->front()
+                 .GetDict()
+                 .FindString("finish_reason"),
+            "length");
 }
 
 TEST(FormatsTest, WhatIsNotARequestOrAnAnswerIsRefused) {
@@ -215,12 +248,39 @@ TEST(FormatsTest, WhatIsNotARequestOrAnAnswerIsRefused) {
   EXPECT_FALSE(RequestIn(ProviderFormat::kOpenAiResponses, R"({"model": "a"})",
                          kAddress));
   EXPECT_FALSE(AnswerFrom(ProviderFormat::kAnthropicMessages,
-                          R"({"error": {"message": "no"}})", kAddress));
-  EXPECT_FALSE(
-      AnswerFrom(ProviderFormat::kOpenAiResponses, "not json", kAddress));
+                          R"({"error": {"message": "no"}})", kAddress, kModel));
+  EXPECT_FALSE(AnswerFrom(ProviderFormat::kOpenAiResponses, "not json",
+                          kAddress, kModel));
   // A chat-completions answer passes through as it is.
-  EXPECT_EQ(AnswerFrom(ProviderFormat::kChatCompletions, "as it is", kAddress),
+  EXPECT_EQ(AnswerFrom(ProviderFormat::kChatCompletions, "as it is", kAddress,
+                       kModel),
             "as it is");
+}
+
+TEST(FormatsTest, AnEffortTakesEachFormatsOwnField) {
+  constexpr char kAsk[] =
+      R"({"model": "m", "messages": [{"role": "user", "content": "Go"}]})";
+  // Gateways nest it; other chat-completions providers take it at the top.
+  EXPECT_EQ(*Parsed(WithEffort(kAsk, ProviderPreset::kOpenRouter, "high"))
+                 .FindStringByDottedPath("reasoning.effort"),
+            "high");
+  const std::string plain = WithEffort(kAsk, ProviderPreset::kCustom, "low");
+  EXPECT_EQ(*Parsed(plain).FindString("reasoning_effort"), "low");
+  EXPECT_EQ(WithEffort(kAsk, ProviderPreset::kCustom, ""), kAsk);
+
+  // Anthropic thinks adaptively at that effort; OpenAI reasons at it.
+  const base::DictValue anthropic =
+      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, plain, kAddress));
+  EXPECT_EQ(*anthropic.FindStringByDottedPath("thinking.type"), "adaptive");
+  EXPECT_EQ(*anthropic.FindStringByDottedPath("output_config.effort"), "low");
+  EXPECT_FALSE(anthropic.Find("reasoning_effort"));
+  const base::DictValue openai =
+      Parsed(RequestIn(ProviderFormat::kOpenAiResponses, plain, kAddress));
+  EXPECT_EQ(*openai.FindStringByDottedPath("reasoning.effort"), "low");
+  EXPECT_EQ(
+      *Parsed(RequestIn(ProviderFormat::kChatCompletions, plain, kAddress))
+           .FindString("reasoning_effort"),
+      "low");
 }
 
 TEST(FormatsTest, ALimitCarriesOver) {

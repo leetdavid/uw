@@ -559,9 +559,7 @@ bool UwChatHandler::Start() {
     return false;
   }
   AgentModel model;
-  model.endpoint = config.endpoint;
-  model.format = config.format;
-  model.model = config.model;
+  model.connection = config;
   if (!config.key_account.empty()) {
     model.api_key =
         ApiKeyStore().GetKey(config.key_account).value_or(std::string());

@@ -1089,8 +1089,7 @@ std::unique_ptr<RemoteModelClient> AutomaticOrganizer::Client(
       profile()
           ->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess(),
-      language.endpoint, language.format, std::move(*key), body,
-      kProviderTimeout);
+      language, std::move(*key), body, kProviderTimeout);
 }
 
 }  // namespace uw

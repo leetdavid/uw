@@ -6,6 +6,7 @@ import {
   ProviderFormat,
   ProviderPreset,
   UpgradeNotice,
+  type Model,
   type ModelChoice,
   type ModelList,
   type Provider,
@@ -105,9 +106,15 @@ export interface PageData {
   upgradeNotice: UpgradeNotice;
 }
 
-export function providerOf(data: PageData, choice: ModelChoice | null) {
+// The picked model as its provider lists it, once the list is in.
+export function modelOf(
+  data: PageData,
+  choice: ModelChoice | null,
+): Model | undefined {
   return choice
-    ? data.providers.find((provider) => provider.id === choice.providerId)
+    ? data.lists[choice.providerId]?.models.find(
+        (model) => model.name === choice.model,
+      )
     : undefined;
 }
 

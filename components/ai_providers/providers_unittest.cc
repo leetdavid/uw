@@ -83,6 +83,19 @@ TEST_F(ProvidersTest, ANewPickIsUntestedUntilItsTestPasses) {
   EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kLanguage)->tested);
 }
 
+TEST_F(ProvidersTest, AnEffortStaysWithItsModel) {
+  SetEffort(prefs_, ModelSlot::kAgent, "high");
+  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kAgent));
+
+  SetChoice(prefs_, ModelSlot::kAgent, "openai", "gpt-5");
+  EXPECT_EQ(ReadChoice(prefs_, ModelSlot::kAgent)->effort, "");
+  SetEffort(prefs_, ModelSlot::kAgent, "high");
+  EXPECT_EQ(ReadChoice(prefs_, ModelSlot::kAgent)->effort, "high");
+
+  SetChoice(prefs_, ModelSlot::kAgent, "openai", "gpt-6");
+  EXPECT_EQ(ReadChoice(prefs_, ModelSlot::kAgent)->effort, "");
+}
+
 TEST_F(ProvidersTest, ATestOfAModelNoLongerPickedChangesNothing) {
   SetChoice(prefs_, ModelSlot::kDecision, "jev", "jev-latest");
   const ModelChoice old = *ReadChoice(prefs_, ModelSlot::kDecision);
