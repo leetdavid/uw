@@ -6,6 +6,8 @@ The page is its own pnpm workspace package in `browser/resources/uw_chat/app`. T
 
 This adds a second way of building WebUI beside Chromium's `build_webui`, with React, Motion, Radix, and Tailwind as dependencies, a bundle of about 550 kB, and code copied from a registry that uw has to update by hand. In return, uw does not rebuild components that already exist. React runs under the WebUI's Trusted Types and script rules unchanged. `UwChatBrowserTest.ThePageRunsWithoutConsoleErrors` fails if that stops being true.
 
+The page starts chats that click and type on the user's signed-in sites. The browser decides which steps need approval, but the page carries the user's answer, so code in the page could approve a step. That trusts every package in the bundle: the Fluid components the shadcn CLI copied from Fluid's registry, which nobody has read line by line, and React, Radix, Motion, Streamdown, and the small npm helpers. uw pins each at an exact version. Before updating Fluid or any of them, read what changed.
+
 Considered options: Fluid's rules applied by hand in plain TypeScript, or in Lit, Chromium's own component library (rejected: either is a hand-made copy of components that already exist). Running the bundler from `pnpm run build` before Chromium's build (rejected: a build started with `autoninja` would serve a stale page).
 
 On 2026-10-15 a second page was agreed for v2.1: `uw://providers` is built from the same package, with its own entry in `app/bundle.ts`, so its model and effort chips are the chat composer's own components. See the [AI providers plan](../plans/ai-providers.md).
