@@ -22,7 +22,15 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 
 ## Design
 
-The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs. They are proposals until the user signs off in T76.
+The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, and the `uw-arc-style` guide has their rules under "AI providers". They are proposals until the user signs off in T76.
+
+- "Providers page: models and providers (Fluid)": the three model choices and the provider list.
+- "Providers page: a provider open (Fluid)": `uw://providers/<id>` with its address, key, format, and each model's check.
+- "Providers page: add a provider (Fluid)": the preset tiles and a Custom provider. uw lists the address's models before it adds the provider.
+- "Chat: model and effort chips (Fluid)": the composer's chips and the model menu.
+- "AI providers: every state (Fluid)": effort levels, no effort setting, checking, a failed check, a missing model, a switch in the middle of a chat, the upgrade notice, provider problems, and the link from uw's settings section.
+
+Effort levels show in lower case, as each provider names them. A thin line in the chat marks where the model or effort changed; it is open to review.
 
 - **Page.** `uw://providers` is a second page in the React package of the chat page, `browser/resources/uw_chat/app`, with its own entry in `app/bundle.ts`, per [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md). Its chips are the same components as the chat composer's.
 - **Storage.** The providers live in profile preferences: an id, the preset, a name, the address, and the format. Each key sits in Keychain under one account per provider. Model check results are profile preferences too.
