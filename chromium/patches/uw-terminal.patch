@@ -39,7 +39,7 @@ index 7274b66570dd11e3e6899974ef0f1307697f22c6..ad58ba43d8160e5306c4d205730882c9
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 12d6be60e250efa15872027b297baab899e250c9..8942df6281a14598a40e66e9182a836e6f3e29f9 100644
+index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510bc65a451 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -19,6 +19,9 @@
@@ -72,7 +72,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..8942df6281a14598a40e66e9182a836e
 +    {uw::TabOrganizationController::kNewChildTab,
 +     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_T},
 +    {uw::TabOrganizationController::kNewTask,
-+     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_N},
++     ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_N},
 +    {uw::TabOrganizationController::kScratchpad,
 +     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_S},
 +    {uw::TabOrganizationController::kUndo,
@@ -95,7 +95,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..8942df6281a14598a40e66e9182a836e
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..efb32e6b9b3201c1d908eaf93fb26761f5ad5ac0 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..eaeca40aabe4b7f1c65264218ba869a9c19e4f74 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -179,7 +179,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..efb32e6b9b3201c1d908eaf93fb26761
 +      .submenu({
 +          Item(IDS_UW_NEW_TASK_MAC)
 +              .command_id(IDC_CREATE_NEW_TAB_GROUP)
-+              .key_equivalent(@"p", NSEventModifierFlagCommand |
++              .key_equivalent(@"n", NSEventModifierFlagCommand |
 +                                        NSEventModifierFlagControl),
 +          Item(IDS_UW_MOVE_TO_NEW_TASK_MAC)
 +              .command_id(uw::TabOrganizationController::kNewTask),

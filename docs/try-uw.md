@@ -52,7 +52,7 @@ Right-click a tab that opened other tabs.
 Open the `Tab` and `Tasks` menus in the menu bar. Each uw command is there with its key, and the tab's right-click menu shows the same keys.
 
 - Ctrl+Cmd+→ and ← nest the selected tab under the tab above, or move it up a level. Ctrl+Cmd+↑ and ↓ move it and its children past the tab above or below.
-- Ctrl+Cmd+N moves it to a new task, Ctrl+Cmd+S to the Scratchpad, and Option+Cmd+W closes it with its children.
+- Shift+Ctrl+Cmd+N moves it to a new task, Ctrl+Cmd+S to the Scratchpad, and Option+Cmd+W closes it with its children.
 - Ctrl+Cmd+1 to 9 go to the tab last used in that task, and Ctrl+Cmd+0 to the Scratchpad. Ctrl+Cmd+R opens the task's name field.
 - The keys also work while a terminal tab has focus.
 
@@ -80,7 +80,7 @@ Expected result: a blank tab opens, selected, one level under that tab and above
 
 Click `Organize` at the foot of the sidebar.
 
-- `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+P do the same. Cmd-T still opens a tab beside the current one, inside its task.
+- `New task` opens a new tab in a new task of its own. The `+` button under the tab list and Ctrl+Cmd+N do the same. Cmd-T still opens a tab beside the current one, inside its task.
 - `Undo tab organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
 - The pause items stop and resume automatic organization.
 - `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.

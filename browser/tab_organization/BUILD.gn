@@ -62,6 +62,7 @@ source_set("browser_tests") {
     ":test_support",
     "//base",
     "//chrome/browser",
+    "//chrome/browser:global_keyboard_shortcuts_mac",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
     "//chrome/common",

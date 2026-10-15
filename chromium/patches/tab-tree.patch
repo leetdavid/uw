@@ -693,7 +693,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b1da56ed7572b83e932101e3020063a7
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
-index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..50107012f37931a703d5c4a544f46fc57ea4c5df 100644
+index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..45d5b12834a23592c90f50d1c72bc506afd02766 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
 @@ -24,6 +24,7 @@
@@ -704,6 +704,15 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..50107012f37931a703d5c4a544f46fc5
  
  namespace {
  
+@@ -158,7 +159,7 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+     keys.push_back(
+         {true, false, true, false, kVK_ANSI_C, IDC_ADD_NEW_TAB_TO_GROUP});
+     keys.push_back(
+-        {true, false, true, false, kVK_ANSI_P, IDC_CREATE_NEW_TAB_GROUP});
++        {true, false, true, false, kVK_ANSI_N, IDC_CREATE_NEW_TAB_GROUP});
+     keys.push_back({true, false, true, false, kVK_ANSI_W, IDC_CLOSE_TAB_GROUP});
+     keys.push_back(
+         {true, false, true, false, kVK_ANSI_X, IDC_FOCUS_NEXT_TAB_GROUP});
 @@ -209,6 +210,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
      return NoCommand();
  

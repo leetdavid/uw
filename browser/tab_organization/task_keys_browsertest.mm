@@ -10,6 +10,7 @@
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/global_keyboard_shortcuts_mac.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -129,8 +130,8 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
       {TabOrganizationController::kCloseBranch, @"w", kOptionCmd},
       {TabOrganizationController::kToggleBranch, @".", kCtrlCmd},
       {TabOrganizationController::kNewChildTab, @"t", kCtrlCmd},
-      {IDC_CREATE_NEW_TAB_GROUP, @"p", kCtrlCmd},
-      {TabOrganizationController::kNewTask, @"n", kCtrlCmd},
+      {IDC_CREATE_NEW_TAB_GROUP, @"n", kCtrlCmd},
+      {TabOrganizationController::kNewTask, @"N", kCtrlCmd},
       {TabOrganizationController::kScratchpad, @"s", kCtrlCmd},
       {kGoToTask1, @"1", kCtrlCmd},
       {kGoToTask9, @"9", kCtrlCmd},
@@ -247,7 +248,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   NewTab();
   Select(parent);
 
-  Press(ui::VKEY_N, kCtrlCmd);
+  Press(ui::VKEY_N, kCtrlCmd | NSEventModifierFlagShift);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return parent->GetGroup().has_value(); }));
   EXPECT_EQ(child->GetGroup(), parent->GetGroup());
@@ -260,6 +261,24 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   Press(ui::VKEY_W, kOptionCmd);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return tabs()->count() == before - 2; }));
+}
+
+// Ctrl+Cmd+N is New task in the menu bar, which a headless window never
+// reaches, so the test asks which command each key runs. Chromium's
+// Ctrl+Cmd+P for a new tab group runs nothing.
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdNIsNewTask) {
+  NSWindow* window =
+      browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  const auto command = [&](ui::KeyboardCode key,
+                           NSEventModifierFlags modifiers) {
+    return CommandForKeyEvent(cocoa_test_event_utils::SynthesizeKeyEvent(
+                                  window, /*keyDown=*/true, key, modifiers))
+        .chrome_command;
+  };
+  EXPECT_EQ(command(ui::VKEY_N, kCtrlCmd), IDC_CREATE_NEW_TAB_GROUP);
+  EXPECT_EQ(command(ui::VKEY_N, kCtrlCmd | NSEventModifierFlagShift),
+            TabOrganizationController::kNewTask);
+  EXPECT_EQ(command(ui::VKEY_P, kCtrlCmd), NO_COMMAND);
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
