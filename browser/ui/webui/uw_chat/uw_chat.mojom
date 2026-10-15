@@ -28,6 +28,8 @@ interface ChatHandler {
   GetSkills() => (array<SkillInfo> skills, string folder);
   // Turns the skill `name` on or off for every chat.
   SetSkillOn(string name, bool on);
+  // Shows uw's skills folder in Finder, making it first if need be.
+  OpenSkillsFolder();
   // The user's answer to the last OnSkillProposal.
   AnswerSkill(bool save);
   // The user's answer to the last OnApproval. A decline may carry a note for

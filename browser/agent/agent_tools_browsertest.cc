@@ -14,6 +14,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/prefs/pref_service.h"
+#include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -175,6 +177,15 @@ IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysWhatWentWrong) {
               HasSubstr("http or https"));
   EXPECT_EQ(*Call("fly", base::DictValue()).FindString("error"),
             "There is no tool called fly.");
+}
+
+IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysSafeBrowsingMustBeOn) {
+  browser()->GetProfile()->GetPrefs()->SetBoolean(
+      prefs::kSafeBrowsingEnabled, false);
+
+  EXPECT_THAT(*Call("open", base::DictValue().Set("url", Url("/form")))
+                   .FindString("error"),
+              HasSubstr("acts only while Safe Browsing is on"));
 }
 
 }  // namespace

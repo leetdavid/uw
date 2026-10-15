@@ -12,10 +12,15 @@
 #include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/version.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
+#include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/optimization_guide/browser_test_util.h"
+#include "chrome/browser/platform_util_internal.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -24,6 +29,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/common/chrome_paths.h"
+#include "components/optimization_guide/core/filters/optimization_hints_component_update_listener.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
@@ -82,7 +88,8 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     host_resolver()->AddRule("shop.test", "127.0.0.1");
-    embedded_https_test_server().SetCertHostnames({"shop.test"});
+    host_resolver()->AddRule("bank.test", "127.0.0.1");
+    embedded_https_test_server().SetCertHostnames({"shop.test", "bank.test"});
     embedded_https_test_server().RegisterRequestHandler(
         base::BindRepeating(&ServeForm));
     ASSERT_TRUE(embedded_https_test_server().Start());
@@ -273,16 +280,33 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     return embedded_https_test_server().GetURL("shop.test", "/checkout").spec();
   }
 
-  // The agent opens the checkout, reads it, and clicks "Place order".
-  void ScriptOrder(std::string_view answer) {
+  // The agent opens the checkout, reads it, and clicks "Place order", or
+  // takes `step` in its place.
+  void ScriptOrder(std::string_view answer,
+                   base::DictValue step = ScriptedModel::Call(
+                       "click",
+                       base::DictValue().Set("tab", 1).Set("element", 2))) {
     model_.Script(
         {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
              "open", base::DictValue().Set("url", Checkout())))),
          ScriptedModel::Calls(base::ListValue().Append(
              ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
-         ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
-             "click", base::DictValue().Set("tab", 1).Set("element", 2)))),
+         ScriptedModel::Calls(base::ListValue().Append(std::move(step))),
          ScriptedModel::Answer(answer)});
+  }
+
+  // Waits for the approval card and returns its text.
+  static std::string Approval(content::WebContents* chat) {
+    return content::EvalJs(
+               chat,
+               "new Promise(resolve => {"
+               "  const check = () => document.getElementById('approval')"
+               "      ? resolve(document.getElementById('approval')"
+               "            .textContent)"
+               "      : setTimeout(check, 20);"
+               "  check();"
+               "});")
+        .ExtractString();
   }
 
   // Waits for the approval card, then picks the answer that starts with
@@ -739,6 +763,28 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillTurnedOffIsLeftOut) {
               ::testing::Not(::testing::HasSubstr("- research:")));
 }
 
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheSkillsFolderOpensFromTheChat) {
+  // Finder stays shut.
+  platform_util::internal::DisableShellOperationsForTesting();
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "document.getElementById('skills').click();"
+      "new Promise(resolve => {"
+      "  const check = () => {"
+      "    const button = document.getElementById('open-skills-folder');"
+      "    button ? (button.click(), resolve()) : setTimeout(check, 20);"
+      "  };"
+      "  check();"
+      "});"));
+
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    return base::DirectoryExists(UwSkills());
+  }));
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillIsSavedOnlyWhenTheUserSaysSo) {
   UseAgentModel();
   model_.Script(
@@ -778,18 +824,9 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PlacingAnOrderWaitsForApproval) {
 
   ASSERT_TRUE(content::ExecJs(chat, SendScript("Place the order")));
   // The page's note does not stop uw from asking.
-  ASSERT_TRUE(content::ExecJs(
-      chat,
-      "new Promise(resolve => {"
-      "  const check = () => document.getElementById('approval')"
-      "      ? resolve() : setTimeout(check, 20);"
-      "  check();"
-      "});"));
+  EXPECT_THAT(Approval(chat),
+              ::testing::HasSubstr("Click button \"Place order\"?"));
   SaveWindowScreenshot(browser(), "approval");
-  EXPECT_THAT(
-      content::EvalJs(chat, "document.getElementById('approval').textContent")
-          .ExtractString(),
-      ::testing::HasSubstr("Click button \"Place order\"?"));
   EXPECT_EQ(Ordered(chat), "");
   EXPECT_TRUE(base::test::RunUntil([&] {
     return content::EvalJs(chat,
@@ -797,6 +834,28 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PlacingAnOrderWaitsForApproval) {
                            "    ?.dataset.state ?? ''")
                .ExtractString() == "waiting";
   }));
+
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Ordered.");
+  EXPECT_EQ(Ordered(chat), "Ordered");
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PressingEnterInAFormWaitsForApproval) {
+  UseAgentModel();
+  ScriptOrder("Ordered.",
+              ScriptedModel::Call("type", base::DictValue()
+                                              .Set("tab", 1)
+                                              .Set("element", 1)
+                                              .Set("text", "Happy birthday")
+                                              .Set("enter", true)));
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Order with a gift message")));
+  const std::string approval = Approval(chat);
+  EXPECT_THAT(approval, ::testing::HasSubstr(
+                            "Type \"Happy birthday\" into text field \"Gift "
+                            "message\" and press Enter?"));
+  EXPECT_THAT(approval, ::testing::HasSubstr("Pressing Enter submits a form."));
+  EXPECT_EQ(Ordered(chat), "");
 
   EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Ordered.");
   EXPECT_EQ(Ordered(chat), "Ordered");
@@ -827,6 +886,81 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, StoppingTheChatEndsIt) {
 
   EXPECT_EQ(Ordered(chat), "");
   EXPECT_EQ(model_.Requests().size(), 3u);
+}
+
+// Chromium's list of sensitive sites holds bank.test.
+class UwChatSensitiveSiteBrowserTest : public UwChatBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    UwChatBrowserTest::SetUpCommandLine(command_line);
+    actor::SetUpBlocklist(command_line, "bank.test");
+  }
+
+  void SetUpOnMainThread() override {
+    UwChatBrowserTest::SetUpOnMainThread();
+    optimization_guide::RetryForHistogramUntilCountReached(
+        &histograms_, "OptimizationGuide.HintsManager.HintCacheInitialized",
+        1);
+    // The engine uses the list only once its component has loaded. The list
+    // itself comes from the command line.
+    optimization_guide::OptimizationHintsComponentUpdateListener::GetInstance()
+        ->MaybeUpdateHintsComponent(
+            {base::Version("1"), home_.GetPath().AppendASCII("hints")});
+  }
+
+  std::string Bank() {
+    return embedded_https_test_server().GetURL("bank.test", "/checkout").spec();
+  }
+
+  bool BankIsOpen() {
+    for (int i = 0; i < tabs()->count(); ++i) {
+      if (tabs()->GetWebContentsAt(i)->GetLastCommittedURL().spec() == Bank()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  base::HistogramTester histograms_;
+};
+
+IN_PROC_BROWSER_TEST_F(UwChatSensitiveSiteBrowserTest,
+                       ASensitiveSiteWaitsForApproval) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Bank())))),
+       ScriptedModel::Answer("Opened your bank.")});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Open my bank")));
+  const std::string approval = Approval(chat);
+  EXPECT_THAT(approval,
+              ::testing::HasSubstr("Let the agent act on bank.test?"));
+  EXPECT_THAT(approval,
+              ::testing::HasSubstr("Chromium marks this site as sensitive."));
+  EXPECT_FALSE(BankIsOpen());
+
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Opened your bank.");
+  EXPECT_TRUE(BankIsOpen());
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatSensitiveSiteBrowserTest,
+                       ADeclinedSensitiveSiteStaysUnused) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Bank())))),
+       ScriptedModel::Answer("I left your bank alone.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(UntilTheEnd(chat, SendScript("Open my bank") +
+                                  ChooseScript("Not this one")),
+            "I left your bank alone.");
+
+  EXPECT_FALSE(BankIsOpen());
+  EXPECT_THAT(model_.Requests()[1],
+              ::testing::HasSubstr("did not approve acting on this site"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {

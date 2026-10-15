@@ -42,6 +42,28 @@ bool IsSubmit(proto::FormControlType type) {
          type == proto::FORM_CONTROL_TYPE_INPUT_IMAGE;
 }
 
+// A field in which Enter submits its form, as the HTML standard's implicit
+// submission says.
+bool EnterSubmits(proto::FormControlType type) {
+  switch (type) {
+    case proto::FORM_CONTROL_TYPE_INPUT_DATE:
+    case proto::FORM_CONTROL_TYPE_INPUT_DATETIME_LOCAL:
+    case proto::FORM_CONTROL_TYPE_INPUT_EMAIL:
+    case proto::FORM_CONTROL_TYPE_INPUT_MONTH:
+    case proto::FORM_CONTROL_TYPE_INPUT_NUMBER:
+    case proto::FORM_CONTROL_TYPE_INPUT_PASSWORD:
+    case proto::FORM_CONTROL_TYPE_INPUT_SEARCH:
+    case proto::FORM_CONTROL_TYPE_INPUT_TELEPHONE:
+    case proto::FORM_CONTROL_TYPE_INPUT_TEXT:
+    case proto::FORM_CONTROL_TYPE_INPUT_TIME:
+    case proto::FORM_CONTROL_TYPE_INPUT_URL:
+    case proto::FORM_CONTROL_TYPE_INPUT_WEEK:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // What typing into a field fills, when the user must approve it.
 std::string_view Fills(const proto::FormControlData& control) {
   if (control.form_control_type() == proto::FORM_CONTROL_TYPE_INPUT_PASSWORD) {
@@ -236,6 +258,8 @@ class Writer {
           {Kind(control.form_control_type()), " \"", Label(node), "\""});
       more = Value(control);
       element.submits = forms_ > 0 && IsSubmit(control.form_control_type());
+      element.enter_submits =
+          forms_ > 0 && EnterSubmits(control.form_control_type());
       element.fills = Fills(control);
     } else {
       element.name = base::StrCat({"clickable \"", Label(node), "\""});

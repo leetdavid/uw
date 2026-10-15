@@ -5,7 +5,15 @@
 import { Fragment, StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { Columns2, Loader2, Pause, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  Columns2,
+  FolderOpen,
+  Loader2,
+  Pause,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { code } from "@streamdown/code";
 import { defaultRehypePlugins, Streamdown, type Components } from "streamdown";
 import {
@@ -441,11 +449,21 @@ function SkillsView({
   return (
     <main className="flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-5">
-        <div className="flex items-baseline gap-2.5">
+        <div className="flex items-center gap-2.5">
           <h1 className="text-base font-semibold">Skills</h1>
           <span className="text-muted-foreground">
             {on} on, {skills.length - on} off
           </span>
+          <Button
+            id="open-skills-folder"
+            variant="secondary"
+            size="compact"
+            leadingIcon={FolderOpen}
+            className="ml-auto"
+            onClick={() => chatHandler.openSkillsFolder()}
+          >
+            Open skills folder
+          </Button>
         </div>
         <p className="max-w-[640px] text-muted-foreground">
           The agent sees each skill's one-line description and reads a

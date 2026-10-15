@@ -22,6 +22,8 @@ struct PageElement {
   std::string name;
   // Clicking it submits a form.
   bool submits = false;
+  // Pressing Enter in it submits a form.
+  bool enter_submits = false;
   // What typing into it fills when that is "a password" or "payment
   // details". Empty for any other field.
   std::string fills;

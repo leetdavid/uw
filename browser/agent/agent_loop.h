@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -91,12 +92,13 @@ class AgentLoop {
     Choice choice = Choice::kDecline;
     std::string note;
   };
-  // Asks the user to approve a step and answers. Without one, every step
-  // runs.
+  // Asks the user to approve a step and answers. It also answers the engine
+  // when it asks about a sensitive site. Without one, every step runs, and
+  // the engine refuses sensitive sites.
   using Approve =
       base::RepeatingCallback<void(AgentTools::Approval,
                                    base::OnceCallback<void(ApprovalAnswer)>)>;
-  void SetApprover(Approve approve) { approve_ = std::move(approve); }
+  void SetApprover(Approve approve);
   const AgentContext& context() const { return *context_; }
   AgentTools& tools() { return tools_; }
 
@@ -110,6 +112,13 @@ class AgentLoop {
                   size_t index,
                   base::DictValue args,
                   ApprovalAnswer answer);
+  void ConfirmSite(AgentTools::Approval approval,
+                   base::OnceCallback<void(bool)> done);
+  void OnSiteAnswer(base::OnceCallback<void(bool)> done, ApprovalAnswer answer);
+  void OnToolCalled(ModelTurn turn,
+                    size_t index,
+                    base::DictValue args,
+                    base::DictValue result);
   void OnTool(ModelTurn turn,
               size_t index,
               base::DictValue args,
@@ -126,6 +135,9 @@ class AgentLoop {
   std::map<std::string, base::FilePath> skills_;
   SaveSkill save_skill_;
   Approve approve_;
+  // The user's no to the engine's question about a site, during the step
+  // under way.
+  std::optional<ApprovalAnswer> site_refused_;
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;

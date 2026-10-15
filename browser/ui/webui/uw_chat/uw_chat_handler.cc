@@ -9,6 +9,7 @@
 
 #include "base/base64.h"
 #include "base/base_paths.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
@@ -19,6 +20,8 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+// //chrome/browser depends on this target, so it cannot depend back.
+#include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -360,6 +363,23 @@ void UwChatHandler::SetSideBySide(bool on, int32_t number) {
                                        split_tabs::SplitTabLayout::kSideBySide);
   }
   SendTabs();
+}
+
+void UwChatHandler::OpenSkillsFolder() {
+  base::ThreadPool::PostTaskAndReply(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce(base::IgnoreResult(&base::CreateDirectory),
+                     UwSkillsFolder()),
+      base::BindOnce(
+          [](base::WeakPtr<UwChatHandler> self) {
+            if (self) {
+              platform_util::OpenItem(Profile::FromBrowserContext(
+                                          self->contents_->GetBrowserContext()),
+                                      UwSkillsFolder(),
+                                      platform_util::OPEN_FOLDER, {});
+            }
+          },
+          weak_factory_.GetWeakPtr()));
 }
 
 void UwChatHandler::GetSkills(GetSkillsCallback callback) {

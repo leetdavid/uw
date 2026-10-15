@@ -134,7 +134,7 @@ Expected result: suggestions from your history, bookmarks, and search show in th
 
 ### Chats
 
-A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button and before typing a password or payment details, and the agent marks other changes. Nothing on a page can answer for you.
+A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.
 
 1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test connection` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
 2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
@@ -146,9 +146,9 @@ Chats are saved after every step. Quit uw in the middle of one and start it agai
 
 The chat page lists every saved chat on its left, newest first, with a spinner while one runs, a pause sign when it stopped early, and a filled dot for an answer you have not seen. Click a chat to go to its tab, or to reopen it in a new tab once its tab is closed. `New chat` opens another, the search field filters by title, and the bin at the end of a row deletes the chat and closes its tab.
 
-On the right, a card for each of the agent's tabs shows a picture of the tab after the agent's last step there and what it did. Click a card to go to its tab. `Side by side` puts the chat and the agent's tab next to each other in split view, and the split follows the agent to its other tabs. Click it again to end the split.
+On the right, a card for each of the agent's tabs shows a picture of the tab after the agent's last step there and what it did. Click a card to go to its tab. `Side by side` puts the chat and the agent's tab next to each other in split view, and the split follows the agent to its other tabs. The sidebar shows the pair as one row in the chat's place, with the agent's other tabs under it. Click it again to end the split.
 
-`Skills` at the foot of the chat list shows every skill the agent can use, from uw's `skills` folder in `~/Library/Application Support/uw-dev` and from `~/.agents/skills`, each with a switch. The agent reads a skill's instructions when a request matches its description, and the composer then says which skill it uses. Ask a chat to "make this a skill": a `Save a skill?` card appears, and nothing is written until you click `Save skill`.
+`Skills` at the foot of the chat list shows every skill the agent can use, from uw's `skills` folder in `~/Library/Application Support/uw-dev` and from `~/.agents/skills`, each with a switch. `Open skills folder` shows uw's folder in Finder. The agent reads a skill's instructions when a request matches its description, and the composer then says which skill it uses. Ask a chat to "make this a skill": a `Save a skill?` card appears, and nothing is written until you click `Save skill`.
 
 ## Not available yet
 

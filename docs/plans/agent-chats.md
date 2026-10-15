@@ -65,7 +65,7 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
   - `bundle.ts` points the plugin's `shiki` import at `src/code-languages.ts`, which lists the languages, and points `decode-named-character-reference` at its plain build: the browser build decodes `&amp;` through `innerHTML`.
   - The page's script grew from about 0.7 MB to 3 MB: Streamdown is about 0.5 MB and the grammars about 1.7 MB, half of that C++.
 - **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
-- **Approvals.** uw asks before every click or typing the model marks with `changes`. It also asks before steps it detects on its own: clicking a submit button inside a form, and typing a password or payment details (`PageElement` in `components/agent/page_text.h`). The chat shows Fluid's Ask User Questions card: Approve, Not this one, Stop the chat, or a note for the agent. A declined step does not happen, and the model is told why. The chat list shows a waiting chat with an amber dot. Only the user answers: page text cannot.
+- **Approvals.** uw asks before every click or typing the model marks with `changes`. It also asks before steps it detects on its own: clicking a submit button inside a form, pressing Enter in a form's field, and typing a password or payment details (`PageElement` in `components/agent/page_text.h`). The engine asks too, through the task delegate in `browser/agent/agent_tools.cc`, before it acts on a site that Chromium's list marks as sensitive; uw shows that as the same card. It asks each time the agent comes to that site from another one. The list comes from Chromium's Optimization Hints component. The engine acts only while Safe Browsing is on, and the agent says so when it is off. The chat shows Fluid's Ask User Questions card: Approve, Not this one, Stop the chat, or a note for the agent. A declined step does not happen, and the model is told why. The chat list shows a waiting chat with an amber dot. Only the user answers: page text cannot.
 
 ## Context
 
@@ -114,5 +114,4 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 - Where a scheduled chat runs when its tab was closed or no window is open. Proposal: it reopens its chat tab in the background in the most recent window. With no window open, it waits and runs as a [catch-up run](../CONTEXT.md#language) when a window opens.
 - Whether the model also gets a screenshot of the page, beside its text. T46 decides.
-- Whether the engine's site checks need Safe Browsing on, and how its "sensitive site" prompt maps onto uw's approvals. The spike did not reach either.
 - Whether the agent should work on `http` pages such as a local development server. The engine refuses to act on them.

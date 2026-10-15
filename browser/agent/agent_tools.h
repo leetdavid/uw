@@ -21,6 +21,10 @@ class ActorKeyedService;
 class ToolRequest;
 }  // namespace actor
 
+namespace url {
+class Origin;
+}  // namespace url
+
 namespace uw {
 
 // The tools a chat's agent uses, over Chromium's agent engine. The agent's
@@ -57,10 +61,19 @@ class AgentTools {
     std::string reason;
   };
   // What a call to `tool` with `args` needs approved: clicking a button
-  // that submits a form, typing a password or payment details, and any click
-  // or typing the model marks with "changes". Nothing for any other step.
+  // that submits a form, pressing Enter in a form's field, typing a password
+  // or payment details, and any click or typing the model marks with
+  // "changes". Nothing for any other step.
   std::optional<Approval> ApprovalFor(std::string_view tool,
                                       const base::DictValue& args);
+  // Asks the user whether the agent may act on a site that Chromium marks as
+  // sensitive, in the middle of a step, and answers true if they approve.
+  // Without one, the engine refuses such a site.
+  using ConfirmSite =
+      base::RepeatingCallback<void(Approval, base::OnceCallback<void(bool)>)>;
+  void SetConfirmSite(ConfirmSite confirm_site) {
+    confirm_site_ = std::move(confirm_site);
+  }
 
   // The agent's open tabs by their numbers.
   std::map<int, tabs::TabInterface*> OpenTabs() const;
@@ -72,6 +85,12 @@ class AgentTools {
     tabs::TabHandle handle;
     PageText page;
   };
+  class EngineDelegate;
+
+  // The engine asks about `site` in the step under way.
+  void AskAboutSite(const url::Origin& site,
+                    bool sensitive,
+                    base::OnceCallback<void(bool)> done);
 
   void Open(const base::DictValue& args, Done done);
   void Navigate(const base::DictValue& args, Done done);
@@ -90,10 +109,14 @@ class AgentTools {
            Done done);
 
   const tabs::TabHandle chat_;
+  const std::unique_ptr<EngineDelegate> delegate_;
   base::WeakPtr<actor::ActorKeyedService> engine_;
   actor::TaskId task_;
   std::map<int, Tab> tabs_;
   int next_tab_ = 1;
+  // The tab the step under way acts in.
+  int acting_tab_ = 0;
+  ConfirmSite confirm_site_;
   base::WeakPtrFactory<AgentTools> weak_factory_{this};
 };
 

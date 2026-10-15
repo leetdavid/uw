@@ -109,19 +109,25 @@ TEST_F(PageTextTest, ItMarksWhatNeedsTheUsersApproval) {
       proto::COARSE_AUTOFILL_FIELD_TYPE_CREDIT_CARD);
   AddControl(form, proto::FORM_CONTROL_TYPE_BUTTON_SUBMIT, 4)
       ->set_field_name("Pay");
-  // A button outside any form submits nothing.
+  // A button or field outside any form submits nothing.
   AddControl(root(), proto::FORM_CONTROL_TYPE_BUTTON_SUBMIT, 5)
       ->set_field_name("Menu");
+  AddControl(root(), proto::FORM_CONTROL_TYPE_INPUT_SEARCH, 6)
+      ->set_field_name("Filter");
 
   const PageText page = Describe();
 
-  ASSERT_EQ(page.elements.size(), 4u);
+  ASSERT_EQ(page.elements.size(), 5u);
   EXPECT_EQ(page.elements[0].fills, "a password");
+  EXPECT_TRUE(page.elements[0].enter_submits);
   EXPECT_EQ(page.elements[1].fills, "payment details");
   EXPECT_FALSE(page.elements[1].submits);
+  EXPECT_TRUE(page.elements[1].enter_submits);
   EXPECT_TRUE(page.elements[2].submits);
+  EXPECT_FALSE(page.elements[2].enter_submits);
   EXPECT_EQ(page.elements[2].name, "button \"Pay\"");
   EXPECT_FALSE(page.elements[3].submits);
+  EXPECT_FALSE(page.elements[4].enter_submits);
 }
 
 TEST_F(PageTextTest, AFieldIsNamedByItsLabel) {

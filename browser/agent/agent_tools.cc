@@ -10,12 +10,14 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ref.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/actor_task.h"
+#include "chrome/browser/actor/actor_task_delegate.h"
 #include "chrome/browser/actor/actor_task_metadata.h"
 #include "chrome/browser/actor/enterprise_policy_checker.h"
 #include "chrome/browser/actor/tab_observation_strategy.h"
@@ -27,6 +29,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/common/actor.mojom.h"
+#include "chrome/common/actor_webui.mojom.h"
 #include "chrome/common/actor/action_result.h"
 #include "components/actor/core/task_source_info.h"
 #include "components/actor/public/mojom/actor_types.mojom.h"
@@ -34,6 +37,7 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "url/gurl.h"
+#include "url/origin.h"
 #include "url/url_constants.h"
 
 namespace uw {
@@ -48,6 +52,11 @@ base::DictValue Error(std::string_view message) {
 }
 
 std::string Refusal(const actor::mojom::ActionResult& result) {
+  if (result.code ==
+      actor::mojom::ActionResultCode::kActionsBlockedSafeBrowsingDisabled) {
+    return "Chromium's agent engine acts only while Safe Browsing is on. The "
+           "user can turn it on in Settings, under Privacy and security.";
+  }
   return result.message.empty()
              ? base::StrCat({"The agent engine refused: ",
                              base::ToString(result.code), "."})
@@ -56,17 +65,107 @@ std::string Refusal(const actor::mojom::ActionResult& result) {
 
 }  // namespace
 
-AgentTools::AgentTools(tabs::TabInterface& chat) : chat_(chat.GetHandle()) {
+// Answers what the engine asks the user. uw asks only about a site Chromium
+// marks as sensitive, as an approval in the chat. The rest get the answers
+// the engine gives itself when no one is there to ask.
+class AgentTools::EngineDelegate : public actor::ActorTaskDelegate {
+ public:
+  explicit EngineDelegate(AgentTools& tools) : tools_(tools) {}
+
+  base::WeakPtr<EngineDelegate> GetWeakPtr() {
+    return weak_factory_.GetWeakPtr();
+  }
+
+  // actor::ActorTaskDelegate:
+  void OnTabAddedToTask(actor::TaskId task_id,
+                        const tabs::TabInterface::Handle& tab) override {}
+  void OnTaskTabsVisibilityChanged(actor::TaskId task_id,
+                                   bool has_visible_tab) override {}
+  void RequestToShowCredentialSelectionDialog(
+      actor::TaskId task_id,
+      const base::flat_map<std::string, gfx::Image>& icons,
+      const std::vector<actor_login::Credential>& credentials,
+      CredentialSelectedCallback callback) override {
+    std::move(callback).Run(
+        actor::webui::mojom::SelectCredentialDialogResponse::New());
+  }
+  void RequestToShowUserConfirmationDialog(
+      actor::TaskId task_id,
+      const url::Origin& site,
+      bool for_blocklisted_origin,
+      UserConfirmationDialogCallback callback) override {
+    tools_->AskAboutSite(
+        site, for_blocklisted_origin,
+        base::BindOnce(
+            [](UserConfirmationDialogCallback callback, bool approved) {
+              auto response =
+                  actor::webui::mojom::UserConfirmationDialogResponse::New();
+              response->result = actor::webui::mojom::
+                  ConfirmationRequestResult::NewPermissionGranted(approved);
+              std::move(callback).Run(std::move(response));
+            },
+            std::move(callback)));
+  }
+  void RequestToConfirmNavigation(
+      actor::TaskId task_id,
+      const url::Origin& site,
+      NavigationConfirmationCallback callback) override {
+    auto response = actor::webui::mojom::NavigationConfirmationResponse::New();
+    response->result =
+        actor::webui::mojom::ConfirmationRequestResult::NewPermissionGranted(
+            false);
+    std::move(callback).Run(std::move(response));
+  }
+  void RequestToShowAutofillSuggestionsDialog(
+      actor::TaskId task_id,
+      std::vector<autofill::ActorFormFillingRequest> requests,
+      base::WeakPtr<actor::AutofillSelectionDialogEventHandler> event_handler,
+      AutofillSuggestionSelectedCallback callback) override {
+    std::move(callback).Run(
+        actor::webui::mojom::SelectAutofillSuggestionsDialogResponse::New(
+            task_id.value(),
+            actor::webui::mojom::SelectAutofillSuggestionsDialogResult::
+                NewErrorReason(actor::webui::mojom::
+                                   SelectAutofillSuggestionsDialogErrorReason::
+                                       kNoActorTaskDelegate)));
+  }
+  void RequestToShowGmailOtpOptInDialog(
+      actor::TaskId task_id,
+      GmailOtpOptInCallback callback) override {
+    std::move(callback).Run(
+        actor::webui::mojom::GmailOtpOptInResult::NewErrorReason(
+            actor::webui::mojom::GmailOtpErrorReason::
+                kRequestPromiseNoSubscriber));
+  }
+  void RequestToShowGmailOtpConfirmationDialog(
+      actor::TaskId task_id,
+      const std::string& verification_code,
+      GmailOtpConfirmationCallback callback) override {
+    std::move(callback).Run(
+        actor::webui::mojom::GmailOtpConfirmationResult::NewErrorReason(
+            actor::webui::mojom::GmailOtpErrorReason::
+                kRequestPromiseNoSubscriber));
+  }
+
+ private:
+  const raw_ref<AgentTools> tools_;
+  base::WeakPtrFactory<EngineDelegate> weak_factory_{this};
+};
+
+AgentTools::AgentTools(tabs::TabInterface& chat)
+    : chat_(chat.GetHandle()),
+      delegate_(std::make_unique<EngineDelegate>(*this)) {
   actor::ActorKeyedService* engine = actor::ActorKeyedService::Get(
       chat.GetBrowserWindowInterface()->GetProfile());
   if (!engine) {
     return;
   }
   engine_ = engine->GetWeakPtr();
-  task_ = engine->CreateTask(
+  task_ = engine->CreateTaskWithOptions(
       actor::TaskSourceInfo(actor::TaskSourceInfo::Client::kExperimentalActor,
                             std::nullopt),
-      actor::GetNullEnterprisePolicyChecker());
+      actor::GetNullEnterprisePolicyChecker(), /*options=*/nullptr,
+      delegate_->GetWeakPtr());
 }
 
 AgentTools::~AgentTools() {
@@ -82,6 +181,7 @@ void AgentTools::Call(std::string_view tool,
     std::move(done).Run(Error("Chromium's agent engine is not running."));
     return;
   }
+  acting_tab_ = tool == "open" ? next_tab_ : args.FindInt("tab").value_or(0);
   if (tool == "open") {
     Open(args, std::move(done));
   } else if (tool == "navigate") {
@@ -111,11 +211,14 @@ std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
     // The step fails on its own.
     return std::nullopt;
   }
+  const bool enter = tool == "type" && args.FindBool("enter").value_or(false);
   Approval approval;
   if (tool == "click" && element->submits) {
     approval.reason = "It submits a form.";
   } else if (tool == "type" && !element->fills.empty()) {
     approval.reason = base::StrCat({"It fills in ", element->fills, "."});
+  } else if (enter && element->enter_submits) {
+    approval.reason = "Pressing Enter submits a form.";
   } else if (args.FindBool("changes").value_or(false)) {
     approval.reason = "The agent says this changes something.";
   } else {
@@ -133,10 +236,26 @@ std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
   } else {
     approval.action = base::StrCat({"Type into ", element->name});
   }
-  if (tool == "type" && args.FindBool("enter").value_or(false)) {
+  if (enter) {
     base::StrAppend(&approval.action, {" and press Enter"});
   }
   return approval;
+}
+
+void AgentTools::AskAboutSite(const url::Origin& site,
+                              bool sensitive,
+                              base::OnceCallback<void(bool)> done) {
+  if (!confirm_site_) {
+    std::move(done).Run(false);
+    return;
+  }
+  Approval approval;
+  approval.tab = acting_tab_;
+  approval.site = site.host();
+  approval.action = base::StrCat({"Let the agent act on ", site.host()});
+  approval.reason = sensitive ? "Chromium marks this site as sensitive."
+                              : "The agent has not used this site before.";
+  confirm_site_.Run(std::move(approval), std::move(done));
 }
 
 std::map<int, tabs::TabInterface*> AgentTools::OpenTabs() const {

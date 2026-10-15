@@ -215,12 +215,57 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
   CallTool(std::move(turn), index, std::move(*args));
 }
 
+void AgentLoop::SetApprover(Approve approve) {
+  approve_ = std::move(approve);
+  tools_.SetConfirmSite(base::BindRepeating(&AgentLoop::ConfirmSite,
+                                            weak_factory_.GetWeakPtr()));
+}
+
 void AgentLoop::CallTool(ModelTurn turn, size_t index, base::DictValue args) {
   const std::string name = turn.calls[index].name;
   base::DictValue asked = args.Clone();
-  tools_.Call(name, args,
-              base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
-                             std::move(turn), index, std::move(asked)));
+  tools_.Call(
+      name, args,
+      base::BindOnce(&AgentLoop::OnToolCalled, weak_factory_.GetWeakPtr(),
+                     std::move(turn), index, std::move(asked)));
+}
+
+void AgentLoop::ConfirmSite(AgentTools::Approval approval,
+                            base::OnceCallback<void(bool)> done) {
+  approve_.Run(std::move(approval),
+               base::BindOnce(&AgentLoop::OnSiteAnswer,
+                              weak_factory_.GetWeakPtr(), std::move(done)));
+}
+
+void AgentLoop::OnSiteAnswer(base::OnceCallback<void(bool)> done,
+                             ApprovalAnswer answer) {
+  const bool approved = answer.choice == ApprovalAnswer::Choice::kApprove;
+  if (!approved) {
+    site_refused_ = std::move(answer);
+  }
+  std::move(done).Run(approved);
+}
+
+void AgentLoop::OnToolCalled(ModelTurn turn,
+                             size_t index,
+                             base::DictValue args,
+                             base::DictValue result) {
+  const std::optional<ApprovalAnswer> refused =
+      std::exchange(site_refused_, std::nullopt);
+  if (refused && refused->choice == ApprovalAnswer::Choice::kStop) {
+    context_->CloseOpenCalls("The user stopped the chat.");
+    Finish(Failed("You stopped the chat."));
+    return;
+  }
+  if (refused) {
+    result = Error(
+        "The user did not approve acting on this site, so the step did not "
+        "happen.");
+    if (!refused->note.empty()) {
+      result.Set("user_said", refused->note);
+    }
+  }
+  OnTool(std::move(turn), index, std::move(args), std::move(result));
 }
 
 void AgentLoop::OnApproval(ModelTurn turn,
