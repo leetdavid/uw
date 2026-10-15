@@ -154,7 +154,7 @@ Agreed: one Undo reverses a complete organization action, including task creatio
 
 Agreed: expose organization controls through a custom button menu inside the tab sidebar, so manual organization remains usable while automatic behavior is developed.
 
-Proposed presentation: a compact "Organize" button in the sidebar header. Its menu includes "Move to new task", "Close branch", "Reorganize all tabs", "Undo tab organization", the automatic/user-directed mode choice, and pause controls. Contextual actions remain available on tabs and branches.
+Built: an "Organize" pill at the foot of the sidebar. Its menu has "New task", "Undo tab organization", the pause choices, "Show organizer activity", and "Tab organization settings". Tab and branch actions such as "Move to new task" and "Close branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize menu when they are built.
 
 Agreed: provide global pause choices for automatic organization: "Pause for 1 hour", "Pause until next launch", and "Pause indefinitely", plus "Resume automatic organization". Pausing stops automatic placements and task proposals across all windows, including application of pending automatic results. Manual tree controls and explicitly requested "Reorganize all tabs" remain available. An explicit reorganization still targets the current window.
 
