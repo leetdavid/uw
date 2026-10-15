@@ -55,6 +55,7 @@ source_set("browser_tests") {
     "//ui/color",
     "//ui/gfx:color_utils",
     "//ui/views",
+    "//url",
     "//uw/browser/tab_organization:test_support",
   ]
 }

@@ -131,7 +131,7 @@ Arrange a few tabs, quit uw, and launch it again with "Continue where you left o
 
 Open `uw://settings/uwOrganization` and scroll to `Window tint`. Click a color, or use the last swatch to pick any color.
 
-Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac in light mode and indigo in dark mode.
+Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac. In dark mode the window is black whatever color you pick.
 
 ### Terminal tabs
 

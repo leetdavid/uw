@@ -8,7 +8,7 @@
 
 namespace gfx {
 class Canvas;
-}
+}  // namespace gfx
 
 namespace views {
 class View;
@@ -23,6 +23,14 @@ void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
                SkColor color);
+
+// Draws the edge of the page card, which holds `toolbar` and `page`: a 1px
+// line just outside it, where it crosses `view`. Draws nothing in fullscreen
+// or when the edge color is transparent.
+void PaintPageCardEdge(gfx::Canvas* canvas,
+                       const views::View* view,
+                       const views::View* toolbar,
+                       const views::View* page);
 
 }  // namespace uw
 

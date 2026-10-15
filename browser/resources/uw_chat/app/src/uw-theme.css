@@ -1,6 +1,7 @@
 /* uw's colors and type for Fluid Functionalism's parts: the page card of the
-   style guide "uw-arc-style" on the Doop canvas. The bundle step copies the
-   two font files next to this page's stylesheet. */
+   style guide "uw-arc-style" on the Doop canvas, and in dark mode the blacks of
+   the guide "uw-themes". The bundle step copies the two font files next to
+   this page's stylesheet. */
 
 @font-face {
   font-family: "Inter Variable";
@@ -73,13 +74,13 @@
 }
 
 .dark {
-  --background: #1c1b26;
-  --foreground: #edebf7;
-  --muted-foreground: #8e8aa6;
-  --accent: #2a2838;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --muted-foreground: #a1a1a1;
+  --accent: #262626;
   --border: rgb(255 255 255 / 0.09);
-  --primary: #edebf7;
-  --primary-foreground: #1c1b26;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
   --focus-ring: #9db0ff;
   --destructive: #f28b82;
   --info: #9db0ff;
@@ -87,15 +88,15 @@
   --warning: #fcad70;
   --hover: rgb(255 255 255 / 0.06);
   --active: rgb(255 255 255 / 0.1);
-  --selected: #3a3850;
-  --surface-1: #1c1b26;
-  --surface-2: #211f2c;
-  --surface-3: #262433;
-  --surface-4: #2a2838;
-  --surface-5: #2f2d3e;
-  --surface-6: #343245;
-  --surface-7: #39374b;
-  --surface-8: #3e3c51;
+  --selected: #1a1a1a;
+  --surface-1: #0a0a0a;
+  --surface-2: #111111;
+  --surface-3: #171717;
+  --surface-4: #1a1a1a;
+  --surface-5: #1f1f1f;
+  --surface-6: #262626;
+  --surface-7: #2e2e2e;
+  --surface-8: #333333;
 }
 
 html,

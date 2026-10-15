@@ -144,7 +144,7 @@ pnpm run check && pnpm run verify --jobs 8
 
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
-To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, a suggestion with its Confirm button, and the settings page with its models, a failed connection test with its details, and its tint control.
+To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, two picked tints, black dark mode with a picked tint, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, a suggestion with its Confirm button, and the settings page with its models, a failed connection test with its details, and its tint control.
 
 ## Real-window tests
 

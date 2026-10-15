@@ -12,6 +12,7 @@
 #include "ui/color/color_recipe.h"
 #include "ui/color/color_transform.h"
 #include "ui/gfx/color_utils.h"
+#include "uw/browser/ui/look/page_card.h"
 #include "uw/components/look/tint.h"
 
 namespace uw {
@@ -20,22 +21,29 @@ namespace {
 constexpr SkAlpha kDividerAlpha = 0x1A;
 constexpr SkAlpha kHoverOnLightAlpha = 0x75;
 constexpr SkAlpha kHoverOnDarkAlpha = 0x14;
+// The active tab on black: white at 12%.
+constexpr float kActiveTabOnBlack = 0.12f;
 
 // Custom themes bring their own frame and tab colors.
 bool UsesTint(const ui::ColorProviderKey& key) {
   return !key.custom_theme;
 }
 
-// The color the user picked in Chromium's theme color picker, when there is
-// one. Otherwise the default for light or dark mode.
+bool IsDarkMode(const ui::ColorProviderKey& key) {
+  return key.color_mode == ui::ColorProviderKey::ColorMode::kDark;
+}
+
+// Black in dark mode, whatever color was picked. In light mode, the color the
+// user picked in Chromium's theme color picker, or the default.
 Tint TintFor(const ui::ColorProviderKey& key) {
+  if (IsDarkMode(key)) {
+    return TintFrom(SK_ColorBLACK);
+  }
   if (key.user_color &&
       key.user_color_source == ui::ColorProviderKey::UserColorSource::kAccent) {
     return TintFrom(*key.user_color);
   }
-  return TintFrom(key.color_mode == ui::ColorProviderKey::ColorMode::kDark
-                      ? kDefaultDarkTint
-                      : kDefaultLightTint);
+  return TintFrom(kDefaultLightTint);
 }
 
 }  // namespace
@@ -69,12 +77,13 @@ void AddTintColorMixer(ui::ColorProvider* provider,
 
 void AddTintTabColorMixer(ui::ColorProvider* provider,
                           const ui::ColorProviderKey& key) {
+  ui::ColorMixer& mixer = provider->AddMixer();
+  mixer[kColorPageCardEdge] = {SK_ColorTRANSPARENT};
   if (!UsesTint(key)) {
     return;
   }
   const Tint tint = TintFor(key);
   const SkColor text = TextColorOn(tint);
-  ui::ColorMixer& mixer = provider->AddMixer();
   for (ui::ColorId foreground :
        {kColorTabForegroundActiveFrameActive,
         kColorTabForegroundActiveFrameInactive,
@@ -88,8 +97,23 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
   }
   mixer[kColorVerticalTabPinnedOutline] = {SK_ColorTRANSPARENT};
   mixer[kColorVerticalTabStripShadow] = {SK_ColorTRANSPARENT};
-  mixer[kColorTabBackgroundActiveFrameActive] = {ActiveTabOn(tint)};
-  mixer[kColorTabBackgroundActiveFrameInactive] = {ActiveTabOn(tint)};
+  if (!IsDarkMode(key)) {
+    mixer[kColorTabBackgroundActiveFrameActive] = {ActiveTabOn(tint)};
+    mixer[kColorTabBackgroundActiveFrameInactive] = {ActiveTabOn(tint)};
+    return;
+  }
+  const SkColor active_tab =
+      color_utils::AlphaBlend(SK_ColorWHITE, SK_ColorBLACK, kActiveTabOnBlack);
+  mixer[kColorTabBackgroundActiveFrameActive] = {active_tab};
+  mixer[kColorTabBackgroundActiveFrameInactive] = {active_tab};
+  mixer[kColorToolbar] = {kBlackCard};
+  mixer[kColorLocationBarBackground] = {kBlackCardField};
+  mixer[kColorLocationBarBackgroundHovered] = {kBlackCardLine};
+  mixer[kColorOmniboxResultsBackground] = {kBlackCardField};
+  mixer[kColorOmniboxResultsBackgroundHovered] = {kBlackCardLine};
+  mixer[kColorOmniboxResultsBackgroundSelected] = {kBlackCardEdge};
+  mixer[kColorToolbarContentAreaSeparator] = {kBlackCardLine};
+  mixer[kColorPageCardEdge] = {kBlackCardEdge};
 }
 
 }  // namespace uw

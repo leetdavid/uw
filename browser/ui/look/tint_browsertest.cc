@@ -13,13 +13,16 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/common/pref_names.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/themes.mojom.h"
@@ -28,7 +31,9 @@
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/widget/widget.h"
+#include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/look/page_card.h"
 
 namespace uw {
 namespace {
@@ -75,8 +80,30 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, DefaultTintFollowsLightAndDarkMode) {
   EXPECT_EQ(Color(kColorTabBackgroundActiveFrameActive), SK_ColorWHITE);
 
   theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
-  EXPECT_EQ(Color(ui::kColorFrameActive), kDefaultDarkTint);
+  EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
   EXPECT_EQ(Color(kColorTabForegroundInactiveFrameActive), kLightTextOnTint);
+  EXPECT_EQ(Color(kColorToolbar), kBlackCard);
+  EXPECT_EQ(Color(kColorLocationBarBackground), kBlackCardField);
+  EXPECT_EQ(Color(kColorOmniboxResultsBackground), kBlackCardField);
+  EXPECT_EQ(Color(kColorToolbarContentAreaSeparator), kBlackCardLine);
+  EXPECT_EQ(Color(kColorPageCardEdge), kBlackCardEdge);
+
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  EXPECT_EQ(Color(kColorPageCardEdge), SK_ColorTRANSPARENT);
+}
+
+// Dark mode is black even with a color picked; light mode keeps the color.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, DarkModeIsBlackWhateverColorIsPicked) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  const SkColor accent = Color(ui::kColorSysPrimary);
+  Pick(kWine);
+  EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
+  EXPECT_EQ(Color(kColorToolbar), kBlackCard);
+  EXPECT_EQ(Color(ui::kColorSysPrimary), accent);
+  SaveWindowScreenshot(browser(), "dark-black");
+
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  EXPECT_EQ(Color(ui::kColorFrameActive), kWine);
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, APickedColorBecomesTheTint) {
@@ -99,7 +126,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, APickedColorBecomesTheTint) {
 // part of the tint. A seam between them shows as a band of another color
 // above and below the card.
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarAndFrameDrawOneGradient) {
-  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   const SkBitmap window = CaptureWindow(browser());
   BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
   const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
@@ -159,6 +186,41 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, ThePageCardHasFourRoundCorners) {
   }
   const gfx::Point center = card.CenterPoint();
   EXPECT_GT(Gap(color_at(center, 0, 0), color_at(card.origin(), -4, -4)), 3);
+}
+
+// On black, the card shows by its gray edge just outside it.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheBlackCardHasAGrayEdge) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  const SkBitmap window = CaptureWindow(browser());
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+  const float scale = static_cast<float>(window.width()) / bounds.width();
+  gfx::Rect card = view->toolbar()->GetBoundsInScreen();
+  card.Union(view->multi_contents_view()->GetBoundsInScreen());
+  card.Offset(-bounds.OffsetFromOrigin());
+  const auto color_at = [&](float x, float y) {
+    return window.getColor(base::ClampFloor(x * scale),
+                           base::ClampFloor(y * scale));
+  };
+  const float middle_x = card.CenterPoint().x();
+  const float middle_y = card.CenterPoint().y();
+  EXPECT_LE(Gap(color_at(middle_x, card.y() - 0.5f), kBlackCardEdge), 3);
+  EXPECT_LE(Gap(color_at(middle_x, card.bottom() + 0.5f), kBlackCardEdge), 3);
+  EXPECT_LE(Gap(color_at(card.right() + 0.5f, middle_y), kBlackCardEdge), 3);
+  EXPECT_LE(Gap(color_at(card.x() - 0.5f, middle_y), kBlackCardEdge), 3);
+  EXPECT_LE(Gap(color_at(middle_x, card.y() - 4), SK_ColorBLACK), 3);
+}
+
+// uw's own pages use the same blacks in dark mode.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackInDarkMode) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("chrome://chat/")));
+  EXPECT_EQ(
+      content::EvalJs(browser()->tab_strip_model()->GetActiveWebContents(),
+                      "getComputedStyle(document.documentElement)"
+                      ".getPropertyValue('--background').trim()"),
+      "#0a0a0a");
+  SaveWindowScreenshot(browser(), "chat-dark");
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {

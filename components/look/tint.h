@@ -8,9 +8,15 @@
 
 namespace uw {
 
-// The tints used until the user picks a color.
+// The tint used in light mode until the user picks a color.
 inline constexpr SkColor kDefaultLightTint = SkColorSetRGB(0xE7, 0xE1, 0xF6);
-inline constexpr SkColor kDefaultDarkTint = SkColorSetRGB(0x2B, 0x25, 0x42);
+
+// Dark mode is black, after Vercel's neutral blacks: the window is black and
+// the page card and its toolbar near-black, with a gray edge.
+inline constexpr SkColor kBlackCard = SkColorSetRGB(0x0A, 0x0A, 0x0A);
+inline constexpr SkColor kBlackCardEdge = SkColorSetRGB(0x26, 0x26, 0x26);
+inline constexpr SkColor kBlackCardLine = SkColorSetRGB(0x1F, 0x1F, 0x1F);
+inline constexpr SkColor kBlackCardField = SkColorSetRGB(0x17, 0x17, 0x17);
 
 // Text on a tint is one of these two.
 inline constexpr SkColor kDarkTextOnTint = SkColorSetRGB(0x1E, 0x1B, 0x2E);

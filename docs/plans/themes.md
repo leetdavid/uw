@@ -1,6 +1,6 @@
 # Themes
 
-Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T94 to T97 are next. Not built.
+Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T95, black dark mode, is built and in review. T94, T96, and T97 are next.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Gradients, black dark mode, and the saved theme reuse the tint code that exists. The picker is the risk: a color field with dots to drag is a custom control.
 
@@ -44,8 +44,8 @@ The rules, with every color, are in the `uw-themes` guide. Two details the desig
 Each stage is a ticket on the [board](roadmap.md#board).
 
 1. T93: the designs on the canvas, signed off by the user.
-2. T94: the theme: up to three colors, intensity, and grain, saved per profile, the suggested themes, and moving today's tint into a theme.
-3. T95: black dark mode in uw's window and pages, and "Theme colors in dark mode".
+2. T94: the theme: up to three colors, intensity, and grain, saved per profile, the suggested themes, moving today's tint into a theme, and "Theme colors in dark mode".
+3. T95: black dark mode in uw's window and pages.
 4. T96: the picker: the color field and its dots, live changes, and the ways to open it.
 5. T97: grain drawn over the theme.
 

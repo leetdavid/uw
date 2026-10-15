@@ -8,11 +8,15 @@
 
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
+#include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/view.h"
+#include "ui/views/widget/widget.h"
+#include "uw/browser/ui/look/page_card.h"
 #include "uw/components/look/tint.h"
 
 #if BUILDFLAG(IS_MAC)
@@ -55,6 +59,28 @@ void PaintTint(gfx::Canvas* canvas,
     PaintWindowButtonDots(canvas, view, kDarkTextOnTint);
   }
 #endif
+}
+
+void PaintPageCardEdge(gfx::Canvas* canvas,
+                       const views::View* view,
+                       const views::View* toolbar,
+                       const views::View* page) {
+  const SkColor color = view->GetColorProvider()->GetColor(kColorPageCardEdge);
+  if (SkColorGetA(color) == SK_AlphaTRANSPARENT ||
+      view->GetWidget()->IsFullscreen()) {
+    return;
+  }
+  gfx::RectF edge = views::View::ConvertRectToTarget(
+      toolbar, view, gfx::RectF(toolbar->GetLocalBounds()));
+  edge.Union(views::View::ConvertRectToTarget(
+      page, view, gfx::RectF(page->GetLocalBounds())));
+  edge.Outset(0.5f);
+  cc::PaintFlags flags;
+  flags.setAntiAlias(true);
+  flags.setStyle(cc::PaintFlags::kStroke_Style);
+  flags.setStrokeWidth(1);
+  flags.setColor(color);
+  canvas->DrawRoundRect(edge, kPageCardRadius + 0.5f, flags);
 }
 
 }  // namespace uw

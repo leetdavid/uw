@@ -15,6 +15,7 @@ namespace {
 constexpr SkColor kButter = SkColorSetRGB(0xF7, 0xE0, 0x8A);
 constexpr SkColor kWine = SkColorSetRGB(0x5A, 0x1F, 0x3A);
 constexpr SkColor kRoyal = SkColorSetRGB(0x27, 0x47, 0xC7);
+constexpr SkColor kIndigo = SkColorSetRGB(0x2B, 0x25, 0x42);
 
 double Hue(SkColor color) {
   color_utils::HSL hsl;
@@ -38,7 +39,7 @@ TEST(TintTest, EndsFortyDegreesAroundTheWheelAtTheSameLightness) {
   EXPECT_EQ(butter.end, SkColorSetRGB(0xF7, 0x97, 0x8A));
   EXPECT_NEAR(Lightness(butter.end), Lightness(butter.start), 0.01);
 
-  const Tint dark = TintFrom(kDefaultDarkTint);
+  const Tint dark = TintFrom(kIndigo);
   EXPECT_NEAR(Hue(dark.start) - Hue(dark.end), 40, 2);
 }
 
@@ -57,7 +58,7 @@ TEST(TintTest, LightTintsTakeDarkText) {
 }
 
 TEST(TintTest, DarkTintsTakeWhiteText) {
-  for (SkColor picked : {kDefaultDarkTint, kWine, SK_ColorBLACK}) {
+  for (SkColor picked : {kIndigo, kWine, SK_ColorBLACK}) {
     const Tint tint = TintFrom(picked);
     EXPECT_EQ(TextColorOn(tint), kLightTextOnTint);
     EXPECT_TRUE(IsDark(tint));
@@ -65,7 +66,7 @@ TEST(TintTest, DarkTintsTakeWhiteText) {
 }
 
 TEST(TintTest, DefaultTintsKeepTextReadable) {
-  for (SkColor picked : {kDefaultLightTint, kDefaultDarkTint}) {
+  for (SkColor picked : {kDefaultLightTint, kIndigo}) {
     const Tint tint = TintFrom(picked);
     for (SkColor background : {tint.start, tint.end}) {
       EXPECT_GE(color_utils::GetContrastRatio(background, TextColorOn(tint)),
@@ -97,7 +98,7 @@ TEST(TintTest, ANudgedPickKeepsItsHue) {
 
 TEST(TintTest, ActiveTabIsWhiteOnLightAndTranslucentOnDark) {
   EXPECT_EQ(ActiveTabOn(TintFrom(kDefaultLightTint)), SK_ColorWHITE);
-  const Tint dark = TintFrom(kDefaultDarkTint);
+  const Tint dark = TintFrom(kIndigo);
   EXPECT_GT(color_utils::GetRelativeLuminance(ActiveTabOn(dark)),
             color_utils::GetRelativeLuminance(FillOn(dark)));
   EXPECT_GT(color_utils::GetRelativeLuminance(FillOn(dark)),
