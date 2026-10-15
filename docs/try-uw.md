@@ -56,6 +56,18 @@ Open the `Tab` and `Tasks` menus in the menu bar. Each uw command is there with 
 
 Expected result: each key does what its menu item says. A page that uses the same key for itself keeps it.
 
+### Collapse a branch
+
+Open a few links from one page with Cmd-click, so they sit under it.
+
+- Point at the page's tab. Its favicon turns into a chevron. Click the chevron: the tabs under it hide and the row ends in their number.
+- Ctrl+Cmd+. does the same for the selected tab, and `Collapse branch` in a tab's right-click menu for that tab. Each turns into `Expand` once the branch is collapsed.
+- Ctrl+Tab skips the hidden tabs. Collapsing the branch of the tab you are on selects the page at its top.
+- Cmd-click another link on the page: the new tab stays hidden and the number goes up. A link opened in front expands the branch.
+- Quit and reopen uw with "Continue where you left off": the branch is still collapsed.
+
+Expected result: the hidden tabs stay open and come back in place. Closing the collapsed tab shows them one level up.
+
 ### Organize button
 
 Click `Organize` at the foot of the sidebar.

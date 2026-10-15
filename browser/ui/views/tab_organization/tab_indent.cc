@@ -28,26 +28,37 @@ TabOrganizationController* ControllerFor(TabCollectionNode* node) {
                : nullptr;
 }
 
+// The tab `child` shows, or null when it shows something else.
+const tabs::TabInterface* TabShownBy(TabCollectionNode* parent,
+                                     const views::View* child) {
+  if (!parent) {
+    return nullptr;
+  }
+  for (const auto& node : parent->children()) {
+    if (node->view() == child && node->type() == TabCollectionNode::Type::TAB) {
+      return std::get<tabs::ConstDanglingUntriagedTabInterface>(
+                 node->GetNodeData())
+          .get();
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 int TabIndentFor(TabCollectionNode* parent, const views::View* child) {
-  if (!parent) {
-    return 0;
-  }
-  for (const auto& node : parent->children()) {
-    if (node->view() != child ||
-        node->type() != TabCollectionNode::Type::TAB) {
-      continue;
-    }
-    const TabOrganizationController* controller = ControllerFor(node.get());
-    const tabs::TabInterface* tab =
-        std::get<tabs::ConstDanglingUntriagedTabInterface>(node->GetNodeData())
-            .get();
-    return controller ? std::min(controller->DepthFor(tab), kMaxIndentLevels) *
-                            kIndentPerLevel
-                      : 0;
-  }
-  return 0;
+  const tabs::TabInterface* tab = TabShownBy(parent, child);
+  const TabOrganizationController* controller = ControllerFor(parent);
+  return tab && controller
+             ? std::min(controller->DepthFor(tab), kMaxIndentLevels) *
+                   kIndentPerLevel
+             : 0;
+}
+
+bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child) {
+  const tabs::TabInterface* tab = TabShownBy(parent, child);
+  const TabOrganizationController* controller = ControllerFor(parent);
+  return tab && controller && controller->IsHidden(tab);
 }
 
 base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,

@@ -16,9 +16,11 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
+#include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/views/view.h"
@@ -162,6 +164,20 @@ bool IsWindowCommandChecked(BrowserWindowInterface* window, int command) {
   return command == kShowOrganizerActivity &&
          window->GetProfile()->GetPrefs()->GetBoolean(
              kOrganizationShowActivityPref);
+}
+
+std::optional<std::u16string> GetWindowCommandTitle(
+    BrowserWindowInterface* window,
+    int command) {
+  const TabOrganizationController* controller =
+      TabOrganizationController::From(window);
+  if (!controller || command != TabOrganizationController::kToggleBranch) {
+    return std::nullopt;
+  }
+  return l10n_util::GetStringUTF16(
+      controller->CollapsesBranches(controller->SelectionFor())
+          ? IDS_UW_COLLAPSE_BRANCH_MAC
+          : IDS_UW_EXPAND_BRANCH_MAC);
 }
 
 }  // namespace uw

@@ -18,6 +18,7 @@
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "uw/browser/tab_organization/hidden_tabs.h"
 #include "uw/components/tab_organization/page_tree.h"
 
 class BrowserWindowInterface;
@@ -36,7 +37,8 @@ namespace uw {
 // Owned by EmbedderBrowserWindowFeatures. Mirrors the window's unpinned tabs
 // into a PageTree and applies tree changes back through TabStripModel. A task
 // is a native tab group; this class never draws one.
-class TabOrganizationController : public TabStripModelObserver {
+class TabOrganizationController : public TabStripModelObserver,
+                                  public HiddenTabs {
  public:
   DECLARE_USER_DATA(TabOrganizationController);
   static constexpr char kSessionKey[] = "uw.page_tree";
@@ -51,10 +53,14 @@ class TabOrganizationController : public TabStripModelObserver {
     kUndo,
     kMoveUp,
     kMoveDown,
-    kLastCommand = kMoveDown,
+    kToggleBranch,
+    kLastCommand = kToggleBranch,
   };
   static bool IsCommand(int command);
-  static void AppendCommands(ui::SimpleMenuModel* menu);
+
+  // Adds the commands to the menu of a tab whose commands act on `ids`.
+  void AppendCommands(ui::SimpleMenuModel* menu,
+                      const std::vector<PageId>& ids) const;
 
   explicit TabOrganizationController(BrowserWindowInterface* window);
   ~TabOrganizationController() override;
@@ -109,6 +115,20 @@ class TabOrganizationController : public TabStripModelObserver {
   bool MoveUp(const PageId& id);
   bool MoveDown(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);
+
+  // A collapsed branch hides the tabs under its top page. Collapsing is not
+  // an organization action, so undo leaves it alone.
+  bool IsCollapsed(const PageId& id) const { return collapsed_.contains(id); }
+  // True when a collapsed branch hides `id`. Horizontal tabs hide nothing.
+  bool IsHidden(const PageId& id) const;
+  bool IsHidden(const tabs::TabInterface* tab) const override;
+  // True when ToggleBranches would collapse the branches of `ids`, false
+  // when it would expand them.
+  bool CollapsesBranches(const std::vector<PageId>& ids) const;
+  // Collapses the branches of `ids` that have tabs under them, or expands
+  // them when all are collapsed. The selected tab never hides: the top page
+  // of its branch is selected in its place.
+  void ToggleBranches(const std::vector<PageId>& ids);
   // Selects the tab used last in `task`, or in the Scratchpad when `task` is
   // empty. Returns false when it holds no tab.
   bool SelectTask(const std::string& task);
@@ -168,6 +188,15 @@ class TabOrganizationController : public TabStripModelObserver {
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
+  // Roots of `ids` with tabs under them.
+  std::vector<PageId> Parents(const std::vector<PageId>& ids) const;
+  bool Vertical() const;
+  // True when a collapsed branch holds `id` below its top page, also while
+  // horizontal tabs show it.
+  bool InCollapsedBranch(const PageId& id) const;
+  // Expands every collapsed branch that holds the selected tab below its top
+  // page.
+  void RevealSelected();
   // Takes each of `staying` out of the branches of `roots`.
   void LeaveBehind(const std::vector<PageId>& roots,
                    const std::vector<PageId>& staying);
@@ -204,6 +233,8 @@ class TabOrganizationController : public TabStripModelObserver {
   // The name uw gave each task. It is saved with every page of the task, so
   // it comes back with the session.
   std::map<std::string, std::u16string> generated_names_;
+  // Pages whose branch is collapsed. Saved with the session.
+  std::set<PageId> collapsed_;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;

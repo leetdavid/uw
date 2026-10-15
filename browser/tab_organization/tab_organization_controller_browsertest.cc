@@ -13,6 +13,7 @@
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -23,17 +24,25 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/common/pref_names.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
+#include "ui/events/base_event_utils.h"
+#include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/animation_test_api.h"
+#include "ui/gfx/geometry/point_f.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/label.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 
 namespace uw {
 namespace {
@@ -58,10 +67,13 @@ class TabOrganizationControllerBrowserTest
   }
 
   // Opens a background tab the way Cmd-clicking a link in `source` does.
-  tabs::TabInterface* OpenLinkFrom(tabs::TabInterface* source) {
-    NavigateParams params(browser(), GURL("about:blank"),
-                          ui::PAGE_TRANSITION_LINK);
-    params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+  tabs::TabInterface* OpenLinkFrom(
+      tabs::TabInterface* source,
+      const GURL& url = GURL("about:blank"),
+      WindowOpenDisposition disposition =
+          WindowOpenDisposition::NEW_BACKGROUND_TAB) {
+    NavigateParams params(browser(), url, ui::PAGE_TRANSITION_LINK);
+    params.disposition = disposition;
     params.source_contents = source->GetContents();
     Navigate(&params);
     tabs::TabInterface* tab =
@@ -119,6 +131,28 @@ class TabOrganizationControllerBrowserTest
 
   // The tab rows of the sidebar, top to bottom.
   std::vector<views::View*> TabRows() { return ViewsOfClass("TabView"); }
+
+  std::vector<views::View*> VisibleRows() {
+    std::vector<views::View*> rows = TabRows();
+    std::erase_if(rows, [](views::View* row) { return !row->GetVisible(); });
+    return rows;
+  }
+
+  // The child of `row` of the class `name`.
+  views::View* PartOf(views::View* row, std::string_view name) {
+    for (views::View* child : row->children()) {
+      if (std::string_view(child->GetClassName()) == name) {
+        return child;
+      }
+    }
+    return nullptr;
+  }
+
+  void Collapse(tabs::TabInterface* tab) {
+    ASSERT_TRUE(controller()->CollapsesBranches({Id(tab)}));
+    controller()->ToggleBranches({Id(tab)});
+    base::RunLoop().RunUntilIdle();
+  }
 
   std::u16string TitleOf(const tab_groups::TabGroupId& group) {
     return tabs()->group_model()->GetTabGroup(group)->visual_data()->title();
@@ -491,6 +525,236 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(controller()->tree().pages().size(), 6u);
   ExpectStripMatchesTree();
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ACollapsedBranchHidesItsTabsAndCountsThem) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  tabs::TabInterface* grandchild = OpenLinkFrom(child);
+  tabs::TabInterface* after = NewTab();
+  EXPECT_FALSE(controller()->CanExecute(
+      TabOrganizationController::kToggleBranch, {Id(after)}));
+  ASSERT_EQ(VisibleRows().size(), 4u);
+
+  Collapse(page);
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+  EXPECT_TRUE(controller()->IsHidden(Id(child)));
+  EXPECT_TRUE(controller()->IsHidden(Id(grandchild)));
+  EXPECT_FALSE(controller()->IsHidden(Id(page)));
+  EXPECT_FALSE(controller()->IsHidden(Id(after)));
+  std::vector<views::View*> rows;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    rows = VisibleRows();
+    return rows.size() == 2u && rows[1]->GetBoundsInScreen().y() ==
+                                    rows[0]->GetBoundsInScreen().bottom() + 2;
+  }));
+  auto* count = static_cast<views::Label*>(PartOf(rows[0], "HiddenCount"));
+  ASSERT_TRUE(count);
+  EXPECT_TRUE(count->GetVisible());
+  EXPECT_EQ(count->GetText(), u"2");
+  EXPECT_FALSE(PartOf(rows[1], "HiddenCount")->GetVisible());
+  SaveWindowScreenshot(browser(), "branch-collapsed");
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  chrome::SelectNextTab(browser());
+  EXPECT_EQ(tabs()->GetActiveTab(), after);
+  chrome::SelectPreviousTab(browser());
+  EXPECT_EQ(tabs()->GetActiveTab(), page);
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheChevronTakesTheFaviconsPlaceAndCollapsesTheBranch) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  OpenLinkFrom(page);
+  std::vector<views::View*> rows = VisibleRows();
+  ASSERT_EQ(rows.size(), 2u);
+  views::View* toggle = PartOf(rows[0], "BranchToggle");
+  views::View* icon = PartOf(rows[0], "TabIcon");
+  ASSERT_TRUE(toggle);
+  ASSERT_TRUE(icon);
+  EXPECT_FALSE(toggle->GetVisible());
+  EXPECT_TRUE(icon->GetVisible());
+
+  const ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::PointF(),
+                             gfx::PointF(), ui::EventTimeForNow(), ui::EF_NONE,
+                             ui::EF_NONE);
+  rows[1]->OnMouseEntered(enter);
+  rows = VisibleRows();
+  EXPECT_FALSE(PartOf(rows[1], "BranchToggle")->GetVisible());
+  rows[0]->OnMouseEntered(enter);
+  rows = VisibleRows();
+  EXPECT_TRUE(toggle->GetVisible());
+  EXPECT_FALSE(icon->GetVisible());
+  EXPECT_EQ(toggle->GetBoundsInScreen().CenterPoint(),
+            icon->GetBoundsInScreen().CenterPoint());
+  SaveWindowScreenshot(browser(), "branch-chevron");
+
+  views::test::ButtonTestApi(views::Button::AsButton(toggle))
+      .NotifyDefaultMouseClick();
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+  EXPECT_EQ(tabs()->GetActiveTab(), page);
+  ASSERT_TRUE(base::test::RunUntil([&] { return VisibleRows().size() == 1u; }));
+  SaveWindowScreenshot(browser(), "branch-chevron-collapsed");
+
+  rows[0]->OnMouseExited(
+      ui::MouseEvent(ui::EventType::kMouseExited, gfx::PointF(), gfx::PointF(),
+                     ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  VisibleRows();
+  EXPECT_FALSE(toggle->GetVisible());
+  EXPECT_TRUE(icon->GetVisible());
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       SelectingAHiddenTabExpandsItsBranch) {
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  tabs::TabInterface* grandchild = OpenLinkFrom(child);
+  Collapse(child);
+  Collapse(page);
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(grandchild));
+  EXPECT_FALSE(controller()->IsCollapsed(Id(page)));
+  EXPECT_FALSE(controller()->IsCollapsed(Id(child)));
+  EXPECT_FALSE(controller()->IsHidden(Id(grandchild)));
+
+  // Collapsing the branch the selected tab is in selects its top tab.
+  Collapse(page);
+  EXPECT_EQ(tabs()->GetActiveTab(), page);
+  EXPECT_TRUE(controller()->IsHidden(Id(grandchild)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       OnlyALinkOpenedInFrontExpandsACollapsedBranch) {
+  tabs::TabInterface* page = InitialTab();
+  OpenLinkFrom(page);
+  Collapse(page);
+  tabs::TabInterface* behind = OpenLinkFrom(page);
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+  EXPECT_TRUE(controller()->IsHidden(Id(behind)));
+
+  tabs::TabInterface* front = OpenLinkFrom(
+      page, GURL("about:blank"), WindowOpenDisposition::NEW_FOREGROUND_TAB);
+  EXPECT_EQ(tabs()->GetActiveTab(), front);
+  EXPECT_EQ(controller()->DepthFor(front), 1);
+  EXPECT_FALSE(controller()->IsCollapsed(Id(page)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ClosingACollapsedTabShowsItsTabsOneLevelUp) {
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  tabs::TabInterface* grandchild = OpenLinkFrom(child);
+  NewTab();
+  Collapse(page);
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(page),
+                             TabCloseTypes::CLOSE_NONE);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(controller()->DepthFor(child), 0);
+  EXPECT_FALSE(controller()->IsHidden(Id(child)));
+  EXPECT_FALSE(controller()->IsHidden(Id(grandchild)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       MovesAndUndoLeaveABranchCollapsed) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  NewTab();
+  Collapse(page);
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(page)}, u"Plan"));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(child->GetGroup(), page->GetGroup());
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+  EXPECT_TRUE(controller()->IsHidden(Id(child)));
+  ASSERT_TRUE(base::test::RunUntil([&] { return VisibleRows().size() == 2u; }));
+
+  controller()->Undo();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheTabMenuSaysWhichWayTheBranchGoes) {
+  tabs::TabInterface* page = InitialTab();
+  OpenLinkFrom(page);
+  const auto label = [&] {
+    ui::SimpleMenuModel menu(nullptr);
+    controller()->AppendCommands(&menu, {Id(page)});
+    return menu.GetLabelAt(
+        menu.GetIndexOfCommandId(TabOrganizationController::kToggleBranch)
+            .value());
+  };
+  EXPECT_EQ(label(), u"Collapse branch");
+  Collapse(page);
+  EXPECT_EQ(label(), u"Expand branch");
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       HorizontalTabsCollapseNothing) {
+  const auto vertical = [&](bool on) {
+    browser()->GetProfile()->GetPrefs()->SetBoolean(
+        ::prefs::kVerticalTabsEnabled, on);
+    base::RunLoop().RunUntilIdle();
+  };
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(page);
+  Collapse(page);
+  vertical(false);
+  EXPECT_FALSE(controller()->IsHidden(Id(child)));
+  EXPECT_FALSE(controller()->CanExecute(
+      TabOrganizationController::kToggleBranch, {Id(page)}));
+  vertical(true);
+  EXPECT_TRUE(controller()->IsHidden(Id(child)));
+
+  // Selecting a tab that the sidebar would hide expands its branch.
+  vertical(false);
+  chrome::SelectNextTab(browser());
+  EXPECT_EQ(tabs()->GetActiveTab(), child);
+  EXPECT_FALSE(controller()->IsCollapsed(Id(page)));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PRE_ACollapsedBranchStaysCollapsedAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://version/")));
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* child =
+      OpenLinkFrom(page, GURL("chrome://version/?child"));
+  ASSERT_TRUE(content::WaitForLoadStop(child->GetContents()));
+  Collapse(page);
+  // Lets the session take the tabs' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ACollapsedBranchStaysCollapsedAfterARestart) {
+  const auto tab_at = [&](std::string_view url) -> tabs::TabInterface* {
+    for (int i = 0; i < tabs()->count(); ++i) {
+      tabs::TabInterface* tab = tabs()->GetTabAtIndex(i);
+      if (tab->GetContents()->GetVisibleURL() == GURL(url)) {
+        return tab;
+      }
+    }
+    return nullptr;
+  };
+  tabs::TabInterface* page = nullptr;
+  tabs::TabInterface* child = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    page = tab_at("chrome://version/");
+    child = tab_at("chrome://version/?child");
+    return page && child && controller()->DepthFor(child) == 1;
+  }));
+  EXPECT_TRUE(controller()->IsCollapsed(Id(page)));
+  EXPECT_TRUE(controller()->IsHidden(Id(child)));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

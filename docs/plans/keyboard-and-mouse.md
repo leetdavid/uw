@@ -1,10 +1,10 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, is built and in review. The other tickets wait for approval. The [command bar](command-bar.md) follows this plan and runs the commands it defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. The other tickets wait for approval. The [command bar](command-bar.md) follows this plan and runs the commands it defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
-Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse". Nothing is drawn there yet.
+Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse". Branch collapse is drawn there.
 
 ## Agreed scope
 
@@ -46,12 +46,16 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 
 - Dragging a parent tab carries its whole branch and keeps its nesting. Option-drag moves only that tab, and its children move up one level as they do today.
 - While a tab is dragged, its indent follows the pointer's horizontal position. It can sit anywhere from the task's top level to one level deeper than the tab above it. The drop keeps the depth shown.
-- A parent tab has a chevron in its indent space. A click collapses or expands its branch. A collapsed parent shows how many tabs it hides.
+- While the pointer is on a parent tab, a chevron takes the place of its favicon. A click collapses or expands its branch and leaves the selection alone. A tab at the top level has no indent space, so the chevron cannot sit there.
+- A collapsed parent keeps its favicon and ends its row with the number of tabs it hides, in the muted text color. The title gives way to it.
 - Collapsed branches follow Chromium's rules for collapsed tab groups:
   - Ctrl+Tab and next or previous tab skip hidden tabs.
   - Selecting a hidden tab any other way expands its branch. This covers Cmd+1 to 9, the command bar, a link opened in front, and the organizer moving the selected tab.
+  - Collapsing the branch of the selected tab selects the parent at its top.
   - Closing a collapsed parent moves its children up one level, where they show again.
-  - The collapse survives a restart. The organizer never changes it.
+  - A link opened in the background from a collapsed branch stays hidden, and the count goes up.
+  - The collapse survives a restart. The organizer and undo never change it.
+- Horizontal tabs show every tab, and the command is off there. A branch keeps its collapse for the sidebar, unless a tab in it is selected.
 - Drags and the chevron count as [manual adjustments](../CONTEXT.md#language), like the menu commands.
 
 ### Mouse actions
@@ -87,7 +91,9 @@ Once the command bar lands, the "+" and the double-click open it instead of a bl
 - The menu bar, the keys, the tab menu, and the Organize menu all run commands through `browser/ui/views/tab_organization/window_commands`.
 - Branch drags extend Chromium's drag set to the branch in `TabDragHandlerImpl::InitializeDrag`, which uw already hooks. Chromium already drags several selected tabs together.
 - The page tree's `Adopt` takes the depth the drop asked for. `tab_indent` shows it while the drag runs.
-- The page tree stores which parents are collapsed and saves it with the session data that already carries parent links. Hiding rows touches the vertical tab strip layout that `tab-tree.patch` already changes. Skipping hidden tabs needs a hook in `TabStripModel`, next to the code that skips collapsed groups.
+- `TabOrganizationController` keeps which parents are collapsed and saves it with the session data that already carries parent links. Collapsing is not an organization action, so it is not in the undo history.
+- Both vertical layouts that `tab-tree.patch` changes give a hidden row no height. The tab row places the chevron and the count from `browser/ui/views/tab_organization/branch_toggle`.
+- `TabStripModel::IsTabCollapsed` also asks `HiddenTabs`, which the controller provides through the window. Ctrl+Tab and the choice of the next tab after a close already skip collapsed groups through it.
 - The mouse switches are profile prefs read by the views they change.
 
 ## Stages
@@ -118,5 +124,5 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 ## Open questions
 
 - Whether window manager apps on the user's Mac already take Ctrl+Cmd with the arrows. Check by hand before T53 ships.
-- What collapse and sideways drags do in horizontal tabs. Proposal: both are off there, and collapsed branches show expanded.
+- What sideways drags do in horizontal tabs. Proposal: they are off there. Collapse was settled with T57: see [Branches with the mouse](#branches-with-the-mouse).
 - Where Ctrl+` returns to when the tab selected before the terminal has closed. Proposal: the tab above the terminal.

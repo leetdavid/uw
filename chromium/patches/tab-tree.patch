@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8e5b685d98e126932d3f65b86020a2315998f144 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..a99f6e98f3e13a583107b0ed6bc50c79fcb4c2ce 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,66 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,71 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -76,6 +76,11 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8e5b685d98e126932d3f65b86020a231
 +      <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
 +      <message name="IDS_UW_MOVE_BRANCH_DOWN_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, below the tab after it at the same level.">Move Branch Down</message>
 +      <message name="IDS_UW_CLOSE_BRANCH_MAC" desc="In Title Case: Closes the selected tab and every tab nested under it.">Close Branch</message>
++      <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the tabs nested under a tab in the tab sidebar.">Collapse branch</message>
++      <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the tabs nested under a tab again in the tab sidebar.">Expand branch</message>
++      <message name="IDS_UW_COLLAPSE_BRANCH_MAC" desc="In Title Case: Hides the tabs nested under the selected tab in the tab sidebar.">Collapse Branch</message>
++      <message name="IDS_UW_EXPAND_BRANCH_MAC" desc="In Title Case: Shows the tabs nested under the selected tab again in the tab sidebar.">Expand Branch</message>
++      <message name="IDS_UW_HIDDEN_TABS" desc="Tooltip of the number at the end of a tab in the tab sidebar whose nested tabs are hidden.">{COUNT, plural, =1 {1 hidden tab} other {# hidden tabs}}</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
@@ -283,7 +288,7 @@ index cdc7c0f..a260033 100644
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-index 1ad01e4..cfb11f7 100644
+index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..e8b6a9b7c48a2fdf32c91b912623f8cf4cee4c2f 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 @@ -3,6 +3,7 @@
@@ -302,7 +307,7 @@ index 1ad01e4..cfb11f7 100644
 +          uw::TabOrganizationController::From(browser_view_->browser());
 +      organizer && organizer->IdFor(tab)) {
 +    model->AddSeparator(ui::NORMAL_SEPARATOR);
-+    uw::TabOrganizationController::AppendCommands(model.get());
++    organizer->AppendCommands(model.get(), organizer->SelectionFor(tab));
 +  }
 +
    CHECK(browser_view_->tab_strip_view());
@@ -413,7 +418,7 @@ index 62e11c5a7a4f2d235b97fdaae2abb26a8b9aa053..d498e1538c77f404e259cf12612a146e
        "//chrome/browser/ui/tabs/organizer:unit_tests",
        "//chrome/browser/ui/tabs/saved_tab_groups",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..0fd2788971b9c8ccd4a03d3792fe7ecc5d771c7c 100644
+index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb78018866b1460f 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 @@ -22,12 +22,13 @@
@@ -431,7 +436,7 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..0fd2788971b9c8ccd4a03d3792fe7ecc
  constexpr int kGroupHeaderVerticalMargin = 4;
  }  // namespace
  
-@@ -132,6 +133,10 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+@@ -132,13 +133,22 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
      } else if (!is_focused) {
        child_x = TabGroupView::kTabLeadingPadding;
      }
@@ -442,6 +447,19 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..0fd2788971b9c8ccd4a03d3792fe7ecc
      bounds.set_x(child_x);
      // If width is bounded, child views should respect the width constraints
      // and take up the available width excluding trailing horizontal padding.
+     if (size_bounds.width().is_bounded()) {
+       bounds.set_width(size_bounds.width().value() - bounds.x());
+     }
+-    layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
++    if (uw::IsHiddenInBranch(tab_group_view->collection_node_, child)) {
++      bounds.set_height(0);
++      layouts.child_layouts.emplace_back(child, false, bounds);
++      continue;
++    }
++    layouts.child_layouts.emplace_back(child, CanBeVisible(child), bounds);
+     height += bounds.height() + kTabVerticalPadding;
+     width = std::max(width, bounds.width());
+   }
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0cb44f1ac2 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
@@ -497,7 +515,7 @@ index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..397943a376515aa3088ac117c5540fb0
  
  #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..478a22bca2adc3f28081ddc61a5e4126f162df59 100644
+index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05bda371b6 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 @@ -21,6 +21,8 @@
@@ -531,7 +549,18 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..478a22bca2adc3f28081ddc61a5e4126
      views::SizeBound child_height_bound = size_bounds.height();
      // In focused mode, pass the scroll viewport height constraint to the child
      // focused group if the incoming size bounds height is unbounded, so that
-@@ -202,6 +212,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -192,7 +202,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+ 
+     auto drag_data = tab_container_view->GetVisualDataForDraggedView(*child);
+     bool should_show_child =
+-        IsChildVisibleInContainer(tab_container_view, focused_group_id, child);
++        IsChildVisibleInContainer(tab_container_view, focused_group_id,
++                                  child) &&
++        !uw::IsHiddenInBranch(tab_container_view->collection_node_, child);
+ 
+     if (!should_show_child) {
+       layouts.child_layouts.emplace_back(
+@@ -202,6 +214,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
        continue;
      }
  
@@ -694,7 +723,7 @@ index a6c53969ea00adc6c6ca3b6c1f3611003b626650..770d0a6d622beb92bc6d281f7fd04930
    AddChildView(BuildSeparator());
  
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index fd63fdec82640fdb42de8388dfd691900f706674..0fd6ebbcb60f93584109400124281b59df90e92c 100644
+index fd63fdec82640fdb42de8388dfd691900f706674..f57ac25a21e3cc634c12fddaf2527c91eb515c60 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 @@ -69,6 +69,8 @@
@@ -706,7 +735,7 @@ index fd63fdec82640fdb42de8388dfd691900f706674..0fd6ebbcb60f93584109400124281b59
  
  namespace {
  
-@@ -388,6 +390,12 @@ void BrowserNativeWidgetMac::ValidateUserInterfaceItem(
+@@ -388,6 +390,13 @@ void BrowserNativeWidgetMac::ValidateUserInterfaceItem(
      result->enable = false;
      return;
    }
@@ -714,8 +743,114 @@ index fd63fdec82640fdb42de8388dfd691900f706674..0fd6ebbcb60f93584109400124281b59
 +    result->enable = uw::CanRunWindowCommand(browser, tag);
 +    result->set_toggle_state = tag == uw::kShowOrganizerActivity;
 +    result->new_toggle_state = uw::IsWindowCommandChecked(browser, tag);
++    result->new_title = uw::GetWindowCommandTitle(browser, tag);
 +    return;
 +  }
  
    // Generate return value (enabled state).
    result->enable = chrome::IsCommandEnabled(browser, tag);
+diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
+index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..bdcf2716a55ceb93087e497014193110297ec2f9 100644
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -320,6 +320,7 @@ if (!is_android) {
+     ]
+ 
+     deps = [
++      "//uw/browser/tab_organization:hidden_tabs",
+       ":tab_group",
+       ":tab_model",
+       ":tab_strip",
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
+index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442feb4963696 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.cc
++++ b/chrome/browser/ui/tabs/tab_strip_model.cc
+@@ -117,6 +117,7 @@
+ #include "ui/base/models/list_selection_model.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/gfx/range/range.h"
++#include "uw/browser/tab_organization/hidden_tabs.h"
+ 
+ using base::UserMetricsAction;
+ using content::WebContents;
+@@ -1514,7 +1515,14 @@ bool TabStripModel::IsTabPinned(int index) const {
+ 
+ bool TabStripModel::IsTabCollapsed(int index) const {
+   std::optional<tab_groups::TabGroupId> group = GetTabGroupForTab(index);
+-  return group.has_value() && IsGroupCollapsed(group.value());
++  if (group.has_value() && IsGroupCollapsed(group.value())) {
++    return true;
++  }
++  const tabs::TabInterface* tab = GetTabAtIndex(index);
++  const BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
++  const uw::HiddenTabs* hidden =
++      window ? uw::HiddenTabs::Get(window->GetUnownedUserDataHost()) : nullptr;
++  return hidden && hidden->IsHidden(tab);
+ }
+ 
+ bool TabStripModel::IsGroupCollapsed(
+@@ -3459,17 +3467,13 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
+     const gfx::Range& block_tab_range) const {
+   // Check tabs from the end of the block.
+   for (int i = block_tab_range.end(); i < count(); ++i) {
+-    std::optional<tab_groups::TabGroupId> current_group = GetTabGroupForTab(i);
+-    if (!current_group.has_value() ||
+-        (!IsGroupCollapsed(current_group.value()))) {
++    if (!IsTabCollapsed(i)) {
+       return i;
+     }
+   }
+   // Then check tabs before start_index, iterating backwards.
+   for (int i = block_tab_range.start() - 1; i >= 0; --i) {
+-    std::optional<tab_groups::TabGroupId> current_group = GetTabGroupForTab(i);
+-    if (!current_group.has_value() ||
+-        (!IsGroupCollapsed(current_group.value()))) {
++    if (!IsTabCollapsed(i)) {
+       return i;
+     }
+   }
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
+index e8d8cb4facb9428bab15389a8fb137ada0982a21..c5e77f3f34371d341023d217280e623962c7ce25 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
+@@ -90,6 +90,7 @@
+ #include "ui/views/view.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/tab_organization/branch_toggle.h"
+ 
+ namespace {
+ constexpr int kFocusRingInset = 0.0f;
+@@ -344,6 +345,10 @@ TabView::TabView(TabCollectionNode* collection_node)
+     }
+   }
+ 
++  if (orientation_ == TabStripOrientation::kVertical) {
++    uw::AddBranchControls(this, tab->GetHandle());
++  }
++
+   title_->SetProperty(views::kElementIdentifierKey, kVerticalTabTitleElementId);
+   SetProperty(views::kElementIdentifierKey, kTabElementId);
+   // Layout manager must be set after child views are created because the
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+index 6641560e2f254670b98975cfd02c81c3ed5ceea7..beb765161ab646d0a1400122df19462cf5ede66f 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+@@ -14,6 +14,7 @@
+ #include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
+ #include "chrome/browser/ui/views/tabs/tab/tab_title.h"
+ #include "chrome/browser/ui/views/tabs/tab_style_views.h"
++#include "uw/browser/ui/views/tab_organization/branch_toggle.h"
+ 
+ namespace {
+ constexpr int kIconDesignWidth = 16;
+@@ -94,6 +95,9 @@ views::ProposedLayout TabViewVerticalLayout::CalculateProposedLayout(
+     }
+   }
+ 
++  uw::LayOutBranchControls(TabView().icon_, TabView().title_,
++                           TabView().hovered_, layouts);
++
+   if (TabView().glic_tab_underline_view_) {
+     const gfx::Rect glic_bounds =
+         gfx::Rect(0, 0, 2 * glic::TabUnderlineView::kEffectThickness, height);

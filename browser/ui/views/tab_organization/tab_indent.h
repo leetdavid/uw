@@ -18,6 +18,10 @@ namespace uw {
 // when it is a tab nested under other pages. 0 for anything else.
 int TabIndentFor(TabCollectionNode* parent, const views::View* child);
 
+// True when `child`, the view of one of `parent`'s child nodes, is a tab that
+// a collapsed tab branch hides.
+bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child);
+
 // Lays out `container` and its child views again whenever the window's page
 // tree changes. `container` must own the returned subscription.
 base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,

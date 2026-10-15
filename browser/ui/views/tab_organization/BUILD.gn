@@ -2,6 +2,8 @@ source_set("tab_organization") {
   sources = [
     "activity_card.cc",
     "activity_card.h",
+    "branch_toggle.cc",
+    "branch_toggle.h",
     "name_lock.cc",
     "name_lock.h",
     "new_task_button.cc",

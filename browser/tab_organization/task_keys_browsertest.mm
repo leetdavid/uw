@@ -127,6 +127,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
       {TabOrganizationController::kMoveUp, up, kCtrlCmd},
       {TabOrganizationController::kMoveDown, down, kCtrlCmd},
       {TabOrganizationController::kCloseBranch, @"w", kOptionCmd},
+      {TabOrganizationController::kToggleBranch, @".", kCtrlCmd},
       {IDC_CREATE_NEW_TAB_GROUP, @"p", kCtrlCmd},
       {TabOrganizationController::kNewTask, @"n", kCtrlCmd},
       {TabOrganizationController::kScratchpad, @"s", kCtrlCmd},
@@ -192,6 +193,29 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, ArrowKeysNestAndMoveBranches) {
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{a, c, b}; }));
   EXPECT_EQ(tabs()->GetIndexOfTab(second), 2);
+}
+
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
+                       CtrlCmdPeriodCollapsesAndExpandsTheBranch) {
+  tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
+  tabs::TabInterface* child = OpenLinkFrom(parent);
+  Select(parent);
+  EXPECT_EQ(GetWindowCommandTitle(browser(),
+                                  TabOrganizationController::kToggleBranch),
+            u"Collapse Branch");
+
+  Press(ui::VKEY_OEM_PERIOD, kCtrlCmd);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return controller()->IsCollapsed(Id(parent)); }));
+  EXPECT_TRUE(controller()->IsHidden(Id(child)));
+  EXPECT_EQ(GetWindowCommandTitle(browser(),
+                                  TabOrganizationController::kToggleBranch),
+            u"Expand Branch");
+
+  Press(ui::VKEY_OEM_PERIOD, kCtrlCmd);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !controller()->IsCollapsed(Id(parent)); }));
+  EXPECT_FALSE(controller()->IsHidden(Id(child)));
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,

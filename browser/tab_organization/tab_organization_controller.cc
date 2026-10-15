@@ -52,7 +52,8 @@ DEFINE_USER_DATA(TabOrganizationController);
 
 TabOrganizationController::TabOrganizationController(
     BrowserWindowInterface* window)
-    : window_(window),
+    : HiddenTabs(window->GetUnownedUserDataHost()),
+      window_(window),
       tabs_(window->GetTabStripModel()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
   tabs_->AddObserver(this);
@@ -69,12 +70,18 @@ bool TabOrganizationController::IsCommand(int command) {
   return command >= kNewTask && command <= kLastCommand;
 }
 
-void TabOrganizationController::AppendCommands(ui::SimpleMenuModel* menu) {
+void TabOrganizationController::AppendCommands(
+    ui::SimpleMenuModel* menu,
+    const std::vector<PageId>& ids) const {
   menu->AddItem(kNewTask, l10n_util::GetStringUTF16(IDS_UW_NEW_TASK));
   menu->AddItem(kScratchpad,
                 l10n_util::GetStringUTF16(IDS_UW_MOVE_TO_SCRATCHPAD));
   menu->AddItem(kNest, l10n_util::GetStringUTF16(IDS_UW_NEST_BRANCH));
   menu->AddItem(kOutdent, l10n_util::GetStringUTF16(IDS_UW_OUTDENT_BRANCH));
+  menu->AddItem(
+      kToggleBranch,
+      l10n_util::GetStringUTF16(CollapsesBranches(ids) ? IDS_UW_COLLAPSE_BRANCH
+                                                       : IDS_UW_EXPAND_BRANCH));
   menu->AddItem(kUndo, l10n_util::GetStringUTF16(IDS_UW_UNDO_ORGANIZATION));
   menu->AddSeparator(ui::NORMAL_SEPARATOR);
   menu->AddItem(kCloseBranch, l10n_util::GetStringUTF16(IDS_UW_CLOSE_BRANCH));
@@ -128,6 +135,7 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
                  self->active_ == id ? self->previous_active_ : self->active_) {
     self->tree_.OpenBeside(*id, *beside);
   }
+  self->RevealSelected();
   self->ScheduleApply();
   self->ScheduleUpdate();
 }
@@ -154,6 +162,9 @@ void TabOrganizationController::RestoreTab(
   const std::string* parent = state->FindString("parent");
   if (parent && !parent->empty()) {
     self->restored_parents_[PageId(*id)] = PageId(*parent);
+  }
+  if (state->FindBool("collapsed").value_or(false)) {
+    self->collapsed_.insert(PageId(*id));
   }
   const std::string* task_name = state->FindString("task_name");
   if (task_name && tab->GetGroup()) {
@@ -238,9 +249,9 @@ bool TabOrganizationController::CanExecute(
     case kMoveDown:
       return roots.size() == 1 && tree_.NextSibling(roots.front());
     case kCloseBranch:
-      return std::ranges::any_of(roots, [this](const PageId& id) {
-        return tree_.BranchOf(id).size() > 1;
-      });
+      return !Parents(ids).empty();
+    case kToggleBranch:
+      return Vertical() && !Parents(ids).empty();
     default:
       return false;
   }
@@ -272,6 +283,9 @@ void TabOrganizationController::Execute(int command,
       break;
     case kCloseBranch:
       CloseBranches(ids);
+      break;
+    case kToggleBranch:
+      ToggleBranches(ids);
       break;
     case kUndo:
       Undo();
@@ -414,6 +428,62 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
           },
           weak_factory_.GetWeakPtr(), closing),
       false);
+}
+
+bool TabOrganizationController::IsHidden(const PageId& id) const {
+  return Vertical() && InCollapsedBranch(id);
+}
+
+bool TabOrganizationController::InCollapsedBranch(const PageId& id) const {
+  const Page* page = tree_.Find(id);
+  for (const Page* up = page ? tree_.Find(page->parent) : nullptr; up;
+       up = tree_.Find(up->parent)) {
+    if (collapsed_.contains(up->id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool TabOrganizationController::IsHidden(const tabs::TabInterface* tab) const {
+  const std::optional<PageId> id = IdFor(tab);
+  return id && IsHidden(*id);
+}
+
+bool TabOrganizationController::CollapsesBranches(
+    const std::vector<PageId>& ids) const {
+  const std::vector<PageId> parents = Parents(ids);
+  return parents.empty() ||
+         std::ranges::any_of(parents, [this](const PageId& id) {
+           return !collapsed_.contains(id);
+         });
+}
+
+void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
+  const std::vector<PageId> parents = Parents(ids);
+  if (parents.empty() || !Vertical()) {
+    return;
+  }
+  if (!CollapsesBranches(ids)) {
+    for (const PageId& id : parents) {
+      collapsed_.erase(id);
+    }
+  } else {
+    collapsed_.insert(parents.begin(), parents.end());
+    const std::optional<PageId> selected = IdFor(tabs_->GetActiveTab());
+    if (selected && InCollapsedBranch(*selected)) {
+      PageId top;
+      for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
+           up = tree_.Find(up->parent)) {
+        if (collapsed_.contains(up->id)) {
+          top = up->id;
+        }
+      }
+      tabs_->ActivateTabAt(tabs_->GetIndexOfTab(TabFor(top)));
+    }
+  }
+  NotifyManualMove(parents);
+  ScheduleUpdate();
 }
 
 bool TabOrganizationController::SelectTask(const std::string& task) {
@@ -648,6 +718,31 @@ std::vector<PageId> TabOrganizationController::Roots(
   return roots;
 }
 
+std::vector<PageId> TabOrganizationController::Parents(
+    const std::vector<PageId>& ids) const {
+  std::vector<PageId> parents = Roots(ids);
+  std::erase_if(parents, [this](const PageId& id) {
+    return tree_.BranchOf(id).size() < 2;
+  });
+  return parents;
+}
+
+bool TabOrganizationController::Vertical() const {
+  return window_->GetProfile()->GetPrefs()->GetBoolean(
+      prefs::kVerticalTabsEnabled);
+}
+
+void TabOrganizationController::RevealSelected() {
+  const std::optional<PageId> selected = IdFor(tabs_->GetActiveTab());
+  if (!selected || !InCollapsedBranch(*selected)) {
+    return;
+  }
+  for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
+       up = tree_.Find(up->parent)) {
+    collapsed_.erase(up->id);
+  }
+}
+
 void TabOrganizationController::LeaveBehind(
     const std::vector<PageId>& roots,
     const std::vector<PageId>& staying) {
@@ -697,6 +792,7 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   tree_.Adopt(strip, moved);
   std::erase_if(opened_, [this](const PageId& id) { return !tree_.Find(id); });
   LinkRestoredPages();
+  RevealSelected();
   ScheduleUpdate();
 }
 
@@ -833,8 +929,7 @@ void TabOrganizationController::ApplyWhenIdle() {
   apply_pending_ = false;
   // Horizontal tab drags do not report their start and end here, so the
   // strip is only put back in tree order on its own in vertical mode.
-  if (dragging_ || !window_->GetProfile()->GetPrefs()->GetBoolean(
-                       prefs::kVerticalTabsEnabled)) {
+  if (dragging_ || !Vertical()) {
     return;
   }
   Apply();
@@ -874,6 +969,13 @@ void TabOrganizationController::Update() {
                                 : SessionServiceFactory::GetForProfile(profile);
   std::erase_if(generated_names_,
                 [this](const auto& entry) { return !GroupFor(entry.first); });
+  // A restored parent keeps its collapse until its children are linked.
+  std::erase_if(collapsed_, [this](const PageId& id) {
+    return tree_.BranchOf(id).size() < 2 &&
+           !std::ranges::any_of(
+               restored_parents_,
+               [&](const auto& link) { return link.second == id; });
+  });
   std::map<PageId, std::string> states;
   for (const auto& [handle, id] : ids_) {
     const Page* page = tree_.Find(id);
@@ -885,6 +987,9 @@ void TabOrganizationController::Update() {
     base::DictValue state;
     state.Set("id", id.value());
     state.Set("parent", page->parent.value());
+    if (collapsed_.contains(id)) {
+      state.Set("collapsed", true);
+    }
     if (HasGeneratedName(page->task)) {
       state.Set("task_name", generated_names_[page->task]);
     }

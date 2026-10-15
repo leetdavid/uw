@@ -10,6 +10,7 @@ source_set("tab_organization") {
     "tab_organization_controller.h",
   ]
   public_deps = [
+    ":hidden_tabs",
     "//base",
     "//chrome/browser/ui/tabs:tab_strip",
     "//components/tab_groups",
@@ -35,6 +36,14 @@ source_set("tab_organization") {
     "//ui/menus",
     "//uw/browser/terminal",
   ]
+}
+
+source_set("hidden_tabs") {
+  sources = [
+    "hidden_tabs.cc",
+    "hidden_tabs.h",
+  ]
+  public_deps = [ "//ui/base/unowned_user_data" ]
 }
 
 source_set("browser_tests") {
