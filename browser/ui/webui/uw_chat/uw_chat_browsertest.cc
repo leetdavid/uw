@@ -555,7 +555,6 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, DeletingAChatClosesItsTab) {
   }));
 }
 
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
   UseAgentModel();
   model_.Script({ScriptedModel::Answer(
@@ -613,6 +612,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
             *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
 }
 
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {
   UseAgentModel();
   model_.Script(
       {ScriptedModel::Calls(base::ListValue().Append(
