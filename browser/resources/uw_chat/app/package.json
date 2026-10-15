@@ -11,13 +11,16 @@
     "@radix-ui/react-slot": "1.5.0",
     "@radix-ui/react-switch": "1.4.1",
     "@radix-ui/react-tooltip": "1.4.1",
+    "@streamdown/code": "2.0.0",
     "class-variance-authority": "0.7.1",
     "cn": "0.4.0",
     "lucide-react": "1.56.0",
     "motion": "14.2.0",
     "pdfjs-dist": "6.4.299",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "shiki": "4.5.0",
+    "streamdown": "2.7.0"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3",

@@ -48,6 +48,8 @@
   --color-info: var(--info);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  /* Streamdown frames code blocks in shadcn's sidebar color. */
+  --color-sidebar: var(--surface-1);
 }
 
 :root {
@@ -109,4 +111,26 @@ body {
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   margin: 0;
+}
+
+/* An answer reads like the messages around it: Fluid's prose at the message
+   size and in the text color. */
+.answer.typeset {
+  --typeset-body: var(--typeset-subtitle);
+  --typeset-body-leading: var(--typeset-subtitle-leading);
+  color: var(--foreground);
+}
+
+/* Streamdown's utilities space its blocks, and utilities win over Fluid's
+   components layer. Handing the margins back to that layer keeps Fluid's
+   spacing. */
+@layer utilities {
+  .answer.typeset > * {
+    margin-block: revert-layer;
+  }
+
+  /* Fluid spaces a pre, but Streamdown wraps code blocks in a div. */
+  .answer.typeset > * + [data-streamdown="code-block"] {
+    margin-block-start: var(--typeset-space-block);
+  }
 }

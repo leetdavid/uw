@@ -9,3 +9,5 @@ This adds a second way of building WebUI beside Chromium's `build_webui`, with R
 Considered options: Fluid's rules applied by hand in plain TypeScript, or in Lit, Chromium's own component library (rejected: either is a hand-made copy of components that already exist). Running the bundler from `pnpm run build` before Chromium's build (rejected: a build started with `autoninja` would serve a stale page).
 
 On 2026-10-15 a second page was agreed for v2.1: `uw://providers` is built from the same package, with its own entry in `app/bundle.ts`, so its model and effort chips are the chat composer's own components. See the [AI providers plan](../plans/ai-providers.md).
+
+With Markdown answers (T75, 2026-10-15) the bundle is about 3 MB, most of it Streamdown and the code grammars. See the [agent chats plan](../plans/agent-chats.md#design).

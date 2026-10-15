@@ -6,6 +6,8 @@ import { Fragment, StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import { Columns2, Loader2, Pause, Plus, Sparkles, Trash2 } from "lucide-react";
+import { code } from "@streamdown/code";
+import { defaultRehypePlugins, Streamdown, type Components } from "streamdown";
 import {
   Banner,
   BannerAction,
@@ -59,6 +61,54 @@ import {
   type SkillProposal,
   type Step,
 } from "@/chat-api";
+
+// Fluid's .typeset styles an answer by its plain elements, and Streamdown's
+// own classes would win over it, so prose renders bare. Code blocks keep
+// Streamdown's, for their colors and copy button.
+const PROSE_TAGS = [
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "p",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "hr",
+  "strong",
+  "em",
+  "del",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+] as const;
+
+const ANSWER_PARTS: Components = {
+  ...Object.fromEntries(PROSE_TAGS.map((tag) => [tag, tag])),
+  inlineCode: ({ node: _node, ...props }) => <code {...props} />,
+  table: ({ node: _node, ...props }) => (
+    <div className="typeset-scroll">
+      <table {...props} />
+    </div>
+  ),
+  // An answer loads nothing from the web, so an image shows its description.
+  img: ({ alt }) => alt ?? null,
+  // A link opens a tab under the chat. Any address but a web page's stays
+  // text.
+  a: ({ node: _node, href, children }) =>
+    href && /^https?:\/\//i.test(href) ? (
+      <a href={href} target="_blank">
+        {children}
+      </a>
+    ) : (
+      <span>{children}</span>
+    ),
+};
 
 // One step in plain words, as the chat and its tests show it.
 function describe(step: Step): string {
@@ -155,7 +205,23 @@ function Line({
     case StepKind.kAnswer:
       return (
         <ChatMessage from="assistant">
-          <span className="answer">{line.text}</span>
+          <Streamdown
+            className="answer typeset"
+            components={ANSWER_PARTS}
+            controls={{
+              code: { copy: true, download: false },
+              table: false,
+              mermaid: false,
+            }}
+            lineNumbers={false}
+            mode="static"
+            plugins={{ code }}
+            // Without Streamdown's raw HTML step, HTML in an answer shows
+            // as text.
+            rehypePlugins={[defaultRehypePlugins.sanitize]}
+          >
+            {line.text}
+          </Streamdown>
         </ChatMessage>
       );
     case StepKind.kFailed:

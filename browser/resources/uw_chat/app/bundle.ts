@@ -5,6 +5,7 @@
 //   bundle.ts --out <dir> --gen <root gen dir> --depfile <file>
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -65,6 +66,18 @@ const bundled = await esbuild.build({
       name: "uw-chat",
       setup(build) {
         build.onResolve({ filter: /^uw-chat-mojom$/ }, () => ({ path: mojom }));
+        build.onResolve({ filter: /^shiki$/ }, () => ({
+          path: join(app, "src/code-languages.ts"),
+        }));
+        // Markdown's browser build decodes entities such as &amp; through
+        // innerHTML, which the page's Trusted Types rules refuse. Its plain
+        // build looks them up in a table.
+        build.onResolve(
+          { filter: /^decode-named-character-reference$/ },
+          ({ path, resolveDir }) => ({
+            path: createRequire(join(resolveDir, "index.js")).resolve(path),
+          }),
+        );
         // Chromium serves these to every WebUI page.
         build.onResolve({ filter: /^\/\/resources\// }, ({ path }) => ({
           path,

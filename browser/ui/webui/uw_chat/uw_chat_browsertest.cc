@@ -556,6 +556,63 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, DeletingAChatClosesItsTab) {
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer(
+      "## Tours\n\n"
+      "| Tour | Price |\n| --- | --- |\n| Alfama | 29 |\n\n"
+      "```python\nprint(\"booked\")\n```\n\n"
+      "Fish &amp; chips for `two`. [Book it](" +
+      Form() +
+      ") or [run this](javascript:alert(1)).\n\n"
+      "![A map of the walk](https://shop.test/map.png)\n\n"
+      "<b>raw</b>")});
+  content::WebContents* chat = OpenChat();
+  content::WebContentsConsoleObserver console(chat);
+  console.SetFilter(base::BindRepeating(
+      [](const content::WebContentsConsoleObserver::Message& message) {
+        return message.log_level == blink::mojom::ConsoleMessageLevel::kError;
+      }));
+  Ask(chat, "Find a tour");
+
+  // Code blocks are colored once their grammar has loaded.
+  EXPECT_TRUE(content::ExecJs(
+      chat,
+      "new Promise(resolve => {"
+      "  const check = () => document.querySelector("
+      "      '.answer [data-streamdown=code-block] span[style*=\"--sdm-c\"]')"
+      "      ? resolve() : setTimeout(check, 20);"
+      "  check();"
+      "});"));
+  SaveWindowScreenshot(browser(), "markdown");
+  EXPECT_EQ(Lines(chat, ".answer h2"), std::vector<std::string>{"Tours"});
+  EXPECT_EQ(Lines(chat, ".answer td"),
+            (std::vector<std::string>{"Alfama", "29"}));
+  EXPECT_EQ(Lines(chat, ".answer p code"), std::vector<std::string>{"two"});
+  EXPECT_THAT(Lines(chat, ".answer p"),
+              testing::ElementsAre("Fish & chips for two. Book it or run this.",
+                                   "A map of the walk", "<b>raw</b>"));
+  EXPECT_EQ(Lines(chat, ".answer img"), std::vector<std::string>{});
+  EXPECT_EQ(content::EvalJs(chat,
+                            "[...document.querySelectorAll('.answer a')]"
+                            "    .map(link => link.href)")
+                .ExtractList(),
+            base::ListValue().Append(Form()));
+  EXPECT_EQ(Lines(chat, ".answer b"), std::vector<std::string>{});
+  EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
+
+  // A link opens its page in a tab under the chat and selects it.
+  EXPECT_TRUE(
+      content::ExecJs(chat, "document.querySelector('.answer a').click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs()->GetActiveWebContents()->GetVisibleURL().spec() == Form();
+  }));
+  TabOrganizationController* tree = TabOrganizationController::From(browser());
+  ASSERT_TRUE(tree);
+  EXPECT_EQ(tree->tree().Find(*tree->IdFor(tabs()->GetActiveTab()))->parent,
+            *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
+}
+
   UseAgentModel();
   model_.Script(
       {ScriptedModel::Calls(base::ListValue().Append(

@@ -3,3 +3,5 @@
 @import "./uw-theme.css";
 
 @source "./";
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
