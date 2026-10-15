@@ -140,6 +140,10 @@ A chat started from a private window. Nothing from it is kept after the private 
 **Agent memory**:
 Facts uw's agent has learned about the user, such as which bank they use. The user can read, edit, and clear them.
 
+**Skill**:
+Instructions that teach uw's agent how to do one kind of request, with a name and a one-line description. The agent sees every skill's description and reads a skill's instructions only when a request calls for it. Unlike agent memory, a skill says how to do something, not what is true about the user.
+_Avoid_: Prompt, routine, workflow.
+
 **Approval**:
 The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none.
 

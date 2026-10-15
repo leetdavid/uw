@@ -74,6 +74,12 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T64 | Tab search opens the command bar | backlog | 7/10 | Cmd+Shift+A narrows it to tabs and hides Chromium's tab search popup. Waits for approval. |
 | T65 | Aliases and recorded keys | backlog | 6/10 | Short words and keys for commands, kept per profile. Waits for approval. |
 | T66 | Math, currency, and translation | backlog | 7/10 | Local math, the European Central Bank's daily rates, and translation by the language model only when picked. Waits for approval. |
+| T67 | Short agent context | in progress | 7/10 | Per the plan's [Context](agent-chats.md#context): only each tab's latest reading stays in full during a request, every bulky result shrinks to one line when the model answers, `recall` brings back any step in full, requests stay under about 200,000 characters, and the model's own error text shows. Agreed on 2026-10-15. Done when `AgentLoopBrowserTest.*` shows a re-read tab sending only its newer reading, a follow-up request starting without page text, and `recall` returning a shrunk step. |
+| T68 | Saved chats and Continue | backlog | 7/10 | Each chat is saved after every step under its id in `uw://chat/<id>` and kept until the user deletes it. After a crash it comes back with its tabs, marked "Stopped when uw quit", and Continue picks up without repeating a step. Agreed on 2026-10-15. |
+| T69 | Chat page redesign | backlog | — | The chat page on the canvas with Fluid Functionalism's components and the Arc style guide: the chat list on the left, messages and steps, tab cards, side by side, an approval, a stopped chat with Continue, and the skills list. The user signs off before T70. |
+| T70 | Chat page in React | backlog | 6/10 | `uw://chat` rebuilt in React with Fluid Functionalism's components, bundled by a pnpm script, with the chat list on its left. Clicking a chat goes to its tab or reopens it. Starts by checking that React runs under the WebUI's script rules. |
+| T71 | Tab cards and side by side | backlog | 6/10 | A card per agent tab with its title, what the agent is doing there, and a screenshot after each step. "Side by side" opens the chat and the agent's current tab in Chromium's split view. |
+| T72 | Skills | backlog | 7/10 | SKILL.md skills from uw's skills folder, `~/.agents/skills`, and ones written in a chat after the user approves. All start on, with a switch each on the chat page. The agent sees each description and loads a skill with a `skill` tool. Scripts do not run. |
 
 ## 1. Choose the browser foundation
 
@@ -111,7 +117,7 @@ Done when a user can generate a page modification, inspect its site access, enab
 
 ## v2: agent chats
 
-[Chats](../product.md#chats) and scheduled chats, agreed on 2026-10-14. The [agent chats plan](agent-chats.md) has the releases and stages, T43 to T52 on the board.
+[Chats](../product.md#chats) and scheduled chats, agreed on 2026-10-14. The [agent chats plan](agent-chats.md) has the releases and stages, T43 to T52 and T67 to T72 on the board.
 
 Done when the plan's [acceptance checks](agent-chats.md#acceptance-checks-for-v20) pass and the user has handed real errands to a chat.
 

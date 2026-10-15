@@ -20,11 +20,21 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - Chats run on this Mac. Cloud runs are planned for later.
 - [Outside agents](../CONTEXT.md#language) reach the same tools through uw's own tool server, in v2.2.
 
+Added on 2026-10-15:
+
+- uw saves each chat after every step. A chat is kept until the user deletes it from the Chats list; clearing browsing data leaves it alone. Private chats are never saved.
+- After a crash, a chat that was running comes back with its tabs, marked "Stopped when uw quit", with Continue. It never repeats a step by itself.
+- The chat page lists the chats on its left. Clicking one goes to its tab, or reopens the tab if it was closed. The Chats list in the sidebar stays as well.
+- The chat page shows a card for each of the agent's tabs: its title, what the agent is doing there, and a screenshot from after the last step. Clicking a card goes to the tab. "Side by side" puts the chat and the agent's current tab in Chromium's split view.
+- The chat page is a React page built from [Fluid Functionalism](https://github.com/mickadesign/fluid-functionalism)'s components, styled after the [canvas](../../AGENTS.md#designs) style guide. It is redesigned on the canvas first and built once the user signs off.
+- The agent can use [skills](../CONTEXT.md#language) in the SKILL.md format: from uw's skills folder, from `~/.agents/skills`, and ones the agent writes in a chat after the user approves. All start on, and the chat page can turn each one off. A skill's scripts do not run.
+- The model gets a small context and can still reach everything; see [Context](#context).
+
 ## Releases
 
 | Release | Contents |
 | --- | --- |
-| v2.0 | Engine spike, Agent model setting, tools, agent loop, chat page, approvals, Ask box on the new tab page, Chats list, history and open-tab access, scheduled chats, private chats. |
+| v2.0 | Engine spike, Agent model setting, tools, agent loop, chat page, short context, saved chats, the redesigned chat page with tab cards, skills, approvals, Ask box on the new tab page, Chats list, history and open-tab access, scheduled chats, private chats. |
 | v2.1 | Chat cards on the new tab page, giving the agent a tab (it works in place, with Stop and Take over), agent memory, passwords and passkeys. |
 | v2.2 | Outside agents on the tool server. |
 | Later | Cloud runs. |
@@ -46,8 +56,20 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 - **Tools.** `browser/agent/agent_tools.h` holds uw's tools over the engine: open a child tab, navigate, read a page, click, and type. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls. Scroll and wait come when a chat needs them.
 - **Reading a page.** `components/agent/page_text.h` turns Chromium's annotated page content into lines of text. Each link, field, and button gets a number, such as `[2] button "Send"`, and the agent clicks or types by that number. A password's value is never shown, and ads are left out.
 - **Agent loop.** `browser/agent/agent_loop.h` runs in the browser process. It sends the conversation and the tools to the model in chat-completions form (`components/agent/agent_protocol.h`), runs the tools the model calls, and repeats until the model answers without a tool. It stops a chat that takes 40 turns without an answer. It reuses `RemoteModelClient` from `browser/tab_organization/`; that code and the Keychain code move to a shared place with T44, when the agent also needs the settings.
-- **Chat page.** `uw://chat` is a WebUI page in TypeScript, built like `uw://terminal`.
+- **Chat page.** `uw://chat` is a WebUI page. T47 built it in plain TypeScript, like `uw://terminal`; T70 rebuilds it in React with Fluid Functionalism, bundled by a pnpm script into files the WebUI serves.
+- **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. Its messages, steps, and every tool result in full are written to the profile folder after each step.
+- **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
 - **Approvals.** uw asks before every step the model marks as a change. It also asks before steps it can detect on its own: submitting a form, filling a password, and filling payment fields.
+
+## Context
+
+The model sees as little as it needs, and a `recall` tool brings back the rest.
+
+- While the agent works on a request, each tab's latest reading stays in full. An older reading of the same tab shrinks to one line naming the step, the page, and its length.
+- When the model answers, every bulky tool result from that request shrinks the same way. The user's messages, the answers, and the one-line steps stay.
+- `recall` returns an earlier step's result in full, by step number, also after a restart. A recalled page is a past copy: its element numbers cannot be clicked, so the agent reads the tab again to act.
+- A request to the model stays under about 200,000 characters. Above that, the oldest readings shrink first.
+- When the model refuses a request, the chat shows the model's own error text.
 
 ## Stages
 
@@ -58,11 +80,17 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 3. T45: agent tools over the engine, with a browser test per tool. Built: `AgentToolsBrowserTest.*` and `PageTextTest.*`.
 4. T46: agent loop. A browser test drives it with scripted tool calls from the test model server. Built: `AgentLoopBrowserTest.*` and `AgentProtocolTest.*`.
 5. T47: chat page, opened from "New chat" in the File menu and the sidebar's "+" menu, or from `uw://chat`. The agent's tabs nest under it, and the first message names the tab. A banner says the chat clicks and types without asking until T48. This is the first stage the user can try end to end.
-6. T48: approvals.
-7. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-8. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-9. T51: scheduled chats.
-10. T52: private chats.
+6. T67: short context, per [Context](#context).
+7. T68: saved chats and Continue after a crash.
+8. T69: the chat page redesigned on the canvas with Fluid Functionalism's components: the chat list, tab cards, side by side, an approval, a stopped chat, and the skills list.
+9. T70: the chat page in React with Fluid Functionalism, with the chat list on its left.
+10. T71: tab cards and side by side.
+11. T72: skills.
+12. T48: approvals.
+13. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+14. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+15. T51: scheduled chats.
+16. T52: private chats.
 
 ## Acceptance checks for v2.0
 
@@ -77,6 +105,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 ## Open questions
 
+- Whether React, Motion, and Radix run under the WebUI's script rules (Trusted Types and its content security policy). T70 checks this first. The Inter font has to ship inside uw, since WebUI pages cannot load web fonts.
 - Where a scheduled chat runs when its tab was closed or no window is open. Proposal: it reopens its chat tab in the background in the most recent window. With no window open, it waits and runs as a [catch-up run](../CONTEXT.md#language) when a window opens.
 - Whether the model also gets a screenshot of the page, beside its text. T46 decides.
 - Whether the engine's site checks need Safe Browsing on, and how its "sensitive site" prompt maps onto uw's approvals. The spike did not reach either.
