@@ -10,7 +10,7 @@ Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.
 | Suggestions come from Chromium's searchbox handler | Passed: `TypingListsSuggestions` gets rows back for typed text |
 | The settings switch turns it off and Cmd+T opens a blank tab again | Passed: `TurnedOffCmdTOpensATab`, `TurningItOffClosesIt`, and `UwOrganizationPageBrowserTest.TheCommandBarSwitchStartsOnAndTurnsItOff` |
 | Escape closes it and opens nothing | Passed in a real window: `MANUAL_EscapeClosesItAndOpensNothing`, and by hand |
-| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys is built; the real-window check is pending. See [below](#keys-typed-right-after-cmdt). |
+| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. Holding keys passed 10 of 10 real-window runs on 2026-10-16; the bar is 100 of 100. See [below](#keys-typed-right-after-cmdt). |
 
 ## Keys typed right after Cmd+T
 
@@ -41,7 +41,7 @@ What the work found, in the order it was tried:
 2. **Focusing it one task later.** Failed one real-window run.
 3. **Focusing it on the next animation frame.** Tried on the theory that Blink drops input until a shown page draws. Failed 3 of 3. Blink drops input itself (`WidgetInputHandlerManager`) only around a page load, so the theory was wrong.
 4. **Logging a real-window run.** In 3 runs, all six keys were held, the page reported its focused field about 12 ms after Cmd+T, and the browser refused each key as it was sent. The page saw no key events at all.
-5. **Trying refused keys again a frame later.** Passes the headless tests. Not yet run in a real window.
+5. **Trying refused keys again a frame later.** Passed 10 of 10 real-window runs on 2026-10-16, each opening the panel twice: once before its page had drawn and once after.
 
 Also found:
 
@@ -59,5 +59,5 @@ Also found:
 
 ## Still open
 
-- Whether keys typed right after Cmd+T land now that refused keys are tried again: `MANUAL_KeysTypedRightAfterCmdTLand` in a real window, run by the user.
+- `MANUAL_KeysTypedRightAfterCmdTLand` in 100 of 100 real-window runs, run by the user. 10 of 10 passed on 2026-10-16.
 - The 100 ms target from Cmd+T to the panel on screen. Not measured.
