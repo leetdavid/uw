@@ -80,7 +80,7 @@ Agreed on 2026-10-15.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
 - A click on "▾" opens a menu with each item's key: New tab, New task, New chat, New terminal, and New split view.
 - A collapsed sidebar hides Organize and "▾" and keeps a lone "+" at its foot. A right-click on it opens the same menu.
-- The design goes on the canvas before it is built.
+- The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user has not signed off yet.
 
 ### Branches with the mouse
 
