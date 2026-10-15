@@ -1,7 +1,5 @@
 # Primary Agent Directives
 
-Do NOT edit this section yourself, ever. This part is managed by the human.
-
 - Focus on simplicity and minimal moving parts. Avoid unnecessary complexity, frameworks, and dependencies.
 - Keep the initial implementation small. Add shared packages when a real consumer needs them.
 - If a plan conflicts with existing directives, ask for clarification before proceeding. Do not assume that a plan overrides the directives.
