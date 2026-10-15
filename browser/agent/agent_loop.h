@@ -24,6 +24,7 @@
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/skills.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -31,10 +32,11 @@ class SharedURLLoaderFactory;
 
 namespace uw {
 
-// The model a chat talks to: its chat-completions address, its name, and its
-// key, which may be empty.
+// The model a chat talks to: its provider's base address and format, its
+// name, and its key, which may be empty.
 struct AgentModel {
-  GURL url;
+  std::string endpoint;
+  ProviderFormat format = ProviderFormat::kChatCompletions;
   std::string model;
   std::string api_key;
 };

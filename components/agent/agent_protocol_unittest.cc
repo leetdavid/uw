@@ -119,5 +119,24 @@ TEST(AgentProtocolTest, TheModelHearsBackWhatItAskedFor) {
   EXPECT_EQ(*answered.FindString("content"), R"({"tab":1})");
 }
 
+// What a provider sent that uw does not read rides on the turn, and goes back
+// into the chat with it. See uw/components/ai_providers/formats.h.
+TEST(AgentProtocolTest, WhatAProviderKeptGoesBackWithItsTurn) {
+  constexpr char kKept[] =
+      R"({"address":"https://api.example.com/v1","format":2,)"
+      R"("items":[{"encrypted_content":"sealed","type":"reasoning"}]})";
+  const std::optional<ModelTurn> turn = ParseAgentResponse(base::StrCat(
+      {R"({"choices":[{"message":{"role":"assistant","content":"Done.",)",
+       R"("uw_kept":)", kKept, "}}]}"}));
+  ASSERT_TRUE(turn);
+  EXPECT_EQ(turn->text, "Done.");
+
+  const base::DictValue message = AssistantMessage(*turn);
+  ASSERT_TRUE(message.FindDict("uw_kept"));
+  EXPECT_EQ(*message.FindDict("uw_kept"),
+            *base::JSONReader::ReadDict(kKept, base::JSON_PARSE_RFC));
+  EXPECT_FALSE(AssistantMessage(ModelTurn{"Hi", {}, ""}).Find("uw_kept"));
+}
+
 }  // namespace
 }  // namespace uw

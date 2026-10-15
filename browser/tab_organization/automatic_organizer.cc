@@ -44,6 +44,19 @@ namespace {
 
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
 
+// The key in `account`: empty when there is no account, nothing when the key
+// is gone.
+std::optional<std::string> KeyIn(const std::string& account) {
+  if (account.empty()) {
+    return std::string();
+  }
+  std::optional<std::string> stored = ApiKeyStore().GetKey(account);
+  if (!stored || stored->empty()) {
+    return std::nullopt;
+  }
+  return stored;
+}
+
 using Kind = AutomaticOrganizer::Event::Kind;
 
 // A folder as a shell prompt shows it, with the home folder as ~.
@@ -464,12 +477,14 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
   }
   request.decision.model = model;
   request.decision.url =
-      decides ? DecisionUrl(decision) : ChatCompletionsUrl(language.endpoint);
+      decides ? DecisionUrl(decision)
+              : LanguageModelUrl(language.endpoint, language.format);
   request.decision.body = *body;
   request.decision.sent_at = base::TimeTicks::Now();
-  std::unique_ptr<RemoteModelClient> client = Client(
-      request.decision.url,
-      decides ? decision.key_account : language.key_account, std::move(*body));
+  std::unique_ptr<RemoteModelClient> client =
+      decides
+          ? Client(request.decision.url, decision.key_account, std::move(*body))
+          : Client(language, std::move(*body));
   if (!client) {
     return false;
   }
@@ -564,13 +579,12 @@ std::unique_ptr<RemoteModelClient> AutomaticOrganizer::PrepareNaming(
   if (!body) {
     return nullptr;
   }
-  std::unique_ptr<RemoteModelClient> client = Client(
-      ChatCompletionsUrl(language.endpoint), language.key_account, *body);
+  std::unique_ptr<RemoteModelClient> client = Client(language, *body);
   if (!client) {
     return nullptr;
   }
   request.naming.model = language.model;
-  request.naming.url = ChatCompletionsUrl(language.endpoint);
+  request.naming.url = LanguageModelUrl(language.endpoint, language.format);
   request.naming.body = std::move(*body);
   request.naming.sent_at = base::TimeTicks::Now();
   return client;
@@ -1053,19 +1067,30 @@ std::unique_ptr<RemoteModelClient> AutomaticOrganizer::Client(
     const GURL& url,
     const std::string& key_account,
     std::string body) {
-  std::string key;
-  if (!key_account.empty()) {
-    std::optional<std::string> stored = ApiKeyStore().GetKey(key_account);
-    if (!stored || stored->empty()) {
-      return nullptr;
-    }
-    key = std::move(*stored);
+  std::optional<std::string> key = KeyIn(key_account);
+  if (!key) {
+    return nullptr;
   }
   return std::make_unique<RemoteModelClient>(
       profile()
           ->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess(),
-      url, std::move(key), std::move(body), kProviderTimeout);
+      url, std::move(*key), std::move(body), kProviderTimeout);
+}
+
+std::unique_ptr<RemoteModelClient> AutomaticOrganizer::Client(
+    const AiConnectionConfig& language,
+    const std::string& body) {
+  std::optional<std::string> key = KeyIn(language.key_account);
+  if (!key) {
+    return nullptr;
+  }
+  return RemoteModelClient::ForLanguageModel(
+      profile()
+          ->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess(),
+      language.endpoint, language.format, std::move(*key), body,
+      kProviderTimeout);
 }
 
 }  // namespace uw

@@ -13,7 +13,10 @@ source_set("agent") {
     "suggestions.h",
   ]
   public_deps = [ "//base" ]
-  deps = [ "//components/optimization_guide/proto:optimization_guide_proto" ]
+  deps = [
+    "//components/optimization_guide/proto:optimization_guide_proto",
+    "//uw/components/ai_providers",
+  ]
 }
 
 source_set("unit_tests") {

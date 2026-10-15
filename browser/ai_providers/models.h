@@ -60,6 +60,7 @@ inline constexpr base::TimeDelta kProviderTimeout = base::Seconds(30);
 // A language or agent model as a request needs it.
 struct AiConnectionConfig {
   std::string endpoint;
+  ProviderFormat format = ProviderFormat::kChatCompletions;
   std::string model;
   // Keychain account id holding the API key; empty when there is none.
   std::string key_account;
@@ -95,8 +96,9 @@ DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
 // credentials, fragments, and invalid URLs.
 bool IsValidProviderEndpoint(std::string_view endpoint);
 
-// Request URLs under a base endpoint like https://api.openai.com/v1.
-GURL ChatCompletionsUrl(std::string_view endpoint);
+// Request URLs under a base endpoint like https://api.openai.com/v1. A
+// language model takes requests at its format's own path.
+GURL LanguageModelUrl(std::string_view endpoint, ProviderFormat format);
 GURL ModelsUrl(std::string_view endpoint);
 GURL DecisionUrl(const DecisionModelConfig& config);
 

@@ -97,7 +97,7 @@ Settings hold an optional decision model and a language model. See [ADR 0003](ad
 | Decision model | OpenAI Decisions API, or a compatible endpoint | `POST <base>/decisions` |
 | Language model | Ollama, or an OpenAI-compatible endpoint | `POST <base>/chat/completions` |
 
-Since T77, each model is picked from the providers the user saves once on `uw://providers`. Until T78, every language model is reached over chat completions; then language models can also use Anthropic Messages and OpenAI Responses. See the [AI providers plan](plans/ai-providers.md) and [ADR 0007](adr/0007-uw-speaks-three-wire-formats-to-language-models.md).
+Since T77, each model is picked from the providers the user saves once on `uw://providers`. Since T78, a language model gets its requests in its provider's format: chat completions, Anthropic Messages, or OpenAI Responses. See the [AI providers plan](plans/ai-providers.md) and [ADR 0007](adr/0007-uw-speaks-three-wire-formats-to-language-models.md).
 
 The decision model picks one option: an existing task, a new task, or the Scratchpad. The language model names a new task. With no decision model, the language model does both in one call.
 

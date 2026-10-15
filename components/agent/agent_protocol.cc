@@ -9,6 +9,7 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_util.h"
+#include "uw/components/ai_providers/formats.h"
 
 namespace uw {
 namespace {
@@ -168,6 +169,10 @@ base::DictValue AssistantMessage(const ModelTurn& turn) {
     }
     message.Set("tool_calls", std::move(calls));
   }
+  if (std::optional<base::DictValue> kept =
+          base::JSONReader::ReadDict(turn.kept, base::JSON_PARSE_RFC)) {
+    message.Set(kKeptPartsKey, std::move(*kept));
+  }
   return message;
 }
 
@@ -240,6 +245,9 @@ std::optional<ModelTurn> ParseAgentResponse(std::string_view body) {
       const std::string* arguments = function->FindString("arguments");
       turn.calls.push_back({*id, *name, arguments ? *arguments : "{}"});
     }
+  }
+  if (const base::DictValue* kept = message->FindDict(kKeptPartsKey)) {
+    turn.kept = base::WriteJson(*kept).value_or("");
   }
   if (turn.text.empty() && turn.calls.empty()) {
     return std::nullopt;

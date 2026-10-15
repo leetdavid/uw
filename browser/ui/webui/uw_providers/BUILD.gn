@@ -29,6 +29,7 @@ source_set("uw_providers") {
     "//components/prefs",
     "//content/public/common",
     "//net",
+    "//services/network/public/cpp",
     "//url",
     "//uw/browser/resources/uw_chat:resources",
     "//uw/components/agent",

@@ -12,6 +12,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "url/gurl.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -20,7 +21,7 @@ class SimpleURLLoader;
 
 namespace uw {
 
-// One-shot HTTPS JSON client for the classification provider. POST bodies go
+// One-shot HTTPS JSON client for the model providers. POST bodies go
 // through Send(); SendGet() covers model listing. Responses are bounded
 // (64 KiB) and timed out; a redirect fails the request and credentials are
 // never sent. No retries: a failed request leaves the branch where it is.
@@ -54,6 +55,17 @@ class RemoteModelClient {
   RemoteModelClient(const RemoteModelClient&) = delete;
   RemoteModelClient& operator=(const RemoteModelClient&) = delete;
 
+  // A request to the language model at the base address `endpoint`, which
+  // speaks `format`. `chat_body` is in chat completions' shape, and so is the
+  // body of a successful outcome. See uw/components/ai_providers/formats.h.
+  static std::unique_ptr<RemoteModelClient> ForLanguageModel(
+      scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
+      const std::string& endpoint,
+      ProviderFormat format,
+      std::string api_key,
+      const std::string& chat_body,
+      base::TimeDelta timeout);
+
   void Send(ResultCallback callback);
   void SendGet(ResultCallback callback);
 
@@ -70,6 +82,11 @@ class RemoteModelClient {
   std::string request_body_;
   base::TimeDelta timeout_;
   KeyHeader key_header_;
+  // Set for a language model that does not speak chat completions: its
+  // answers are read back into that shape.
+  std::optional<ProviderFormat> answer_format_;
+  // The base address the answer came from, which marks what it kept.
+  std::string address_;
   ResultCallback callback_;
   std::unique_ptr<network::SimpleURLLoader> loader_;
   base::WeakPtrFactory<RemoteModelClient> weak_factory_{this};

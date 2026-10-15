@@ -26,6 +26,9 @@ struct ToolCall {
 struct ModelTurn {
   std::string text;
   std::vector<ToolCall> calls;
+  // What the provider sent that uw does not read, as JSON, for the next
+  // request to the same provider. See uw/components/ai_providers/formats.h.
+  std::string kept;
 };
 
 // The tools of browser/agent/agent_tools.h, and recall, as a model is told

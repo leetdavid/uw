@@ -132,12 +132,13 @@ void AgentLoop::AskModel() {
   }
   const std::optional<std::string> body =
       context_->Request(model_.model, kMaxRequestLength);
-  if (!body || !model_.url.is_valid()) {
+  if (!body || model_.endpoint.empty()) {
     Finish(Failed("No agent model is set."));
     return;
   }
-  client_ = std::make_unique<RemoteModelClient>(
-      loader_, model_.url, model_.api_key, *body, kModelTimeout);
+  client_ = RemoteModelClient::ForLanguageModel(loader_, model_.endpoint,
+                                                model_.format, model_.api_key,
+                                                *body, kModelTimeout);
   client_->Send(
       base::BindOnce(&AgentLoop::OnModel, weak_factory_.GetWeakPtr()));
 }
@@ -226,8 +227,8 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
 
 void AgentLoop::SetApprover(Approve approve) {
   approve_ = std::move(approve);
-  tools_.SetConfirmSite(base::BindRepeating(&AgentLoop::ConfirmSite,
-                                            weak_factory_.GetWeakPtr()));
+  tools_.SetConfirmSite(
+      base::BindRepeating(&AgentLoop::ConfirmSite, weak_factory_.GetWeakPtr()));
 }
 
 void AgentLoop::CallTool(ModelTurn turn, size_t index, base::DictValue args) {

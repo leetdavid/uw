@@ -97,5 +97,6 @@ source_set("browser_tests") {
     "//ui/gfx/geometry",
     "//url",
     "//uw/browser/tab_organization",
+    "//uw/components/ai_providers",
   ]
 }

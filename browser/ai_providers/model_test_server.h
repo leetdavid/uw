@@ -26,6 +26,8 @@ struct ModelRequest {
   std::string method;
   std::string body;
   std::string authorization;
+  // Anthropic takes its key in this header instead.
+  std::string anthropic_key;
 };
 
 // A decision model's answer that the tab belongs to the task `choice` or, for

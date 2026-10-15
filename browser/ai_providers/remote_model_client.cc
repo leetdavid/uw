@@ -14,6 +14,8 @@
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "url/gurl.h"
+#include "uw/browser/ai_providers/models.h"
+#include "uw/components/ai_providers/formats.h"
 
 namespace uw {
 
@@ -63,6 +65,27 @@ RemoteModelClient::RemoteModelClient(
       key_header_(key_header) {}
 
 RemoteModelClient::~RemoteModelClient() = default;
+
+// static
+std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
+    scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
+    const std::string& endpoint,
+    ProviderFormat format,
+    std::string api_key,
+    const std::string& chat_body,
+    base::TimeDelta timeout) {
+  auto client = std::make_unique<RemoteModelClient>(
+      std::move(loader_factory), LanguageModelUrl(endpoint, format),
+      std::move(api_key),
+      RequestIn(format, chat_body, endpoint).value_or(chat_body), timeout,
+      format == ProviderFormat::kAnthropicMessages ? KeyHeader::kAnthropic
+                                                   : KeyHeader::kBearer);
+  if (format != ProviderFormat::kChatCompletions) {
+    client->answer_format_ = format;
+    client->address_ = endpoint;
+  }
+  return client;
+}
 
 void RemoteModelClient::Send(ResultCallback callback) {
   StartRequest(/*post=*/true, std::move(callback));
@@ -138,6 +161,12 @@ void RemoteModelClient::OnComplete(std::optional<std::string> body) {
   outcome.body = std::move(body).value_or(std::string());
   outcome.ok = outcome.net_error == net::OK && outcome.http_status >= 200 &&
                outcome.http_status < 300;
+  if (outcome.ok && answer_format_) {
+    if (std::optional<std::string> chat =
+            AnswerFrom(*answer_format_, outcome.body, address_)) {
+      outcome.body = std::move(*chat);
+    }
+  }
   loader_.reset();
   Finish(std::move(outcome));
 }

@@ -26,6 +26,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace uw {
 namespace {
@@ -65,8 +66,8 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
     chat_ = browser()->tab_strip_model()->GetActiveTab();
     agent_ = std::make_unique<AgentLoop>(
         *chat_,
-        AgentModel{embedded_test_server()->GetURL("/v1/chat/completions"),
-                   "test-agent", "agent-key"},
+        AgentModel{embedded_test_server()->GetURL("/v1").spec(),
+                   ProviderFormat::kChatCompletions, "test-agent", "agent-key"},
         base::BindRepeating(&AgentLoopBrowserTest::OnStep,
                             base::Unretained(this)));
   }
@@ -78,6 +79,16 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Sends `text` and waits until the agent answers or gives up.
+  // Talks to the model in `format` from now on.
+  void UseFormat(ProviderFormat format) {
+    agent_ = std::make_unique<AgentLoop>(
+        *chat_,
+        AgentModel{embedded_test_server()->GetURL("/v1").spec(), format,
+                   "test-agent", "agent-key"},
+        base::BindRepeating(&AgentLoopBrowserTest::OnStep,
+                            base::Unretained(this)));
+  }
+
   const AgentLoop::Step& Ask(std::string_view text) {
     steps_.clear();
     agent_->Send(text);
@@ -220,6 +231,58 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, StopsWhenItGoesRoundInCircles) {
   EXPECT_EQ(end.kind, Kind::kFailed);
   EXPECT_EQ(end.text, "The agent stopped after 40 steps without an answer.");
   EXPECT_EQ(model_.Requests().size(), 40u);
+}
+
+// Over OpenAI Responses, a tool call and its result travel as Responses items,
+// and the sealed reasoning that came with the call goes back with them.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       AChatOverResponsesSendsItsReasoningBack) {
+  UseFormat(ProviderFormat::kOpenAiResponses);
+  model_.Script(
+      {R"({"status":"completed","output":[)"
+       R"({"type":"reasoning","id":"rs_1","encrypted_content":"sealed"},)"
+       R"({"type":"function_call","call_id":"call_1","name":"fly",)"
+       R"("arguments":"{}"}]})",
+       R"({"status":"completed","output":[{"type":"message",)"
+       R"("role":"assistant","content":[{"type":"output_text",)"
+       R"("text":"I can't fly."}]}]})"});
+
+  const AgentLoop::Step& end = Ask("Fly to Lisbon");
+
+  EXPECT_EQ(end.kind, Kind::kAnswer);
+  EXPECT_EQ(end.text, "I can't fly.");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[0], HasSubstr(R"("store":false)"));
+  EXPECT_THAT(requests[0], HasSubstr(R"("instructions":)"));
+  EXPECT_THAT(requests[1], HasSubstr(R"("encrypted_content":"sealed")"));
+  EXPECT_THAT(requests[1], HasSubstr(R"("type":"function_call_output")"));
+  EXPECT_THAT(requests[1], Not(HasSubstr("uw_kept")));
+}
+
+// Over Anthropic Messages, the tool call is a tool_use block, its result a
+// tool_result block, and the signed thinking goes back before them.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       AChatOverAnthropicMessagesSendsItsThinkingBack) {
+  UseFormat(ProviderFormat::kAnthropicMessages);
+  model_.Script(
+      {R"({"stop_reason":"tool_use","content":[)"
+       R"({"type":"thinking","thinking":"No wings.","signature":"sig"},)"
+       R"({"type":"tool_use","id":"toolu_1","name":"fly","input":{}}]})",
+       R"({"stop_reason":"end_turn","content":[)"
+       R"({"type":"text","text":"I can't fly."}]})"});
+
+  const AgentLoop::Step& end = Ask("Fly to Lisbon");
+
+  EXPECT_EQ(end.kind, Kind::kAnswer);
+  EXPECT_EQ(end.text, "I can't fly.");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[0], HasSubstr(R"("system":)"));
+  EXPECT_THAT(requests[0], HasSubstr(R"("max_tokens":8192)"));
+  EXPECT_THAT(requests[1], HasSubstr(R"("signature":"sig")"));
+  EXPECT_THAT(requests[1], HasSubstr(R"("type":"tool_result")"));
+  EXPECT_THAT(requests[1], HasSubstr(R"("tool_use_id":"toolu_1")"));
 }
 
 }  // namespace

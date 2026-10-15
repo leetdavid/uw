@@ -40,6 +40,8 @@ struct InnerTextResult;
 
 namespace uw {
 
+struct AiConnectionConfig;
+
 class TabOrganizationController;
 
 // Files tab branches into tasks in the background. When a page's title
@@ -304,9 +306,13 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // when that changed.
   void UpdateNaming();
   void CancelRequestsFor(const PageId& page);
+  // A request that carries the key in `key_account`, or none when that key
+  // is gone. A language model gets it in its own format.
   std::unique_ptr<RemoteModelClient> Client(const GURL& url,
                                             const std::string& key_account,
                                             std::string body);
+  std::unique_ptr<RemoteModelClient> Client(const AiConnectionConfig& language,
+                                            const std::string& body);
 
   const raw_ptr<BrowserWindowInterface> window_;
   const raw_ptr<TabOrganizationController> controller_;

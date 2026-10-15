@@ -22,8 +22,9 @@ class HttpResponse;
 
 namespace uw {
 
-// Plays an agent's model in browser tests, at /v1/chat/completions of
-// `server`. Each request gets the next of the scripted replies.
+// Plays an agent's model in browser tests, at /v1/chat/completions,
+// /v1/messages, and /v1/responses of `server`. Each request gets the next of
+// the scripted replies, in the shape the test scripts.
 class ScriptedModel {
  public:
   // Before `server` starts.

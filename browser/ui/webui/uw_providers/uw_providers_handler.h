@@ -17,7 +17,6 @@
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 #include "uw/components/ai_providers/providers.h"
 
-class GURL;
 class Profile;
 
 namespace uw {
@@ -60,10 +59,9 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
  private:
   // A request the page waits on. Several model lists can be on their way at
   // once, one per provider.
-  void Send(const GURL& url,
-            RemoteModelClient::KeyHeader key_header,
-            std::string key,
-            std::optional<std::string> body,
+  scoped_refptr<network::SharedURLLoaderFactory> LoaderFactory();
+  void Send(std::unique_ptr<RemoteModelClient> client,
+            bool post,
             RemoteModelClient::ResultCallback done);
   void OnAnswered(int request,
                   RemoteModelClient::ResultCallback done,

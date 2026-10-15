@@ -12,6 +12,7 @@
 #include "net/base/url_util.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/components/ai_providers/formats.h"
 
 namespace uw {
 namespace {
@@ -137,10 +138,13 @@ AiConnectionConfig ConfigFor(const PrefService* prefs, ModelSlot slot) {
       prefs ? ReadChoice(*prefs, slot) : std::nullopt;
   const std::optional<Provider> provider =
       choice ? FindProvider(*prefs, choice->provider_id) : std::nullopt;
-  if (!provider || !LanguageFormatOf(*provider)) {
+  const std::optional<ProviderFormat> format =
+      provider ? LanguageFormatOf(*provider) : std::nullopt;
+  if (!format) {
     return config;
   }
   config.endpoint = provider->address;
+  config.format = *format;
   config.model = choice->model;
   config.key_account = provider->key_account;
   return config;
@@ -270,8 +274,8 @@ bool IsValidProviderEndpoint(std::string_view endpoint) {
   return url.SchemeIs("http") && net::IsLocalhost(url);
 }
 
-GURL ChatCompletionsUrl(std::string_view endpoint) {
-  return EndpointUrl(endpoint, "/chat/completions");
+GURL LanguageModelUrl(std::string_view endpoint, ProviderFormat format) {
+  return EndpointUrl(endpoint, LanguageModelPath(format));
 }
 
 GURL ModelsUrl(std::string_view endpoint) {

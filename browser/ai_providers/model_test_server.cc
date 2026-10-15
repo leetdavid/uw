@@ -140,11 +140,12 @@ std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
     return nullptr;
   }
   base::AutoLock hold(lock_);
-  const auto authorization = request.headers.find("Authorization");
+  const auto header = [&request](const std::string& name) {
+    const auto found = request.headers.find(name);
+    return found == request.headers.end() ? std::string() : found->second;
+  };
   requests_.push_back({path, request.method_string, request.content,
-                       authorization == request.headers.end()
-                           ? std::string()
-                           : authorization->second});
+                       header("Authorization"), header("x-api-key")});
   auto response = std::make_unique<net::test_server::BasicHttpResponse>();
   const Reply* about = nullptr;
   for (const auto& [key, candidate] : answers_about_) {

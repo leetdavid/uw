@@ -158,10 +158,10 @@ void ChatSuggestions::OnSites(history::MostVisitedURLList visited) {
     return;
   }
   tried_ = base::Time::Now();
-  client_ = std::make_unique<RemoteModelClient>(
+  client_ = RemoteModelClient::ForLanguageModel(
       profile_->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess(),
-      ChatCompletionsUrl(language.endpoint), std::move(key), std::move(*body),
+      language.endpoint, language.format, std::move(key), *body,
       kProviderTimeout);
   client_->Send(
       base::BindOnce(&ChatSuggestions::OnAnswer, weak_factory_.GetWeakPtr()));

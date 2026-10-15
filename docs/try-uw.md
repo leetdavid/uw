@@ -92,7 +92,7 @@ Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Verc
 
 Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. A newly picked model says `Not tested yet`. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
 
-Until the Anthropic Messages and OpenAI Responses formats land, uw reaches every language model over chat completions, including OpenAI's and Anthropic's. Tool calls and effort levels per model are not shown yet.
+uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions. Tool calls and effort levels per model are not shown yet.
 
 ### Automatic organization
 

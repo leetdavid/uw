@@ -1,0 +1,423 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+#include "uw/components/ai_providers/formats.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/strings/string_util.h"
+#include "base/values.h"
+
+namespace uw {
+namespace {
+
+// Anthropic needs a limit on every request; chats set none.
+constexpr int kAnthropicMaxTokens = 8192;
+
+std::string_view StringOr(const base::DictValue& dict,
+                          std::string_view key,
+                          std::string_view fallback = "") {
+  const std::string* value = dict.FindString(key);
+  return value ? std::string_view(*value) : fallback;
+}
+
+// The kept parts of `message`, when `address` sent them in `format`.
+const base::ListValue* KeptParts(const base::DictValue& message,
+                                 ProviderFormat format,
+                                 std::string_view address) {
+  const base::DictValue* kept = message.FindDict(kKeptPartsKey);
+  if (!kept || StringOr(*kept, "address") != address ||
+      kept->FindInt("format") != static_cast<int>(format)) {
+    return nullptr;
+  }
+  return kept->FindList("items");
+}
+
+base::DictValue KeptPartsFrom(ProviderFormat format,
+                              std::string_view address,
+                              base::ListValue items) {
+  return base::DictValue()
+      .Set("address", address)
+      .Set("format", static_cast<int>(format))
+      .Set("items", std::move(items));
+}
+
+// The system messages, joined.
+std::string Instructions(const base::ListValue& messages) {
+  std::vector<std::string_view> parts;
+  for (const base::Value& message : messages) {
+    const base::DictValue* dict = message.GetIfDict();
+    if (dict && StringOr(*dict, "role") == "system") {
+      parts.push_back(StringOr(*dict, "content"));
+    }
+  }
+  return base::JoinString(parts, "\n\n");
+}
+
+base::DictValue ArgumentsOf(const base::DictValue& call) {
+  const base::DictValue* function = call.FindDict("function");
+  std::optional<base::DictValue> parsed =
+      function ? base::JSONReader::ReadDict(StringOr(*function, "arguments"),
+                                            base::JSON_PARSE_RFC)
+               : std::nullopt;
+  return parsed ? std::move(*parsed) : base::DictValue();
+}
+
+std::optional<std::string> Write(const base::DictValue& dict) {
+  return base::WriteJson(dict);
+}
+
+base::DictValue ChatAnswer(std::string text,
+                           base::ListValue calls,
+                           base::DictValue kept,
+                           std::string_view finish_reason) {
+  base::DictValue message = base::DictValue()
+                                .Set("role", "assistant")
+                                .Set("content", std::move(text));
+  if (!calls.empty()) {
+    message.Set("tool_calls", std::move(calls));
+  }
+  if (!kept.empty()) {
+    message.Set(kKeptPartsKey, std::move(kept));
+  }
+  return base::DictValue().Set(
+      "choices",
+      base::ListValue().Append(base::DictValue()
+                                   .Set("finish_reason", finish_reason)
+                                   .Set("message", std::move(message))));
+}
+
+base::DictValue ToolCall(std::string_view id,
+                         std::string_view name,
+                         std::string arguments) {
+  return base::DictValue()
+      .Set("id", id)
+      .Set("type", "function")
+      .Set("function", base::DictValue()
+                           .Set("name", name)
+                           .Set("arguments", std::move(arguments)));
+}
+
+// Anthropic Messages: the system text apart, alternating user and assistant
+// messages of content blocks, tool results as user blocks.
+base::DictValue AnthropicRequest(const base::DictValue& chat,
+                                 std::string_view address) {
+  const base::ListValue empty;
+  const base::ListValue* messages = chat.FindList("messages");
+  base::ListValue out;
+  const auto add = [&out](std::string_view role, base::ListValue blocks) {
+    if (blocks.empty()) {
+      return;
+    }
+    base::DictValue* last = out.empty() ? nullptr : out.back().GetIfDict();
+    if (last && StringOr(*last, "role") == role) {
+      for (base::Value& block : blocks) {
+        last->FindList("content")->Append(std::move(block));
+      }
+      return;
+    }
+    out.Append(
+        base::DictValue().Set("role", role).Set("content", std::move(blocks)));
+  };
+  for (const base::Value& entry : messages ? *messages : empty) {
+    const base::DictValue* message = entry.GetIfDict();
+    if (!message) {
+      continue;
+    }
+    const std::string_view role = StringOr(*message, "role");
+    const std::string_view text = StringOr(*message, "content");
+    base::ListValue blocks;
+    if (role == "user") {
+      if (!text.empty()) {
+        blocks.Append(base::DictValue().Set("type", "text").Set("text", text));
+      }
+      add("user", std::move(blocks));
+    } else if (role == "assistant") {
+      if (const base::ListValue* kept = KeptParts(
+              *message, ProviderFormat::kAnthropicMessages, address)) {
+        blocks = kept->Clone();
+      }
+      if (!text.empty()) {
+        blocks.Append(base::DictValue().Set("type", "text").Set("text", text));
+      }
+      if (const base::ListValue* calls = message->FindList("tool_calls")) {
+        for (const base::Value& call : *calls) {
+          if (const base::DictValue* dict = call.GetIfDict()) {
+            const base::DictValue* function = dict->FindDict("function");
+            blocks.Append(
+                base::DictValue()
+                    .Set("type", "tool_use")
+                    .Set("id", StringOr(*dict, "id"))
+                    .Set("name", function ? StringOr(*function, "name") : "")
+                    .Set("input", ArgumentsOf(*dict)));
+          }
+        }
+      }
+      add("assistant", std::move(blocks));
+    } else if (role == "tool") {
+      blocks.Append(base::DictValue()
+                        .Set("type", "tool_result")
+                        .Set("tool_use_id", StringOr(*message, "tool_call_id"))
+                        .Set("content", text));
+      add("user", std::move(blocks));
+    }
+  }
+  base::DictValue request =
+      base::DictValue()
+          .Set("model", StringOr(chat, "model"))
+          .Set("max_tokens",
+               chat.FindInt("max_tokens").value_or(kAnthropicMaxTokens))
+          .Set("messages", std::move(out));
+  if (std::string system = Instructions(messages ? *messages : empty);
+      !system.empty()) {
+    request.Set("system", std::move(system));
+  }
+  if (const base::ListValue* tools = chat.FindList("tools")) {
+    base::ListValue converted;
+    for (const base::Value& tool : *tools) {
+      const base::DictValue* function =
+          tool.is_dict() ? tool.GetDict().FindDict("function") : nullptr;
+      if (!function) {
+        continue;
+      }
+      const base::DictValue* parameters = function->FindDict("parameters");
+      converted.Append(
+          base::DictValue()
+              .Set("name", StringOr(*function, "name"))
+              .Set("description", StringOr(*function, "description"))
+              .Set("input_schema",
+                   parameters ? parameters->Clone()
+                              : base::DictValue().Set("type", "object")));
+    }
+    request.Set("tools", std::move(converted));
+  }
+  return request;
+}
+
+// OpenAI Responses: the system text as instructions, then a list of input
+// items. Nothing is stored at OpenAI, so sealed reasoning comes back with the
+// answer and goes along with the next request.
+base::DictValue ResponsesRequest(const base::DictValue& chat,
+                                 std::string_view address) {
+  const base::ListValue empty;
+  const base::ListValue* messages = chat.FindList("messages");
+  base::ListValue input;
+  for (const base::Value& entry : messages ? *messages : empty) {
+    const base::DictValue* message = entry.GetIfDict();
+    if (!message) {
+      continue;
+    }
+    const std::string_view role = StringOr(*message, "role");
+    const std::string_view text = StringOr(*message, "content");
+    if (role == "user") {
+      input.Append(base::DictValue().Set("role", "user").Set("content", text));
+    } else if (role == "assistant") {
+      if (const base::ListValue* kept =
+              KeptParts(*message, ProviderFormat::kOpenAiResponses, address)) {
+        for (const base::Value& item : *kept) {
+          input.Append(item.Clone());
+        }
+      }
+      if (!text.empty()) {
+        input.Append(
+            base::DictValue().Set("role", "assistant").Set("content", text));
+      }
+      if (const base::ListValue* calls = message->FindList("tool_calls")) {
+        for (const base::Value& call : *calls) {
+          const base::DictValue* dict = call.GetIfDict();
+          const base::DictValue* function =
+              dict ? dict->FindDict("function") : nullptr;
+          if (function) {
+            input.Append(
+                base::DictValue()
+                    .Set("type", "function_call")
+                    .Set("call_id", StringOr(*dict, "id"))
+                    .Set("name", StringOr(*function, "name"))
+                    .Set("arguments", StringOr(*function, "arguments", "{}")));
+          }
+        }
+      }
+    } else if (role == "tool") {
+      input.Append(base::DictValue()
+                       .Set("type", "function_call_output")
+                       .Set("call_id", StringOr(*message, "tool_call_id"))
+                       .Set("output", text));
+    }
+  }
+  base::DictValue request =
+      base::DictValue()
+          .Set("model", StringOr(chat, "model"))
+          .Set("store", false)
+          .Set("include",
+               base::ListValue().Append("reasoning.encrypted_content"))
+          .Set("input", std::move(input));
+  if (std::string instructions = Instructions(messages ? *messages : empty);
+      !instructions.empty()) {
+    request.Set("instructions", std::move(instructions));
+  }
+  if (std::optional<int> limit = chat.FindInt("max_tokens")) {
+    request.Set("max_output_tokens", *limit);
+  }
+  if (const base::ListValue* tools = chat.FindList("tools")) {
+    base::ListValue converted;
+    for (const base::Value& tool : *tools) {
+      const base::DictValue* function =
+          tool.is_dict() ? tool.GetDict().FindDict("function") : nullptr;
+      if (!function) {
+        continue;
+      }
+      base::DictValue entry = function->Clone();
+      entry.Set("type", "function");
+      converted.Append(std::move(entry));
+    }
+    request.Set("tools", std::move(converted));
+  }
+  return request;
+}
+
+std::optional<base::DictValue> AnthropicAnswer(const base::DictValue& answer,
+                                               std::string_view address) {
+  const base::ListValue* content = answer.FindList("content");
+  if (!content) {
+    return std::nullopt;
+  }
+  std::string text;
+  base::ListValue calls;
+  base::ListValue kept;
+  for (const base::Value& entry : *content) {
+    const base::DictValue* block = entry.GetIfDict();
+    if (!block) {
+      continue;
+    }
+    const std::string_view type = StringOr(*block, "type");
+    if (type == "text") {
+      text += StringOr(*block, "text");
+    } else if (type == "tool_use") {
+      const base::DictValue* input = block->FindDict("input");
+      calls.Append(
+          ToolCall(StringOr(*block, "id"), StringOr(*block, "name"),
+                   input ? base::WriteJson(*input).value_or("{}") : "{}"));
+    } else if (type == "thinking" || type == "redacted_thinking") {
+      kept.Append(block->Clone());
+    }
+  }
+  const std::string_view stop = StringOr(answer, "stop_reason");
+  return ChatAnswer(std::move(text), std::move(calls),
+                    kept.empty()
+                        ? base::DictValue()
+                        : KeptPartsFrom(ProviderFormat::kAnthropicMessages,
+                                        address, std::move(kept)),
+                    stop == "tool_use"     ? "tool_calls"
+                    : stop == "max_tokens" ? "length"
+                                           : "stop");
+}
+
+std::optional<base::DictValue> ResponsesAnswer(const base::DictValue& answer,
+                                               std::string_view address) {
+  const base::ListValue* output = answer.FindList("output");
+  if (!output) {
+    return std::nullopt;
+  }
+  std::string text;
+  base::ListValue calls;
+  base::ListValue kept;
+  for (const base::Value& entry : *output) {
+    const base::DictValue* item = entry.GetIfDict();
+    if (!item) {
+      continue;
+    }
+    const std::string_view type = StringOr(*item, "type");
+    if (type == "message") {
+      if (const base::ListValue* parts = item->FindList("content")) {
+        for (const base::Value& part : *parts) {
+          if (part.is_dict() &&
+              StringOr(part.GetDict(), "type") == "output_text") {
+            text += StringOr(part.GetDict(), "text");
+          }
+        }
+      }
+    } else if (type == "function_call") {
+      calls.Append(ToolCall(StringOr(*item, "call_id"), StringOr(*item, "name"),
+                            std::string(StringOr(*item, "arguments", "{}"))));
+    } else if (type == "reasoning") {
+      kept.Append(item->Clone());
+    }
+  }
+  const bool cut_short = StringOr(answer, "status") == "incomplete";
+  const bool calls_tools = !calls.empty();
+  return ChatAnswer(std::move(text), std::move(calls),
+                    kept.empty()
+                        ? base::DictValue()
+                        : KeptPartsFrom(ProviderFormat::kOpenAiResponses,
+                                        address, std::move(kept)),
+                    cut_short     ? "length"
+                    : calls_tools ? "tool_calls"
+                                  : "stop");
+}
+
+}  // namespace
+
+std::string_view LanguageModelPath(ProviderFormat format) {
+  switch (format) {
+    case ProviderFormat::kAnthropicMessages:
+      return "/messages";
+    case ProviderFormat::kOpenAiResponses:
+      return "/responses";
+    case ProviderFormat::kChatCompletions:
+    case ProviderFormat::kOpenAiDecisions:
+    case ProviderFormat::kSystemOne:
+      return "/chat/completions";
+  }
+}
+
+std::optional<std::string> RequestIn(ProviderFormat format,
+                                     std::string_view chat_body,
+                                     std::string_view address) {
+  std::optional<base::DictValue> chat =
+      base::JSONReader::ReadDict(chat_body, base::JSON_PARSE_RFC);
+  if (!chat || !chat->FindList("messages")) {
+    return std::nullopt;
+  }
+  switch (format) {
+    case ProviderFormat::kAnthropicMessages:
+      return Write(AnthropicRequest(*chat, address));
+    case ProviderFormat::kOpenAiResponses:
+      return Write(ResponsesRequest(*chat, address));
+    case ProviderFormat::kChatCompletions:
+    case ProviderFormat::kOpenAiDecisions:
+    case ProviderFormat::kSystemOne:
+      // Chat completions takes the request as it is, without what other
+      // formats kept.
+      for (base::Value& message : *chat->FindList("messages")) {
+        if (message.is_dict()) {
+          message.GetDict().Remove(kKeptPartsKey);
+        }
+      }
+      return Write(*chat);
+  }
+}
+
+std::optional<std::string> AnswerFrom(ProviderFormat format,
+                                      std::string_view body,
+                                      std::string_view address) {
+  if (format != ProviderFormat::kAnthropicMessages &&
+      format != ProviderFormat::kOpenAiResponses) {
+    return std::string(body);
+  }
+  std::optional<base::DictValue> answer =
+      base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  if (!answer) {
+    return std::nullopt;
+  }
+  std::optional<base::DictValue> chat =
+      format == ProviderFormat::kAnthropicMessages
+          ? AnthropicAnswer(*answer, address)
+          : ResponsesAnswer(*answer, address);
+  return chat ? Write(*chat) : std::nullopt;
+}
+
+}  // namespace uw

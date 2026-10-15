@@ -2076,5 +2076,32 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(OrganizationReady(prefs()));
 }
 
+// A language model at a provider that speaks Anthropic Messages gets the
+// naming request in that format, with Anthropic's key header, and its answer
+// names the task.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ALanguageModelOverAnthropicMessagesNamesTheNewTask) {
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  UseModel(ModelSlot::kLanguage, ProviderFormat::kAnthropicMessages,
+           "claude-model", "anthropic-key");
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99, 0.97));
+  Answer("/v1/messages", R"({"stop_reason":"end_turn","content":[)"
+                         R"({"type":"text","text":"Plan Lisbon trip"}]})");
+
+  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+
+  ASSERT_TRUE(link->GetGroup());
+  EXPECT_EQ(TitleOf(*link->GetGroup()), u"Plan Lisbon trip");
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_EQ(requests[1].path, "/v1/messages");
+  EXPECT_EQ(requests[1].anthropic_key, "anthropic-key");
+  EXPECT_EQ(requests[1].authorization, "");
+  EXPECT_NE(requests[1].body.find(R"("model":"claude-model")"),
+            std::string::npos);
+  EXPECT_NE(requests[1].body.find(R"("system":)"), std::string::npos);
+}
+
 }  // namespace
 }  // namespace uw

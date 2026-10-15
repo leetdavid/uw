@@ -22,11 +22,13 @@
 #include "content/public/browser/storage_partition.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "net/base/net_errors.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/ai_providers/formats.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 
 namespace uw {
@@ -34,7 +36,10 @@ namespace uw {
 struct UwProvidersHandler::ModelTest {
   GURL url;
   std::string key_account;
+  // In chat completions' shape for a language model, which gets it in its
+  // own format.
   std::optional<std::string> body;
+  std::optional<AiConnectionConfig> language;
   base::RepeatingCallback<bool(const std::string&)> reads;
 };
 
@@ -178,8 +183,7 @@ mojom::ModelListPtr ModelListFrom(RemoteModelClient::Outcome outcome) {
 
 // Sent to the slot's model as automatic organization reaches it. A language
 // model passes when it answers with text, a decision model when it answers
-// with a choice. Until uw speaks Anthropic Messages and OpenAI Responses,
-// every language model is reached over chat completions.
+// with a choice.
 UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
                                       const PrefService& prefs) {
   UwProvidersHandler::ModelTest test;
@@ -206,8 +210,9 @@ UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
   }
   base::ListValue messages;
   messages.Append(UserMessage("Say hello in one word."));
-  test.url = ChatCompletionsUrl(config.endpoint);
+  test.url = LanguageModelUrl(config.endpoint, config.format);
   test.key_account = config.key_account;
+  test.language = config;
   test.body = BuildAgentRequestBody(config.model, messages, base::ListValue());
   test.reads = base::BindRepeating([](const std::string& body) {
     const std::optional<ModelTurn> turn = ParseAgentResponse(body);
@@ -249,8 +254,10 @@ void UwProvidersHandler::ListModels(const std::string& provider_id,
       !IsValidProviderEndpoint(provider->address)) {
     return;
   }
-  Send(ModelsUrl(provider->address), KeyHeaderFor(*provider),
-       StoredKey(*provider), std::nullopt,
+  Send(std::make_unique<RemoteModelClient>(
+           LoaderFactory(), ModelsUrl(provider->address), StoredKey(*provider),
+           std::string(), kProviderTimeout, KeyHeaderFor(*provider)),
+       /*post=*/false,
        base::BindOnce(&ModelListFrom).Then(std::move(callback)));
 }
 
@@ -263,8 +270,11 @@ void UwProvidersHandler::ListModelsAt(mojom::NewProviderPtr input,
       !IsValidProviderEndpoint(provider.address)) {
     return;
   }
-  Send(ModelsUrl(provider.address), KeyHeaderFor(provider), input->api_key,
-       std::nullopt, base::BindOnce(&ModelListFrom).Then(std::move(callback)));
+  Send(std::make_unique<RemoteModelClient>(
+           LoaderFactory(), ModelsUrl(provider.address), input->api_key,
+           std::string(), kProviderTimeout, KeyHeaderFor(provider)),
+       /*post=*/false,
+       base::BindOnce(&ModelListFrom).Then(std::move(callback)));
 }
 
 void UwProvidersHandler::AddProvider(mojom::NewProviderPtr input,
@@ -341,9 +351,14 @@ void UwProvidersHandler::TestModel(mojom::ModelSlot page_slot,
   std::string key = test.key_account.empty()
                         ? std::string()
                         : ApiKeyStore().GetKey(test.key_account).value_or("");
-  const GURL url = test.url;
-  const std::optional<std::string> body = test.body;
-  Send(url, RemoteModelClient::KeyHeader::kBearer, key, body,
+  std::unique_ptr<RemoteModelClient> client =
+      test.language
+          ? RemoteModelClient::ForLanguageModel(
+                LoaderFactory(), test.language->endpoint, test.language->format,
+                key, *test.body, kProviderTimeout)
+          : std::make_unique<RemoteModelClient>(LoaderFactory(), test.url, key,
+                                                *test.body, kProviderTimeout);
+  Send(std::move(client), /*post=*/true,
        base::BindOnce(&UwProvidersHandler::OnTested, weak_factory_.GetWeakPtr(),
                       slot, *choice, std::move(test), key,
                       base::TimeTicks::Now(), std::move(callback)));
@@ -355,23 +370,22 @@ void UwProvidersHandler::DismissUpgradeNotice(
   std::move(callback).Run();
 }
 
-void UwProvidersHandler::Send(const GURL& url,
-                              RemoteModelClient::KeyHeader key_header,
-                              std::string key,
-                              std::optional<std::string> body,
+scoped_refptr<network::SharedURLLoaderFactory>
+UwProvidersHandler::LoaderFactory() {
+  return profile_->GetDefaultStoragePartition()
+      ->GetURLLoaderFactoryForBrowserProcess();
+}
+
+void UwProvidersHandler::Send(std::unique_ptr<RemoteModelClient> client,
+                              bool post,
                               RemoteModelClient::ResultCallback done) {
   const int request = next_request_++;
-  auto client = std::make_unique<RemoteModelClient>(
-      profile_->GetDefaultStoragePartition()
-          ->GetURLLoaderFactoryForBrowserProcess(),
-      url, std::move(key), body.value_or(std::string()), kProviderTimeout,
-      key_header);
   RemoteModelClient* sender = client.get();
   requests_[request] = std::move(client);
   auto answered =
       base::BindOnce(&UwProvidersHandler::OnAnswered,
                      weak_factory_.GetWeakPtr(), request, std::move(done));
-  if (body) {
+  if (post) {
     sender->Send(std::move(answered));
   } else {
     sender->SendGet(std::move(answered));
@@ -412,12 +426,15 @@ void UwProvidersHandler::OnTested(ModelSlot slot,
     result->outcome = mojom::TestOutcome::kHttpError;
     result->provider_message = ProviderMessage(outcome.body);
   }
-  result->detail =
-      base::StrCat({outcome.net_error == net::OK
-                        ? "HTTP " + base::NumberToString(outcome.http_status)
-                        : net::ErrorToShortString(outcome.net_error),
-                    "\n", Readable(outcome.body), "\n\nPOST ", test.url.spec(),
-                    "\n", Readable(*test.body)});
+  result->detail = base::StrCat(
+      {outcome.net_error == net::OK
+           ? "HTTP " + base::NumberToString(outcome.http_status)
+           : net::ErrorToShortString(outcome.net_error),
+       "\n", Readable(outcome.body), "\n\nPOST ", test.url.spec(), "\n",
+       Readable(test.language ? RequestIn(test.language->format, *test.body,
+                                          test.language->endpoint)
+                                    .value_or(*test.body)
+                              : *test.body)});
   std::move(callback).Run(std::move(result));
 }
 

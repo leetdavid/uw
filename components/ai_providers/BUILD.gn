@@ -1,7 +1,9 @@
-# The AI providers the user saves once, and the model choices that pick from
-# them. See docs/plans/ai-providers.md.
+# The AI providers the user saves once, the model choices that pick from
+# them, and the formats uw speaks to them. See docs/plans/ai-providers.md.
 source_set("ai_providers") {
   sources = [
+    "formats.cc",
+    "formats.h",
     "providers.cc",
     "providers.h",
   ]
@@ -11,10 +13,14 @@ source_set("ai_providers") {
 
 source_set("unit_tests") {
   testonly = true
-  sources = [ "providers_unittest.cc" ]
+  sources = [
+    "formats_unittest.cc",
+    "providers_unittest.cc",
+  ]
   deps = [
     ":ai_providers",
     "//base",
+    "//base/test:test_support",
     "//components/prefs:test_support",
     "//testing/gtest",
   ]

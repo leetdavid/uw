@@ -338,5 +338,27 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
 }
 
+// Anthropic takes its key in its own header, for the model list and for the
+// test alike, and the test goes over Anthropic Messages.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       AnAnthropicModelIsListedAndTestedInItsOwnFormat) {
+  AddTestServer(ProviderFormat::kAnthropicMessages);
+  models_.Answer("/v1/models", kTwoModels);
+  models_.Answer("/v1/messages", R"({"stop_reason":"end_turn","content":[)"
+                                 R"({"type":"text","text":"Hello"}]})");
+  Open();
+
+  Pick("Language model", "chat-a");
+  EXPECT_THAT(Test("Language model"), HasSubstr("chat-a answered in"));
+
+  std::vector<std::string> keys;
+  for (const ModelRequest& request : models_.Requests()) {
+    keys.push_back(request.method + " " + request.path + " " +
+                   request.anthropic_key + request.authorization);
+  }
+  EXPECT_THAT(
+      keys, ElementsAre("GET /v1/models sk-test", "POST /v1/messages sk-test"));
+}
+
 }  // namespace
 }  // namespace uw

@@ -82,7 +82,10 @@ std::string ScriptedModel::Hang() {
 
 std::unique_ptr<net::test_server::HttpResponse> ScriptedModel::Serve(
     const net::test_server::HttpRequest& request) {
-  if (request.relative_url != "/v1/chat/completions") {
+  // Chat completions, Anthropic Messages, and OpenAI Responses.
+  if (request.relative_url != "/v1/chat/completions" &&
+      request.relative_url != "/v1/messages" &&
+      request.relative_url != "/v1/responses") {
     return nullptr;
   }
   base::AutoLock lock(lock_);
