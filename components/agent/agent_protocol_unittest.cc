@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/json/json_reader.h"
+#include "base/strings/strcat.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace uw {
@@ -48,7 +49,19 @@ TEST(AgentProtocolTest, DescribesEveryTool) {
     EXPECT_EQ(*function.FindDict("parameters")->FindString("type"), "object");
   }
   EXPECT_EQ(names, (std::vector<std::string>{"open", "navigate", "read",
-                                             "click", "type"}));
+                                             "click", "type", "recall"}));
+}
+
+TEST(AgentProtocolTest, FindsTheMessageInAnErrorResponse) {
+  EXPECT_EQ(
+      ModelErrorMessage(
+          R"({"error":{"message":"The context is too long.","code":400}})"),
+      "The context is too long.");
+  EXPECT_EQ(ModelErrorMessage(R"({"error":"Invalid key"})"), "Invalid key");
+  EXPECT_EQ(ModelErrorMessage("<html>Bad gateway</html>"), "");
+  EXPECT_EQ(ModelErrorMessage(base::StrCat(
+                {R"({"error":{"message":")", std::string(500, 'x'), "\"}}"})),
+            std::string(300, 'x'));
 }
 
 TEST(AgentProtocolTest, ReadsToolCalls) {

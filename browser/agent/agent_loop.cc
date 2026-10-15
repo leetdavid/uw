@@ -26,6 +26,8 @@ namespace {
 constexpr int kMaxTurns = 40;
 // A large model can think for a while before it answers.
 constexpr base::TimeDelta kModelTimeout = base::Minutes(2);
+// Long enough for several full readings, short enough for most models.
+constexpr size_t kMaxRequestLength = 200000;
 
 AgentLoop::Step Failed(std::string text) {
   AgentLoop::Step step;
@@ -43,9 +45,7 @@ AgentLoop::AgentLoop(tabs::TabInterface& chat, AgentModel model, OnStep on_step)
       loader_(chat.GetBrowserWindowInterface()
                   ->GetProfile()
                   ->GetDefaultStoragePartition()
-                  ->GetURLLoaderFactoryForBrowserProcess()) {
-  messages_.Append(AgentInstructions());
-}
+                  ->GetURLLoaderFactoryForBrowserProcess()) {}
 
 AgentLoop::~AgentLoop() = default;
 
@@ -55,7 +55,7 @@ void AgentLoop::Send(std::string_view text) {
   }
   working_ = true;
   turns_ = 0;
-  messages_.Append(UserMessage(text));
+  context_.AddUser(text);
   AskModel();
 }
 
@@ -67,7 +67,7 @@ void AgentLoop::AskModel() {
     return;
   }
   const std::optional<std::string> body =
-      BuildAgentRequestBody(model_.model, messages_, AgentToolSchemas());
+      context_.Request(model_.model, kMaxRequestLength);
   if (!body || !model_.url.is_valid()) {
     Finish(Failed("No agent model is set."));
     return;
@@ -80,11 +80,16 @@ void AgentLoop::AskModel() {
 
 void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
   if (!outcome.ok) {
-    Finish(Failed(base::StrCat(
+    std::string text = base::StrCat(
         {"The model request failed: ",
          outcome.http_status ? base::StrCat({"HTTP ", base::NumberToString(
                                                           outcome.http_status)})
-                             : net::ErrorToShortString(outcome.net_error)})));
+                             : net::ErrorToShortString(outcome.net_error)});
+    if (const std::string message = ModelErrorMessage(outcome.body);
+        !message.empty()) {
+      base::StrAppend(&text, {": ", message});
+    }
+    Finish(Failed(std::move(text)));
     return;
   }
   std::optional<ModelTurn> turn = ParseAgentResponse(outcome.body);
@@ -92,7 +97,7 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
     Finish(Failed("The model's answer could not be read."));
     return;
   }
-  messages_.Append(AssistantMessage(*turn));
+  context_.AddAssistant(*turn);
   if (turn->calls.empty()) {
     Step answer;
     answer.kind = Step::Kind::kAnswer;
@@ -119,6 +124,11 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
            base::DictValue().Set("error", "The arguments were not JSON."));
     return;
   }
+  if (call.name == "recall") {
+    base::DictValue recalled = context_.Recall(*args);
+    OnTool(std::move(turn), index, std::move(*args), std::move(recalled));
+    return;
+  }
   const std::string name = call.name;
   base::DictValue asked = args->Clone();
   tools_.Call(name, *args,
@@ -131,7 +141,7 @@ void AgentLoop::OnTool(ModelTurn turn,
                        base::DictValue args,
                        base::DictValue result) {
   const ToolCall& call = turn.calls[index];
-  messages_.Append(ToolMessage(call.id, result));
+  context_.AddResult(call.id, call.name, args, result);
   Step step;
   step.kind = Step::Kind::kTool;
   step.tool = call.name;
@@ -142,6 +152,7 @@ void AgentLoop::OnTool(ModelTurn turn,
 }
 
 void AgentLoop::Finish(Step step) {
+  context_.ShortenAll();
   working_ = false;
   on_step_.Run(step);
 }

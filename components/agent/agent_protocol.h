@@ -28,7 +28,8 @@ struct ModelTurn {
   std::vector<ToolCall> calls;
 };
 
-// The tools of browser/agent/agent_tools.h as a model is told about them.
+// The tools of browser/agent/agent_tools.h, and recall, as a model is told
+// about them.
 base::ListValue AgentToolSchemas();
 // The instructions every chat starts with.
 base::DictValue AgentInstructions();
@@ -44,6 +45,10 @@ std::optional<std::string> BuildAgentRequestBody(
     std::string_view model,
     const base::ListValue& messages,
     const base::ListValue& tools);
+
+// The message in an error response such as {"error": {"message": "..."}},
+// shortened to fit a line. Empty when there is none.
+std::string ModelErrorMessage(std::string_view body);
 
 // The first choice of a chat-completions response. Nothing for a response
 // that is not one, or that has neither text nor a tool call.

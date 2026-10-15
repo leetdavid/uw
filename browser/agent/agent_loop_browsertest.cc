@@ -31,6 +31,7 @@ namespace uw {
 namespace {
 
 using ::testing::HasSubstr;
+using ::testing::Not;
 using Kind = AgentLoop::Step::Kind;
 
 constexpr char kForm[] = R"(<!doctype html>
@@ -146,12 +147,41 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, FillsAFormAndSaysItIsDone) {
       base::JSONReader::ReadDict(requests[0], base::JSON_PARSE_RFC);
   ASSERT_TRUE(first);
   EXPECT_EQ(*first->FindString("model"), "test-agent");
-  EXPECT_EQ(first->FindList("tools")->size(), 5u);
+  EXPECT_EQ(first->FindList("tools")->size(), 6u);
   const base::ListValue& messages = *first->FindList("messages");
   ASSERT_EQ(messages.size(), 2u);
   EXPECT_EQ(*messages[1].GetDict().FindString("content"),
             "Book a tour for Ada");
   EXPECT_THAT(requests[2], HasSubstr("Your name"));
+}
+
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       AFollowUpStartsWithoutPageTextAndCanRecallIt) {
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/form"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Answer("The form asks for your name.")});
+  ASSERT_EQ(Ask("What does the form ask for?").kind, Kind::kAnswer);
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("recall", base::DictValue().Set("step", 2)))),
+       ScriptedModel::Answer("It says \"Your name\".")});
+
+  const AgentLoop::Step& end = Ask("What exactly did it say?");
+
+  EXPECT_EQ(end.kind, Kind::kAnswer);
+  ASSERT_EQ(steps_.size(), 2u);
+  EXPECT_EQ(steps_[0].tool, "recall");
+  EXPECT_THAT(*steps_[0].result.FindStringByDottedPath("result.text"),
+              HasSubstr("Your name"));
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 5u);
+  EXPECT_THAT(requests[2], HasSubstr("Your name"));
+  EXPECT_THAT(requests[3], Not(HasSubstr("Your name")));
+  EXPECT_THAT(requests[3], HasSubstr("Call recall with step 2"));
+  EXPECT_THAT(requests[4], HasSubstr("Your name"));
 }
 
 IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, AToolThatFailsIsToldToTheModel) {
@@ -171,6 +201,11 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, AToolThatFailsIsToldToTheModel) {
 IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, SaysWhenTheModelFails) {
   model_.Script({"{}"}, net::HTTP_INTERNAL_SERVER_ERROR);
   EXPECT_EQ(Ask("Hello").text, "The model request failed: HTTP 500");
+
+  model_.Script({R"({"error":{"message":"The context is too long."}})"},
+                net::HTTP_BAD_REQUEST);
+  EXPECT_EQ(Ask("Hello").text,
+            "The model request failed: HTTP 400: The context is too long.");
 
   model_.Script({"not an answer"});
   EXPECT_EQ(Ask("Hello").text, "The model's answer could not be read.");

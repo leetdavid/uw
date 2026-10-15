@@ -46,6 +46,8 @@ function describe(step: Step): string {
       return `Clicked element ${args.element} in tab ${args.tab}`;
     case 'type':
       return `Typed into element ${args.element} in tab ${args.tab}`;
+    case 'recall':
+      return `Looked again at ${result.result?.title || `step ${args.step}`}`;
     default:
       return step.tool;
   }

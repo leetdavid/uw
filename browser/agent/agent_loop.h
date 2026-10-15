@@ -16,6 +16,7 @@
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
 #include "uw/browser/tab_organization/remote_model_client.h"
+#include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
 
 namespace network {
@@ -34,7 +35,8 @@ struct AgentModel {
 
 // Runs one chat. Each message from the user goes to the model, and the model
 // and the tools take turns until the model answers without calling a tool.
-// Every step is reported as it ends.
+// Every step is reported as it ends. The model sees a short context; see
+// docs/plans/agent-chats.md#context.
 class AgentLoop {
  public:
   struct Step {
@@ -72,7 +74,7 @@ class AgentLoop {
   const AgentModel model_;
   const OnStep on_step_;
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
-  base::ListValue messages_;
+  AgentContext context_;
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;
