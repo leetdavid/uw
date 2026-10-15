@@ -1,6 +1,6 @@
 # Themes
 
-Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T95, black dark mode, is built and in review. T94, T96, and T97 are next.
+Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T95, black dark mode, and T94, the saved theme, are built and in review. T96 and T97 are next.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Gradients, black dark mode, and the saved theme reuse the tint code that exists. The picker is the risk: a color field with dots to drag is a custom control.
 
@@ -28,6 +28,15 @@ Defaults, proposed by uw and accepted on 2026-10-16:
 - "Theme colors in dark mode" starts off.
 - A tint the user picked before themes becomes a one-color theme.
 - A two- or three-color gradient runs at 160 degrees, through the dots in the order they were added.
+
+## How a theme is saved
+
+Chosen by uw for T94 on 2026-10-16.
+
+- The theme's first color, at its intensity, is Chromium's own user color. Chromium's color picker, the "Customize Chromium" panel, and Chromium's sync see it, and Chromium's colors follow it.
+- The colors, intensity, grain, and "Theme colors in dark mode" are four profile prefs, `uw.theme.*` in `components/look/theme_prefs.h`. They do not sync.
+- When Chromium's user color is not the saved first color at the saved intensity, the color was picked somewhere else, and the theme is that one color. This covers the "Customize Chromium" panel and tints picked before themes, with no migration step.
+- The window draws the more colors only when its frame color is the one the saved theme makes. Black dark mode and Chromium's own themes stay one color.
 
 ## Design
 

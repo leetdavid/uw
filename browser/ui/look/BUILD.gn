@@ -20,11 +20,13 @@ source_set("look") {
   deps = [
     "//cc/paint",
     "//chrome/browser/ui/color:color_headers",
+    "//components/prefs",
     "//skia",
     "//ui/color",
     "//ui/gfx",
     "//ui/gfx:color_utils",
     "//ui/views",
+    "//uw/components/look:prefs",
   ]
   if (is_mac) {
     frameworks = [ "AppKit.framework" ]
@@ -42,6 +44,7 @@ source_set("browser_tests") {
     ":look",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile_test_util",
     "//chrome/browser/themes",
     "//chrome/browser/ui",
     "//chrome/browser/ui/color:color_headers",
@@ -57,5 +60,6 @@ source_set("browser_tests") {
     "//ui/views",
     "//url",
     "//uw/browser/tab_organization:test_support",
+    "//uw/components/look:prefs",
   ]
 }

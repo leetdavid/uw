@@ -13,6 +13,7 @@
 #include "ui/color/color_transform.h"
 #include "ui/gfx/color_utils.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/components/look/theme.h"
 #include "uw/components/look/tint.h"
 
 namespace uw {
@@ -33,17 +34,32 @@ bool IsDarkMode(const ui::ColorProviderKey& key) {
   return key.color_mode == ui::ColorProviderKey::ColorMode::kDark;
 }
 
-// Black in dark mode, whatever color was picked. In light mode, the color the
-// user picked in Chromium's theme color picker, or the default.
-Tint TintFor(const ui::ColorProviderKey& key) {
-  if (IsDarkMode(key)) {
-    return TintFrom(SK_ColorBLACK);
-  }
+// Dark mode is black unless "Theme colors in dark mode" is on, which Chromium's
+// key shows by not asking for its neutral colors.
+bool IsBlack(const ui::ColorProviderKey& key) {
+  return IsDarkMode(key) &&
+         key.user_color_source ==
+             ui::ColorProviderKey::UserColorSource::kGrayscale;
+}
+
+// The theme's first color, which lives in Chromium's user color, or the
+// default.
+SkColor FirstThemeColor(const ui::ColorProviderKey& key) {
   if (key.user_color &&
       key.user_color_source == ui::ColorProviderKey::UserColorSource::kAccent) {
-    return TintFrom(*key.user_color);
+    return *key.user_color;
   }
-  return TintFrom(kDefaultLightTint);
+  return kDefaultLightTint;
+}
+
+Tint TintFor(const ui::ColorProviderKey& key) {
+  if (IsBlack(key)) {
+    return TintFrom(SK_ColorBLACK);
+  }
+  if (IsDarkMode(key)) {
+    return TintFrom(DarkModeColorOf(FirstThemeColor(key)));
+  }
+  return TintFrom(FirstThemeColor(key));
 }
 
 }  // namespace
@@ -97,15 +113,15 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
   }
   mixer[kColorVerticalTabPinnedOutline] = {SK_ColorTRANSPARENT};
   mixer[kColorVerticalTabStripShadow] = {SK_ColorTRANSPARENT};
-  if (!IsDarkMode(key)) {
-    mixer[kColorTabBackgroundActiveFrameActive] = {ActiveTabOn(tint)};
-    mixer[kColorTabBackgroundActiveFrameInactive] = {ActiveTabOn(tint)};
-    return;
-  }
   const SkColor active_tab =
-      color_utils::AlphaBlend(SK_ColorWHITE, SK_ColorBLACK, kActiveTabOnBlack);
+      IsBlack(key) ? color_utils::AlphaBlend(SK_ColorWHITE, SK_ColorBLACK,
+                                             kActiveTabOnBlack)
+                   : ActiveTabOn(tint);
   mixer[kColorTabBackgroundActiveFrameActive] = {active_tab};
   mixer[kColorTabBackgroundActiveFrameInactive] = {active_tab};
+  if (!IsDarkMode(key)) {
+    return;
+  }
   mixer[kColorToolbar] = {kBlackCard};
   mixer[kColorLocationBarBackground] = {kBlackCardField};
   mixer[kColorLocationBarBackgroundHovered] = {kBlackCardLine};

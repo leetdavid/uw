@@ -1,0 +1,49 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+#ifndef UW_COMPONENTS_LOOK_THEME_PREFS_H_
+#define UW_COMPONENTS_LOOK_THEME_PREFS_H_
+
+#include <optional>
+#include <vector>
+
+#include "third_party/skia/include/core/SkColor.h"
+#include "uw/components/look/theme.h"
+
+class PrefRegistrySimple;
+class PrefService;
+
+namespace uw {
+
+// A profile's theme, kept in its prefs. Its first color also lives in
+// Chromium's user color, at the theme's intensity, so Chromium's color picker
+// and its colors stay in step with the theme.
+inline constexpr char kThemeColorsPref[] = "uw.theme.colors";
+inline constexpr char kThemeIntensityPref[] = "uw.theme.intensity";
+inline constexpr char kThemeGrainPref[] = "uw.theme.grain";
+inline constexpr char kThemeColorsInDarkModePref[] =
+    "uw.theme.colors_in_dark_mode";
+
+void RegisterThemeProfilePrefs(PrefRegistrySimple* registry);
+
+// The theme saved in `prefs`, given Chromium's `user_color`. With no user
+// color, it is the default theme. When the saved first color at the saved
+// intensity is not the user color, the color was picked elsewhere, such as in
+// Chromium's color picker or before themes, and the theme is that one color.
+Theme ReadTheme(const PrefService& prefs, std::optional<SkColor> user_color);
+
+// The colors the window's gradient runs through when `frame_color` comes from
+// the theme saved in `prefs`: the frame color, then the theme's more colors.
+// Empty for a theme of one color, and when the frame color comes from
+// elsewhere, such as black dark mode, Chromium's own themes, or a color picked
+// in Chromium's color picker.
+std::vector<SkColor> GradientColorsFor(const PrefService& prefs,
+                                       SkColor frame_color);
+
+// Saves `theme`. The caller sets Chromium's user color to its first color at
+// its intensity.
+void WriteTheme(PrefService& prefs, const Theme& theme);
+
+}  // namespace uw
+
+#endif  // UW_COMPONENTS_LOOK_THEME_PREFS_H_

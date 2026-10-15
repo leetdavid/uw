@@ -39,10 +39,14 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/themed_background.cc b/chrome/browser/ui/views/frame/themed_background.cc
-index 169aee34fb3855b3e85fc99725013a2259290e08..ae207e5fdd5ff8eba01eb41c5a7fed338f53b157 100644
+index 169aee34fb3855b3e85fc99725013a2259290e08..829084ccc855505d47d5f22ab3c5474a889a4577 100644
 --- a/chrome/browser/ui/views/frame/themed_background.cc
 +++ b/chrome/browser/ui/views/frame/themed_background.cc
-@@ -9,13 +9,16 @@
+@@ -6,16 +6,20 @@
+ 
+ #include <optional>
+ 
++#include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/themes/theme_properties.h"
  #include "chrome/browser/ui/color/chrome_color_id.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -59,7 +63,7 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..ae207e5fdd5ff8eba01eb41c5a7fed33
  
  namespace {
  
-@@ -109,10 +112,21 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
+@@ -109,10 +113,22 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
                                         ThemeChoice theme_choice) {
    bool painted =
        PaintThemeCustomImage(canvas, view, browser_view, theme_choice);
@@ -72,7 +76,8 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..ae207e5fdd5ff8eba01eb41c5a7fed33
 +  const SkColor color = view->GetColorProvider()->GetColor(
 +      GetThemeChoiceInfo(theme_choice, view).second);
 +  if (theme_choice == kFrameTheme) {
-+    uw::PaintTint(canvas, view, browser_view, color);
++    uw::PaintTint(canvas, view, browser_view, color,
++                  *browser_view->GetProfile()->GetPrefs());
 +    if (browser_view->ShouldDrawVerticalTabStrip()) {
 +      uw::PaintPageCardEdge(
 +          canvas, view, browser_view->toolbar(),
@@ -291,7 +296,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
        break;
      }
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..94a2e66c42ed848d69c5a038f7de8a493b08cf4f 100644
+index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b862a1747 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 @@ -37,6 +37,7 @@
@@ -310,13 +315,14 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..94a2e66c42ed848d69c5a038f7de8a49
  
  namespace {
  
-@@ -506,7 +508,13 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+@@ -506,7 +508,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
                                      : kBrowserFrameAlphaLight;
      canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
    } else {
 -    canvas->DrawColor(frame_color);
 +    if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
-+      uw::PaintTint(canvas, this, GetBrowserView(), frame_color);
++      uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
++                    *GetBrowserView()->GetProfile()->GetPrefs());
 +      uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
 +                            GetBrowserView()->multi_contents_view());
 +    } else {
@@ -326,20 +332,64 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..94a2e66c42ed848d69c5a038f7de8a49
      auto* theme_service = ThemeServiceFactory::GetForProfile(
          GetBrowserView()->browser()->GetProfile());
 diff --git a/chrome/browser/themes/theme_service.cc b/chrome/browser/themes/theme_service.cc
-index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..590855ebf0317a978efa434fb97341c836df8846 100644
+index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..9eb22fd7d53c9efee3c6a57ba67e5b242e45d9f3 100644
 --- a/chrome/browser/themes/theme_service.cc
 +++ b/chrome/browser/themes/theme_service.cc
-@@ -765,6 +765,13 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
+@@ -72,6 +72,7 @@
+ #include "ui/color/color_provider_key.h"
+ #include "ui/color/color_provider_manager.h"
+ #include "ui/native_theme/native_theme.h"
++#include "uw/components/look/theme_prefs.h"
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #include "base/scoped_observation.h"
+@@ -289,6 +290,7 @@ std::unique_ptr<ui::ThemeProvider> ThemeService::CreateBoundThemeProvider(
+ // static
+ void ThemeService::RegisterProfilePrefs(
+     user_prefs::PrefRegistrySyncable* registry) {
++  uw::RegisterThemeProfilePrefs(registry);
+ #if BUILDFLAG(IS_LINUX)
+   registry->RegisterIntegerPref(prefs::kSystemTheme,
+                                 static_cast<int>(ui::GetDefaultSystemTheme()));
+@@ -405,6 +407,13 @@ void ThemeService::Init() {
+   pref_change_registrar_.Add(
+       prefs::kUserColor, base::BindRepeating(&ThemeService::NotifyThemeChanged,
+                                              base::Unretained(this)));
++  for (const char* pref :
++       {uw::kThemeColorsPref, uw::kThemeIntensityPref, uw::kThemeGrainPref,
++        uw::kThemeColorsInDarkModePref}) {
++    pref_change_registrar_.Add(
++        pref, base::BindRepeating(&ThemeService::NotifyThemeChanged,
++                                  base::Unretained(this)));
++  }
+ }
+ 
+ void ThemeService::Shutdown() {
+@@ -765,6 +774,15 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
      key.custom_theme = GetThemeSupplier();
    }
  
-+  // uw: dark mode is black whatever color is picked, so Chromium draws its own
-+  // parts in the neutral colors it uses for incognito.
++  // uw: dark mode is black whatever color is picked, unless "Theme colors in
++  // dark mode" is on, so Chromium draws its own parts in the neutral colors it
++  // uses for incognito.
 +  if (key.color_mode == ui::ColorProviderKey::ColorMode::kDark &&
-+      !key.custom_theme && !UsingDeviceTheme()) {
++      !key.custom_theme && !UsingDeviceTheme() &&
++      !profile_->GetPrefs()->GetBoolean(uw::kThemeColorsInDarkModePref)) {
 +    key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
 +  }
 +
    return key;
  }
  
+diff --git a/chrome/browser/themes/BUILD.gn b/chrome/browser/themes/BUILD.gn
+index 73f2984811f4e4f5b7cd0e89b58a4fad8025c082..149ba1a647f04e4a00f0da4dc8657914b97c564a 100644
+--- a/chrome/browser/themes/BUILD.gn
++++ b/chrome/browser/themes/BUILD.gn
+@@ -58,6 +58,7 @@ source_set("themes") {
+     "//ui/color/dynamic_color",
+     "//ui/gfx",
+     "//ui/native_theme",
++    "//uw/components/look:prefs",
+   ]
+   public_deps = [
+     "//base",

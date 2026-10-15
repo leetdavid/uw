@@ -6,6 +6,8 @@
 
 #include "third_party/skia/include/core/SkColor.h"
 
+class PrefService;
+
 namespace gfx {
 class Canvas;
 }  // namespace gfx
@@ -17,12 +19,13 @@ class View;
 namespace uw {
 
 // Fills `view` with its part of the window tint. The gradient starts at
-// `color` and spans `window`, so every view that calls this draws one
-// continuous sheet.
+// `color`, runs through the more colors of the theme saved in `prefs`, and
+// spans `window`, so every view that calls this draws one continuous sheet.
 void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
-               SkColor color);
+               SkColor color,
+               const PrefService& prefs);
 
 // Draws the edge of the page card, which holds `toolbar` and `page`: a 1px
 // line just outside it, where it crosses `view`. Draws nothing in fullscreen

@@ -9,6 +9,9 @@
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -34,12 +37,15 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/components/look/theme.h"
+#include "uw/components/look/theme_prefs.h"
 
 namespace uw {
 namespace {
 
 constexpr SkColor kButter = SkColorSetRGB(0xF7, 0xE0, 0x8A);
 constexpr SkColor kWine = SkColorSetRGB(0x5A, 0x1F, 0x3A);
+constexpr SkColor kSky = SkColorSetRGB(0xD8, 0xE6, 0xF9);
 
 int Channel(SkColor color, int shift) {
   return (color >> shift) & 0xFF;
@@ -61,10 +67,22 @@ class TintBrowserTest : public headless::HeadlessModeBrowserTest {
     return ThemeServiceFactory::GetForProfile(browser()->GetProfile());
   }
 
-  SkColor Color(ui::ColorId id) {
-    return BrowserView::GetBrowserViewForBrowser(browser())
+  SkColor Color(ui::ColorId id) { return Color(browser(), id); }
+
+  SkColor Color(Browser* window, ui::ColorId id) {
+    return BrowserView::GetBrowserViewForBrowser(window)
         ->GetColorProvider()
         ->GetColor(id);
+  }
+
+  // Saves `theme` as the picker does: in the profile's prefs, with its first
+  // color at its intensity as Chromium's user color.
+  void SetTheme(Profile* profile, const Theme& theme) {
+    WriteTheme(*profile->GetPrefs(), theme);
+    ThemeServiceFactory::GetForProfile(profile)
+        ->SetUserColorAndBrowserColorVariant(
+            WithIntensity(theme.colors[0], theme.intensity),
+            ui::mojom::BrowserColorVariant::kTonalSpot);
   }
 
   void Pick(SkColor color) {
@@ -221,6 +239,71 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackInDarkMode) {
                       ".getPropertyValue('--background').trim()"),
       "#0a0a0a");
   SaveWindowScreenshot(browser(), "chat-dark");
+}
+
+// Two colors run from the first, at the top leading corner, to the second, at
+// the bottom trailing corner.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, ATwoColorThemeRunsThroughBothColors) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  Theme butter_to_sky;
+  butter_to_sky.colors = {kButter, kSky};
+  SetTheme(browser()->GetProfile(), butter_to_sky);
+  const SkBitmap window = CaptureWindow(browser());
+  const int width = window.width();
+  const int height = window.height();
+  EXPECT_LE(Gap(window.getColor(width / 40, 3), kButter), 6);
+  EXPECT_LE(Gap(window.getColor(width - width / 40, height - 3), kSky), 6);
+  SaveWindowScreenshot(browser(), "theme-two-colors");
+}
+
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, AColorPickedElsewhereIsAOneColorTheme) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  Theme butter_to_sky;
+  butter_to_sky.colors = {kButter, kSky};
+  SetTheme(browser()->GetProfile(), butter_to_sky);
+  Pick(kWine);
+  EXPECT_EQ(ReadTheme(*browser()->GetProfile()->GetPrefs(), kWine).colors,
+            std::vector<SkColor>{kWine});
+  const SkBitmap window = CaptureWindow(browser());
+  EXPECT_LE(Gap(window.getColor(window.width() - window.width() / 40,
+                                window.height() - 3),
+                TintFrom(kWine).end),
+            6);
+}
+
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, ThemeColorsInDarkModeDarkenTheTheme) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme wine;
+  wine.colors = {kWine};
+  wine.colors_in_dark_mode = true;
+  SetTheme(browser()->GetProfile(), wine);
+  EXPECT_EQ(Color(ui::kColorFrameActive),
+            TintFrom(DarkModeColorOf(kWine)).start);
+  EXPECT_EQ(Color(kColorToolbar), kBlackCard);
+  SaveWindowScreenshot(browser(), "dark-theme-colors");
+
+  wine.colors_in_dark_mode = false;
+  SetTheme(browser()->GetProfile(), wine);
+  EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
+}
+
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, TwoProfilesKeepTwoThemes) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  Profile& second = profiles::testing::CreateProfileSync(
+      manager, manager->GenerateNextProfileDirectoryPath());
+  Browser* other = CreateBrowser(&second);
+  for (Profile* profile : {browser()->GetProfile(), &second}) {
+    ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+        ThemeService::BrowserColorScheme::kLight);
+  }
+  Theme butter;
+  butter.colors = {kButter};
+  SetTheme(browser()->GetProfile(), butter);
+  Theme wine;
+  wine.colors = {kWine};
+  SetTheme(&second, wine);
+  EXPECT_EQ(Color(ui::kColorFrameActive), kButter);
+  EXPECT_EQ(Color(other, ui::kColorFrameActive), kWine);
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {

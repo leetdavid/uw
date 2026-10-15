@@ -1,7 +1,9 @@
-# The Arc-style look's color rules. No browser dependencies, so they are
-# tested without a window.
+# The Arc-style look's color rules and the saved theme. No browser
+# dependencies, so they are tested without a window.
 source_set("look") {
   sources = [
+    "theme.cc",
+    "theme.h",
     "tint.cc",
     "tint.h",
   ]
@@ -9,11 +11,28 @@ source_set("look") {
   deps = [ "//ui/gfx:color_utils" ]
 }
 
+source_set("prefs") {
+  sources = [
+    "theme_prefs.cc",
+    "theme_prefs.h",
+  ]
+  public_deps = [ ":look" ]
+  deps = [
+    "//base",
+    "//components/prefs",
+  ]
+}
+
 source_set("unit_tests") {
   testonly = true
-  sources = [ "tint_unittest.cc" ]
+  sources = [
+    "theme_unittest.cc",
+    "tint_unittest.cc",
+  ]
   deps = [
     ":look",
+    ":prefs",
+    "//components/prefs:test_support",
     "//skia",
     "//testing/gtest",
     "//ui/gfx:color_utils",

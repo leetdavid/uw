@@ -5,18 +5,20 @@
 
 #include <cmath>
 #include <numbers>
+#include <vector>
 
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
+#include "cc/paint/paint_shader.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
-#include "ui/gfx/skia_paint_util.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/components/look/theme_prefs.h"
 #include "uw/components/look/tint.h"
 
 #if BUILDFLAG(IS_MAC)
@@ -35,7 +37,8 @@ constexpr double kAngle = 160.0 * std::numbers::pi / 180.0;
 void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
-               SkColor color) {
+               SkColor color,
+               const PrefService& prefs) {
   const Tint tint = TintFrom(color);
   const double across = std::sin(kAngle);
   const double down = -std::cos(kAngle);
@@ -45,13 +48,26 @@ void PaintTint(gfx::Canvas* canvas,
   views::View::ConvertPointToTarget(window, view, &origin);
   const double middle_x = origin.x() + window->width() / 2.0;
   const double middle_y = origin.y() + window->height() / 2.0;
+  const SkPoint ends[] = {
+      SkPoint::Make(static_cast<float>(middle_x - across * length / 2),
+                    static_cast<float>(middle_y - down * length / 2)),
+      SkPoint::Make(static_cast<float>(middle_x + across * length / 2),
+                    static_cast<float>(middle_y + down * length / 2))};
+  std::vector<SkColor> colors = GradientColorsFor(prefs, tint.start);
+  if (colors.empty()) {
+    colors = {tint.start, tint.end};
+  }
+  std::vector<SkColor4f> stops;
+  std::vector<SkScalar> positions;
+  for (size_t i = 0; i < colors.size(); ++i) {
+    stops.push_back(SkColor4f::FromColor(colors[i]));
+    positions.push_back(static_cast<SkScalar>(i) /
+                        static_cast<SkScalar>(colors.size() - 1));
+  }
   cc::PaintFlags flags;
-  flags.setShader(gfx::CreateGradientShader(
-      gfx::Point(std::lround(middle_x - across * length / 2),
-                 std::lround(middle_y - down * length / 2)),
-      gfx::Point(std::lround(middle_x + across * length / 2),
-                 std::lround(middle_y + down * length / 2)),
-      tint.start, tint.end));
+  flags.setShader(cc::PaintShader::MakeLinearGradient(
+      ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
+      SkTileMode::kClamp));
   canvas->DrawRect(view->GetLocalBounds(), flags);
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.
