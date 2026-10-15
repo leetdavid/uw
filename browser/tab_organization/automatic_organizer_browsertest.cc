@@ -2022,7 +2022,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(OrganizationReady(prefs()));
   EXPECT_EQ(ReadDecisionModelConfig(prefs()).format,
             DecisionFormat::kSystemOne);
-  EXPECT_EQ(ReadAgentModelConfig(prefs()).model, "agent-model");
+  EXPECT_EQ(AgentChoice(*prefs())->model, "agent-model");
 
   // The old connections and their Keychain accounts are gone, so a second
   // run changes nothing.

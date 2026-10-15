@@ -37,6 +37,8 @@ class ScriptedModel {
   void Script(std::vector<std::string> replies, int status = 200);
   // The body of every request so far.
   std::vector<std::string> Requests();
+  // The models GET /v1/models lists: "test-agent" until a test names others.
+  void ListModels(std::vector<std::string> names);
 
   // One tool call for Calls().
   static base::DictValue Call(std::string_view name,
@@ -56,6 +58,7 @@ class ScriptedModel {
   std::deque<std::string> replies_ GUARDED_BY(lock_);
   int status_ GUARDED_BY(lock_) = 200;
   std::vector<std::string> requests_ GUARDED_BY(lock_);
+  std::vector<std::string> models_ GUARDED_BY(lock_) = {"test-agent"};
 };
 
 }  // namespace uw

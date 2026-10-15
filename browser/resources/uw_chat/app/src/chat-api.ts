@@ -12,6 +12,7 @@ import {
 import type {
   AgentTab,
   Approval,
+  ChatModel,
   ChatSummary,
   SkillInfo,
   SkillProposal,
@@ -22,6 +23,7 @@ export { ApprovalChoice, ChatState, SkillSource, StepKind };
 export type {
   AgentTab,
   Approval,
+  ChatModel,
   ChatSummary,
   SkillInfo,
   SkillProposal,

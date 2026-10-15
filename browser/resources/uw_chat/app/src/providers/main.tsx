@@ -68,7 +68,7 @@ const ROWS = [
   {
     slot: ModelSlot.kAgent,
     name: "Agent model",
-    what: "New chats start on it.",
+    what: "New chats start on it. Each chat can switch.",
   },
 ];
 
@@ -273,6 +273,12 @@ function ProvidersList({
                   <EffortChip
                     efforts={modelOf(data, choice)?.efforts ?? []}
                     effort={choice?.effort ?? ""}
+                    model={choice?.model}
+                    preset={
+                      data.providers.find(
+                        (provider) => provider.id === choice?.providerId,
+                      )?.preset
+                    }
                     className="w-full"
                     onPick={async (effort) => {
                       await providersHandler.setEffort(slot, effort);

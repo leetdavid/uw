@@ -27,6 +27,7 @@ import {
   Banner,
   BannerAction,
   BannerActions,
+  BannerDescription,
   BannerTitle,
 } from "@/components/ui/banner";
 import {
@@ -62,6 +63,13 @@ import {
 import { fontWeights } from "@/lib/font-weight";
 import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
+import { EffortChip, ModelChip } from "./providers/model-chip";
+import { ProviderIcon } from "./providers/provider-parts";
+import {
+  providersHandler,
+  type ModelList,
+  type Provider,
+} from "./providers/providers-api";
 import {
   ApprovalChoice,
   ChatState,
@@ -72,6 +80,7 @@ import {
   StepKind,
   type AgentTab,
   type Approval,
+  type ChatModel,
   type ChatSummary,
   type SkillInfo,
   type SkillProposal,
@@ -285,18 +294,45 @@ function StepLine({ step, last }: { step: Step; last: boolean }) {
   );
 }
 
+// Where the chat's model or its effort changed. See the frame "AI
+// providers: every state (Fluid)".
+function ModelLine({
+  model,
+  providers,
+}: {
+  model: ChatModel | null;
+  providers: Provider[];
+}) {
+  const provider = providers.find((each) => each.id === model?.providerId);
+  return (
+    model && (
+      <div className="model-line flex items-center gap-2.5 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        {provider && <ProviderIcon preset={provider.preset} className="size-3" />}
+        Now {model.model}
+        {model.effort && ` · ${model.effort}`}
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    )
+  );
+}
+
 function Line({
   line,
   last,
+  providers,
   onContinue,
   onTryAgain,
 }: {
   line: Step;
   last: boolean;
+  providers: Provider[];
   onContinue: () => void;
   onTryAgain: () => void;
 }) {
   switch (line.kind) {
+    case StepKind.kModel:
+      return <ModelLine model={line.model} providers={providers} />;
     case StepKind.kUser:
       return (
         <ChatMessage from="user">
@@ -922,6 +958,14 @@ function Chat() {
   const [proposal, setProposal] = useState<SkillProposal | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
+  // The model the chat runs on, the providers it can pick from, and each
+  // provider's models once listed.
+  const [model, setModel] = useState<ChatModel | null>(null);
+  const [providers, setProviders] = useState<Provider[] | null>(null);
+  const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
+    {},
+  );
+  const listed = useRef(new Set<string>());
   const [working, setWorking] = useState(false);
   const [since, setSince] = useState(0);
   const [, setNow] = useState(0);
@@ -956,6 +1000,9 @@ function Chat() {
           document.body.dataset.chatId = id;
         },
       ),
+      chatPage.onModel.addListener((picked: ChatModel | null) =>
+        setModel(picked),
+      ),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
       chatPage.onTabs.addListener(
         (tabs: AgentTab[], current: number, split: boolean) => {
@@ -981,6 +1028,7 @@ function Chat() {
     ];
     connect();
     loadSkills();
+    loadProviders();
     chatHandler.getSuggestions().then(({ suggestions }) => {
       if (suggestions.length) {
         setSuggestions(suggestions);
@@ -988,6 +1036,70 @@ function Chat() {
     });
     return () => listeners.forEach((id) => chatPage.removeListener(id));
   }, []);
+
+  const loadProviders = async () => {
+    const { state } = await providersHandler.getState();
+    const usable = state.providers.filter((provider) => provider.servesLanguage);
+    setProviders(usable);
+    return usable;
+  };
+
+  // A provider is listed once; one whose list failed is asked again the next
+  // time the menu opens.
+  const listModels = (providerId: string) => {
+    if (listed.current.has(providerId)) {
+      return;
+    }
+    listed.current.add(providerId);
+    providersHandler.listModels(providerId).then(({ list }) => {
+      if (!list.ok) {
+        listed.current.delete(providerId);
+      }
+      setLists((before) => ({ ...before, [providerId]: list }));
+    });
+  };
+
+  // The chat's own provider is listed at once, for its model's levels; the
+  // others when the model menu opens, which also picks up new providers.
+  useEffect(() => {
+    if (model) {
+      listModels(model.providerId);
+    }
+  }, [model?.providerId]);
+
+  // Marks the switch in the chat once it has begun, as the browser does:
+  // switches in a row make one line.
+  const switchTo = (picked: ChatModel) => {
+    setModel(picked);
+    if (!lines.some((line) => line.kind === StepKind.kUser)) {
+      return;
+    }
+    const line: Step = {
+      kind: StepKind.kModel,
+      tool: "",
+      args: "",
+      result: "",
+      text: "",
+      model: picked,
+    };
+    setLines((before) =>
+      before.at(-1)?.kind === StepKind.kModel
+        ? [...before.slice(0, -1), line]
+        : [...before, line],
+    );
+  };
+
+  const pickModel = (provider: Provider, name: string) => {
+    switchTo({ providerId: provider.id, model: name, effort: "" });
+    chatHandler.setModel(provider.id, name);
+  };
+
+  const pickEffort = (effort: string) => {
+    if (model) {
+      switchTo({ ...model, effort });
+      chatHandler.setEffort(effort);
+    }
+  };
 
   const loadSkills = () => {
     chatHandler.getSkills().then(({ skills, folder }) => {
@@ -1016,9 +1128,26 @@ function Chat() {
     end.current?.scrollIntoView({ block: "end" });
   }, [lines, working]);
 
+  const chosen = providers?.find(
+    (provider) => provider.id === model?.providerId,
+  );
+  const chosenList = model ? lists[model.providerId] : undefined;
+  const chosenModel = chosenList?.models.find(
+    (each) => each.name === model?.model,
+  );
+  // The chat waits for another model once its own is gone.
+  const gone =
+    !model || !providers
+      ? ""
+      : !chosen
+        ? `${model.model}'s provider was removed.`
+        : chosenList?.ok && !chosenModel
+          ? `${model.model} is no longer offered by ${chosen.name}.`
+          : "";
+
   const send = (text: string) => {
     const message = text.trim();
-    if (!message || working || !opened) {
+    if (!message || working || !opened || gone) {
       return;
     }
     // The first message names the tab.
@@ -1027,7 +1156,14 @@ function Chat() {
     }
     setLines((before) => [
       ...before,
-      { kind: StepKind.kUser, tool: "", args: "", result: "", text: message },
+      {
+        kind: StepKind.kUser,
+        tool: "",
+        args: "",
+        result: "",
+        text: message,
+        model: null,
+      },
     ]);
     setDraft("");
     setWorking(true);
@@ -1038,7 +1174,14 @@ function Chat() {
   const resume = () => {
     setLines((before) => [
       ...before,
-      { kind: StepKind.kResumed, tool: "", args: "", result: "", text: "" },
+      {
+        kind: StepKind.kResumed,
+        tool: "",
+        args: "",
+        result: "",
+        text: "",
+        model: null,
+      },
     ]);
     setWorking(true);
     setSince(Date.now());
@@ -1052,8 +1195,15 @@ function Chat() {
   };
 
   const groups = group(lines);
+  // A model switch is never what the chat ends on.
+  const lastGroup = groups.findLastIndex(
+    (run) => run[0]!.kind !== StepKind.kModel,
+  );
   const title = lines.find((line) => line.kind === StepKind.kUser)?.text;
-  const stopped = !working && lines.at(-1)?.kind === StepKind.kStopped;
+  const stopped =
+    !working &&
+    lines.findLast((line) => line.kind !== StepKind.kModel)?.kind ===
+      StepKind.kStopped;
   const state = approval
     ? "Waits for your approval"
     : working
@@ -1061,8 +1211,41 @@ function Chat() {
       : stopped
         ? "Stopped"
         : "";
+  const chips = providers && (
+    <div id="model-chips" className="flex min-w-0 items-center gap-1.5">
+      <ModelChip
+        choice={model}
+        providers={providers}
+        lists={lists}
+        needsTools
+        gone={Boolean(gone)}
+        manage
+        className="h-7 max-w-[240px]"
+        onOpen={async () => {
+          for (const provider of await loadProviders()) {
+            listModels(provider.id);
+          }
+        }}
+        onPick={pickModel}
+      />
+      <EffortChip
+        efforts={chosenModel?.efforts ?? []}
+        effort={model?.effort ?? ""}
+        model={model?.model}
+        preset={chosen?.preset}
+        className="h-7"
+        onPick={pickEffort}
+      />
+    </div>
+  );
   const composer = (
     <>
+      {gone && (
+        <Banner id="model-gone" status="warning" className="mb-2">
+          <BannerTitle>{gone}</BannerTitle>
+          <BannerDescription>Pick a model to go on with this chat.</BannerDescription>
+        </Banner>
+      )}
       <InputMessage
         value={draft}
         onValueChange={setDraft}
@@ -1073,6 +1256,7 @@ function Chat() {
         placeholderSuggestion={title ? undefined : suggestions[0]}
         suggestions={title ? undefined : suggestions.slice(1)}
         textareaProps={{ id: "message", "aria-label": "Message" }}
+        leftSlot={chips}
       />
       <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">
         Changes on a site wait for your approval
@@ -1141,7 +1325,8 @@ function Chat() {
               <Fragment key={index}>
                 <Line
                   line={run[0]!}
-                  last={index === groups.length - 1 && !working}
+                  last={index === lastGroup && !working}
+                  providers={providers ?? []}
                   onContinue={resume}
                   onTryAgain={tryAgain}
                 />

@@ -14,10 +14,12 @@
 #include "ui/webui/mojo_web_ui_controller.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 
 namespace uw {
 
 class UwChatHandler;
+class UwProvidersHandler;
 class UwChatUI;
 
 class UwChatUIConfig : public content::DefaultWebUIConfig<UwChatUI> {
@@ -35,6 +37,8 @@ class UwChatUI : public ui::MojoWebUIController,
   ~UwChatUI() override;
 
   void BindInterface(mojo::PendingReceiver<mojom::ChatHandlerFactory> receiver);
+  // The composer's model menu lists the providers and their models.
+  void BindInterface(mojo::PendingReceiver<mojom::ProvidersHandler> receiver);
 
  private:
   // mojom::ChatHandlerFactory:
@@ -43,6 +47,7 @@ class UwChatUI : public ui::MojoWebUIController,
       mojo::PendingReceiver<mojom::ChatHandler> handler) override;
 
   std::unique_ptr<UwChatHandler> handler_;
+  std::unique_ptr<UwProvidersHandler> providers_;
   mojo::Receiver<mojom::ChatHandlerFactory> factory_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();

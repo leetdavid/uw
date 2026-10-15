@@ -3,7 +3,7 @@
 // model, one that calls no tools is shown but cannot be picked. See the frame
 // "Chat: model and effort chips (Fluid)" on the canvas page "AI providers".
 import { Fragment, useState, type ReactNode } from "react";
-import { ChevronDown, Gauge } from "lucide-react";
+import { ChevronDown, Gauge, Plug } from "lucide-react";
 import {
   DropdownContent,
   DropdownEmpty,
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
-import type { ModelList, Provider } from "./providers-api";
+import type { ModelList, Provider, ProviderPreset } from "./providers-api";
 import { ProviderIcon } from "./provider-parts";
 
 // How many models a provider shows before the search narrows them.
@@ -30,7 +30,10 @@ export function ModelChip({
   lists,
   unset,
   needsTools,
+  gone,
+  manage,
   className,
+  onOpen,
   onPick,
   onClear,
 }: {
@@ -42,7 +45,12 @@ export function ModelChip({
   unset?: string;
   // A chat runs on the model, so it has to call tools.
   needsTools?: boolean;
+  // The chosen model is no longer offered.
+  gone?: boolean;
+  // Ends the menu with a link to uw://providers.
+  manage?: boolean;
   className?: string;
+  onOpen?: () => void;
   onPick: (provider: Provider, model: string) => void;
   onClear?: () => void;
 }) {
@@ -92,7 +100,14 @@ export function ModelChip({
       rows.push(<DropdownEmpty key={`${provider.id}-error`}>{list.error}</DropdownEmpty>);
       continue;
     }
-    const shown = needle ? models : models.slice(0, FIRST_MODELS);
+    // The first few, and the chosen one wherever it is.
+    const shown = needle
+      ? models
+      : models.filter(
+          (model, at) =>
+            at < FIRST_MODELS ||
+            (choice?.providerId === provider.id && choice.model === model.name),
+        );
     rows.push(
       <Fragment key={`${provider.id}-models`}>
         {shown.map((model) => {
@@ -130,13 +145,25 @@ export function ModelChip({
       </DropdownEmpty>,
     );
   }
+  if (manage) {
+    rows.push(
+      <DropdownSeparator key="manage-line" />,
+      <MenuItem
+        key="manage"
+        index={index++}
+        icon={Plug}
+        label="Manage providers"
+        onSelect={() => open("chrome://providers/")}
+      />,
+    );
+  }
   const total = providers.reduce(
     (sum, provider) => sum + (lists[provider.id]?.models.length ?? 0),
     0,
   );
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(opened) => opened && onOpen?.()}>
       <DropdownTrigger
         render={
           <button type="button" className={cn(CHIP, className)}>
@@ -145,7 +172,9 @@ export function ModelChip({
               className={cn(
                 "flex-1 truncate text-left",
                 !choice && "text-muted-foreground",
-                choice && !chosen && "line-through decoration-muted-foreground",
+                choice &&
+                  (!chosen || gone) &&
+                  "line-through decoration-muted-foreground",
               )}
             >
               {choice?.model ?? unset ?? "Pick a model"}
@@ -171,11 +200,16 @@ export function ModelChip({
 export function EffortChip({
   efforts,
   effort,
+  model,
+  preset,
   className,
   onPick,
 }: {
   efforts: string[];
   effort: string;
+  // The model and its provider, which head the menu.
+  model?: string;
+  preset?: ProviderPreset;
   className?: string;
   onPick: (effort: string) => void;
 }) {
@@ -196,6 +230,14 @@ export function EffortChip({
         }
       />
       <DropdownContent checkedIndex={checkedIndex} className="w-[168px]">
+        {model && (
+          <DropdownLabel className="flex items-center gap-1.5">
+            {preset !== undefined && (
+              <ProviderIcon preset={preset} className="size-3 opacity-70" />
+            )}
+            <span className="truncate">{model}</span>
+          </DropdownLabel>
+        )}
         {levels.map((level, index) => (
           <MenuItem
             key={level || "default"}

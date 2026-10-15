@@ -71,6 +71,36 @@ std::set<std::string>& OpenChats() {
   return *open;
 }
 
+base::DictValue ModelValue(const ModelChoice& choice) {
+  return base::DictValue()
+      .Set("provider", choice.provider_id)
+      .Set("model", choice.model)
+      .Set("effort", choice.effort);
+}
+
+std::optional<ModelChoice> ModelFrom(const base::DictValue* value) {
+  const std::string* provider = value ? value->FindString("provider") : nullptr;
+  const std::string* model = value ? value->FindString("model") : nullptr;
+  const std::string* effort = value ? value->FindString("effort") : nullptr;
+  if (!provider || !model) {
+    return std::nullopt;
+  }
+  return ModelChoice{*provider, *model, false,
+                     effort ? *effort : std::string()};
+}
+
+mojom::ChatModelPtr PageModel(const std::optional<ModelChoice>& choice) {
+  return choice ? mojom::ChatModel::New(choice->provider_id, choice->model,
+                                        choice->effort)
+                : nullptr;
+}
+
+bool IsModelLine(const base::Value& entry) {
+  const std::string* kind =
+      entry.is_dict() ? entry.GetDict().FindString("kind") : nullptr;
+  return kind && *kind == "model";
+}
+
 mojom::StepPtr Failed(std::string text) {
   auto step = mojom::Step::New();
   step->kind = mojom::StepKind::kFailed;
@@ -261,8 +291,7 @@ void UwChatHandler::Send(const std::string& text) {
 }
 
 void UwChatHandler::Resume() {
-  const base::DictValue* last =
-      log_.empty() ? nullptr : log_.back().GetIfDict();
+  const base::DictValue* last = LastLine();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
   if (!loaded_ || Working() || !kind || *kind != "stopped") {
     return;
@@ -288,8 +317,7 @@ void UwChatHandler::TryAgain() {
     Send(*text);
     return;
   }
-  const base::DictValue* last =
-      log_.empty() ? nullptr : log_.back().GetIfDict();
+  const base::DictValue* last = LastLine();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
   if (!kind || *kind != "failed" || !skills_loaded_) {
     return;
@@ -514,6 +542,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
     if (const base::ListValue* log = saved->FindList("log")) {
       log_ = log->Clone();
     }
+    model_ = ModelFrom(saved->FindDict("model"));
     if (const base::DictValue* context = saved->FindDict("context")) {
       saved_context_ = AgentContext::FromValue(*context);
     }
@@ -542,7 +571,13 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
       lines.push_back(LineFor(entry.GetDict()));
     }
   }
+  if (!model_) {
+    model_ =
+        AgentChoice(*Profile::FromBrowserContext(contents_->GetBrowserContext())
+                         ->GetPrefs());
+  }
   page_->OnOpened(id_, title_, std::move(lines));
+  page_->OnModel(PageModel(model_));
   OnChatsChanged();
 }
 
@@ -552,20 +587,20 @@ bool UwChatHandler::Start() {
     page_->OnStep(Failed("A chat works only in a tab."));
     return false;
   }
-  const AiConnectionConfig config = ReadAgentModelConfig(
-      Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs());
-  if (!IsComplete(config)) {
+  // A chat opened before any model was picked takes the agent model now.
+  if (!model_) {
+    model_ =
+        AgentChoice(*Profile::FromBrowserContext(contents_->GetBrowserContext())
+                         ->GetPrefs());
+    page_->OnModel(PageModel(model_));
+  }
+  std::optional<AgentModel> model = AgentModelNow();
+  if (!model) {
     page_->OnStep(Failed("Pick a model on AI providers first."));
     return false;
   }
-  AgentModel model;
-  model.connection = config;
-  if (!config.key_account.empty()) {
-    model.api_key =
-        ApiKeyStore().GetKey(config.key_account).value_or(std::string());
-  }
   agent_ = std::make_unique<AgentLoop>(
-      *tab, std::move(model),
+      *tab, std::move(*model),
       base::BindRepeating(&UwChatHandler::OnStep, base::Unretained(this)),
       std::move(saved_context_),
       base::BindRepeating(&UwChatHandler::Save, base::Unretained(this)));
@@ -612,6 +647,71 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
   page_->OnStep(std::move(sent));
 }
 
+std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
+  const PrefService& prefs =
+      *Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs();
+  AgentModel model;
+  if (model_) {
+    model.connection = ConfigForChoice(prefs, *model_);
+  }
+  if (!IsComplete(model.connection)) {
+    return std::nullopt;
+  }
+  if (!model.connection.key_account.empty()) {
+    model.api_key = ApiKeyStore()
+                        .GetKey(model.connection.key_account)
+                        .value_or(std::string());
+  }
+  return model;
+}
+
+void UwChatHandler::SetModel(const std::string& provider_id,
+                             const std::string& model) {
+  if (!loaded_ || provider_id.empty() || model.empty()) {
+    return;
+  }
+  model_ = ModelChoice{provider_id, model, false, std::string()};
+  OnModelChanged();
+}
+
+void UwChatHandler::SetEffort(const std::string& effort) {
+  if (!loaded_ || !model_) {
+    return;
+  }
+  model_->effort = effort;
+  OnModelChanged();
+}
+
+// Switches in a row make one line, as the page shows them.
+void UwChatHandler::OnModelChanged() {
+  if (agent_) {
+    if (std::optional<AgentModel> model = AgentModelNow()) {
+      agent_->SetModel(std::move(*model));
+    }
+  }
+  if (!title_.empty()) {
+    base::DictValue line = base::DictValue()
+                               .Set("kind", "model")
+                               .Set("model", ModelValue(*model_));
+    if (!log_.empty() && IsModelLine(log_.back())) {
+      log_.back() = base::Value(std::move(line));
+    } else {
+      Log(std::move(line));
+    }
+  }
+  Save();
+  page_->OnModel(PageModel(model_));
+}
+
+const base::DictValue* UwChatHandler::LastLine() const {
+  for (size_t i = log_.size(); i > 0; --i) {
+    if (!IsModelLine(log_[i - 1])) {
+      return log_[i - 1].GetIfDict();
+    }
+  }
+  return nullptr;
+}
+
 bool UwChatHandler::Working() const {
   return agent_ && agent_->working();
 }
@@ -645,6 +745,9 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
     line->kind = mojom::StepKind::kStopped;
   } else if (*kind == "resumed") {
     line->kind = mojom::StepKind::kResumed;
+  } else if (*kind == "model") {
+    line->kind = mojom::StepKind::kModel;
+    line->model = PageModel(ModelFrom(entry.FindDict("model")));
   }
   return line;
 }
@@ -679,14 +782,18 @@ void UwChatHandler::Save() {
       tabs.Append(base::DictValue().Set("number", number).Set("page", page));
     }
   }
-  file_->Save(base::DictValue()
-                  .Set("version", 1)
-                  .Set("title", title_)
-                  .Set("running", Working())
-                  .Set("updated", base::TimeToValue(updated_))
-                  .Set("log", log_.Clone())
-                  .Set("context", context->ToValue())
-                  .Set("tabs", std::move(tabs)));
+  base::DictValue saved = base::DictValue()
+                              .Set("version", 1)
+                              .Set("title", title_)
+                              .Set("running", Working())
+                              .Set("updated", base::TimeToValue(updated_))
+                              .Set("log", log_.Clone())
+                              .Set("context", context->ToValue())
+                              .Set("tabs", std::move(tabs));
+  if (model_) {
+    saved.Set("model", ModelValue(*model_));
+  }
+  file_->Save(saved);
   UpdateIndex();
 }
 
@@ -889,8 +996,7 @@ void UwChatHandler::UpdateIndex() {
   if (!index || updated_.is_null()) {
     return;
   }
-  const base::DictValue* last =
-      log_.empty() ? nullptr : log_.back().GetIfDict();
+  const base::DictValue* last = LastLine();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
   ChatIndex::State state = ChatIndex::State::kDone;
   if (approval_answer_) {

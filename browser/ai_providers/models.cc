@@ -135,12 +135,13 @@ bool SameProvider(const OldConnection& a, const OldConnection& b) {
          a.provider.format == b.provider.format;
 }
 
-AiConnectionConfig ConfigFor(const PrefService* prefs, ModelSlot slot) {
+}  // namespace
+
+AiConnectionConfig ConfigForChoice(const PrefService& prefs,
+                                   const ModelChoice& choice) {
   AiConnectionConfig config;
-  const std::optional<ModelChoice> choice =
-      prefs ? ReadChoice(*prefs, slot) : std::nullopt;
   const std::optional<Provider> provider =
-      choice ? FindProvider(*prefs, choice->provider_id) : std::nullopt;
+      FindProvider(prefs, choice.provider_id);
   const std::optional<ProviderFormat> format =
       provider ? LanguageFormatOf(*provider) : std::nullopt;
   if (!format) {
@@ -149,13 +150,11 @@ AiConnectionConfig ConfigFor(const PrefService* prefs, ModelSlot slot) {
   config.endpoint = provider->address;
   config.preset = provider->preset;
   config.format = *format;
-  config.model = choice->model;
-  config.effort = choice->effort;
+  config.model = choice.model;
+  config.effort = choice.effort;
   config.key_account = provider->key_account;
   return config;
 }
-
-}  // namespace
 
 void RegisterModelPrefs(PrefRegistrySimple* registry) {
   for (const char* pref :
@@ -238,13 +237,14 @@ void MoveConnectionsToProviders(PrefService* prefs, bool tested) {
 }
 
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs) {
-  return ConfigFor(prefs, ModelSlot::kLanguage);
+  const std::optional<ModelChoice> choice =
+      prefs ? ReadChoice(*prefs, ModelSlot::kLanguage) : std::nullopt;
+  return choice ? ConfigForChoice(*prefs, *choice) : AiConnectionConfig();
 }
 
-AiConnectionConfig ReadAgentModelConfig(const PrefService* prefs) {
-  return prefs && ReadChoice(*prefs, ModelSlot::kAgent)
-             ? ConfigFor(prefs, ModelSlot::kAgent)
-             : ConfigFor(prefs, ModelSlot::kLanguage);
+std::optional<ModelChoice> AgentChoice(const PrefService& prefs) {
+  std::optional<ModelChoice> agent = ReadChoice(prefs, ModelSlot::kAgent);
+  return agent ? agent : ReadChoice(prefs, ModelSlot::kLanguage);
 }
 
 DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs) {

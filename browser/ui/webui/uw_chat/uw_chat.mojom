@@ -41,6 +41,19 @@ interface ChatHandler {
   // The user's answer to the last OnApproval. A decline may carry a note for
   // the agent.
   AnswerApproval(ApprovalChoice choice, string note);
+  // Runs the chat on `model` of the provider `provider_id` from the next
+  // request on, at its provider's default effort.
+  SetModel(string provider_id, string model);
+  // One of the chat's model's levels, or empty for its provider's default.
+  SetEffort(string effort);
+};
+
+// The model a chat runs on, from a provider on uw://providers.
+struct ChatModel {
+  string provider_id;
+  string model;
+  // Empty for the provider's default.
+  string effort;
 };
 
 // The kinds of uw::AgentLoop::Step, and the other lines a saved chat holds.
@@ -54,6 +67,8 @@ enum StepKind {
   kStopped,
   // The user picked it up again.
   kResumed,
+  // The user switched the chat's model or its effort.
+  kModel,
 };
 
 // One step of the agent's work.
@@ -65,6 +80,8 @@ struct Step {
   string result;
   // The agent's answer, what went wrong, or the user's message.
   string text;
+  // For kModel: the model the chat runs on from there.
+  ChatModel? model;
 };
 
 // What the chat list shows beside a chat. Matches uw::ChatIndex::State.
@@ -139,6 +156,9 @@ interface ChatPage {
   // The chat is ready: its id for the page's address, its title, and every
   // line it holds so far.
   OnOpened(string id, string title, array<Step> lines);
+  // The model the chat runs on, after OnOpened and after every change.
+  // Nothing when no model is picked anywhere.
+  OnModel(ChatModel? model);
   OnStep(Step step);
   // Every saved chat, newest first, whenever the list changes.
   OnChats(array<ChatSummary> chats);

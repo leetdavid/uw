@@ -110,7 +110,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..579e47e5c5df25060eb72cca47349040
        <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
          Use graphics acceleration when available
 diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-index 8a0281a596af3532fa6342b5653f93e913261023..dd8b512c518030a915c1714b056e36dd2f352e65 100644
+index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96d633b0b7 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 @@ -223,6 +223,17 @@
@@ -141,7 +141,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..dd8b512c518030a915c1714b056e36dd
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ChatHandlerFactory,
 +                                         uw::UwChatUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ProvidersHandler,
-+                                         uw::UwProvidersUI>(map);
++                                         uw::UwProvidersUI, uw::UwChatUI>(map);
 +#endif
 +
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)

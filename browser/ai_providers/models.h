@@ -91,8 +91,13 @@ void MoveConnectionsToProviders(PrefService* prefs, bool tested);
 // The models picked on uw://providers. Empty when the slot holds no model, or
 // its provider is gone or cannot serve it.
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs);
-// The language model's connection until an agent model is picked.
-AiConnectionConfig ReadAgentModelConfig(const PrefService* prefs);
+// The model a new chat starts on: the agent model, or the language model
+// until one is picked.
+std::optional<ModelChoice> AgentChoice(const PrefService& prefs);
+// The connection to `choice` as a language model. Empty when its provider is
+// gone or cannot serve it.
+AiConnectionConfig ConfigForChoice(const PrefService& prefs,
+                                   const ModelChoice& choice);
 DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
 
 // Accepts https URLs, plus http loopback for local testing. Rejects

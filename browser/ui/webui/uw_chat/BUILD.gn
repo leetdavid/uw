@@ -22,6 +22,7 @@ source_set("uw_chat") {
     "//ui/webui",
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/ui/webui/uw_providers",
   ]
   deps = [
     "//chrome/browser/profiles:profile",

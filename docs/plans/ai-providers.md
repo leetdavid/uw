@@ -1,6 +1,6 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15 and T78 on 2026-10-16. T79 is in progress: the catalog and the providers page's effort chips were built on 2026-10-16, and the chat composer's chips are next.
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss.
 
@@ -46,7 +46,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 1. T76: the design on the canvas: `uw://providers` with its states, adding a provider, and the model and effort chips with their menus. Signed off on 2026-10-15.
 2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15.
 3. T78: the Anthropic Messages and OpenAI Responses formats. Built on 2026-10-16, with the shared code moved to `browser/ai_providers/`. Live calls over each format are for the user to check: the tests play the providers with a local server.
-4. T79: the model catalog, and the model and effort chips in the chat composer. Built in part on 2026-10-16: the catalog, Ollama's model details, effort in each format, and the providers page's effort chips and per-model tool calls and levels.
+4. T79: the model catalog, and the model and effort chips in the chat composer. Built on 2026-10-16. What a model kept goes back only to that model, so a switch to another model at the same provider drops it.
 
 ## Acceptance checks
 

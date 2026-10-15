@@ -44,6 +44,11 @@ std::vector<std::string> ScriptedModel::Requests() {
   return requests_;
 }
 
+void ScriptedModel::ListModels(std::vector<std::string> names) {
+  base::AutoLock lock(lock_);
+  models_ = std::move(names);
+}
+
 // static
 base::DictValue ScriptedModel::Call(std::string_view name,
                                     base::DictValue args) {
@@ -82,6 +87,19 @@ std::string ScriptedModel::Hang() {
 
 std::unique_ptr<net::test_server::HttpResponse> ScriptedModel::Serve(
     const net::test_server::HttpRequest& request) {
+  if (request.relative_url == "/v1/models") {
+    base::AutoLock lock(lock_);
+    base::ListValue data;
+    for (const std::string& name : models_) {
+      data.Append(base::DictValue().Set("id", name));
+    }
+    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+    response->set_content_type("application/json");
+    response->set_content(
+        base::WriteJson(base::DictValue().Set("data", std::move(data)))
+            .value_or("{}"));
+    return response;
+  }
   // Chat completions, Anthropic Messages, and OpenAI Responses.
   if (request.relative_url != "/v1/chat/completions" &&
       request.relative_url != "/v1/messages" &&

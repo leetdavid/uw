@@ -26,6 +26,7 @@
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/components/agent/skills.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace content {
 class WebContents;
@@ -72,6 +73,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void AnswerSkill(bool save) override;
   void AnswerApproval(mojom::ApprovalChoice choice,
                       const std::string& note) override;
+  void SetModel(const std::string& provider_id,
+                const std::string& model) override;
+  void SetEffort(const std::string& effort) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -81,10 +85,18 @@ class UwChatHandler : public mojom::ChatHandler,
 
  private:
   void OnLoaded(std::optional<base::DictValue> saved);
-  // Starts the agent with the agent model in settings, giving it back the
-  // tabs it had. False, after telling the page why, when there is no agent
-  // model or the page is not in a tab.
+  // Starts the agent on the chat's model, giving it back the tabs it had.
+  // False, after telling the page why, when the chat has no model it can
+  // reach or the page is not in a tab.
   bool Start();
+  // The chat's model as the agent reaches it. Nothing when the chat has no
+  // model, or its provider is gone.
+  std::optional<AgentModel> AgentModelNow() const;
+  // Runs the agent on the chat's model from now on, marks the switch once
+  // the chat has begun, and tells the page.
+  void OnModelChanged();
+  // The last line of the log that is not a model switch.
+  const base::DictValue* LastLine() const;
   void OnStep(const AgentLoop::Step& step);
   bool Working() const;
   // One line of the saved log as the page shows it.
@@ -126,6 +138,8 @@ class UwChatHandler : public mojom::ChatHandler,
   std::unique_ptr<ChatFile> file_;
   bool loaded_ = false;
   std::string title_;
+  // The model the chat runs on. Nothing when no model is picked anywhere.
+  std::optional<ModelChoice> model_;
   // What the page shows, in order. Steps are kept in the context.
   base::ListValue log_;
   // The saved conversation and the agent's tabs by number, by the tree's page

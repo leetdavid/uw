@@ -77,6 +77,8 @@ class AgentLoop {
   // Asks the model again after its request failed, with the chat as it is.
   void TryAgain();
   bool working() const { return working_; }
+  // Talks to `model` from the next request on.
+  void SetModel(AgentModel model) { model_ = std::move(model); }
   // The skills the agent may load from now on.
   void SetSkills(const std::vector<Skill>& skills);
   // Asks the user whether to save the skill a save_skill call describes,
@@ -128,7 +130,7 @@ class AgentLoop {
   void Finish(Step step);
 
   AgentTools tools_;
-  const AgentModel model_;
+  AgentModel model_;
   const OnStep on_step_;
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
   const std::unique_ptr<AgentContext> context_;

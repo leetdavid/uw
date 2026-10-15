@@ -5,6 +5,7 @@
 
 #include <utility>
 
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/grit/uw_chat_resources.h"
 #include "chrome/grit/uw_chat_resources_map.h"
 #include "components/performance_manager/public/decorators/page_live_state_decorator.h"
@@ -14,6 +15,7 @@
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
 
 namespace uw {
 
@@ -46,6 +48,12 @@ void UwChatUI::CreateHandler(
   handler_.reset();
   handler_ = std::make_unique<UwChatHandler>(
       web_ui()->GetWebContents(), std::move(page), std::move(handler));
+}
+
+void UwChatUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProvidersHandler> receiver) {
+  providers_ = std::make_unique<UwProvidersHandler>(
+      Profile::FromWebUI(web_ui()), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(UwChatUI)

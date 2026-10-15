@@ -97,7 +97,7 @@ Expected result: `Test` beside the language or decision model sends it one small
 
 uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions.
 
-A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`. The chat composer has no model chips yet.
+A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`.
 
 ### Automatic organization
 
@@ -156,6 +156,8 @@ A chat asks before it changes anything on a site: a card in the chat names the s
 A new chat asks "What should the agent do?" and suggests three requests: Tab takes the one in the field, and a click takes one of the others. With a language model on `uw://providers`, the language model writes them once a day from your recent chats and most-visited sites, and the chat after the one that asked shows them. Before that, and in a private window, the chat suggests the product's examples.
 
 Expected result: the chat tab takes your first message as its title, and the chat's heading shows it with what the chat is doing: `Working`, then minutes, or `Waits for your approval`. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a quiet line with what it acted on in bold, such as `Clicked button "Send" in tab 1`, then the answer. When the model request fails, `Try again` asks once more without a new message, and `AI providers` opens `uw://providers`. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
+
+Each chat runs on its own model. Its composer has the model chip and, for a model with levels, the effort chip; a new chat starts on the agent model. The model menu groups models by provider, dims the ones that call no tools, and ends with `Manage providers`. Expected result: a switch applies from the next request, even while the agent works, and a thin line such as `Now gpt-5 · high` marks it. The chat keeps its model when it opens again. A chat whose provider was removed, or whose model the provider no longer lists, says so and sends nothing until you pick another model.
 
 Chats are saved after every step. Quit uw in the middle of one and start it again with "Continue where you left off" set at `chrome://settings/onStartup`. Expected result: the chat tab comes back with everything it showed and the line `Stopped before it finished` with `Continue`. Continue goes on in the same agent tabs.
 

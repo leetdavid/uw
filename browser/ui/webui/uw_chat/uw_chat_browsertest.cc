@@ -111,11 +111,22 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
 
   TabStripModel* tabs() { return browser()->tab_strip_model(); }
 
+  // A chat keeps its provider across a restart, so a test server saved
+  // before one moves to this run's address.
   void UseAgentModel() {
     PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    const std::string address = embedded_test_server()->GetURL("/v1").spec();
+    for (Provider saved : ReadProviders(prefs)) {
+      if (saved.name == "Test server") {
+        saved.address = address;
+        ASSERT_TRUE(UpdateProvider(prefs, saved));
+        SetChoice(prefs, ModelSlot::kAgent, saved.id, "test-agent");
+        return;
+      }
+    }
     Provider provider = PresetProvider(ProviderPreset::kCustom);
     provider.name = "Test server";
-    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    provider.address = address;
     SetChoice(prefs, ModelSlot::kAgent, AddProvider(prefs, provider),
               "test-agent");
   }
@@ -209,6 +220,57 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
       lines.push_back(line.GetString());
     }
     return lines;
+  }
+
+  // Opens the menu of the composer's model chip, or of its effort chip when
+  // `effort` is true, and picks `name`.
+  void Pick(content::WebContents* chat, const std::string& name, bool effort) {
+    ASSERT_TRUE(content::ExecJs(
+        chat,
+        content::JsReplace(
+            "(async () => {"
+            "const until = (probe) => new Promise((resolve) => {"
+            "  const check = () => probe() ? resolve(probe())"
+            "      : setTimeout(check, 20);"
+            "  check();"
+            "});"
+            "const chip = () => document.querySelector($2"
+            "    ? '#model-chips [aria-label=\"Effort\"]'"
+            "    : '#model-chips [aria-haspopup=\"menu\"]');"
+            "(await until(chip)).dispatchEvent(new PointerEvent('pointerdown',"
+            "    {bubbles: true, button: 0, pointerType: 'mouse'}));"
+            "(await until(() => [...document.querySelectorAll("
+            "    '[role=\"menu\"] [role^=\"menuitem\"]')]"
+            "    .find((row) => row.getAttribute('aria-label') === $1)))"
+            "    .click();"
+            "await until(() => chip().textContent.includes($1));"
+            "})()",
+            name, effort)));
+  }
+
+  // Leaves the chat and opens it again in the same tab. A chat open in a
+  // tab cannot be opened twice, so the tab leaves it first.
+  void Reopen(content::WebContents* chat) {
+    const GURL address = chat->GetLastCommittedURL();
+    ASSERT_TRUE(content::NavigateToURL(chat, GURL("about:blank")));
+    ASSERT_TRUE(content::NavigateToURL(chat, address));
+    WaitForChat(chat);
+  }
+
+  // Waits until `expression` is truthy in `chat`, and returns its value.
+  static content::EvalJsResult Until(content::WebContents* chat,
+                                     const std::string& expression) {
+    return content::EvalJs(
+        chat,
+        "new Promise((resolve) => {"
+        "  const check = () => {"
+        "    const value = " +
+            expression +
+            ";"
+            "    value ? resolve(value) : setTimeout(check, 20);"
+            "  };"
+            "  check();"
+            "});");
   }
 
   std::vector<std::string> Steps(content::WebContents* chat) {
@@ -850,7 +912,8 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PlacingAnOrderWaitsForApproval) {
   EXPECT_EQ(Ordered(chat), "Ordered");
 }
 
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PressingEnterInAFormWaitsForApproval) {
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       PressingEnterInAFormWaitsForApproval) {
   UseAgentModel();
   ScriptOrder("Ordered.",
               ScriptedModel::Call("type", base::DictValue()
@@ -910,8 +973,7 @@ class UwChatSensitiveSiteBrowserTest : public UwChatBrowserTest {
   void SetUpOnMainThread() override {
     UwChatBrowserTest::SetUpOnMainThread();
     optimization_guide::RetryForHistogramUntilCountReached(
-        &histograms_, "OptimizationGuide.HintsManager.HintCacheInitialized",
-        1);
+        &histograms_, "OptimizationGuide.HintsManager.HintCacheInitialized", 1);
     // The engine uses the list only once its component has loaded. The list
     // itself comes from the command line.
     optimization_guide::OptimizationHintsComponentUpdateListener::GetInstance()
@@ -1124,6 +1186,68 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   EXPECT_EQ(Lines(chat, ".mine"),
             std::vector<std::string>{"Book a tour for Ada"});
   EXPECT_EQ(model_.Requests().size(), 1u);
+}
+
+// A chat switches its model and effort between messages: the next request
+// goes to the new model, a line marks the switch, and the chat keeps it.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatSwitchesModelAndEffort) {
+  UseAgentModel();
+  model_.ListModels({"test-agent", "test-other"});
+  model_.Script({ScriptedModel::Answer("First.")});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(Ask(chat, "Hello"), "First.");
+
+  Pick(chat, "test-other", /*effort=*/false);
+  Pick(chat, "high", /*effort=*/true);
+  EXPECT_EQ(Lines(chat, ".model-line"),
+            std::vector<std::string>{"Now test-other · high"});
+  model_.Script({ScriptedModel::Answer("Second.")});
+  EXPECT_EQ(Ask(chat, "Again"), "Second.");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[0], ::testing::HasSubstr(R"("model":"test-agent")"));
+  EXPECT_THAT(requests[0],
+              ::testing::Not(::testing::HasSubstr("reasoning_effort")));
+  EXPECT_THAT(requests[1], ::testing::HasSubstr(R"("model":"test-other")"));
+  EXPECT_THAT(requests[1],
+              ::testing::HasSubstr(R"("reasoning_effort":"high")"));
+
+  Reopen(chat);
+  EXPECT_EQ(Lines(chat, ".model-line"),
+            std::vector<std::string>{"Now test-other · high"});
+  EXPECT_EQ(Until(chat,
+                  "document.querySelector('#model-chips')?.textContent"
+                  "    === 'test-otherhigh'"),
+            true);
+}
+
+// A chat whose provider was removed says so, and sends nothing until the
+// user picks another model.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatWaitsWhenItsProviderIsGone) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("First.")});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(Ask(chat, "Hello"), "First.");
+
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  RemoveProvider(prefs, ReadChoice(prefs, ModelSlot::kAgent)->provider_id);
+  Reopen(chat);
+  EXPECT_EQ(Until(chat, "document.getElementById('model-gone')?.textContent"),
+            "test-agent's provider was removed.Pick a model to go on with "
+            "this chat.");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Again")));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "new Promise((resolve) => setTimeout(() =>"
+                            "    resolve(document.getElementById('message')"
+                            "        .value), 300))"),
+            "Again");
+  EXPECT_EQ(model_.Requests().size(), 1u);
+
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Second.")});
+  Pick(chat, "test-agent", /*effort=*/false);
+  EXPECT_EQ(Until(chat, "!document.getElementById('model-gone')"), true);
+  EXPECT_EQ(Ask(chat, "Again"), "Second.");
 }
 
 }  // namespace
