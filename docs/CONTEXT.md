@@ -36,7 +36,7 @@ A page that is part of the browser, such as settings. Its address starts with `u
 _Avoid_: Chrome page, internal page, WebUI page.
 
 **Command bar**:
-uw's popup for opening pages and running commands from the keyboard. It searches commands, tasks, open tabs, history, bookmarks, and the web.
+uw's popup for opening pages and running commands from the keyboard. It searches commands, tasks, open tabs, history, bookmarks, and the web, and can send what was typed to a chat or a terminal.
 _Avoid_: Palette, command palette, launcher, omnibox.
 
 **Result menu**:

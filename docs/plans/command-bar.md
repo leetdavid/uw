@@ -1,10 +1,10 @@
 # Command bar
 
-Status: scope agreed on 2026-10-14. T60, the spike, started on 2026-10-15 at the user's request. The other tickets wait for approval. The command bar runs the commands of the [keyboard and mouse plan](keyboard-and-mouse.md).
+Status: scope agreed on 2026-10-14. Widened on 2026-10-15: one list ranked by use, instant results only, sending the typed text to a chat or a terminal, and sums with units and currencies. T60, the spike, started on 2026-10-15 at the user's request. The other tickets wait for approval. The command bar runs the commands of the [keyboard and mouse plan](keyboard-and-mouse.md).
 
-Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later stages are smaller: 6/10 and 7/10.
+Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. One ranked list has to put uw's commands and tasks on the same scale as Chromium's history and bookmark scores. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later tickets: sending to a chat 7/10, running in a terminal 6/10, aliases and keys 6/10, and the calculator 6/10.
 
-The decision to replace typing in the address bar is recorded in [ADR 0005](../adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md). The design goes on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Command bar": the frames "Command bar: as you type", "Command bar: before typing", and "Command bar: every state", drawn on 2026-10-15. The user has not signed off yet.
+The decision to replace typing in the address bar is recorded in [ADR 0005](../adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md). The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Command bar": the frames "Command bar: as you type", "Command bar: before typing", "Command bar: every state", "Calculator: units and currencies", "Calculator: every state", "Chat: send the text with Cmd+Return", "Terminal: run the text with Option+Return", and "Chat and terminal: every state". Redrawn on 2026-10-15 for the wider scope. The user has not signed off yet.
 
 ## Agreed scope
 
@@ -16,6 +16,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T61 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
 - Cmd+L, and a click on the address in the toolbar, open it filled with the current address, selected. A page picked from it loads in the current tab. The lock, star, and zoom icons beside the address keep their own clicks.
 - Cmd+Shift+A opens it narrowed to open and recently closed tabs. Chromium's tab search popup and its toolbar button are hidden.
+- Cmd+Shift+P opens it with `>` in the field, ready for a shell command. See [Sending the text to a chat or a terminal](#sending-the-text-to-a-chat-or-a-terminal). Agreed on 2026-10-15.
 - Commands run on the tab that was selected when the command bar opened.
 - It opens at once and never loses a key. Every typed address goes through it, so a late or dropped key breaks the [primary design rule](../product.md#principles). Keys pressed between Cmd+T and the panel appearing land in its field, in order. Added on 2026-10-14.
 - A "New blank tab" command opens Chromium's new tab page.
@@ -24,19 +25,48 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 
 - Commands, from the list the [keyboard and mouse plan](keyboard-and-mouse.md#design) defines, and Chromium's own browser commands.
 - Tasks, to go to one or to move a tab there.
-- Open tabs, history, bookmarks, and web search, from the same suggestion engine as Chromium's address bar. Chromium's site search shortcuts, such as typing `gh` and a query, work as they do there. An address being typed is completed inline, as the address bar does.
-- Before anything is typed, the few tabs selected most recently and the commands run most recently. Cmd+L shows the current address instead.
+- Open tabs, history, bookmarks, and past searches, from the same suggestion engine as Chromium's address bar. Chromium's site search shortcuts, such as `gh` and Tab, work as they do there. An address being typed is completed inline, as the address bar does.
+- Only results that are ready at once. The list changes only when the user types, never because a result arrived late. Changed on 2026-10-15:
+  - Live suggestions from the search engine are left out, so nothing typed leaves the Mac until the user picks a row.
+  - History covers the pages Chromium's address bar can find at once: pages typed at least once, visited 4 or more times, or visited in the last 3 days.
+- Before anything is typed, the tabs, tasks, commands, and pages the user picks most often and most recently. Cmd+L shows the current address instead. Changed on 2026-10-15: before, the most recent tabs and commands.
 
-### Layout
+### Ranking
 
-- The best match comes first. Fixed sections follow in a fixed order: Tabs, Tasks, Commands, Bookmarks, History, Search. Rows do not change places between sections as typing continues.
-- When nothing matches well, the last rows are "Search the web for …" and "Ask uw …". Ask uw starts a [chat](../CONTEXT.md#language). The new tab page keeps its own Ask box.
+Agreed on 2026-10-15, after [Raycast's ranking](https://www.raycast.com/changelog/macos/1-40-0). Before, the best match came first and fixed sections followed.
+
+- One list, ranked as a whole. Each row has a small label on its right: Tab, Task, Command, Bookmark, History, or Search.
+- A row rises the more often and the more recently it is picked from the command bar. It rises further when the typed text, or the start of it, was typed before that row was picked.
+- Only picks in the command bar count. A command run from its key or a menu does not. Chromium's history rows also keep Chromium's own ranking by visits.
+- A math answer comes first when the text is math. When nothing matches well, the last rows are "Search the web for …" and "Ask uw …".
+- Cmd+K on a row offers "Reset ranking", which forgets what uw learned about that row.
+- What uw learns stays on the Mac, in the profile. Private windows teach it nothing. Clearing browsing history clears it.
+
+### Picking a row
+
 - Return runs the selected row's first action. Cmd+K opens its [result menu](../CONTEXT.md#language): a tab can be switched to, closed, moved to a task, or have its link copied.
+- "Ask uw …" does what Cmd+Return does.
+
+### Sending the text to a chat or a terminal
+
+Agreed on 2026-10-15. The user types first and picks where the text goes with the key that sends it.
+
+| Key | What it does |
+| --- | --- |
+| Return | Runs the selected row. |
+| Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message and the tab that was selected attached, so the agent reads that page first. The chat opens in front, below that tab's branch. |
+| Option+Return | Runs the text as a shell command in this task's terminal and brings that terminal to the front. |
+| Tab | Chromium's site search, as in the address bar. |
+
+- Cmd+K on the text offers "Add to <chat>" for a chat that is already open, "Ask without this tab", and "Ask in the background", which opens the chat without selecting it.
+- This task's terminal is the one Ctrl+\` goes to, per the [terminal key](keyboard-and-mouse.md#terminal-key). With none, or with a [busy terminal](../CONTEXT.md#language), a new terminal opens where a blank new tab would and runs the text.
+- Cmd+K on the text offers "Run in a new terminal" and "Run and stay here", which runs it without leaving the current tab.
+- A `>` at the start of the field marks a shell command, and Return runs it as Option+Return does. Cmd+Shift+P puts it there. Typing `>` in an empty field does the same, and Backspace in an empty field removes it.
+- Ctrl+Return keeps Chromium's meaning: it adds `www.` and `.com` to the typed word and opens it.
 
 ### Models
 
-- Text typed in the command bar reaches a model only when the user picks a row that asks one: a translation or Ask uw. Nothing is sent while typing.
-- Web search suggestions reach the search engine as they do from Chromium's address bar, under Chromium's own setting.
+- Text typed in the command bar reaches a model only when the user asks for one: a translation row, Ask uw, or Cmd+Return. Nothing is sent while typing.
 
 ### Aliases and recorded keys
 
@@ -44,59 +74,70 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - The user can record a key for any command from its result menu. It works while a uw window is in front, and nowhere else.
 - A recorded key must include Cmd, so it works in a terminal tab. uw refuses a key already in use and names the command that has it.
 
-### Math, currency, and translation
+### Math, units, currency, and translation
 
-- Math is worked out on the Mac and shown as the best match. Return copies the result.
-- Currency uses the European Central Bank's daily reference rates, fetched at most once a day. Fetching them sends nothing the user typed. The default target is the currency of the Mac's region, and "in EUR" picks another.
+Widened on 2026-10-15. Before, unit conversions were a non-goal.
+
+- Math, units, and currencies are worked out on the Mac and shown as the first row. Return copies the result.
+- Units and currencies mix in one sum: `10 HKD + 10 EUR to USD`, or `20 kg * 10 m/s/s / 5W`, which shows 40 N/W.
+- The answer keeps the units typed. Base units are combined only where they make a named unit, so kg·m/s² becomes N. `to s/m` converts to another unit.
+- A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
+- A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
+- Currency uses the European Central Bank's daily reference rates, fetched at most once a day. Fetching them sends nothing the user typed. Offline, the last rates fetched are used and their date is shown.
+- The default currency is the currency of the Mac's region. A "Default currency" setting in the Command bar section of uw's settings page picks another. `in EUR` picks one for a single sum.
 - A "Translate … to <browser language>" row appears when the text looks like another language, or after typing "translate". It asks the language model only when picked. The answer shows in the command bar with a Copy action.
 
 ## Non-goals
 
 - A plugin system. It is a possible later direction, not part of this plan.
 - Hotkeys that work outside uw.
-- Unit conversions.
+- Live suggestions from the search engine. Added on 2026-10-15.
 
 ## Design
 
 - `browser/resources/uw_command_bar/` and `browser/ui/webui/uw_command_bar/` hold the page and its Mojo link, as the terminal's do. It shows in a top-chrome WebUI panel, the kind Chromium uses for its tab search popup.
 - While the switch is on, each window keeps its command bar page loaded and shows it in a `WebUIBubbleDialogView` over the page card, from `browser/ui/views/command_bar/`. Chromium's `WebUIContentsPreloadManager` keeps one page for all of Chromium and picks which, and tab search's bubble drops its page 30 seconds after closing, so neither keeps it ready. Keys pressed before the field has focus are held by the browser and passed to the page in order once it is ready.
-- Open tabs, history, bookmarks, search suggestions, and site search shortcuts come from Chromium's searchbox handler, the one behind the new tab page's search box (`chrome/browser/ui/webui/searchbox/`). The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
-- Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it.
-- Recent tabs and commands, aliases, and recorded keys are profile prefs.
-- The math library is pinned to an exact version in `package.json`, like ghostty-web. The rates are fetched by the browser process.
+- Open tabs, history, bookmarks, past searches, and site search shortcuts come from Chromium's suggestion engine, asked for instant results only with `AutocompleteInput::set_omit_asynchronous_matches`, the mode Chromium uses for pasted text. The spike used the new tab page's searchbox handler (`chrome/browser/ui/webui/searchbox/`), which loads a picked page inside the panel, so T61 needs a handler of uw's own. The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
+- Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
+- Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
+- What uw learns from picks, aliases, recorded keys, and the default currency are profile prefs. A history deletion clears what uw learned.
+- Cmd+Return opens `uw://chat` the way New chat does, with the text and the attached tab.
+- Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
+- The math library is pinned to an exact version in `package.json`, like ghostty-web. Proposal: mathjs, which has units and lets uw add each currency as a unit. The rates are fetched by the browser process.
 - Translation is one chat request to the language model, through the connection automatic organization already uses.
 
 ## Stages
 
-Each stage is a ticket on the [board](roadmap.md#board). The design comes before T61.
+Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-15.
 
-Stage (a), the core:
-
-1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler. Proposed, not agreed: it answers the first stage's biggest unknown before the rest is built.
-2. T61: the command bar on Cmd+T, with its sources, layout, and recent items.
-3. T62: Cmd+L and the address click open it.
-4. T63: the result menu and the fallbacks. Ask uw waits for the chat page, T47.
-5. T64: Cmd+Shift+A opens it narrowed to tabs.
-
-Stage (b): T65, aliases and recorded keys.
-
-Stage (c): T66, math, currency, and translation.
+1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler.
+2. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
+3. T81: Cmd+Return sends the text to a new chat.
+4. T54, from the [keyboard and mouse plan](keyboard-and-mouse.md#stages): Ctrl+\` goes to the task's terminal, which T82 needs.
+5. T82: Option+Return and Cmd+Shift+P run the text in a terminal.
+6. T66: math, units, currency, the default currency setting, and translation.
+7. T62: Cmd+L and the address click open it.
+8. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
+9. T64: Cmd+Shift+A opens it narrowed to tabs.
+10. T65: aliases and recorded keys.
 
 ## Acceptance checks
 
 1. Keys sent right after Cmd+T, before the panel has drawn, all appear in its field in order, in 100 of 100 runs of a headless test. On the user's Mac the panel shows within 100 ms of Cmd+T. The 100 ms is uw's proposal.
-2. Cmd+T opens the command bar over the selected tab, listing recent tabs and commands. Escape leaves the tab strip unchanged. Picking an address opens a tab below the selected tab's branch.
+2. Cmd+T opens the command bar over the selected tab, listing the most-used items. Escape leaves the tab strip unchanged. Picking an address opens a tab below the selected tab's branch.
 3. Typing "move to scratchpad" and Return moves the tab that was selected.
 4. Cmd+L shows the current address selected. Editing it and Return loads the new address in the same tab. A click on the address does the same. The lock icon still opens site information.
-5. For the same text, the history, bookmark, and search rows match what Chromium's suggestion engine returns.
-6. The best match comes first, then the sections in their fixed order.
-7. Cmd+K on a tab row offers Switch, Close, Move to task, and Copy link.
+5. For the same text, the history, bookmark, and past search rows match Chromium's instant results, and a test search server receives no request while text is typed.
+6. After a row is picked twice for "gi", typing "g" puts it first. Reset ranking puts it back. Picks in a private window change nothing.
+7. Cmd+K on a tab row offers Switch, Close, Move to task, Copy link, and Reset ranking.
 8. Text with no good match ends with "Search the web for …" and "Ask uw …".
 9. Cmd+Shift+A shows open and recently closed tabs only.
-10. Cmd+T, Cmd+L, and Cmd+Shift+A work with a terminal tab selected.
-11. A test model server receives no request while text is typed, and one request when a translation row is picked.
-12. An alias runs its command. A recorded key without Cmd is refused, a key in use is refused with its owner named, and a recorded key runs its command after a restart.
-13. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date.
+10. Cmd+T, Cmd+L, Cmd+Shift+A, and Cmd+Shift+P work with a terminal tab selected.
+11. A test model server receives no request while text is typed, and one request when a translation row is picked or Cmd+Return is pressed.
+12. Cmd+Return opens a chat in front, below the selected tab's branch, with the text as its first message and the tab attached.
+13. Option+Return runs the text in the task's terminal and selects it. With that terminal busy, a new terminal runs it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
+14. An alias runs its command. A recorded key without Cmd is refused, a key in use is refused with its owner named, and a recorded key runs its command after a restart.
+15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 N/W, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
@@ -104,6 +145,3 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 
 - Which other address bar habits Cmd+L must keep: paste and go, dragging the address out, the site search chip, and extensions' address bar keywords.
 - Where aliases and recorded keys are listed and edited: a section of uw's settings page, the command bar alone, or both.
-- Whether recent tabs and commands are kept per window or per profile.
-- What currency conversion shows offline. Proposal: the last rates fetched, with their date.
-- What the command bar keeps from a private window. Proposal: nothing after the private windows close, like a [private chat](../CONTEXT.md#language).

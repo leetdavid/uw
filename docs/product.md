@@ -250,7 +250,7 @@ Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
 
 Agreed on 2026-10-14: every command has a menu bar entry and a key, and the tab tree works with the mouse alone. Tasks do not nest: a [tab branch](CONTEXT.md#language) is the only level below a task. Branches collapse, and dragging nests them. The [keyboard and mouse plan](plans/keyboard-and-mouse.md) has the keys and the details.
 
-Agreed on 2026-10-14: a [command bar](CONTEXT.md#language) replaces typing in the address bar. Cmd+T, Cmd+L, and a click on the address open it. It finds commands, tasks, open tabs, history, bookmarks, and the web, and offers "Ask uw" to start a chat. Text typed there reaches a model only when the user picks a row that asks one. See the [command bar plan](plans/command-bar.md) and [ADR 0005](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md).
+Agreed on 2026-10-14: a [command bar](CONTEXT.md#language) replaces typing in the address bar. Cmd+T, Cmd+L, and a click on the address open it. It finds commands, tasks, open tabs, history, bookmarks, and the web, and offers "Ask uw" to start a chat. Text typed there reaches a model only when the user asks for one. Widened on 2026-10-15: results are ranked by use, Cmd+Return sends the text to a chat, Option+Return runs it in a terminal, and sums can mix units and currencies. See the [command bar plan](plans/command-bar.md) and [ADR 0005](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md).
 
 ### Pinned tabs
 

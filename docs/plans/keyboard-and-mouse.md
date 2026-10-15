@@ -35,6 +35,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Focus the sidebar | Ctrl+Cmd+L | new |
 | Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
 | New terminal | Ctrl+Shift+\` | new |
+| Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
 | Move to task, pause, organizer activity, Suggest a name | menu, and the command bar later | no key |
 
 ### Terminal key
@@ -127,7 +128,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 8. T73: New child tab, its key, and "New tab below" by the right-clicked tab.
 9. T74: children nested by hand stay with their parent.
 
-T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15.
+T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
 ## Acceptance checks
 
