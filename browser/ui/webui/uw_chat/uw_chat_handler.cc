@@ -7,24 +7,36 @@
 #include <utility>
 #include <vector>
 
+#include "base/base64.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/no_destructor.h"
 #include "base/strings/strcat.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/favicon/content/content_favicon_driver.h"
+#include "components/split_tabs/split_tab_visual_data.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/gfx/codec/jpeg_codec.h"
+#include "ui/gfx/codec/png_codec.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -81,6 +93,25 @@ mojom::ChatState StateFor(ChatIndex::State state) {
     case ChatIndex::State::kUnread:
       return mojom::ChatState::kUnread;
   }
+}
+
+// How wide a picture of a tab is taken: the card's width, twice over for
+// sharp screens.
+constexpr int kPictureWidth = 480;
+constexpr int kPictureQuality = 70;
+
+std::string DataUrl(std::string_view type, base::span<const uint8_t> bytes) {
+  return base::StrCat({"data:", type, ";base64,", base::Base64Encode(bytes)});
+}
+
+// The agent's tab a tool step acted in: the one it named, or the one it
+// opened. None for a step that failed.
+int TabOf(const AgentLoop::Step& step) {
+  if (step.result.contains("error")) {
+    return 0;
+  }
+  return step.args.FindInt("tab").value_or(
+      step.result.FindInt("tab").value_or(0));
 }
 
 GURL ChatUrl(std::string_view id) {
@@ -224,6 +255,37 @@ void UwChatHandler::DeleteChat(const std::string& id) {
           std::move(showing)));
 }
 
+void UwChatHandler::ShowTab(int32_t number) {
+  if (tabs::TabInterface* tab = AgentTab(number)) {
+    BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
+    TabListInterface::From(window)->ActivateTab(tab->GetHandle());
+    window->GetWindow()->Activate();
+  }
+}
+
+void UwChatHandler::SetSideBySide(bool on, int32_t number) {
+  tabs::TabInterface* chat =
+      tabs::TabInterface::MaybeGetFromContents(contents_);
+  if (!chat) {
+    return;
+  }
+  TabStripModel* model = chat->GetBrowserWindowInterface()->GetTabStripModel();
+  const std::optional<split_tabs::SplitTabId> split = chat->GetSplit();
+  if (split) {
+    model->RemoveSplit(*split);
+  }
+  tabs::TabInterface* agent = AgentTab(number ? number : current_tab_);
+  if (on && agent &&
+      agent->GetBrowserWindowInterface() == chat->GetBrowserWindowInterface()) {
+    // The split takes the active tab, which is the chat while its page is
+    // being used.
+    model->ActivateTabAt(model->GetIndexOfTab(chat));
+    model->ExecuteAddToNewSplitCommand(model->GetIndexOfTab(agent),
+                                       split_tabs::SplitTabLayout::kSideBySide);
+  }
+  SendTabs();
+}
+
 void UwChatHandler::OnChatsChanged() {
   ChatIndex* index = index_observation_.GetSource();
   if (!index || !index->loaded()) {
@@ -340,6 +402,8 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
   }
   if (step.kind != AgentLoop::Step::Kind::kTool) {
     unread_ = contents_->GetVisibility() != content::Visibility::VISIBLE;
+  } else {
+    OnToolStep(step);
   }
   Save();
   auto sent = mojom::Step::New();
@@ -427,6 +491,94 @@ void UwChatHandler::Save() {
                   .Set("context", context->ToValue())
                   .Set("tabs", std::move(tabs)));
   UpdateIndex();
+}
+
+tabs::TabInterface* UwChatHandler::AgentTab(int number) {
+  if (!agent_) {
+    return nullptr;
+  }
+  const std::map<int, tabs::TabInterface*> open = agent_->tools().OpenTabs();
+  const auto tab = open.find(number);
+  return tab == open.end() ? nullptr : tab->second;
+}
+
+void UwChatHandler::OnToolStep(const AgentLoop::Step& step) {
+  const int number = TabOf(step);
+  tabs::TabInterface* tab = AgentTab(number);
+  if (!tab) {
+    return;
+  }
+  const bool moved = number != current_tab_;
+  current_tab_ = number;
+  content::WebContents* contents = tab->GetContents();
+  Card& card = cards_[number];
+  card.title = base::UTF16ToUTF8(contents->GetTitle());
+  card.url = contents->GetVisibleURL().spec();
+  const favicon::FaviconDriver* icons =
+      favicon::ContentFaviconDriver::FromWebContents(contents);
+  const gfx::Image favicon = icons ? icons->GetFavicon() : gfx::Image();
+  if (!favicon.IsEmpty()) {
+    if (std::optional<std::vector<uint8_t>> png =
+            gfx::PNGCodec::EncodeBGRASkBitmap(*favicon.ToSkBitmap(),
+                                              /*discard_transparency=*/false)) {
+      card.favicon = DataUrl("image/png", *png);
+    }
+  }
+  if (content::RenderWidgetHostView* view =
+          contents->GetRenderWidgetHostView()) {
+    const gfx::Size size = view->GetViewBounds().size();
+    if (!size.IsEmpty()) {
+      view->CopyFromSurface(
+          gfx::Rect(),
+          gfx::Size(kPictureWidth,
+                    kPictureWidth * size.height() / size.width()),
+          base::Seconds(5),
+          base::BindOnce(&UwChatHandler::OnPicture, weak_factory_.GetWeakPtr(),
+                         number));
+    }
+  }
+  // Side by side, the chat follows the agent to its other tabs.
+  tabs::TabInterface* chat =
+      tabs::TabInterface::MaybeGetFromContents(contents_);
+  if (moved && chat && chat->GetSplit() &&
+      tab->GetSplit() != chat->GetSplit()) {
+    SetSideBySide(true, number);
+    return;
+  }
+  SendTabs();
+}
+
+void UwChatHandler::OnPicture(int number,
+                              const content::CopyFromSurfaceResult& result) {
+  if (!result.has_value() || result->bitmap.drawsNothing()) {
+    return;
+  }
+  if (std::optional<std::vector<uint8_t>> jpeg =
+          gfx::JPEGCodec::Encode(result->bitmap, kPictureQuality)) {
+    cards_[number].picture = DataUrl("image/jpeg", *jpeg);
+    SendTabs();
+  }
+}
+
+void UwChatHandler::SendTabs() {
+  const std::map<int, tabs::TabInterface*> open =
+      agent_ ? agent_->tools().OpenTabs()
+             : std::map<int, tabs::TabInterface*>();
+  std::vector<mojom::AgentTabPtr> cards;
+  for (const auto& [number, card] : cards_) {
+    auto sent = mojom::AgentTab::New();
+    sent->number = number;
+    sent->title = card.title;
+    sent->url = card.url;
+    sent->favicon = card.favicon;
+    sent->picture = card.picture;
+    sent->closed = !open.contains(number);
+    cards.push_back(std::move(sent));
+  }
+  tabs::TabInterface* chat =
+      tabs::TabInterface::MaybeGetFromContents(contents_);
+  page_->OnTabs(std::move(cards), current_tab_,
+                chat && chat->GetSplit().has_value());
 }
 
 void UwChatHandler::UpdateIndex() {

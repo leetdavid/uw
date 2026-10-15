@@ -5,13 +5,14 @@
 import { Fragment, StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { Loader2, Pause, Plus, Trash2 } from "lucide-react";
+import { Columns2, Loader2, Pause, Plus, Trash2 } from "lucide-react";
 import {
   Banner,
   BannerAction,
   BannerActions,
   BannerTitle,
 } from "@/components/ui/banner";
+import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage } from "@/components/ui/input-message";
 import {
@@ -43,6 +44,7 @@ import {
   chatPage,
   connect,
   StepKind,
+  type AgentTab,
   type ChatSummary,
   type Step,
 } from "@/chat-api";
@@ -279,10 +281,195 @@ function ChatList({
   );
 }
 
+// The agent's tab a step acted in: the one it named, or the one it opened.
+function tabOf(step: Step): number {
+  if (step.kind !== StepKind.kTool) {
+    return 0;
+  }
+  const result = JSON.parse(step.result);
+  return result.error ? 0 : (JSON.parse(step.args).tab ?? result.tab ?? 0);
+}
+
+// What the agent last did in each of its tabs, in the chat's words.
+function lastSteps(lines: Step[]): Map<number, string> {
+  const last = new Map<number, string>();
+  for (const line of lines) {
+    const number = tabOf(line);
+    if (number) {
+      last.set(number, describe(line));
+    }
+  }
+  return last;
+}
+
+function TabCard({
+  tab,
+  current,
+  working,
+  doing,
+}: {
+  tab: AgentTab;
+  current: boolean;
+  working: boolean;
+  doing: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-tab={tab.number}
+      disabled={tab.closed}
+      onClick={() => chatHandler.showTab(tab.number)}
+      className={cn(
+        "tab-card rounded-xl border border-border bg-background p-1 text-left",
+        current && !tab.closed && "border-focus-ring/45 ring-3 ring-focus-ring/10",
+        tab.closed && "opacity-60",
+      )}
+    >
+      <div className="h-[136px] overflow-hidden rounded-lg bg-surface-1">
+        {tab.picture && (
+          <img
+            src={tab.picture}
+            alt=""
+            className="h-full w-full object-cover object-top"
+          />
+        )}
+      </div>
+      <div className="px-1.5 pt-2 pb-1">
+        <div className="flex items-center gap-1.5 font-medium">
+          {tab.favicon && <img src={tab.favicon} alt="" className="size-3.5" />}
+          <span className="tab-title truncate">{tab.title || tab.url}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {current && working && !tab.closed && (
+            <Loader2 className="size-3 shrink-0 animate-spin" />
+          )}
+          <span className="tab-doing truncate">
+            {tab.closed ? "Closed" : doing}
+          </span>
+          <span className="ml-auto shrink-0">Tab {tab.number}</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SideBySideButton({ on }: { on: boolean }) {
+  return (
+    <Button
+      data-side-by-side=""
+      variant="secondary"
+      size="compact"
+      leadingIcon={Columns2}
+      active={on}
+      aria-pressed={on}
+      onClick={() => chatHandler.setSideBySide(!on, 0)}
+    >
+      Side by side
+    </Button>
+  );
+}
+
+// The agent's tabs: cards on the right of a wide page, and a strip of small
+// tabs above the chat when the page is narrow or sits beside a tab.
+function AgentTabs({
+  tabs,
+  current,
+  working,
+  sideBySide,
+  lines,
+}: {
+  tabs: AgentTab[];
+  current: number;
+  working: boolean;
+  sideBySide: boolean;
+  lines: Step[];
+}) {
+  const doing = lastSteps(lines);
+  return (
+    <aside
+      className={cn(
+        "hidden w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border px-3.5 py-4",
+        !sideBySide && "lg:flex",
+      )}
+    >
+      <div className="flex h-7 items-center gap-2">
+        <h2 className="text-sm font-semibold">Tabs</h2>
+        <span className="text-muted-foreground">{tabs.length}</span>
+        <span className="ml-auto">
+          <SideBySideButton on={sideBySide} />
+        </span>
+      </div>
+      {tabs.map((tab) => (
+        <TabCard
+          key={tab.number}
+          tab={tab}
+          current={tab.number === current}
+          working={working}
+          doing={doing.get(tab.number) ?? ""}
+        />
+      ))}
+      <p className="mt-auto text-xs text-muted-foreground">
+        Click a card to go to its tab. Each picture is the tab after the
+        agent's last step there.
+      </p>
+    </aside>
+  );
+}
+
+function TabStrip({
+  tabs,
+  current,
+  sideBySide,
+}: {
+  tabs: AgentTab[];
+  current: number;
+  sideBySide: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "mx-auto flex w-full max-w-[720px] items-center gap-2 px-7 pt-3",
+        !sideBySide && "lg:hidden",
+      )}
+    >
+      <div className="flex min-w-0 flex-1 gap-0.5 rounded-[10px] bg-accent p-[3px]">
+        {tabs
+          .filter((tab) => !tab.closed)
+          .map((tab) => (
+            <button
+              key={tab.number}
+              type="button"
+              data-strip-tab={tab.number}
+              onClick={() =>
+                sideBySide
+                  ? chatHandler.setSideBySide(true, tab.number)
+                  : chatHandler.showTab(tab.number)
+              }
+              className={cn(
+                "flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-[7px] px-2.5 text-muted-foreground",
+                tab.number === current &&
+                  "bg-background font-semibold text-foreground shadow-sm",
+              )}
+            >
+              {tab.favicon && (
+                <img src={tab.favicon} alt="" className="size-3.5" />
+              )}
+              <span className="truncate">{tab.title || tab.url}</span>
+            </button>
+          ))}
+      </div>
+      <SideBySideButton on={sideBySide} />
+    </div>
+  );
+}
+
 function Chat() {
   const [opened, setOpened] = useState(false);
   const [chatId, setChatId] = useState("");
   const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [agentTabs, setAgentTabs] = useState<AgentTab[]>([]);
+  const [currentTab, setCurrentTab] = useState(0);
+  const [sideBySide, setSideBySide] = useState(false);
   const [lines, setLines] = useState<Step[]>([]);
   const [working, setWorking] = useState(false);
   const [draft, setDraft] = useState("");
@@ -307,6 +494,13 @@ function Chat() {
         },
       ),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
+      chatPage.onTabs.addListener(
+        (tabs: AgentTab[], current: number, split: boolean) => {
+          setAgentTabs(tabs);
+          setCurrentTab(current);
+          setSideBySide(split);
+        },
+      ),
       chatPage.onStep.addListener((step: Step) => {
         setLines((before) => [...before, step]);
         if (step.kind !== StepKind.kTool) {
@@ -353,7 +547,11 @@ function Chat() {
   return (
     <SidebarProvider persist={false} width="15rem" className="h-full">
       <ChatList chats={chats} current={chatId} />
-      <SidebarInset className="flex h-full flex-col">
+      <SidebarInset className="flex h-full flex-row">
+      <div className="flex min-w-0 flex-1 flex-col">
+      {agentTabs.length > 0 && (
+        <TabStrip tabs={agentTabs} current={currentTab} sideBySide={sideBySide} />
+      )}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
           <Banner status="warning" className="ungated">
@@ -400,6 +598,16 @@ function Chat() {
           textareaProps={{ id: "message", "aria-label": "Message" }}
         />
       </div>
+      </div>
+      {agentTabs.length > 0 && (
+        <AgentTabs
+          tabs={agentTabs}
+          current={currentTab}
+          working={working}
+          sideBySide={sideBySide}
+          lines={lines}
+        />
+      )}
       </SidebarInset>
     </SidebarProvider>
   );

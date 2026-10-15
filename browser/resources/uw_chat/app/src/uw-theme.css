@@ -104,6 +104,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   margin: 0;

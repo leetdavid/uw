@@ -468,6 +468,71 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, DeletingAChatClosesItsTab) {
   }));
 }
 
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Form())))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "click", base::DictValue().Set("tab", 1).Set("element", 2)))),
+       ScriptedModel::Answer("Clicked Send.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Click Send"), "Clicked Send.");
+
+  // Each step leaves a picture of the tab on its card.
+  EXPECT_TRUE(content::ExecJs(
+      chat,
+      "new Promise(resolve => {"
+      "  const check = () => document.querySelector("
+      "      '.tab-card[data-tab=\"1\"] img[src^=\"data:image/jpeg\"]')"
+      "      ? resolve() : setTimeout(check, 20);"
+      "  check();"
+      "});"));
+  SaveWindowScreenshot(browser(), "chat-cards");
+  EXPECT_EQ(Lines(chat, ".tab-title"), std::vector<std::string>{"Book a tour"});
+  EXPECT_EQ(Lines(chat, ".tab-doing"),
+            std::vector<std::string>{"Clicked element 2 in tab 1"});
+
+  ClickFor(chat, "data-tab", "1");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs()->GetActiveWebContents()->GetLastCommittedURL().spec() ==
+           Form();
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, SideBySidePutsTheChatBesideItsTab) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Form())))),
+       ScriptedModel::Answer("Opened the form.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Open the form"), "Opened the form.");
+  tabs::TabInterface* chat_tab = tabs::TabInterface::GetFromContents(chat);
+  tabs::TabInterface* agent_tab = nullptr;
+  for (int i = 0; i < tabs()->count(); ++i) {
+    if (tabs()->GetWebContentsAt(i)->GetLastCommittedURL().spec() == Form()) {
+      agent_tab = tabs()->GetTabAtIndex(i);
+    }
+  }
+  ASSERT_TRUE(agent_tab);
+
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('[data-side-by-side]').click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return chat_tab->GetSplit().has_value() &&
+           agent_tab->GetSplit() == chat_tab->GetSplit();
+  }));
+  SaveWindowScreenshot(browser(), "side-by-side");
+
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('[data-side-by-side]').click();"));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !chat_tab->GetSplit().has_value(); }));
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {
   content::WebContents* chat = OpenChat();
 

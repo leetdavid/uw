@@ -14,6 +14,7 @@
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -26,6 +27,10 @@
 
 namespace content {
 class WebContents;
+}
+
+namespace tabs {
+class TabInterface;
 }
 
 namespace uw {
@@ -51,6 +56,8 @@ class UwChatHandler : public mojom::ChatHandler,
   void OpenChat(const std::string& id) override;
   void NewChat() override;
   void DeleteChat(const std::string& id) override;
+  void ShowTab(int32_t number) override;
+  void SetSideBySide(bool on, int32_t number) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -73,6 +80,15 @@ class UwChatHandler : public mojom::ChatHandler,
   // Tells the chat list how this chat stands.
   void UpdateIndex();
 
+  // The agent's open tab `number`, or null.
+  tabs::TabInterface* AgentTab(int number);
+  // Brings the card of the tab a tool step acted in up to date, and takes a
+  // new picture of that tab.
+  void OnToolStep(const AgentLoop::Step& step);
+  void OnPicture(int number, const content::CopyFromSurfaceResult& result);
+  // Tells the page about the agent's tabs.
+  void SendTabs();
+
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::ChatPage> page_;
   mojo::Receiver<mojom::ChatHandler> receiver_;
@@ -92,6 +108,17 @@ class UwChatHandler : public mojom::ChatHandler,
   base::Time updated_;
   // An answer came while the page was out of sight.
   bool unread_ = false;
+  // What the cards on the page show of each of the agent's tabs, kept after
+  // a tab closes.
+  struct Card {
+    std::string title;
+    std::string url;
+    std::string favicon;
+    std::string picture;
+  };
+  std::map<int, Card> cards_;
+  // The tab the agent acted in last.
+  int current_tab_ = 0;
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::WeakPtrFactory<UwChatHandler> weak_factory_{this};

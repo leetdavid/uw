@@ -7,10 +7,10 @@ import {
   ChatState,
   StepKind,
 } from "uw-chat-mojom";
-import type { ChatSummary, Step } from "uw-chat-mojom";
+import type { AgentTab, ChatSummary, Step } from "uw-chat-mojom";
 
 export { ChatState, StepKind };
-export type { ChatSummary, Step };
+export type { AgentTab, ChatSummary, Step };
 
 export const chatPage = new ChatPageCallbackRouter();
 export const chatHandler = new ChatHandlerRemote();

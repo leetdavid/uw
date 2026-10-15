@@ -126,6 +126,8 @@ Chats are saved after every step. Quit uw in the middle of one and start it agai
 
 The chat page lists every saved chat on its left, newest first, with a spinner while one runs, a pause sign when it stopped early, and a filled dot for an answer you have not seen. Click a chat to go to its tab, or to reopen it in a new tab once its tab is closed. `New chat` opens another, the search field filters by title, and the bin at the end of a row deletes the chat and closes its tab.
 
+On the right, a card for each of the agent's tabs shows a picture of the tab after the agent's last step there and what it did. Click a card to go to its tab. `Side by side` puts the chat and the agent's tab next to each other in split view, and the split follows the agent to its other tabs. Click it again to end the split.
+
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.

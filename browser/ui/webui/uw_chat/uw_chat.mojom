@@ -19,6 +19,11 @@ interface ChatHandler {
   NewChat();
   // Deletes the chat `id` and closes its tab.
   DeleteChat(string id);
+  // Goes to the agent's tab `number`.
+  ShowTab(int32 number);
+  // Puts the chat beside the agent's tab `number`, or its latest tab when
+  // `number` is 0, in split view; or ends the split when `on` is false.
+  SetSideBySide(bool on, int32 number);
 };
 
 // The kinds of uw::AgentLoop::Step, and the other lines a saved chat holds.
@@ -62,6 +67,19 @@ struct ChatSummary {
   ChatState state;
 };
 
+// One of the agent's tabs, for its card on the chat page.
+struct AgentTab {
+  int32 number;
+  string title;
+  string url;
+  // The tab's icon, and a picture of it after the agent's last step there,
+  // as data: URLs. Empty until there is one.
+  string favicon;
+  string picture;
+  // The tab is closed. Its card stays until the chat ends.
+  bool closed;
+};
+
 interface ChatPage {
   // The chat is ready: its id for the page's address, its title, and every
   // line it holds so far.
@@ -69,4 +87,7 @@ interface ChatPage {
   OnStep(Step step);
   // Every saved chat, newest first, whenever the list changes.
   OnChats(array<ChatSummary> chats);
+  // The agent's tabs, the one it acted in last, and whether the chat sits
+  // beside that tab in split view, after every change.
+  OnTabs(array<AgentTab> tabs, int32 current, bool side_by_side);
 };
