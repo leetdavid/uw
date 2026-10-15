@@ -32,6 +32,7 @@ uw browser is a Chromium-based browser in development with vertical tabs and AI 
 - [ADR 0003: a decision model sits beside the language model](adr/0003-decision-model-beside-the-language-model.md): which providers decide tab placement and how.
 - [ADR 0004: the terminal draws with ghostty-web in a page](adr/0004-the-terminal-draws-with-ghostty-web.md): why a terminal tab is a page and not a native Ghostty view.
 - [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
+- [ADR 0006: the chat page is React with Fluid Functionalism](adr/0006-the-chat-page-is-react-with-fluid-functionalism.md): why one WebUI page is a React bundle built beside Chromium's own WebUI tooling.
 
 ## Status
 

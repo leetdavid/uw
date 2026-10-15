@@ -56,7 +56,7 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 - **Tools.** `browser/agent/agent_tools.h` holds uw's tools over the engine: open a child tab, navigate, read a page, click, and type. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls. Scroll and wait come when a chat needs them.
 - **Reading a page.** `components/agent/page_text.h` turns Chromium's annotated page content into lines of text. Each link, field, and button gets a number, such as `[2] button "Send"`, and the agent clicks or types by that number. A password's value is never shown, and ads are left out.
 - **Agent loop.** `browser/agent/agent_loop.h` runs in the browser process. It sends the conversation and the tools to the model in chat-completions form (`components/agent/agent_protocol.h`), runs the tools the model calls, and repeats until the model answers without a tool. It stops a chat that takes 40 turns without an answer. It reuses `RemoteModelClient` from `browser/tab_organization/`; that code and the Keychain code move to a shared place with T44, when the agent also needs the settings.
-- **Chat page.** `uw://chat` is a WebUI page. T47 built it in plain TypeScript, like `uw://terminal`; T70 rebuilds it in React with Fluid Functionalism, bundled by a pnpm script into files the WebUI serves.
+- **Chat page.** `uw://chat` is a WebUI page in React with Fluid Functionalism's components, in the pnpm workspace package `browser/resources/uw_chat/app`. Chromium's build bundles it with esbuild through `app/bundle.ts`. See [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md).
 - **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. `browser/agent/chat_file.h` writes it to `uw_chats/<id>.json` in the profile folder after each step, replacing the file in one step: the lines the page shows, the model's context with every tool result in full, and the agent's tabs by the tab tree's page ids. A step cut short is told to the model as one that may or may not have happened. Nothing is saved in a private window.
 - **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
 - **Approvals.** uw asks before every step the model marks as a change. It also asks before steps it can detect on its own: submitting a form, filling a password, and filling payment fields.
@@ -105,7 +105,6 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 ## Open questions
 
-- Whether React, Motion, and Radix run under the WebUI's script rules (Trusted Types and its content security policy). T70 checks this first. The Inter font has to ship inside uw, since WebUI pages cannot load web fonts.
 - Where a scheduled chat runs when its tab was closed or no window is open. Proposal: it reopens its chat tab in the background in the most recent window. With no window open, it waits and runs as a [catch-up run](../CONTEXT.md#language) when a window opens.
 - Whether the model also gets a screenshot of the page, beside its text. T46 decides.
 - Whether the engine's site checks need Safe Browsing on, and how its "sensitive site" prompt maps onto uw's approvals. The spike did not reach either.

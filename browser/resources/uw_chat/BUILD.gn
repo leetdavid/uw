@@ -1,24 +1,68 @@
-# The uw://chat page: one chat with uw's agent.
-import("//ui/webui/resources/tools/build_webui.gni")
+# The uw://chat page: one chat with uw's agent. The page is a React app in
+# app/, built from Fluid Functionalism's parts. app/bundle.ts checks its types,
+# bundles it with Chromium's node, and puts the page's files in one folder;
+# the bundle carries the page's mojo bindings.
+import("//third_party/node/node.gni")
+import("//tools/grit/grit_rule.gni")
+import("//ui/webui/resources/tools/generate_grd.gni")
 
 assert(!is_android)
 
-build_webui("build") {
-  grd_prefix = "uw_chat"
+app_dir = "$target_gen_dir/app"
+app_files = [
+  "chat.html",
+  "favicon.svg",
+  "chat.js",
+  "chat.css",
+  "inter-latin.woff2",
+  "inter-latin-ext.woff2",
+]
 
-  static_files = [
+node("app") {
+  script = "//third_party/node/node.py"
+  inputs = [
+    "app/bundle.ts",
     "chat.html",
     "favicon.svg",
   ]
-  ts_files = [ "chat.ts" ]
-
-  ts_deps = [
-    "//ui/webui/resources/js:build_ts",
+  outputs = []
+  foreach(file, app_files) {
+    outputs += [ "$app_dir/$file" ]
+  }
+  depfile = "$target_gen_dir/app.d"
+  deps = [
     "//ui/webui/resources/mojo:build_ts",
+    "//uw/browser/ui/webui/uw_chat:mojo_bindings_ts__generator",
   ]
+  args = [
+    rebase_path("app/bundle.ts", root_build_dir),
+    "--out",
+    rebase_path(app_dir, root_build_dir),
+    "--gen",
+    rebase_path(root_gen_dir, root_build_dir),
+    "--depfile",
+    rebase_path(depfile, root_build_dir),
+  ]
+}
 
-  mojo_files_deps = [ "//uw/browser/ui/webui/uw_chat:mojo_bindings_ts__generator" ]
-  mojo_files = [ "$root_gen_dir/uw/browser/ui/webui/uw_chat/uw_chat.mojom-webui.ts" ]
+generate_grd("build_grd") {
+  grd_prefix = "uw_chat"
+  out_grd = "$target_gen_dir/resources.grd"
+  input_files = app_files
+  input_files_base_dir = rebase_path(app_dir, root_build_dir)
+  deps = [ ":app" ]
+}
 
-  webui_context_type = "trusted"
+grit("resources") {
+  # The grd is generated at build time.
+  enable_input_discovery_for_gn_analyze = false
+  source = "$target_gen_dir/resources.grd"
+  deps = [ ":build_grd" ]
+  outputs = [
+    "grit/uw_chat_resources.h",
+    "grit/uw_chat_resources_map.cc",
+    "grit/uw_chat_resources_map.h",
+    "uw_chat_resources.pak",
+  ]
+  output_dir = "$root_gen_dir/chrome"
 }

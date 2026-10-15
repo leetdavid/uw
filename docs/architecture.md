@@ -24,7 +24,7 @@ As substantial product code arrives, add directories for real implementations:
 | --- | --- |
 | `browser/<feature>/` | Profile lifetime, preference registration, and integration with browser tabs, downloads, or windows. Native Views code belongs under `browser/ui/views/<feature>/`. |
 | `components/<feature>/` | Feature logic behind a small interface, with its own GN target and colocated tests. Use Chromium types where useful; avoid dependencies on `//chrome/browser`. |
-| `resources/<feature>/` | Product-owned WebUI TypeScript, HTML, and styles when a feature needs WebUI. |
+| `resources/<feature>/` | Product-owned WebUI TypeScript, HTML, and styles when a feature needs WebUI. The chat page is a React app in `resources/uw_chat/app`, a pnpm workspace package; see [ADR 0006](adr/0006-the-chat-page-is-react-with-fluid-functionalism.md). |
 
 Keep substantial new C++ in ordinary files. Preparation exposes it at Chromium's `src/uw`, with narrow GN patches wiring explicit targets into the browser. The [manual tab-tree slice](plans/native-tab-tree.md) is the first consumer of this mapping. The links are a build-time view, not a second source of truth.
 

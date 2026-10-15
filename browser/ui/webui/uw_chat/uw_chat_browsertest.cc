@@ -107,13 +107,22 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     return chat;
   }
 
-  // Waits until the page has its chat, which puts the chat's id in the page's
+  // Waits until the page has its chat and has put the chat's id in its
   // address.
   void WaitForChat(content::WebContents* chat) {
     EXPECT_TRUE(content::WaitForLoadStop(chat));
-    EXPECT_TRUE(base::test::RunUntil([&] {
-      return ChatFile::IsChatId(chat->GetLastCommittedURL().path().substr(1));
-    }));
+    const std::string id =
+        content::EvalJs(chat,
+                        "new Promise(resolve => {"
+                        "  const check = () => document.body.dataset.chat"
+                        "      ? resolve(document.body.dataset.chat)"
+                        "      : setTimeout(check, 20);"
+                        "  check();"
+                        "});")
+            .ExtractString();
+    EXPECT_TRUE(ChatFile::IsChatId(id));
+    EXPECT_TRUE(base::test::RunUntil(
+        [&] { return chat->GetLastCommittedURL().path() == "/" + id; }));
   }
 
   // Runs `script` and returns the next line that ends the agent's turn.
@@ -134,13 +143,23 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
         .ExtractString();
   }
 
+  // Types `text` into the composer and presses Enter. React owns the field,
+  // so the text goes in through an input event, and Enter waits until the
+  // page has taken it.
+  static std::string SendScript(const std::string& text) {
+    return content::JsReplace(
+        "const field = document.getElementById('message');"
+        "Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+        "    'value').set.call(field, $1);"
+        "field.dispatchEvent(new Event('input', {bubbles: true}));"
+        "setTimeout(() => field.dispatchEvent(new KeyboardEvent('keydown',"
+        "    {key: 'Enter', bubbles: true})), 50);",
+        text);
+  }
+
   // Sends `text` and returns the line that ends the agent's turn.
   std::string Ask(content::WebContents* chat, const std::string& text) {
-    return UntilTheEnd(
-        chat, content::JsReplace(
-                  "document.getElementById('message').value = $1;"
-                  "document.getElementById('composer').requestSubmit();",
-                  text));
+    return UntilTheEnd(chat, SendScript(text));
   }
 
   std::vector<std::string> Lines(content::WebContents* chat,
@@ -289,10 +308,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PRE_AStoppedChatGoesOnWithContinue) {
        ScriptedModel::Hang()});
   content::WebContents* chat = OpenChat();
 
-  ASSERT_TRUE(content::ExecJs(
-      chat,
-      "document.getElementById('message').value = 'Book a tour for Ada';"
-      "document.getElementById('composer').requestSubmit();"));
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Book a tour for Ada")));
   // uw quits while the model thinks about its second step.
   ASSERT_TRUE(
       base::test::RunUntil([&] { return model_.Requests().size() == 2; }));
@@ -320,6 +336,25 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AStoppedChatGoesOnWithContinue) {
               ::testing::HasSubstr("uw quit while you were working"));
   EXPECT_EQ(Lines(chat, ".stopped"),
             std::vector<std::string>{"Stopped before it finished."});
+}
+
+// The page is a React bundle under WebUI's script rules, which refuse HTML
+// strings (Trusted Types) and scripts from elsewhere. A broken rule shows as
+// a console error.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePageRunsWithoutConsoleErrors) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Hello.")});
+  content::WebContents* chat = tabs()->GetActiveWebContents();
+  content::WebContentsConsoleObserver console(chat);
+  console.SetFilter(base::BindRepeating(
+      [](const content::WebContentsConsoleObserver::Message& message) {
+        return message.log_level == blink::mojom::ConsoleMessageLevel::kError;
+      }));
+  ASSERT_TRUE(content::NavigateToURL(chat, GURL("chrome://chat/")));
+  WaitForChat(chat);
+
+  EXPECT_EQ(Ask(chat, "Hello"), "Hello.");
+  EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {

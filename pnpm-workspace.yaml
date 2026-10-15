@@ -1,0 +1,7 @@
+packages:
+  - browser/resources/uw_chat/app
+
+# Both ship prebuilt binaries for macOS; their install scripts are not needed.
+allowBuilds:
+  esbuild: false
+  "@parcel/watcher": false

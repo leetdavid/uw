@@ -1,0 +1,112 @@
+// Builds the uw://chat page for Chromium's build: checks its types, bundles
+// its script, writes its stylesheet, and puts them in one folder with the
+// page's HTML, icon, and fonts. GN runs it with Chromium's
+// node from the build directory:
+//   bundle.ts --out <dir> --gen <root gen dir> --depfile <file>
+import { execFileSync } from "node:child_process";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import * as esbuild from "esbuild";
+
+const app = dirname(fileURLToPath(import.meta.url));
+const modules = join(app, "node_modules");
+const { values } = parseArgs({
+  options: {
+    out: { type: "string" },
+    gen: { type: "string" },
+    depfile: { type: "string" },
+  },
+});
+if (!values.out || !values.gen || !values.depfile) {
+  throw new Error("Usage: bundle.ts --out <dir> --gen <dir> --depfile <file>");
+}
+const out = resolve(values.out);
+const gen = resolve(values.gen);
+const mojom = join(gen, "uw/browser/ui/webui/uw_chat/uw_chat.mojom-webui.ts");
+mkdirSync(out, { recursive: true });
+
+// The app's own settings, plus the generated bindings and the types of
+// Chromium's shared //resources scripts that they import.
+const tsconfig = join(out, "tsconfig.json");
+writeFileSync(
+  tsconfig,
+  JSON.stringify({
+    extends: join(app, "tsconfig.json"),
+    compilerOptions: {
+      paths: {
+        "@/*": [join(app, "src/*")],
+        "uw-chat-mojom": [mojom],
+        "//resources/*": [join(gen, "ui/webui/resources/tsc/*")],
+      },
+    },
+    include: [join(app, "src"), mojom],
+  }),
+);
+execFileSync(process.execPath, [join(modules, "typescript/bin/tsc"), "-p", tsconfig], {
+  stdio: "inherit",
+});
+
+const bundled = await esbuild.build({
+  entryPoints: [join(app, "src/main.tsx")],
+  outfile: join(out, "chat.js"),
+  bundle: true,
+  format: "esm",
+  minify: true,
+  target: "chrome140",
+  jsx: "automatic",
+  tsconfig: join(app, "tsconfig.json"),
+  define: { "process.env.NODE_ENV": '"production"' },
+  // Chat messages carry no files, so the PDF preview never loads.
+  external: ["pdfjs-dist"],
+  plugins: [
+    {
+      name: "uw-chat",
+      setup(build) {
+        build.onResolve({ filter: /^uw-chat-mojom$/ }, () => ({ path: mojom }));
+        // Chromium serves these to every WebUI page.
+        build.onResolve({ filter: /^\/\/resources\// }, ({ path }) => ({
+          path,
+          external: true,
+        }));
+      },
+    },
+  ],
+  metafile: true,
+  logLevel: "warning",
+});
+
+const tailwind = join(modules, "@tailwindcss/cli/dist/index.mjs");
+execFileSync(
+  process.execPath,
+  [tailwind, "-i", "src/page.css", "-o", join(out, "chat.css"), "--minify"],
+  { cwd: app, stdio: "inherit" },
+);
+
+const page = dirname(app);
+for (const file of ["chat.html", "favicon.svg"]) {
+  copyFileSync(join(page, file), join(out, file));
+}
+
+const fonts = join(modules, "@fontsource-variable/inter/files");
+copyFileSync(join(fonts, "inter-latin-opsz-normal.woff2"), join(out, "inter-latin.woff2"));
+copyFileSync(
+  join(fonts, "inter-latin-ext-opsz-normal.woff2"),
+  join(out, "inter-latin-ext.woff2"),
+);
+
+// Everything the page was built from, so the build reruns this when any of
+// it changes.
+const inputs = [
+  ...Object.keys(bundled.metafile.inputs).map((input) => resolve(input)),
+  ...["page.css", "chat.css", "uw-theme.css"].map((file) => join(app, "src", file)),
+  join(app, "bundle.ts"),
+  join(app, "package.json"),
+];
+writeFileSync(
+  values.depfile,
+  `${relative(process.cwd(), join(out, "chat.js"))}: ${inputs
+    .map((input) => input.replaceAll(" ", "\\ "))
+    .join(" ")}\n`,
+);
