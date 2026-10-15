@@ -1,6 +1,6 @@
 # Command bar spike
 
-Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.md#stages). Headless browser tests only, so far. The keyboard checks still need a real window.
+Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.md#stages). Headless browser tests, two keyboard tests in a real window, and the user's own check by hand.
 
 ## Result
 
@@ -9,8 +9,22 @@ Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.
 | A panel over the page card opens on Cmd+T without creating a tab | Passed: `CommandBarBrowserTest.CmdTOpensItWithoutATab` |
 | Suggestions come from Chromium's searchbox handler | Passed: `TypingListsSuggestions` gets rows back for typed text |
 | The settings switch turns it off and Cmd+T opens a blank tab again | Passed: `TurnedOffCmdTOpensATab`, `TurningItOffClosesIt`, and `UwOrganizationPageBrowserTest.TheCommandBarSwitchStartsOnAndTurnsItOff` |
-| Keys typed right after Cmd+T land in the field in order | Not checked. Needs a real window. |
-| Escape closes it and opens nothing | Not checked. Needs a real window. |
+| Escape closes it and opens nothing | Passed in a real window: `MANUAL_EscapeClosesItAndOpensNothing`, and by hand |
+| Keys typed right after Cmd+T land in the field in order | Failed for fast keys. Passed by hand at human speed. See [below](#keys-typed-right-after-cmdt). |
+
+## Keys typed right after Cmd+T
+
+`MANUAL_KeysTypedRightAfterCmdTLand` posts Cmd+T and "github" through the app's event queue in a real window. The panel shows and becomes the key window at once, but the field stays empty: every key arrives before the page has focus, and the page drops it.
+
+A temporary build waited a set time between Cmd+T and the first key, three runs each:
+
+| Gap after Cmd+T | Result |
+| --- | --- |
+| 0, 5, 10, 20 ms | 0 of 3: every key lost |
+| 40 ms | 1 of 3 |
+| 80 ms | 3 of 3 |
+
+The user typed by hand right after Cmd+T and every letter landed. A fast typist can still press the first key inside 40 ms, so uw has to hold keys in the browser until the field has focus, as the plan's [design](../plans/command-bar.md#design) says. The test stays as the check for that, and should pass 100 of 100 runs once uw holds the keys.
 
 ## What the spike found
 
@@ -22,5 +36,5 @@ Run on 2026-10-15 for ticket T60 of the [command bar plan](../plans/command-bar.
 
 ## Still open
 
-- Whether macOS hands keys typed right after Cmd+T to the panel, and in order. If it does not, uw holds keys in the browser until the field has focus, as the plan's [design](../plans/command-bar.md#design) says.
+- Holding keys until the field has focus. Not built.
 - The 100 ms target from Cmd+T to the panel on screen. Not measured.

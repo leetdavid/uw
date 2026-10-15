@@ -4,7 +4,7 @@ Status: scope agreed on 2026-10-14. T60, the spike, started on 2026-10-15 at the
 
 Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later stages are smaller: 6/10 and 7/10.
 
-The decision to replace typing in the address bar is recorded in [ADR 0005](../adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md). The design goes on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Command bar". Nothing is drawn there yet.
+The decision to replace typing in the address bar is recorded in [ADR 0005](../adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md). The design goes on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Command bar": the frames "Command bar: as you type", "Command bar: before typing", and "Command bar: every state", drawn on 2026-10-15. The user has not signed off yet.
 
 ## Agreed scope
 
