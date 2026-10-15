@@ -12,7 +12,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - Every tab is a tab: the organizer may move a chat tab like any other.
 - The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in. Page text never counts as the user's instruction.
 - From T47 until T48 landed on 2026-10-15, chats ran without approvals, on test sites only. Approvals now gate every change.
-- Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now.
+- Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now. In v2.1 the agent model moves to `uw://providers`, and each chat can switch its model and effort; see the [AI providers plan](ai-providers.md).
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
 - [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification.
 - A [private chat](../CONTEXT.md#language) keeps nothing after the private windows close.
@@ -29,13 +29,15 @@ Added on 2026-10-15:
 - The chat page is a React page built from [Fluid Functionalism](https://github.com/mickadesign/fluid-functionalism)'s components, styled after the [canvas](../../AGENTS.md#designs) style guide. It is redesigned on the canvas first and built once the user signs off.
 - The agent can use [skills](../CONTEXT.md#language) in the SKILL.md format: from uw's skills folder, from `~/.agents/skills`, and ones the agent writes in a chat after the user approves. All start on, and the chat page can turn each one off. A skill's scripts do not run.
 - The model gets a small context and can still reach everything; see [Context](#context).
+- The agent's answers are drawn as Markdown: headings, lists, tables, task lists, quotes, code with colors for about a dozen languages, and links. A link opens as a child tab under the chat and is selected; Cmd-click opens it in the background. Only `http` and `https` links work. The user's own messages stay plain text.
+- [Agent memory](../CONTEXT.md#language), in v2.1, follows a plain-sentence model: the agent reads every memory at the start of a request, keeps and forgets them without asking, and each change is a line under its answer with Edit and Undo. A switch in the composer keeps one chat out of memory. Memories stay on this Mac, are never taken from page text, and never hold passwords, card numbers, or account numbers. A private chat keeps none. The rest waits for the user's research into how memory is stored.
 
 ## Releases
 
 | Release | Contents |
 | --- | --- |
-| v2.0 | Engine spike, Agent model setting, tools, agent loop, chat page, short context, saved chats, the redesigned chat page with tab cards, skills, approvals, Ask box on the new tab page, Chats list, history and open-tab access, scheduled chats, private chats. |
-| v2.1 | Chat cards on the new tab page, giving the agent a tab (it works in place, with Stop and Take over), agent memory, passwords and passkeys. |
+| v2.0 | Engine spike, Agent model setting, tools, agent loop, chat page, short context, saved chats, the redesigned chat page with tab cards, skills, approvals, Markdown answers, Ask box on the new tab page, Chats list, history and open-tab access, scheduled chats, private chats. |
+| v2.1 | Chat cards on the new tab page, giving the agent a tab (it works in place, with Stop and Take over), agent memory, [AI providers](ai-providers.md) with a model and effort picker in each chat, passwords and passkeys. |
 | v2.2 | Outside agents on the tool server. |
 | Later | Cloud runs. |
 
@@ -58,6 +60,7 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 - **Agent loop.** `browser/agent/agent_loop.h` runs in the browser process. It sends the conversation and the tools to the model in chat-completions form (`components/agent/agent_protocol.h`), runs the tools the model calls, and repeats until the model answers without a tool. It stops a chat that takes 40 turns without an answer. It reuses `RemoteModelClient` from `browser/tab_organization/`; that code and the Keychain code move to a shared place with T44, when the agent also needs the settings.
 - **Chat page.** `uw://chat` is a WebUI page in React with Fluid Functionalism's components, in the pnpm workspace package `browser/resources/uw_chat/app`. Chromium's build bundles it with esbuild through `app/bundle.ts`. See [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md).
 - **Saved chats.** Each chat has an id in its address, `uw://chat/<id>`, so session restore reopens the right chat. `browser/agent/chat_file.h` writes it to `uw_chats/<id>.json` in the profile folder after each step, replacing the file in one step: the lines the page shows, the model's context with every tool result in full, and the agent's tabs by the tab tree's page ids. A step cut short is told to the model as one that may or may not have happened. Nothing is saved in a private window.
+- **Markdown.** An answer is drawn by [Streamdown](https://streamdown.ai) inside Fluid's `.typeset` styles, with the `@streamdown/code` plugin limited to shell, JSON, TypeScript, JavaScript, Python, HTML, CSS, SQL, YAML, Rust, Go, C++, and diff. No Mermaid or math plugin: Mermaid writes `innerHTML`, which the page's Trusted Types rules forbid.
 - **Skills.** The agent's instructions list each skill's name and description. A `skill` tool returns a skill's instructions when the agent picks it.
 - **Approvals.** uw asks before every click or typing the model marks with `changes`. It also asks before steps it detects on its own: clicking a submit button inside a form, and typing a password or payment details (`PageElement` in `components/agent/page_text.h`). The chat shows Fluid's Ask User Questions card: Approve, Not this one, Stop the chat, or a note for the agent. A declined step does not happen, and the model is told why. The chat list shows a waiting chat with an amber dot. Only the user answers: page text cannot.
 
@@ -87,10 +90,11 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 10. T71: tab cards and side by side.
 11. T72: skills.
 12. T48: approvals.
-13. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-14. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-15. T51: scheduled chats.
-16. T52: private chats.
+13. T75: Markdown answers.
+14. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+15. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+16. T51: scheduled chats.
+17. T52: private chats.
 
 ## Acceptance checks for v2.0
 

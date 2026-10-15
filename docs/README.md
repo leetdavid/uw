@@ -35,6 +35,11 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Agent engine spike](research/agent-engine-spike.md): uw drives Chromium's agent engine without Gemini's panel, and what it cannot do yet.
 - [ADR 0006: the chat page is React with Fluid Functionalism](adr/0006-the-chat-page-is-react-with-fluid-functionalism.md): why one WebUI page is a React bundle built beside Chromium's own WebUI tooling.
 
+### AI providers
+
+- [AI providers plan](plans/ai-providers.md): providers saved once, the `uw://providers` page, and a model and effort picker in each chat.
+- [ADR 0007: uw speaks three wire formats to language models](adr/0007-uw-speaks-three-wire-formats-to-language-models.md): chat completions, Anthropic Messages, and OpenAI Responses.
+
 ### Integrations
 
 - [Terminal tab plan](plans/terminal-tab.md): a shell in a regular tab drawn by ghostty-web, the spike that comes first, stages, and acceptance checks.

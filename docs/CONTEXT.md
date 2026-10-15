@@ -92,11 +92,25 @@ One LLM request about where a tab belongs. It says which task the tab belongs to
 **Provisional task name**:
 The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
 
+**Provider**:
+A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key. One provider can serve both language models and decision models.
+_Avoid_: Connection, endpoint, backend
+
 **Decision model**:
-A model that answers a typed question with a choice and a confidence instead of text. uw can use Jev, the OpenAI Decisions API, or a compatible endpoint to decide a tab branch's placement and whether a task needs a name. It does not write the name.
+A model from a provider that answers a typed question with a choice and a confidence instead of text, such as Jev or a model behind the OpenAI Decisions API. It decides a tab branch's placement and whether a task needs a name. It does not write the name.
 
 **Language model**:
-The chat model uw connects to through Ollama or an OpenAI-compatible endpoint. It names new tasks, and decides placement when no decision model is set.
+A model from a provider that answers in text. One names new tasks, and decides placement when no decision model is set.
+
+**Agent model**:
+The language model a new chat starts on. Each chat can switch to another.
+
+**Effort**:
+How long a model may think before it answers, in the levels its provider offers for that model.
+_Avoid_: Reasoning level, thinking budget
+
+**Model check**:
+The test uw runs the first time a model is picked for chats: the model must call a tool, and uw finds which effort levels it accepts. A model that fails cannot run a chat.
 
 **Task naming call**:
 A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it. After a call that failed or gave no usable name, it is sent again for the next tab that changes and stays in that task.
@@ -145,7 +159,8 @@ _Avoid_: Delegated browser task, agent task, run, job.
 A chat started from a private window. Nothing from it is kept after the private windows close.
 
 **Agent memory**:
-Facts uw's agent has learned about the user, such as which bank they use. The user can read, edit, and clear them.
+What uw's agent keeps between chats: plain sentences about the user, one a memory, such as which bank they use. The agent reads them all at the start of a request and keeps or forgets them as it works, without asking; the user rewords, forgets, and puts them back.
+_Avoid_: Notes, knowledge base, context
 
 **Skill**:
 Instructions that teach uw's agent how to do one kind of request, with a name and a one-line description. The agent sees every skill's description and reads a skill's instructions only when a request calls for it. Unlike agent memory, a skill says how to do something, not what is true about the user.

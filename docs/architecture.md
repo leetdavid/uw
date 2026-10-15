@@ -97,6 +97,8 @@ Settings hold an optional decision model and a language model. See [ADR 0003](ad
 | Decision model | OpenAI Decisions API, or a compatible endpoint | `POST <base>/decisions` |
 | Language model | Ollama, or an OpenAI-compatible endpoint | `POST <base>/chat/completions` |
 
+In v2.1 each connection is picked from providers the user saves once, and language models can also use Anthropic Messages and OpenAI Responses. See the [AI providers plan](plans/ai-providers.md) and [ADR 0007](adr/0007-uw-speaks-three-wire-formats-to-language-models.md).
+
 The decision model picks one option: an existing task, a new task, or the Scratchpad. The language model names a new task. With no decision model, the language model does both in one call.
 
 Apply results asynchronously and check them against current tab state, so a late response never overrides a manual action or a newer navigation. A result needs the [agreed confidence](plans/automatic-organization.md#agreed-scope) to move anything.

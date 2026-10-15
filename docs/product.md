@@ -288,7 +288,9 @@ Agreed: require an explicit "Enable Jev tab classification" choice before sendin
 | --- | --- |
 | Managed local model | uw recommends a model for the device, shows the download size, and downloads and manages it after the user chooses it. |
 | Ollama | Connect to an Ollama endpoint and choose an available model. |
-| Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom OpenAI-compatible endpoints. |
+| Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom endpoints in any format uw speaks. |
+
+Agreed on 2026-10-15 for v2.1: the user saves each [provider](CONTEXT.md#language) once, with its key, and every model choice picks from them: the language model, the decision model, and the agent model. Each chat can switch its model and effort. See the [AI providers plan](plans/ai-providers.md).
 
 Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
 
