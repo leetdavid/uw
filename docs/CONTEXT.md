@@ -109,8 +109,8 @@ The language model a new chat starts on. Each chat can switch to another.
 How long a model may think before it answers, in the levels its provider offers for that model.
 _Avoid_: Reasoning level, thinking budget
 
-**Model check**:
-The test uw runs the first time a model is picked for chats: the model must call a tool, and uw finds which effort levels it accepts. A model that fails cannot run a chat.
+**Model catalog**:
+The public list at models.dev of what each provider's models can do: whether a model calls tools, and its effort levels. uw keeps a copy and refreshes it daily.
 
 **Task naming call**:
 A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it. After a call that failed or gave no usable name, it is sent again for the next tab that changes and stays in that task.
