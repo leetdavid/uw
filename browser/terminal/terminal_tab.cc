@@ -5,16 +5,21 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "base/files/file_path.h"
 #include "base/strings/strcat.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/supports_user_data.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "content/public/browser/invalidate_type.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/drop_data.h"
 #include "content/public/common/url_constants.h"
+#include "ui/base/clipboard/file_info.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
+#include "uw/components/terminal/shell_quote.h"
 
 namespace uw {
 namespace {
@@ -53,6 +58,21 @@ void SetTerminalFolder(content::WebContents* contents,
   // The tab strip passes the change on, so the organizer looks at the tab
   // again even when a title the shell set stays the same.
   contents->NotifyNavigationStateChanged(content::INVALIDATE_TYPE_TAB);
+}
+
+void DropFilesAsPaths(content::WebContents* contents, content::DropData& drop) {
+  if (drop.filenames.empty() ||
+      !IsTerminalUrl(contents->GetLastCommittedURL())) {
+    return;
+  }
+  std::vector<base::FilePath> paths;
+  for (const ui::FileInfo& file : drop.filenames) {
+    paths.push_back(file.path);
+  }
+  drop.text = base::UTF8ToUTF16(QuotePathsForShell(paths));
+  drop.filenames.clear();
+  drop.file_mime_types.clear();
+  drop.file_system_files.clear();
 }
 
 }  // namespace uw

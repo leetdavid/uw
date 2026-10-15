@@ -12,8 +12,9 @@ class FilePath;
 }
 
 namespace content {
+struct DropData;
 class WebContents;
-}
+}  // namespace content
 
 namespace uw {
 
@@ -34,6 +35,10 @@ bool IsTerminalUrl(const GURL& url);
 base::FilePath TerminalFolder(content::WebContents* contents);
 void SetTerminalFolder(content::WebContents* contents,
                        const base::FilePath& folder);
+
+// Files dropped on a terminal tab reach its page as their paths, quoted for
+// the shell, and the page pastes them. A drop on any other tab is left alone.
+void DropFilesAsPaths(content::WebContents* contents, content::DropData& drop);
 
 }  // namespace uw
 

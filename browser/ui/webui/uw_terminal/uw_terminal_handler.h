@@ -40,6 +40,7 @@ class UwTerminalHandler : public mojom::TerminalHandler,
   void Write(const std::string& text) override;
   void Resize(int32_t columns, int32_t rows) override;
   void AckOutput() override;
+  void PastePaths(PastePathsCallback callback) override;
 
   // ShellSession::Client:
   void OnShellOutput(std::string text) override;

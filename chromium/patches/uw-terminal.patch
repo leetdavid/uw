@@ -241,3 +241,35 @@ index b316adf2f9b6facc57dab99083b3015ecb9c0f71..223b60634e62555a71835cec86d3281b
    AddNewTabInGroupItem();
  
    AddSeparator(ui::NORMAL_SEPARATOR);
+diff --git a/chrome/browser/ui/tab_contents/BUILD.gn b/chrome/browser/ui/tab_contents/BUILD.gn
+index 7f2c5c2262c1d4bf01c9cdf31436b9cd06bc9b74..f302a04f845e228c8483410ff553a509ed4cd06a 100644
+--- a/chrome/browser/ui/tab_contents/BUILD.gn
++++ b/chrome/browser/ui/tab_contents/BUILD.gn
+@@ -76,6 +76,7 @@ source_set("impl") {
+     "//ui/base",
+     "//ui/base/clipboard:file_info",
+     "//ui/gfx/codec",
++    "//uw/browser/terminal",
+   ]
+   if (is_android) {
+     deps += [ "//chrome/browser/ui/android/tab_contents" ]
+diff --git a/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc b/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
+index 371dda0a45c779bf905f43fea5b32e82d1173268..51475ec1cfac22a58bc6a6730a64ee3787224fdf 100644
+--- a/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
++++ b/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
+@@ -30,6 +30,7 @@
+ #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+ #include "third_party/abseil-cpp/absl/container/flat_hash_set.h"
+ #include "ui/base/clipboard/file_info.h"
++#include "uw/browser/terminal/terminal_tab.h"
+ 
+ #if BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS) && \
+     BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+@@ -245,6 +246,7 @@ void HandleOnPerformingDrop(
+     content::DropData drop_data,
+     content::WebContentsViewDelegate::DropCompletionCallback callback) {
+   CHECK(callback);
++  uw::DropFilesAsPaths(web_contents, drop_data);
+ 
+   content::WebContents* scan_target =
+       glic::GetGlicGuestWebContents(web_contents);

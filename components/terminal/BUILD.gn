@@ -4,6 +4,8 @@ source_set("terminal") {
   sources = [
     "shell_host.cc",
     "shell_host.h",
+    "shell_quote.cc",
+    "shell_quote.h",
     "shell_session.cc",
     "shell_session.h",
   ]
@@ -15,6 +17,7 @@ source_set("unit_tests") {
   testonly = true
   sources = [
     "shell_host_unittest.cc",
+    "shell_quote_unittest.cc",
     "shell_session_unittest.cc",
   ]
   deps = [

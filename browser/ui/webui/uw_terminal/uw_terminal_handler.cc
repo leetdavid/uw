@@ -4,16 +4,24 @@
 #include "uw/browser/ui/webui/uw_terminal/uw_terminal_handler.h"
 
 #include <algorithm>
+#include <optional>
 #include <utility>
+#include <vector>
 
 #include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
+#include "base/task/thread_pool.h"
 #include "chrome/grit/generated_resources.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/clipboard/clipboard.h"
+#include "ui/base/clipboard/clipboard_buffer.h"
+#include "ui/base/clipboard/file_info.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/terminal/shell_host.h"
+#include "uw/components/terminal/shell_quote.h"
 
 namespace uw {
 namespace {
@@ -28,6 +36,58 @@ ShellHost::Options UserShell(int columns, int rows) {
   options.columns = columns;
   options.rows = rows;
   return options;
+}
+
+// Each pasted image gets a folder of its own, so its name can stay plain.
+base::FilePath SaveImage(const std::vector<uint8_t>& png) {
+  base::FilePath folder;
+  if (!base::CreateNewTempDirectory("uw-paste", &folder)) {
+    return base::FilePath();
+  }
+  const base::FilePath path = folder.Append("image.png");
+  return base::WriteFile(path, png) ? path : base::FilePath();
+}
+
+std::string QuotePath(const base::FilePath& path) {
+  return path.empty() ? std::string() : QuotePathsForShell({path});
+}
+
+void PasteImage(mojom::TerminalHandler::PastePathsCallback callback,
+                const std::vector<uint8_t>& png) {
+  if (png.empty()) {
+    std::move(callback).Run(std::string());
+    return;
+  }
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce(&SaveImage, png),
+      base::BindOnce(&QuotePath).Then(std::move(callback)));
+}
+
+void PasteImageWithoutText(mojom::TerminalHandler::PastePathsCallback callback,
+                           std::u16string text) {
+  if (!text.empty()) {
+    std::move(callback).Run(std::string());
+    return;
+  }
+  ui::Clipboard::GetForCurrentThread()->ReadPng(
+      ui::ClipboardBuffer::kCopyPaste, std::nullopt,
+      base::BindOnce(&PasteImage, std::move(callback)));
+}
+
+void PasteFilesOrImage(mojom::TerminalHandler::PastePathsCallback callback,
+                       std::vector<ui::FileInfo> files) {
+  if (files.empty()) {
+    ui::Clipboard::GetForCurrentThread()->ReadText(
+        ui::ClipboardBuffer::kCopyPaste, std::nullopt,
+        base::BindOnce(&PasteImageWithoutText, std::move(callback)));
+    return;
+  }
+  std::vector<base::FilePath> paths;
+  for (const ui::FileInfo& file : files) {
+    paths.push_back(file.path);
+  }
+  std::move(callback).Run(QuotePathsForShell(paths));
 }
 
 }  // namespace
@@ -66,6 +126,12 @@ void UwTerminalHandler::AckOutput() {
   if (session_) {
     session_->AckOutput();
   }
+}
+
+void UwTerminalHandler::PastePaths(PastePathsCallback callback) {
+  ui::Clipboard::GetForCurrentThread()->ReadFilenames(
+      ui::ClipboardBuffer::kCopyPaste, std::nullopt,
+      base::BindOnce(&PasteFilesOrImage, std::move(callback)));
 }
 
 void UwTerminalHandler::OnShellOutput(std::string text) {

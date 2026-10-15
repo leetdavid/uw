@@ -9,6 +9,8 @@ source_set("terminal") {
     "//chrome/browser/ui/browser_window",
     "//content/public/browser",
     "//content/public/common",
+    "//ui/base/clipboard:file_info",
     "//url",
+    "//uw/components/terminal",
   ]
 }

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -14,24 +15,38 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/drop_data.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/blink/public/common/input/web_mouse_event.h"
+#include "third_party/blink/public/common/page/drag_operation.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/clipboard/clipboard.h"
+#include "ui/base/clipboard/clipboard_buffer.h"
+#include "ui/base/clipboard/file_info.h"
+#include "ui/base/clipboard/scoped_clipboard_writer.h"
+#include "ui/base/clipboard/test/test_clipboard.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/components/terminal/shell_quote.h"
 
 namespace uw {
 namespace {
@@ -46,6 +61,13 @@ class UwTerminalBrowserTest : public headless::HeadlessModeBrowserTest {
     // zsh finds none of the user's startup files in an empty folder, so the
     // tests do not depend on them.
     base::Environment::Create()->SetVar("ZDOTDIR", folder_path_.value());
+    // Pastes read a test clipboard, so the tests leave the user's alone.
+    ui::TestClipboard::CreateForCurrentThread();
+  }
+
+  void TearDownOnMainThread() override {
+    ui::Clipboard::DestroyClipboardForCurrentThread();
+    HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
   content::WebContents* contents() {
@@ -105,6 +127,30 @@ class UwTerminalBrowserTest : public headless::HeadlessModeBrowserTest {
     })) << name
         << ": " << text;
     return text;
+  }
+
+  // Opens a terminal running `cat`, which writes each byte it gets to the
+  // file `name` at once.
+  content::WebContents* OpenCat(std::string_view name) {
+    content::WebContents* terminal = OpenTerminal();
+    Type(u"cd " + Folder() + u" && stty -icanon && cat > " +
+         base::UTF8ToUTF16(name) + u"\r");
+    WaitForFile(name, [](const std::string&) { return true; });
+    return terminal;
+  }
+
+  base::FilePath NewFile(std::string_view name) {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    const base::FilePath file = folder_path_.Append(name);
+    EXPECT_TRUE(base::WriteFile(file, ""));
+    return file;
+  }
+
+  SkBitmap Image() {
+    SkBitmap image;
+    image.allocN32Pixels(4, 4);
+    image.eraseColor(SK_ColorRED);
+    return image;
   }
 
   bool Exists(std::string_view name) {
@@ -185,6 +231,94 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
   EXPECT_TRUE(clicks.starts_with("^[[<0;")) << clicks;
   EXPECT_NE(clicks.find("M^[[<0;"), std::string::npos) << clicks;
   EXPECT_TRUE(clicks.ends_with("m\n")) << clicks;
+}
+
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, APastedFileTypesItsPath) {
+  const base::FilePath file = NewFile("my shot (1).png");
+  {
+    ui::ScopedClipboardWriter writer(ui::ClipboardBuffer::kCopyPaste);
+    writer.WriteFilenames(
+        ui::FileInfosToURIList({ui::FileInfo(file, file.BaseName())}));
+  }
+  OpenCat("pasted");
+  contents()->Paste();
+  const std::string quoted = QuotePathsForShell({file});
+  EXPECT_EQ(WaitForFile("pasted",
+                        [&](const std::string& text) {
+                          return text.size() >= quoted.size();
+                        }),
+            quoted);
+}
+
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       APastedImageIsSavedAndTypesItsPath) {
+  {
+    ui::ScopedClipboardWriter writer(ui::ClipboardBuffer::kCopyPaste);
+    writer.WriteImage(Image());
+  }
+  OpenCat("pasted");
+  contents()->Paste();
+  const base::FilePath image(WaitForFile("pasted", [](const std::string& text) {
+    return text.ends_with("/image.png");
+  }));
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  std::string png;
+  EXPECT_TRUE(base::ReadFileToString(image, &png));
+  EXPECT_TRUE(png.starts_with("\x89PNG")) << image;
+  base::DeletePathRecursively(image.DirName());
+}
+
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, TextWithAnImagePastesTheText) {
+  {
+    ui::ScopedClipboardWriter writer(ui::ClipboardBuffer::kCopyPaste);
+    writer.WriteText(u"caption");
+    writer.WriteImage(Image());
+  }
+  OpenCat("pasted");
+  contents()->Paste();
+  EXPECT_EQ(
+      WaitForFile("pasted",
+                  [](const std::string& text) { return text.size() >= 7; }),
+      "caption");
+}
+
+// The browser hands a terminal tab the paths of dropped files. Any other tab
+// gets the files.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, ADroppedFileTypesItsPath) {
+  const base::FilePath file = NewFile("dropped file.txt");
+  content::DropData drop;
+  drop.filenames.emplace_back(file, file.BaseName());
+
+  std::optional<content::DropData> page_drop;
+  HandleOnPerformingDrop(
+      browser()->tab_strip_model()->GetActiveWebContents(), drop,
+      base::BindLambdaForTesting(
+          [&](std::optional<content::DropData> data) { page_drop = data; }));
+  ASSERT_TRUE(page_drop);
+  EXPECT_EQ(page_drop->filenames.size(), 1u);
+
+  content::WebContents* terminal = OpenCat("dropped");
+  content::RenderWidgetHost* widget =
+      terminal->GetRenderWidgetHostView()->GetRenderWidgetHost();
+  const gfx::PointF point(100, 60);
+  drop.view_id = widget->GetRoutingID();
+  widget->DragTargetDragEnter(drop, point, point, blink::kDragOperationCopy, 0,
+                              base::DoNothing());
+  widget->DragTargetDragOver(point, point, blink::kDragOperationCopy, 0,
+                             base::DoNothing());
+  HandleOnPerformingDrop(
+      terminal, drop,
+      base::BindLambdaForTesting([&](std::optional<content::DropData> data) {
+        ASSERT_TRUE(data);
+        EXPECT_TRUE(data->filenames.empty());
+        widget->DragTargetDrop(*data, point, point, 0, base::DoNothing());
+      }));
+  const std::string quoted = QuotePathsForShell({file});
+  EXPECT_EQ(WaitForFile("dropped",
+                        [&](const std::string& text) {
+                          return text.size() >= quoted.size();
+                        }),
+            quoted);
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, ClosingTheTabEndsTheShell) {

@@ -22,6 +22,12 @@ interface TerminalHandler {
 
   // The page has drawn the last output and can take more.
   AckOutput();
+
+  // What a paste of files or an image types: the files on the clipboard as
+  // their paths, quoted for the shell. An image with no file and no text is
+  // first saved to a new temporary file. Empty when the page should paste the
+  // text instead.
+  PastePaths() => (string paths);
 };
 
 // Page side.

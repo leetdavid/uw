@@ -485,7 +485,7 @@ export class Chromium {
 const TEST_SUITES = {
   unit_tests: [
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
-    "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellSessionTest.*",
+    "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
     "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*",
   ],
   browser_tests: [

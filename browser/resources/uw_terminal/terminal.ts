@@ -152,7 +152,25 @@ document.addEventListener('copy', (event: ClipboardEvent) => {
   }
 });
 
-// Dropped text is pasted. Anything else dropped would replace the page.
+// A paste of files or an image types their paths. The page cannot see paths,
+// so the browser reads them from the clipboard. ghostty-web pastes the rest.
+document.addEventListener('paste', (event: ClipboardEvent) => {
+  const data = event.clipboardData;
+  if (!data?.files.length) {
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const text = data.getData('text/plain');
+  handler.pastePaths().then(({paths}) => {
+    if (paths || text) {
+      terminal.paste(paths || text);
+    }
+  });
+}, {capture: true});
+
+// Dropped text is pasted, and the browser turns dropped files into their
+// paths. Anything else dropped would replace the page.
 document.addEventListener('dragover', event => event.preventDefault());
 document.addEventListener('drop', (event: DragEvent) => {
   event.preventDefault();
