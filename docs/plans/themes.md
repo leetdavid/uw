@@ -31,7 +31,13 @@ Defaults, proposed by uw and accepted on 2026-10-16:
 
 ## Design
 
-To be drawn on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Themes": the picker in light and dark mode, the suggested themes, a gradient of two and three colors, grain, black dark mode with the chat page, and "Theme colors in dark mode". The rules go in the `uw-arc-style` guide, or a guide of their own if it has no room.
+On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Themes", drawn on 2026-10-16 and waiting for the user's sign-off:
+
+- "Theme picker: light": the picker over a lilac-to-sky window.
+- "Dark mode: black": the black window and the chat page on Vercel's neutral blacks.
+- "Themes: every state": one, two, and three colors, low intensity, grain, a dark color in light mode, black dark mode, and theme colors in dark mode.
+
+The rules, with every color, are in the `uw-themes` guide. Two details the designs added: a favicon too dark for black sits on a light plate in its favorites tile, and theme colors in dark mode are each color at 14% lightness.
 
 ## Stages
 
@@ -58,4 +64,4 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Open questions
 
-- How a theme darkens when "Theme colors in dark mode" is on. To settle in the designs.
+None yet. The darkening of theme colors in dark mode is drawn as 14% lightness and waits for sign-off with the rest.
