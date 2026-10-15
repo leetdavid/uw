@@ -192,5 +192,15 @@ TEST_F(AgentContextTest, AQuitAnswersTheCallsItCutShort) {
   EXPECT_EQ(recalled.FindIntByDottedPath("args.element"), 3);
 }
 
+TEST_F(AgentContextTest, TheInstructionsListTheSkills) {
+  context_.SetSkills("- book-activities: Books tours and tickets.");
+  EXPECT_THAT(
+      Request(),
+      HasSubstr("Skills:\\n- book-activities: Books tours and tickets."));
+
+  context_.SetSkills("");
+  EXPECT_THAT(Request(), Not(HasSubstr("book-activities")));
+}
+
 }  // namespace
 }  // namespace uw

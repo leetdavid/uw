@@ -5,10 +5,13 @@
 #define UW_BROWSER_AGENT_AGENT_LOOP_H_
 
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
@@ -19,6 +22,7 @@
 #include "uw/browser/tab_organization/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/skills.h"
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -70,6 +74,16 @@ class AgentLoop {
   // Picks the chat up again after uw quit while the agent was working.
   void Resume();
   bool working() const { return working_; }
+  // The skills the agent may load from now on.
+  void SetSkills(const std::vector<Skill>& skills);
+  // Asks the user whether to save the skill a save_skill call describes,
+  // saves it if so, and answers with what the model is told.
+  using SaveSkill =
+      base::RepeatingCallback<void(base::DictValue args,
+                                   base::OnceCallback<void(base::DictValue)>)>;
+  void SetSkillSaver(SaveSkill save_skill) {
+    save_skill_ = std::move(save_skill);
+  }
   const AgentContext& context() const { return *context_; }
   AgentTools& tools() { return tools_; }
 
@@ -77,6 +91,7 @@ class AgentLoop {
   void AskModel();
   void OnModel(RemoteModelClient::Outcome outcome);
   void RunCall(ModelTurn turn, size_t index);
+  void LoadSkill(ModelTurn turn, size_t index, base::DictValue args);
   void OnTool(ModelTurn turn,
               size_t index,
               base::DictValue args,
@@ -89,6 +104,9 @@ class AgentLoop {
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
   const std::unique_ptr<AgentContext> context_;
   const base::RepeatingClosure on_change_;
+  // Each skill's SKILL.md by the skill's name.
+  std::map<std::string, base::FilePath> skills_;
+  SaveSkill save_skill_;
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;

@@ -6,12 +6,15 @@
 #include <optional>
 #include <utility>
 
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/location.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/thread_pool.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -28,6 +31,34 @@ constexpr int kMaxTurns = 40;
 constexpr base::TimeDelta kModelTimeout = base::Minutes(2);
 // Long enough for several full readings, short enough for most models.
 constexpr size_t kMaxRequestLength = 200000;
+
+// A file of a skill larger than this is not read.
+constexpr size_t kMaxSkillFile = 256 * 1024;
+
+base::DictValue Error(std::string_view message) {
+  return base::DictValue().Set("error", message);
+}
+
+// What the skill tool answers: a skill's instructions, or with `file`, that
+// file of the skill's folder. Blocks.
+base::DictValue ReadSkill(base::FilePath path,
+                          std::string name,
+                          std::optional<std::string> file) {
+  std::string text;
+  if (!base::ReadFileToStringWithMaxSize(path, &text, kMaxSkillFile) ||
+      !base::IsStringUTF8(text)) {
+    return Error("That file of the skill cannot be read as text.");
+  }
+  if (file) {
+    return base::DictValue()
+        .Set("skill", name)
+        .Set("file", *file)
+        .Set("text", text);
+  }
+  return base::DictValue()
+      .Set("skill", name)
+      .Set("instructions", SkillInstructions(text));
+}
 
 AgentLoop::Step Failed(std::string text) {
   AgentLoop::Step step;
@@ -54,6 +85,17 @@ AgentLoop::AgentLoop(tabs::TabInterface& chat,
       on_change_(std::move(on_change)) {}
 
 AgentLoop::~AgentLoop() = default;
+
+void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
+  skills_.clear();
+  std::string list;
+  for (const Skill& skill : skills) {
+    skills_[skill.name] = skill.file;
+    base::StrAppend(&list, {list.empty() ? "" : "\n", "- ", skill.name, ": ",
+                            skill.description});
+  }
+  context_->SetSkills(list);
+}
 
 void AgentLoop::Send(std::string_view text) {
   if (working_) {
@@ -143,11 +185,57 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     OnTool(std::move(turn), index, std::move(*args), std::move(recalled));
     return;
   }
+  if (call.name == "skill") {
+    LoadSkill(std::move(turn), index, std::move(*args));
+    return;
+  }
+  if (call.name == "save_skill") {
+    if (!save_skill_) {
+      OnTool(std::move(turn), index, std::move(*args),
+             Error("Skills cannot be saved here."));
+      return;
+    }
+    base::DictValue asked = args->Clone();
+    save_skill_.Run(
+        std::move(*args),
+        base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
+                       std::move(turn), index, std::move(asked)));
+    return;
+  }
   const std::string name = call.name;
   base::DictValue asked = args->Clone();
   tools_.Call(name, *args,
               base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
                              std::move(turn), index, std::move(asked)));
+}
+
+void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {
+  const std::string* name = args.FindString("name");
+  const auto skill = name ? skills_.find(*name) : skills_.end();
+  if (skill == skills_.end()) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("There is no such skill. Use a name from the list."));
+    return;
+  }
+  base::FilePath path = skill->second;
+  std::optional<std::string> file;
+  if (const std::string* wanted = args.FindString("file")) {
+    const base::FilePath relative = base::FilePath::FromUTF8Unsafe(*wanted);
+    if (relative.empty() || relative.IsAbsolute() ||
+        relative.ReferencesParent()) {
+      OnTool(std::move(turn), index, std::move(args),
+             Error("file must be a path inside the skill's folder."));
+      return;
+    }
+    path = path.DirName().Append(relative);
+    file = *wanted;
+  }
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()},
+      base::BindOnce(&ReadSkill, std::move(path), skill->first,
+                     std::move(file)),
+      base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
+                     std::move(turn), index, std::move(args)));
 }
 
 void AgentLoop::OnTool(ModelTurn turn,

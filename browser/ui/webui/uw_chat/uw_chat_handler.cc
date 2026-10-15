@@ -8,13 +8,16 @@
 #include <vector>
 
 #include "base/base64.h"
+#include "base/base_paths.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/no_destructor.h"
+#include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/thread_pool.h"
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
@@ -23,10 +26,13 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/common/chrome_paths.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/prefs/pref_service.h"
+#include "components/prefs/scoped_user_pref_update.h"
 #include "components/split_tabs/split_tab_visual_data.h"
-#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "components/tabs/public/tab_interface.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "ui/base/base_window.h"
@@ -114,6 +120,53 @@ int TabOf(const AgentLoop::Step& step) {
       step.result.FindInt("tab").value_or(0));
 }
 
+// uw's own skills, and those made in chats: beside the profiles.
+base::FilePath UwSkillsFolder() {
+  base::FilePath data;
+  base::PathService::Get(chrome::DIR_USER_DATA, &data);
+  return data.AppendASCII("skills");
+}
+
+base::FilePath& AgentsSkillsFolderForTesting() {
+  static base::NoDestructor<base::FilePath> folder;
+  return *folder;
+}
+
+// The skills other agents share.
+base::FilePath AgentsSkillsFolder() {
+  if (!AgentsSkillsFolderForTesting().empty()) {
+    return AgentsSkillsFolderForTesting();
+  }
+  base::FilePath home;
+  base::PathService::Get(base::DIR_HOME, &home);
+  return home.AppendASCII(".agents").AppendASCII("skills");
+}
+
+// uw's skills first; a skill in ~/.agents/skills with the same name as one
+// of uw's is left out. Blocks.
+std::vector<Skill> FindAllSkills(base::FilePath uw, base::FilePath agents) {
+  std::vector<Skill> skills = FindSkills(uw, /*agents_folder=*/false);
+  for (Skill& skill : FindSkills(agents, /*agents_folder=*/true)) {
+    if (std::ranges::none_of(skills, [&](const Skill& kept) {
+          return kept.name == skill.name;
+        })) {
+      skills.push_back(std::move(skill));
+    }
+  }
+  return skills;
+}
+
+mojom::SkillSource SourceFor(Skill::Source source) {
+  switch (source) {
+    case Skill::Source::kUw:
+      return mojom::SkillSource::kUw;
+    case Skill::Source::kAgents:
+      return mojom::SkillSource::kAgents;
+    case Skill::Source::kChat:
+      return mojom::SkillSource::kChat;
+  }
+}
+
 GURL ChatUrl(std::string_view id) {
   return GURL(
       base::StrCat({content::kChromeUIScheme, "://", kChatHost, "/", id}));
@@ -159,6 +212,7 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
   if (ChatIndex* index = ChatIndex::For(profile)) {
     index_observation_.Observe(index);
   }
+  LoadSkills(base::DoNothing());
   if (profile->IsOffTheRecord()) {
     OnLoaded(std::nullopt);
     return;
@@ -168,14 +222,27 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
       base::BindOnce(&UwChatHandler::OnLoaded, weak_factory_.GetWeakPtr()));
 }
 
+// static
+void UwChatHandler::SetAgentsSkillsFolderForTesting(base::FilePath folder) {
+  AgentsSkillsFolderForTesting() = std::move(folder);
+}
+
 UwChatHandler::~UwChatHandler() {
   OpenChats().erase(id_);
 }
 
 void UwChatHandler::Send(const std::string& text) {
-  if (!loaded_ || Working() || (!agent_ && !Start())) {
+  if (!loaded_ || Working()) {
     return;
   }
+  if (!skills_loaded_) {
+    waiting_message_ = text;
+    return;
+  }
+  if (!agent_ && !Start()) {
+    return;
+  }
+  agent_->SetSkills(EnabledSkills());
   if (title_.empty()) {
     title_ = text;
   }
@@ -188,10 +255,17 @@ void UwChatHandler::Resume() {
   const base::DictValue* last =
       log_.empty() ? nullptr : log_.back().GetIfDict();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
-  if (!loaded_ || Working() || !kind || *kind != "stopped" ||
-      (!agent_ && !Start())) {
+  if (!loaded_ || Working() || !kind || *kind != "stopped") {
     return;
   }
+  if (!skills_loaded_) {
+    waiting_resume_ = true;
+    return;
+  }
+  if (!agent_ && !Start()) {
+    return;
+  }
+  agent_->SetSkills(EnabledSkills());
   Log(base::DictValue().Set("kind", "resumed"));
   agent_->Resume();
   Save();
@@ -286,6 +360,47 @@ void UwChatHandler::SetSideBySide(bool on, int32_t number) {
   SendTabs();
 }
 
+void UwChatHandler::GetSkills(GetSkillsCallback callback) {
+  LoadSkills(base::BindOnce(&UwChatHandler::ReplySkills,
+                            weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void UwChatHandler::SetSkillOn(const std::string& name, bool on) {
+  ScopedListPrefUpdate off(
+      Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs(),
+      kAgentDisabledSkillsPref);
+  off->EraseValue(base::Value(name));
+  if (!on) {
+    off->Append(name);
+  }
+}
+
+void UwChatHandler::AnswerSkill(bool save) {
+  if (!skill_answer_) {
+    return;
+  }
+  if (!save) {
+    std::move(skill_answer_)
+        .Run(base::DictValue()
+                 .Set("saved", false)
+                 .Set("reason", "The user chose not to save it."));
+    return;
+  }
+  const std::string* name = proposed_skill_.FindString("name");
+  const std::string* description = proposed_skill_.FindString("description");
+  const std::string* instructions = proposed_skill_.FindString("instructions");
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()},
+      base::BindOnce(
+          [](base::FilePath folder, std::string name, std::string description,
+             std::string instructions) {
+            return WriteSkill(folder, name, description, instructions);
+          },
+          UwSkillsFolder(), *name, *description, *instructions),
+      base::BindOnce(&UwChatHandler::OnSkillWritten,
+                     weak_factory_.GetWeakPtr()));
+}
+
 void UwChatHandler::OnChatsChanged() {
   ChatIndex* index = index_observation_.GetSource();
   if (!index || !index->loaded()) {
@@ -376,6 +491,8 @@ bool UwChatHandler::Start() {
       base::BindRepeating(&UwChatHandler::OnStep, base::Unretained(this)),
       std::move(saved_context_),
       base::BindRepeating(&UwChatHandler::Save, base::Unretained(this)));
+  agent_->SetSkillSaver(base::BindRepeating(&UwChatHandler::AskToSaveSkill,
+                                            base::Unretained(this)));
   if (TabOrganizationController* tree =
           TabOrganizationController::From(tab->GetBrowserWindowInterface())) {
     for (const auto& [number, page] : saved_tabs_) {
@@ -579,6 +696,103 @@ void UwChatHandler::SendTabs() {
       tabs::TabInterface::MaybeGetFromContents(contents_);
   page_->OnTabs(std::move(cards), current_tab_,
                 chat && chat->GetSplit().has_value());
+}
+
+void UwChatHandler::LoadSkills(base::OnceClosure done) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()},
+      base::BindOnce(&FindAllSkills, UwSkillsFolder(), AgentsSkillsFolder()),
+      base::BindOnce(&UwChatHandler::OnSkillsLoaded, weak_factory_.GetWeakPtr(),
+                     std::move(done)));
+}
+
+void UwChatHandler::OnSkillsLoaded(base::OnceClosure done,
+                                   std::vector<Skill> skills) {
+  skills_ = std::move(skills);
+  skills_loaded_ = true;
+  if (agent_) {
+    agent_->SetSkills(EnabledSkills());
+  }
+  std::move(done).Run();
+  if (std::optional<std::string> text = std::exchange(waiting_message_, {})) {
+    Send(*text);
+  }
+  if (std::exchange(waiting_resume_, false)) {
+    Resume();
+  }
+}
+
+std::vector<Skill> UwChatHandler::EnabledSkills() const {
+  const base::ListValue& off =
+      Profile::FromBrowserContext(contents_->GetBrowserContext())
+          ->GetPrefs()
+          ->GetList(kAgentDisabledSkillsPref);
+  std::vector<Skill> on;
+  for (const Skill& skill : skills_) {
+    if (!off.contains(skill.name)) {
+      on.push_back(skill);
+    }
+  }
+  return on;
+}
+
+void UwChatHandler::ReplySkills(GetSkillsCallback callback) {
+  const base::ListValue& off =
+      Profile::FromBrowserContext(contents_->GetBrowserContext())
+          ->GetPrefs()
+          ->GetList(kAgentDisabledSkillsPref);
+  std::vector<mojom::SkillInfoPtr> skills;
+  for (const Skill& skill : skills_) {
+    skills.push_back(mojom::SkillInfo::New(skill.name, skill.description,
+                                           SourceFor(skill.source),
+                                           !off.contains(skill.name)));
+  }
+  std::move(callback).Run(std::move(skills), UwSkillsFolder().AsUTF8Unsafe());
+}
+
+void UwChatHandler::AskToSaveSkill(
+    base::DictValue args,
+    base::OnceCallback<void(base::DictValue)> answer) {
+  const std::string* name = args.FindString("name");
+  const std::string* description = args.FindString("description");
+  const std::string* instructions = args.FindString("instructions");
+  std::string_view error;
+  if (!name || !IsSkillName(*name)) {
+    error = "name must be lowercase letters, digits, and hyphens.";
+  } else if (!description || description->empty() || !instructions ||
+             instructions->empty()) {
+    error = "save_skill needs a description and instructions.";
+  } else if (std::ranges::any_of(skills_, [&](const Skill& skill) {
+               return skill.name == *name;
+             })) {
+    error = "A skill with that name exists already.";
+  } else if (skill_answer_) {
+    error = "The user has not answered the last save_skill yet.";
+  }
+  if (!error.empty()) {
+    std::move(answer).Run(base::DictValue().Set("error", error));
+    return;
+  }
+  page_->OnSkillProposal(
+      mojom::SkillProposal::New(*name, *description, *instructions));
+  proposed_skill_ = std::move(args);
+  skill_answer_ = std::move(answer);
+}
+
+void UwChatHandler::OnSkillWritten(bool written) {
+  if (!skill_answer_) {
+    return;
+  }
+  if (!written) {
+    std::move(skill_answer_)
+        .Run(base::DictValue().Set("error", "The skill could not be saved."));
+    return;
+  }
+  LoadSkills(base::BindOnce(
+      [](base::OnceCallback<void(base::DictValue)> answer) {
+        std::move(answer).Run(base::DictValue().Set("saved", true));
+      },
+      std::move(skill_answer_)));
 }
 
 void UwChatHandler::UpdateIndex() {

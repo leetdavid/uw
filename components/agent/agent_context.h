@@ -42,6 +42,9 @@ class AgentContext {
   base::DictValue Recall(const base::DictValue& args) const;
   // Shortens every long result, for when the model has answered.
   void ShortenAll();
+  // Lists `skills`, one per line, in the instructions every request starts
+  // with. Empty for none.
+  void SetSkills(std::string_view skills);
   // Answers each tool call of the model's last turn that has no result yet
   // with `error`. A model refuses a request with an unanswered call.
   void CloseOpenCalls(std::string_view error);

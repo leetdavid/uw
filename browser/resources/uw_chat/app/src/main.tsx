@@ -5,7 +5,7 @@
 import { Fragment, StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { Columns2, Loader2, Pause, Plus, Trash2 } from "lucide-react";
+import { Columns2, Loader2, Pause, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
   Banner,
   BannerAction,
@@ -18,6 +18,7 @@ import { InputMessage } from "@/components/ui/input-message";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -31,6 +32,7 @@ import {
   type SidebarMenuButtonProps,
 } from "@/components/ui/sidebar";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
+import { Switch } from "@/components/ui/switch";
 import {
   ThinkingStep,
   ThinkingSteps,
@@ -43,9 +45,12 @@ import {
   chatHandler,
   chatPage,
   connect,
+  SkillSource,
   StepKind,
   type AgentTab,
   type ChatSummary,
+  type SkillInfo,
+  type SkillProposal,
   type Step,
 } from "@/chat-api";
 
@@ -69,6 +74,14 @@ function describe(step: Step): string {
       return `Typed into element ${args.element} in tab ${args.tab}`;
     case "recall":
       return `Looked again at ${result.result?.title || `step ${args.step}`}`;
+    case "skill":
+      return args.file
+        ? `Read ${args.file} of the ${args.name} skill`
+        : `Used the ${args.name} skill`;
+    case "save_skill":
+      return result.saved
+        ? `Saved the ${args.name} skill`
+        : `Did not save the ${args.name} skill`;
     default:
       return step.tool;
   }
@@ -81,6 +94,8 @@ const TOOL_ICONS: Record<string, IconName> = {
   click: "corner-down-right",
   type: "pencil",
   recall: "rotate-ccw",
+  skill: "lightbulb",
+  save_skill: "check",
 };
 
 function isStep(line: Step): boolean {
@@ -202,9 +217,15 @@ function when(updated: number): string {
 function ChatList({
   chats,
   current,
+  view,
+  skillsOn,
+  onView,
 }: {
   chats: ChatSummary[];
   current: string;
+  view: View;
+  skillsOn: number;
+  onView: (view: View) => void;
 }) {
   const [query, setQuery] = useState("");
   const wanted = query.trim().toLowerCase();
@@ -248,9 +269,11 @@ function ChatList({
                     data-chat={chat.id}
                     data-title={chat.title}
                     data-state={STATE_NAMES[chat.state]}
-                    isActive={chat.id === current}
+                    isActive={chat.id === current && view === "chat"}
                     onClick={() => {
-                      if (chat.id !== current) {
+                      if (chat.id === current) {
+                        onView("chat");
+                      } else {
                         chatHandler.openChat(chat.id);
                       }
                     }}
@@ -277,8 +300,184 @@ function ChatList({
           </SidebarGroup>
         ))}
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              id="skills"
+              icon={Sparkles}
+              isActive={view === "skills"}
+              onClick={() => onView(view === "skills" ? "chat" : "skills")}
+            >
+              <span className="flex-1">Skills</span>
+              <span className="text-muted-foreground tabular-nums">
+                {skillsOn} on
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
+}
+
+type View = "chat" | "skills";
+
+const SOURCES: { source: SkillSource | null; label: string }[] = [
+  { source: null, label: "All" },
+  { source: SkillSource.kUw, label: "uw" },
+  { source: SkillSource.kAgents, label: "~/.agents/skills" },
+  { source: SkillSource.kChat, label: "Made in chats" },
+];
+
+const SOURCE_NAMES: Record<SkillSource, string> = {
+  [SkillSource.kUw]: "uw",
+  [SkillSource.kAgents]: "~/.agents/skills",
+  [SkillSource.kChat]: "Made in a chat",
+};
+
+// Every skill the agent can use, each with a switch. Turning one off keeps
+// it from every chat until it is turned on again.
+function SkillsView({
+  skills,
+  folder,
+  onToggle,
+}: {
+  skills: SkillInfo[];
+  folder: string;
+  onToggle: (skill: SkillInfo) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState<SkillSource | null>(null);
+  const wanted = query.trim().toLowerCase();
+  const shown = skills.filter(
+    (skill) =>
+      (source === null || skill.source === source) &&
+      `${skill.name} ${skill.description}`.toLowerCase().includes(wanted),
+  );
+  const on = skills.filter((skill) => skill.on).length;
+  return (
+    <main className="flex-1 overflow-y-auto">
+      <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-5">
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-base font-semibold">Skills</h1>
+          <span className="text-muted-foreground">
+            {on} on, {skills.length - on} off
+          </span>
+        </div>
+        <p className="max-w-[640px] text-muted-foreground">
+          The agent sees each skill's one-line description and reads a
+          skill's instructions only when a request calls for it. Scripts in a
+          skill do not run. Add a skill by putting its folder in {folder}, or
+          ask a chat to make one.
+        </p>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            aria-label="Search skills"
+            placeholder="Search skills"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-9 w-64 rounded-lg bg-accent px-3 outline-none placeholder:text-muted-foreground"
+          />
+          <div className="flex gap-0.5 rounded-[10px] bg-accent p-[3px]">
+            {SOURCES.map((choice) => (
+              <button
+                key={choice.label}
+                type="button"
+                onClick={() => setSource(choice.source)}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-muted-foreground",
+                  source === choice.source &&
+                    "bg-background font-semibold text-foreground shadow-sm",
+                )}
+              >
+                {choice.label}
+                <span className="font-normal text-muted-foreground">
+                  {
+                    skills.filter(
+                      (skill) =>
+                        choice.source === null || skill.source === choice.source,
+                    ).length
+                  }
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-border">
+          {shown.map((skill) => (
+            <div
+              key={skill.name}
+              className="flex items-start gap-4 border-t border-border px-4 py-2.5 first:border-t-0"
+            >
+              <div className="min-w-0 flex-1">
+                <Switch
+                  data-skill={skill.name}
+                  label={skill.name}
+                  checked={skill.on}
+                  onToggle={() => onToggle(skill)}
+                />
+                <p className="truncate pl-11 text-xs text-muted-foreground">
+                  {skill.description}
+                </p>
+              </div>
+              <span className="w-36 shrink-0 truncate pt-2 text-xs text-muted-foreground">
+                {SOURCE_NAMES[skill.source]}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// The agent asks to keep a skill it wrote. Nothing is saved until the user
+// says so.
+function SkillProposalCard({ proposal }: { proposal: SkillProposal }) {
+  return (
+    <div className="rounded-xl border border-border p-3.5">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Sparkles className="size-4 text-info" />
+        Save a skill?
+      </div>
+      <div className="mt-2.5 rounded-lg bg-accent px-3 py-2.5 text-xs leading-relaxed">
+        <div className="font-semibold">{proposal.name}</div>
+        <div className="text-muted-foreground">{proposal.description}</div>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button
+          id="save-skill"
+          variant="primary"
+          size="compact"
+          onClick={() => chatHandler.answerSkill(true)}
+        >
+          Save skill
+        </Button>
+        <Button
+          id="skip-skill"
+          variant="secondary"
+          size="compact"
+          onClick={() => chatHandler.answerSkill(false)}
+        >
+          Not now
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// The skill the agent loaded since the user's last message, if any.
+function usingSkill(lines: Step[]): string {
+  let name = "";
+  for (const line of lines) {
+    if (line.kind === StepKind.kUser) {
+      name = "";
+    } else if (line.kind === StepKind.kTool && line.tool === "skill") {
+      name = JSON.parse(line.args).name ?? "";
+    }
+  }
+  return name;
 }
 
 // The agent's tab a step acted in: the one it named, or the one it opened.
@@ -470,6 +669,10 @@ function Chat() {
   const [agentTabs, setAgentTabs] = useState<AgentTab[]>([]);
   const [currentTab, setCurrentTab] = useState(0);
   const [sideBySide, setSideBySide] = useState(false);
+  const [view, setView] = useState<View>("chat");
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [skillsFolder, setSkillsFolder] = useState("");
+  const [proposal, setProposal] = useState<SkillProposal | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
   const [working, setWorking] = useState(false);
   const [draft, setDraft] = useState("");
@@ -501,7 +704,13 @@ function Chat() {
           setSideBySide(split);
         },
       ),
+      chatPage.onSkillProposal.addListener((asked: SkillProposal) =>
+        setProposal(asked),
+      ),
       chatPage.onStep.addListener((step: Step) => {
+        if (step.tool === "save_skill") {
+          setProposal(null);
+        }
         setLines((before) => [...before, step]);
         if (step.kind !== StepKind.kTool) {
           setWorking(false);
@@ -509,8 +718,32 @@ function Chat() {
       }),
     ];
     connect();
+    loadSkills();
     return () => listeners.forEach((id) => chatPage.removeListener(id));
   }, []);
+
+  const loadSkills = () => {
+    chatHandler.getSkills().then(({ skills, folder }) => {
+      setSkills(skills);
+      setSkillsFolder(folder);
+    });
+  };
+
+  const toggleSkill = (skill: SkillInfo) => {
+    chatHandler.setSkillOn(skill.name, !skill.on);
+    setSkills((before) =>
+      before.map((kept) =>
+        kept.name === skill.name ? { ...kept, on: !kept.on } : kept,
+      ),
+    );
+  };
+
+  const showView = (next: View) => {
+    if (next === "skills") {
+      loadSkills();
+    }
+    setView(next);
+  };
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -546,9 +779,18 @@ function Chat() {
   const groups = group(lines);
   return (
     <SidebarProvider persist={false} width="15rem" className="h-full">
-      <ChatList chats={chats} current={chatId} />
+      <ChatList
+        chats={chats}
+        current={chatId}
+        view={view}
+        skillsOn={skills.filter((skill) => skill.on).length}
+        onView={showView}
+      />
       <SidebarInset className="flex h-full flex-row">
-      <div className="flex min-w-0 flex-1 flex-col">
+      {view === "skills" && (
+        <SkillsView skills={skills} folder={skillsFolder} onToggle={toggleSkill} />
+      )}
+      <div className={cn("flex min-w-0 flex-1 flex-col", view === "skills" && "hidden")}>
       {agentTabs.length > 0 && (
         <TabStrip tabs={agentTabs} current={currentTab} sideBySide={sideBySide} />
       )}
@@ -579,11 +821,18 @@ function Chat() {
               </Fragment>
             ),
           )}
-          {working && <ThinkingIndicator id="working" />}
+          {proposal && <SkillProposalCard proposal={proposal} />}
+          {working && !proposal && <ThinkingIndicator id="working" />}
           <div ref={end} />
         </div>
       </main>
       <div className="mx-auto w-full max-w-[720px] px-7 pb-4">
+        {usingSkill(lines) && (
+          <div className="mb-2 inline-flex h-6 items-center gap-1.5 rounded-md bg-accent px-2 text-xs text-muted-foreground">
+            <Sparkles className="size-3" />
+            Using {usingSkill(lines)}
+          </div>
+        )}
         <InputMessage
           value={draft}
           onValueChange={setDraft}
@@ -599,7 +848,7 @@ function Chat() {
         />
       </div>
       </div>
-      {agentTabs.length > 0 && (
+      {agentTabs.length > 0 && view === "chat" && (
         <AgentTabs
           tabs={agentTabs}
           current={currentTab}

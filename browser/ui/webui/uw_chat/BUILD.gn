@@ -29,8 +29,10 @@ source_set("uw_chat") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/common:constants",
     "//components/favicon/content",
     "//components/performance_manager",
+    "//components/prefs",
     "//components/split_tabs",
     "//components/tabs:public",
     "//components/viz/common",
@@ -50,6 +52,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "uw_chat_browsertest.cc" ]
   deps = [
+    ":uw_chat",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",

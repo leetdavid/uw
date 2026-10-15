@@ -5,12 +5,19 @@ import {
   ChatHandlerRemote,
   ChatPageCallbackRouter,
   ChatState,
+  SkillSource,
   StepKind,
 } from "uw-chat-mojom";
-import type { AgentTab, ChatSummary, Step } from "uw-chat-mojom";
+import type {
+  AgentTab,
+  ChatSummary,
+  SkillInfo,
+  SkillProposal,
+  Step,
+} from "uw-chat-mojom";
 
-export { ChatState, StepKind };
-export type { AgentTab, ChatSummary, Step };
+export { ChatState, SkillSource, StepKind };
+export type { AgentTab, ChatSummary, SkillInfo, SkillProposal, Step };
 
 export const chatPage = new ChatPageCallbackRouter();
 export const chatHandler = new ChatHandlerRemote();

@@ -60,6 +60,8 @@ inline constexpr char kAgentModePref[] = "uw.agent.mode";
 inline constexpr char kAgentEndpointPref[] = "uw.agent.endpoint";
 inline constexpr char kAgentModelPref[] = "uw.agent.model";
 inline constexpr char kAgentKeyAccountPref[] = "uw.agent.key_account";
+// The names of the skills the user turned off. Every other skill is on.
+inline constexpr char kAgentDisabledSkillsPref[] = "uw.agent.disabled_skills";
 
 // Whether Cmd+T opens the command bar instead of a blank tab.
 inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";

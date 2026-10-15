@@ -128,6 +128,8 @@ The chat page lists every saved chat on its left, newest first, with a spinner w
 
 On the right, a card for each of the agent's tabs shows a picture of the tab after the agent's last step there and what it did. Click a card to go to its tab. `Side by side` puts the chat and the agent's tab next to each other in split view, and the split follows the agent to its other tabs. Click it again to end the split.
 
+`Skills` at the foot of the chat list shows every skill the agent can use, from uw's `skills` folder in `~/Library/Application Support/uw-dev` and from `~/.agents/skills`, each with a switch. The agent reads a skill's instructions when a request matches its description, and the composer then says which skill it uses. Ask a chat to "make this a skill": a `Save a skill?` card appears, and nothing is written until you click `Save skill`.
+
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.

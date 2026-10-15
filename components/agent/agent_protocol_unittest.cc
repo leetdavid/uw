@@ -49,7 +49,8 @@ TEST(AgentProtocolTest, DescribesEveryTool) {
     EXPECT_EQ(*function.FindDict("parameters")->FindString("type"), "object");
   }
   EXPECT_EQ(names, (std::vector<std::string>{"open", "navigate", "read",
-                                             "click", "type", "recall"}));
+                                             "click", "type", "skill",
+                                             "save_skill", "recall"}));
 }
 
 TEST(AgentProtocolTest, FindsTheMessageInAnErrorResponse) {

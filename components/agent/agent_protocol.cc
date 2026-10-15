@@ -24,6 +24,11 @@ constexpr char kInstructions[] =
     "to one line to save space; call recall with a step number to see one "
     "again. A recalled page is a copy from that step: read the tab again "
     "before you click or type.\n"
+    "Skills teach you how to do some kinds of requests. When a request "
+    "matches a skill listed below, call skill with its name first and follow "
+    "its instructions. A skill's scripts cannot run; read its other files "
+    "with skill's file parameter. To keep a way of doing something for next "
+    "time, call save_skill. The user decides whether it is saved.\n"
     "When the job is done, or you have the answer, reply to the user in a "
     "few plain sentences and call no tool.";
 
@@ -98,6 +103,29 @@ base::ListValue AgentToolSchemas() {
                .Set("enter",
                     Parameter("boolean", "Whether to press Enter afterwards.")),
            Names({"tab", "element", "text"})));
+  tools.Append(Tool(
+      "skill",
+      "Loads a skill's instructions, or with file, another file from the "
+      "skill's folder.",
+      base::DictValue()
+          .Set("name", Parameter("string", "The skill's name, from the list."))
+          .Set("file", Parameter("string",
+                                 "A path inside the skill's folder, such as "
+                                 "references/sites.md.")),
+      Names({"name"})));
+  tools.Append(Tool(
+      "save_skill",
+      "Asks the user to save a new skill: instructions for a kind of request, "
+      "to use next time.",
+      base::DictValue()
+          .Set("name",
+               Parameter("string", "Lowercase letters, digits, and hyphens."))
+          .Set("description",
+               Parameter("string",
+                         "One line: what the skill does and when to "
+                         "use it."))
+          .Set("instructions", Parameter("string", "The steps, in Markdown.")),
+      Names({"name", "description", "instructions"})));
   tools.Append(Tool(
       "recall", "Shows the full result of an earlier step again.",
       base::DictValue().Set("step", Parameter("integer", "The step's number.")),

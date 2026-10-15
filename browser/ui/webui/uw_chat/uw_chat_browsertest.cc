@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license.
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
@@ -20,6 +23,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/common/chrome_paths.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
@@ -36,6 +40,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 
 namespace uw {
 namespace {
@@ -70,10 +75,15 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
         base::BindRepeating(&ServeForm));
     ASSERT_TRUE(embedded_https_test_server().Start());
     ASSERT_TRUE(embedded_test_server()->Start());
+    // The test's own folder stands in for ~/.agents/skills.
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(home_.CreateUniqueTempDir());
+    UwChatHandler::SetAgentsSkillsFolderForTesting(AgentsSkills());
   }
 
   void TearDownOnMainThread() override {
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
+    UwChatHandler::SetAgentsSkillsFolderForTesting(base::FilePath());
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
@@ -224,11 +234,35 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
                   attribute, id)));
   }
 
+  static base::FilePath UwSkills() {
+    base::FilePath data;
+    EXPECT_TRUE(base::PathService::Get(chrome::DIR_USER_DATA, &data));
+    return data.AppendASCII("skills");
+  }
+
+  base::FilePath AgentsSkills() {
+    return home_.GetPath().AppendASCII(".agents").AppendASCII("skills");
+  }
+
+  static void WriteSkillFile(const base::FilePath& folder,
+                             const std::string& name,
+                             const std::string& description,
+                             const std::string& instructions) {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    const base::FilePath skill = folder.AppendASCII(name);
+    ASSERT_TRUE(base::CreateDirectory(skill));
+    ASSERT_TRUE(base::WriteFile(skill.AppendASCII("SKILL.md"),
+                                "---\nname: " + name +
+                                    "\ndescription: " + description +
+                                    "\n---\n\n" + instructions + "\n"));
+  }
+
   std::string Form() {
     return embedded_https_test_server().GetURL("shop.test", "/form").spec();
   }
 
   ScriptedModel model_{*embedded_test_server()};
+  base::ScopedTempDir home_;
 };
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
@@ -531,6 +565,100 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, SideBySidePutsTheChatBesideItsTab) {
       chat, "document.querySelector('[data-side-by-side]').click();"));
   EXPECT_TRUE(
       base::test::RunUntil([&] { return !chat_tab->GetSplit().has_value(); }));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentListsSkillsAndLoadsOne) {
+  WriteSkillFile(UwSkills(), "book-activities", "Books tours and tickets.",
+                 "Compare the sites in the user's history.");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.",
+                 "Read primary sources.");
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "skill", base::DictValue().Set("name", "book-activities")))),
+       ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(Ask(chat, "Book a tour"), "Done.");
+
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[0], ::testing::HasSubstr(
+                               "- book-activities: Books tours and tickets."));
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("- research: Researches a question."));
+  EXPECT_THAT(requests[1],
+              ::testing::HasSubstr("Compare the sites in the user's history."));
+  EXPECT_EQ(Steps(chat),
+            std::vector<std::string>{"Used the book-activities skill"});
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillTurnedOffIsLeftOut) {
+  WriteSkillFile(UwSkills(), "book-activities", "Books tours and tickets.",
+                 "Compare the sites.");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.",
+                 "Read primary sources.");
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "document.getElementById('skills').click();"
+      "new Promise(resolve => {"
+      "  const check = () => {"
+      "    const row = document.querySelector('[data-skill=\"research\"]');"
+      "    row ? (row.click(), resolve()) : setTimeout(check, 20);"
+      "  };"
+      "  check();"
+      "});"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return browser()
+        ->GetProfile()
+        ->GetPrefs()
+        ->GetList(kAgentDisabledSkillsPref)
+        .contains("research");
+  }));
+  SaveWindowScreenshot(browser(), "skills");
+  ASSERT_TRUE(
+      content::ExecJs(chat, "document.getElementById('skills').click();"));
+  EXPECT_EQ(Ask(chat, "Book a tour"), "Done.");
+
+  EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr("- book-activities:"));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::Not(::testing::HasSubstr("- research:")));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillIsSavedOnlyWhenTheUserSaysSo) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "save_skill", base::DictValue()
+                             .Set("name", "book-activities")
+                             .Set("description", "Books tours and tickets.")
+                             .Set("instructions", "1. Compare the sites.")))),
+       ScriptedModel::Answer("Saved it.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(UntilTheEnd(chat, SendScript("Remember how to book a tour") +
+                                  "(function save() {"
+                                  "  const button ="
+                                  "      document.getElementById('save-skill');"
+                                  "  button ? button.click()"
+                                  "         : setTimeout(save, 20);"
+                                  "})();"),
+            "Saved it.");
+
+  EXPECT_THAT(model_.Requests()[1], ::testing::HasSubstr("\\\"saved\\\":true"));
+  EXPECT_EQ(Steps(chat),
+            std::vector<std::string>{"Saved the book-activities skill"});
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  std::string text;
+  ASSERT_TRUE(base::ReadFileToString(
+      UwSkills().AppendASCII("book-activities").AppendASCII("SKILL.md"),
+      &text));
+  EXPECT_THAT(text, ::testing::HasSubstr("uw-made-in: chat"));
+  EXPECT_THAT(text, ::testing::HasSubstr("1. Compare the sites."));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {

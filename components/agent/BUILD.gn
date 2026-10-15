@@ -7,6 +7,8 @@ source_set("agent") {
     "agent_protocol.h",
     "page_text.cc",
     "page_text.h",
+    "skills.cc",
+    "skills.h",
   ]
   public_deps = [ "//base" ]
   deps = [ "//components/optimization_guide/proto:optimization_guide_proto" ]
@@ -18,6 +20,7 @@ source_set("unit_tests") {
     "agent_context_unittest.cc",
     "agent_protocol_unittest.cc",
     "page_text_unittest.cc",
+    "skills_unittest.cc",
   ]
   deps = [
     ":agent",

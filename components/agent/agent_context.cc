@@ -137,6 +137,16 @@ void AgentContext::ShortenAll() {
   }
 }
 
+void AgentContext::SetSkills(std::string_view skills) {
+  base::DictValue instructions = AgentInstructions();
+  if (!skills.empty()) {
+    std::string content = *instructions.FindString("content");
+    base::StrAppend(&content, {"\n\nSkills:\n", skills});
+    instructions.Set("content", std::move(content));
+  }
+  messages_[0] = base::Value(std::move(instructions));
+}
+
 void AgentContext::CloseOpenCalls(std::string_view error) {
   size_t turn = messages_.size();
   while (turn > 0) {

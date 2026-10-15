@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
@@ -24,6 +25,7 @@
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
+#include "uw/components/agent/skills.h"
 
 namespace content {
 class WebContents;
@@ -50,6 +52,10 @@ class UwChatHandler : public mojom::ChatHandler,
   UwChatHandler& operator=(const UwChatHandler&) = delete;
   ~UwChatHandler() override;
 
+  // Reads the skills that other agents share from `folder` in place of
+  // ~/.agents/skills. An empty path restores it.
+  static void SetAgentsSkillsFolderForTesting(base::FilePath folder);
+
   // mojom::ChatHandler:
   void Send(const std::string& text) override;
   void Resume() override;
@@ -58,6 +64,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void DeleteChat(const std::string& id) override;
   void ShowTab(int32_t number) override;
   void SetSideBySide(bool on, int32_t number) override;
+  void GetSkills(GetSkillsCallback callback) override;
+  void SetSkillOn(const std::string& name, bool on) override;
+  void AnswerSkill(bool save) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -89,6 +98,17 @@ class UwChatHandler : public mojom::ChatHandler,
   // Tells the page about the agent's tabs.
   void SendTabs();
 
+  // Reads the skills in uw's folder and ~/.agents/skills, then runs `done`.
+  void LoadSkills(base::OnceClosure done);
+  void OnSkillsLoaded(base::OnceClosure done, std::vector<Skill> skills);
+  std::vector<Skill> EnabledSkills() const;
+  void ReplySkills(GetSkillsCallback callback);
+  // The agent's save_skill call: shows the page the skill, and answers once
+  // the user does.
+  void AskToSaveSkill(base::DictValue args,
+                      base::OnceCallback<void(base::DictValue)> answer);
+  void OnSkillWritten(bool written);
+
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::ChatPage> page_;
   mojo::Receiver<mojom::ChatHandler> receiver_;
@@ -119,6 +139,14 @@ class UwChatHandler : public mojom::ChatHandler,
   std::map<int, Card> cards_;
   // The tab the agent acted in last.
   int current_tab_ = 0;
+  std::vector<Skill> skills_;
+  bool skills_loaded_ = false;
+  // What the user sent before the skills were read, to send once they are.
+  std::optional<std::string> waiting_message_;
+  bool waiting_resume_ = false;
+  // The skill the agent asked to save, and its answer.
+  base::DictValue proposed_skill_;
+  base::OnceCallback<void(base::DictValue)> skill_answer_;
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::WeakPtrFactory<UwChatHandler> weak_factory_{this};

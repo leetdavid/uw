@@ -24,6 +24,12 @@ interface ChatHandler {
   // Puts the chat beside the agent's tab `number`, or its latest tab when
   // `number` is 0, in split view; or ends the split when `on` is false.
   SetSideBySide(bool on, int32 number);
+  // Every skill the agent can use, and the folder that holds uw's own.
+  GetSkills() => (array<SkillInfo> skills, string folder);
+  // Turns the skill `name` on or off for every chat.
+  SetSkillOn(string name, bool on);
+  // The user's answer to the last OnSkillProposal.
+  AnswerSkill(bool save);
 };
 
 // The kinds of uw::AgentLoop::Step, and the other lines a saved chat holds.
@@ -67,6 +73,27 @@ struct ChatSummary {
   ChatState state;
 };
 
+// Where a skill comes from. Matches uw::Skill::Source.
+enum SkillSource {
+  kUw,
+  kAgents,
+  kChat,
+};
+
+struct SkillInfo {
+  string name;
+  string description;
+  SkillSource source;
+  bool on;
+};
+
+// A skill the agent wrote in a chat, waiting for the user to save it.
+struct SkillProposal {
+  string name;
+  string description;
+  string instructions;
+};
+
 // One of the agent's tabs, for its card on the chat page.
 struct AgentTab {
   int32 number;
@@ -90,4 +117,6 @@ interface ChatPage {
   // The agent's tabs, the one it acted in last, and whether the chat sits
   // beside that tab in split view, after every change.
   OnTabs(array<AgentTab> tabs, int32 current, bool side_by_side);
+  // The agent asks to save a new skill. AnswerSkill gives the user's answer.
+  OnSkillProposal(SkillProposal proposal);
 };

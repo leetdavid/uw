@@ -147,7 +147,7 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, FillsAFormAndSaysItIsDone) {
       base::JSONReader::ReadDict(requests[0], base::JSON_PARSE_RFC);
   ASSERT_TRUE(first);
   EXPECT_EQ(*first->FindString("model"), "test-agent");
-  EXPECT_EQ(first->FindList("tools")->size(), 6u);
+  EXPECT_EQ(first->FindList("tools")->size(), 8u);
   const base::ListValue& messages = *first->FindList("messages");
   ASSERT_EQ(messages.size(), 2u);
   EXPECT_EQ(*messages[1].GetDict().FindString("content"),
