@@ -127,7 +127,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 8. T73: New child tab, its key, and "New tab below" by the right-clicked tab.
 9. T74: children nested by hand stay with their parent.
 
-T73 and T74 are built next, then the command bar, then the other stages. Changed on 2026-10-15.
+T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15.
 
 ## Acceptance checks
 

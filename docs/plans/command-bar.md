@@ -1,6 +1,6 @@
 # Command bar
 
-Status: scope agreed on 2026-10-14. Nothing is built yet. T60 starts once T73 and T74 of the [keyboard and mouse plan](keyboard-and-mouse.md), whose commands it runs, are built. Agreed on 2026-10-15. The other tickets wait for approval.
+Status: scope agreed on 2026-10-14. T60, the spike, started on 2026-10-15 at the user's request. The other tickets wait for approval. The command bar runs the commands of the [keyboard and mouse plan](keyboard-and-mouse.md).
 
 Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later stages are smaller: 6/10 and 7/10.
 
@@ -13,6 +13,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - The [command bar](../CONTEXT.md#language) is a panel centered over the page card. The page dims a little behind it.
 - Cmd+T and File → New Tab open it to open a new page. Escape creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
 - "New child tab" and Ctrl+Cmd+T open it too. A page picked from it opens as the first child of that tab, per [New child tab](keyboard-and-mouse.md#new-child-tab). Agreed on 2026-10-15.
+- A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T61 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
 - Cmd+L, and a click on the address in the toolbar, open it filled with the current address, selected. A page picked from it loads in the current tab. The lock, star, and zoom icons beside the address keep their own clicks.
 - Cmd+Shift+A opens it narrowed to open and recently closed tabs. Chromium's tab search popup and its toolbar button are hidden.
 - Commands run on the tab that was selected when the command bar opened.
@@ -58,7 +59,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 ## Design
 
 - `browser/resources/uw_command_bar/` and `browser/ui/webui/uw_command_bar/` hold the page and its Mojo link, as the terminal's do. It shows in a top-chrome WebUI panel, the kind Chromium uses for its tab search popup.
-- The page is loaded before it is needed, through Chromium's `WebUIContentsPreloadManager`, which already does this for tab search. Keys pressed before the field has focus are held by the browser and passed to the page in order once it is ready.
+- While the switch is on, each window keeps its command bar page loaded and shows it in a `WebUIBubbleDialogView` over the page card, from `browser/ui/views/command_bar/`. Chromium's `WebUIContentsPreloadManager` keeps one page for all of Chromium and picks which, and tab search's bubble drops its page 30 seconds after closing, so neither keeps it ready. Keys pressed before the field has focus are held by the browser and passed to the page in order once it is ready.
 - Open tabs, history, bookmarks, search suggestions, and site search shortcuts come from Chromium's searchbox handler, the one behind the new tab page's search box (`chrome/browser/ui/webui/searchbox/`). The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it.
 - Recent tabs and commands, aliases, and recorded keys are profile prefs.
