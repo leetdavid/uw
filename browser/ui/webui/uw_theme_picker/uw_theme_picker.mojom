@@ -1,0 +1,42 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+// Chromium's color mode: Auto follows macOS.
+enum ColorMode {
+  kAuto,
+  kLight,
+  kDark,
+};
+
+// The profile's theme, as the picker shows it.
+struct Theme {
+  // One to three colors as 0xAARRGGBB, in the order they were added.
+  array<uint32> colors;
+  // How much of each color's saturation shows, from 0 to 100.
+  int32 intensity;
+  // How strong the grain over the theme is, from 0 to 100.
+  int32 grain;
+  bool colors_in_dark_mode;
+};
+
+// Links the theme picker page to its handler.
+interface ThemePickerHandlerFactory {
+  CreateHandler(pending_receiver<ThemePickerHandler> handler);
+};
+
+// Browser side. Only the theme picker page can reach it.
+interface ThemePickerHandler {
+  // The theme, the color mode, and the suggested themes, each one to three
+  // colors.
+  GetState() => (Theme theme, ColorMode mode, array<array<uint32>> suggested);
+
+  // Saves the theme. The window changes at once.
+  SetTheme(Theme theme);
+
+  SetMode(ColorMode mode);
+
+  // The page has drawn and can be shown.
+  ShowUI();
+};

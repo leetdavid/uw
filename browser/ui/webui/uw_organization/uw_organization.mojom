@@ -39,15 +39,6 @@ struct PauseResult {
   int32 pause_mode;
 };
 
-// The window tint as the page shows it. Colors are "#RRGGBB".
-struct TintState {
-  // Empty when nothing is picked and the default tint applies.
-  string picked;
-  // The color the tint starts at. It differs from `picked` when uw made a
-  // mid-tone color lighter or darker to keep text readable.
-  string applied;
-};
-
 // Profile-scoped backend for the uw page of chrome://settings.
 interface OrganizationHandler {
   GetState() => (State state);
@@ -57,11 +48,8 @@ interface OrganizationHandler {
   // the nearest one in it. Returns what was stored.
   SetThresholds(Thresholds thresholds) => (Thresholds thresholds);
 
-  GetTint() => (TintState tint);
-  // Picks the window tint. Ignores anything that is not a "#RRGGBB" color.
-  SetTint(string color) => (TintState tint);
-  // Returns to the default tint.
-  ClearTint() => (TintState tint);
+  // Opens the theme picker in the window that shows the page.
+  OpenThemePicker();
   // Every window follows at once.
   SetCommandBar(bool on) => ();
 };

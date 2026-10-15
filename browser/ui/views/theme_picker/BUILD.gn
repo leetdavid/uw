@@ -1,0 +1,51 @@
+# The theme picker's bubble, which holds the theme picker page beside the
+# sidebar.
+source_set("theme_picker") {
+  sources = [
+    "theme_picker.cc",
+    "theme_picker.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/base/unowned_user_data",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/webui/top_chrome",
+    "//ui/gfx",
+    "//ui/views",
+    "//url",
+    "//uw/browser/ui/webui/uw_theme_picker",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "theme_picker_browsertest.mm" ]
+  deps = [
+    ":theme_picker",
+    "//base",
+    "//base/test:test_support",
+    "//chrome:strings",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/themes",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//skia",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/color",
+    "//url",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/webui/uw_theme_picker",
+    "//uw/components/look",
+    "//uw/components/look:prefs",
+  ]
+}

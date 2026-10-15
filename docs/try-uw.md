@@ -127,11 +127,11 @@ The [placement rules](plans/automatic-organization.md#placement-rules) and the [
 
 Arrange a few tabs, quit uw, and launch it again with "Continue where you left off" set at `chrome://settings/onStartup`. Check that groups and tab order return. This is a trial, not a guarantee.
 
-### Window tint
+### Themes
 
-Open `uw://settings/uwOrganization` and scroll to `Window tint`. Click a color, or use the last swatch to pick any color.
+Open the theme picker from View → Theme…, from `Theme…` in the menu of empty space in the sidebar, or from the `Theme` row at `uw://settings/uwOrganization`.
 
-Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac. In dark mode the window is black whatever color you pick.
+Expected result: a panel opens beside the sidebar. Click a suggested theme, or drag a dot in the color field, and the window changes as you drag. `+` adds a dot, up to three, and dragging a dot out of the field removes it. Text on the window stays white on a dark color and near-black on a light one. `Intensity` grays the colors and `Grain` adds a fine texture around the page card. `Light`, `Dark`, and `Auto` change uw and the color scheme web pages see. In dark mode the window is black unless `Theme colors in dark mode` is on. A color picked in the "Customize Chromium" panel becomes a one-color theme.
 
 ### Terminal tabs
 

@@ -7,38 +7,20 @@
 #include <string>
 #include <utility>
 
-#include "base/strings/string_number_conversions.h"
-#include "base/strings/stringprintf.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_ui_data_source.h"
-#include "third_party/skia/include/core/SkColor.h"
-#include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/webui/web_ui_util.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
-#include "uw/components/look/tint.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/components/tab_organization/placement.h"
 
 namespace uw {
 namespace {
-
-std::string Hex(SkColor color) {
-  return base::StringPrintf("#%02X%02X%02X", SkColorGetR(color),
-                            SkColorGetG(color), SkColorGetB(color));
-}
-
-std::optional<SkColor> ColorFromHex(const std::string& hex) {
-  uint32_t rgb = 0;
-  if (hex.size() != 7 || hex[0] != '#' ||
-      !base::HexStringToUInt(hex.substr(1), &rgb)) {
-    return std::nullopt;
-  }
-  return SkColorSetA(rgb, SK_AlphaOPAQUE);
-}
 
 mojom::Waiting WaitingFor(const PrefService* prefs) {
   if (const std::optional<ModelSlot> untested = UntestedModel(prefs)) {
@@ -97,18 +79,8 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationThresholdsNote",
        IDS_UW_SETTINGS_ORGANIZATION_THRESHOLDS_NOTE},
       {"uwOrganizationPauseTitle", IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE},
-      {"uwOrganizationTintTitle", IDS_UW_SETTINGS_ORGANIZATION_TINT_TITLE},
-      {"uwOrganizationTintColor", IDS_UW_SETTINGS_ORGANIZATION_TINT_COLOR},
-      {"uwOrganizationTintSwatch", IDS_UW_SETTINGS_ORGANIZATION_TINT_SWATCH},
-      {"uwOrganizationTintCustom", IDS_UW_SETTINGS_ORGANIZATION_TINT_CUSTOM},
-      {"uwOrganizationTintDefault", IDS_UW_SETTINGS_ORGANIZATION_TINT_DEFAULT},
-      {"uwOrganizationTintStatusDefault",
-       IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_DEFAULT},
-      {"uwOrganizationTintStatusPicked",
-       IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_PICKED},
-      {"uwOrganizationTintStatusAdjusted",
-       IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED},
-      {"uwOrganizationTintNote", IDS_UW_SETTINGS_ORGANIZATION_TINT_NOTE},
+      {"uwOrganizationTheme", IDS_UW_SETTINGS_THEME},
+      {"uwOrganizationThemeDescription", IDS_UW_SETTINGS_THEME_DESCRIPTION},
       {"uwCommandBarTitle", IDS_UW_SETTINGS_COMMAND_BAR_TITLE},
       {"uwCommandBarToggle", IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE},
       {"uwCommandBarNote", IDS_UW_SETTINGS_COMMAND_BAR_NOTE},
@@ -118,7 +90,6 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationResume", IDS_UW_PAUSE_RESUME},
   };
   data_source->AddLocalizedStrings(kLocalizedStrings);
-  data_source->AddString("uwOrganizationDefaultTint", Hex(kDefaultLightTint));
 }
 
 void UwOrganizationHandler::GetState(GetStateCallback callback) {
@@ -180,39 +151,18 @@ mojom::ThresholdsPtr UwOrganizationHandler::CurrentThresholds() const {
                                 needed.new_name);
 }
 
-void UwOrganizationHandler::GetTint(GetTintCallback callback) {
-  std::move(callback).Run(CurrentTint());
-}
-
-void UwOrganizationHandler::SetTint(const std::string& color,
-                                    SetTintCallback callback) {
-  if (const std::optional<SkColor> picked = ColorFromHex(color)) {
-    ThemeServiceFactory::GetForProfile(profile_)
-        ->SetUserColorAndBrowserColorVariant(
-            *picked, ui::mojom::BrowserColorVariant::kTonalSpot);
+void UwOrganizationHandler::OpenThemePicker() {
+  if (BrowserWindowInterface* window =
+          ProfileBrowserCollection::GetForProfile(profile_)
+              ->GetLastActiveBrowser()) {
+    chrome::ExecuteCommand(window, kShowThemePicker);
   }
-  std::move(callback).Run(CurrentTint());
-}
-
-void UwOrganizationHandler::ClearTint(ClearTintCallback callback) {
-  ThemeServiceFactory::GetForProfile(profile_)->SetUserColor(std::nullopt);
-  std::move(callback).Run(CurrentTint());
 }
 
 void UwOrganizationHandler::SetCommandBar(bool on,
                                           SetCommandBarCallback callback) {
   profile_->GetPrefs()->SetBoolean(kCommandBarEnabledPref, on);
   std::move(callback).Run();
-}
-
-mojom::TintStatePtr UwOrganizationHandler::CurrentTint() const {
-  auto tint = mojom::TintState::New();
-  if (const std::optional<SkColor> picked =
-          ThemeServiceFactory::GetForProfile(profile_)->GetUserColor()) {
-    tint->picked = Hex(*picked);
-    tint->applied = Hex(TintFrom(*picked).start);
-  }
-  return tint;
 }
 
 }  // namespace uw

@@ -1,0 +1,34 @@
+# The theme picker page's browser side: its controller, which saves the
+# profile's theme as the user picks.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_theme_picker.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_theme_picker") {
+  sources = [
+    "uw_theme_picker_ui.cc",
+    "uw_theme_picker_ui.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//base",
+    "//chrome/browser/ui/webui/top_chrome",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/themes",
+    "//components/prefs",
+    "//ui/base",
+    "//ui/base/mojom",
+    "//ui/webui",
+    "//uw/browser/resources/uw_theme_picker:resources",
+    "//uw/components/look",
+    "//uw/components/look:prefs",
+  ]
+}

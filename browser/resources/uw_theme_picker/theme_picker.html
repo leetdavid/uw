@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <title>Theme</title>
+    <style>
+      :root {
+        --panel: #fff;
+        --text: #1e1b2e;
+        --text2: #4a4760;
+        --well: #f2f1f8;
+        --chosen: #fff;
+        --line: rgb(30 27 46 / 9%);
+        --track: rgb(30 27 46 / 12%);
+        --primary: #3b5bdb;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --panel: #171717;
+          --text: #ededed;
+          --text2: #a1a1a1;
+          --well: #0a0a0a;
+          --chosen: #262626;
+          --line: #262626;
+          --track: rgb(255 255 255 / 14%);
+          --primary: #9db0ff;
+        }
+      }
+
+      html,
+      body {
+        background: var(--panel);
+        color: var(--text);
+        font: 13px/1.35 system-ui, sans-serif;
+        margin: 0;
+      }
+
+      body {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 14px;
+        width: 304px;
+      }
+
+      button {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      svg {
+        fill: none;
+        height: 14px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.75;
+        width: 14px;
+      }
+
+      #modes {
+        background: var(--well);
+        border-radius: 10px;
+        display: grid;
+        gap: 4px;
+        grid-template-columns: repeat(3, 1fr);
+        padding: 3px;
+      }
+
+      #modes button {
+        align-items: center;
+        border-radius: 8px;
+        color: var(--text2);
+        display: flex;
+        font-size: 12px;
+        font-weight: 500;
+        gap: 6px;
+        height: 28px;
+        justify-content: center;
+      }
+
+      #modes button[aria-pressed='true'] {
+        background: var(--chosen);
+        box-shadow: 0 1px 2px rgb(30 27 46 / 14%);
+        color: var(--text);
+      }
+
+      #field {
+        background:
+            linear-gradient(to bottom, rgb(255 255 255 / 92%),
+                            rgb(255 255 255 / 0%) 52%),
+            linear-gradient(to right, hsl(0 70% 72%), hsl(40 75% 70%),
+                            hsl(80 60% 68%), hsl(140 50% 66%),
+                            hsl(200 65% 70%), hsl(250 60% 74%),
+                            hsl(300 55% 72%), hsl(360 70% 72%));
+        border-radius: 12px;
+        box-shadow: inset 0 0 0 1px rgb(30 27 46 / 6%);
+        height: 176px;
+        position: relative;
+        touch-action: none;
+      }
+
+      .dot {
+        border: 3px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 4px rgb(30 27 46 / 35%);
+        box-sizing: border-box;
+        height: 20px;
+        margin: -10px 0 0 -10px;
+        position: absolute;
+        width: 20px;
+      }
+
+      #add {
+        background: rgb(255 255 255 / 85%);
+        border-radius: 13px;
+        bottom: 8px;
+        box-shadow: 0 1px 3px rgb(30 27 46 / 20%);
+        color: #1e1b2e;
+        display: grid;
+        height: 26px;
+        place-items: center;
+        position: absolute;
+        right: 8px;
+        width: 26px;
+      }
+
+      #suggested {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      #suggested button {
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px rgb(30 27 46 / 8%);
+        height: 22px;
+        width: 22px;
+      }
+
+      #suggested button[aria-pressed='true'] {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .row {
+        align-items: center;
+        color: var(--text2);
+        display: flex;
+        font-size: 12px;
+        gap: 10px;
+      }
+
+      .row label {
+        width: 58px;
+      }
+
+      input[type='range'] {
+        appearance: none;
+        background: var(--track);
+        border-radius: 2px;
+        flex: 1;
+        height: 4px;
+        margin: 0;
+      }
+
+      #intensity {
+        background: linear-gradient(to right, var(--text) var(--value),
+                                    var(--track) var(--value));
+      }
+
+      #grain {
+        background: repeating-linear-gradient(90deg, rgb(30 27 46 / 12%) 0 2px,
+                                              rgb(30 27 46 / 4%) 2px 4px);
+      }
+
+      input[type='range']::-webkit-slider-thumb {
+        appearance: none;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px rgb(30 27 46 / 20%),
+            0 1px 3px rgb(30 27 46 / 25%);
+        height: 14px;
+        width: 14px;
+      }
+
+      #switch-row {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        display: flex;
+        font-size: 12.5px;
+        justify-content: space-between;
+        padding-top: 12px;
+      }
+
+      #colors-in-dark-mode {
+        appearance: none;
+        background: rgb(30 27 46 / 18%);
+        border-radius: 9px;
+        height: 18px;
+        margin: 0;
+        position: relative;
+        width: 30px;
+      }
+
+      #colors-in-dark-mode::after {
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 2px rgb(30 27 46 / 30%);
+        content: '';
+        height: 14px;
+        left: 2px;
+        position: absolute;
+        top: 2px;
+        width: 14px;
+      }
+
+      #colors-in-dark-mode:checked {
+        background: var(--primary);
+      }
+
+      #colors-in-dark-mode:checked::after {
+        left: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="modes" role="group">
+      <button id="auto" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
+        <span></span>
+      </button>
+      <button id="light" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <span></span>
+      </button>
+      <button id="dark" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <span></span>
+      </button>
+    </div>
+    <div id="field" role="group">
+      <button id="add">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg>
+      </button>
+    </div>
+    <div id="suggested" role="group"></div>
+    <div class="row">
+      <label for="intensity"></label>
+      <input id="intensity" type="range" min="0" max="100">
+    </div>
+    <div class="row">
+      <label for="grain"></label>
+      <input id="grain" type="range" min="0" max="100">
+    </div>
+    <div id="switch-row">
+      <label for="colors-in-dark-mode"></label>
+      <input id="colors-in-dark-mode" type="checkbox" role="switch">
+    </div>
+    <script type="module" src="theme_picker.js"></script>
+  </body>
+</html>

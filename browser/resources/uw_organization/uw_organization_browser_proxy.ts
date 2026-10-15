@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {PauseResult, State, Thresholds, TintState} from './uw_organization.mojom-webui.js';
+import type {PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -12,9 +12,7 @@ export interface UwOrganizationBrowserProxy {
   setEnabled(on: boolean): Promise<State>;
   setPause(mode: number): Promise<PauseResult>;
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
-  getTint(): Promise<TintState>;
-  setTint(color: string): Promise<TintState>;
-  clearTint(): Promise<TintState>;
+  openThemePicker(): void;
   setCommandBar(on: boolean): Promise<void>;
 }
 
@@ -40,16 +38,8 @@ export class UwOrganizationBrowserProxyImpl implements
         response => response.thresholds);
   }
 
-  getTint() {
-    return this.handler.getTint().then(response => response.tint);
-  }
-
-  setTint(color: string) {
-    return this.handler.setTint(color).then(response => response.tint);
-  }
-
-  clearTint() {
-    return this.handler.clearTint().then(response => response.tint);
+  openThemePicker() {
+    this.handler.openThemePicker();
   }
 
   async setCommandBar(on: boolean) {

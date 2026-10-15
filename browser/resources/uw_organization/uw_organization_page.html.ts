@@ -64,40 +64,6 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     border-top: var(--cr-separator-line);
     padding: 12px 0 16px;
   }
-  .uw-swatches {
-    display: flex;
-    flex: 1;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .uw-swatch {
-    appearance: none;
-    block-size: 28px;
-    border: 1px solid var(--cr-separator-color);
-    border-radius: 50%;
-    cursor: pointer;
-    inline-size: 28px;
-    padding: 0;
-  }
-  .uw-swatch[aria-pressed='true'] {
-    outline: 2px solid var(--cr-focus-outline-color);
-    outline-offset: 2px;
-  }
-  .uw-any-color {
-    background: conic-gradient(
-        #f7978a, #f7e08a, #cfefdd, #d8e6f9, #e7e1f6, #f7978a);
-    box-sizing: border-box;
-    display: inline-block;
-    overflow: hidden;
-  }
-  .uw-any-color input {
-    block-size: 100%;
-    border: none;
-    cursor: pointer;
-    inline-size: 100%;
-    opacity: 0;
-    padding: 0;
-  }
   h2.uw-heading {
     font-size: 108%;
     font-weight: 500;
@@ -165,34 +131,11 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     </div>
   </div>
   <div class="uw-section">
-    <h2 class="uw-heading">${this.i18n_('uwOrganizationTintTitle')}</h2>
-    <div class="uw-row">
-      <div class="uw-label">${this.i18n_('uwOrganizationTintColor')}</div>
-      <div class="uw-swatches">
-        ${this.tintPresets_.map(color => html`
-          <button class="uw-swatch" style="background: ${color}"
-              data-color="${color}"
-              aria-label="${this.swatchLabel_(color)}"
-              aria-pressed="${color === this.tint_.picked}"
-              @click="${this.onSwatchClick_}">
-          </button>`)}
-        <label class="uw-swatch uw-any-color"
-            title="${this.i18n_('uwOrganizationTintCustom')}">
-          <input id="customTint" type="color"
-              aria-label="${this.i18n_('uwOrganizationTintCustom')}"
-              .value="${this.customTintValue_()}"
-              @change="${this.onCustomTintChange_}">
-        </label>
-      </div>
-      <cr-button id="defaultTint" ?disabled="${!this.tint_.picked}"
-          @click="${this.onDefaultTintClick_}">
-        ${this.i18n_('uwOrganizationTintDefault')}
-      </cr-button>
-    </div>
-    <div class="uw-row">
-      <div id="tintStatus" class="uw-secondary">${this.tintStatus_()}</div>
-    </div>
-    <div class="uw-note">${this.i18n_('uwOrganizationTintNote')}</div>
+    <cr-link-row id="themeLink" embedded
+        label="${this.i18n_('uwOrganizationTheme')}"
+        sub-label="${this.i18n_('uwOrganizationThemeDescription')}"
+        @click="${this.onThemeClick_}">
+    </cr-link-row>
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwCommandBarTitle')}</h2>

@@ -1,5 +1,5 @@
 # Mojo backend for the uw organization section of chrome://settings.
-# Profile-scoped (prefs and the theme color); it never touches window state.
+# Profile-scoped prefs. Its one window action opens the theme picker.
 import("//mojo/public/tools/bindings/mojom.gni")
 
 mojom("mojo_bindings") {
@@ -20,15 +20,13 @@ source_set("uw_organization_handler") {
   ]
   deps = [
     "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
     "//chrome/browser/profiles:profile",
-    "//chrome/browser/themes",
     "//components/prefs",
-    "//skia",
     "//ui/base",
-    "//ui/base/mojom",
-    "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/ai_providers",
-    "//uw/components/look",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
     "//uw/components/tab_organization",
   ]
 }
@@ -43,21 +41,17 @@ source_set("browser_tests") {
     "//chrome:strings",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
-    "//chrome/browser/themes",
     "//chrome/browser/ui",
     "//chrome/test:test_support",
     "//components/prefs",
     "//content/test:test_support",
-    "//skia",
     "//testing/gmock",
     "//testing/gtest",
     "//ui/base",
-    "//ui/color",
-    "//ui/gfx:color_utils",
     "//url",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/theme_picker",
     "//uw/components/ai_providers",
-    "//uw/components/look",
   ]
 }

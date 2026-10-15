@@ -111,6 +111,10 @@ Each is on by default and has a switch in a new "Mouse" section of uw's settings
 
 Once the command bar lands, the "+" and the double-click open it instead of a blank tab.
 
+### Menu of empty sidebar space
+
+Right-clicking empty space in the sidebar shows a menu with `Theme…`, which opens the [theme picker](themes.md). Built in T96.
+
 ### Sidebar keys
 
 - Ctrl+Cmd+L moves keyboard focus to the tab list. Chromium's pane focus keys reach it too.

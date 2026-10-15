@@ -34,6 +34,7 @@
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
+#include "uw/browser/ui/views/theme_picker/theme_picker.h"
 
 namespace uw {
 namespace {
@@ -51,7 +52,8 @@ constexpr int kRowSpacing = 4;
 
 }  // namespace
 
-OrganizeBar::OrganizeBar(BrowserWindowInterface* window) : window_(window) {
+OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
+    : window_(window), theme_picker_(std::make_unique<ThemePicker>(window)) {
   SetOrientation(views::LayoutOrientation::kVertical);
   SetProperty(
       views::kMarginsKey,
@@ -191,6 +193,23 @@ void OrganizeBar::ShowMenu() {
   menu_runner_->RunMenuAt(GetWidget(), nullptr, button_->GetBoundsInScreen(),
                           views::MenuAnchorPosition::kTopLeft,
                           ui::mojom::MenuSourceType::kNone);
+}
+
+void OrganizeBar::ShowContextMenuForViewImpl(
+    views::View* source,
+    const gfx::Point& point,
+    ui::mojom::MenuSourceType source_type) {
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  menu_model_->AddItemWithStringId(kTheme, IDS_UW_THEME_MENU);
+  hover_lock_ =
+      BrowserView::GetBrowserViewForBrowser(window_)
+          ->tab_strip_view()
+          ->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepCurrentState);
+  menu_runner_ = std::make_unique<views::MenuRunner>(
+      menu_model_.get(), views::MenuRunner::CONTEXT_MENU,
+      base::BindRepeating(&OrganizeBar::OnMenuClosed, base::Unretained(this)));
+  menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
+                          views::MenuAnchorPosition::kTopLeft, source_type);
 }
 
 void OrganizeBar::OnMenuClosed() {

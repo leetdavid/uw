@@ -29,6 +29,7 @@
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/theme_picker/theme_picker.h"
 
 namespace uw {
 namespace {
@@ -152,6 +153,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kShowOrganizationSettings:
       chrome::ShowSettingsSubPage(window, kSettingsSubPage);
+      break;
+    case kShowThemePicker:
+      ThemePicker::Open(window);
       break;
   }
 }

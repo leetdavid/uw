@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..a06919f3a70085ed0ab6022e40310a16381e97a5 100644
+index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..ae9bcb609506961d1c7e982ee734a5501985bb91 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,10 @@
+@@ -69,6 +69,11 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
@@ -10,10 +10,11 @@ index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..a06919f3a70085ed0ab6022e40310a16
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 +#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
++#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +405,10 @@ void RegisterChromeWebUIConfigs() {
+@@ -401,6 +406,11 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());
@@ -21,20 +22,22 @@ index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..a06919f3a70085ed0ab6022e40310a16
 +  map.AddWebUIConfig(std::make_unique<uw::UwChatUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwProvidersUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwCommandBarUIConfig>());
++  map.AddWebUIConfig(std::make_unique<uw::UwThemePickerUIConfig>());
  #endif  // BUILDFLAG(IS_ANDROID)
  
  #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OPENBSD)
 diff --git a/chrome/chrome_paks.gni b/chrome/chrome_paks.gni
-index 7274b66570dd11e3e6899974ef0f1307697f22c6..ad58ba43d8160e5306c4d205730882c9319dee21 100644
+index 7274b66570dd11e3e6899974ef0f1307697f22c6..f496d60f28f4ffa040c27aa5b6a39dbf7684ce59 100644
 --- a/chrome/chrome_paks.gni
 +++ b/chrome/chrome_paks.gni
-@@ -256,6 +256,9 @@ template("chrome_extra_paks") {
+@@ -256,6 +256,10 @@ template("chrome_extra_paks") {
          "$root_gen_dir/chrome/webui_browser_resources.pak",
          "$root_gen_dir/chrome/webui_gallery_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_resources.pak",
 +        "$root_gen_dir/chrome/uw_terminal_resources.pak",
 +        "$root_gen_dir/chrome/uw_chat_resources.pak",
 +        "$root_gen_dir/chrome/uw_command_bar_resources.pak",
++        "$root_gen_dir/chrome/uw_theme_picker_resources.pak",
          "$root_gen_dir/chrome/webui_toolbar_shared_resources.pak",
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
@@ -95,7 +98,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..d68d59e655e0fba834b907d4114b638209c051dc 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..26a0ebe085a96ed6013bc9873efddc6ca0e42380 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -130,7 +133,17 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..d68d59e655e0fba834b907d4114b6382
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
-@@ -562,12 +573,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -328,6 +339,9 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+                   .command_id(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE)
+                   .key_equivalent(@"L", NSEventModifierFlagCommand)
+                   .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
++              Item(IDS_UW_THEME_MENU)
++                  .command_id(uw::kShowThemePicker)
++                  .remove_if(is_pwa),
+               Item(IDS_CUSTOMIZE_TOUCH_BAR)
+                   .tag(IDC_CUSTOMIZE_TOUCH_BAR)
+                   .action(@selector(toggleTouchBarCustomizationPalette:))
+@@ -562,12 +576,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                    .command_id(IDC_PIN_TARGET_TAB)
                    .is_alternate()
                    .key_equivalent(@"", NSEventModifierFlagOption),
@@ -143,7 +156,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..d68d59e655e0fba834b907d4114b6382
                Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
                    .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
                Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
-@@ -583,12 +588,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +591,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -233,7 +246,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..d68d59e655e0fba834b907d4114b6382
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +726,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +729,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,
@@ -296,14 +309,15 @@ index 371dda0a45c779bf905f43fea5b32e82d1173268..51475ec1cfac22a58bc6a6730a64ee37
    content::WebContents* scan_target =
        glic::GetGlicGuestWebContents(web_contents);
 diff --git a/tools/metrics/histograms/metadata/page/histograms.xml b/tools/metrics/histograms/metadata/page/histograms.xml
-index 7e8cb88ba8e66244a7552a1f1e1c62a1160b71c5..afdb1c3d8378b8560f49b1ff853aec743f182d6a 100644
+index 7e8cb88ba8e66244a7552a1f1e1c62a1160b71c5..f3d68df92c6750a3093e533e0932a8d2fcbc868c 100644
 --- a/tools/metrics/histograms/metadata/page/histograms.xml
 +++ b/tools/metrics/histograms/metadata/page/histograms.xml
-@@ -659,6 +659,7 @@ chromium-metrics-reviews@google.com.
+@@ -659,6 +659,8 @@ chromium-metrics-reviews@google.com.
    <variant name=".TabSearch"/>
    <variant name=".TabsFromOtherDevicesSidePanel"/>
    <variant name=".UserEducation"/>
 +  <variant name=".UwCommandBar"/>
++  <variant name=".UwThemePicker"/>
  </variants>
  
  <!-- LINT.ThenChange(//tools/metrics/histograms/metadata/ui/histograms.xml:TopChromeWebUIName) -->

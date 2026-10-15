@@ -23,7 +23,8 @@ enum WindowCommand {
   kResumeOrganization,
   kShowOrganizerActivity,
   kShowOrganizationSettings,
-  kLastWindowCommand = kShowOrganizationSettings,
+  kShowThemePicker,
+  kLastWindowCommand = kShowThemePicker,
 };
 
 bool IsWindowCommand(int command);

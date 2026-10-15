@@ -46,7 +46,7 @@ Agreed on 2026-10-12:
 
 - **Colors.** `components/look/tint` holds the color rules, tested without a window. A uw color mixer in `browser/ui/look` sets Chromium's existing color IDs from them. It is added in `chrome/browser/ui/color/chrome_color_mixers.cc`. No view picks colors by itself.
 - **Glass frame.** Chromium's transparent macOS frame hides every frame color, so uw turns it off by default. Its preference still works.
-- **Tint control.** uw's settings page has a "Window tint" section: eight preset colors, a color input for any other color, and a button for the default. It says so when it had to adjust a color. The pick is stored as Chromium's theme color, so the "Customize Chromium" panel changes the same value.
+- **Tint control.** Replaced on 2026-10-16 by the [theme picker](themes.md). uw's settings page has a `Theme` row that opens it. The theme's first color is stored as Chromium's theme color, so the "Customize Chromium" panel changes the same value.
 - **Gradient.** `PaintTint` paints the gradient in window coordinates wherever Chromium paints the frame color, so every view draws one continuous sheet.
 - **Sizes.** `chrome/browser/ui/layout_constants.cc` already has values for the vertical tab height, radius, padding, and pinned tab height. The patch changes those numbers.
 - **Card.** The window layout insets the main area beside the vertical tab strip by `kPageCardMargins`, then reuses Chromium's own corner rounding for the toolbar and the page with `kPageCardRadius`. Fullscreen windows have no card.
@@ -68,7 +68,7 @@ Agreed on 2026-10-12:
 2. Tab and task behavior is unchanged: `TabOrganizationControllerBrowserTest.*` and `AutomaticOrganizerBrowserTest.*` pass without edits.
 3. Collapse, rename, recolor, and drag of a task still work from the folder row.
 4. With either default tint, text on the tint and on the card has at least a 4.5:1 contrast ratio.
-5. With any picked tint, text on it has at least a 4.5:1 contrast ratio. `TintTest.*` covers light, dark, and mid-tone colors. `TintBrowserTest.*` covers a picked color in a window. `UwOrganizationPageBrowserTest.*` picks a preset, a mid-tone color, and the default from the settings page.
+5. With any picked tint, text on it has at least a 4.5:1 contrast ratio. `TintTest.*` covers light, dark, and mid-tone colors. `TintBrowserTest.*` covers a picked color in a window. `ThemePickerBrowserTest.*` picks a suggested theme, moves and adds dots, and sets intensity, grain, and the mode from the picker.
 6. Horizontal tabs keep Chromium's layout. Their frame takes the tint as a plain color, like any Chromium theme color.
 7. `pnpm run check` and `pnpm run verify` pass.
 

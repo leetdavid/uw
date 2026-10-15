@@ -4,8 +4,8 @@
 
 /**
  * @fileoverview uw settings: whether automatic tab organization runs, how
- * eagerly it moves tabs, the global pause controls, the window tint, and the
- * command bar. The models live on uw://providers.
+ * eagerly it moves tabs, the global pause controls, a row that opens the theme
+ * picker, and the command bar. The models live on uw://providers.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -20,7 +20,7 @@ import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
 import {Waiting} from './uw_organization.mojom-webui.js';
-import type {State, Thresholds, TintState} from './uw_organization.mojom-webui.js';
+import type {State, Thresholds} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
 
@@ -39,19 +39,6 @@ interface ThresholdRow {
   stop: number;
   shown: string;
 }
-
-// Lilac, sky, mint, butter, and peach take dark text. Indigo, wine, and forest
-// take white text.
-const TINT_PRESETS = [
-  '#E7E1F6',
-  '#D8E6F9',
-  '#CFEFDD',
-  '#F7E08A',
-  '#F9E3D2',
-  '#2B2542',
-  '#5A1F3A',
-  '#1F3A2E',
-];
 
 const WAITING_TEXT: Record<Waiting, string> = {
   [Waiting.kNothing]: '',
@@ -72,14 +59,11 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   static override get properties() {
     return {
       state_: {type: Object},
-      tint_: {type: Object},
     };
   }
 
   // Null until the saved state has loaded.
   protected accessor state_: State|null = null;
-  protected accessor tint_: TintState = {picked: '', applied: ''};
-  protected tintPresets_ = TINT_PRESETS;
   private browserProxy_ = UwOrganizationBrowserProxyImpl.getInstance();
 
   override connectedCallback() {
@@ -197,40 +181,8 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.state_ = {...state, thresholds};
   }
 
-  protected swatchLabel_(color: string): string {
-    return loadTimeData.getStringF('uwOrganizationTintSwatch', color);
-  }
-
-  // A color input only takes lowercase "#rrggbb".
-  protected customTintValue_(): string {
-    return (this.tint_.picked ||
-            loadTimeData.getString('uwOrganizationDefaultTint'))
-        .toLowerCase();
-  }
-
-  protected tintStatus_(): string {
-    const {picked, applied} = this.tint_;
-    if (!picked) {
-      return this.i18n_('uwOrganizationTintStatusDefault');
-    }
-    return picked === applied ?
-        loadTimeData.getStringF('uwOrganizationTintStatusPicked', picked) :
-        loadTimeData.getStringF(
-            'uwOrganizationTintStatusAdjusted', picked, applied);
-  }
-
-  protected async onSwatchClick_(e: Event) {
-    this.tint_ = await this.browserProxy_.setTint(
-        (e.currentTarget as HTMLElement).dataset['color']!);
-  }
-
-  protected async onCustomTintChange_(e: Event) {
-    this.tint_ = await this.browserProxy_.setTint(
-        (e.currentTarget as HTMLInputElement).value.toUpperCase());
-  }
-
-  protected async onDefaultTintClick_() {
-    this.tint_ = await this.browserProxy_.clearTint();
+  protected onThemeClick_() {
+    this.browserProxy_.openThemePicker();
   }
 
   protected async onCommandBarChange_(e: CustomEvent<boolean>) {
@@ -262,7 +214,6 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
 
   private async refresh_() {
     this.state_ = await this.browserProxy_.getState();
-    this.tint_ = await this.browserProxy_.getTint();
   }
 }
 

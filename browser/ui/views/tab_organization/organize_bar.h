@@ -14,6 +14,7 @@
 #include "base/timer/timer.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/menus/simple_menu_model.h"
+#include "ui/views/context_menu_controller.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -35,6 +36,7 @@ namespace uw {
 
 class ActivityCard;
 class NewButton;
+class ThemePicker;
 
 // Sits at the foot of the tab sidebar. Holds the Organize button with its
 // menu, and the new button at the right end. Above them, a card names the
@@ -43,7 +45,8 @@ class NewButton;
 // request and what every answer was. It never takes focus by itself. The
 // narrow sidebar keeps only the new button's "+".
 class OrganizeBar : public views::FlexLayoutView,
-                    public ui::SimpleMenuModel::Delegate {
+                    public ui::SimpleMenuModel::Delegate,
+                    public views::ContextMenuController {
   METADATA_HEADER(OrganizeBar, views::FlexLayoutView)
 
  public:
@@ -57,6 +60,7 @@ class OrganizeBar : public views::FlexLayoutView,
     kResume = kResumeOrganization,
     kShowActivity = kShowOrganizerActivity,
     kSettings = kShowOrganizationSettings,
+    kTheme = kShowThemePicker,
   };
 
   explicit OrganizeBar(BrowserWindowInterface* window);
@@ -79,6 +83,12 @@ class OrganizeBar : public views::FlexLayoutView,
   bool GetAcceleratorForCommandId(int command_id,
                                   ui::Accelerator* accelerator) const override;
 
+  // views::ContextMenuController, for empty space in the sidebar:
+  void ShowContextMenuForViewImpl(
+      views::View* source,
+      const gfx::Point& point,
+      ui::mojom::MenuSourceType source_type) override;
+
  private:
   void OnCollapseChanged(tabs::VerticalTabStripCollapseState state);
   void ShowMenu();
@@ -96,6 +106,7 @@ class OrganizeBar : public views::FlexLayoutView,
   bool collapsed_ = false;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  std::unique_ptr<ThemePicker> theme_picker_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
   base::OneShotTimer card_timer_;
   // The last answer was a failed request, so the next failure stays quiet.

@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..579e47e5c5df25060eb72cca47349040fe0cd46f 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..daf9b780aa461b4ca17e7fda17809d3ca46813a4 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,106 @@
+@@ -3904,6 +3904,85 @@
          System
        </message>
      </if>
@@ -69,32 +69,11 @@ index 63c989a76dadc13953e35513998e83326ee3612b..579e47e5c5df25060eb72cca47349040
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Heading of the pause controls.">
 +        Pause automatic organization
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_TITLE" desc="Heading of the window tint settings.">
-+        Window tint
++      <message name="IDS_UW_SETTINGS_THEME" desc="Row that opens the theme picker, which sets the colors, grain, and light or dark mode of the browser window.">
++        Theme
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_COLOR" desc="Label of the window tint color choices.">
-+        Color
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_SWATCH" desc="Accessible name of a preset window tint color.">
-+        Use <ph name="COLOR">$1<ex>#5A1F3A</ex></ph>
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_CUSTOM" desc="Accessible name of the control that picks any window tint color.">
-+        Pick another color
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_DEFAULT" desc="Button that returns to the default window tint.">
-+        Use the default
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_DEFAULT" desc="Status when no window tint color is picked.">
-+        Default tint: lilac in light mode, indigo in dark mode.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_PICKED" desc="Status naming the picked window tint color.">
-+        Tint: <ph name="COLOR">$1<ex>#5A1F3A</ex></ph>
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_STATUS_ADJUSTED" desc="Status when uw made a picked window tint color lighter or darker.">
-+        You picked <ph name="PICKED">$1<ex>#2747C7</ex></ph>. uw uses <ph name="APPLIED">$2<ex>#1E3799</ex></ph> so text on it stays readable.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_TINT_NOTE" desc="Explains the window tint.">
-+        The window fades from this color to its neighbor on the color wheel. Text on it turns white or near-black, whichever reads better. The Customize Chromium panel changes the same color.
++      <message name="IDS_UW_SETTINGS_THEME_DESCRIPTION" desc="Second line of the row that opens the theme picker.">
++        The window's colors, grain, and light or dark mode
 +      </message>
 +      <message name="IDS_UW_SETTINGS_COMMAND_BAR_TITLE" desc="Heading of the command bar settings. The command bar is a panel for opening pages and running commands from the keyboard.">
 +        Command bar
@@ -110,10 +89,10 @@ index 63c989a76dadc13953e35513998e83326ee3612b..579e47e5c5df25060eb72cca47349040
        <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
          Use graphics acceleration when available
 diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96d633b0b7 100644
+index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2c2c9c14d 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -223,6 +223,17 @@
+@@ -223,6 +223,19 @@
  #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
  #endif
  
@@ -126,12 +105,14 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
++#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
++#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
 +#endif
 +
  namespace chrome::internal {
  
  using content::RegisterWebUIControllerInterfaceBinder;
-@@ -361,6 +372,15 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -361,6 +374,17 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
                                           WhatsNewUI>(map);
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
  
@@ -142,12 +123,14 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96
 +                                         uw::UwChatUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ProvidersHandler,
 +                                         uw::UwProvidersUI, uw::UwChatUI>(map);
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::ThemePickerHandlerFactory,
++                                         uw::UwThemePickerUI>(map);
 +#endif
 +
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
    RegisterWebUIControllerInterfaceBinder<
        feature_showcase::mojom::DefaultBrowserPageHandlerFactory,
-@@ -393,7 +413,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -393,7 +417,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
  
    RegisterWebUIControllerInterfaceBinder<searchbox::mojom::PageHandlerFactory,
                                           NewTabPageUI, OmniboxPopupUI,
@@ -157,7 +140,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96
  
    RegisterWebUIControllerInterfaceBinder<
        omnibox_everywhere_debug::mojom::PageHandlerFactory, OmniboxEverywhereUI>(
-@@ -676,6 +697,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -676,6 +701,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
  #if !BUILDFLAG(IS_CHROMEOS)
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()
@@ -166,16 +149,17 @@ index 8a0281a596af3532fa6342b5653f93e913261023..c33a182f8587976ee3a8944e15efbf96
        .Add<batch_upload_promo::mojom::PageHandlerFactory>()
        .Add<customize_color_scheme_mode::mojom::
 diff --git a/chrome/browser/resources/BUILD.gn b/chrome/browser/resources/BUILD.gn
-index e66dc00a9a34f11922e90ce88a7f03070fc65bed..906831fbd6fd805e871fb723196df249957b1d3b 100644
+index e66dc00a9a34f11922e90ce88a7f03070fc65bed..e691ed3d2414ee4a050a643383e7da1ed9bab62e 100644
 --- a/chrome/browser/resources/BUILD.gn
 +++ b/chrome/browser/resources/BUILD.gn
-@@ -104,6 +104,10 @@ group("resources") {
+@@ -104,6 +104,11 @@ group("resources") {
        "webui_toolbar_shared:resources",
        "whats_new:resources",
        "//components/browser_apis/tab_strip/resources",
 +      "//uw/browser/resources/uw_chat:resources",
 +      "//uw/browser/resources/uw_organization:resources",
 +      "//uw/browser/resources/uw_command_bar:resources",
++      "//uw/browser/resources/uw_theme_picker:resources",
 +      "//uw/browser/resources/uw_terminal:resources",
      ]
      if (is_chrome_branded) {
@@ -400,7 +384,7 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -1332,7 +1332,13 @@ static_library("ui") {
+@@ -1332,7 +1332,14 @@ static_library("ui") {
 
      # Non-android deps for "ui" target.
      deps += [
@@ -411,6 +395,7 @@ index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a2
 +      "//uw/browser/ui/webui/uw_terminal",
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/webui/uw_command_bar",
++      "//uw/browser/ui/webui/uw_theme_picker",
        ":accelerator_table",
        ":browser_actions",
        ":browser_select_file_dialog_controller",
@@ -567,10 +552,10 @@ index 595b377b5091b584e7347ee0d05f73d6f997823e..ed7f52de0bafa10f890ba92d6ae93e29
    tsconfig_base = "tsconfig_base.json"
    composite = true
 diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
-index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..4472e761199b8cdc52e8ac42a0d5ec5ec2fef072 100644
+index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..d99431e8568a888e088169c20594bcefdd7d80a1 100644
 --- a/tools/gritsettings/resource_ids.spec
 +++ b/tools/gritsettings/resource_ids.spec
-@@ -1789,6 +1789,26 @@
+@@ -1789,6 +1789,31 @@
      "includes": [10140],
    },
  
@@ -592,6 +577,11 @@ index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..4472e761199b8cdc52e8ac42a0d5ec5e
 +  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_command_bar/resources.grd": {
 +    "META": {"sizes": {"includes": [10],}},
 +    "includes": [10300],
++  },
++
++  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_theme_picker/resources.grd": {
++    "META": {"sizes": {"includes": [10],}},
++    "includes": [10320],
 +  },
 +
    "<(SHARED_INTERMEDIATE_DIR)/THIS_IS_A_PLACEHOLDER.grd": {

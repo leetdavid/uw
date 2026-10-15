@@ -20,7 +20,7 @@ class WebUIDataSource;
 namespace uw {
 
 // Mojo backend for the uw page of chrome://settings: whether automatic tab
-// organization runs, its pause, its thresholds, the window tint, and the
+// organization runs, its pause, its thresholds, the theme picker, and the
 // command bar. Its models are picked on uw://providers.
 // Profile-scoped: it touches profile prefs and the profile's theme color,
 // never window state, so closing windows while settings is open is safe.
@@ -41,15 +41,12 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetPause(int32_t mode, SetPauseCallback callback) override;
   void SetThresholds(mojom::ThresholdsPtr thresholds,
                      SetThresholdsCallback callback) override;
-  void GetTint(GetTintCallback callback) override;
-  void SetTint(const std::string& color, SetTintCallback callback) override;
-  void ClearTint(ClearTintCallback callback) override;
+  void OpenThemePicker() override;
   void SetCommandBar(bool on, SetCommandBarCallback callback) override;
 
  private:
   mojom::StatePtr CurrentState() const;
   mojom::ThresholdsPtr CurrentThresholds() const;
-  mojom::TintStatePtr CurrentTint() const;
 
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::OrganizationHandler> receiver_;
