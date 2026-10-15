@@ -50,7 +50,7 @@ Agreed before v2 started. The [organizer](automatic-organization.md) in-review t
 
 ## Design
 
-The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs: a chat at work, an approval, the Ask box on the new tab page, and every state of a chat row with the schedule popover. They are proposals until built.
+The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs: a chat at work, an approval, the Ask box on the new tab page, and every state of a chat row with the schedule popover. The four frames marked "(Fluid)" redesign the chat page for T69: the agent at work, side by side, every state, and skills. They replace "Chat: the agent at work" for the chat page. They are proposals until built.
 
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages. uw turns off the engine's Gemini-only pieces: the toolbar task icon, the take-over button, the overlay over the agent's tab, and the "Gemini is working" toast. The task icon brought Gemini's button with it, and clicking that button aborted uw on 2026-10-15. The blue icon on the agent's tab stays.
 - **Tools.** `browser/agent/agent_tools.h` holds uw's tools over the engine: open a child tab, navigate, read a page, click, and type. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls. Scroll and wait come when a chat needs them.
