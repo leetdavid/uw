@@ -18,6 +18,8 @@ pnpm run launch
 
 A profile with no saved orientation starts with vertical tabs. uw keeps tabs in tree order only in vertical mode.
 
+Cmd-T opens the [command bar](#command-bar), which is on by default but cannot open pages yet. Several tests below start with Cmd-T. Before you run them, turn off `Cmd+T opens the command bar` at `uw://settings/uwOrganization`, and Cmd-T opens a blank tab again.
+
 ## What works now
 
 All of these are manual tests. Record anything that differs from the expected result.
@@ -68,6 +70,12 @@ Open a few links from one page with Cmd-click, so they sit under it.
 
 Expected result: the hidden tabs stay open and come back in place. Closing the collapsed tab shows them one level up.
 
+### New child tab
+
+Right-click a tab that has children but is not selected, and choose `New child tab`, under `New tab below`.
+
+Expected result: a blank tab opens, selected, one level under that tab and above its other children. Ctrl+Cmd+T and `New Child Tab` in the Tab menu do the same for the selected tab. `New tab below` opens below the right-clicked tab and its children, at its level.
+
 ### Organize button
 
 Click `Organize` at the foot of the sidebar.
@@ -112,15 +120,27 @@ Open `uw://settings/uwOrganization` and scroll to `Window tint`. Click a color, 
 
 Expected result: the window around the page card becomes a gradient that starts at your color. Text on it is white on a dark color and near-black on a light one. If you pick a color in between, such as a medium blue, uw makes it a little lighter or darker and the page tells you which color it used. `Use the default` returns to lilac in light mode and indigo in dark mode.
 
+### Terminal tabs
+
+Choose `New terminal` from the File menu, press Ctrl+\`, or right-click the sidebar's `+` and choose `New terminal`.
+
+Expected result: a tab opens with your login shell in it, named after the shell's folder. Cmd shortcuts, Ctrl+Tab, and Ctrl+\` go to uw, not the shell, and Option works as Alt. A pasted or dropped file types its quoted path. A pasted image is saved to a temporary file, and its path is typed. The organizer files a terminal tab by its title and folder, never by what the shell printed.
+
+### Command bar
+
+With `Cmd+T opens the command bar` on, Cmd-T, File → New Tab, and `New Tab` in the `+` menu open a panel over the page instead of a tab. Type a few letters.
+
+Expected result: suggestions from your history, bookmarks, and search show in the panel. Escape closes it and opens nothing. Picking a suggestion does not open a page yet, and a key pressed within about 40 ms of Cmd-T can be lost. Turn the switch off and Cmd-T opens a blank tab again, in every window at once.
+
 ### Chats
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button and before typing a password or payment details, and the agent marks other changes. Nothing on a page can answer for you.
 
-1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
-2. Choose `New chat` from the File menu or the sidebar's `+` menu, or type `uw://chat`.
+1. Open `uw://settings/uwOrganization` and fill in `Agent model` with a model that calls tools, at an OpenAI-compatible endpoint. `Test connection` asks it to open a page and passes only if it calls a tool. `Save` keeps it. Without an agent model, chats use the language model.
+2. Choose `New chat` from the File menu, right-click the sidebar's `+` and choose `New chat`, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
 
-Expected result: the chat tab takes your first message as its title. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a line in the chat, then the answer. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
+Expected result: the chat tab takes your first message as its title. The pages the agent opens appear as child tabs under the chat tab and load in the background, and your selected tab stays selected. Each step shows as a line in the chat, such as `Clicked button "Send" in tab 1`, then the answer. The agent reads pages as text, and it clicks and types only on https pages. With automatic organization on, the organizer may still move the agent's tabs out from under the chat.
 
 Chats are saved after every step. Quit uw in the middle of one and start it again with "Continue where you left off" set at `chrome://settings/onStartup`. Expected result: the chat tab comes back with everything it showed and the line `Stopped before it finished` with `Continue`. Continue goes on in the same agent tabs.
 
@@ -135,7 +155,8 @@ On the right, a card for each of the agent's tabs shows a picture of the tab aft
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
-- Approvals in chats, the Chats list, scheduled chats, and prompt-built site customizations.
+- The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
+- A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem
