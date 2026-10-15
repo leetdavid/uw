@@ -31,6 +31,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/blink/public/common/input/web_mouse_event.h"
+#include "third_party/blink/public/common/input/web_mouse_wheel_event.h"
 #include "third_party/blink/public/common/page/drag_operation.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/clipboard/clipboard.h"
@@ -43,6 +44,7 @@
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/vector2d.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -253,6 +255,34 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
   EXPECT_TRUE(clicks.starts_with("^[[<0;")) << clicks;
   EXPECT_NE(clicks.find("M^[[<0;"), std::string::npos) << clicks;
   EXPECT_TRUE(clicks.ends_with("m\n")) << clicks;
+}
+
+// A program that asks for the mouse gets the wheel as mouse buttons, also on
+// the alternate screen, where ghostty-web would send arrow keys.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       AProgramThatAsksForTheMouseGetsTheWheel) {
+  content::WebContents* terminal = OpenTerminal();
+  Type(u"cd " + Folder() +
+       u" && stty -icanon && printf '\\033[?1049h\\033[?1000h\\033[?1006h"
+       u"\\033]0;wheel\\007' && cat > wheel\r");
+  // The file appears once cat has started. The title follows the request for
+  // the mouse, so it shows once the page has read it.
+  WaitForFile("wheel", [](const std::string&) { return true; });
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return terminal->GetTitle() == u"wheel";
+  })) << terminal->GetTitle();
+  content::SimulateMouseWheelEvent(contents(), gfx::Point(100, 60),
+                                   gfx::Vector2d(0, 120),
+                                   blink::WebMouseWheelEvent::kPhaseBegan);
+  content::SimulateMouseWheelEvent(contents(), gfx::Point(100, 60),
+                                   gfx::Vector2d(0, -120),
+                                   blink::WebMouseWheelEvent::kPhaseChanged);
+  // Up is button 64 and down is 65, in the SGR form.
+  const std::string wheel = WaitForFile("wheel", [](const std::string& text) {
+    return text.find("M\x1b[<65;") != std::string::npos;
+  });
+  EXPECT_TRUE(wheel.starts_with("\x1b[<64;")) << wheel;
+  EXPECT_EQ(wheel.find("\x1b[A"), std::string::npos) << wheel;
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, APastedFileTypesItsPath) {

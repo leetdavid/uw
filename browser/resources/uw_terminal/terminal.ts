@@ -120,6 +120,41 @@ page.output.addListener((text: string) => {
 terminal.onData((text: string) => handler.write(text));
 terminal.onResize(({cols, rows}) => handler.resize(cols, rows));
 
+// A program that asks for the mouse, such as herdr or opencode, gets the wheel
+// as mouse buttons at the cell under the pointer, one for each line scrolled.
+// ghostty-web would send arrow keys on the alternate screen.
+let wheelPixels = 0;
+terminal.attachCustomWheelEventHandler((event: WheelEvent) => {
+  const renderer = terminal.renderer;
+  if (!renderer || !terminal.hasMouseTracking()) {
+    return false;
+  }
+  const height = renderer.charHeight;
+  const pixelsPerUnit = [1, height, height * terminal.rows];
+  const pixels = event.deltaY * (pixelsPerUnit[event.deltaMode] ?? 1);
+  if (Math.sign(pixels) !== Math.sign(wheelPixels)) {
+    wheelPixels = 0;
+  }
+  wheelPixels += pixels;
+  const lines = Math.trunc(wheelPixels / height);
+  wheelPixels -= lines * height;
+  if (!lines) {
+    return true;
+  }
+  const canvas = renderer.getCanvas().getBoundingClientRect();
+  const cell = (offset: number, size: number, count: number) =>
+      Math.min(count, Math.max(1, Math.floor(offset / size) + 1));
+  const col =
+      cell(event.clientX - canvas.left, renderer.charWidth, terminal.cols);
+  const row = cell(event.clientY - canvas.top, height, terminal.rows);
+  const button = lines < 0 ? 64 : 65;
+  const report = terminal.getMode(1006) ?
+      `\x1b[<${button};${col};${row}M` :
+      '\x1b[M' + String.fromCharCode(32 + button, 32 + col, 32 + row);
+  handler.write(report.repeat(Math.abs(lines)));
+  return true;
+});
+
 let layout: KeyboardLayoutMap|undefined;
 function readLayout() {
   navigator.keyboard?.getLayoutMap().then(map => layout = map, () => {});
