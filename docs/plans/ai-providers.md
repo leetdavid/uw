@@ -19,6 +19,11 @@ Implementability: **6/10** using the [roadmap convention](roadmap.md#implementab
 - A chat whose model is no longer available says so on its chip and waits for the user to pick another. uw never switches a model on its own.
 - On the first launch of the build that has this page, each saved connection becomes a provider. Connections with the same address and key become one. The organizer and chats go on with the same models, and the old preferences and Keychain accounts are removed once the move has succeeded.
 - The organizer reads its two models from the providers. Nothing about how it organizes changes.
+- Every provider's address can be changed, presets included, such as OpenAI at a company gateway. The Add dialog shows a preset's address filled in and editable, and a provider's page can change it later. A new address is saved only once uw lists its models there; the key and the model choices stay. A preset at another address keeps its icon, its format, and its catalog entries. Agreed on 2026-10-16.
+- A [proxy](../CONTEXT.md#language), such as CLIProxyAPI, is added as Custom; there is no preset for one. Custom has a fourth format, "Each model's own": a model the catalog lists under Anthropic goes over Anthropic Messages, one under OpenAI over OpenAI Responses, and any other over chat completions, with the levels that catalog entry gives. uw works the format out when it lists the models and keeps it with the choice. Agreed on 2026-10-16.
+- A Custom provider sends its key as `Authorization: Bearer`, and over Anthropic Messages also as `x-api-key`, so proxies that read either header work. The Anthropic preset keeps `x-api-key` alone. Agreed on 2026-10-16.
+- An address is https, or plain http on this Mac or a private network: 10.x, 172.16–31.x, 192.168.x, `*.local`, and 100.64–127.x for Tailscale. Agreed on 2026-10-16.
+- A network proxy needs nothing here: uw's model requests follow the Mac's proxy settings, like the rest of the browser.
 - uw's settings section keeps automatic organization, the thresholds, pause, the tint, and the command bar switch, and links to `uw://providers`. The settings sidebar also lists "AI providers" under uw, with the external-link mark Extensions has; it opens `uw://providers` in a new tab. Agreed on 2026-10-16. The language, decision, and agent model cards leave it.
 
 ## Design
@@ -47,6 +52,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15.
 3. T78: the Anthropic Messages and OpenAI Responses formats. Built on 2026-10-16, with the shared code moved to `browser/ai_providers/`. Live calls over each format are for the user to check: the tests play the providers with a local server.
 4. T79: the model catalog, and the model and effort chips in the chat composer. Built on 2026-10-16. What a model kept goes back only to that model, so a switch to another model at the same provider drops it.
+5. T103: proxies and addresses: changeable addresses, the "Each model's own" format, the key headers, and plain http on private networks. Built after T99, which changes the same catalog code.
 
 ## Acceptance checks
 
@@ -57,7 +63,10 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 5. The effort chip lists the catalog's levels for the model. Picking a model sends no request to it.
 6. A chat whose provider was removed says so and waits for the user to pick a model.
 7. A model picked while automatic organization is on is used from the next tab on, without a test.
-8. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
+8. With CLIProxyAPI added as Custom with "Each model's own", a Claude model goes over Messages and a GPT model over Responses at `http://localhost:8317/v1`, each with the key as `Authorization: Bearer`.
+9. Changing OpenAI's address to one that lists no models keeps the old address and says why.
+10. A provider at `http://192.168.1.20:8317/v1` can be added; one at a public `http://` address cannot.
+11. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 
 ## Open questions
 

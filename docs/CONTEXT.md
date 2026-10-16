@@ -112,6 +112,10 @@ The `New task` title a task has until the language model returns a valid name fo
 A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key. One provider can serve both language models and decision models.
 _Avoid_: Connection, endpoint, backend
 
+**Proxy**:
+A provider that serves other providers' models at its own address, such as CLIProxyAPI, OpenRouter, or a company gateway. A network proxy that carries all of the browser's traffic is not one.
+_Avoid_: Gateway, router, relay
+
 **Decision model**:
 A model from a provider that answers a typed question with a choice and a confidence instead of text, such as Jev or a model behind the OpenAI Decisions API. It decides a tab branch's placement and whether a task needs a name. It does not write the name.
 

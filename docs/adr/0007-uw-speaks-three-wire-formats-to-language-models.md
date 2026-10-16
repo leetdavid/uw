@@ -16,6 +16,8 @@ No vendor SDK and no model library. What a provider sends back that uw does not 
 
 An [effort](../CONTEXT.md#language) level goes in the field each format reads: `reasoning_effort` over chat completions, or `reasoning.effort` at OpenRouter and Vercel AI Gateway, which read that instead; `reasoning.effort` over Responses; and adaptive thinking with `output_config.effort` over Messages. Until the user picks a level, uw sends none, and the provider's default applies. Decided on 2026-10-16, when T79 was started.
 
+A [proxy](../CONTEXT.md#language) such as CLIProxyAPI speaks all three formats and translates between them. A Custom provider can take the format "Each model's own", so each model goes over its maker's format and keeps its native thinking: the [model catalog](../CONTEXT.md#language) names the maker, per [ADR 0008](0008-uw-reads-what-a-model-can-do-from-models-dev.md). A Custom provider sends its key as a Bearer token, and over Messages also as `x-api-key`; only the Anthropic preset sends `x-api-key` alone. Decided on 2026-10-16 for T103, over a name rule such as `claude-*` (rejected: model names in uw's code) and one format per provider (rejected: Claude and GPT through one proxy would need two providers at one address).
+
 The two decision formats in [ADR 0003](0003-decision-model-beside-the-language-model.md) stay as they are.
 
 Considered options: chat completions only, with Anthropic through its compatible endpoint (rejected: OpenAI's reasoning models lose tools, Anthropic loses thinking); chat completions plus Anthropic, adding Responses when an OpenAI model fails (rejected: the failure is already known, so waiting for it only delays the fix).
