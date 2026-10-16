@@ -13,7 +13,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - The [command bar](../CONTEXT.md#language) is a panel centered over the page card. The page dims a little behind it.
 - Cmd+T and File → New Tab open it to open a new page. Escape creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
 - "New child tab" and Ctrl+Cmd+T open it too. A page picked from it opens as the first child of that tab, per [New child tab](keyboard-and-mouse.md#new-child-tab). Agreed on 2026-10-15.
-- A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T61 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
+- A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T98 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
 - Cmd+L, and a click on the address in the toolbar, open it filled with the current address, selected. A page picked from it loads in the current tab. The lock, star, and zoom icons beside the address keep their own clicks.
 - Cmd+Shift+A opens it narrowed to open and recently closed tabs. Chromium's tab search popup and its toolbar button are hidden.
 - Cmd+Shift+P opens it with `>` in the field, ready for a shell command. See [Sending the text to a chat or a terminal](#sending-the-text-to-a-chat-or-a-terminal). Agreed on 2026-10-15.
@@ -97,7 +97,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 
 - `browser/resources/uw_command_bar/` and `browser/ui/webui/uw_command_bar/` hold the page and its Mojo link, as the terminal's do. It shows in a top-chrome WebUI panel, the kind Chromium uses for its tab search popup.
 - While the switch is on, each window keeps its command bar page loaded and shows it in a `WebUIBubbleDialogView` over the page card, from `browser/ui/views/command_bar/`. Chromium's `WebUIContentsPreloadManager` keeps one page for all of Chromium and picks which, and tab search's bubble drops its page 30 seconds after closing, so neither keeps it ready. Keys pressed before the page can take them are held by the browser and passed to the page in order once the page says its field has focus. Until the page's first frame is on screen, the browser refuses its keys, so a refused key stays held and is tried again a frame later. After one second the browser stops holding.
-- Open tabs, history, bookmarks, past searches, and site search shortcuts come from Chromium's suggestion engine, asked for instant results only with `AutocompleteInput::set_omit_asynchronous_matches`, the mode Chromium uses for pasted text. The spike used the new tab page's searchbox handler (`chrome/browser/ui/webui/searchbox/`), which loads a picked page inside the panel, so T61 needs a handler of uw's own. The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
+- Open tabs, history, bookmarks, past searches, and site search shortcuts come from Chromium's suggestion engine, asked for instant results only with `AutocompleteInput::set_omit_asynchronous_matches`, the mode Chromium uses for pasted text. The spike used the new tab page's searchbox handler (`chrome/browser/ui/webui/searchbox/`), which loads a picked page inside the panel. T98 subclasses it as `UwCommandBarHandler`: it opens a picked row in a new tab, runs an open-tab row's switch action, names each row's kind for the page, and asks for instant results only through a hook `uw-command-bar.patch` adds to Chromium's `SearchboxHandler`. The panel's `OpenURLFromTab` hands the page to the window, which opens it where `chrome::NewTab` would put a blank tab. The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
 - Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
 - What uw learns from picks, aliases, recorded keys, and the default currency are profile prefs. A history deletion clears what uw learned.
@@ -111,15 +111,16 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-15.
 
 1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler.
-2. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
-3. T81: Cmd+Return sends the text to a new chat.
-4. T54, from the [keyboard and mouse plan](keyboard-and-mouse.md#stages): Ctrl+\` goes to the task's terminal, which T82 needs.
-5. T82: Option+Return and Cmd+Shift+P run the text in a terminal.
-6. T66: math, units, currency, the default currency setting, and translation.
-7. T62: Cmd+L and the address click open it.
-8. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
-9. T64: Cmd+Shift+A opens it narrowed to tabs.
-10. T65: aliases and recorded keys.
+2. T98: the command bar opens what is picked, in the design's look, from Chromium's instant results. Added on 2026-10-16 so Cmd+T opens pages before T61.
+3. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
+4. T81: Cmd+Return sends the text to a new chat.
+5. T54, from the [keyboard and mouse plan](keyboard-and-mouse.md#stages): Ctrl+\` goes to the task's terminal, which T82 needs.
+6. T82: Option+Return and Cmd+Shift+P run the text in a terminal.
+7. T66: math, units, currency, the default currency setting, and translation.
+8. T62: Cmd+L and the address click open it.
+9. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
+10. T64: Cmd+Shift+A opens it narrowed to tabs.
+11. T65: aliases and recorded keys.
 
 ## Acceptance checks
 

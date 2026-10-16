@@ -5,56 +5,242 @@
     <meta name="color-scheme" content="light dark">
     <title>Command bar</title>
     <style>
-      html,
-      body {
-        background: #fff;
-        color: #1e1b2e;
-        font: 14px system-ui, sans-serif;
-        margin: 0;
+      :root {
+        --card: #fff;
+        --text: #1e1b2e;
+        --text2: #4a4760;
+        --muted: #77748c;
+        --line: rgba(30, 27, 46, 0.09);
+        --field: #f2f1f8;
+        --primary: #3b5bdb;
       }
 
       @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          background: #171717;
-          color: #ededed;
+        :root {
+          --card: #171717;
+          --text: #ededed;
+          --text2: #c4c4c4;
+          --muted: #8f8f8f;
+          --line: rgba(255, 255, 255, 0.09);
+          --field: #262626;
+          --primary: #8da2fb;
         }
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+
+      html,
+      body {
+        background: var(--card);
+        color: var(--text);
+        font: 13px/1.35 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body {
+        width: 640px;
+      }
+
+      svg {
+        fill: none;
+        flex: none;
+        height: 16px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.75;
+        width: 16px;
+      }
+
+      kbd {
+        align-items: center;
+        background: var(--field);
+        border-radius: 5px;
+        color: var(--text2);
+        display: inline-flex;
+        font: 500 11px ui-monospace, 'SF Mono', Menlo, monospace;
+        gap: 3px;
+        padding: 1px 5px;
+      }
+
+      kbd svg {
+        height: 11px;
+        width: 11px;
+      }
+
+      #query {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 12px;
+        height: 56px;
+        padding: 0 16px 0 18px;
+      }
+
+      #query > svg {
+        color: var(--muted);
+        height: 20px;
+        width: 20px;
       }
 
       #field {
         background: transparent;
         border: none;
-        box-sizing: border-box;
         color: inherit;
+        flex: 1;
         font: inherit;
         font-size: 18px;
+        letter-spacing: -0.005em;
+        min-width: 0;
         outline: none;
-        padding: 14px 16px;
-        width: 100%;
+        padding: 0;
+      }
+
+      #field::placeholder {
+        color: var(--muted);
       }
 
       #results {
         list-style: none;
-        margin: 0;
-        padding: 0 0 8px;
+        padding: 6px 8px 8px;
+      }
+
+      #results:empty {
+        display: none;
       }
 
       #results li {
+        align-items: center;
+        border-radius: 10px;
+        cursor: default;
+        display: flex;
+        font-size: 14px;
+        gap: 12px;
+        height: 40px;
+        padding: 0 10px;
+      }
+
+      #results li.selected {
+        background: var(--field);
+      }
+
+      .icon {
+        color: var(--text2);
+        display: grid;
+        flex: none;
+        height: 20px;
+        place-items: center;
+        width: 20px;
+      }
+
+      .icon img {
+        border-radius: 4px;
+        height: 16px;
+        width: 16px;
+      }
+
+      .title {
+        min-width: 0;
         overflow: hidden;
-        padding: 6px 16px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      #results li span {
+      #results li:first-child .title {
+        font-weight: 600;
+      }
+
+      .detail {
+        color: var(--muted);
+        flex: 1;
+        font-size: 13px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .kind {
+        color: var(--muted);
+        flex: none;
+        font-size: 12px;
+        text-align: right;
+        width: 64px;
+      }
+
+      #results li.selected .kind {
+        color: var(--text2);
+      }
+
+      #keys {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        display: flex;
+        font-size: 12px;
+        gap: 16px;
+        height: 36px;
+        padding: 0 16px;
+      }
+
+      #keys span {
+        align-items: center;
+        display: flex;
+        gap: 6px;
+      }
+
+      #keys .later {
         opacity: 0.6;
-        padding-inline-start: 8px;
+      }
+
+      #keys .end {
+        margin-left: auto;
+      }
+
+      #keys:not(.typing) .typed {
+        display: none;
       }
     </style>
   </head>
   <body>
-    <input id="field" spellcheck="false" autocomplete="off">
-    <ul id="results"></ul>
+    <svg width="0" height="0" style="position: absolute">
+      <defs>
+        <symbol id="search" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+        </symbol>
+        <symbol id="enter" viewBox="0 0 24 24">
+          <path d="M9 10 4 15l5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+        </symbol>
+      </defs>
+    </svg>
+    <div id="query">
+      <svg><use href="#search"/></svg>
+      <input id="field" spellcheck="false" autocomplete="off"
+          placeholder="Search tabs, tasks, commands, or the web">
+      <kbd>esc</kbd>
+    </div>
+    <ul id="results" role="listbox"></ul>
+    <div id="keys">
+      <span class="typed">
+        <kbd><svg><use href="#enter"/></svg></kbd>
+        <span id="action">Open</span>
+      </span>
+      <span class="typed later"
+          title="Comes with T81: Cmd+Return sends the text to a new chat">
+        <kbd>Cmd <svg><use href="#enter"/></svg></kbd> Ask uw (T81)
+      </span>
+      <span class="typed later"
+          title="Comes with T82: Option+Return runs the text in this task's terminal">
+        <kbd>Option <svg><use href="#enter"/></svg></kbd> Run in terminal (T82)
+      </span>
+      <span class="end later"
+          title="Comes with T63: Cmd+K shows what you can do with a row">
+        <kbd>Cmd K</kbd> Actions (T63)
+      </span>
+    </div>
     <script type="module" src="/command_bar.js"></script>
   </body>
 </html>

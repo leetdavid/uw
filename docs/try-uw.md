@@ -18,7 +18,7 @@ pnpm run launch
 
 A profile with no saved orientation starts with vertical tabs. uw keeps tabs in tree order only in vertical mode.
 
-Cmd-T opens the [command bar](#command-bar), which is on by default but cannot open pages yet. Several tests below start with Cmd-T. Before you run them, turn off `Cmd+T opens the command bar` at `uw://settings/uwOrganization`, and Cmd-T opens a blank tab again.
+Cmd-T opens the [command bar](#command-bar), which is on by default. Several tests below start with a blank tab from Cmd-T. Before you run them, turn off `Cmd+T opens the command bar` at `uw://settings/uwOrganization`, and Cmd-T opens a blank tab again.
 
 ## What works now
 
@@ -141,9 +141,9 @@ Expected result: a tab opens with your login shell in it, named after the shell'
 
 ### Command bar
 
-With `Cmd+T opens the command bar` on, Cmd-T, File → New Tab, and the new button's `+` open a panel over the page instead of a tab. Type a few letters.
+With `Cmd+T opens the command bar` on, Cmd-T, File → New Tab, and the new button's `+` open a panel over the page instead of a tab. Type a few letters of a page you visited or have open, then press Return, or use the arrow keys or the mouse to pick another row.
 
-Expected result: suggestions from your history, bookmarks, and search show in the panel. Escape closes it and opens nothing. Picking a suggestion does not open a page yet, and a key pressed within about 40 ms of Cmd-T can be lost. Turn the switch off and Cmd-T opens a blank tab again, in every window at once.
+Expected result: the panel lists your open tabs, history, bookmarks, and a search for the typed text, each row labeled Tab, History, Bookmark, or Search. The panel is empty until you type, and nothing typed is sent to the search engine until you pick a row. Return or a click opens the row in a new tab, where Cmd-T's blank tab would have gone; a Tab row switches to that tab. Text with no row picked opens as an address, or as a search. Escape closes the panel and opens nothing, and no key typed right after Cmd-T is lost. The footer's Cmd-Return, Option-Return, and Cmd-K do nothing yet; each names the ticket that brings it. Turn the switch off and Cmd-T opens a blank tab again, in every window at once.
 
 ### Chats
 

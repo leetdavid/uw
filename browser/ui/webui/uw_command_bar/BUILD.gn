@@ -1,7 +1,9 @@
-# The command bar page's browser side: its controller, which hands the page
-# Chromium's searchbox handler.
+# The command bar page's browser side: its controller, and the searchbox
+# handler it hands the page.
 source_set("uw_command_bar") {
   sources = [
+    "uw_command_bar_handler.cc",
+    "uw_command_bar_handler.h",
     "uw_command_bar_ui.cc",
     "uw_command_bar_ui.h",
   ]
@@ -14,7 +16,11 @@ source_set("uw_command_bar") {
   ]
   deps = [
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/webui:favicon_source",
     "//chrome/browser/ui/webui/searchbox",
+    "//components/bookmarks/browser",
+    "//components/favicon_base",
+    "//components/omnibox/browser",
     "//ui/webui",
     "//uw/browser/resources/uw_command_bar:resources",
   ]

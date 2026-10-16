@@ -12,6 +12,10 @@
 #include "base/timer/timer.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/new_tab_grouping_user_data.h"  // nogncheck
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_dialog_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_wrapper.h"
@@ -21,13 +25,14 @@
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/focused_node_details.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
+#include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/geometry/size.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/webview/webview.h"
@@ -38,7 +43,6 @@
 namespace uw {
 namespace {
 
-constexpr gfx::Size kSize(640, 360);
 constexpr int kTopInset = 96;
 // A key the browser refused is tried again after about one frame.
 constexpr base::TimeDelta kRetry = base::Milliseconds(16);
@@ -56,10 +60,13 @@ constexpr base::TimeDelta kLongestHold = base::Seconds(1);
 class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
                          public content::RenderWidgetHost::InputEventObserver {
  public:
-  explicit Page(Profile* profile)
+  using Opener = base::RepeatingCallback<void(const content::OpenURLParams&)>;
+
+  Page(Profile* profile, Opener open)
       : WebUIContentsWrapperT(GURL(kCommandBarUrl),
                               profile,
-                              IDS_UW_COMMAND_BAR) {}
+                              IDS_UW_COMMAND_BAR),
+        open_(std::move(open)) {}
 
   void HoldKeys() {
     held_.clear();
@@ -88,6 +95,14 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
     // here. It stays held for the next try.
     return sending_ ||
            WebUIContentsWrapperT::HandleKeyboardEvent(source, event);
+  }
+  content::WebContents* OpenURLFromTab(
+      content::WebContents* source,
+      const content::OpenURLParams& params,
+      base::OnceCallback<void(content::NavigationHandle&)>
+          navigation_handle_callback) override {
+    open_.Run(params);
+    return nullptr;
   }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
@@ -146,6 +161,7 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
     holding_ = false;
   }
 
+  Opener open_;
   bool holding_ = false;
   bool sending_ = false;
   bool refused_ = false;
@@ -196,7 +212,9 @@ void CommandBar::OnSettingChanged() {
   const bool on =
       window_->GetProfile()->GetPrefs()->GetBoolean(kCommandBarEnabledPref);
   if (on && !contents_) {
-    contents_ = std::make_unique<Page>(window_->GetProfile());
+    contents_ = std::make_unique<Page>(
+        window_->GetProfile(),
+        base::BindRepeating(&CommandBar::OpenPicked, base::Unretained(this)));
     webui::SetBrowserWindowInterface(contents_->web_contents(), window_);
   } else if (!on && contents_) {
     if (bubble_) {
@@ -216,12 +234,35 @@ void CommandBar::Show() {
   const gfx::Rect anchor(area.CenterPoint().x(), area.y() + kTopInset, 0, 0);
   auto view = std::make_unique<WebUIBubbleDialogView>(
       card, contents_->GetWeakPtr(), anchor, views::BubbleBorder::TOP_CENTER,
-      /*autosize=*/false);
-  view->web_view()->SetPreferredSize(kSize);
+      /*autosize=*/true);
   bubble_ = view->GetWeakPtr();
   views::BubbleDialogDelegateView::CreateBubble(std::move(view));
   contents_->HoldKeys();
   bubble_->ShowUI();
+}
+
+void CommandBar::OpenPicked(const content::OpenURLParams& params) {
+  if (bubble_) {
+    bubble_->CloseUI();
+  }
+  NavigateParams navigate(window_, params.url, params.transition);
+  navigate.FillNavigateParamsFromOpenURLParams(params);
+  navigate.source_contents = nullptr;
+  navigate.tabstrip_index = -1;
+  if (params.disposition == WindowOpenDisposition::SWITCH_TO_TAB) {
+    navigate.disposition = WindowOpenDisposition::SWITCH_TO_TAB;
+  } else {
+    // As chrome::NewTab does, so the page lands where Cmd+T's blank tab
+    // would have.
+    navigate.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+    const tabs::TabInterface* active =
+        window_->GetTabStripModel()->GetActiveTab();
+    window_->GetProfile()->SetUserData(
+        NewTabGroupingUserData::kNewTabGroupingUserDataKey,
+        std::make_unique<NewTabGroupingUserData>(active ? active->GetGroup()
+                                                        : std::nullopt));
+  }
+  Navigate(&navigate);
 }
 
 }  // namespace uw

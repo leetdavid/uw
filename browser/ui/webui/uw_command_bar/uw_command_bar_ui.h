@@ -15,9 +15,9 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 
-class RealboxHandler;
-
 namespace uw {
+
+class UwCommandBarHandler;
 
 inline constexpr char kCommandBarHost[] = "uw-command-bar.top-chrome";
 inline constexpr char kCommandBarUrl[] = "chrome://uw-command-bar.top-chrome/";
@@ -30,6 +30,9 @@ class UwCommandBarUIConfig
   UwCommandBarUIConfig()
       : DefaultTopChromeWebUIConfig(content::kChromeUIScheme, kCommandBarHost) {
   }
+
+  // TopChromeWebUIConfig:
+  bool ShouldAutoResizeHost() override;
 };
 
 // The command bar's page. Its suggestions come from the searchbox handler
@@ -53,7 +56,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
       mojo::PendingRemote<searchbox::mojom::Page> page,
       mojo::PendingReceiver<searchbox::mojom::PageHandler> handler) override;
 
-  std::unique_ptr<RealboxHandler> handler_;
+  std::unique_ptr<UwCommandBarHandler> handler_;
   mojo::Receiver<searchbox::mojom::PageHandlerFactory> factory_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();

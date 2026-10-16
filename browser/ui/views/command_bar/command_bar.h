@@ -15,8 +15,9 @@ class BrowserWindowInterface;
 class WebUIBubbleDialogView;
 
 namespace content {
+struct OpenURLParams;
 class WebContents;
-}
+}  // namespace content
 
 namespace uw {
 
@@ -45,6 +46,9 @@ class CommandBar {
 
   void OnSettingChanged();
   void Show();
+  // Opens a row picked in the command bar: in a new tab where Cmd+T's blank
+  // tab goes, or in the open tab it names. Then closes the command bar.
+  void OpenPicked(const content::OpenURLParams& params);
 
   const raw_ptr<BrowserWindowInterface> window_;
   PrefChangeRegistrar setting_;
