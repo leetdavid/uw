@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -100,16 +100,18 @@ Agreed on 2026-10-15.
 
 ### Mouse actions
 
-Each is on by default and has a switch in a new "Mouse" section of uw's settings page.
+Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mouse" section of uw's settings page. A switch turned off leaves that click as Chromium has it.
 
 | Action | Result |
 | --- | --- |
-| Option-click a tab's close button | Closes its branch. |
-| Hover a task's folder row | Shows a "+" that opens a new tab in that task. |
-| Double-click empty space below the tabs | Opens a new tab. |
-| Middle-click a task's folder row | Closes the task and its tabs. |
+| Option-click a tab's close button | Closes its branch, like Close branch. |
+| Hover a task's folder row | Shows a "+" before the task's menu button. A click opens a tab at the end of the task and selects it. Tooltip "New tab in task". |
+| Double-click empty space below the tabs | Does what the foot's "+" does. |
+| Middle-click a task's folder row | Closes the task and its tabs, like Close task. |
 
-Once the command bar lands, the "+" and the double-click open it instead of a blank tab.
+- The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar and in horizontal tabs.
+- Once the command bar lands, the task row's "+" opens it instead of a blank tab.
+- The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16.
 
 ### Menu of empty sidebar space
 
