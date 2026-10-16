@@ -33,6 +33,10 @@ Added on 2026-10-15:
 - The agent's answers are drawn as Markdown: headings, lists, tables, task lists, quotes, code with colors for about a dozen languages, and links. A link opens as a child tab under the chat and is selected; Cmd-click opens it in the background. Only `http` and `https` links work. The user's own messages stay plain text.
 - [Agent memory](../CONTEXT.md#language), in v2.1, follows a plain-sentence model: the agent reads every memory at the start of a request, keeps and forgets them without asking, and each change is a line under its answer with Edit and Undo. A switch in the composer keeps one chat out of memory. Memories stay on this Mac, are never taken from page text, and never hold passwords, card numbers, or account numbers. A private chat keeps none. The rest waits for the user's research into how memory is stored.
 
+Added on 2026-10-16:
+
+- The agent may send several steps in one answer when they all use the same reading of a tab, such as filling in a form's fields and then submitting it. uw runs them in order. The first step that fails, or that the user declines, ends the batch: the steps after it do not run, and the model is told so. Each change still asks on its own. The agent reads the tab again after a step that loads a page or changes what it shows. Steps in different tabs do not run at the same time.
+
 ## Releases
 
 | Release | Contents |
@@ -97,10 +101,11 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 12. T48: approvals.
 13. T75: Markdown answers.
 14. T83: the chat page brought to the "(Fluid)" designs: steps, the chat's state, the empty chat, and the approval and failure cards.
-15. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-16. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-17. T51: scheduled chats.
-18. T52: private chats.
+15. T100: several steps in one answer, per [Agreed scope](#agreed-scope).
+16. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+17. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+18. T51: scheduled chats.
+19. T52: private chats.
 
 ## Acceptance checks for v2.0
 
