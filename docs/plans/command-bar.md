@@ -2,7 +2,7 @@
 
 Status: scope agreed on 2026-10-14. Widened on 2026-10-15: one list ranked by use, instant results only, sending the typed text to a chat or a terminal, and sums with units and currencies. T60, the spike, started on 2026-10-15 at the user's request. The other tickets wait for approval. The command bar runs the commands of the [keyboard and mouse plan](keyboard-and-mouse.md).
 
-Implementability: **3/10** for the first stage, using the [roadmap convention](roadmap.md#implementability-estimates). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. One ranked list has to put uw's commands and tasks on the same scale as Chromium's history and bookmark scores. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later tickets: sending to a chat 7/10, running in a terminal 6/10, aliases and keys 6/10, and the calculator 6/10.
+Implementability, using the [roadmap convention](roadmap.md#implementability-estimates): **6/10** for the command and task rows (T61), and **4/10** for ranking by picks (T111). Taking over Cmd+L and clicks on the address means the command bar must keep what people rely on in Chromium's address bar. One ranked list has to put uw's commands and tasks on the same scale as Chromium's history and bookmark scores. Reusing Chromium's suggestion engine keeps history, bookmarks, and search from being rebuilt. The later tickets: sending to a chat 7/10, running in a terminal 6/10, aliases and keys 6/10, and the calculator 6/10.
 
 The decision to replace typing in the address bar is recorded in [ADR 0005](../adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md). The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Command bar": the frames "Command bar: as you type", "Command bar: before typing", "Command bar: every state", "Calculator: units and currencies", "Calculator: every state", "Chat: send the text with Cmd+Return", "Terminal: run the text with Option+Return", and "Chat and terminal: every state". Redrawn on 2026-10-15 for the wider scope. The look's rules are in the canvas style guide `uw-command-bar`. The user has not signed off yet.
 
@@ -116,12 +116,13 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 3. T99: addresses complete inline, Tab takes the completion, and Return opens the completed address. Added on 2026-10-16.
 4. T82: Option+Return, `>`, and Cmd+Shift+P run the text in a new terminal.
 5. T81: Cmd+Return sends the text to a new chat, with the selected tab handed to the agent.
-6. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
-7. T66: math, units, currency, the default currency setting, and translation.
-8. T62: Cmd+L and the address click open it.
-9. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
-10. T64: Cmd+Shift+A opens it narrowed to tabs.
-11. T65: aliases and recorded keys.
+6. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
+7. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
+8. T66: math, units, currency, the default currency setting, and translation.
+9. T62: Cmd+L and the address click open it.
+10. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
+11. T64: Cmd+Shift+A opens it narrowed to tabs.
+12. T65: aliases and recorded keys.
 
 ## Acceptance checks
 
