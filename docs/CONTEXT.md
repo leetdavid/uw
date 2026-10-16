@@ -193,6 +193,10 @@ _Avoid_: Prompt, routine, workflow.
 **Approval**:
 The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none.
 
+**Approval mode**:
+How much a chat asks before it acts. Ask first asks before every click and typing. Auto, the default, asks before each change on a site and each sign-in. Full auto never asks. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
+_Avoid_: permission mode, autonomy level.
+
 **Outside agent**:
 An AI agent running outside uw, such as Claude Code or Codex, that the user lets work in uw's tabs.
 

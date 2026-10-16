@@ -187,7 +187,7 @@ uw's agent carries out requests in the browser. A chat runs a request when the u
 Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent browses for the user in a [chat](CONTEXT.md#language). It handles any request it can carry out, including retrieving information and taking actions that change things.
 
 - A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
-- The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in.
+- The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](CONTEXT.md#language), Auto. Ask first also asks before every click and typing; Full auto never asks.
 - [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
 
 Example use cases:

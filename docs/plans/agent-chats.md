@@ -10,7 +10,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - The agent opens its tabs as child tabs of the chat tab, in the same window. They load in the background and never take the user's selection or keyboard focus. The user can click one to watch or step in.
 - While a chat runs, its tab and its child tabs move only together. After it finishes they are ordinary child tabs.
 - Every tab is a tab: the organizer may move a chat tab like any other.
-- The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in. Page text never counts as the user's instruction.
+- The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](../CONTEXT.md#language), Auto; see the modes added on 2026-10-16. Page text never counts as the user's instruction.
 - From T47 until T48 landed on 2026-10-15, chats ran without approvals, on test sites only. Approvals now gate every change.
 - Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now. In v2.1 the agent model moves to `uw://providers`, and each chat can switch its model and effort; see the [AI providers plan](ai-providers.md).
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
@@ -36,6 +36,7 @@ Added on 2026-10-15:
 Added on 2026-10-16:
 
 - The agent may send several steps in one answer when they all use the same reading of a tab, such as filling in a form's fields and then submitting it. uw runs them in order. The first step that fails, or that the user declines, ends the batch: the steps after it do not run, and the model is told so. Each change still asks on its own. The agent reads the tab again after a step that loads a page or changes what it shows. Steps in different tabs do not run at the same time.
+- A chat has an [approval mode](../CONTEXT.md#language), picked from a chip in the composer beside the model and effort. Ask first asks before every click and typing; opening, reading, and going to an address do not ask. Auto, the default, asks as above. Full auto never asks, answers yes to Chromium's question about a sensitive site, and turns the chip amber. A change applies from the next step. A chat keeps its mode when it opens again. A mode picked on a new chat before its first message becomes the mode new chats start on; one picked later stays with that chat. In every mode page text never counts as the user's instruction, and the engine acts only while Safe Browsing is on.
 
 ## Releases
 
@@ -102,10 +103,11 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 13. T75: Markdown answers.
 14. T83: the chat page brought to the "(Fluid)" designs: steps, the chat's state, the empty chat, and the approval and failure cards.
 15. T100: several steps in one answer, per [Agreed scope](#agreed-scope).
-16. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-17. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-18. T51: scheduled chats.
-19. T52: private chats.
+16. T105: approval modes, per [Agreed scope](#agreed-scope).
+17. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+18. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+19. T51: scheduled chats.
+20. T52: private chats.
 
 ## Acceptance checks for v2.0
 
