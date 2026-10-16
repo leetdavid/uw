@@ -342,6 +342,14 @@ void AgentLoop::OnTool(ModelTurn turn,
   step.args = std::move(args);
   step.result = std::move(result);
   on_step_.Run(step);
+  // The steps after a failed or declined one in the same answer counted on
+  // it, so they do not run.
+  if (step.result.contains("error") && index + 1 < turn.calls.size()) {
+    context_->CloseOpenCalls(
+        base::StrCat({"Not run, because step ",
+                      base::NumberToString(step.number), " did not work."}));
+    index = turn.calls.size() - 1;
+  }
   RunCall(std::move(turn), index + 1);
 }
 

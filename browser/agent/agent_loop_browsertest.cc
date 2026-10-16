@@ -10,6 +10,7 @@
 
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -281,6 +282,92 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
   EXPECT_THAT(requests[1], HasSubstr(R"("signature":"sig")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("type":"tool_result")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("tool_use_id":"toolu_1")"));
+}
+
+// Steps in one answer run in order, and the first that fails ends the rest:
+// they do not run, and the model hears why.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       AFailedStepEndsTheRestOfItsAnswer) {
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/form"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(
+           base::ListValue()
+               .Append(ScriptedModel::Call(
+                   "click", base::DictValue().Set("tab", 1).Set("element", 9)))
+               .Append(ScriptedModel::Call("type", base::DictValue()
+                                                       .Set("tab", 1)
+                                                       .Set("element", 1)
+                                                       .Set("text", "Ada")))
+               .Append(ScriptedModel::Call(
+                   "click",
+                   base::DictValue().Set("tab", 1).Set("element", 2)))),
+       ScriptedModel::Answer("The form has no such button.")});
+
+  const AgentLoop::Step& end = Ask("Book a tour for Ada");
+
+  EXPECT_EQ(end.kind, Kind::kAnswer);
+  ASSERT_EQ(steps_.size(), 4u);
+  EXPECT_EQ(steps_[2].tool, "click");
+  EXPECT_TRUE(steps_[2].result.FindString("error"));
+  tabs::TabInterface* tab = browser()->tab_strip_model()->GetTabAtIndex(1);
+  EXPECT_EQ(content::EvalJs(tab->GetContents(),
+                            "document.getElementById('name').value"),
+            "");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 4u);
+  EXPECT_THAT(requests[3], HasSubstr("Not run, because step 3 did not work."));
+}
+
+// A change the user declines ends the rest of its answer too.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       ADeclinedChangeEndsTheRestOfItsAnswer) {
+  std::vector<std::string> asked;
+  agent_->SetApprover(base::BindLambdaForTesting(
+      [&](AgentTools::Approval approval,
+          base::OnceCallback<void(AgentLoop::ApprovalAnswer)> done) {
+        asked.push_back(approval.action);
+        std::move(done).Run({AgentLoop::ApprovalAnswer::Choice::kDecline});
+      }));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/form"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(
+           base::ListValue()
+               .Append(ScriptedModel::Call("type", base::DictValue()
+                                                       .Set("tab", 1)
+                                                       .Set("element", 1)
+                                                       .Set("text", "Ada")))
+               .Append(ScriptedModel::Call("click", base::DictValue()
+                                                        .Set("tab", 1)
+                                                        .Set("element", 2)
+                                                        .Set("changes", true)))
+               .Append(ScriptedModel::Call("type", base::DictValue()
+                                                       .Set("tab", 1)
+                                                       .Set("element", 1)
+                                                       .Set("text", "Bob")))),
+       ScriptedModel::Answer("You declined, so nothing was sent.")});
+
+  const AgentLoop::Step& end = Ask("Book a tour for Ada");
+
+  EXPECT_EQ(end.kind, Kind::kAnswer);
+  EXPECT_EQ(asked.size(), 1u);
+  ASSERT_EQ(steps_.size(), 5u);
+  EXPECT_EQ(steps_[2].tool, "type");
+  EXPECT_FALSE(steps_[2].result.FindString("error"));
+  EXPECT_EQ(steps_[3].tool, "click");
+  EXPECT_TRUE(steps_[3].result.FindString("error"));
+  tabs::TabInterface* tab = browser()->tab_strip_model()->GetTabAtIndex(1);
+  EXPECT_EQ(content::EvalJs(tab->GetContents(),
+                            "document.getElementById('name').value + '|' + "
+                            "document.getElementById('said').textContent"),
+            "Ada|");
+  EXPECT_THAT(model_.Requests()[3],
+              HasSubstr("Not run, because step 4 did not work."));
 }
 
 }  // namespace
