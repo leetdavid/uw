@@ -114,6 +114,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void Save();
   // Tells the chat list how this chat stands.
   void UpdateIndex();
+  // Sends the chat's notification saying `what` happened, with `text`,
+  // unless the user is looking: the chat shows in the window they use.
+  void Notify(const std::string& what, const std::string& text);
 
   // The agent's open tab `number`, or null.
   tabs::TabInterface* AgentTab(int number);

@@ -13,6 +13,7 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_util.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
@@ -20,6 +21,7 @@
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/optimization_guide/browser_test_util.h"
 #include "chrome/browser/platform_util_internal.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
@@ -43,6 +45,8 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/ui_base_switches.h"
+#include "ui/base/window_open_disposition.h"
+#include "ui/message_center/public/cpp/notification.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -122,15 +126,32 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(home_.CreateUniqueTempDir());
     UwChatHandler::SetAgentsSkillsFolderForTesting(AgentsSkills());
+    notifications_ = std::make_unique<NotificationDisplayServiceTester>(
+        browser()->GetProfile());
   }
 
   void TearDownOnMainThread() override {
+    notifications_.reset();
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
     UwChatHandler::SetAgentsSkillsFolderForTesting(base::FilePath());
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
   TabStripModel* tabs() { return browser()->tab_strip_model(); }
+
+  // The chat notifications on show.
+  std::vector<message_center::Notification> ChatNotifications() {
+    return notifications_->GetDisplayedNotificationsForType(
+        NotificationHandler::Type::UW_CHAT);
+  }
+
+  // Puts a blank tab in front of the chat, so the user is not looking at it.
+  void HideChat() {
+    ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+        browser(), GURL("about:blank"),
+        WindowOpenDisposition::NEW_FOREGROUND_TAB,
+        ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  }
 
   // A chat keeps its provider across a restart, so a test server saved
   // before one moves to this run's address.
@@ -467,6 +488,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   ScriptedModel model_{*embedded_test_server()};
   std::string catalog_;
   base::ScopedTempDir home_;
+  std::unique_ptr<NotificationDisplayServiceTester> notifications_;
 };
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
@@ -1547,6 +1569,82 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModelThatCannotSeeImagesWaits) {
                             "        .length), 300))"),
             0);
   EXPECT_TRUE(model_.Requests().empty());
+}
+
+// A chat the user is not looking at says how it ended in a notification, and
+// clicking the notification goes to the chat.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       AChatOutOfViewNotifiesAndTheNotificationGoesToIt) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Booked.\n\nIt starts at noon.")});
+  content::WebContents* chat = OpenChat();
+  HideChat();
+  Ask(chat, "Book a tour");
+
+  std::vector<message_center::Notification> shown = ChatNotifications();
+  ASSERT_EQ(shown.size(), 1u);
+  EXPECT_EQ(shown[0].title(), u"Book a tour");
+  EXPECT_EQ(shown[0].context_message(), u"Answered");
+  EXPECT_EQ(shown[0].message(), u"Booked. It starts at noon.");
+
+  notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT,
+                                shown[0].id(), std::nullopt, std::nullopt);
+  EXPECT_EQ(tabs()->GetActiveWebContents(), chat);
+  EXPECT_TRUE(ChatNotifications().empty());
+}
+
+// A step that waits for approval sends a notification, the answer after it
+// replaces it, and a failure sends one too.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnApprovalAndAFailureNotify) {
+  UseAgentModel();
+  ScriptOrder("Ordered.");
+  content::WebContents* chat = OpenChat();
+  HideChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Place the order")));
+  EXPECT_THAT(Approval(chat), ::testing::HasSubstr("Place order"));
+  std::vector<message_center::Notification> shown = ChatNotifications();
+  ASSERT_EQ(shown.size(), 1u);
+  EXPECT_EQ(shown[0].context_message(), u"Waits for your approval");
+  EXPECT_EQ(shown[0].message(), u"Click button \"Place order\" on shop.test?");
+
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Ordered.");
+  shown = ChatNotifications();
+  ASSERT_EQ(shown.size(), 1u);
+  EXPECT_EQ(shown[0].context_message(), u"Answered");
+  EXPECT_EQ(shown[0].message(), u"Ordered.");
+
+  model_.Script({ScriptedModel::Answer("Too busy.")}, 503);
+  EXPECT_THAT(Ask(chat, "Email me the receipt"),
+              ::testing::StartsWith("The model request failed"));
+  shown = ChatNotifications();
+  ASSERT_EQ(shown.size(), 1u);
+  EXPECT_EQ(shown[0].context_message(), u"Didn't finish");
+  EXPECT_TRUE(base::StartsWith(shown[0].message(),
+                               u"The model request failed: HTTP 503"));
+}
+
+// A chat the user is looking at sends no notification, and neither does a
+// stop.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatInViewOrStoppedDoesNotNotify) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Hello.")});
+  content::WebContents* chat = OpenChat();
+  browser()->GetWindow()->Activate();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return browser()->GetWindow()->IsActive(); }));
+  EXPECT_EQ(Ask(chat, "Hi"), "Hello.");
+  EXPECT_TRUE(ChatNotifications().empty());
+
+  HideChat();
+  model_.Script({ScriptedModel::Hang()});
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 2u; }));
+  EXPECT_EQ(UntilTheEnd(chat,
+                        "document.querySelector('button[aria-label=\"Stop\"]')"
+                        "    .click();"),
+            "You stopped the chat.");
+  EXPECT_TRUE(ChatNotifications().empty());
 }
 
 }  // namespace

@@ -28,7 +28,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -50,6 +49,7 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ai_providers/api_key_store.h"
@@ -268,31 +268,6 @@ mojom::SkillSource SourceFor(Skill::Source source) {
   }
 }
 
-GURL ChatUrl(std::string_view id) {
-  return GURL(
-      base::StrCat({content::kChromeUIScheme, "://", kChatHost, "/", id}));
-}
-
-// The tabs of `profile`, in every window, that show the chat `id`. A tab
-// that session restore has not loaded yet counts by the address it will load.
-std::vector<tabs::TabInterface*> TabsShowing(Profile* profile,
-                                             std::string_view id) {
-  const GURL url = ChatUrl(id);
-  std::vector<tabs::TabInterface*> showing;
-  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
-    if (window->GetProfile() != profile) {
-      continue;
-    }
-    for (tabs::TabInterface* tab :
-         TabListInterface::From(window)->GetAllTabs()) {
-      if (tab->GetContents()->GetVisibleURL() == url) {
-        showing.push_back(tab);
-      }
-    }
-  }
-  return showing;
-}
-
 }  // namespace
 
 UwChatHandler::UwChatHandler(content::WebContents* contents,
@@ -430,11 +405,9 @@ void UwChatHandler::OpenChat(const std::string& id) {
   }
   Profile* profile =
       Profile::FromBrowserContext(contents_->GetBrowserContext());
-  std::vector<tabs::TabInterface*> showing = TabsShowing(profile, id);
+  std::vector<tabs::TabInterface*> showing = TabsShowingChat(profile, id);
   if (!showing.empty()) {
-    BrowserWindowInterface* window = showing[0]->GetBrowserWindowInterface();
-    TabListInterface::From(window)->ActivateTab(showing[0]->GetHandle());
-    window->GetWindow()->Activate();
+    GoToTab(showing[0]);
     return;
   }
   tabs::TabInterface* chat =
@@ -463,7 +436,7 @@ void UwChatHandler::DeleteChat(const std::string& id) {
     index->Delete(id);
   }
   std::vector<tabs::TabHandle> showing;
-  for (tabs::TabInterface* tab : TabsShowing(
+  for (tabs::TabInterface* tab : TabsShowingChat(
            Profile::FromBrowserContext(contents_->GetBrowserContext()), id)) {
     showing.push_back(tab->GetHandle());
   }
@@ -484,9 +457,7 @@ void UwChatHandler::DeleteChat(const std::string& id) {
 
 void UwChatHandler::ShowTab(int32_t number) {
   if (tabs::TabInterface* tab = AgentTab(number)) {
-    BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
-    TabListInterface::From(window)->ActivateTab(tab->GetHandle());
-    window->GetWindow()->Activate();
+    GoToTab(tab);
   }
 }
 
@@ -755,6 +726,11 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
   }
   if (step.kind != AgentLoop::Step::Kind::kTool) {
     unread_ = contents_->GetVisibility() != content::Visibility::VISIBLE;
+    if (step.kind != AgentLoop::Step::Kind::kStoppedByUser) {
+      Notify(step.kind == AgentLoop::Step::Kind::kAnswer ? "Answered"
+                                                         : "Didn't finish",
+             step.text);
+    }
   } else {
     OnToolStep(step);
   }
@@ -1134,6 +1110,8 @@ void UwChatHandler::AskApproval(
     AgentTools::Approval approval,
     base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
   approval_answer_ = std::move(answer);
+  Notify("Waits for your approval",
+         base::StrCat({approval.action, " on ", approval.site, "?"}));
   page_->OnApproval(mojom::Approval::New(approval.tab, approval.site,
                                          approval.action, approval.reason));
   UpdateIndex();
@@ -1153,6 +1131,16 @@ void UwChatHandler::OnSkillWritten(bool written) {
         std::move(answer).Run(base::DictValue().Set("saved", true));
       },
       std::move(skill_answer_)));
+}
+
+void UwChatHandler::Notify(const std::string& what, const std::string& text) {
+  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents_);
+  if (tab && contents_->GetVisibility() == content::Visibility::VISIBLE &&
+      tab->GetBrowserWindowInterface()->GetWindow()->IsActive()) {
+    return;
+  }
+  NotifyAboutChat(Profile::FromBrowserContext(contents_->GetBrowserContext()),
+                  id_, title_, what, text);
 }
 
 void UwChatHandler::UpdateIndex() {

@@ -19,8 +19,8 @@ source_set("agent") {
     "//components/history/core/browser",
     "//components/tabs:public",
     "//url",
-    "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/ai_providers",
+    "//uw/browser/tab_organization:ai_connection",
     "//uw/components/agent",
   ]
   deps = [
@@ -47,12 +47,38 @@ source_set("chat_tab") {
     "chat_tab.cc",
     "chat_tab.h",
   ]
-  public_deps = [ "//components/tabs:public" ]
+  public_deps = [
+    "//components/tabs:public",
+    "//url",
+  ]
   deps = [
     "//base",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/tab_list",
     "//chrome/browser/ui/browser_window",
     "//content/public/browser",
     "//content/public/common",
+    "//ui/base",
+  ]
+}
+
+# The notification a chat sends when it finishes or waits for approval, and
+# what a click on it does. Chromium's notification service registers the
+# handler, so nothing here may depend on that service's implementation.
+source_set("chat_notification") {
+  sources = [
+    "chat_notification.cc",
+    "chat_notification.h",
+  ]
+  public_deps = [ "//chrome/browser/notifications" ]
+  deps = [
+    ":chat_tab",
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//components/tabs:public",
+    "//ui/base",
+    "//ui/gfx",
+    "//ui/message_center/public/cpp",
     "//url",
   ]
 }

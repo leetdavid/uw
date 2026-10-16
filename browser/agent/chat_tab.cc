@@ -8,9 +8,14 @@
 
 #include "base/strings/strcat.h"
 #include "base/supports_user_data.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
+#include "ui/base/base_window.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
 
@@ -23,12 +28,37 @@ struct StartData : base::SupportsUserData::Data {
   ChatStart start;
 };
 
-GURL ChatUrl() {
-  return GURL(base::StrCat(
-      {content::kChromeUIScheme, url::kStandardSchemeSeparator, kChatHost}));
+}  // namespace
+
+GURL ChatUrl(std::string_view id) {
+  return GURL(
+      base::StrCat({content::kChromeUIScheme, url::kStandardSchemeSeparator,
+                    kChatHost, "/", id}));
 }
 
-}  // namespace
+std::vector<tabs::TabInterface*> TabsShowingChat(Profile* profile,
+                                                 std::string_view id) {
+  const GURL url = ChatUrl(id);
+  std::vector<tabs::TabInterface*> showing;
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    if (window->GetProfile() != profile) {
+      continue;
+    }
+    for (tabs::TabInterface* tab :
+         TabListInterface::From(window)->GetAllTabs()) {
+      if (tab->GetContents()->GetVisibleURL() == url) {
+        showing.push_back(tab);
+      }
+    }
+  }
+  return showing;
+}
+
+void GoToTab(tabs::TabInterface* tab) {
+  BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
+  TabListInterface::From(window)->ActivateTab(tab->GetHandle());
+  window->GetWindow()->Activate();
+}
 
 void OpenChatTab(BrowserWindowInterface* window) {
   chrome::AddTabAt(window, ChatUrl(), -1, true);

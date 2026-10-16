@@ -159,6 +159,8 @@ While the agent works, the composer's button is Stop when the field is empty. Ex
 
 A message can carry images: paste one, drag images onto the composer, or use the paperclip, up to 5. Expected result: each shows as a tile in the composer with an ×, and above your message once sent; the model gets them as image 1, image 2, and so on. After its answer they shrink in what it sees, and it can ask for one again. When the chat's model can't see images, as models.dev says of `deepseek-v4-pro`, the composer says `deepseek-v4-pro can't see images. Pick a model that can.` and the message waits.
 
+Ask the agent something, then switch to another tab or app before it answers. Expected result: a macOS notification titled with the chat, saying `Answered` and the start of the answer; clicking it brings uw forward on the chat. A failure says `Didn't finish`, and a step that waits for approval says `Waits for your approval`. Nothing comes while you watch the chat, or after you press Stop. If none appears, check that uw may send them in System Settings, Notifications.
+
 1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
 2. Choose `New Chat` from the File menu or the new button's `▾` menu, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"

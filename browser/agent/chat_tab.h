@@ -6,10 +6,14 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "components/tabs/public/tab_interface.h"
+#include "url/gurl.h"
 
 class BrowserWindowInterface;
+class Profile;
 
 namespace content {
 class WebContents;
@@ -22,6 +26,17 @@ inline constexpr int kNewChatCommand = 56101;
 
 // The page of a chat is chrome://chat, shown as uw://chat.
 inline constexpr char kChatHost[] = "chat";
+
+// The address of the chat `id`, or of a new chat when `id` is empty.
+GURL ChatUrl(std::string_view id = {});
+
+// The tabs of `profile`, in every window, that show the chat `id`. A tab
+// that session restore has not loaded yet counts by the address it will load.
+std::vector<tabs::TabInterface*> TabsShowingChat(Profile* profile,
+                                                 std::string_view id);
+
+// Selects `tab` and brings its window, and uw, to the front.
+void GoToTab(tabs::TabInterface* tab);
 
 // Opens a chat where a blank new tab would open.
 void OpenChatTab(BrowserWindowInterface* window);

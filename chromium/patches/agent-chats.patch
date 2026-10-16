@@ -28,3 +28,51 @@ index a67210a0392247edca3ab3f561275db8ea103c68..a85ed7550b1612c577fff80179ee9f65
  // Controls whether the tab indicator in the actor ui is enabled.
  const base::FeatureParam<bool> kGlicActorUiTabIndicator{
      &kGlicActorUi, kGlicActorUiTabIndicatorName, true};
+diff --git a/chrome/browser/notifications/BUILD.gn b/chrome/browser/notifications/BUILD.gn
+index 8c6b02e11f7cf5ecf00b4c5815d7e7cc7f596cab..9314dbabcf45f8354ca5b208592184da3b57b543 100644
+--- a/chrome/browser/notifications/BUILD.gn
++++ b/chrome/browser/notifications/BUILD.gn
+@@ -220,6 +220,7 @@ source_set("impl") {
+     "//components/visibility_timer",
+     "//ui/message_center",
+     "//ui/strings:ui_strings_grit",
++    "//uw/browser/agent:chat_notification",
+   ]
+ 
+   if (is_android) {
+diff --git a/chrome/browser/notifications/notification_display_service_impl.cc b/chrome/browser/notifications/notification_display_service_impl.cc
+index c185575c57d0f0e72edc3c9bcfc5874e4c2a63dd..151762827a78a523f094025f70ff833194585b8b 100644
+--- a/chrome/browser/notifications/notification_display_service_impl.cc
++++ b/chrome/browser/notifications/notification_display_service_impl.cc
+@@ -25,6 +25,7 @@
+ #include "content/public/browser/browser_thread.h"
+ #include "extensions/buildflags/buildflags.h"
+ #include "ui/message_center/public/cpp/notification.h"
++#include "uw/browser/agent/chat_notification.h"
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+ #include "chrome/browser/extensions/api/notifications/extension_notification_handler.h"
+@@ -77,6 +78,8 @@ NotificationDisplayServiceImpl::NotificationDisplayServiceImpl(Profile* profile)
+         std::make_unique<NonPersistentNotificationHandler>());
+     AddNotificationHandler(NotificationHandler::Type::WEB_PERSISTENT,
+                            std::make_unique<PersistentNotificationHandler>());
++    AddNotificationHandler(NotificationHandler::Type::UW_CHAT,
++                           std::make_unique<uw::ChatNotificationHandler>());
+ 
+ #if (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
+      BUILDFLAG(IS_WIN)) &&                                                 \
+diff --git a/chrome/browser/notifications/notification_handler.h b/chrome/browser/notifications/notification_handler.h
+index 93437bb2ae097d1b7f8f4beeea1e6d125c3b16c6..94911cda288b6ad74fad71de544d4065f08928c1 100644
+--- a/chrome/browser/notifications/notification_handler.h
++++ b/chrome/browser/notifications/notification_handler.h
+@@ -40,7 +40,9 @@ class NotificationHandler {
+     NOTIFICATIONS_MUTED = 9,
+     TAILORED_SECURITY = 10,
+     DEFAULT_BROWSER_CHANGED = 11,
+-    MAX = DEFAULT_BROWSER_CHANGED,
++    // uw: a chat that finished or waits for approval.
++    UW_CHAT = 12,
++    MAX = UW_CHAT,
+   };
+ 
+   virtual ~NotificationHandler();
