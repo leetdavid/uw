@@ -51,7 +51,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 ### Look and controls
 
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
-- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, and black dark mode.
+- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, black dark mode, and a page mode apart from the window's.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Command bar plan](plans/command-bar.md): one panel on Cmd+T and Cmd+L for commands, tasks, tabs, and the web, ranked by use, that can also send the typed text to a chat or a terminal.
 - [Command bar spike](research/command-bar-spike.md): what the panel, the searchbox handler, and headless tests did, and the keyboard checks still open.

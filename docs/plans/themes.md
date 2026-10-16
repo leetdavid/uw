@@ -71,6 +71,36 @@ Each stage is a ticket on the [board](roadmap.md#board).
 9. Two profiles keep two themes.
 10. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 
+## Page mode
+
+Status: scope agreed with the user on 2026-10-16. Not built. The design, T101, comes first.
+
+Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a profile pref, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
+
+- Page mode is Same as window, Light, or Dark. Same as window is the default, so nothing changes until the user picks.
+- It covers websites and uw's own tab pages: the chat page, the providers page, and the terminal. Chromium's own pages, such as Settings, History, and the new tab page, follow the window mode, since their colors come from the window.
+- Pages are only told the mode (`prefers-color-scheme`). A site with no dark look of its own stays light. Chromium's auto-dark is not used.
+- The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones. So does the page's scrollbar.
+- Open pages change as soon as the setting does.
+- The control is a "Pages" row in the picker, under the window's Auto, Light, and Dark.
+- It is saved per profile and does not sync. Incognito pages keep following macOS, as Chromium does.
+- No per-site exceptions for now.
+
+Stages:
+
+1. T101: the "Pages" row drawn on the canvas's "Themes" page and signed off by the user.
+2. T102: page mode built.
+
+Acceptance checks:
+
+1. With Same as window, pages behave as they do today.
+2. In a light window with Dark pages, a website and the chat page see `prefers-color-scheme: dark`, the sidebar and toolbar stay light, and Settings stays light.
+3. In a dark window with Light pages, the reverse.
+4. In a light window with Dark pages, the card is `#0A0A0A` before a page paints.
+5. Changing the row changes open pages without a reload.
+6. Two profiles keep two page modes. Incognito pages follow macOS.
+7. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
 ## Open questions
 
 None.

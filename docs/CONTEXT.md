@@ -15,6 +15,14 @@ _Avoid_: Group, tab group, task group, workspace, space.
 The colors uw draws its window in: the tint behind the sidebar and the page card. A profile has one theme, shared by all its windows.
 _Avoid_: Skin, space color.
 
+**Window mode**:
+Whether uw's window is light or dark: the sidebar, the toolbar, menus, and uw's panels such as the command bar and the theme picker. Auto follows macOS. Chromium's own pages, such as Settings, follow it too.
+_Avoid_: Skin, browser mode, color scheme.
+
+**Page mode**:
+Whether pages in tabs are asked for their light or dark look: websites and uw's own tab pages, such as the chat page. It is the window mode unless the user picks Light or Dark for pages. A site with no dark look of its own stays light.
+_Avoid_: Website theme, content theme, web dark mode.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared across windows in its browser profile.
 
