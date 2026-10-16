@@ -81,6 +81,7 @@ source_set("browser_tests") {
     "//content/test:test_support",
     "//net:test_support",
     "//testing/gtest",
+    "//ui/base",
     "//ui/compositor",
     "//ui/events:test_support",
     "//ui/views:test_support",

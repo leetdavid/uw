@@ -846,7 +846,7 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
  
      if (size_bounds.width().is_bounded()) {
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index ab919030ae2fbd70240f192e1a7060776530523a..bac53281806f2af5eaedcbceb4f696e896fe7b93 100644
+index ab919030ae2fbd70240f192e1a7060776530523a..e2d9914d520e779b47adc2e8266af12595025d09 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -67,6 +67,7 @@
@@ -868,6 +868,27 @@ index ab919030ae2fbd70240f192e1a7060776530523a..bac53281806f2af5eaedcbceb4f696e8
    gemini_button_ = AddChildView(std::make_unique<views::View>());
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
+@@ -279,14 +284,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
+     return false;
+   }
+ 
+-  if (IsHitInView(top_button_container_, point)) {
++  // A container the layout has hidden keeps its old bounds, which can lie over
++  // the tabs.
++  if (top_button_container_->GetVisible() &&
++      IsHitInView(top_button_container_, point)) {
+     gfx::Point point_in_child = point;
+     views::View::ConvertPointToTarget(this, top_button_container_,
+                                       &point_in_child);
+     return top_button_container_->IsPositionInWindowCaption(point_in_child);
+   }
+ 
+-  if (IsHitInView(bottom_button_container_, point)) {
++  if (bottom_button_container_->GetVisible() &&
++      IsHitInView(bottom_button_container_, point)) {
+     gfx::Point point_in_child = point;
+     views::View::ConvertPointToTarget(this, bottom_button_container_,
+                                       &point_in_child);
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..f466ecc27542d4bd2d64a4b7e576047af6d0de1e 100644
 --- a/chrome/browser/ui/browser_command_controller.cc

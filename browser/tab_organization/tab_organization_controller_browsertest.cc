@@ -43,6 +43,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "ui/base/hit_test.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
@@ -1045,6 +1046,37 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(service);
   WaitUntilSavedGroupsLoad(service);
   EXPECT_FALSE(KeepsAClosedTask(service));
+}
+
+// The empty space under the last tab drags the window. Once tabs fill the
+// sidebar, the layout hides that space and leaves its old bounds over the
+// tabs, which must still take clicks rather than drag the window.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TabsThatFillTheSidebarTakeClicks) {
+  views::View* empty_space = ViewsOfClass("VerticalTabStripBottomContainer")[0];
+  ASSERT_TRUE(empty_space->GetVisible());
+  const gfx::Rect old_bounds = empty_space->GetBoundsInScreen();
+  for (int i = 0; i < 40 && empty_space->GetVisible(); ++i) {
+    NewTab();
+    ViewsOfClass("VerticalTabStripBottomContainer");
+  }
+  ASSERT_FALSE(empty_space->GetVisible());
+
+  int checked = 0;
+  for (views::View* row : VisibleRows()) {
+    if (!old_bounds.Contains(row->GetBoundsInScreen().CenterPoint())) {
+      continue;
+    }
+    views::Widget* widget = row->GetWidget();
+    gfx::Point point = row->GetLocalBounds().CenterPoint();
+    views::View::ConvertPointToWidget(row, &point);
+    if (widget->GetRootView()->GetEventHandlerForPoint(point) != row) {
+      continue;
+    }
+    EXPECT_EQ(widget->GetNonClientComponent(point), HTCLIENT);
+    ++checked;
+  }
+  EXPECT_GT(checked, 0);
 }
 }  // namespace
 }  // namespace uw
