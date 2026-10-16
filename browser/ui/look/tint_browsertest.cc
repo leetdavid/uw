@@ -5,6 +5,10 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <functional>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/browser_process.h"
@@ -17,6 +21,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
@@ -29,14 +34,17 @@
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/themes.mojom.h"
+#include "ui/base/page_transition_types.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/sidebar_tab_fill.h"
 #include "uw/components/look/theme.h"
 #include "uw/components/look/theme_prefs.h"
 
@@ -264,6 +272,68 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, ATwoColorThemeRunsThroughBothColors) {
   EXPECT_LE(Gap(window.getColor(width / 40, 3), kButter), 6);
   EXPECT_LE(Gap(window.getColor(width - width / 40, height - 3), kSky), 6);
   SaveWindowScreenshot(browser(), "theme-two-colors");
+}
+
+// Tab rows have no fill until the pointer is on them, and tiles and hovered
+// rows are see-through, so the theme shows through all of them.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarTabsLetTheThemeShowThrough) {
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_TRUE(
+        AddTabAtIndex(i + 1, GURL("about:blank"), ui::PAGE_TRANSITION_TYPED));
+  }
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  const views::View* sidebar =
+      view->vertical_tab_strip_region_view_for_testing();
+  using State = TabStyle::TabSelectionState;
+  Theme butter_to_sky;
+  butter_to_sky.colors = {kButter, kSky};
+  for (bool dark : {false, true}) {
+    theme()->SetBrowserColorScheme(
+        dark ? ThemeService::BrowserColorScheme::kDark
+             : ThemeService::BrowserColorScheme::kLight);
+    butter_to_sky.colors_in_dark_mode = dark;
+    SetTheme(browser()->GetProfile(), butter_to_sky);
+    const SkColor fill = SkColorSetA(SK_ColorWHITE, dark ? 0x14 : 0x75);
+    EXPECT_EQ(SidebarTabFill(sidebar, false, State::kInactive, 0),
+              SK_ColorTRANSPARENT);
+    EXPECT_EQ(SidebarTabFill(sidebar, false, State::kInactive, 1), fill);
+    EXPECT_EQ(SidebarTabFill(sidebar, true, State::kInactive, 0), fill);
+    EXPECT_GT(SkColorGetA(*SidebarTabFill(sidebar, true, State::kInactive, 1)),
+              SkColorGetA(fill));
+    EXPECT_EQ(SidebarTabFill(sidebar, false, State::kActive, 1), std::nullopt);
+    EXPECT_EQ(Color(kColorNewTabButtonCRBackgroundFrameActive), fill);
+
+    const SkBitmap window = CaptureWindow(browser());
+    const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+    const float scale = static_cast<float>(window.width()) / bounds.width();
+    const auto color_at = [&](int x, int y) {
+      return window.getColor(base::ClampRound((x - bounds.x()) * scale),
+                             base::ClampRound((y - bounds.y()) * scale));
+    };
+    std::vector<gfx::Rect> rows;
+    const std::function<void(const views::View*)> visit =
+        [&](const views::View* row) {
+          if (std::string_view(row->GetClassName()) == "TabView") {
+            rows.push_back(row->GetBoundsInScreen());
+          }
+          for (const views::View* child : row->children()) {
+            visit(child);
+          }
+        };
+    visit(sidebar);
+    ASSERT_EQ(rows.size(), 5u);
+    std::ranges::sort(rows, {}, &gfx::Rect::y);
+    // The active tab is at the top. The four under it are at rest.
+    for (size_t i = 1; i < rows.size(); ++i) {
+      const int middle = rows[i].CenterPoint().y();
+      EXPECT_LE(Gap(color_at(rows[i].x() + 4, middle),
+                    color_at(rows[i].x() - 4, middle)),
+                2)
+          << "dark=" << dark << " row " << i;
+    }
+    SaveWindowScreenshot(browser(), dark ? "sidebar-dark" : "sidebar-light");
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, AColorPickedElsewhereIsAOneColorTheme) {

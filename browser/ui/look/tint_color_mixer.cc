@@ -20,8 +20,10 @@ namespace uw {
 namespace {
 
 constexpr SkAlpha kDividerAlpha = 0x1A;
-constexpr SkAlpha kHoverOnLightAlpha = 0x75;
-constexpr SkAlpha kHoverOnDarkAlpha = 0x14;
+// Tiles, pills, and hovered rows: white at 46% on a light tint and 8% on a dark
+// one, see-through so the theme shows through them.
+constexpr SkAlpha kFillOnLightAlpha = 0x75;
+constexpr SkAlpha kFillOnDarkAlpha = 0x14;
 // The active tab on black: white at 12%.
 constexpr float kActiveTabOnBlack = 0.12f;
 
@@ -71,24 +73,24 @@ void AddTintColorMixer(ui::ColorProvider* provider,
   }
   const Tint tint = TintFor(key);
   const SkColor text = TextColorOn(tint);
-  const SkColor hover = SkColorSetA(
-      SK_ColorWHITE, IsDark(tint) ? kHoverOnDarkAlpha : kHoverOnLightAlpha);
+  const SkColor fill = SkColorSetA(
+      SK_ColorWHITE, IsDark(tint) ? kFillOnDarkAlpha : kFillOnLightAlpha);
   ui::ColorMixer& mixer = provider->AddMixer();
   for (ui::ColorId frame :
        {ui::kColorSysHeader, ui::kColorSysHeaderInactive, ui::kColorFrameActive,
         ui::kColorFrameActiveUnthemed, ui::kColorFrameInactive}) {
     mixer[frame] = {tint.start};
   }
-  mixer[ui::kColorSysHeaderContainer] = {FillOn(tint)};
-  mixer[ui::kColorSysHeaderContainerInactive] = {FillOn(tint)};
+  mixer[ui::kColorSysHeaderContainer] = {fill};
+  mixer[ui::kColorSysHeaderContainerInactive] = {fill};
   mixer[ui::kColorSysOnHeaderPrimary] = {text};
   mixer[ui::kColorSysOnHeaderPrimaryInactive] = {text};
   mixer[ui::kColorSysOnHeaderDivider] = {SkColorSetA(text, kDividerAlpha)};
   mixer[ui::kColorSysOnHeaderDividerInactive] = {
       SkColorSetA(text, kDividerAlpha)};
-  mixer[ui::kColorSysStateHeaderHover] = {hover};
-  mixer[ui::kColorSysStateHeaderHoverInactive] = {hover};
-  mixer[ui::kColorSysStateOnHeaderHover] = {hover};
+  mixer[ui::kColorSysStateHeaderHover] = {fill};
+  mixer[ui::kColorSysStateHeaderHoverInactive] = {fill};
+  mixer[ui::kColorSysStateOnHeaderHover] = {fill};
 }
 
 void AddTintTabColorMixer(ui::ColorProvider* provider,

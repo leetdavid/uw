@@ -1,10 +1,10 @@
 # The Arc-style look: tint colors, the window gradient, the inactive window
-# buttons, and favorite tiles.
+# buttons, and the fills of sidebar tabs.
 source_set("look") {
   sources = [
-    "favorite_tile.cc",
-    "favorite_tile.h",
     "page_card.h",
+    "sidebar_tab_fill.cc",
+    "sidebar_tab_fill.h",
     "tint_color_mixer.cc",
     "tint_color_mixer.h",
     "tint_painter.cc",
@@ -18,6 +18,7 @@ source_set("look") {
   }
   public_deps = [ "//uw/components/look" ]
   deps = [
+    "//base",
     "//cc/paint",
     "//chrome/browser/ui/color:color_headers",
     "//components/prefs",

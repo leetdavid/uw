@@ -24,7 +24,7 @@ Agreed on 2026-10-12:
 ## Scope
 
 - **Window tint.** The frame, the sidebar, and the area around the page share one gradient. It runs from the picked color to the same color with its hue turned by 40 degrees.
-- **Text on the tint.** Text and icons are near-black or white, whichever has more contrast with the tint. Fills and the active tab change strength the same way.
+- **Text on the tint.** Text and icons are near-black or white, whichever has more contrast with the tint. Fills and the active tab change strength the same way. Fills are see-through white, 46% on a light tint and 8% on a dark one, so the gradient shows through tiles, pills, and hovered rows.
 - **Readable tints.** Text keeps at least a 4.5:1 contrast ratio everywhere on the tint. A mid-tone color cannot do that, so uw makes it lighter or darker, whichever takes the smaller change, and keeps its hue.
 - **Default tints.** Lilac to sky until the user picks a color. Changed on 2026-10-16: dark mode is black whatever color is picked, and the [themes plan](themes.md) makes the tint a theme of up to three colors.
 - **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint.

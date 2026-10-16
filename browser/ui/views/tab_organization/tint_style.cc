@@ -5,6 +5,7 @@
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/ui_base_types.h"
 #include "ui/gfx/text_constants.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
@@ -12,8 +13,9 @@
 namespace uw {
 
 void StyleAsPill(views::MdTextButton* button) {
+  // A text button draws no edge, which would show over a see-through fill.
+  button->SetStyle(ui::ButtonStyle::kText);
   button->SetBgColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
-  button->SetStrokeColorIdOverride(kColorNewTabButtonCRBackgroundFrameActive);
   button->SetEnabledTextColors(kColorTabForegroundInactiveFrameActive);
 }
 

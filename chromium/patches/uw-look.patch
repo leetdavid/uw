@@ -127,30 +127,31 @@ index a8b7ef68008b132ec786b91ddcb232c16a0c5750..542eb8b79437be476858fe676b1806af
        return 12;
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
 diff --git a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..0f3976e6aeaedf3dcf07c55ccf785da8b819303d 100644
+index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60767676bd 100644
 --- a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
 +++ b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
 @@ -24,6 +24,7 @@
  #include "ui/gfx/scoped_canvas.h"
  #include "ui/views/view_utils.h"
  #include "ui/views/widget/widget.h"
-+#include "uw/browser/ui/look/favorite_tile.h"
++#include "uw/browser/ui/look/sidebar_tab_fill.h"
  
  VerticalTabStyleViews::VerticalTabStyleViews(
      std::unique_ptr<TabStyleViewDelegate> delegate)
-@@ -142,7 +143,10 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+@@ -142,7 +143,11 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
                                      hovered)) {
      cc::PaintFlags flags;
      flags.setAntiAlias(true);
 -    flags.setColor(GetCurrentTabBackgroundColor(selection_state));
 +    flags.setColor(
-+        uw::FavoriteTileColor(delegate_->GetView(), delegate_->IsPinned(),
-+                              selection_state, hovered)
++        uw::SidebarTabFill(delegate_->GetView(), delegate_->IsPinned(),
++                           selection_state,
++                           hovered ? delegate_->GetHoverAnimationValue() : 0)
 +            .value_or(GetCurrentTabBackgroundColor(selection_state)));
      canvas->DrawRect(gfx::ScaleToEnclosingRect(
                           delegate_->GetView()->GetLocalBounds(), scale),
                       flags);
-@@ -178,7 +182,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+@@ -178,7 +183,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
      return true;
    }
  

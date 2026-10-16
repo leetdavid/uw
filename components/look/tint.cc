@@ -11,8 +11,6 @@ namespace uw {
 namespace {
 
 constexpr double kHueTurn = -40.0 / 360.0;
-constexpr float kFillOnLight = 0.46f;
-constexpr float kFillOnDark = 0.08f;
 constexpr float kActiveTabOnDark = 0.16f;
 constexpr double kLightnessStep = 0.01;
 constexpr int kLightnessSteps = 100;
@@ -75,11 +73,6 @@ SkColor TextColorOn(const Tint& tint) {
 
 bool IsDark(const Tint& tint) {
   return TextColorOn(tint) == kLightTextOnTint;
-}
-
-SkColor FillOn(const Tint& tint) {
-  return color_utils::AlphaBlend(SK_ColorWHITE, MiddleOf(tint),
-                                 IsDark(tint) ? kFillOnDark : kFillOnLight);
 }
 
 SkColor ActiveTabOn(const Tint& tint) {

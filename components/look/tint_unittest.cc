@@ -100,8 +100,6 @@ TEST(TintTest, ActiveTabIsWhiteOnLightAndTranslucentOnDark) {
   EXPECT_EQ(ActiveTabOn(TintFrom(kDefaultLightTint)), SK_ColorWHITE);
   const Tint dark = TintFrom(kIndigo);
   EXPECT_GT(color_utils::GetRelativeLuminance(ActiveTabOn(dark)),
-            color_utils::GetRelativeLuminance(FillOn(dark)));
-  EXPECT_GT(color_utils::GetRelativeLuminance(FillOn(dark)),
             color_utils::GetRelativeLuminance(MiddleOf(dark)));
 }
 

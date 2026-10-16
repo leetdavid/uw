@@ -47,9 +47,6 @@ SkColor TextColorOn(const Tint& tint);
 // True when the tint takes white text.
 bool IsDark(const Tint& tint);
 
-// What tiles, pills, and hovered rows are filled with on the tint.
-SkColor FillOn(const Tint& tint);
-
 // What the active tab is filled with on the tint.
 SkColor ActiveTabOn(const Tint& tint);
 
