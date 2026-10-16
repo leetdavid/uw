@@ -67,7 +67,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 5. With "Theme colors in dark mode" on, dark mode shows the theme darkened.
 6. A color picked in the "Customize Chromium" panel becomes a one-color theme.
 7. A tint picked before the upgrade is the theme after it.
-8. At no grain nothing is drawn. Above it, grain covers the theme and not the page card.
+8. At no grain nothing is drawn. Above it, grain covers the theme and not the page card, in light and dark mode. On a theme that takes white text, grain lightens instead of darkening.
 9. Two profiles keep two themes.
 10. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 

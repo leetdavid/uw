@@ -59,13 +59,13 @@ views::Widget* ThemePicker::GetWidgetForTesting() const {
 }
 
 void ThemePicker::Show() {
-  if (!bubble_) {
-    bubble_ = WebUIBubbleManager::Create<UwThemePickerUI>(
-        window_, GURL(kThemePickerUrl), IDS_UW_THEME_PICKER);
-  }
-  if (bubble_->GetBubbleWidget()) {
+  if (bubble_ && bubble_->GetBubbleWidget()) {
     return;
   }
+  // A new page each time. Chromium can keep a closed bubble's page, but a kept
+  // page has already asked to be shown, and holds the theme as it was then.
+  bubble_ = WebUIBubbleManager::Create<UwThemePickerUI>(
+      window_, GURL(kThemePickerUrl), IDS_UW_THEME_PICKER);
   const gfx::Rect card = BrowserView::GetBrowserViewForBrowser(window_)
                              ->contents_container()
                              ->GetBoundsInScreen();

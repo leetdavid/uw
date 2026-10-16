@@ -109,6 +109,14 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
       content::EvalJs(page, "document.querySelectorAll('#suggested button')[0]"
                             ".getAttribute('aria-pressed')"));
   SaveWindowScreenshot(browser(), "theme-picker");
+
+  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(page, "matchMedia('(prefers-color-scheme: dark)')"
+                                 ".matches")
+        .ExtractBool();
+  }));
+  SaveWindowScreenshot(browser(), "theme-picker-dark");
 }
 
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ASuggestedThemeBecomesTheTheme) {
@@ -163,6 +171,21 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, SlidersAndTheSwitchSaveAtOnce) {
     return saved.intensity == 40 && saved.grain == 60 &&
            saved.colors_in_dark_mode;
   }));
+}
+
+// Chromium can keep a closed picker's page, which never asks to be shown again.
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
+                       ThePickerOpensAgainWithTheThemeAsItIsNow) {
+  Open();
+  picker()->GetWidgetForTesting()->CloseNow();
+  ASSERT_FALSE(picker()->IsShowing());
+
+  Theme grainy = Saved();
+  grainy.grain = 60;
+  WriteTheme(*browser()->GetProfile()->GetPrefs(), grainy);
+  content::WebContents* page = Open();
+  EXPECT_EQ("60",
+            content::EvalJs(page, "document.getElementById('grain').value"));
 }
 
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheModeButtonsSetTheMode) {

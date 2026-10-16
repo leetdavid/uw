@@ -13,6 +13,8 @@
         --chosen: #fff;
         --line: rgb(30 27 46 / 9%);
         --track: rgb(30 27 46 / 12%);
+        --track-faint: rgb(30 27 46 / 4%);
+        --switch-off: rgb(30 27 46 / 18%);
         --primary: #3b5bdb;
       }
 
@@ -25,6 +27,8 @@
           --chosen: #262626;
           --line: #262626;
           --track: rgb(255 255 255 / 14%);
+          --track-faint: rgb(255 255 255 / 5%);
+          --switch-off: rgb(255 255 255 / 18%);
           --primary: #9db0ff;
         }
       }
@@ -182,8 +186,8 @@
       }
 
       #grain {
-        background: repeating-linear-gradient(90deg, rgb(30 27 46 / 12%) 0 2px,
-                                              rgb(30 27 46 / 4%) 2px 4px);
+        background: repeating-linear-gradient(90deg, var(--track) 0 2px,
+                                              var(--track-faint) 2px 4px);
       }
 
       input[type='range']::-webkit-slider-thumb {
@@ -207,7 +211,7 @@
 
       #colors-in-dark-mode {
         appearance: none;
-        background: rgb(30 27 46 / 18%);
+        background: var(--switch-off);
         border-radius: 9px;
         height: 18px;
         margin: 0;

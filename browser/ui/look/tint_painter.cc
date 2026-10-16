@@ -39,7 +39,8 @@ namespace {
 constexpr double kAngle = 160.0 * std::numbers::pi / 180.0;
 
 // Full grain is gray noise around middle gray, as in the designs, multiplied
-// over the tint at 35%, one noise dot per screen pixel.
+// over a light tint at 35%, one noise dot per screen pixel. A dark tint has no
+// room to get darker, so the grain is screened over it instead.
 constexpr float kFullGrainOpacity = 0.35f;
 constexpr int kGrainTileSize = 128;
 constexpr uint8_t kGrainDarkest = 90;
@@ -66,8 +67,11 @@ const cc::PaintImage& GrainTile() {
   return *tile;
 }
 
-// Multiplies grain over `view` at `grain` percent of full strength.
-void PaintGrain(gfx::Canvas* canvas, const views::View* view, int grain) {
+// Draws grain over `view` at `grain` percent of full strength.
+void PaintGrain(gfx::Canvas* canvas,
+                const views::View* view,
+                int grain,
+                bool dark) {
   if (grain <= 0) {
     return;
   }
@@ -76,7 +80,7 @@ void PaintGrain(gfx::Canvas* canvas, const views::View* view, int grain) {
   cc::PaintFlags flags;
   flags.setShader(cc::PaintShader::MakeImage(GrainTile(), SkTileMode::kRepeat,
                                              SkTileMode::kRepeat, &pixels));
-  flags.setBlendMode(SkBlendMode::kMultiply);
+  flags.setBlendMode(dark ? SkBlendMode::kScreen : SkBlendMode::kMultiply);
   flags.setAlphaf(kFullGrainOpacity * std::min(grain, kFullGrain) / kFullGrain);
   canvas->DrawRect(view->GetLocalBounds(), flags);
 }
@@ -118,7 +122,7 @@ void PaintTint(gfx::Canvas* canvas,
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
       SkTileMode::kClamp));
   canvas->DrawRect(view->GetLocalBounds(), flags);
-  PaintGrain(canvas, view, ReadTheme(prefs, std::nullopt).grain);
+  PaintGrain(canvas, view, ReadTheme(prefs, std::nullopt).grain, IsDark(tint));
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.
   if (TextColorOn(tint) == kDarkTextOnTint) {

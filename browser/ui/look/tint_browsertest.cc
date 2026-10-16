@@ -61,6 +61,16 @@ int Gap(SkColor first, SkColor second) {
   return gap;
 }
 
+// The largest step between neighboring pixels along 40 pixels of a row.
+int Roughness(const SkBitmap& window, int x, int y) {
+  int most = 0;
+  for (int step = 0; step < 40; ++step) {
+    most = std::max(most, Gap(window.getColor(x + step, y),
+                              window.getColor(x + step + 1, y)));
+  }
+  return most;
+}
+
 class TintBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   ThemeService* theme() {
@@ -309,25 +319,34 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TwoProfilesKeepTwoThemes) {
 // Grain shows on the window around the card and never on the card.
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GrainCoversTheWindowAndNotTheCard) {
   theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
-  const auto roughness = [](const SkBitmap& window, int x, int y) {
-    int most = 0;
-    for (int step = 0; step < 40; ++step) {
-      most = std::max(most, Gap(window.getColor(x + step, y),
-                                window.getColor(x + step + 1, y)));
-    }
-    return most;
-  };
   const SkBitmap smooth = CaptureWindow(browser());
   const int middle = smooth.height() / 2;
-  EXPECT_LE(roughness(smooth, 20, middle), 2);
+  EXPECT_LE(Roughness(smooth, 20, middle), 2);
 
   Theme grainy;
   grainy.grain = kFullGrain;
   SetTheme(browser()->GetProfile(), grainy);
   const SkBitmap rough = CaptureWindow(browser());
-  EXPECT_GE(roughness(rough, 20, middle), 8);
-  EXPECT_LE(roughness(rough, rough.width() * 3 / 5, middle), 1);
+  EXPECT_GE(Roughness(rough, 20, middle), 8);
+  EXPECT_LE(Roughness(rough, rough.width() * 3 / 5, middle), 1);
   SaveWindowScreenshot(browser(), "theme-grain");
+}
+
+// A dark window has no room to get darker, so grain lightens it instead.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, GrainShowsOnADarkWindow) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme grainy;
+  grainy.grain = kFullGrain;
+  for (bool colors_in_dark_mode : {false, true}) {
+    grainy.colors_in_dark_mode = colors_in_dark_mode;
+    SetTheme(browser()->GetProfile(), grainy);
+    const SkBitmap window = CaptureWindow(browser());
+    const int middle = window.height() / 2;
+    EXPECT_GE(Roughness(window, 20, middle), 8) << colors_in_dark_mode;
+    EXPECT_LE(Roughness(window, window.width() * 3 / 5, middle), 1)
+        << colors_in_dark_mode;
+  }
+  SaveWindowScreenshot(browser(), "theme-grain-dark");
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {
