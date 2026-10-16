@@ -63,9 +63,11 @@ class AgentTools {
   // What a call to `tool` with `args` needs approved: clicking a button
   // that submits a form, pressing Enter in a form's field, typing a password
   // or payment details, and any click or typing the model marks with
-  // "changes". Nothing for any other step.
+  // "changes". With `every_step`, any other click or typing as well. Nothing
+  // for any other step.
   std::optional<Approval> ApprovalFor(std::string_view tool,
-                                      const base::DictValue& args);
+                                      const base::DictValue& args,
+                                      bool every_step = false);
   // Asks the user whether the agent may act on a site that Chromium marks as
   // sensitive, in the middle of a step, and answers true if they approve.
   // Without one, the engine refuses such a site.

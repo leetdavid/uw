@@ -253,6 +253,30 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
             name, effort)));
   }
 
+  // Opens the approval mode chip's menu and picks `name`, such as "Full auto".
+  void PickMode(content::WebContents* chat, const std::string& name) {
+    ASSERT_TRUE(content::ExecJs(
+        chat,
+        content::JsReplace(
+            "(async () => {"
+            "const until = (probe) => new Promise((resolve) => {"
+            "  const check = () => probe() ? resolve(probe())"
+            "      : setTimeout(check, 20);"
+            "  check();"
+            "});"
+            "const chip = () => document.querySelector("
+            "    '[aria-label=\"Approval mode\"]');"
+            "(await until(chip)).dispatchEvent(new PointerEvent('pointerdown',"
+            "    {bubbles: true, button: 0, pointerType: 'mouse'}));"
+            "(await until(() => [...document.querySelectorAll("
+            "    '[role=\"menu\"] [role^=\"menuitem\"]')]"
+            "    .find((row) => row.getAttribute('aria-label') === $1)))"
+            "    .click();"
+            "await until(() => chip().textContent === $1);"
+            "})()",
+            name)));
+  }
+
   // Leaves the chat and opens it again in the same tab. A chat open in a
   // tab cannot be opened twice, so the tab leaves it first.
   void Reopen(content::WebContents* chat) {
@@ -1222,7 +1246,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatSwitchesModelAndEffort) {
             std::vector<std::string>{"Now test-other · high"});
   EXPECT_EQ(Until(chat,
                   "document.querySelector('#model-chips')?.textContent"
-                  "    === 'test-otherhigh'"),
+                  "    === 'test-otherhighAuto'"),
             true);
 }
 
@@ -1302,6 +1326,46 @@ IN_PROC_BROWSER_TEST_F(UwChatDarkModeBrowserTest,
                             "document.documentElement.classList.remove('dark');"
                             "getComputedStyle(document.body).backgroundColor"),
             "rgb(10, 10, 10)");
+}
+
+// A mode picked on a new chat, before its first message, is the mode new
+// chats start on. Picked later, it stays with that chat.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModePickedOnANewChatIsTheDefault) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Hi.")});
+  content::WebContents* chat = OpenChat();
+  const std::string chip =
+      "document.querySelector('[aria-label=\"Approval mode\"]')?.textContent";
+  EXPECT_EQ(Until(chat, chip), "Auto");
+
+  PickMode(chat, "Ask first");
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  EXPECT_EQ(prefs.GetString(kAgentApprovalModePref), "ask_first");
+  EXPECT_EQ(Ask(chat, "Hello"), "Hi.");
+  PickMode(chat, "Full auto");
+  EXPECT_EQ(prefs.GetString(kAgentApprovalModePref), "ask_first");
+
+  Reopen(chat);
+  EXPECT_EQ(Until(chat, chip + " === 'Full auto'"), true);
+  content::WebContents* next = OpenChat();
+  EXPECT_EQ(Until(next, chip + " === 'Ask first'"), true);
+}
+
+// In Full auto the agent acts on a sensitive site without asking.
+IN_PROC_BROWSER_TEST_F(UwChatSensitiveSiteBrowserTest,
+                       FullAutoActsOnASensitiveSiteWithoutAsking) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Bank())))),
+       ScriptedModel::Answer("Opened your bank.")});
+  content::WebContents* chat = OpenChat();
+  PickMode(chat, "Full auto");
+
+  EXPECT_EQ(Ask(chat, "Open my bank"), "Opened your bank.");
+  EXPECT_TRUE(BankIsOpen());
+  EXPECT_EQ(content::EvalJs(chat, "!!document.getElementById('approval')"),
+            false);
 }
 
 }  // namespace

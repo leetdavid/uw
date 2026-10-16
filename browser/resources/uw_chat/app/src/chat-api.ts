@@ -2,6 +2,7 @@
 // "uw-chat-mojom" at the bindings the build generates.
 import {
   ApprovalChoice,
+  ApprovalMode,
   ChatHandlerFactory,
   ChatHandlerRemote,
   ChatPageCallbackRouter,
@@ -19,7 +20,7 @@ import type {
   Step,
 } from "uw-chat-mojom";
 
-export { ApprovalChoice, ChatState, SkillSource, StepKind };
+export { ApprovalChoice, ApprovalMode, ChatState, SkillSource, StepKind };
 export type {
   AgentTab,
   Approval,

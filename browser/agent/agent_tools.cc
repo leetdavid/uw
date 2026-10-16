@@ -29,8 +29,8 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/common/actor.mojom.h"
-#include "chrome/common/actor_webui.mojom.h"
 #include "chrome/common/actor/action_result.h"
+#include "chrome/common/actor_webui.mojom.h"
 #include "components/actor/core/task_source_info.h"
 #include "components/actor/public/mojom/actor_types.mojom.h"
 #include "content/public/browser/web_contents.h"
@@ -200,7 +200,8 @@ void AgentTools::Call(std::string_view tool,
 
 std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
     std::string_view tool,
-    const base::DictValue& args) {
+    const base::DictValue& args,
+    bool every_step) {
   if (tool != "click" && tool != "type") {
     return std::nullopt;
   }
@@ -221,6 +222,8 @@ std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
     approval.reason = "Pressing Enter submits a form.";
   } else if (args.FindBool("changes").value_or(false)) {
     approval.reason = "The agent says this changes something.";
+  } else if (every_step) {
+    approval.reason = "Ask first is on.";
   } else {
     return std::nullopt;
   }

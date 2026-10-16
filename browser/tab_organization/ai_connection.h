@@ -37,6 +37,9 @@ inline constexpr char kOrganizationShowActivityPref[] =
 // The names of the skills the user turned off. Every other skill is on.
 inline constexpr char kAgentDisabledSkillsPref[] = "uw.agent.disabled_skills";
 
+// The approval mode new chats start on: "ask_first", "auto", or "full_auto".
+inline constexpr char kAgentApprovalModePref[] = "uw.agent.approval_mode";
+
 // Whether Cmd+T opens the command bar instead of a blank tab.
 inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
 

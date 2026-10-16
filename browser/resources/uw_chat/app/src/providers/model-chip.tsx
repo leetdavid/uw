@@ -21,7 +21,7 @@ import { ProviderIcon } from "./provider-parts";
 // How many models a provider shows before the search narrows them.
 const FIRST_MODELS = 8;
 
-const CHIP =
+export const CHIP =
   "inline-flex h-[30px] min-w-0 items-center gap-[7px] rounded-lg bg-muted px-2 font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function ModelChip({

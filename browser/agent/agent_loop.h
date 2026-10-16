@@ -33,6 +33,11 @@ class SharedURLLoaderFactory;
 
 namespace uw {
 
+// How much a chat asks before it acts. Ask first asks before every click and
+// typing, Auto before each change, and Full auto never. See
+// docs/plans/agent-chats.md.
+enum class ApprovalMode { kAskFirst, kAuto, kFullAuto };
+
 // The model a chat talks to, and its key, which may be empty.
 struct AgentModel {
   AiConnectionConfig connection;
@@ -79,6 +84,8 @@ class AgentLoop {
   bool working() const { return working_; }
   // Talks to `model` from the next request on.
   void SetModel(AgentModel model) { model_ = std::move(model); }
+  // Asks for approval as `mode` says from the next step on. Auto until set.
+  void SetMode(ApprovalMode mode) { mode_ = mode; }
   // The skills the agent may load from now on.
   void SetSkills(const std::vector<Skill>& skills);
   // Asks the user whether to save the skill a save_skill call describes,
@@ -139,6 +146,7 @@ class AgentLoop {
   std::map<std::string, base::FilePath> skills_;
   SaveSkill save_skill_;
   Approve approve_;
+  ApprovalMode mode_ = ApprovalMode::kAuto;
   // The user's no to the engine's question about a site, during the step
   // under way.
   std::optional<ApprovalAnswer> site_refused_;

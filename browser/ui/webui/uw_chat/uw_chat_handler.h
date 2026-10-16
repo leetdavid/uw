@@ -77,6 +77,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void SetModel(const std::string& provider_id,
                 const std::string& model) override;
   void SetEffort(const std::string& effort) override;
+  void SetMode(mojom::ApprovalMode mode) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -144,6 +145,7 @@ class UwChatHandler : public mojom::ChatHandler,
   std::string title_;
   // The model the chat runs on. Nothing when no model is picked anywhere.
   std::optional<ModelChoice> model_;
+  ApprovalMode mode_ = ApprovalMode::kAuto;
   // What the page shows, in order. Steps are kept in the context.
   base::ListValue log_;
   // The saved conversation and the agent's tabs by number, by the tree's page

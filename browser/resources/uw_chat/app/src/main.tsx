@@ -64,6 +64,7 @@ import { fontWeights } from "@/lib/font-weight";
 import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { EffortChip, ModelChip } from "./providers/model-chip";
+import { ModeChip } from "./mode-chip";
 import { ProviderIcon } from "./providers/provider-parts";
 import {
   providersHandler,
@@ -72,6 +73,7 @@ import {
 } from "./providers/providers-api";
 import {
   ApprovalChoice,
+  ApprovalMode,
   ChatState,
   chatHandler,
   chatPage,
@@ -963,6 +965,7 @@ function Chat() {
   // The model the chat runs on, the providers it can pick from, and each
   // provider's models once listed.
   const [model, setModel] = useState<ChatModel | null>(null);
+  const [mode, setMode] = useState(ApprovalMode.kAuto);
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
     {},
@@ -1005,6 +1008,7 @@ function Chat() {
       chatPage.onModel.addListener((picked: ChatModel | null) =>
         setModel(picked),
       ),
+      chatPage.onMode.addListener((picked: ApprovalMode) => setMode(picked)),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
       chatPage.onAsk.addListener((text: string) => setAsked(text)),
       chatPage.onTabs.addListener(
@@ -1246,6 +1250,14 @@ function Chat() {
         preset={chosen?.preset}
         className="h-7"
         onPick={pickEffort}
+      />
+      <ModeChip
+        mode={mode}
+        className="h-7"
+        onPick={(picked) => {
+          setMode(picked);
+          chatHandler.setMode(picked);
+        }}
       />
     </div>
   );

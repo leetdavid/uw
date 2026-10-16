@@ -46,6 +46,9 @@ interface ChatHandler {
   SetModel(string provider_id, string model);
   // One of the chat's model's levels, or empty for its provider's default.
   SetEffort(string effort);
+  // How much the chat asks from the next step on. Picked on a new chat
+  // before its first message, it is also the mode new chats start on.
+  SetMode(ApprovalMode mode);
 };
 
 // The model a chat runs on, from a provider on uw://providers.
@@ -132,6 +135,13 @@ enum ApprovalChoice {
   kStop,
 };
 
+// Matches uw::ApprovalMode.
+enum ApprovalMode {
+  kAskFirst,
+  kAuto,
+  kFullAuto,
+};
+
 // A skill the agent wrote in a chat, waiting for the user to save it.
 struct SkillProposal {
   string name;
@@ -159,6 +169,8 @@ interface ChatPage {
   // The model the chat runs on, after OnOpened and after every change.
   // Nothing when no model is picked anywhere.
   OnModel(ChatModel? model);
+  // The chat's approval mode, after OnOpened and after every change.
+  OnMode(ApprovalMode mode);
   OnStep(Step step);
   // Every saved chat, newest first, whenever the list changes.
   OnChats(array<ChatSummary> chats);

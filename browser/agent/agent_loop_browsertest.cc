@@ -370,5 +370,65 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
               HasSubstr("Not run, because step 4 did not work."));
 }
 
+// Ask first asks before every click and typing, and Full auto before none,
+// not even a step the model marks as a change.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, EachModeAsksAsItSays) {
+  std::vector<std::string> reasons;
+  agent_->SetApprover(base::BindLambdaForTesting(
+      [&](AgentTools::Approval approval,
+          base::OnceCallback<void(AgentLoop::ApprovalAnswer)> done) {
+        reasons.push_back(approval.reason);
+        std::move(done).Run({AgentLoop::ApprovalAnswer::Choice::kApprove});
+      }));
+  // Types `name` and clicks Send, after opening the form on the first run.
+  const auto script = [&](std::string_view name, bool open) {
+    std::vector<std::string> replies;
+    if (open) {
+      replies.push_back(
+          ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+              "open", base::DictValue().Set("url", Url("/form"))))));
+    }
+    replies.push_back(ScriptedModel::Calls(base::ListValue().Append(
+        ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))));
+    replies.push_back(ScriptedModel::Calls(
+        base::ListValue()
+            .Append(ScriptedModel::Call("type", base::DictValue()
+                                                    .Set("tab", 1)
+                                                    .Set("element", 1)
+                                                    .Set("text", name)))
+            .Append(ScriptedModel::Call("click", base::DictValue()
+                                                     .Set("tab", 1)
+                                                     .Set("element", 2)
+                                                     .Set("changes", true)))));
+    replies.push_back(ScriptedModel::Answer("Sent."));
+    model_.Script(std::move(replies));
+  };
+
+  agent_->SetMode(ApprovalMode::kAskFirst);
+  script("Ada", /*open=*/true);
+  ASSERT_EQ(Ask("Send Ada").kind, Kind::kAnswer);
+  EXPECT_EQ(reasons,
+            (std::vector<std::string>{
+                "Ask first is on.", "The agent says this changes something."}));
+
+  reasons.clear();
+  agent_->SetMode(ApprovalMode::kAuto);
+  script("Bob", /*open=*/false);
+  ASSERT_EQ(Ask("Send Bob").kind, Kind::kAnswer);
+  EXPECT_EQ(
+      reasons,
+      (std::vector<std::string>{"The agent says this changes something."}));
+
+  reasons.clear();
+  agent_->SetMode(ApprovalMode::kFullAuto);
+  script("Cy", /*open=*/false);
+  ASSERT_EQ(Ask("Send Cy").kind, Kind::kAnswer);
+  EXPECT_TRUE(reasons.empty());
+  tabs::TabInterface* tab = browser()->tab_strip_model()->GetTabAtIndex(1);
+  EXPECT_EQ(content::EvalJs(tab->GetContents(),
+                            "document.getElementById('said').textContent"),
+            "Cy");
+}
+
 }  // namespace
 }  // namespace uw

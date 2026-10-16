@@ -211,9 +211,10 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
                        std::move(turn), index, std::move(asked)));
     return;
   }
-  if (approve_) {
-    if (std::optional<AgentTools::Approval> approval =
-            tools_.ApprovalFor(call.name, *args)) {
+  if (approve_ && mode_ != ApprovalMode::kFullAuto) {
+    if (std::optional<AgentTools::Approval> approval = tools_.ApprovalFor(
+            call.name, *args,
+            /*every_step=*/mode_ == ApprovalMode::kAskFirst)) {
       approve_.Run(
           std::move(*approval),
           base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
@@ -241,6 +242,10 @@ void AgentLoop::CallTool(ModelTurn turn, size_t index, base::DictValue args) {
 
 void AgentLoop::ConfirmSite(AgentTools::Approval approval,
                             base::OnceCallback<void(bool)> done) {
+  if (mode_ == ApprovalMode::kFullAuto) {
+    std::move(done).Run(true);
+    return;
+  }
   approve_.Run(std::move(approval),
                base::BindOnce(&AgentLoop::OnSiteAnswer,
                               weak_factory_.GetWeakPtr(), std::move(done)));

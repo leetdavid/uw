@@ -4,6 +4,7 @@
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 
 #include <set>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -70,6 +71,31 @@ constexpr char kCutShort[] =
 std::set<std::string>& OpenChats() {
   static base::NoDestructor<std::set<std::string>> open;
   return *open;
+}
+
+// Approval modes as the profile and a chat's file keep them.
+constexpr std::pair<ApprovalMode, std::string_view> kModeNames[] = {
+    {ApprovalMode::kAskFirst, "ask_first"},
+    {ApprovalMode::kAuto, "auto"},
+    {ApprovalMode::kFullAuto, "full_auto"}};
+
+std::string_view NameOf(ApprovalMode mode) {
+  for (const auto& [each, name] : kModeNames) {
+    if (each == mode) {
+      return name;
+    }
+  }
+  return "auto";
+}
+
+// Auto for a name it does not know.
+ApprovalMode ModeNamed(std::string_view name) {
+  for (const auto& [mode, each] : kModeNames) {
+    if (each == name) {
+      return mode;
+    }
+  }
+  return ApprovalMode::kAuto;
 }
 
 base::DictValue ModelValue(const ModelChoice& choice) {
@@ -541,6 +567,9 @@ void UwChatHandler::OnVisibilityChanged(content::Visibility visibility) {
 
 void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   loaded_ = true;
+  mode_ = ModeNamed(Profile::FromBrowserContext(contents_->GetBrowserContext())
+                        ->GetPrefs()
+                        ->GetString(kAgentApprovalModePref));
   if (saved) {
     if (const std::string* title = saved->FindString("title")) {
       title_ = *title;
@@ -550,6 +579,9 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
       log_ = log->Clone();
     }
     model_ = ModelFrom(saved->FindDict("model"));
+    if (const std::string* mode = saved->FindString("mode")) {
+      mode_ = ModeNamed(*mode);
+    }
     if (const base::DictValue* context = saved->FindDict("context")) {
       saved_context_ = AgentContext::FromValue(*context);
     }
@@ -585,6 +617,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   }
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
+  page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
   OnChatsChanged();
   if (start_) {
     page_->OnAsk(start_->text);
@@ -618,6 +651,7 @@ bool UwChatHandler::Start() {
                                             base::Unretained(this)));
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
+  agent_->SetMode(mode_);
   if (TabOrganizationController* tree =
           TabOrganizationController::From(tab->GetBrowserWindowInterface())) {
     for (const auto& [number, page] : saved_tabs_) {
@@ -715,6 +749,25 @@ void UwChatHandler::SetEffort(const std::string& effort) {
   }
   model_->effort = effort;
   OnModelChanged();
+}
+
+// On a new chat, before its first message, the pick is also the mode new
+// chats start on.
+void UwChatHandler::SetMode(mojom::ApprovalMode mode) {
+  if (!loaded_) {
+    return;
+  }
+  mode_ = static_cast<ApprovalMode>(mode);
+  if (agent_) {
+    agent_->SetMode(mode_);
+  }
+  if (title_.empty()) {
+    Profile::FromBrowserContext(contents_->GetBrowserContext())
+        ->GetPrefs()
+        ->SetString(kAgentApprovalModePref, NameOf(mode_));
+  }
+  Save();
+  page_->OnMode(mode);
 }
 
 // Switches in a row make one line, as the page shows them.
@@ -828,6 +881,7 @@ void UwChatHandler::Save() {
   if (model_) {
     saved.Set("model", ModelValue(*model_));
   }
+  saved.Set("mode", NameOf(mode_));
   file_->Save(saved);
   UpdateIndex();
 }

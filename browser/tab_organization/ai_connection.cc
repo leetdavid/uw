@@ -27,6 +27,7 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterDoublePref(kOrganizationRenameThresholdPref,
                                kDefaultThresholds.new_name);
   registry->RegisterListPref(kAgentDisabledSkillsPref);
+  registry->RegisterStringPref(kAgentApprovalModePref, "auto");
   registry->RegisterBooleanPref(kCommandBarEnabledPref, true);
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));

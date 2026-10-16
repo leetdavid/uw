@@ -153,6 +153,8 @@ Expected result: the panel lists your open tabs, history, bookmarks, and a searc
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.
 
+The shield chip in the composer picks how much a chat asks. `Auto`, the default, asks as above. `Ask first` also asks before every click and typing, with the reason `Ask first is on.` `Full auto` never asks, not even for a sensitive site, and the chip turns amber. Expected result: a mode picked on a new chat before its first message is the mode the next new chat starts on; a mode picked later stays with that chat, also after it opens again.
+
 1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
 2. Choose `New Chat` from the File menu or the new button's `▾` menu, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"
