@@ -11,6 +11,10 @@ The immediate activity the user is pursuing with a set of tabs. A broader projec
 The regular tabs of one browsing task in one window, shown as a folder in the sidebar. Tasks do not nest. uw says "task" wherever it shows one, in menus, tooltips, and VoiceOver. Underneath, a task is a Chromium tab group; say "tab group" only for that mechanism.
 _Avoid_: Group, tab group, task group, workspace, space.
 
+**Workspace**:
+One browser profile, as in Arc's profiles: its own logins, cookies, history, extensions, theme, and pinned tabs. Workspaces separate areas such as work and personal; tasks organize the tabs inside one.
+_Avoid_: Space.
+
 **Theme**:
 The colors uw draws its window in: the tint behind the sidebar and the page card. A profile has one theme, shared by all its windows.
 _Avoid_: Skin, space color.
