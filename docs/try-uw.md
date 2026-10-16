@@ -82,12 +82,12 @@ Expected result: a blank tab opens, selected, one level under that tab and above
 
 Click `Organize` at the foot of the sidebar.
 
-- `New task` opens a new tab in a new task of its own. Ctrl+Cmd+N does the same. Cmd-T still opens a tab beside the current one, inside its task.
+- `New Task` opens a new tab in a new task of its own. Ctrl+Cmd+N does the same. Cmd-T still opens a tab beside the current one, inside its task.
 - The new button sits at the right end of the foot. Its `+` does what Cmd-T does. Its `▾` lists `New Tab`, `New Task`, `New Chat`, `New Terminal`, and `New Split View`, each with its key. There is no `+` under the tab list. Collapse the sidebar: a lone `+` stays at its foot, and a right-click on it opens the same menu.
-- `Undo tab organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
+- `Undo Tab Organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
 - The pause items stop and resume automatic organization. While automatic organization is off they are grayed out, and the settings page hides them.
-- `Show organizer activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
-- `Tab organization settings` opens the settings page.
+- `Show Organizer Activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
+- `Tab Organization Settings…` opens the settings page.
 
 ### AI providers
 
@@ -117,7 +117,7 @@ A tab is asked about again when its title changes or it goes to another site. Ch
 
 A task that uw named can change its name. Open a few related pages from it that its name is too narrow for, such as hotels in other parts of town in a task named after one neighbourhood. Expected result: the tabs stay and the task gets a wider name. A task you renamed yourself keeps your name. uw remembers which names it gave across a restart.
 
-Open a task's menu with the button on its row and click `Suggest a name`, the row under the name field. It is there when a language model is set, also while automatic organization is paused or off. Expected result: the row reads `Suggesting a name…` and a spinner turns on the task's row. Within a few seconds the name shows in the field and on the task. The menu can be closed while it waits. The name counts as one uw gave, so a task you had named yourself loses its lock. If the model gives nothing usable, the row reads `Could not suggest a name` and its tooltip says why.
+Open a task's menu with the button on its row and click `Suggest a Name`, the row under the name field. It is there when a language model is set, also while automatic organization is paused or off. Expected result: the row reads `Suggesting a name…` and a spinner turns on the task's row. Within a few seconds the name shows in the field and on the task. The menu can be closed while it waits. The name counts as one uw gave, so a task you had named yourself loses its lock. If the model gives nothing usable, the row reads `Could not suggest a name` and its tooltip says why.
 
 Three sliders on the settings page set how sure a model must be before uw acts without asking: `Move a tab`, `Start a task`, and `Rename a task`. Each shows its number, from 0.50 to 0.95. Drag one down and uw does that one thing more often. Pinned tabs are never sorted.
 

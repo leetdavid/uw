@@ -16,6 +16,10 @@ namespace content {
 class WebContents;
 }
 
+namespace views {
+class Widget;
+}
+
 namespace uw {
 
 // A window's theme picker: a bubble beside the sidebar that holds the theme
@@ -37,6 +41,7 @@ class ThemePicker {
   bool IsShowing() const;
   // Null until the picker first opens.
   content::WebContents* page() const;
+  views::Widget* GetWidgetForTesting() const;
 
  private:
   void Show();

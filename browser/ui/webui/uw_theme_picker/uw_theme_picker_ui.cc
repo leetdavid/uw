@@ -54,6 +54,10 @@ std::vector<uint32_t> ToMojo(const std::vector<SkColor>& colors) {
 
 }  // namespace
 
+bool UwThemePickerUIConfig::ShouldAutoResizeHost() {
+  return true;
+}
+
 class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
  public:
   Handler(UwThemePickerUI* ui,

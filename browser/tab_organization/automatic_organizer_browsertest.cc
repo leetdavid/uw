@@ -226,7 +226,7 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
                                           std::nullopt, false);
   }
 
-  // The "Suggest a name" row of an open task menu.
+  // The "Suggest a Name" row of an open task menu.
   static SuggestNameItem* SuggestItemOf(views::Widget* menu) {
     for (views::View* row :
          menu->widget_delegate()->GetContentsView()->children()) {
@@ -1837,7 +1837,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(link->GetGroup(), task);
 }
 
-// "Suggest a name" in a task's menu asks the language model for a name from
+// "Suggest a Name" in a task's menu asks the language model for a name from
 // the tabs the task holds, while automatic organization is paused too. The
 // name lands in the field and on the task as one uw gave, in place of the
 // name the user had typed.
@@ -1852,7 +1852,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   SuggestNameItem* item = SuggestItemOf(menu.get());
   ASSERT_TRUE(item);
   ASSERT_TRUE(item->GetVisible());
-  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_EQ(TextOf(item), u"Suggest a Name");
   EXPECT_EQ(NameFieldOf(menu.get()), u"Lisbon");
   SaveWidgetScreenshot(menu.get(), "suggest-a-name");
 
@@ -1864,7 +1864,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(Requests()[0].body.find("Title: flights\\n"), std::string::npos);
   EXPECT_NE(Requests()[0].body.find("- hotels"), std::string::npos);
   EXPECT_EQ(NameFieldOf(menu.get()), u"Plan Lisbon trip");
-  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_EQ(TextOf(item), u"Suggest a Name");
   EXPECT_TRUE(item->button()->GetEnabled());
   EXPECT_TRUE(controller()->HasGeneratedName(task.ToString()));
   EXPECT_FALSE(NameLockOf(task)->GetVisible());
@@ -1891,7 +1891,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(item);
   ASSERT_TRUE(item->GetVisible());
   views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
-  EXPECT_EQ(TextOf(item), u"Suggesting a name\u2026");
+  EXPECT_EQ(TextOf(item), u"Suggesting a Name\u2026");
   EXPECT_FALSE(item->button()->GetEnabled());
   EXPECT_TRUE(organizer()->IsNaming(task.ToString()));
   EXPECT_TRUE(SpinnerOf(task)->spinning());
@@ -1930,7 +1930,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return TitleOf(task) == u"Plan Lisbon trip"; }));
   EXPECT_EQ(Requests().size(), 2u);
-  EXPECT_EQ(TextOf(item), u"Suggest a name");
+  EXPECT_EQ(TextOf(item), u"Suggest a Name");
   EXPECT_TRUE(item->button()->GetTooltipText().empty());
 }
 

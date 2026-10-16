@@ -54,6 +54,10 @@ content::WebContents* ThemePicker::page() const {
              : nullptr;
 }
 
+views::Widget* ThemePicker::GetWidgetForTesting() const {
+  return bubble_ ? bubble_->GetBubbleWidget() : nullptr;
+}
+
 void ThemePicker::Show() {
   if (!bubble_) {
     bubble_ = WebUIBubbleManager::Create<UwThemePickerUI>(

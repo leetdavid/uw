@@ -171,17 +171,19 @@ void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
 
 void OrganizeBar::ShowMenu() {
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-  menu_model_->AddItemWithStringId(kNewTask, IDS_UW_OPEN_NEW_TASK);
-  menu_model_->AddItemWithStringId(kUndo, IDS_UW_UNDO_ORGANIZATION);
+  menu_model_->AddItemWithStringId(kNewTask, IDS_UW_NEW_TASK_MAC);
+  menu_model_->AddItemWithStringId(kUndo, IDS_UW_UNDO_ORGANIZATION_MAC);
   menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu_model_->AddItemWithStringId(kPauseForAnHour, IDS_UW_PAUSE_1HOUR);
+  menu_model_->AddItemWithStringId(kPauseForAnHour, IDS_UW_PAUSE_1HOUR_MAC);
   menu_model_->AddItemWithStringId(kPauseUntilLaunch,
-                                   IDS_UW_PAUSE_UNTIL_LAUNCH);
-  menu_model_->AddItemWithStringId(kPauseIndefinitely, IDS_UW_PAUSE_INDEFINITE);
-  menu_model_->AddItemWithStringId(kResume, IDS_UW_PAUSE_RESUME);
+                                   IDS_UW_PAUSE_UNTIL_LAUNCH_MAC);
+  menu_model_->AddItemWithStringId(kPauseIndefinitely,
+                                   IDS_UW_PAUSE_INDEFINITE_MAC);
+  menu_model_->AddItemWithStringId(kResume, IDS_UW_PAUSE_RESUME_MAC);
   menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu_model_->AddCheckItemWithStringId(kShowActivity, IDS_UW_SHOW_ACTIVITY);
-  menu_model_->AddItemWithStringId(kSettings, IDS_UW_ORGANIZATION_SETTINGS);
+  menu_model_->AddCheckItemWithStringId(kShowActivity,
+                                        IDS_UW_SHOW_ACTIVITY_MAC);
+  menu_model_->AddItemWithStringId(kSettings, IDS_UW_ORGANIZATION_SETTINGS_MAC);
 
   hover_lock_ =
       BrowserView::GetBrowserViewForBrowser(window_)

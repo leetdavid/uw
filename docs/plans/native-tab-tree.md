@@ -15,7 +15,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
 - Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
 - Tab menu commands: "New child tab", "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
-- An "Organize" button at the foot of the sidebar opens a menu: "New task", "Undo tab organization", the pause controls, "Show organizer activity", and the settings page.
+- An "Organize" button at the foot of the sidebar opens a menu: "New Task", "Undo Tab Organization", the pause controls, "Show Organizer Activity", and the settings page.
 - "New task" opens a new tab in a new task of its own, named `New task`. The sidebar's "+" button and Ctrl+Cmd+N do the same. The key was Chromium's Ctrl+Cmd+P until 2026-10-15; see [Keys](keyboard-and-mouse.md#keys). Cmd-T still opens a tab beside the active tab, in its task. Agreed on 2026-10-12.
 - [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.
 - Option+Cmd+Z runs "Undo tab organization" in the focused window. Each press goes back one action, the user's or uw's, whether or not the activity card is showing. Nothing extra is shown. The Organize menu shows the key beside the item. Agreed on 2026-10-13.

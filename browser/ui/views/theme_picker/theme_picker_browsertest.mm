@@ -7,7 +7,10 @@
 
 #include <vector>
 
+#include "base/run_loop.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "base/time/time.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
@@ -28,6 +31,8 @@
 #include "ui/base/l10n/l10n_util_mac.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -176,6 +181,56 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheModeButtonsSetTheMode) {
     return themes()->GetBrowserColorScheme() ==
            ThemeService::BrowserColorScheme::kSystem;
   }));
+}
+
+// A real window can close a bubble as soon as it shows, which a headless one
+// never does. Run these with `pnpm run window-tests`.
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
+                       MANUAL_ThePickerOpensAndStaysOpenInARealWindow) {
+  chrome::ExecuteCommand(browser(), kShowThemePicker);
+  ASSERT_TRUE(picker()->page());
+  content::WebContentsConsoleObserver console(picker()->page());
+  EXPECT_TRUE(base::test::RunUntil([&] { return picker()->IsShowing(); }))
+      << "console: " << console.GetMessageAt(0u);
+  base::RunLoop wait;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, wait.QuitClosure(), base::Seconds(1));
+  wait.Run();
+  EXPECT_TRUE(picker()->IsShowing());
+  if (views::Widget* bubble = picker()->GetWidgetForTesting()) {
+    const gfx::Rect bounds = bubble->GetWindowBoundsInScreen();
+    EXPECT_GE(bounds.width(), 300) << bounds.ToString();
+    EXPECT_GE(bounds.height(), 380) << bounds.ToString();
+    SaveWidgetScreenshot(bubble, "theme-picker-window");
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
+                       MANUAL_TheSettingsRowOpensThePickerInARealWindow) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://settings/uwOrganization")));
+  content::WebContents* settings =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(content::ExecJs(settings, R"(
+    (async () => {
+      const find = (root) => {
+        const found = root.querySelector('settings-uw-organization-page');
+        if (found) return found;
+        for (const element of root.querySelectorAll('*')) {
+          const inner = element.shadowRoot && find(element.shadowRoot);
+          if (inner) return inner;
+        }
+        return null;
+      };
+      let row = null;
+      while (!row) {
+        row = find(document)?.shadowRoot?.getElementById('themeLink');
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      row.click();
+    })()
+  )"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return picker()->IsShowing(); }));
 }
 
 }  // namespace

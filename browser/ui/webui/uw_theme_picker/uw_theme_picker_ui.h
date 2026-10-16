@@ -28,6 +28,9 @@ class UwThemePickerUIConfig
   UwThemePickerUIConfig()
       : DefaultTopChromeWebUIConfig(content::kChromeUIScheme,
                                     kThemePickerHost) {}
+
+  // The bubble takes the page's size.
+  bool ShouldAutoResizeHost() override;
 };
 
 // The theme picker's page, shown in a bubble beside the sidebar. It saves the

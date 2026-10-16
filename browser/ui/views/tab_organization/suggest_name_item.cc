@@ -38,7 +38,7 @@ SuggestNameItem::SuggestNameItem(BrowserWindowInterface* window,
   organizer_ = organizer->AsWeakPtr();
   SetUseDefaultFillLayout(true);
   button_ = AddChildView(CreateBubbleMenuItem(
-      0, l10n_util::GetStringUTF16(IDS_UW_SUGGEST_NAME),
+      0, l10n_util::GetStringUTF16(IDS_UW_SUGGEST_NAME_MAC),
       base::BindRepeating(&SuggestNameItem::Suggest, base::Unretained(this)),
       ui::ImageModel::FromVectorIcon(vector_icons::kButtonMagicIcon,
                                      ui::kColorMenuIcon, kIconSize)));
@@ -78,7 +78,7 @@ void SuggestNameItem::Refresh() {
   button_->SetText(l10n_util::GetStringUTF16(naming ? IDS_UW_SUGGESTING_NAME
                                              : failed_
                                                  ? IDS_UW_SUGGEST_NAME_FAILED
-                                                 : IDS_UW_SUGGEST_NAME));
+                                                 : IDS_UW_SUGGEST_NAME_MAC));
   button_->SetTooltipText(naming ? std::u16string() : reason_);
   button_->SetEnabled(!naming);
 }

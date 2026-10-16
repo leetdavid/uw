@@ -41,6 +41,8 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//ui/base",
     "//ui/color",
+    "//ui/gfx",
+    "//ui/views",
     "//url",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:test_support",
