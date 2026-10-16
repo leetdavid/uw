@@ -109,16 +109,16 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 
 ## Stages
 
-Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-16: T99, T82, and T81 moved ahead of T61 at the user's request, and T82 no longer waits for T54.
+Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-16: T99, T82, and T81 moved ahead of T61 at the user's request, and T82 no longer waits for T54. Changed again the same day: the user put commands off, so T66 comes before T61.
 
 1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler.
 2. T98: the command bar opens what is picked, in the design's look, from Chromium's instant results. Added on 2026-10-16 so Cmd+T opens pages before T61.
 3. T99: addresses complete inline, Tab takes the completion, and Return opens the completed address. Added on 2026-10-16.
 4. T82: Option+Return, `>`, and Cmd+Shift+P run the text in a new terminal.
 5. T81: Cmd+Return sends the text to a new chat, with the selected tab handed to the agent.
-6. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
-7. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
-8. T66: math, units, currency, the default currency setting, and translation.
+6. T66: math, units, currency, the default currency setting, and translation.
+7. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
+8. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
 9. T62: Cmd+L and the address click open it.
 10. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
 11. T64: Cmd+Shift+A opens it narrowed to tabs.
