@@ -12,6 +12,7 @@
 #include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
@@ -97,9 +98,24 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     embedded_https_test_server().SetCertHostnames({"shop.test", "bank.test"});
     embedded_https_test_server().RegisterRequestHandler(
         base::BindRepeating(&ServeForm));
+    embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
+        [](const std::string* catalog,
+           const net::test_server::HttpRequest& request)
+            -> std::unique_ptr<net::test_server::HttpResponse> {
+          if (request.relative_url != "/v1/catalog.json" || catalog->empty()) {
+            return nullptr;
+          }
+          auto response =
+              std::make_unique<net::test_server::BasicHttpResponse>();
+          response->set_content_type("application/json");
+          response->set_content(*catalog);
+          return response;
+        },
+        base::Unretained(&catalog_)));
     ASSERT_TRUE(embedded_https_test_server().Start());
     ASSERT_TRUE(embedded_test_server()->Start());
-    // The model catalog comes from the test server, which has none.
+    // The model catalog comes from the test server: none, unless a test sets
+    // `catalog_` before a model list is asked for.
     CatalogStore::SetSourceForTesting(
         embedded_test_server()->GetURL("/v1/catalog.json"));
     // The test's own folder stands in for ~/.agents/skills.
@@ -293,7 +309,11 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   // tab cannot be opened twice, so the tab leaves it first.
   void Reopen(content::WebContents* chat) {
     const GURL address = chat->GetLastCommittedURL();
+    // The chat stays open until the old page's frame is gone; a page that
+    // asks for it before then starts a new chat.
+    content::RenderFrameDeletedObserver left(chat->GetPrimaryMainFrame());
     ASSERT_TRUE(content::NavigateToURL(chat, GURL("about:blank")));
+    left.WaitUntilDeleted();
     ASSERT_TRUE(content::NavigateToURL(chat, address));
     WaitForChat(chat);
   }
@@ -445,6 +465,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   ScriptedModel model_{*embedded_test_server()};
+  std::string catalog_;
   base::ScopedTempDir home_;
 };
 
@@ -1459,6 +1480,73 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   EXPECT_THAT(model_.Requests()[3],
               ::testing::HasSubstr("The user did not approve this step"));
   EXPECT_THAT(model_.Requests()[3], ::testing::HasSubstr("Not today"));
+}
+
+// Pastes a small PNG called sofa.png into the composer.
+constexpr char kPasteImage[] = R"(
+  (async () => {
+    const canvas = new OffscreenCanvas(8, 6);
+    canvas.getContext('2d').fillRect(0, 0, 8, 6);
+    const blob = await canvas.convertToBlob({type: 'image/png'});
+    const files = new DataTransfer();
+    files.items.add(new File([blob], 'sofa.png', {type: 'image/png'}));
+    document.getElementById('message').dispatchEvent(
+        new ClipboardEvent('paste', {clipboardData: files, bubbles: true}));
+    await new Promise((resolve) => {
+      const check = () => document.querySelector('[aria-label="Remove sofa.png"]')
+          ? resolve() : setTimeout(check, 20);
+      check();
+    });
+  })()
+)";
+
+// A pasted image goes with the message as image 1, shows above it, and is
+// there again when the chat opens again.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, APastedImageGoesWithTheMessage) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("It is a black rectangle.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, kPasteImage));
+
+  EXPECT_EQ(Ask(chat, "What is this?"), "It is a black rectangle.");
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelectorAll('.sent-image')"
+                            "    .length"),
+            1);
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("data:image/png;base64,"));
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("Image 1:"));
+
+  Reopen(chat);
+  EXPECT_EQ(
+      Until(chat, "document.querySelectorAll('.sent-image').length === 1"),
+      true);
+}
+
+// A model the catalog lists without image input makes the composer say so,
+// and the message waits.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModelThatCannotSeeImagesWaits) {
+  UseAgentModel();
+  catalog_ = base::StrCat({R"({"testlab": {"api": ")",
+                           embedded_test_server()->GetURL("/v1").spec(),
+                           R"(", "models": {"test-agent": {"tool_call": true,)"
+                           R"( "modalities": {"input": ["text"]}}}}})"});
+  model_.ListModels({"test-agent"});
+  model_.Script({ScriptedModel::Answer("Hello.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, kPasteImage));
+
+  EXPECT_EQ(
+      Until(chat, "document.getElementById('cannot-see-images')?.textContent"),
+      "test-agent can't see images. Pick a model that can.");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("What is this?")));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "new Promise((resolve) => setTimeout(() =>"
+                            "    resolve(document.querySelectorAll('.mine')"
+                            "        .length), 300))"),
+            0);
+  EXPECT_TRUE(model_.Requests().empty());
 }
 
 }  // namespace

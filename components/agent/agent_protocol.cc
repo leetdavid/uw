@@ -31,7 +31,9 @@ constexpr char kInstructions[] =
     "Each tool result has a step number. Earlier results may be shortened "
     "to one line to save space; call recall with a step number to see one "
     "again. A recalled page is a copy from that step: read the tab again "
-    "before you click or type.\n"
+    "before you click or type. Images the user sends are numbered from 1. "
+    "Once you answer, each shrinks to one line; call recall with its image "
+    "number to see it again.\n"
     "Skills teach you how to do some kinds of requests. When a request "
     "matches a skill listed below, call skill with its name first and follow "
     "its instructions. A skill's scripts cannot run; read its other files "
@@ -143,9 +145,13 @@ base::ListValue AgentToolSchemas() {
           .Set("instructions", Parameter("string", "The steps, in Markdown.")),
       Names({"name", "description", "instructions"})));
   tools.Append(Tool(
-      "recall", "Shows the full result of an earlier step again.",
-      base::DictValue().Set("step", Parameter("integer", "The step's number.")),
-      Names({"step"})));
+      "recall",
+      "Shows the full result of an earlier step again, or an image the user "
+      "sent.",
+      base::DictValue()
+          .Set("step", Parameter("integer", "The step's number."))
+          .Set("image", Parameter("integer", "An image's number, instead.")),
+      base::ListValue()));
   return tools;
 }
 

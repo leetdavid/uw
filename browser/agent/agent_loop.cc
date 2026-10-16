@@ -104,13 +104,13 @@ void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
   context_->SetSkills(list);
 }
 
-void AgentLoop::Send(std::string_view text) {
+void AgentLoop::Send(std::string_view text, std::vector<std::string> images) {
   if (working_) {
     return;
   }
   working_ = true;
   turns_ = 0;
-  context_->AddUser(text);
+  context_->AddUser(text, images);
   AskModel();
 }
 
@@ -143,20 +143,20 @@ void AgentLoop::Stop() {
   stopping_ = true;
 }
 
-void AgentLoop::Steer(std::string_view text) {
+void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
   if (!working_) {
-    Send(text);
+    Send(text, std::move(images));
     return;
   }
   turns_ = 0;
   if (asking_) {
     client_.reset();
     asking_ = false;
-    context_->AddUser(text);
+    context_->AddUser(text, images);
     AskModel();
     return;
   }
-  steer_ = std::string(text);
+  steer_ = Message{std::string(text), std::move(images)};
 }
 
 void AgentLoop::AskModel() {
@@ -164,8 +164,12 @@ void AgentLoop::AskModel() {
     Finish(StoppedByUser());
     return;
   }
+  if (!recalled_images_.empty()) {
+    context_->ShowImages(std::exchange(recalled_images_, {}));
+  }
   if (steer_) {
-    context_->AddUser(*std::exchange(steer_, std::nullopt));
+    const Message steer = *std::exchange(steer_, std::nullopt);
+    context_->AddUser(steer.text, steer.images);
   }
   if (++turns_ > kMaxTurns) {
     Finish(Failed(base::StrCat({"The agent stopped after ",
@@ -247,6 +251,9 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
   }
   if (call.name == "recall") {
     base::DictValue recalled = context_->Recall(*args);
+    if (const std::optional<int> image = recalled.FindInt("image")) {
+      recalled_images_.push_back(*image);
+    }
     OnTool(std::move(turn), index, std::move(*args), std::move(recalled));
     return;
   }
@@ -417,6 +424,7 @@ void AgentLoop::OnTool(ModelTurn turn,
 void AgentLoop::Finish(Step step) {
   stopping_ = false;
   steer_.reset();
+  recalled_images_.clear();
   context_->ShortenAll();
   working_ = false;
   on_step_.Run(step);

@@ -189,6 +189,11 @@ interface InputMessageProps
   /** Sends a draft into the running response instead of queueing it. With it,
    *  Enter while streaming steers and Cmd/Ctrl+Enter queues. */
   onSteer?: (text: string, files: File[]) => void;
+  /** A line between the attached files and the field, such as why the
+   *  message cannot go yet. */
+  notice?: ReactNode;
+  /** Keeps the message from being sent, as while a notice says why. */
+  sendBlocked?: boolean;
   /** Keeps the queue from dispatching on the next `streaming → idle` edge, as
    *  after a failure or a stop. Each row then offers Send now. */
   holdQueue?: boolean;
@@ -536,6 +541,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       onStop,
       onSteer,
       holdQueue,
+      notice,
+      sendBlocked,
       queue,
       onQueueChange,
       showQueue = true,
@@ -693,7 +700,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     }, [resizeTextarea]);
 
     const trimmed = value.trim();
-    const canSend = !disabled && (trimmed.length > 0 || filesArr.length > 0);
+    const canSend =
+      !disabled && !sendBlocked && (trimmed.length > 0 || filesArr.length > 0);
 
     // Edge = the box-shadow's 1px ring, recoloured in place per state so the
     // stroke gains contrast without ever appearing to thicken (no second
@@ -1193,6 +1201,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
               </motion.div>
             )}
           </AnimatePresence>
+          {notice && <div className="pb-1">{notice}</div>}
 
           {/* Queued messages — reorderable rows above the textarea. The outer
               motion.div collapses the region height when the queue empties;
@@ -1254,6 +1263,15 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                 onValueChange(e.target.value);
               }}
               onKeyDown={handleKeyDown}
+              // Pasted images join the attached files.
+              onPaste={(e) => {
+                textareaProps?.onPaste?.(e);
+                if (!supportsFiles) return;
+                const pasted = [...e.clipboardData.files].filter(matchesAccept);
+                if (!pasted.length) return;
+                addFiles(pasted);
+                if (!e.clipboardData.getData("text/plain")) e.preventDefault();
+              }}
               // Compose the consumer's textareaProps handlers with the internal
               // focus-visible tracking (the spread below would otherwise
               // overwrite these).

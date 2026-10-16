@@ -23,6 +23,10 @@ namespace uw {
 // this key: {"address": ..., "model": ..., "format": ..., "items": [...]}.
 inline constexpr char kKeptPartsKey[] = "uw_kept";
 
+// Marks a user message uw adds to show the model an image it recalled. It is
+// not a new turn from the user, so what the model kept still goes back.
+inline constexpr char kShownKey[] = "uw_shown";
+
 // The path under a provider's base address that takes language-model
 // requests in `format`.
 std::string_view LanguageModelPath(ProviderFormat format);

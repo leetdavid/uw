@@ -17,9 +17,11 @@ import {
   FolderOpen,
   Loader2,
   Pause,
+  Paperclip,
   Plus,
   Sparkles,
   Square,
+  TriangleAlert,
   Trash2,
 } from "lucide-react";
 import { code } from "@streamdown/code";
@@ -69,6 +71,7 @@ import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { EffortChip, ModelChip } from "./providers/model-chip";
 import { ModeChip } from "./mode-chip";
+import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
 import { ProviderIcon } from "./providers/provider-parts";
 import {
   providersHandler,
@@ -254,6 +257,19 @@ const TOOL_ICONS: Record<string, IconName> = {
   save_skill: "check",
 };
 
+// A message from the user, with its images as data: URLs.
+function userLine(text: string, images: string[]): Step {
+  return {
+    kind: StepKind.kUser,
+    tool: "",
+    args: "",
+    result: "",
+    text,
+    model: null,
+    images,
+  };
+}
+
 function isStep(line: Step): boolean {
   return line.kind === StepKind.kTool || line.kind === StepKind.kResumed;
 }
@@ -348,8 +364,8 @@ function Line({
       return <ModelLine model={line.model} providers={providers} />;
     case StepKind.kUser:
       return (
-        <ChatMessage from="user">
-          <span className="mine">{line.text}</span>
+        <ChatMessage from="user" images={line.images}>
+          {line.text && <span className="mine">{line.text}</span>}
         </ChatMessage>
       );
     case StepKind.kAnswer:
@@ -985,6 +1001,7 @@ function Chat() {
   const [model, setModel] = useState<ChatModel | null>(null);
   const [mode, setMode] = useState(ApprovalMode.kAuto);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
     {},
@@ -1107,6 +1124,7 @@ function Chat() {
       result: "",
       text: "",
       model: picked,
+      images: [],
     };
     setLines((before) =>
       before.at(-1)?.kind === StepKind.kModel
@@ -1171,51 +1189,44 @@ function Chat() {
           ? `${model.model} is no longer offered by ${chosen.name}.`
           : "";
 
-  const send = (text: string) => {
+  // The chat's model takes no images, as the model catalog says.
+  const cannotSee = (attached: File[]) =>
+    attached.length > 0 && chosenModel?.seesImages === false;
+
+  const send = async (text: string, attached: File[] = []) => {
     const message = text.trim();
-    if (!message || working || !opened || gone) {
+    if (
+      (!message && !attached.length) ||
+      working ||
+      !opened ||
+      gone ||
+      cannotSee(attached)
+    ) {
       return;
     }
-    // The first message names the tab.
-    if (!lines.some((line) => line.kind === StepKind.kUser)) {
-      document.title = message;
-    }
-    setLines((before) => [
-      ...before,
-      {
-        kind: StepKind.kUser,
-        tool: "",
-        args: "",
-        result: "",
-        text: message,
-        model: null,
-      },
-    ]);
-    setDraft("");
     setWorking(true);
     setSince(Date.now());
-    chatHandler.send(message);
+    const images = await Promise.all(attached.map(imageData));
+    // The first message names the tab.
+    if (message && !lines.some((line) => line.kind === StepKind.kUser)) {
+      document.title = message;
+    }
+    setLines((before) => [...before, userLine(message, images)]);
+    setDraft("");
+    setFiles([]);
+    chatHandler.send(message, images);
   };
 
   // A message while the agent works: it goes in after the step under way, or
   // declines a step that waits for approval.
-  const steer = (text: string) => {
+  const steer = async (text: string, attached: File[]) => {
     const message = text.trim();
-    if (!message) {
+    if ((!message && !attached.length) || cannotSee(attached)) {
       return;
     }
-    setLines((before) => [
-      ...before,
-      {
-        kind: StepKind.kUser,
-        tool: "",
-        args: "",
-        result: "",
-        text: message,
-        model: null,
-      },
-    ]);
-    chatHandler.steer(message);
+    const images = await Promise.all(attached.map(imageData));
+    setLines((before) => [...before, userLine(message, images)]);
+    chatHandler.steer(message, images);
   };
 
   // Sends what the command bar asked, as if typed, once the chat is open.
@@ -1236,6 +1247,7 @@ function Chat() {
         result: "",
         text: "",
         model: null,
+        images: [],
       },
     ]);
     setWorking(true);
@@ -1305,6 +1317,20 @@ function Chat() {
       />
     </div>
   );
+  // Why the images cannot go yet, or that the limit is reached.
+  const notice = cannotSee(files) ? (
+    <p
+      id="cannot-see-images"
+      className="flex items-center gap-1.5 px-1 text-[12.5px] text-warning"
+    >
+      <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+      {model?.model} can't see images. Pick a model that can.
+    </p>
+  ) : files.length >= MAX_IMAGES ? (
+    <p className="px-1 text-xs text-muted-foreground">
+      A message holds up to {MAX_IMAGES} images.
+    </p>
+  ) : null;
   const composer = (
     <>
       {gone && (
@@ -1328,7 +1354,29 @@ function Chat() {
         placeholderSuggestion={title ? undefined : suggestions[0]}
         suggestions={title ? undefined : suggestions.slice(1)}
         textareaProps={{ id: "message", "aria-label": "Message" }}
-        leftSlot={chips}
+        files={files}
+        onFilesChange={setFiles}
+        accept={IMAGE_TYPES}
+        maxFiles={MAX_IMAGES}
+        filePreviewSize={64}
+        notice={notice}
+        sendBlocked={cannotSee(files)}
+        leftSlot={({ openFilePicker }) => (
+          <div className="flex min-w-0 items-center gap-1.5">
+            <button
+              type="button"
+              id="attach"
+              aria-label="Attach images"
+              title="Attach images"
+              disabled={files.length >= MAX_IMAGES}
+              onClick={() => openFilePicker(IMAGE_TYPES)}
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-hover hover:text-foreground disabled:opacity-35"
+            >
+              <Paperclip aria-hidden className="size-4" />
+            </button>
+            {chips}
+          </div>
+        )}
       />
       <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">
         {approval

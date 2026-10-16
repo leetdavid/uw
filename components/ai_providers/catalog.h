@@ -17,6 +17,8 @@ namespace uw {
 // What a model can do, as uw shows and uses it. See ADR 0008.
 struct ModelAbilities {
   bool calls_tools = true;
+  // Whether it takes images. A model the catalog does not know is taken to.
+  bool sees_images = true;
   // The effort levels the model takes, named as its provider names them.
   // Empty when it takes none.
   std::vector<std::string> efforts;

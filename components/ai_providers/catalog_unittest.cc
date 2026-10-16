@@ -21,6 +21,7 @@ using ::testing::IsEmpty;
 constexpr char kApiJson[] = R"({
   "openai": {"models": {
     "gpt-5": {"tool_call": true, "reasoning": true,
+              "modalities": {"input": ["text", "image"]},
               "reasoning_options": [{"type": "effort",
                                      "values": ["minimal", "low", "medium", "high"]}]},
     "gpt-4o": {"tool_call": true, "reasoning": false}
@@ -39,6 +40,7 @@ constexpr char kApiJson[] = R"({
   }},
   "deepseek": {"api": "https://api.deepseek.com", "models": {
     "deepseek-v4-pro": {"tool_call": true, "reasoning": true,
+                        "modalities": {"input": ["text"]},
                         "reasoning_options": [{"type": "toggle"},
                                               {"type": "effort",
                                                "values": ["low", "high", "max"]}]}
@@ -180,6 +182,23 @@ TEST(CatalogTest, AProxyModelGoesOverItsMakersFormat) {
   EXPECT_EQ(FormatOfModel(Preset(ProviderPreset::kOpenAi), "claude-opus-5-5",
                           &*catalog),
             ProviderFormat::kOpenAiResponses);
+}
+
+// The catalog says which models take images. One it does not know, or that
+// lists no input types, is taken to.
+TEST(CatalogTest, TheCatalogSaysWhichModelsSeeImages) {
+  const std::optional<ModelCatalog> catalog =
+      ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  EXPECT_FALSE(
+      catalog->For(Custom("https://api.deepseek.com"), "deepseek-v4-pro")
+          .sees_images);
+  EXPECT_TRUE(
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-5").sees_images);
+  EXPECT_TRUE(
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-4o").sees_images);
+  EXPECT_TRUE(catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-9-preview")
+                  .sees_images);
 }
 
 TEST(CatalogTest, TheSavedCopyReadsBackTheSame) {

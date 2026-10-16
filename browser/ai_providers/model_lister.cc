@@ -199,6 +199,8 @@ void ModelLister::OnOllamaModel(Listing* listing,
     ModelAbilities& abilities = listing->result.models[index].abilities;
     abilities.calls_tools =
         std::ranges::contains(*capabilities, base::Value("tools"));
+    abilities.sees_images =
+        std::ranges::contains(*capabilities, base::Value("vision"));
     abilities.efforts.clear();
     if (std::ranges::contains(*capabilities, base::Value("thinking"))) {
       abilities.efforts.assign(std::begin(kUsualEfforts),

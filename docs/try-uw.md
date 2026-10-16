@@ -157,6 +157,8 @@ The shield chip in the composer picks how much a chat asks. `Auto`, the default,
 
 While the agent works, the composer's button is Stop when the field is empty. Expected result: the waiting model request is dropped, a click or typing under way finishes, and the chat says `You stopped the chat.` Enter sends a message the agent reads after its current step; Cmd+Enter queues it as a row above the composer, sent once the agent answers. After a failure or a stop, queued rows stay, with Send now, Edit, and the ×. While a step waits for approval, Enter declines it with your message as the note.
 
+A message can carry images: paste one, drag images onto the composer, or use the paperclip, up to 5. Expected result: each shows as a tile in the composer with an ×, and above your message once sent; the model gets them as image 1, image 2, and so on. After its answer they shrink in what it sees, and it can ask for one again. When the chat's model can't see images, as models.dev says of `deepseek-v4-pro`, the composer says `deepseek-v4-pro can't see images. Pick a model that can.` and the message waits.
+
 1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
 2. Choose `New Chat` from the File menu or the new button's `▾` menu, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"

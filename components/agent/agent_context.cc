@@ -4,12 +4,14 @@
 #include "uw/components/agent/agent_context.h"
 
 #include <algorithm>
+#include <iterator>
 #include <utility>
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "uw/components/ai_providers/formats.h"
 
 namespace uw {
 namespace {
@@ -19,6 +21,21 @@ constexpr size_t kShortResult = 300;
 
 std::string Json(const base::DictValue& value) {
   return base::WriteJson(value).value_or("{}");
+}
+
+base::DictValue TextPart(std::string_view text) {
+  return base::DictValue().Set("type", "text").Set("text", text);
+}
+
+base::DictValue ImagePart(std::string_view url) {
+  return base::DictValue()
+      .Set("type", "image_url")
+      .Set("image_url", base::DictValue().Set("url", url));
+}
+
+// Comes before each image, so the model knows its number.
+std::string ImageLabel(int number) {
+  return base::StrCat({"Image ", base::NumberToString(number), ":"});
 }
 
 }  // namespace
@@ -60,6 +77,31 @@ std::unique_ptr<AgentContext> AgentContext::FromValue(
          value->Clone(), static_cast<size_t>(*message),
          result->FindBool("shortened").value_or(false)});
   }
+  if (const base::ListValue* images = saved.FindList("images")) {
+    for (const base::Value& entry : *images) {
+      const base::DictValue* image = entry.GetIfDict();
+      const std::optional<int> number =
+          image ? image->FindInt("number") : std::nullopt;
+      const std::string* url = image ? image->FindString("url") : nullptr;
+      const std::optional<int> message =
+          image ? image->FindInt("message") : std::nullopt;
+      const std::optional<int> part =
+          image ? image->FindInt("part") : std::nullopt;
+      const base::ListValue* parts =
+          message && *message > 0 &&
+                  static_cast<size_t>(*message) < messages->size()
+              ? (*messages)[*message].GetDict().FindList("content")
+              : nullptr;
+      if (!number || !url || !parts || !part || *part < 1 ||
+          static_cast<size_t>(*part) >= parts->size()) {
+        return nullptr;
+      }
+      context->images_.push_back(
+          {*number, *url, static_cast<size_t>(*message),
+           static_cast<size_t>(*part),
+           image->FindBool("shortened").value_or(false)});
+    }
+  }
   return context;
 }
 
@@ -73,13 +115,65 @@ base::DictValue AgentContext::ToValue() const {
                        .Set("message", static_cast<int>(result.message))
                        .Set("shortened", result.shortened));
   }
+  base::ListValue images;
+  for (const Image& image : images_) {
+    images.Append(base::DictValue()
+                      .Set("number", image.number)
+                      .Set("url", image.url)
+                      .Set("message", static_cast<int>(image.message))
+                      .Set("part", static_cast<int>(image.part))
+                      .Set("shortened", image.shortened));
+  }
   return base::DictValue()
       .Set("messages", messages_.Clone())
-      .Set("results", std::move(results));
+      .Set("results", std::move(results))
+      .Set("images", std::move(images));
 }
 
 void AgentContext::AddUser(std::string_view text) {
   messages_.Append(UserMessage(text));
+}
+
+void AgentContext::AddUser(std::string_view text,
+                           const std::vector<std::string>& images) {
+  if (images.empty()) {
+    AddUser(text);
+    return;
+  }
+  int number = 0;
+  for (const Image& image : images_) {
+    number = std::max(number, image.number);
+  }
+  base::ListValue parts;
+  parts.Append(TextPart(text));
+  for (const std::string& url : images) {
+    parts.Append(TextPart(ImageLabel(++number)));
+    images_.push_back({number, url, messages_.size(), parts.size()});
+    parts.Append(ImagePart(url));
+  }
+  messages_.Append(
+      base::DictValue().Set("role", "user").Set("content", std::move(parts)));
+}
+
+void AgentContext::ShowImages(const std::vector<int>& numbers) {
+  base::ListValue parts;
+  parts.Append(TextPart("The images you recalled."));
+  std::vector<Image> shown;
+  for (int number : numbers) {
+    if (const Image* image = FindImage(number)) {
+      parts.Append(TextPart(ImageLabel(number)));
+      shown.push_back({number, image->url, messages_.size(), parts.size()});
+      parts.Append(ImagePart(image->url));
+    }
+  }
+  if (shown.empty()) {
+    return;
+  }
+  messages_.Append(base::DictValue()
+                       .Set("role", "user")
+                       .Set("content", std::move(parts))
+                       .Set(kShownKey, true));
+  std::ranges::move(shown, std::back_inserter(images_));
 }
 
 void AgentContext::AddAssistant(const ModelTurn& turn) {
@@ -107,6 +201,16 @@ int AgentContext::AddResult(std::string_view call_id,
 }
 
 base::DictValue AgentContext::Recall(const base::DictValue& args) const {
+  if (const std::optional<int> image = args.FindInt("image")) {
+    if (!FindImage(*image)) {
+      return base::DictValue().Set(
+          "error", base::StrCat({"There is no image ",
+                                 base::NumberToString(*image), "."}));
+    }
+    return base::DictValue()
+        .Set("image", *image)
+        .Set("shown", "The image follows in the next message.");
+  }
   const std::optional<int> step = args.FindInt("step");
   if (!step || *step < 1 || static_cast<size_t>(*step) > results_.size()) {
     return base::DictValue().Set(
@@ -133,6 +237,11 @@ void AgentContext::ShortenAll() {
   for (Result& result : results_) {
     if (!result.shortened && CanShorten(result)) {
       Shorten(result);
+    }
+  }
+  for (Image& image : images_) {
+    if (!image.shortened) {
+      Shorten(image);
     }
   }
 }
@@ -193,10 +302,15 @@ void AgentContext::CloseOpenCalls(std::string_view error) {
 
 std::optional<std::string> AgentContext::Request(std::string_view model,
                                                  size_t max_length) {
+  // Images are sent as they are; only text counts against the limit.
+  size_t pictures = 0;
+  for (const Image& image : images_) {
+    pictures += image.shortened ? 0 : image.url.size();
+  }
   for (;;) {
     std::optional<std::string> body =
         BuildAgentRequestBody(model, messages_, AgentToolSchemas());
-    if (!body || body->size() <= max_length) {
+    if (!body || body->size() <= max_length + pictures) {
       return body;
     }
     auto oldest = std::ranges::find_if(results_, [](const Result& result) {
@@ -231,9 +345,11 @@ void AgentContext::Shorten(Result& result) {
          title ? *title : "", "\" at ", url ? *url : "", ": ",
          base::NumberToString(text ? text->size() : 0), " characters"});
   } else if (result.tool == "recall") {
+    const std::optional<int> image = result.args.FindInt("image");
     line = base::StrCat(
-        {"Step ", step, " recalled step ",
-         base::NumberToString(result.args.FindInt("step").value_or(0))});
+        {"Step ", step, " recalled ", image ? "image " : "step ",
+         base::NumberToString(
+             image ? *image : result.args.FindInt("step").value_or(0))});
   } else {
     line = base::StrCat({"Step ", step, " used ", result.tool, ": ",
                          base::NumberToString(Json(result.result).size()),
@@ -246,6 +362,22 @@ void AgentContext::Shorten(Result& result) {
                           .Set("step", result.step)
                           .Set("shortened", std::move(line))));
   result.shortened = true;
+}
+
+void AgentContext::Shorten(Image& image) {
+  base::ListValue* parts =
+      messages_[image.message].GetDict().FindList("content");
+  if (parts && image.part < parts->size()) {
+    (*parts)[image.part] = base::Value(TextPart(base::StrCat(
+        {"[Shrunk. Call recall with image ", base::NumberToString(image.number),
+         " to see it again.]"})));
+  }
+  image.shortened = true;
+}
+
+const AgentContext::Image* AgentContext::FindImage(int number) const {
+  const auto image = std::ranges::find(images_, number, &Image::number);
+  return image == images_.end() ? nullptr : &*image;
 }
 
 }  // namespace uw

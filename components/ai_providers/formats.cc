@@ -34,11 +34,32 @@ size_t CurrentTurnStart(const base::ListValue& messages) {
   for (size_t i = 0; i < messages.size(); ++i) {
     const base::DictValue* message = messages[i].GetIfDict();
     if (message && message->FindString("role") &&
-        *message->FindString("role") == "user") {
+        *message->FindString("role") == "user" &&
+        !message->FindBool(kShownKey).value_or(false)) {
       start = i;
     }
   }
   return start;
+}
+
+// The parts of a user message: its text, or the list it has when it carries
+// images, as chat completions writes them.
+base::ListValue UserParts(const base::DictValue& message) {
+  if (const base::ListValue* parts = message.FindList("content")) {
+    return parts->Clone();
+  }
+  base::ListValue parts;
+  if (const std::string* text = message.FindString("content");
+      text && !text->empty()) {
+    parts.Append(base::DictValue().Set("type", "text").Set("text", *text));
+  }
+  return parts;
+}
+
+// The address of an image part, such as a data: URL.
+std::string_view ImageUrl(const base::DictValue& part) {
+  const base::DictValue* image = part.FindDict("image_url");
+  return image ? StringOr(*image, "url") : "";
 }
 
 // The kept parts of `message`, when `model` at `address` sent them in
@@ -155,8 +176,31 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
     const std::string_view text = StringOr(*message, "content");
     base::ListValue blocks;
     if (role == "user") {
-      if (!text.empty()) {
-        blocks.Append(base::DictValue().Set("type", "text").Set("text", text));
+      for (const base::Value& entry : UserParts(*message)) {
+        const base::DictValue* part = entry.GetIfDict();
+        if (!part) {
+          continue;
+        }
+        if (StringOr(*part, "type") == "text") {
+          blocks.Append(base::DictValue()
+                            .Set("type", "text")
+                            .Set("text", StringOr(*part, "text")));
+          continue;
+        }
+        // data:<media type>;base64,<data>
+        const std::string_view url = ImageUrl(*part);
+        const size_t comma = url.find(",");
+        if (url.starts_with("data:") && comma != std::string_view::npos &&
+            url.substr(0, comma).ends_with(";base64")) {
+          blocks.Append(
+              base::DictValue()
+                  .Set("type", "image")
+                  .Set("source",
+                       base::DictValue()
+                           .Set("type", "base64")
+                           .Set("media_type", url.substr(5, comma - 5 - 7))
+                           .Set("data", url.substr(comma + 1))));
+        }
       }
       add("user", std::move(blocks));
     } else if (role == "assistant") {
@@ -245,8 +289,28 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
     }
     const std::string_view role = StringOr(*message, "role");
     const std::string_view text = StringOr(*message, "content");
-    if (role == "user") {
+    if (role == "user" && !message->FindList("content")) {
       input.Append(base::DictValue().Set("role", "user").Set("content", text));
+    } else if (role == "user") {
+      base::ListValue content;
+      for (const base::Value& entry : UserParts(*message)) {
+        const base::DictValue* part = entry.GetIfDict();
+        if (!part) {
+          continue;
+        }
+        if (StringOr(*part, "type") == "text") {
+          content.Append(base::DictValue()
+                             .Set("type", "input_text")
+                             .Set("text", StringOr(*part, "text")));
+        } else {
+          content.Append(base::DictValue()
+                             .Set("type", "input_image")
+                             .Set("image_url", ImageUrl(*part)));
+        }
+      }
+      input.Append(base::DictValue()
+                       .Set("role", "user")
+                       .Set("content", std::move(content)));
     } else if (role == "assistant") {
       if (const base::ListValue* kept =
               i > turn ? KeptParts(*message, ProviderFormat::kOpenAiResponses,
@@ -453,6 +517,7 @@ std::optional<std::string> RequestIn(ProviderFormat format,
       for (base::Value& message : *chat->FindList("messages")) {
         if (message.is_dict()) {
           message.GetDict().Remove(kKeptPartsKey);
+          message.GetDict().Remove(kShownKey);
         }
       }
       return Write(*chat);

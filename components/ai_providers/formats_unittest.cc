@@ -296,5 +296,71 @@ TEST(FormatsTest, ALimitCarriesOver) {
       4096);
 }
 
+// An image in a user message goes as each format's own image part. A message
+// that shows recalled images is not a new turn, so what the model kept still
+// goes back, and chat completions does not see uw's mark on it.
+TEST(FormatsTest, AnImageGoesInEachFormatsOwnParts) {
+  constexpr char kImages[] = R"({
+    "model": "a-model",
+    "messages": [
+      {"role": "user", "content": [
+        {"type": "text", "text": "Find this sofa"},
+        {"type": "image_url",
+         "image_url": {"url": "data:image/png;base64,iVBOR"}}]},
+      {"role": "assistant", "content": "",
+       "tool_calls": [{"id": "call_1", "type": "function",
+                       "function": {"name": "recall",
+                                    "arguments": "{\"image\":1}"}}],
+       "uw_kept": {"address": "https://api.example.com/v1",
+                   "model": "a-model", "format": 1,
+                   "items": [{"type": "thinking", "thinking": "Look again.",
+                              "signature": "sig"}]}},
+      {"role": "tool", "tool_call_id": "call_1", "content": "{\"image\":1}"},
+      {"role": "user", "uw_shown": true, "content": [
+        {"type": "image_url",
+         "image_url": {"url": "data:image/jpeg;base64,/9j/4"}}]}
+    ]
+  })";
+
+  const base::DictValue anthropic =
+      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, kImages, kAddress));
+  EXPECT_EQ(*anthropic.FindList("messages"), base::test::ParseJsonList(R"([
+    {"role": "user", "content": [
+      {"type": "text", "text": "Find this sofa"},
+      {"type": "image", "source": {"type": "base64",
+                                   "media_type": "image/png",
+                                   "data": "iVBOR"}}]},
+    {"role": "assistant", "content": [
+      {"type": "thinking", "thinking": "Look again.", "signature": "sig"},
+      {"type": "tool_use", "id": "call_1", "name": "recall",
+       "input": {"image": 1}}]},
+    {"role": "user", "content": [
+      {"type": "tool_result", "tool_use_id": "call_1",
+       "content": "{\"image\":1}"},
+      {"type": "image", "source": {"type": "base64",
+                                   "media_type": "image/jpeg",
+                                   "data": "/9j/4"}}]}
+  ])"));
+
+  const base::DictValue responses =
+      Parsed(RequestIn(ProviderFormat::kOpenAiResponses, kImages, kAddress));
+  EXPECT_EQ((*responses.FindList("input"))[0], base::test::ParseJson(R"(
+    {"role": "user", "content": [
+      {"type": "input_text", "text": "Find this sofa"},
+      {"type": "input_image", "image_url": "data:image/png;base64,iVBOR"}]}
+  )"));
+
+  const base::DictValue chat =
+      Parsed(RequestIn(ProviderFormat::kChatCompletions, kImages, kAddress));
+  const base::ListValue& messages = *chat.FindList("messages");
+  EXPECT_FALSE(messages[3].GetDict().contains("uw_shown"));
+  EXPECT_EQ(*messages[0].GetDict().FindList("content"),
+            *base::test::ParseJsonDict(kImages)
+                 .FindList("messages")
+                 ->front()
+                 .GetDict()
+                 .FindList("content"));
+}
+
 }  // namespace
 }  // namespace uw

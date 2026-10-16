@@ -31,6 +31,12 @@ class AgentContext {
   base::DictValue ToValue() const;
 
   void AddUser(std::string_view text);
+  // A message with `images`, each a data: URL. They are numbered on from the
+  // chat's earlier images.
+  void AddUser(std::string_view text, const std::vector<std::string>& images);
+  // Shows the model the images it recalled by `numbers`, in a message of
+  // their own.
+  void ShowImages(const std::vector<int>& numbers);
   void AddAssistant(const ModelTurn& turn);
   // Records what a tool answered to the call `call_id` and returns its step
   // number. A reading of a tab shortens the older readings of that tab.
@@ -40,7 +46,8 @@ class AgentContext {
                 const base::DictValue& result);
   // What the recall tool answers to `args`.
   base::DictValue Recall(const base::DictValue& args) const;
-  // Shortens every long result, for when the model has answered.
+  // Shortens every long result and every image, for when the model has
+  // answered.
   void ShortenAll();
   // Lists `skills`, one per line, in the instructions every request starts
   // with. Empty for none.
@@ -50,7 +57,8 @@ class AgentContext {
   void CloseOpenCalls(std::string_view error);
 
   // The request for `model`. Shortens the oldest long results until it fits
-  // in `max_length` characters, or nothing is left to shorten.
+  // in `max_length` characters, not counting images, or nothing is left to
+  // shorten.
   std::optional<std::string> Request(std::string_view model, size_t max_length);
 
  private:
@@ -64,11 +72,24 @@ class AgentContext {
     bool shortened = false;
   };
 
+  struct Image {
+    int number = 0;
+    std::string url;
+    // Where it sits: a message, and a part of that message's content.
+    size_t message = 0;
+    size_t part = 0;
+    bool shortened = false;
+  };
+
   static bool CanShorten(const Result& result);
   void Shorten(Result& result);
+  void Shorten(Image& image);
+  const Image* FindImage(int number) const;
 
   base::ListValue messages_;
   std::vector<Result> results_;
+  // A recalled image appears again under its own number.
+  std::vector<Image> images_;
 };
 
 }  // namespace uw

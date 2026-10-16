@@ -57,6 +57,9 @@ struct ModelChoice {
 struct Model {
   string name;
   bool calls_tools;
+  // Whether it takes images, as the catalog or Ollama says. True when
+  // neither knows.
+  bool sees_images;
   // Named as its provider names them. Empty when it takes none.
   array<string> efforts;
   // The format requests to it go over.

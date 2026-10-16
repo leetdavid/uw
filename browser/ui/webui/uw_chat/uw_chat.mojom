@@ -9,8 +9,9 @@ interface ChatHandlerFactory {
 };
 
 interface ChatHandler {
-  // The user's next message. Ignored while the agent is working.
-  Send(string text);
+  // The user's next message, with up to 5 images as data: URLs. Ignored
+  // while the agent is working.
+  Send(string text, array<string> images);
   // Picks up a chat that stopped before it finished.
   Resume();
   // Tries the failed request again: the message that could not be sent, or
@@ -54,7 +55,7 @@ interface ChatHandler {
   Stop();
   // A message while the agent works. It goes in after the step under way;
   // while a step waits for approval it declines that step, as its note.
-  Steer(string text);
+  Steer(string text, array<string> images);
 };
 
 // The model a chat runs on, from a provider on uw://providers.
@@ -93,6 +94,8 @@ struct Step {
   string text;
   // For kModel: the model the chat runs on from there.
   ChatModel? model;
+  // For kUser: the images the message carried, as data: URLs.
+  array<string> images;
 };
 
 // What the chat list shows beside a chat. Matches uw::ChatIndex::State.

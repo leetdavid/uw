@@ -3,6 +3,7 @@
 
 #include "uw/components/ai_providers/catalog.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -13,7 +14,7 @@
 namespace uw {
 namespace {
 
-constexpr int kSavedVersion = 2;
+constexpr int kSavedVersion = 3;
 
 constexpr ProviderPreset kCatalogPresets[] = {
     ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
@@ -72,8 +73,12 @@ base::DictValue Abilities(const base::DictValue& model) {
       }
     }
   }
+  const base::ListValue* inputs =
+      model.FindListByDottedPath("modalities.input");
   return base::DictValue()
       .Set("tools", model.FindBool("tool_call").value_or(true))
+      .Set("images",
+           !inputs || std::ranges::contains(*inputs, base::Value("image")))
       .Set("efforts", std::move(efforts));
 }
 
@@ -184,6 +189,7 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
   }
   ModelAbilities abilities;
   abilities.calls_tools = known->FindBool("tools").value_or(true);
+  abilities.sees_images = known->FindBool("images").value_or(true);
   if (const base::ListValue* efforts = known->FindList("efforts")) {
     for (const base::Value& effort : *efforts) {
       if (effort.is_string()) {

@@ -16,6 +16,9 @@ interface ChatMessageProps
   from: "user" | "assistant";
   /** Optional attachments rendered as square thumbnails above the bubble. */
   files?: File[];
+  /** Images as URLs, such as data: URLs, shown as 112×84 tiles above the
+   *  bubble. */
+  images?: string[];
   /** Side length of each attachment thumbnail in pixels. Defaults to 64. */
   thumbnailSize?: number;
   /** Timestamp shown in the hover-revealed meta row, before the actions.
@@ -39,7 +42,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, thumbnailSize = 64, time, actions, children, size, className, ...props },
+    { from, files, images, thumbnailSize = 64, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -77,6 +80,23 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
                 key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
                 file={file}
                 size={thumbnailSize}
+              />
+            ))}
+          </div>
+        )}
+        {images && images.length > 0 && (
+          <div
+            className={cn(
+              "flex flex-wrap gap-1.5",
+              isUser ? "justify-end" : "justify-start"
+            )}
+          >
+            {images.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`Image ${i + 1}`}
+                className="sent-image h-[84px] w-[112px] rounded-xl object-cover ring-1 ring-border"
               />
             ))}
           </div>

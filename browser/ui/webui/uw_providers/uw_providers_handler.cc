@@ -127,10 +127,10 @@ mojom::ModelListPtr PageList(ModelListing listing) {
   list->ok = listing.ok;
   list->error = std::move(listing.error);
   for (ListedModel& model : listing.models) {
-    list->models.push_back(
-        mojom::Model::New(std::move(model.name), model.abilities.calls_tools,
-                          std::move(model.abilities.efforts),
-                          static_cast<mojom::ProviderFormat>(model.format)));
+    list->models.push_back(mojom::Model::New(
+        std::move(model.name), model.abilities.calls_tools,
+        model.abilities.sees_images, std::move(model.abilities.efforts),
+        static_cast<mojom::ProviderFormat>(model.format)));
   }
   return list;
 }

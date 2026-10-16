@@ -59,7 +59,8 @@ class UwChatHandler : public mojom::ChatHandler,
   static void SetAgentsSkillsFolderForTesting(base::FilePath folder);
 
   // mojom::ChatHandler:
-  void Send(const std::string& text) override;
+  void Send(const std::string& text,
+            const std::vector<std::string>& images) override;
   void Resume() override;
   void TryAgain() override;
   void OpenChat(const std::string& id) override;
@@ -79,7 +80,8 @@ class UwChatHandler : public mojom::ChatHandler,
   void SetEffort(const std::string& effort) override;
   void SetMode(mojom::ApprovalMode mode) override;
   void Stop() override;
-  void Steer(const std::string& text) override;
+  void Steer(const std::string& text,
+             const std::vector<std::string>& images) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -172,12 +174,17 @@ class UwChatHandler : public mojom::ChatHandler,
   int current_tab_ = 0;
   std::vector<Skill> skills_;
   bool skills_loaded_ = false;
+  struct Message {
+    std::string text;
+    // data: URLs.
+    std::vector<std::string> images;
+  };
   // What the user sent before the skills were read, to send once they are.
-  std::optional<std::string> waiting_message_;
+  std::optional<Message> waiting_message_;
   bool waiting_resume_ = false;
   // The message that could not be sent because the chat had no agent, for
   // Try again.
-  std::optional<std::string> unsent_;
+  std::optional<Message> unsent_;
   // What the command bar opened this chat with, until it is asked.
   std::optional<ChatStart> start_;
   // Tells the agent about the tab handed to it, before the first message.

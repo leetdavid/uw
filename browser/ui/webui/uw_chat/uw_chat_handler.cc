@@ -132,6 +132,37 @@ bool IsModelLine(const base::Value& entry) {
   return kind && *kind == "model";
 }
 
+// The images a message may carry: up to 5 data: URLs of the types the page
+// sends, none larger than the page makes them. The rest are left out.
+std::vector<std::string> UsableImages(const std::vector<std::string>& images) {
+  constexpr size_t kMaxImages = 5;
+  constexpr size_t kMaxImageLength = 8 * 1024 * 1024;
+  std::vector<std::string> usable;
+  for (const std::string& image : images) {
+    if (usable.size() < kMaxImages && image.size() <= kMaxImageLength &&
+        (image.starts_with("data:image/png;base64,") ||
+         image.starts_with("data:image/jpeg;base64,"))) {
+      usable.push_back(image);
+    }
+  }
+  return usable;
+}
+
+// A message from the user as the chat file keeps it.
+base::DictValue UserLine(const std::string& text,
+                         const std::vector<std::string>& images) {
+  base::DictValue line =
+      base::DictValue().Set("kind", "user").Set("text", text);
+  if (!images.empty()) {
+    base::ListValue list;
+    for (const std::string& image : images) {
+      list.Append(image);
+    }
+    line.Set("images", std::move(list));
+  }
+  return line;
+}
+
 mojom::StepPtr Failed(std::string text) {
   auto step = mojom::Step::New();
   step->kind = mojom::StepKind::kFailed;
@@ -302,16 +333,17 @@ UwChatHandler::~UwChatHandler() {
   OpenChats().erase(id_);
 }
 
-void UwChatHandler::Send(const std::string& text) {
+void UwChatHandler::Send(const std::string& text,
+                         const std::vector<std::string>& images) {
   if (!loaded_ || Working()) {
     return;
   }
   if (!skills_loaded_) {
-    waiting_message_ = text;
+    waiting_message_ = Message{text, images};
     return;
   }
   if (!agent_ && !Start()) {
-    unsent_ = text;
+    unsent_ = Message{text, images};
     return;
   }
   unsent_.reset();
@@ -319,8 +351,9 @@ void UwChatHandler::Send(const std::string& text) {
   if (title_.empty()) {
     title_ = text;
   }
-  Log(base::DictValue().Set("kind", "user").Set("text", text));
-  agent_->Send(handed_over_ + text);
+  const std::vector<std::string> usable = UsableImages(images);
+  Log(UserLine(text, usable));
+  agent_->Send(handed_over_ + text, usable);
   handed_over_.clear();
   Save();
 }
@@ -336,18 +369,20 @@ void UwChatHandler::Stop() {
 }
 
 // While a step waits for approval, the message declines it as its note.
-void UwChatHandler::Steer(const std::string& text) {
+void UwChatHandler::Steer(const std::string& text,
+                          const std::vector<std::string>& images) {
   if (!Working()) {
-    Send(text);
+    Send(text, images);
     return;
   }
-  Log(base::DictValue().Set("kind", "user").Set("text", text));
+  const std::vector<std::string> usable = UsableImages(images);
+  Log(UserLine(text, usable));
   Save();
   if (approval_answer_) {
     AnswerApproval(mojom::ApprovalChoice::kDecline, text);
     return;
   }
-  agent_->Steer(text);
+  agent_->Steer(text, usable);
 }
 
 void UwChatHandler::Resume() {
@@ -373,8 +408,8 @@ void UwChatHandler::TryAgain() {
   if (!loaded_ || Working()) {
     return;
   }
-  if (std::optional<std::string> text = std::exchange(unsent_, {})) {
-    Send(*text);
+  if (std::optional<Message> message = std::exchange(unsent_, {})) {
+    Send(message->text, message->images);
     return;
   }
   const base::DictValue* last = LastLine();
@@ -857,6 +892,13 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
     line->result = Json(step.FindDict("result"));
   } else if (*kind == "user") {
     line->kind = mojom::StepKind::kUser;
+    if (const base::ListValue* images = entry.FindList("images")) {
+      for (const base::Value& image : *images) {
+        if (image.is_string()) {
+          line->images.push_back(image.GetString());
+        }
+      }
+    }
   } else if (*kind == "answer") {
     line->kind = mojom::StepKind::kAnswer;
   } else if (*kind == "stopped_by_user") {
@@ -1023,8 +1065,8 @@ void UwChatHandler::OnSkillsLoaded(base::OnceClosure done,
     agent_->SetSkills(EnabledSkills());
   }
   std::move(done).Run();
-  if (std::optional<std::string> text = std::exchange(waiting_message_, {})) {
-    Send(*text);
+  if (std::optional<Message> message = std::exchange(waiting_message_, {})) {
+    Send(message->text, message->images);
   }
   if (std::exchange(waiting_resume_, false)) {
     Resume();

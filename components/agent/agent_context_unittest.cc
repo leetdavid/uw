@@ -202,5 +202,50 @@ TEST_F(AgentContextTest, TheInstructionsListTheSkills) {
   EXPECT_THAT(Request(), Not(HasSubstr("book-activities")));
 }
 
+// An image goes with its message and the steps after it, and does not count
+// against the request's length. Once the model answers it shrinks to a line,
+// and recall shows it again in a message of its own.
+TEST_F(AgentContextTest, AnImageShrinksOnceTheModelAnswersAndComesBack) {
+  const std::string image =
+      base::StrCat({"data:image/png;base64,", std::string(5000, 'A')});
+  context_.AddUser("Find this sofa", {image});
+  context_.AddResult("call_1", "read", Tab(1),
+                     Reading(base::StrCat({"Sofas ", std::string(1000, 'x')})));
+  const size_t full = Request().size();
+
+  std::string body = Request(full - image.size() + 100);
+  EXPECT_EQ(Count(body, image), 1);
+  EXPECT_EQ(Count(body, std::string(1000, 'x')), 1);
+  EXPECT_THAT(body, HasSubstr("Image 1:"));
+
+  context_.AddAssistant({"It is the Mags sofa.", {}});
+  context_.ShortenAll();
+  body = Request();
+  EXPECT_EQ(Count(body, image), 0);
+  EXPECT_THAT(body, HasSubstr("[Shrunk. Call recall with image 1 to see it "
+                              "again.]"));
+
+  EXPECT_EQ(context_.Recall(base::DictValue().Set("image", 1)).FindInt("image"),
+            1);
+  EXPECT_EQ(
+      *context_.Recall(base::DictValue().Set("image", 2)).FindString("error"),
+      "There is no image 2.");
+  context_.ShowImages({1});
+  body = Request();
+  EXPECT_EQ(Count(body, image), 1);
+  EXPECT_THAT(body, HasSubstr(R"("uw_shown":true)"));
+
+  // A saved chat keeps its images, and the next one is number 2.
+  std::unique_ptr<AgentContext> saved =
+      AgentContext::FromValue(context_.ToValue());
+  ASSERT_TRUE(saved);
+  saved->ShortenAll();
+  saved->AddUser("And this one?", {image});
+  const std::optional<std::string> next = saved->Request("agent", 200000);
+  ASSERT_TRUE(next);
+  EXPECT_EQ(Count(*next, image), 1);
+  EXPECT_THAT(*next, HasSubstr("Image 2:"));
+}
+
 }  // namespace
 }  // namespace uw

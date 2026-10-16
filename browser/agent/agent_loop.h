@@ -76,7 +76,7 @@ class AgentLoop {
   ~AgentLoop();
 
   // Sends the user's next message. Does nothing while the agent works.
-  void Send(std::string_view text);
+  void Send(std::string_view text, std::vector<std::string> images = {});
   // Picks the chat up again after uw quit while the agent was working.
   void Resume();
   // Asks the model again after its request failed, with the chat as it is.
@@ -87,7 +87,7 @@ class AgentLoop {
   // Puts the user's `text` in after the step under way, before the next model
   // request. A waiting model request is sent again with it. Sends it when
   // the agent is not working.
-  void Steer(std::string_view text);
+  void Steer(std::string_view text, std::vector<std::string> images = {});
   bool working() const { return working_; }
   // Talks to `model` from the next request on.
   void SetModel(AgentModel model) { model_ = std::move(model); }
@@ -164,7 +164,15 @@ class AgentLoop {
   bool asking_ = false;
   // Stop or Steer came while a step was under way.
   bool stopping_ = false;
-  std::optional<std::string> steer_;
+  struct Message {
+    std::string text;
+    // data: URLs.
+    std::vector<std::string> images;
+  };
+  std::optional<Message> steer_;
+  // Images the model recalled in its current answer, shown to it before it
+  // is asked again.
+  std::vector<int> recalled_images_;
   base::WeakPtrFactory<AgentLoop> weak_factory_{this};
 };
 
