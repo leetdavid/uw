@@ -30,7 +30,7 @@ Agreed on 2026-10-12:
 - **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint.
 - **Tab rows.** 34px tall with a 10px radius. The active tab is a card. Other tabs have no background until hovered.
 - **Favorites.** Pinned tabs are tiles, four per row, 44px tall with a 12px radius.
-- **Tasks.** A tab group header is a folder row: a folder icon in the group's color, the name in semibold, and a chevron. It keeps Chromium's collapse, rename, color, and drag.
+- **Tasks.** A tab group header is a folder row: a folder icon in the group's color and the name in semibold. While the pointer is on the row, a chevron takes the folder icon's place, as on a [parent tab](keyboard-and-mouse.md#branches-with-the-mouse). It keeps Chromium's collapse, rename, color, and drag. Changed on 2026-10-16: the chevron used to sit at the end of the row.
 - **Sidebar foot.** The Organize button is a pill at the left, and the [new button](keyboard-and-mouse.md#new-button) sits at the right end. The automatic-move message is a small card above them. The new button was added on 2026-10-15.
 - **Toolbar.** 44px tall, on the card.
 
@@ -50,7 +50,7 @@ Agreed on 2026-10-12:
 - **Gradient.** `PaintTint` paints the gradient in window coordinates wherever Chromium paints the frame color, so every view draws one continuous sheet.
 - **Sizes.** `chrome/browser/ui/layout_constants.cc` already has values for the vertical tab height, radius, padding, and pinned tab height. The patch changes those numbers.
 - **Card.** The window layout insets the main area beside the vertical tab strip by `kPageCardMargins`, then reuses Chromium's own corner rounding for the toolbar and the page with `kPageCardRadius`. Fullscreen windows have no card.
-- **Task rows.** `TabGroupHeaderView` is patched for the vertical strip: no fill, text in the tint's text color, and a folder icon where it shows the shared-group icon. Its click, drag, and editor code are untouched.
+- **Task rows.** `TabGroupHeaderView` is patched for the vertical strip: no fill, text in the tint's text color, and a folder icon where it shows the shared-group icon. Chromium's collapse chevron sits beside the folder icon and replaces it under the pointer. Its click, drag, and editor code are untouched.
 - **Screenshots.** `SaveWindowScreenshot` saves the composited window as a PNG from a headless test. See [the README](../../README.md#tooling-checks).
 
 ## Stages
@@ -58,7 +58,7 @@ Agreed on 2026-10-12:
 1. **Screenshot helper.** Built. It saves the sidebar with a task in light and dark mode, an automatic move, and the settings page.
 2. **Tint and card.** Built, except the shadow. The toolbar and the page sit in a card with an 8px inset and a 12px radius. The card has no shadow yet.
 3. **Tab rows and favorites.** Built: 34px rows with a 10px radius, the active tab as a card, and pinned tabs as filled tiles. Tiles use the row radius of 10px, not 12px, because Chromium has one radius for both.
-4. **Task rows.** Built. The header shows a folder icon in the group's color, the name in semibold, and Chromium's chevron. Chromium's colored line beside a task's tabs stays, although the design has none.
+4. **Task rows.** Built. The header shows a folder icon in the group's color and the name in semibold. Under the pointer, the chevron takes the folder icon's place. Chromium's colored line beside a task's tabs stays, although the design has none.
 5. **Sidebar foot and toolbar.** The Organize and Undo buttons are pills. The automatic-move message is the [activity card](automatic-organization.md#agreed-scope), built on 2026-10-12. The toolbar keeps Chromium's height of about 46px.
 6. **User tint.** Built. A color picked on uw's settings page drives the gradient and the text color, and a mid-tone pick is made readable.
 

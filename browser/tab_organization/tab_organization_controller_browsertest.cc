@@ -29,6 +29,7 @@
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -708,6 +709,40 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   VisibleRows();
   EXPECT_FALSE(toggle->GetVisible());
   EXPECT_TRUE(icon->GetVisible());
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheTaskChevronTakesTheFolderIconsPlace) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(InitialTab())}, u"Plan"));
+  std::vector<views::View*> headers = ViewsOfClass("TabGroupHeaderView");
+  ASSERT_EQ(headers.size(), 1u);
+  auto* header = static_cast<TabGroupHeaderView*>(headers[0]);
+  views::View* folder = header->children().front();
+  views::View* chevron = header->collapse_icon_for_testing();
+  views::View* title = header->title_label_for_testing();
+  EXPECT_TRUE(folder->GetVisible());
+  EXPECT_FALSE(chevron->GetVisible());
+  const gfx::Rect folder_bounds = folder->GetBoundsInScreen();
+  const int title_x = title->GetBoundsInScreen().x();
+
+  header->OnMouseEntered(
+      ui::MouseEvent(ui::EventType::kMouseEntered, gfx::PointF(), gfx::PointF(),
+                     ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  ViewsOfClass("TabGroupHeaderView");
+  EXPECT_TRUE(chevron->GetVisible());
+  EXPECT_FALSE(folder->GetVisible());
+  EXPECT_EQ(chevron->GetBoundsInScreen(), folder_bounds);
+  EXPECT_EQ(title->GetBoundsInScreen().x(), title_x);
+  SaveWindowScreenshot(browser(), "task-chevron");
+
+  header->OnMouseExited(
+      ui::MouseEvent(ui::EventType::kMouseExited, gfx::PointF(), gfx::PointF(),
+                     ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  ViewsOfClass("TabGroupHeaderView");
+  EXPECT_FALSE(chevron->GetVisible());
+  EXPECT_TRUE(folder->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

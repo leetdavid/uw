@@ -160,7 +160,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..0f3976e6aeaedf3dcf07c55ccf785da8
  
  SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f721f3f4bf0eb438454e3e41f963728..70cccd81e374f6aacecfa8b6932b678cc5aa9405 100644
+index cfaf18f54f721f3f4bf0eb438454e3e41f963728..739103c103da9c13b5570e9d304a7eb58e389357 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -9,6 +9,7 @@
@@ -179,7 +179,15 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..70cccd81e374f6aacecfa8b6932b678c
  
  namespace {
  constexpr int kGroupHeaderCornerRadius = 8;
-@@ -169,6 +171,19 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -54,6 +56,7 @@ constexpr int kFocusRingInset = 2;
+ constexpr int kAttentionIndicatorWidth = 8;
+ // The amount of padding between the label and any sync icon.
+ constexpr int kSyncIconLabelPadding = 2;
++constexpr SkAlpha kChevronAlpha = 0xBF;
+ 
+ views::ScrollView* GetScrollView(views::View* view) {
+   views::View* ancestor = view;
+@@ -169,6 +172,22 @@ TabGroupHeaderView::TabGroupHeaderView(
        editor_bubble_tracker_.RegisterOnBubbleClosed(base::BindRepeating(
            &TabGroupHeaderView::OnBubbleClosed, base::Unretained(this)));
  
@@ -194,12 +202,38 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..70cccd81e374f6aacecfa8b6932b678c
 +    AddChildViewAt(
 +        std::make_unique<uw::NamingSpinner>(delegate_->GetTabGroup().id()),
 +        GetIndexOf(editor_bubble_button_).value());
++    ReorderChildView(collapse_icon_, GetIndexOf(sync_icon_).value() + 1);
++    collapse_icon_->SetProperty(
++        views::kMarginsKey, gfx::Insets::TLBR(0, 0, 0, kSyncIconLabelPadding));
 +  }
 +
    SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
    SetInteriorMargin(gfx::Insets::VH(0, kGroupHeaderHorizontalInset));
    SetDefault(views::kFlexBehaviorKey,
-@@ -527,18 +542,26 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -199,7 +218,7 @@ TabGroupHeaderView::TabGroupHeaderView(
+         views::kFlexBehaviorKey,
+         views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
+                                  views::MaximumFlexSizeRule::kPreferred));
+-    collapse_icon_->SetVisible(!delegate_->IsGroupFocused());
++    UpdateFolderIcon();
+   }
+ 
+   sync_icon_->SetProperty(views::kMarginsKey,
+@@ -388,9 +407,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+     delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
+   }
+   UpdateEditorBubbleButtonVisibility();
++  hovered_ = true;
++  UpdateFolderIcon();
+ }
+ 
+ void TabGroupHeaderView::OnMouseExited(const ui::MouseEvent& event) {
++  hovered_ = false;
++  UpdateFolderIcon();
+ #if BUILDFLAG(IS_LINUX)
+   // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
+   // Wayland/X11 due to asynchronous cursor updates during mouse exit events.
+@@ -527,18 +550,26 @@ void TabGroupHeaderView::OnDataChanged(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
      SkColor foreground_color = GetForegroundColor();
@@ -228,7 +262,44 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..70cccd81e374f6aacecfa8b6932b678c
      }
      if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
-@@ -673,6 +696,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -557,16 +588,12 @@ void TabGroupHeaderView::OnDataChanged(
+ 
+     // Update collapse icon.
+     if (collapse_icon_) {
+-      collapse_icon_->SetVisible(!delegate_->IsGroupFocused());
++      UpdateFolderIcon();
+       collapse_icon_->SetImage(ui::ImageModel::FromVectorIcon(
+           tab_group_visual_data_.is_collapsed()
+-              ? features::IsRoundedIconsEnabled()
+-                    ? kKeyboardArrowDownIcon
+-                    : kKeyboardArrowDownChromeRefreshOldIcon
+-          : features::IsRoundedIconsEnabled()
+-              ? vector_icons::kKeyboardArrowUpIcon
+-              : kKeyboardArrowUpChromeRefreshOldIcon,
+-          foreground_color, kIconSize));
++              ? vector_icons::kKeyboardArrowRightFlippableIcon
++              : vector_icons::kKeyboardArrowDownIcon,
++          SkColorSetA(foreground_color, kChevronAlpha), kIconSize));
+     }
+ 
+     // Update background.
+@@ -627,6 +654,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+   UpdateAccessibleName();
+ }
+ 
++void TabGroupHeaderView::UpdateFolderIcon() {
++  if (!collapse_icon_) {
++    return;
++  }
++  const bool chevron = hovered_ && !delegate_->IsGroupFocused();
++  collapse_icon_->SetVisible(chevron);
++  sync_icon_->SetVisible(!chevron);
++}
++
+ void TabGroupHeaderView::UpdateAccessibleName() {
+   if (features::IsTabGroupHoverCardsEnabled()) {
+     GetViewAccessibility().SetName(tab_groups::GetHoverCardAccessibilityText(
+@@ -673,6 +709,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
@@ -239,6 +310,25 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..70cccd81e374f6aacecfa8b6932b678c
      SkColor background_color = GetColorProvider()->GetColor(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
+diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
+index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c80d9b2988 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
+@@ -134,12 +134,14 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+   void UpdateTooltipText();
+   void UpdateIsCollapsed();
+   void UpdateAttentionState(bool needs_attention);
++  void UpdateFolderIcon();
+ 
+   SkColor GetForegroundColor() const;
+ 
+   tab_groups::TabGroupVisualData tab_group_visual_data_;
+   bool needs_attention_ = false;
+   bool is_shared_ = false;
++  bool hovered_ = false;
+ 
+   // The sync icon that is displayed in the tab group header of saved groups in
+   // the tabstrip.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4cdafdd34 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc

@@ -29,7 +29,7 @@ All of these are manual tests. Record anything that differs from the expected re
 1. Open three disposable tabs with Cmd-T.
 2. Right-click one and choose `Move to New Task`.
 
-Expected result: the tab moves into a new task named `New task`, above the ungrouped tabs and after any other task. The task shows as a folder row. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the task as you would a tab group in Chromium.
+Expected result: the tab moves into a new task named `New task`, above the ungrouped tabs and after any other task. The task shows as a folder row. Point at it: its folder icon turns into a chevron, as a parent tab's favicon does. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Rename, recolor, collapse, and drag the task as you would a tab group in Chromium.
 
 Open the task's menu with the button on its row. Expected result: it says task, never group: `New Tab in Task`, `Move Task to New Window`, `Move Tabs to Scratchpad`, and `Close Task`, with no `Delete` and no note that groups save. In a tab's right-click menu, `Move to Task` lists the tasks. Close a task, quit, and start uw again: ⋮ has no `Tab groups` menu and the closed task is not offered anywhere. Cmd+Shift+T still brings back a task you just closed.
 
