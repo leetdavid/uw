@@ -197,6 +197,10 @@ The user's go-ahead for one change an agent wants to make on a site, such as sub
 How much a chat asks before it acts. Ask first asks before every click and typing. Auto, the default, asks before each change on a site and each sign-in. Full auto never asks. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
 _Avoid_: permission mode, autonomy level.
 
+**Steer**:
+To send a chat a message while its agent works. The agent reads it after its current step, before it asks the model again. A queued message instead waits until the agent has answered.
+_Avoid_: interrupt, inject.
+
 **Outside agent**:
 An AI agent running outside uw, such as Claude Code or Codex, that the user lets work in uw's tabs.
 

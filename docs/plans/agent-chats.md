@@ -37,6 +37,8 @@ Added on 2026-10-16:
 
 - The agent may send several steps in one answer when they all use the same reading of a tab, such as filling in a form's fields and then submitting it. uw runs them in order. The first step that fails, or that the user declines, ends the batch: the steps after it do not run, and the model is told so. Each change still asks on its own. The agent reads the tab again after a step that loads a page or changes what it shows. Steps in different tabs do not run at the same time.
 - A chat has an [approval mode](../CONTEXT.md#language), picked from a chip in the composer beside the model and effort. Ask first asks before every click and typing; opening, reading, and going to an address do not ask. Auto, the default, asks as above. Full auto never asks, answers yes to Chromium's question about a sensitive site, and turns the chip amber. A change applies from the next step. A chat keeps its mode when it opens again. A mode picked on a new chat before its first message becomes the mode new chats start on; one picked later stays with that chat. In every mode page text never counts as the user's instruction, and the engine acts only while Safe Browsing is on.
+- A message can carry images: pasted, dragged onto the composer, or picked with the attach button. Up to 5, each scaled to at most 1,568 px on its long side. They show as Fluid's tiles in the composer and above the sent message. They go to the model with the message and stay through the steps that follow; once the model answers, each shrinks to a line such as `[image 1, step 4]`, and `recall` brings it back. The chat file keeps them. A model that the model catalog lists without image input cannot take them: the composer says `deepseek-v4-pro can't see images. Pick a model that can.` and sending waits until the model chip holds one that can.
+- While the agent works, the composer's button is Stop when the field is empty. Stop drops the waiting model request at once; a click or typing under way finishes first, and the chat says `You stopped the chat.` The next message carries on from there. Enter [steers](../CONTEXT.md#language): the message goes in after the current step, before the next model request, and a request already waiting is sent again with it. Cmd+Enter queues: the message waits as a row above the composer and goes once a run ends with an answer. After a failure or a stop, queued messages stay, to send, edit, or delete. While a step waits for approval, Enter declines it with the message as the note.
 
 ## Releases
 
@@ -104,10 +106,12 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 14. T83: the chat page brought to the "(Fluid)" designs: steps, the chat's state, the empty chat, and the approval and failure cards.
 15. T100: several steps in one answer, per [Agreed scope](#agreed-scope).
 16. T105: approval modes, per [Agreed scope](#agreed-scope).
-17. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-18. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-19. T51: scheduled chats.
-20. T52: private chats.
+17. T106: images in a message, drawn on the canvas first.
+18. T107: stop, steer, and queue.
+19. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+20. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+21. T51: scheduled chats.
+22. T52: private chats.
 
 ## Acceptance checks for v2.0
 
