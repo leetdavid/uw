@@ -155,6 +155,8 @@ A chat asks before it changes anything on a site: a card in the chat names the s
 
 The shield chip in the composer picks how much a chat asks. `Auto`, the default, asks as above. `Ask first` also asks before every click and typing, with the reason `Ask first is on.` `Full auto` never asks, not even for a sensitive site, and the chip turns amber. Expected result: a mode picked on a new chat before its first message is the mode the next new chat starts on; a mode picked later stays with that chat, also after it opens again.
 
+While the agent works, the composer's button is Stop when the field is empty. Expected result: the waiting model request is dropped, a click or typing under way finishes, and the chat says `You stopped the chat.` Enter sends a message the agent reads after its current step; Cmd+Enter queues it as a row above the composer, sent once the agent answers. After a failure or a stop, queued rows stay, with Send now, Edit, and the ×. While a step waits for approval, Enter declines it with your message as the note.
+
 1. Open `uw://providers` and pick an `Agent model` that calls tools. Without one, chats use the language model.
 2. Choose `New Chat` from the File menu or the new button's `▾` menu, or type `uw://chat`.
 3. Ask for something, such as "What is the top story on Hacker News?"

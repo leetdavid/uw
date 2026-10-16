@@ -186,6 +186,12 @@ interface InputMessageProps
    *  consumer should halt the current response and flip `status` to `"idle"`,
    *  which immediately dispatches the next queued message. */
   onStop?: () => void;
+  /** Sends a draft into the running response instead of queueing it. With it,
+   *  Enter while streaming steers and Cmd/Ctrl+Enter queues. */
+  onSteer?: (text: string, files: File[]) => void;
+  /** Keeps the queue from dispatching on the next `streaming → idle` edge, as
+   *  after a failure or a stop. Each row then offers Send now. */
+  holdQueue?: boolean;
   /** Controlled queue of pending messages. Requires `status` to be controlled. */
   queue?: QueuedMessage[];
   /** Called when the queue changes (enqueue, edit, delete, reorder, dispatch). */
@@ -278,6 +284,8 @@ interface QueuedRowProps {
   onEdit: (item: QueuedMessage) => void;
   onRemove: (item: QueuedMessage) => void;
   onMove: (item: QueuedMessage, dir: -1 | 1) => void;
+  // Offered while the queue is held, as after a failure or a stop.
+  onSendNow?: (item: QueuedMessage) => void;
 }
 
 function QueuedRow({
@@ -289,9 +297,22 @@ function QueuedRow({
   onEdit,
   onRemove,
   onMove,
+  onSendNow,
 }: QueuedRowProps) {
   const icons = useIcons();
   const XIcon = icons.x;
+  const PencilIcon = icons.pencil;
+  const SendIcon = icons["arrow-up"];
+  // Revealed on row hover; always shown on touch and while the queue is held.
+  const rowButton = cn(
+    "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
+    "text-muted-foreground hover:text-foreground hover:bg-hover",
+    isTouch || onSendNow
+      ? "opacity-100"
+      : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
+    "transition-opacity duration-80 cursor-pointer outline-none",
+    "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
+  );
   const ImageIcon = icons.image;
   const compactStep = useSize().variant === "compact";
   const fileCount = item.files.length;
@@ -349,6 +370,36 @@ function QueuedRow({
       {/* py-1/-my-1 keeps truncate's overflow:hidden from clipping
           ascenders/descenders outside the trimmed box. */}
       <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
+      {onSendNow && (
+        <Tooltip content="Send now" side="top">
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSendNow(item);
+            }}
+            aria-label={`Send queued message now: ${label}`}
+            className={rowButton}
+          >
+            <SendIcon size={13} strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+      )}
+      <Tooltip content="Edit" side="top">
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(item);
+          }}
+          aria-label={`Edit queued message: ${label}`}
+          className={rowButton}
+        >
+          <PencilIcon size={13} strokeWidth={2.25} />
+        </button>
+      </Tooltip>
       <Tooltip content="Remove" side="top">
         <button
           type="button"
@@ -363,9 +414,9 @@ function QueuedRow({
           className={cn(
             "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
             "text-muted-foreground hover:text-foreground hover:bg-hover",
-            // Hover devices reveal × on row-hover; touch has no hover, so keep
-            // it persistently visible there.
-            isTouch
+            // Hover devices reveal × on row-hover; touch has no hover, and a
+            // held queue offers Send now beside it, so keep it visible there.
+            isTouch || onSendNow
               ? "opacity-100"
               : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
             "transition-opacity duration-80 cursor-pointer outline-none",
@@ -483,6 +534,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       textareaProps,
       status,
       onStop,
+      onSteer,
+      holdQueue,
       queue,
       onQueueChange,
       showQueue = true,
@@ -658,9 +711,15 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
           ? `0 0 0 1px var(--border), ${EDGE_DROP}`
           : undefined;
 
-    const handleSend = useCallback(() => {
+    const handleSend = useCallback((queue = false) => {
       if (!canSend) return;
       setHistoryIndex(null);
+      if (streaming && onSteer && !queue) {
+        onSteer(trimmed, filesArr);
+        onValueChange("");
+        if (supportsFiles) onFilesChange?.([]);
+        return;
+      }
       // While the assistant is streaming, a submit enqueues instead of sending:
       // snapshot the draft (text + currently-attached files) into a queue item,
       // then clear the composer and keep focus.
@@ -688,6 +747,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       onValueChange,
       supportsFiles,
       onFilesChange,
+      onSteer,
     ]);
 
     const handleStop = useCallback(() => onStop?.(), [onStop]);
@@ -701,7 +761,12 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       const prev = prevStatusRef.current;
       prevStatusRef.current = status;
       if (!supportsQueue) return;
-      if (prev === "streaming" && status === "idle" && queueArr.length > 0) {
+      if (
+        prev === "streaming" &&
+        status === "idle" &&
+        queueArr.length > 0 &&
+        !holdQueue
+      ) {
         const [next, ...rest] = queueArr;
         onQueueChange?.(rest);
         onSend?.(next.text, next.files, { queuedId: next.id });
@@ -709,9 +774,17 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
           `Message sent.${rest.length ? ` ${rest.length} still queued.` : ""}`
         );
       }
-    }, [status, supportsQueue, queueArr, onQueueChange, onSend]);
+    }, [status, supportsQueue, queueArr, onQueueChange, onSend, holdQueue]);
 
     // ── Queue item actions ────────────────────────────────────────────
+    const sendQueuedNow = useCallback(
+      (item: QueuedMessage) => {
+        onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id));
+        onSend?.(item.text, item.files, { queuedId: item.id });
+      },
+      [onQueueChange, onSend]
+    );
+
     const editQueued = useCallback(
       (item: QueuedMessage) => {
         if (!supportsQueue) return;
@@ -766,8 +839,10 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     // Stop⇄arrow swap animates.
     const buttonMode: "send" | "queue" | "stop" = !streaming
       ? "send"
-      : canSend && supportsQueue
-        ? "queue"
+      : canSend
+        ? supportsQueue && !onSteer
+          ? "queue"
+          : "send"
         : onStop
           ? "stop"
           : "send";
@@ -776,7 +851,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         ? "Stop"
         : buttonMode === "queue"
           ? "Queue message"
-          : sendLabel;
+          : streaming && onSteer
+            ? "Steer"
+            : sendLabel;
 
     const setCaretEnd = useCallback(() => {
       requestAnimationFrame(() => {
@@ -890,7 +967,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
 
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          handleSend();
+          handleSend(e.metaKey || e.ctrlKey);
         }
       },
       [
@@ -1152,6 +1229,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                           onEdit={editQueued}
                           onRemove={removeQueued}
                           onMove={moveQueued}
+                          onSendNow={
+                            holdQueue && !streaming ? sendQueuedNow : undefined
+                          }
                         />
                       ))}
                     </AnimatePresence>
@@ -1279,7 +1359,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                 type="button"
                 variant="primary"
                 size="icon-sm"
-                onClick={buttonMode === "stop" ? handleStop : handleSend}
+                onClick={buttonMode === "stop" ? handleStop : () => handleSend()}
                 disabled={buttonMode === "stop" ? disabled : !canSend}
                 aria-label={buttonLabel}
               >

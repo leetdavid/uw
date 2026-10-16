@@ -182,7 +182,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     return content::EvalJs(
                chat,
                "const ends = () => document.querySelectorAll('.answer, "
-               ".failed');"
+               ".failed, .stopped-by-user');"
                "const before = ends().length;" +
                    script +
                    "new Promise(resolve => {"
@@ -206,6 +206,18 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
         "setTimeout(() => field.dispatchEvent(new KeyboardEvent('keydown',"
         "    {key: 'Enter', bubbles: true})), 50);",
         text);
+  }
+
+  // Types `text` and presses Enter, with Cmd when `command` is true.
+  static std::string EnterScript(const std::string& text, bool command) {
+    return content::JsReplace(
+        "const field = document.getElementById('message');"
+        "Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+        "    'value').set.call(field, $1);"
+        "field.dispatchEvent(new Event('input', {bubbles: true}));"
+        "setTimeout(() => field.dispatchEvent(new KeyboardEvent('keydown',"
+        "    {key: 'Enter', metaKey: $2, bubbles: true})), 50);",
+        text, command);
   }
 
   // Sends `text` and returns the line that ends the agent's turn.
@@ -1366,6 +1378,87 @@ IN_PROC_BROWSER_TEST_F(UwChatSensitiveSiteBrowserTest,
   EXPECT_TRUE(BankIsOpen());
   EXPECT_EQ(content::EvalJs(chat, "!!document.getElementById('approval')"),
             false);
+}
+
+// Stop in the composer ends a chat whose model has not answered. A message
+// queued with Cmd+Enter waits after a stop instead of going.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       StopEndsTheChatAndQueuedMessagesWait) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 1u; }));
+  const std::string queued =
+      "document.querySelector('[aria-label^=\"Queued message\"]')"
+      "    ?.textContent";
+
+  ASSERT_TRUE(content::ExecJs(
+      chat, EnterScript("Then email me the link", /*command=*/true)));
+  EXPECT_EQ(Until(chat, queued), "Then email me the link");
+  EXPECT_EQ(UntilTheEnd(chat,
+                        "document.querySelector('button[aria-label=\"Stop\"]')"
+                        "    .click();"),
+            "You stopped the chat.");
+  EXPECT_EQ(content::EvalJs(chat,
+                            "new Promise((resolve) => setTimeout(() =>"
+                            "    resolve(" +
+                                queued + "), 300))"),
+            "Then email me the link");
+  EXPECT_EQ(model_.Requests().size(), 1u);
+  SaveWindowScreenshot(browser(), "chat-stopped-with-a-queue");
+}
+
+// Enter while the agent works steers it: the waiting request is sent again
+// with the message. A queued message goes once the agent answers.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       EnterSteersAndAQueuedMessageFollowsTheAnswer) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 1u; }));
+  ASSERT_TRUE(content::ExecJs(
+      chat, EnterScript("Then email me the link", /*command=*/true)));
+  ASSERT_EQ(Until(chat,
+                  "document.querySelector('[aria-label^=\"Queued message\"]')"
+                  "    ?.textContent"),
+            "Then email me the link");
+
+  model_.Script({ScriptedModel::Answer("Found one on Sunday."),
+                 ScriptedModel::Answer("Emailed it.")});
+  ASSERT_TRUE(
+      content::ExecJs(chat, EnterScript("Make it Sunday", /*command=*/false)));
+  EXPECT_EQ(Until(chat, "document.querySelectorAll('.answer').length === 2"),
+            true);
+
+  EXPECT_EQ(Lines(chat, ".mine"),
+            (std::vector<std::string>{"Find a tour", "Make it Sunday",
+                                      "Then email me the link"}));
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 3u);
+  EXPECT_THAT(requests[1], ::testing::HasSubstr("Make it Sunday"));
+  EXPECT_THAT(requests[2], ::testing::HasSubstr("Then email me the link"));
+}
+
+// Enter while a step waits for approval declines it, with the message as
+// the note for the agent.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       EnterDeclinesAStepThatWaitsForApproval) {
+  UseAgentModel();
+  ScriptOrder("I did not order.");
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Place the order")));
+  Approval(chat);
+
+  EXPECT_EQ(UntilTheEnd(chat, EnterScript("Not today", /*command=*/false)),
+            "I did not order.");
+  EXPECT_EQ(Ordered(chat), "");
+  EXPECT_THAT(model_.Requests()[3],
+              ::testing::HasSubstr("The user did not approve this step"));
+  EXPECT_THAT(model_.Requests()[3], ::testing::HasSubstr("Not today"));
 }
 
 }  // namespace

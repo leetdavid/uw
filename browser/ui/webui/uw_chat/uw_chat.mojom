@@ -49,6 +49,12 @@ interface ChatHandler {
   // How much the chat asks from the next step on. Picked on a new chat
   // before its first message, it is also the mode new chats start on.
   SetMode(ApprovalMode mode);
+  // Stops the agent: a waiting model request is dropped and a step under way
+  // finishes first. Answers a waiting approval with Stop the chat.
+  Stop();
+  // A message while the agent works. It goes in after the step under way;
+  // while a step waits for approval it declines that step, as its note.
+  Steer(string text);
 };
 
 // The model a chat runs on, from a provider on uw://providers.
@@ -72,6 +78,8 @@ enum StepKind {
   kResumed,
   // The user switched the chat's model or its effort.
   kModel,
+  // The user stopped the chat, with Stop or from an approval.
+  kStoppedByUser,
 };
 
 // One step of the agent's work.

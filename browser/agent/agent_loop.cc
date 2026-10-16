@@ -67,6 +67,13 @@ AgentLoop::Step Failed(std::string text) {
   return step;
 }
 
+AgentLoop::Step StoppedByUser() {
+  AgentLoop::Step step;
+  step.kind = AgentLoop::Step::Kind::kStoppedByUser;
+  step.text = "You stopped the chat.";
+  return step;
+}
+
 }  // namespace
 
 AgentLoop::AgentLoop(tabs::TabInterface& chat,
@@ -123,7 +130,43 @@ void AgentLoop::TryAgain() {
   AskModel();
 }
 
+void AgentLoop::Stop() {
+  if (!working_) {
+    return;
+  }
+  if (asking_) {
+    client_.reset();
+    asking_ = false;
+    Finish(StoppedByUser());
+    return;
+  }
+  stopping_ = true;
+}
+
+void AgentLoop::Steer(std::string_view text) {
+  if (!working_) {
+    Send(text);
+    return;
+  }
+  turns_ = 0;
+  if (asking_) {
+    client_.reset();
+    asking_ = false;
+    context_->AddUser(text);
+    AskModel();
+    return;
+  }
+  steer_ = std::string(text);
+}
+
 void AgentLoop::AskModel() {
+  if (stopping_) {
+    Finish(StoppedByUser());
+    return;
+  }
+  if (steer_) {
+    context_->AddUser(*std::exchange(steer_, std::nullopt));
+  }
   if (++turns_ > kMaxTurns) {
     Finish(Failed(base::StrCat({"The agent stopped after ",
                                 base::NumberToString(kMaxTurns),
@@ -138,11 +181,13 @@ void AgentLoop::AskModel() {
   }
   client_ = RemoteModelClient::ForLanguageModel(
       loader_, model_.connection, model_.api_key, *body, kModelTimeout);
+  asking_ = true;
   client_->Send(
       base::BindOnce(&AgentLoop::OnModel, weak_factory_.GetWeakPtr()));
 }
 
 void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
+  asking_ = false;
   if (!outcome.ok) {
     std::string text = base::StrCat(
         {"The model request failed: ",
@@ -174,6 +219,17 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
 }
 
 void AgentLoop::RunCall(ModelTurn turn, size_t index) {
+  if (stopping_) {
+    context_->CloseOpenCalls("The user stopped the chat.");
+    Finish(StoppedByUser());
+    return;
+  }
+  // The user wrote in: the rest of the answer's steps wait for the model to
+  // read it.
+  if (steer_ && index < turn.calls.size()) {
+    context_->CloseOpenCalls("Not run, because the user sent a new message.");
+    index = turn.calls.size();
+  }
   if (index == turn.calls.size()) {
     // The model client that called OnModel may still be on the stack.
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -268,7 +324,7 @@ void AgentLoop::OnToolCalled(ModelTurn turn,
       std::exchange(site_refused_, std::nullopt);
   if (refused && refused->choice == ApprovalAnswer::Choice::kStop) {
     context_->CloseOpenCalls("The user stopped the chat.");
-    Finish(Failed("You stopped the chat."));
+    Finish(StoppedByUser());
     return;
   }
   if (refused) {
@@ -301,7 +357,7 @@ void AgentLoop::OnApproval(ModelTurn turn,
     }
     case ApprovalAnswer::Choice::kStop:
       context_->CloseOpenCalls("The user stopped the chat.");
-      Finish(Failed("You stopped the chat."));
+      Finish(StoppedByUser());
       return;
   }
 }
@@ -359,6 +415,8 @@ void AgentLoop::OnTool(ModelTurn turn,
 }
 
 void AgentLoop::Finish(Step step) {
+  stopping_ = false;
+  steer_.reset();
   context_->ShortenAll();
   working_ = false;
   on_step_.Run(step);

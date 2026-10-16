@@ -430,5 +430,32 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, EachModeAsksAsItSays) {
             "Cy");
 }
 
+// A steer reaches a request that waits for the model: it is sent again with
+// the user's new message. A stop ends the run at once.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       AStopOrASteerReachesAWaitingRequest) {
+  model_.Script({ScriptedModel::Hang()});
+  steps_.clear();
+  agent_->Send("Find a tour");
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 1u; }));
+  model_.Script({ScriptedModel::Answer("Sunday at 10.")});
+  agent_->Steer("Make it Sunday");
+  ASSERT_TRUE(base::test::RunUntil([&] { return !agent_->working(); }));
+  EXPECT_EQ(steps_.back().text, "Sunday at 10.");
+  std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[1], HasSubstr("Find a tour"));
+  EXPECT_THAT(requests[1], HasSubstr("Make it Sunday"));
+
+  model_.Script({ScriptedModel::Hang()});
+  agent_->Send("And Monday?");
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 3u; }));
+  agent_->Stop();
+  EXPECT_FALSE(agent_->working());
+  EXPECT_EQ(steps_.back().kind, Kind::kStoppedByUser);
+}
+
 }  // namespace
 }  // namespace uw

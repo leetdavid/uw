@@ -78,6 +78,8 @@ class UwChatHandler : public mojom::ChatHandler,
                 const std::string& model) override;
   void SetEffort(const std::string& effort) override;
   void SetMode(mojom::ApprovalMode mode) override;
+  void Stop() override;
+  void Steer(const std::string& text) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;

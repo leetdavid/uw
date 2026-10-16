@@ -51,7 +51,7 @@ struct AgentModel {
 class AgentLoop {
  public:
   struct Step {
-    enum class Kind { kTool, kAnswer, kFailed };
+    enum class Kind { kTool, kAnswer, kFailed, kStoppedByUser };
     Kind kind = Kind::kFailed;
     // For a tool: its step number, its name, what the model asked, and what
     // the tool answered.
@@ -81,6 +81,13 @@ class AgentLoop {
   void Resume();
   // Asks the model again after its request failed, with the chat as it is.
   void TryAgain();
+  // Ends the run: a waiting model request is dropped, and a step under way
+  // finishes first.
+  void Stop();
+  // Puts the user's `text` in after the step under way, before the next model
+  // request. A waiting model request is sent again with it. Sends it when
+  // the agent is not working.
+  void Steer(std::string_view text);
   bool working() const { return working_; }
   // Talks to `model` from the next request on.
   void SetModel(AgentModel model) { model_ = std::move(model); }
@@ -153,6 +160,11 @@ class AgentLoop {
   std::unique_ptr<RemoteModelClient> client_;
   int turns_ = 0;
   bool working_ = false;
+  // A model request is under way.
+  bool asking_ = false;
+  // Stop or Steer came while a step was under way.
+  bool stopping_ = false;
+  std::optional<std::string> steer_;
   base::WeakPtrFactory<AgentLoop> weak_factory_{this};
 };
 

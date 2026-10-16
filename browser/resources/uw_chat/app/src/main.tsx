@@ -19,6 +19,7 @@ import {
   Pause,
   Plus,
   Sparkles,
+  Square,
   Trash2,
 } from "lucide-react";
 import { code } from "@streamdown/code";
@@ -36,7 +37,10 @@ import {
 } from "@/components/ui/ask-user-questions";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
-import { InputMessage } from "@/components/ui/input-message";
+import {
+  InputMessage,
+  type QueuedMessage,
+} from "@/components/ui/input-message";
 import {
   Sidebar,
   SidebarContent,
@@ -144,6 +148,13 @@ const EXAMPLES = [
   "Get the logs of the latest crash on Railway",
   "Find subscriptions I could cancel",
 ];
+
+// What the note under the composer says while the agent waits, by mode.
+const MODE_NOTES: Record<ApprovalMode, string> = {
+  [ApprovalMode.kAskFirst]: "Every click and typing waits for your approval",
+  [ApprovalMode.kAuto]: "Changes on a site wait for your approval",
+  [ApprovalMode.kFullAuto]: "Full auto: the agent acts without asking",
+};
 
 // How long the agent has worked on the current request, as the chat's
 // header says it.
@@ -378,6 +389,13 @@ function Line({
             </BannerActions>
           )}
         </Banner>
+      );
+    case StepKind.kStoppedByUser:
+      return (
+        <p className="stopped-by-user flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Square aria-hidden className="size-3.5" />
+          {line.text}
+        </p>
       );
     case StepKind.kStopped:
       return (
@@ -966,6 +984,7 @@ function Chat() {
   // provider's models once listed.
   const [model, setModel] = useState<ChatModel | null>(null);
   const [mode, setMode] = useState(ApprovalMode.kAuto);
+  const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
     {},
@@ -1178,6 +1197,27 @@ function Chat() {
     chatHandler.send(message);
   };
 
+  // A message while the agent works: it goes in after the step under way, or
+  // declines a step that waits for approval.
+  const steer = (text: string) => {
+    const message = text.trim();
+    if (!message) {
+      return;
+    }
+    setLines((before) => [
+      ...before,
+      {
+        kind: StepKind.kUser,
+        tool: "",
+        args: "",
+        result: "",
+        text: message,
+        model: null,
+      },
+    ]);
+    chatHandler.steer(message);
+  };
+
   // Sends what the command bar asked, as if typed, once the chat is open.
   useEffect(() => {
     if (asked && opened) {
@@ -1219,6 +1259,10 @@ function Chat() {
     !working &&
     lines.findLast((line) => line.kind !== StepKind.kModel)?.kind ===
       StepKind.kStopped;
+  // Queued messages wait after a run that ended in a failure or a stop.
+  const ended = lines.findLast((line) => line.kind !== StepKind.kModel)?.kind;
+  const holdQueue =
+    ended === StepKind.kFailed || ended === StepKind.kStoppedByUser;
   const state = approval
     ? "Waits for your approval"
     : working
@@ -1273,6 +1317,11 @@ function Chat() {
         value={draft}
         onValueChange={setDraft}
         onSend={send}
+        onSteer={steer}
+        onStop={() => chatHandler.stop()}
+        queue={queue}
+        onQueueChange={setQueue}
+        holdQueue={holdQueue}
         disabled={!opened}
         status={working ? "streaming" : "idle"}
         placeholder="Reply to the agent"
@@ -1282,7 +1331,11 @@ function Chat() {
         leftSlot={chips}
       />
       <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">
-        Changes on a site wait for your approval
+        {approval
+          ? "Enter declines the step with this note · Cmd+Enter queues"
+          : working
+            ? "Enter steers · Cmd+Enter queues"
+            : MODE_NOTES[mode]}
       </p>
     </>
   );

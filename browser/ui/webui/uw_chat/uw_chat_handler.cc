@@ -147,6 +147,8 @@ mojom::StepKind KindOf(AgentLoop::Step::Kind kind) {
       return mojom::StepKind::kAnswer;
     case AgentLoop::Step::Kind::kFailed:
       return mojom::StepKind::kFailed;
+    case AgentLoop::Step::Kind::kStoppedByUser:
+      return mojom::StepKind::kStoppedByUser;
   }
 }
 
@@ -321,6 +323,31 @@ void UwChatHandler::Send(const std::string& text) {
   agent_->Send(handed_over_ + text);
   handed_over_.clear();
   Save();
+}
+
+void UwChatHandler::Stop() {
+  if (approval_answer_) {
+    AnswerApproval(mojom::ApprovalChoice::kStop, std::string());
+    return;
+  }
+  if (Working()) {
+    agent_->Stop();
+  }
+}
+
+// While a step waits for approval, the message declines it as its note.
+void UwChatHandler::Steer(const std::string& text) {
+  if (!Working()) {
+    Send(text);
+    return;
+  }
+  Log(base::DictValue().Set("kind", "user").Set("text", text));
+  Save();
+  if (approval_answer_) {
+    AnswerApproval(mojom::ApprovalChoice::kDecline, text);
+    return;
+  }
+  agent_->Steer(text);
 }
 
 void UwChatHandler::Resume() {
@@ -687,6 +714,9 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
     case AgentLoop::Step::Kind::kFailed:
       Log(base::DictValue().Set("kind", "failed").Set("text", step.text));
       break;
+    case AgentLoop::Step::Kind::kStoppedByUser:
+      Log(base::DictValue().Set("kind", "stopped_by_user"));
+      break;
   }
   if (step.kind != AgentLoop::Step::Kind::kTool) {
     unread_ = contents_->GetVisibility() != content::Visibility::VISIBLE;
@@ -829,6 +859,9 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
     line->kind = mojom::StepKind::kUser;
   } else if (*kind == "answer") {
     line->kind = mojom::StepKind::kAnswer;
+  } else if (*kind == "stopped_by_user") {
+    line->kind = mojom::StepKind::kStoppedByUser;
+    line->text = "You stopped the chat.";
   } else if (*kind == "stopped") {
     line->kind = mojom::StepKind::kStopped;
   } else if (*kind == "resumed") {
