@@ -484,3 +484,94 @@ index 73f2984811f4e4f5b7cd0e89b58a4fad8025c082..149ba1a647f04e4a00f0da4dc8657914
    ]
    public_deps = [
      "//base",
+diff --git a/chrome/browser/ui/views/frame/browser_widget.cc b/chrome/browser/ui/views/frame/browser_widget.cc
+index e6483eae651ee77f6bac3140fe46cb8be3e58296..eaf66bcdd0cebe298ec1eba23b8305b2e2fca5ae 100644
+--- a/chrome/browser/ui/views/frame/browser_widget.cc
++++ b/chrome/browser/ui/views/frame/browser_widget.cc
+@@ -41,6 +41,7 @@
+ #include "ui/color/color_provider_key.h"
+ #include "ui/views/controls/menu/menu_runner.h"
+ #include "ui/views/widget/native_widget.h"
++#include "uw/browser/ui/look/page_color.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chromeos/ui/base/window_properties.h"
+@@ -496,6 +497,9 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
+   // Apply BrowserWidget overrides:
+   key.app_controller =
+       web_app::AppBrowserController::From(browser_view_->browser());
++  if (!key.app_controller) {
++    key.app_controller = uw::PageColorMixers(browser_view_);
++  }
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+   // ChromeOS SystemWebApps use the OS theme all the time.
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+index ae5f0f10e51eca0477a8d1c10df63321b0f09d08..3159992672f89e19be11aef704b76cdae2d96b4e 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+@@ -142,6 +142,7 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
+ #include "url/gurl.h"
++#include "uw/browser/ui/look/page_color.h"
+ 
+ #if BUILDFLAG(IS_MAC)
+ #include "ui/base/cocoa/appkit_utils.h"
+@@ -1269,7 +1270,7 @@ int OmniboxViewViews::GetOmniboxTextLength() const {
+ 
+ void OmniboxViewViews::SetEmphasis(bool emphasize, const gfx::Range& range) {
+   const SkColor color = GetColorProvider()->GetColor(
+-      emphasize ? kColorOmniboxText : kColorOmniboxTextDimmed);
++      emphasize ? uw::kColorPageFieldText : uw::kColorPageFieldTextDimmed);
+   if (range.IsValid()) {
+     ApplyColor(color, range);
+   } else {
+@@ -2345,7 +2346,7 @@ void OmniboxViewViews::UpdatePlaceholderTextColor() {
+   SetPlaceholderTextColorId(
+       omnibox::ShouldUseDimPlaceholderColor(location_bar_view_)
+           ? kColorOmniboxForegroundDisabled
+-          : kColorOmniboxText);
++          : uw::kColorPageFieldText);
+ }
+ 
+ BEGIN_METADATA(OmniboxViewViews)
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index 335b2902fd43016d45fa176e4aeec65ec87dcb64..8754f8445d3c2c6c65fa4241be3864509fc6c62e 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -164,6 +164,7 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/look/page_color.h"
+ 
+ #if BUILDFLAG(IS_MAC)
+ #include "chrome/browser/web_applications/os_integration/mac/app_shim_registry.h"
+@@ -1333,14 +1334,13 @@ void LocationBarView::RefreshBackground() {
+   if (is_caret_visible) {
+     // Match the background color to the popup if the Omnibox is visibly
+     // focused.
+-    background_color_ =
+-        color_provider->GetColor(kColorOmniboxResultsBackground);
++    background_color_ = color_provider->GetColor(uw::kColorPageFieldFocused);
+   } else if (input_in_progress && !high_contrast) {
+     // Under CR23 guidelines, if the Omnibox is unfocused, but still contains
+     // in-progress user input, the background color matches the popup (unless
+     // high-contrast mode is enabled).
+-    normal = color_provider->GetColor(kColorOmniboxResultsBackground);
+-    hovered = color_provider->GetColor(kColorOmniboxResultsBackgroundHovered);
++    normal = color_provider->GetColor(uw::kColorPageFieldFocused);
++    hovered = color_provider->GetColor(uw::kColorPageFieldFocusedHovered);
+     background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
+   }
+ 
+@@ -2099,7 +2099,7 @@ void LocationBarView::OnLocationIconDragged(const ui::MouseEvent& event) {
+ 
+ SkColor LocationBarView::GetSecurityChipColor(
+     security_state::SecurityLevel security_level) const {
+-  ui::ColorId id = kColorOmniboxText;
++  ui::ColorId id = uw::kColorPageFieldText;
+   if (security_level == security_state::DANGEROUS) {
+     id = kColorOmniboxSecurityChipDangerous;
+   }

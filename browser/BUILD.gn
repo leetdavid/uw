@@ -6,6 +6,7 @@ group("browser_tests") {
     "ui:browser_tests",
     "ui/look:browser_tests",
     "ui/views/command_bar:browser_tests",
+    "ui/views/page_colors:browser_tests",
     "ui/views/theme_picker:browser_tests",
     "ui/webui/uw_chat:browser_tests",
     "ui/webui/uw_organization:browser_tests",

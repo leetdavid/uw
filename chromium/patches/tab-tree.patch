@@ -390,33 +390,35 @@ index c8e946c..307bd0f 100644
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..6c202473cede348f73df51be0f6b41a0c40bf68a 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..a334643147ea86418c5b26c4b68da9e4b1d479f1 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,8 @@ source_set("internal") {
+@@ -58,6 +58,9 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
 +      "//uw/browser/tab_organization",
 +      "//uw/browser/ui/views/command_bar",
++      "//uw/browser/ui/views/page_colors",
        "//chrome/browser:global_features",
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..2df30d27e7a961de6cdebebee541f586851928bb 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..fb81bedb42acc33eba4086929d297b6ac20b1f99 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -6,6 +6,9 @@
+@@ -6,6 +6,10 @@
  
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
 +#include "uw/browser/tab_organization/automatic_organizer.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
++#include "uw/browser/ui/views/page_colors/page_colors.h"
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,7 +24,13 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,7 +25,13 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -431,11 +433,26 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..2df30d27e7a961de6cdebebee541f586
  }
  
  void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
+@@ -31,9 +41,12 @@ void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
+ 
+ void EmbedderBrowserWindowFeatures::InitPostBrowserViewConstruction(
+     BrowserView* browser_view) {
+-  // Embedder implementation goes here.
++  if (browser_view->browser()->GetType() ==
++      BrowserWindowInterface::TYPE_NORMAL) {
++    page_colors_ = std::make_unique<uw::PageColors>(browser_view);
++  }
+ }
+ 
+ void EmbedderBrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
+-  // Embedder implementation goes here.
++  page_colors_.reset();
+ }
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..04c01835a52a9dbfe5c343a74b771cc366f52911 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..1d0e0344bbad5dfe7107f5ad34fb22c4668be4e9 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,14 @@
+@@ -7,6 +7,15 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
@@ -444,19 +461,21 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..04c01835a52a9dbfe5c343a74b771cc3
 +namespace uw {
 +class AutomaticOrganizer;
 +class CommandBar;
++class PageColors;
 +class TabOrganizationController;
 +}
 +
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +52,9 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +53,10 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
 +  std::unique_ptr<uw::TabOrganizationController> tab_organization_;
 +  std::unique_ptr<uw::AutomaticOrganizer> automatic_organizer_;
 +  std::unique_ptr<uw::CommandBar> command_bar_;
++  std::unique_ptr<uw::PageColors> page_colors_;
  };
  
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_

@@ -103,9 +103,9 @@ Acceptance checks:
 
 ## Page colors
 
-Status: scope agreed with the user on 2026-10-16. Not built. The design, T109, comes first.
+Status: scope agreed with the user on 2026-10-16. The design, T109, and the build, T110, are in review. Nobody has used it in a real window yet.
 
-Implementability: **5/10**. Chromium already reports each page's background color and tells the browser when it changes, and uw's color mixer already sets the toolbar's colors. The new parts are an observer of each window's shown tab, a way to give one window its own toolbar colors, and a fade that uw paints itself, since rebuilding the window's colors on every frame of a fade is too slow. Chromium colors made from the toolbar's, such as the address bar's dropdown and infobars, change with it and need checking.
+Implementability: **5/10**. Chromium already reports each page's background color and tells the browser when it changes, and uw's color mixer already sets the toolbar's colors. The new parts are an observer of each window's shown tab, a way to give one window its own toolbar colors, and a crossfade, since rebuilding the window's colors on every frame of a fade is too slow. Chromium colors made from the toolbar's, such as the address bar's dropdown and infobars, change with it and need checking.
 
 Agreed:
 
@@ -118,7 +118,8 @@ Agreed:
 
 Proposed by uw and drawn for T109 on the canvas's "Themes" page, as "Page colors: a red page" and "Page colors: every state". The numbers are in the `uw-themes` guide.
 
-- The fade takes 200 ms. Icons and text switch to their new color halfway through.
+- The fade takes 200 ms. The top of the card crossfades as a whole, so icons and text blend from their old color to their new one. Changed while building: the design had them switch halfway.
+- The address field keeps the page color while it has focus or holds typed text. The dropdown under it keeps the window's colors. Chromium gives the focused field the dropdown's colors, which would leave white text on a white field over a red page.
 - Icons and text are near-black or white, whichever reads better on the page color, as on the theme. The address field and the line under the bars are the text color at a low strength over the page color.
 - A page whose color is today's toolbar color gets today's toolbar exactly, so the terminal does not change.
 - In a split view, the toolbar takes the color of the page that has focus. Private windows follow the same rules.
@@ -136,6 +137,13 @@ Acceptance checks:
 4. A page that changes its background, such as from a script, changes the toolbar without a reload.
 5. A white page in a dark window gives a white toolbar. Text in the address field keeps a 4.5:1 contrast ratio on every page color.
 6. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
+How it is built, for T110:
+
+- `browser/ui/views/page_colors` watches the active tab of each normal window and passes its page color on when it changes.
+- `browser/ui/look/page_color` makes the toolbar's, the address field's, and the bookmarks bar's colors from it. The window takes them through the slot in Chromium's color key that web-app windows use for their own colors.
+- On a change, the top of the card keeps its old look on a layer of its own and fades it out over the newly colored one.
+- `PageColorsBrowserTest.*` covers checks 1 to 5 headless.
 
 ## Open questions
 

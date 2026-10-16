@@ -1,8 +1,10 @@
 # The Arc-style look: tint colors, the window gradient, the inactive window
-# buttons, and the fills of sidebar tabs.
+# buttons, the fills of sidebar tabs, and the toolbar in the page's color.
 source_set("look") {
   sources = [
     "page_card.h",
+    "page_color.cc",
+    "page_color.h",
     "sidebar_tab_fill.cc",
     "sidebar_tab_fill.h",
     "tint_color_mixer.cc",

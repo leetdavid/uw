@@ -1,0 +1,47 @@
+# The toolbar and bookmarks bar in the color of the page under them.
+source_set("page_colors") {
+  sources = [
+    "page_colors.cc",
+    "page_colors.h",
+  ]
+  public_deps = [
+    "//base",
+    "//content/public/browser",
+    "//skia",
+  ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//ui/compositor",
+    "//ui/gfx",
+    "//ui/views",
+    "//uw/browser/ui/look",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "page_colors_browsertest.cc" ]
+  deps = [
+    ":page_colors",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/themes",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/color:color_headers",
+    "//chrome/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//skia",
+    "//testing/gtest",
+    "//ui/color",
+    "//ui/compositor",
+    "//ui/gfx:color_utils",
+    "//ui/views",
+    "//url",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/look",
+  ]
+}

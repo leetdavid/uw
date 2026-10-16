@@ -37,6 +37,8 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/color/color_provider_key.h"
+#include "ui/color/color_provider_manager.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
@@ -87,10 +89,14 @@ class TintBrowserTest : public headless::HeadlessModeBrowserTest {
 
   SkColor Color(ui::ColorId id) { return Color(browser(), id); }
 
+  // The window's own colors, without the page color on its toolbar.
   SkColor Color(Browser* window, ui::ColorId id) {
-    return BrowserView::GetBrowserViewForBrowser(window)
-        ->GetColorProvider()
-        ->GetColor(id);
+    ui::ColorProviderKey key = BrowserView::GetBrowserViewForBrowser(window)
+                                   ->GetWidget()
+                                   ->GetColorProviderKeyForTesting();
+    key.app_controller = nullptr;
+    return ui::ColorProviderManager::Get().GetColorProviderFor(key)->GetColor(
+        id);
   }
 
   // Saves `theme` as the picker does: in the profile's prefs, with its first

@@ -13,6 +13,7 @@
 #include "ui/color/color_transform.h"
 #include "ui/gfx/color_utils.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/page_color.h"
 #include "uw/components/look/theme.h"
 #include "uw/components/look/tint.h"
 
@@ -97,6 +98,7 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
                           const ui::ColorProviderKey& key) {
   ui::ColorMixer& mixer = provider->AddMixer();
   mixer[kColorPageCardEdge] = {SK_ColorTRANSPARENT};
+  AddPageFieldDefaults(mixer);
   if (!UsesTint(key)) {
     return;
   }
