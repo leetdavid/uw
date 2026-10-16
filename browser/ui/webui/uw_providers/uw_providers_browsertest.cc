@@ -316,6 +316,32 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->model, "chat-a");
 }
 
+// A provider that could not list its models without a key lists them again
+// once a key is saved on its page, without a reload.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, ANewKeyListsTheModelsAgain) {
+  Provider provider = PresetProvider(ProviderPreset::kCustom);
+  provider.name = "Test server";
+  provider.address = Address();
+  const std::string id = AddProvider(prefs(), std::move(provider));
+  models_.Fail("/v1/models", 401, R"({"error":{"message":"Bad key."}})");
+  Open(id);
+  EXPECT_EQ(true, Run("await until(() => document.body.innerText"
+                      "    .includes('HTTP 401 Bad key.'));"
+                      "return true;"));
+
+  models_.Answer("/v1/models", kTwoModels);
+  EXPECT_EQ(true,
+            Run("withText('button', 'Add a key').click();"
+                "await until(() => field('New key'));"
+                "type('New key', 'sk-new');"
+                "await until(() => !withText('button', 'Save').disabled);"
+                "withText('button', 'Save').click();"
+                "await until(() => modelRow('chat-b'));"
+                "return true;"));
+  EXPECT_THAT(RequestsTo("/v1/models"),
+              ElementsAre("GET ", "GET Bearer sk-new"));
+}
+
 // The page is a React bundle under WebUI's script rules, which refuse HTML
 // strings (Trusted Types) and scripts from elsewhere. A broken rule shows as
 // a console error.

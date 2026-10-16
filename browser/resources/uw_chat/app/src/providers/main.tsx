@@ -377,28 +377,40 @@ function Providers() {
   const [data, setData] = useState<PageData | null>(null);
   const id = decodeURIComponent(location.pathname.slice(1));
 
-  const refresh = useCallback(async () => {
+  // `relist` names a provider whose models to list again, such as one with a
+  // new key.
+  const refresh = useCallback(async (relist?: string) => {
     const { state } = await providersHandler.getState();
-    setData((old) => ({
-      providers: state.providers,
-      choices: {
-        [ModelSlot.kLanguage]: state.language,
-        [ModelSlot.kDecision]: state.decision,
-        [ModelSlot.kAgent]: state.agent,
-      },
-      lists: old?.lists ?? {},
-      upgradeNotice: state.upgradeNotice,
-    }));
+    setData((old) => {
+      const lists = { ...old?.lists };
+      if (relist) {
+        delete lists[relist];
+      }
+      return {
+        providers: state.providers,
+        choices: {
+          [ModelSlot.kLanguage]: state.language,
+          [ModelSlot.kDecision]: state.decision,
+          [ModelSlot.kAgent]: state.agent,
+        },
+        lists,
+        upgradeNotice: state.upgradeNotice,
+      };
+    });
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // Lists each provider's models once; the list says whether it answers.
-  const providerIds = data?.providers.map((provider) => provider.id).join(" ");
+  // Lists the models of each provider that has no list yet; the list says
+  // whether it answers.
+  const unlisted = data?.providers
+    .filter((provider) => !(provider.id in data.lists))
+    .map((provider) => provider.id)
+    .join(" ");
   useEffect(() => {
-    for (const providerId of providerIds?.split(" ").filter(Boolean) ?? []) {
+    for (const providerId of unlisted?.split(" ").filter(Boolean) ?? []) {
       setData((old) => {
         if (!old || providerId in old.lists) {
           return old;
@@ -411,7 +423,7 @@ function Providers() {
         return { ...old, lists: { ...old.lists, [providerId]: undefined } };
       });
     }
-  }, [providerIds]);
+  }, [unlisted]);
 
   const provider = data?.providers.find((each) => each.id === id);
   useEffect(() => {

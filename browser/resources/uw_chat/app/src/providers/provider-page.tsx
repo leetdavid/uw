@@ -48,7 +48,7 @@ export function ProviderPage({
 }: {
   provider: Provider;
   data: PageData;
-  onChanged: () => void;
+  onChanged: (relist?: string) => void;
 }) {
   const [replacing, setReplacing] = useState(false);
   const [key, setKey] = useState("");
@@ -70,7 +70,7 @@ export function ProviderPage({
     await providersHandler.replaceKey(provider.id, key);
     setKey("");
     setReplacing(false);
-    onChanged();
+    onChanged(provider.id);
   };
 
   const remove = async () => {
