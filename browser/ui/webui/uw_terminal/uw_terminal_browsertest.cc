@@ -257,6 +257,34 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
   EXPECT_TRUE(clicks.ends_with("m\n")) << clicks;
 }
 
+// A Cmd-click on a link goes to a program that asks for the mouse, which opens
+// the link itself, as in Ghostty. The page opens no tab of its own.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       ACmdClickedLinkGoesOnlyToAProgramThatAsksForTheMouse) {
+  content::WebContents* terminal = OpenTerminal();
+  const int tabs = browser()->tab_strip_model()->count();
+  Type(u"cd " + Folder() +
+       u" && printf '\\033[2J\\033[Hhttps://example.com/link\\n"
+       u"\\033[?1000h\\033[?1006h\\033]0;link\\007' && cat -v > clicks\r");
+  // The file appears once cat has started. The title follows the request for
+  // the mouse, so it shows once the page has read it.
+  WaitForFile("clicks", [](const std::string&) { return true; });
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return terminal->GetTitle() == u"link";
+  })) << terminal->GetTitle();
+  content::SimulateMouseClickAt(contents(), blink::WebInputEvent::kMetaKey,
+                                blink::WebMouseEvent::Button::kLeft,
+                                gfx::Point(40, 14));
+  Type(u"\r");
+  Press('d', ui::DomCode::US_D, ui::VKEY_D, /*control=*/true, false, false);
+  const std::string clicks = WaitForFile(
+      "clicks", [](const std::string& text) { return text.ends_with('\n'); });
+  // Cmd is reported as 8. The click is in the link's first row.
+  EXPECT_TRUE(clicks.starts_with("^[[<8;")) << clicks;
+  EXPECT_NE(clicks.find(";1M"), std::string::npos) << clicks;
+  EXPECT_EQ(browser()->tab_strip_model()->count(), tabs);
+}
+
 // A program that asks for the mouse gets the wheel as mouse buttons, also on
 // the alternate screen, where ghostty-web would send arrow keys.
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,

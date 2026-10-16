@@ -155,6 +155,14 @@ terminal.attachCustomWheelEventHandler((event: WheelEvent) => {
   return true;
 });
 
+// A program that asks for the mouse gets a Cmd-click and opens a link itself,
+// as in Ghostty. ghostty-web would open the link as well.
+window.addEventListener('click', (event: MouseEvent) => {
+  if ((event.metaKey || event.ctrlKey) && terminal.hasMouseTracking()) {
+    event.stopPropagation();
+  }
+}, {capture: true});
+
 let layout: KeyboardLayoutMap|undefined;
 function readLayout() {
   navigator.keyboard?.getLayoutMap().then(map => layout = map, () => {});
