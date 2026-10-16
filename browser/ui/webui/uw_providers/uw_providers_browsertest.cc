@@ -461,6 +461,31 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnEffortGoesWithTheModel) {
   EXPECT_THAT(sent, HasSubstr(R"("reasoning":{"effort":"high"})"));
 }
 
+// A preset already added says so under its name, and its tile grows to fit,
+// even where text renders taller than here.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnAddedPresetsTileHoldsItsIcon) {
+  AddPreset(ProviderPreset::kJev, Address());
+  models_.Answer("/v1/models", kTwoModels);
+  Open();
+  EXPECT_EQ(
+      "Jev Added fits",
+      Run("withText('button', 'Add provider').click();"
+          "await until(dialog);"
+          "const tall = document.createElement('style');"
+          "tall.textContent = '[role=dialog] button * {line-height: 2}';"
+          "document.head.append(tall);"
+          "const tile = await until(() => all('button', dialog())"
+          "    .find((button) => button.textContent === 'JevAdded'));"
+          "await new Promise((resolve) => requestAnimationFrame(resolve));"
+          "const icon = tile.firstElementChild.getBoundingClientRect();"
+          "const box = tile.getBoundingClientRect();"
+          "return 'Jev Added ' + (icon.top >= box.top &&"
+          "    tile.scrollHeight <= tile.clientHeight ? 'fits' :"
+          "    'spills: ' + [icon.top, box.top, tile.scrollHeight,"
+          "                        tile.clientHeight]);"));
+  SaveWindowScreenshot(browser(), "add-provider");
+}
+
 // Ollama says itself whether a model calls tools and thinks.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, OllamaSaysWhatItsModelsCanDo) {
   const std::string id =

@@ -104,7 +104,7 @@ export function AddProviderDialog({
               type="button"
               onClick={() => pick(each)}
               className={cn(
-                "flex h-[62px] flex-col items-center justify-center gap-[5px] whitespace-nowrap rounded-[10px] border border-border text-[12.5px] font-medium outline-none",
+                "flex min-h-[62px] flex-col items-center justify-center gap-[5px] whitespace-nowrap rounded-[10px] border border-border py-2 text-[12.5px] font-medium outline-none",
                 each === preset &&
                   "border-[color-mix(in_srgb,var(--focus-ring)_55%,transparent)] ring-[3px] ring-[color-mix(in_srgb,var(--focus-ring)_12%,transparent)]",
               )}
