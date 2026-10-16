@@ -8,11 +8,16 @@
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "url/gurl.h"
 
 namespace uw {
 namespace {
 
-constexpr int kSavedVersion = 1;
+constexpr int kSavedVersion = 2;
+
+constexpr ProviderPreset kCatalogPresets[] = {
+    ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
+    ProviderPreset::kOpenRouter, ProviderPreset::kVercelAiGateway};
 
 // The models.dev provider behind each preset that has one.
 std::optional<std::string_view> CatalogKey(ProviderPreset preset) {
@@ -30,6 +35,24 @@ std::optional<std::string_view> CatalogKey(ProviderPreset preset) {
     case ProviderPreset::kJev:
       return std::nullopt;
   }
+}
+
+bool IsPresetKey(std::string_view key) {
+  for (ProviderPreset preset : kCatalogPresets) {
+    if (*CatalogKey(preset) == key) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// An address as uw compares them: without a trailing slash.
+std::string Trimmed(const GURL& address) {
+  std::string spec = address.spec();
+  while (spec.ends_with('/')) {
+    spec.pop_back();
+  }
+  return spec;
 }
 
 // One model of api.json as uw keeps it. Only named effort levels count.
@@ -70,14 +93,13 @@ std::optional<ModelCatalog> ModelCatalog::FromModelsDev(
     return std::nullopt;
   }
   ModelCatalog catalog;
-  for (ProviderPreset preset :
-       {ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
-        ProviderPreset::kOpenRouter, ProviderPreset::kVercelAiGateway}) {
-    const std::string_view key = *CatalogKey(preset);
-    const base::DictValue* provider = all->FindDict(key);
+  for (const auto [key, entry] : *all) {
+    const base::DictValue* provider = entry.GetIfDict();
     const base::DictValue* models =
         provider ? provider->FindDict("models") : nullptr;
-    if (!models) {
+    const std::string* address =
+        provider ? provider->FindString("api") : nullptr;
+    if (!models || (!address && !IsPresetKey(key))) {
       continue;
     }
     base::DictValue kept;
@@ -87,6 +109,9 @@ std::optional<ModelCatalog> ModelCatalog::FromModelsDev(
       }
     }
     catalog.models_.Set(key, std::move(kept));
+    if (address) {
+      catalog.addresses_.Set(key, *address);
+    }
   }
   if (catalog.models_.empty()) {
     return std::nullopt;
@@ -98,27 +123,58 @@ std::optional<ModelCatalog> ModelCatalog::FromModelsDev(
 std::optional<ModelCatalog> ModelCatalog::FromSaved(std::string_view json) {
   std::optional<base::DictValue> saved =
       base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
-  base::DictValue* models = saved && saved->FindInt("version") == kSavedVersion
-                                ? saved->FindDict("models")
-                                : nullptr;
-  if (!models) {
+  const bool current = saved && saved->FindInt("version") == kSavedVersion;
+  base::DictValue* models = current ? saved->FindDict("models") : nullptr;
+  base::DictValue* addresses = current ? saved->FindDict("addresses") : nullptr;
+  if (!models || !addresses) {
     return std::nullopt;
   }
   ModelCatalog catalog;
   catalog.models_ = std::move(*models);
+  catalog.addresses_ = std::move(*addresses);
   return catalog;
 }
 
 std::string ModelCatalog::ToSaved() const {
   return base::WriteJson(base::DictValue()
                              .Set("version", kSavedVersion)
-                             .Set("models", models_.Clone()))
+                             .Set("models", models_.Clone())
+                             .Set("addresses", addresses_.Clone()))
       .value_or("");
+}
+
+std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
+  const GURL wanted(address);
+  if (!wanted.is_valid()) {
+    return std::nullopt;
+  }
+  std::optional<std::string> on_host;
+  int hosts = 0;
+  for (const auto [key, value] : addresses_) {
+    const GURL known(value.is_string() ? value.GetString() : std::string());
+    if (!known.is_valid()) {
+      continue;
+    }
+    if (Trimmed(known) == Trimmed(wanted)) {
+      return key;
+    }
+    if (known.host() == wanted.host()) {
+      ++hosts;
+      on_host = key;
+    }
+  }
+  return hosts == 1 ? on_host : std::nullopt;
 }
 
 ModelAbilities ModelCatalog::For(const Provider& provider,
                                  std::string_view model) const {
-  const std::optional<std::string_view> key = CatalogKey(provider.preset);
+  std::optional<std::string> key;
+  if (provider.preset == ProviderPreset::kCustom) {
+    key = KeyAt(provider.address);
+  } else if (const std::optional<std::string_view> preset_key =
+                 CatalogKey(provider.preset)) {
+    key = std::string(*preset_key);
+  }
   const base::DictValue* models = key ? models_.FindDict(*key) : nullptr;
   const base::DictValue* known = models ? models->FindDict(model) : nullptr;
   if (!known) {
@@ -137,7 +193,7 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
 }
 
 bool CatalogCovers(ProviderPreset preset) {
-  return CatalogKey(preset).has_value();
+  return preset == ProviderPreset::kCustom || CatalogKey(preset).has_value();
 }
 
 ModelAbilities UnknownModelAbilities(const Provider& provider) {

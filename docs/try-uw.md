@@ -97,7 +97,7 @@ Expected result: `Test` beside the language or decision model sends it one small
 
 uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions.
 
-A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`.
+A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. A Custom provider at an address models.dev lists, such as `https://api.deepseek.com`, gets that provider's levels: DeepSeek's `deepseek-v4-pro` shows `low`, `high`, and `max`. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`.
 
 ### Automatic organization
 

@@ -400,6 +400,10 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
 
   std::vector<std::string> keys;
   for (const ModelRequest& request : models_.Requests()) {
+    // The catalog request carries no key.
+    if (request.path == "/v1/catalog.json") {
+      continue;
+    }
     keys.push_back(request.method + " " + request.path + " " +
                    request.anthropic_key + request.authorization);
   }
@@ -426,6 +430,23 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                 "const note = (name) => item(name, menu)?.dataset.note ?? '';"
                 "await until(() => item('maker/talker', menu));"
                 "return note('maker/talker') + '|' + note('maker/thinker');"));
+}
+
+// A Custom provider at an address the catalog lists, such as DeepSeek's,
+// reads that entry's levels instead of the usual guess.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       ACustomProviderReadsTheCatalogAtItsAddress) {
+  const std::string id = AddTestServer(ProviderFormat::kChatCompletions);
+  models_.Answer("/v1/models", R"({"data":[{"id":"deepseek-v4-pro"}]})");
+  models_.Answer(
+      "/v1/catalog.json",
+      base::StrCat({R"({"deepseek": {"api": ")", Address(),
+                    R"(", "models": {"deepseek-v4-pro": {"tool_call": true,)"
+                    R"( "reasoning_options": [{"type": "toggle"}, {"type":)"
+                    R"( "effort", "values": ["low", "high", "max"]}]}}}})"}));
+  Open(id);
+  EXPECT_EQ("deepseek-v4-proCalls toolslowhighmax",
+            Run("return await until(() => modelRow('deepseek-v4-pro'));"));
 }
 
 // An effort picked for the language model goes with its requests, in the

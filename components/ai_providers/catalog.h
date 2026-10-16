@@ -26,8 +26,9 @@ struct ModelAbilities {
 inline constexpr char const* kUsualEfforts[] = {"low", "medium", "high"};
 
 // The parts of the models.dev catalog uw reads: for each provider uw has a
-// preset for, each model's tool calls and effort levels. uw downloads
-// https://models.dev/api.json and keeps this small copy of it.
+// preset for, and each provider with an address, each model's tool calls and
+// effort levels. uw downloads https://models.dev/api.json and keeps this
+// smaller copy of it.
 class ModelCatalog {
  public:
   ModelCatalog();
@@ -45,14 +46,22 @@ class ModelCatalog {
   // model. A model it does not know calls tools, and takes the usual levels
   // over chat completions and none over the other formats. A model that only
   // switches thinking on or off, or takes a token budget, has no levels.
+  // A Custom provider reads the catalog provider at its address.
   ModelAbilities For(const Provider& provider, std::string_view model) const;
 
  private:
+  // The catalog provider at `address`: the one with the same address, else
+  // the only one on the same host.
+  std::optional<std::string> KeyAt(std::string_view address) const;
+
   // {"openai": {"gpt-5": {"tools": true, "efforts": ["low", ...]}}}
   base::DictValue models_;
+  // {"deepseek": "https://api.deepseek.com"}
+  base::DictValue addresses_;
 };
 
-// Whether the catalog knows the models of providers made from `preset`.
+// Whether uw looks up the models of providers made from `preset` in the
+// catalog. A Custom provider is looked up by its address.
 bool CatalogCovers(ProviderPreset preset);
 
 // What a model the catalog does not know can do at `provider`.

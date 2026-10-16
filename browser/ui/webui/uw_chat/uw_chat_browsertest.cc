@@ -46,6 +46,7 @@
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -98,6 +99,9 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
         base::BindRepeating(&ServeForm));
     ASSERT_TRUE(embedded_https_test_server().Start());
     ASSERT_TRUE(embedded_test_server()->Start());
+    // The model catalog comes from the test server, which has none.
+    CatalogStore::SetSourceForTesting(
+        embedded_test_server()->GetURL("/v1/catalog.json"));
     // The test's own folder stands in for ~/.agents/skills.
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(home_.CreateUniqueTempDir());
@@ -1294,10 +1298,9 @@ class UwChatDarkModeBrowserTest : public UwChatBrowserTest {
 IN_PROC_BROWSER_TEST_F(UwChatDarkModeBrowserTest,
                        TheChatIsDarkBeforeItsScriptMarksIt) {
   content::WebContents* chat = OpenChat();
-  EXPECT_EQ(content::EvalJs(
-                chat,
-                "document.documentElement.classList.remove('dark');"
-                "getComputedStyle(document.body).backgroundColor"),
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.documentElement.classList.remove('dark');"
+                            "getComputedStyle(document.body).backgroundColor"),
             "rgb(10, 10, 10)");
 }
 

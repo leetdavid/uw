@@ -10,7 +10,10 @@ source_set("ai_providers") {
     "providers.h",
   ]
   public_deps = [ "//base" ]
-  deps = [ "//components/prefs" ]
+  deps = [
+    "//components/prefs",
+    "//url",
+  ]
 }
 
 source_set("unit_tests") {

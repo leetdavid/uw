@@ -41,10 +41,10 @@ source_set("uw_chat") {
     "//ui/base",
     "//ui/gfx",
     "//ui/gfx/codec",
+    "//uw/browser/ai_providers",
     "//uw/browser/resources/uw_chat:resources",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
-    "//uw/browser/ai_providers",
     "//uw/components/agent",
   ]
 }
@@ -79,6 +79,7 @@ source_set("browser_tests") {
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/agent:test_support",
+    "//uw/browser/ai_providers",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
