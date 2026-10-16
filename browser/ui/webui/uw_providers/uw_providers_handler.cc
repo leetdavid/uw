@@ -23,6 +23,7 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/components/agent/agent_protocol.h"
@@ -69,8 +70,10 @@ Provider ProviderFrom(const mojom::NewProvider& input) {
   Provider provider = PresetProvider(preset);
   if (preset == ProviderPreset::kCustom) {
     provider.name = input.name;
-    provider.address = input.address;
     provider.format = static_cast<ProviderFormat>(input.format);
+  }
+  if (preset == ProviderPreset::kCustom || !input.address.empty()) {
+    provider.address = input.address;
   }
   return provider;
 }
@@ -126,7 +129,8 @@ mojom::ModelListPtr PageList(ModelListing listing) {
   for (ListedModel& model : listing.models) {
     list->models.push_back(
         mojom::Model::New(std::move(model.name), model.abilities.calls_tools,
-                          std::move(model.abilities.efforts)));
+                          std::move(model.abilities.efforts),
+                          static_cast<mojom::ProviderFormat>(model.format)));
   }
   return list;
 }
@@ -187,6 +191,14 @@ void UwProvidersHandler::GetState(GetStateCallback callback) {
   auto state = mojom::ProvidersState::New();
   for (const Provider& provider : ReadProviders(prefs)) {
     state->providers.push_back(PageProvider(provider));
+  }
+  for (ProviderPreset preset :
+       {ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
+        ProviderPreset::kOpenRouter, ProviderPreset::kVercelAiGateway,
+        ProviderPreset::kOllama, ProviderPreset::kJev}) {
+    state->preset_addresses.push_back(
+        mojom::PresetAddress::New(static_cast<mojom::ProviderPreset>(preset),
+                                  PresetProvider(preset).address));
   }
   state->language = PageChoice(prefs, ModelSlot::kLanguage);
   state->decision = PageChoice(prefs, ModelSlot::kDecision);
@@ -251,6 +263,33 @@ void UwProvidersHandler::ReplaceKey(const std::string& provider_id,
   std::move(callback).Run();
 }
 
+void UwProvidersHandler::ChangeAddress(const std::string& provider_id,
+                                       const std::string& address,
+                                       ChangeAddressCallback callback) {
+  callback = mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+      std::move(callback), mojom::ModelList::New());
+  std::optional<Provider> provider =
+      FindProvider(*profile_->GetPrefs(), provider_id);
+  if (!provider || profile_->IsOffTheRecord()) {
+    return;
+  }
+  const std::string key = StoredKey(*provider);
+  provider->address = address;
+  lister_.List(*provider, key,
+               base::BindOnce(&UwProvidersHandler::OnAddressListed,
+                              weak_factory_.GetWeakPtr(), *provider,
+                              std::move(callback)));
+}
+
+void UwProvidersHandler::OnAddressListed(Provider moved,
+                                         ChangeAddressCallback callback,
+                                         ModelListing listing) {
+  if (listing.ok) {
+    UpdateProvider(*profile_->GetPrefs(), moved);
+  }
+  std::move(callback).Run(PageList(std::move(listing)));
+}
+
 void UwProvidersHandler::RemoveProvider(const std::string& provider_id,
                                         RemoveProviderCallback callback) {
   ApiKeyStore().DeleteKey(KeyAccountFor(provider_id));
@@ -265,10 +304,22 @@ void UwProvidersHandler::PickModel(mojom::ModelSlot page_slot,
   PrefService& prefs = *profile_->GetPrefs();
   const ModelSlot slot = SlotFrom(page_slot);
   const std::optional<Provider> provider = FindProvider(prefs, provider_id);
-  if (provider && ServesSlot(*provider, slot) && !model.empty()) {
-    SetChoice(prefs, slot, provider_id, model);
+  if (!provider || !ServesSlot(*provider, slot) || model.empty()) {
+    std::move(callback).Run();
+    return;
   }
-  std::move(callback).Run();
+  CatalogStore::For(profile_)->FormatOf(
+      *provider, model,
+      base::BindOnce(&UwProvidersHandler::OnPickFormat,
+                     weak_factory_.GetWeakPtr(), slot, provider_id, model)
+          .Then(std::move(callback)));
+}
+
+void UwProvidersHandler::OnPickFormat(ModelSlot slot,
+                                      const std::string& provider_id,
+                                      const std::string& model,
+                                      std::optional<ProviderFormat> format) {
+  SetChoice(*profile_->GetPrefs(), slot, provider_id, model, format);
 }
 
 void UwProvidersHandler::ClearModel(mojom::ModelSlot slot,

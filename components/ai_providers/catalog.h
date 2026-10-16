@@ -49,10 +49,17 @@ class ModelCatalog {
   // A Custom provider reads the catalog provider at its address.
   ModelAbilities For(const Provider& provider, std::string_view model) const;
 
+  // The format of `model`'s maker: Anthropic's models go over Anthropic
+  // Messages, OpenAI's over OpenAI Responses, and any other over chat
+  // completions.
+  ProviderFormat MakerFormatOf(std::string_view model) const;
+
  private:
   // The catalog provider at `address`: the one with the same address, else
   // the only one on the same host.
   std::optional<std::string> KeyAt(std::string_view address) const;
+  // "anthropic" or "openai" when that maker's entry lists `model`.
+  std::optional<std::string> MakerKeyOf(std::string_view model) const;
 
   // {"openai": {"gpt-5": {"tools": true, "efforts": ["low", ...]}}}
   base::DictValue models_;
@@ -63,6 +70,13 @@ class ModelCatalog {
 // Whether uw looks up the models of providers made from `preset` in the
 // catalog. A Custom provider is looked up by its address.
 bool CatalogCovers(ProviderPreset preset);
+
+// The format `model` goes over at `provider`: its maker's when the provider
+// leaves it to each model, from `catalog` while there is one; the provider's
+// own otherwise.
+ProviderFormat FormatOfModel(const Provider& provider,
+                             std::string_view model,
+                             const ModelCatalog* catalog);
 
 // What a model the catalog does not know can do at `provider`.
 ModelAbilities UnknownModelAbilities(const Provider& provider);

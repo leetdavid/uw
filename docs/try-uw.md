@@ -99,6 +99,10 @@ uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic 
 
 A provider's page shows whether each model calls tools and which effort levels it takes, from the [models.dev](https://models.dev) catalog or, for Ollama, from Ollama itself. A Custom provider at an address models.dev lists, such as `https://api.deepseek.com`, gets that provider's levels: DeepSeek's `deepseek-v4-pro` shows `low`, `high`, and `max`. The language and agent models get an effort chip when the model has levels; `default` sends no effort. In the agent model's menu, a model that calls no tools is dimmed and says `No tool calls`.
 
+Every provider's address can change: the Add dialog shows a preset's address filled in, and `Change` on a provider's page takes a new one. Expected result: uw saves it once it lists the models there; otherwise it says why, and the old address stays. An address is https, or plain http on this Mac or your own network, such as `http://192.168.1.20:8317/v1`.
+
+To use [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), add a Custom provider at `http://localhost:8317/v1` with the format `Each model's own`, and the key from its `api-keys` if you set any. Expected result: its page lists each model with the format it goes over: Claude models over Anthropic Messages, GPT models over OpenAI Responses, and the rest over chat completions, with their own effort levels. A Custom provider sends its key as `Authorization: Bearer`, and over Anthropic Messages also as `x-api-key`.
+
 ### Automatic organization
 
 Pick a decision model, a language model, or both at `uw://providers`; `Test` is optional. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says so while no model is picked. Then open a link in a new tab.

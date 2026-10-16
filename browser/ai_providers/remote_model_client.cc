@@ -67,6 +67,17 @@ RemoteModelClient::RemoteModelClient(
 RemoteModelClient::~RemoteModelClient() = default;
 
 // static
+RemoteModelClient::KeyHeader RemoteModelClient::KeyHeaderFor(
+    ProviderPreset preset,
+    ProviderFormat format) {
+  if (format != ProviderFormat::kAnthropicMessages) {
+    return KeyHeader::kBearer;
+  }
+  return preset == ProviderPreset::kAnthropic ? KeyHeader::kAnthropic
+                                              : KeyHeader::kBoth;
+}
+
+// static
 std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
     scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
     const AiConnectionConfig& model,
@@ -81,9 +92,7 @@ std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
       RequestIn(format, WithEffort(chat_body, model.preset, model.effort),
                 endpoint)
           .value_or(chat_body),
-      timeout,
-      format == ProviderFormat::kAnthropicMessages ? KeyHeader::kAnthropic
-                                                   : KeyHeader::kBearer);
+      timeout, KeyHeaderFor(model.preset, format));
   if (format != ProviderFormat::kChatCompletions) {
     client->answer_format_ = format;
     client->address_ = endpoint;
@@ -112,10 +121,11 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   }
   // Ollama connections carry no key and send no key header.
   if (!api_key_.empty()) {
-    if (key_header_ == KeyHeader::kAnthropic) {
+    if (key_header_ != KeyHeader::kBearer) {
       resource->headers.SetHeader("x-api-key", api_key_);
       resource->headers.SetHeader("anthropic-version", "2023-06-01");
-    } else {
+    }
+    if (key_header_ != KeyHeader::kAnthropic) {
       resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
                                   "Bearer " + api_key_);
     }

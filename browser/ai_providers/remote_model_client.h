@@ -45,8 +45,10 @@ class RemoteModelClient {
   };
   using ResultCallback = base::OnceCallback<void(Outcome)>;
 
-  // How the key travels. Anthropic takes it in its own header.
-  enum class KeyHeader { kBearer, kAnthropic };
+  // How the key travels. Anthropic takes it in its own header; a proxy that
+  // speaks Anthropic Messages gets it both ways, as proxies read either.
+  enum class KeyHeader { kBearer, kAnthropic, kBoth };
+  static KeyHeader KeyHeaderFor(ProviderPreset preset, ProviderFormat format);
 
   RemoteModelClient(
       scoped_refptr<network::SharedURLLoaderFactory> loader_factory,

@@ -20,6 +20,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 // //chrome/browser depends on this target, so it cannot depend back.
 #include "chrome/browser/platform_util.h"  // nogncheck
@@ -72,10 +73,14 @@ std::set<std::string>& OpenChats() {
 }
 
 base::DictValue ModelValue(const ModelChoice& choice) {
-  return base::DictValue()
-      .Set("provider", choice.provider_id)
-      .Set("model", choice.model)
-      .Set("effort", choice.effort);
+  base::DictValue value = base::DictValue()
+                              .Set("provider", choice.provider_id)
+                              .Set("model", choice.model)
+                              .Set("effort", choice.effort);
+  if (choice.format) {
+    value.Set("format", static_cast<int>(*choice.format));
+  }
+  return value;
 }
 
 std::optional<ModelChoice> ModelFrom(const base::DictValue* value) {
@@ -85,7 +90,8 @@ std::optional<ModelChoice> ModelFrom(const base::DictValue* value) {
   if (!provider || !model) {
     return std::nullopt;
   }
-  return ModelChoice{*provider, *model, effort ? *effort : std::string()};
+  return ModelChoice{*provider, *model, FormatFrom(value->FindInt("format")),
+                     effort ? *effort : std::string()};
 }
 
 mojom::ChatModelPtr PageModel(const std::optional<ModelChoice>& choice) {
@@ -683,10 +689,23 @@ std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
 
 void UwChatHandler::SetModel(const std::string& provider_id,
                              const std::string& model) {
-  if (!loaded_ || provider_id.empty() || model.empty()) {
+  Profile* profile =
+      Profile::FromBrowserContext(contents_->GetBrowserContext());
+  const std::optional<Provider> provider =
+      FindProvider(*profile->GetPrefs(), provider_id);
+  if (!loaded_ || !provider || model.empty()) {
     return;
   }
-  model_ = ModelChoice{provider_id, model, std::string()};
+  CatalogStore::For(profile)->FormatOf(
+      *provider, model,
+      base::BindOnce(&UwChatHandler::OnModelFormat, weak_factory_.GetWeakPtr(),
+                     provider_id, model));
+}
+
+void UwChatHandler::OnModelFormat(const std::string& provider_id,
+                                  const std::string& model,
+                                  std::optional<ProviderFormat> format) {
+  model_ = ModelChoice{provider_id, model, format, std::string()};
   OnModelChanged();
 }
 

@@ -54,9 +54,7 @@ GURL OllamaShowUrl(std::string_view address) {
 }
 
 RemoteModelClient::KeyHeader KeyHeaderFor(const Provider& provider) {
-  return provider.format == ProviderFormat::kAnthropicMessages
-             ? RemoteModelClient::KeyHeader::kAnthropic
-             : RemoteModelClient::KeyHeader::kBearer;
+  return RemoteModelClient::KeyHeaderFor(provider.preset, provider.format);
 }
 
 }  // namespace
@@ -136,8 +134,10 @@ void ModelLister::OnList(std::unique_ptr<Listing> listing,
   for (const std::u16string& name : *names) {
     std::string model = base::UTF16ToUTF8(name);
     if (ForChat(model)) {
+      const ProviderFormat format =
+          FormatOfModel(listing->provider, model, nullptr);
       listing->result.models.push_back(
-          {std::move(model), UnknownModelAbilities(listing->provider)});
+          {std::move(model), UnknownModelAbilities(listing->provider), format});
     }
   }
   Listing* raw = listing.get();
@@ -176,6 +176,7 @@ void ModelLister::OnList(std::unique_ptr<Listing> listing,
         if (catalog) {
           for (ListedModel& model : raw->result.models) {
             model.abilities = catalog->For(raw->provider, model.name);
+            model.format = FormatOfModel(raw->provider, model.name, catalog);
           }
         }
         self->Finish(raw);

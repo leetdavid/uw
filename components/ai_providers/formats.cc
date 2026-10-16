@@ -409,6 +409,7 @@ std::string_view LanguageModelPath(ProviderFormat format) {
     case ProviderFormat::kChatCompletions:
     case ProviderFormat::kOpenAiDecisions:
     case ProviderFormat::kSystemOne:
+    case ProviderFormat::kEachModel:
       return "/chat/completions";
   }
 }
@@ -446,6 +447,7 @@ std::optional<std::string> RequestIn(ProviderFormat format,
     case ProviderFormat::kChatCompletions:
     case ProviderFormat::kOpenAiDecisions:
     case ProviderFormat::kSystemOne:
+    case ProviderFormat::kEachModel:
       // Chat completions takes the request as it is, without what other
       // formats kept.
       for (base::Value& message : *chat->FindList("messages")) {

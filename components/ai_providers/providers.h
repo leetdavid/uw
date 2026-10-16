@@ -30,6 +30,9 @@ enum class ProviderFormat {
   // These two serve decision models only.
   kOpenAiDecisions = 3,
   kSystemOne = 4,
+  // For a proxy: each model goes over its maker's format, which the model
+  // catalog names. See ADR 0007.
+  kEachModel = 5,
 };
 
 // The Add provider menu. Every preset but kCustom fills in a name, an
@@ -60,6 +63,9 @@ enum class ModelSlot { kLanguage, kDecision, kAgent };
 struct ModelChoice {
   std::string provider_id;
   std::string model;
+  // The format the model goes over, at a provider that leaves it to each
+  // model.
+  std::optional<ProviderFormat> format;
   // One of the model's effort levels, or empty for the provider's default.
   std::string effort;
 };
@@ -81,14 +87,24 @@ bool UpdateProvider(PrefService& prefs, const Provider& provider);
 // The choices that used it stay, and wait for the user to pick another model.
 void RemoveProvider(PrefService& prefs, std::string_view id);
 
+// An address uw sends requests to: https, or plain http on this Mac or a
+// private network (10.x, 172.16-31.x, 192.168.x, 100.64-127.x for
+// Tailscale, and *.local). Never one with a user name, a password, or a
+// fragment.
+bool IsValidProviderEndpoint(std::string_view endpoint);
+
 // The Keychain account for a provider's key.
 std::string KeyAccountFor(std::string_view provider_id);
+
+// A format stored as a number, or nothing for a number uw does not know.
+std::optional<ProviderFormat> FormatFrom(std::optional<int> value);
 
 std::optional<ModelChoice> ReadChoice(const PrefService& prefs, ModelSlot slot);
 void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
-               std::string_view model);
+               std::string_view model,
+               std::optional<ProviderFormat> format = std::nullopt);
 void ClearChoice(PrefService& prefs, ModelSlot slot);
 // Sets the effort of the model the slot holds. Empty is the provider's
 // default. Picking another model starts on the default again.

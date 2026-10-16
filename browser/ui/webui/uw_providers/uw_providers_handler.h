@@ -47,6 +47,9 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
   void ReplaceKey(const std::string& provider_id,
                   const std::string& api_key,
                   ReplaceKeyCallback callback) override;
+  void ChangeAddress(const std::string& provider_id,
+                     const std::string& address,
+                     ChangeAddressCallback callback) override;
   void RemoveProvider(const std::string& provider_id,
                       RemoveProviderCallback callback) override;
   void PickModel(mojom::ModelSlot slot,
@@ -77,6 +80,14 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
                 base::TimeTicks sent_at,
                 TestModelCallback callback,
                 RemoteModelClient::Outcome outcome);
+
+  void OnPickFormat(ModelSlot slot,
+                    const std::string& provider_id,
+                    const std::string& model,
+                    std::optional<ProviderFormat> format);
+  void OnAddressListed(Provider moved,
+                       ChangeAddressCallback callback,
+                       ModelListing listing);
 
   const raw_ptr<Profile> profile_;
   mojo::Receiver<mojom::ProvidersHandler> receiver_;

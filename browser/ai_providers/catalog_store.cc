@@ -117,6 +117,21 @@ void CatalogStore::Get(CatalogCallback done) {
   Download();
 }
 
+void CatalogStore::FormatOf(const Provider& provider,
+                            std::string model,
+                            FormatCallback done) {
+  if (provider.format != ProviderFormat::kEachModel) {
+    std::move(done).Run(std::nullopt);
+    return;
+  }
+  Get(base::BindOnce(
+      [](Provider provider, std::string model, FormatCallback done,
+         const ModelCatalog* catalog) {
+        std::move(done).Run(FormatOfModel(provider, model, catalog));
+      },
+      provider, std::move(model), std::move(done)));
+}
+
 void CatalogStore::OnRead(std::optional<Saved> saved) {
   reading_ = false;
   read_ = true;

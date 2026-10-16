@@ -52,7 +52,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 2. T77: providers and `uw://providers`: the provider list, keys, the three model choices, moving the saved connections, the organizer reading from providers, and the link from settings. Built on 2026-10-15.
 3. T78: the Anthropic Messages and OpenAI Responses formats. Built on 2026-10-16, with the shared code moved to `browser/ai_providers/`. Live calls over each format are for the user to check: the tests play the providers with a local server.
 4. T79: the model catalog, and the model and effort chips in the chat composer. Built on 2026-10-16. What a model kept goes back only to that model, so a switch to another model at the same provider drops it.
-5. T103: proxies and addresses: changeable addresses, the "Each model's own" format, the key headers, and plain http on private networks. Built after T99, which changes the same catalog code.
+5. T103: proxies and addresses: changeable addresses, the "Each model's own" format, the key headers, and plain http on private networks. Built on 2026-10-16, on T104's catalog lookups by address. A live check through CLIProxyAPI is for the user: the tests play a proxy with a local server.
 
 ## Acceptance checks
 

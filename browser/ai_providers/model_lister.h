@@ -23,6 +23,8 @@ namespace uw {
 struct ListedModel {
   std::string name;
   ModelAbilities abilities;
+  // The format requests to the model go over.
+  ProviderFormat format = ProviderFormat::kChatCompletions;
 };
 
 struct ModelListing {

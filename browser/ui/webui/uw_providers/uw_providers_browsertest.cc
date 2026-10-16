@@ -385,11 +385,12 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
 }
 
-// Anthropic takes its key in its own header, for the model list and for the
-// test alike, and the test goes over Anthropic Messages.
+// Anthropic takes its key in its own header alone, for the model list and
+// for the test alike, even at another address, and the test goes over
+// Anthropic Messages.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                        AnAnthropicModelIsListedAndTestedInItsOwnFormat) {
-  AddTestServer(ProviderFormat::kAnthropicMessages);
+  AddPreset(ProviderPreset::kAnthropic, Address());
   models_.Answer("/v1/models", kTwoModels);
   models_.Answer("/v1/messages", R"({"stop_reason":"end_turn","content":[)"
                                  R"({"type":"text","text":"Hello"}]})");
@@ -505,6 +506,113 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnAddedPresetsTileHoldsItsIcon) {
           "    'spills: ' + [icon.top, box.top, tile.scrollHeight,"
           "                        tile.clientHeight]);"));
   SaveWindowScreenshot(browser(), "add-provider");
+}
+
+// A provider moves to a new address only once its models list there.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       AnAddressMovesOnceItsModelsList) {
+  const std::string id = AddTestServer(ProviderFormat::kChatCompletions);
+  models_.Answer("/v1/models", kTwoModels);
+  models_.Answer("/v1/moved/v1/models", R"({"data":[{"id":"moved-model"}]})");
+  Open(id);
+
+  const std::string nothing =
+      embedded_test_server()->GetURL("/v1/nothing/v1").spec();
+  EXPECT_THAT(
+      Run(content::JsReplace(
+              "withText('button', 'Change').click();"
+              "await until(() => field('New address'));"
+              "type('New address', $1);"
+              "withText('button', 'Save').click();"
+              "return (await until(() =>"
+              "    document.querySelector('[role=alert]'))).textContent;",
+              nothing))
+          .ExtractString(),
+      HasSubstr("(HTTP 404), so the old address stays."));
+  SaveWindowScreenshot(browser(), "address-kept");
+  EXPECT_EQ(FindProvider(prefs(), id)->address, Address());
+
+  const std::string moved =
+      embedded_test_server()->GetURL("/v1/moved/v1").spec();
+  ASSERT_EQ(true,
+            Run(content::JsReplace("type('New address', $1);"
+                                   "withText('button', 'Save').click();"
+                                   "await until(() => modelRow('moved-model'));"
+                                   "return true;",
+                                   moved)));
+  EXPECT_EQ(FindProvider(prefs(), id)->address, moved);
+  EXPECT_EQ(ApiKeyStore().GetKey(KeyAccountFor(id)), "sk-test");
+}
+
+// At a proxy that leaves the format to each model, the catalog names each
+// model's maker: Claude goes over Anthropic Messages with the key both ways,
+// GPT over OpenAI Responses, and the rest over chat completions.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       EachModelGoesOverItsMakersFormat) {
+  const std::string id = AddTestServer(ProviderFormat::kEachModel);
+  models_.Answer("/v1/catalog.json", R"({
+    "anthropic": {"models": {"claude-x": {"tool_call": true,
+        "reasoning_options": [{"type": "effort", "values": ["low", "high"]}]}}},
+    "openai": {"models": {"gpt-x": {"tool_call": true}}}})");
+  models_.Answer(
+      "/v1/models",
+      R"({"data":[{"id":"claude-x"},{"id":"gpt-x"},{"id":"other-x"}]})");
+  models_.Answer("/v1/messages", R"({"stop_reason":"end_turn","content":[)"
+                                 R"({"type":"text","text":"Hello"}]})");
+  models_.Answer("/v1/responses",
+                 R"({"status":"completed","output":[{"type":"message",)"
+                 R"("role":"assistant","content":[{"type":"output_text",)"
+                 R"("text":"Hello"}]}]})");
+  Open(id);
+  EXPECT_EQ("claude-xAnthropic MessagesCalls toolslowhigh",
+            Run("return await until(() => modelRow('claude-x'));"));
+  EXPECT_EQ("gpt-xOpenAI ResponsesCalls toolsNo effort levels",
+            Run("return await until(() => modelRow('gpt-x'));"));
+  EXPECT_EQ("other-xChat completionsCalls toolslowmediumhigh",
+            Run("return await until(() => modelRow('other-x'));"));
+  SaveWindowScreenshot(browser(), "each-model");
+
+  Open();
+  Pick("Language model", "claude-x");
+  EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->format,
+            ProviderFormat::kAnthropicMessages);
+  EXPECT_THAT(Test("Language model"), HasSubstr("claude-x answered in"));
+  Pick("Language model", "gpt-x");
+  EXPECT_THAT(Test("Language model"), HasSubstr("gpt-x answered in"));
+
+  std::vector<std::string> sent;
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.method == "POST") {
+      sent.push_back(request.path + " " + request.authorization + " / " +
+                     request.anthropic_key);
+    }
+  }
+  EXPECT_THAT(sent, ElementsAre("/v1/messages Bearer sk-test / sk-test",
+                                "/v1/responses Bearer sk-test / "));
+}
+
+// A preset fills in its own address, which the user can change, say to a
+// company gateway. It stays that preset, with its own format.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       APresetCanStartAtAnotherAddress) {
+  models_.Answer("/v1/models", kTwoModels);
+  Open();
+  EXPECT_EQ("https://api.openai.com/v1",
+            Run("withText('button', 'Add provider').click();"
+                "await until(dialog);"
+                "withText('button', 'OpenAI', dialog()).click();"
+                "return (await until(() => field('Address'))).value;"));
+  ASSERT_EQ(true, Run(content::JsReplace(
+                      "type('Address', $1);"
+                      "type('Key', 'sk-test');"
+                      "withText('button', 'Add provider', dialog()).click();"
+                      "await until(() => !dialog());"
+                      "return true;",
+                      Address())));
+  const std::optional<Provider> openai = FindProvider(prefs(), "openai");
+  ASSERT_TRUE(openai);
+  EXPECT_EQ(openai->address, Address());
+  EXPECT_EQ(openai->format, ProviderFormat::kOpenAiResponses);
 }
 
 // Ollama says itself whether a model calls tools and thinks.

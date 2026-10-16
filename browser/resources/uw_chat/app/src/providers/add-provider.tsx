@@ -31,10 +31,14 @@ const PRESETS = [
   ProviderPreset.kCustom,
 ];
 
+export const ADDRESS_RULE =
+  "This address cannot be used. It must start with https://, or with http:// for this Mac or your own network.";
+
 const FORMATS = [
   ProviderFormat.kChatCompletions,
   ProviderFormat.kAnthropicMessages,
   ProviderFormat.kOpenAiResponses,
+  ProviderFormat.kEachModel,
   ProviderFormat.kOpenAiDecisions,
   ProviderFormat.kSystemOne,
 ];
@@ -43,16 +47,20 @@ export function AddProviderDialog({
   open,
   onOpenChange,
   providers,
+  presetAddresses,
   onAdded,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   providers: Provider[];
+  presetAddresses: Partial<Record<ProviderPreset, string>>;
   onAdded: () => void;
 }) {
   const [preset, setPreset] = useState(ProviderPreset.kOpenAi);
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(
+    presetAddresses[ProviderPreset.kOpenAi] ?? "",
+  );
   const [format, setFormat] = useState(ProviderFormat.kChatCompletions);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,6 +69,7 @@ export function AddProviderDialog({
 
   const pick = (next: ProviderPreset) => {
     setPreset(next);
+    setAddress(presetAddresses[next] ?? "");
     setError("");
   };
 
@@ -81,11 +90,11 @@ export function AddProviderDialog({
     const { id } = await providersHandler.addProvider(provider);
     setBusy(false);
     if (!id) {
-      setError("This address cannot be used. It must start with https://, or with http:// for this Mac.");
+      setError(ADDRESS_RULE);
       return;
     }
     setName("");
-    setAddress("");
+    setAddress(presetAddresses[preset] ?? "");
     setKey("");
     onAdded();
     onOpenChange(false);
@@ -130,15 +139,15 @@ export function AddProviderDialog({
                 value={name}
                 onChange={setName}
               />
-              <InputField
-                index={1}
-                label="Address"
-                placeholder="http://localhost:4000/v1"
-                value={address}
-                onChange={setAddress}
-              />
             </>
           )}
+          <InputField
+            index={1}
+            label="Address"
+            placeholder="http://localhost:4000/v1"
+            value={address}
+            onChange={setAddress}
+          />
           {preset !== ProviderPreset.kOllama && (
             <InputField
               index={2}
@@ -169,7 +178,9 @@ export function AddProviderDialog({
               ))}
             </RadioGroup>
             <p className="mt-1.5 text-[12px] text-muted-foreground">
-              The last two serve decision models only.
+              "Each model's own" sends each model over its maker's format, for
+              a proxy such as CLIProxyAPI. The last two serve decision models
+              only.
             </p>
           </div>
         )}
@@ -184,7 +195,7 @@ export function AddProviderDialog({
           </Button>
           <Button
             loading={busy}
-            disabled={custom && (!name.trim() || !address.trim())}
+            disabled={!address.trim() || (custom && !name.trim())}
             onClick={add}
           >
             Add provider

@@ -38,6 +38,7 @@ export const FORMAT_NAMES: Record<ProviderFormat, string> = {
   [ProviderFormat.kOpenAiResponses]: "OpenAI Responses",
   [ProviderFormat.kOpenAiDecisions]: "OpenAI Decisions",
   [ProviderFormat.kSystemOne]: "TypeSafe System One",
+  [ProviderFormat.kEachModel]: "Each model's own",
 };
 
 export const SLOT_NAMES: Record<ModelSlot, string> = {
@@ -101,6 +102,8 @@ export function ProviderTile({
 // once it arrives.
 export interface PageData {
   providers: Provider[];
+  // The address each preset fills in.
+  presetAddresses: Partial<Record<ProviderPreset, string>>;
   choices: Record<ModelSlot, ModelChoice | null>;
   lists: Record<string, ModelList | undefined>;
   upgradeNotice: UpgradeNotice;

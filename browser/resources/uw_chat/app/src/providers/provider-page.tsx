@@ -5,8 +5,10 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronLeft, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputField, InputGroup } from "@/components/ui/input-group";
+import { ADDRESS_RULE } from "./add-provider";
 import {
   ModelSlot,
+  ProviderFormat,
   ProviderPreset,
   providersHandler,
   type Provider,
@@ -22,12 +24,15 @@ const FIRST_MODELS = 8;
 const SLOTS = [ModelSlot.kLanguage, ModelSlot.kDecision, ModelSlot.kAgent];
 
 // Where the tool calls and effort levels on the page come from.
-function abilitiesSource(preset: ProviderPreset) {
-  if (preset === ProviderPreset.kOllama) {
+function abilitiesSource(provider: Provider) {
+  if (provider.preset === ProviderPreset.kOllama) {
     return "Tool calls and thinking come from Ollama's own model details.";
   }
-  if (preset === ProviderPreset.kCustom) {
-    return "The models.dev catalog does not cover custom providers, so uw takes each model to call tools, with its format's usual effort levels.";
+  if (provider.format === ProviderFormat.kEachModel) {
+    return "The models.dev catalog names each model's maker, whose format and effort levels it gets. A model it does not list goes over chat completions, with low, medium, and high.";
+  }
+  if (provider.preset === ProviderPreset.kCustom) {
+    return "Tool calls and effort levels come from the models.dev entry at this address, when the catalog has one. Otherwise uw takes each model to call tools, with its format's usual effort levels.";
   }
   return "Tool calls and effort levels come from the models.dev catalog, which uw keeps on this Mac and refreshes once a day.";
 }
@@ -52,6 +57,10 @@ export function ProviderPage({
 }) {
   const [replacing, setReplacing] = useState(false);
   const [key, setKey] = useState("");
+  const [moving, setMoving] = useState(false);
+  const [address, setAddress] = useState(provider.address);
+  const [addressError, setAddressError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [all, setAll] = useState(false);
   const list = data.lists[provider.id];
@@ -70,6 +79,24 @@ export function ProviderPage({
     await providersHandler.replaceKey(provider.id, key);
     setKey("");
     setReplacing(false);
+    onChanged(provider.id);
+  };
+
+  // The old address stays until the new one lists its models.
+  const saveAddress = async () => {
+    setBusy(true);
+    setAddressError("");
+    const { list } = await providersHandler.changeAddress(provider.id, address);
+    setBusy(false);
+    if (!list.ok) {
+      setAddressError(
+        list.error
+          ? `uw could not list the models there (${list.error}), so the old address stays.`
+          : `${ADDRESS_RULE} The old address stays.`,
+      );
+      return;
+    }
+    setMoving(false);
     onChanged(provider.id);
   };
 
@@ -114,9 +141,55 @@ export function ProviderPage({
       </h2>
       <div className="overflow-hidden rounded-xl border border-border">
         <Row label="Address">
-          <span className="flex h-8 min-w-0 items-center rounded-lg bg-muted px-2.5">
-            <span className="truncate">{provider.address}</span>
-          </span>
+          {moving ? (
+            <span className="flex flex-col gap-1.5">
+              <span className="flex items-center gap-2">
+                <InputGroup className="flex-1">
+                  <InputField
+                    index={0}
+                    label="New address"
+                    labelHidden
+                    value={address}
+                    onChange={setAddress}
+                    autoFocus
+                  />
+                </InputGroup>
+                <Button
+                  size="sm"
+                  loading={busy}
+                  disabled={!address.trim() || address === provider.address}
+                  onClick={saveAddress}
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setMoving(false);
+                    setAddress(provider.address);
+                    setAddressError("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </span>
+              {addressError && (
+                <span role="alert" className="text-[12.5px] text-destructive">
+                  {addressError}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <span className="flex h-8 min-w-0 flex-1 items-center rounded-lg bg-muted px-2.5">
+                <span className="truncate">{provider.address}</span>
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => setMoving(true)}>
+                Change
+              </Button>
+            </span>
+          )}
         </Row>
         <Row label="Key">
           {replacing ? (
@@ -204,6 +277,11 @@ export function ProviderPage({
           >
             <span className="flex min-w-0 items-center gap-2 font-medium">
               <span className="truncate">{model.name}</span>
+              {provider.format === ProviderFormat.kEachModel && (
+                <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                  {FORMAT_NAMES[model.format]}
+                </span>
+              )}
               {usedFor(model.name).map((slot) => (
                 <span
                   key={slot}
@@ -253,7 +331,7 @@ export function ProviderPage({
       </div>
       {provider.servesLanguage && (
         <p className="mt-2.5 text-[12px] leading-[1.45] text-muted-foreground">
-          {abilitiesSource(provider.preset)}
+          {abilitiesSource(provider)}
         </p>
       )}
     </>

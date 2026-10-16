@@ -153,6 +153,35 @@ TEST(CatalogTest, ACustomProviderReadsTheCatalogAtItsAddress) {
       ElementsAre("low", "medium", "high"));
 }
 
+TEST(CatalogTest, AProxyModelGoesOverItsMakersFormat) {
+  const std::optional<ModelCatalog> catalog =
+      ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  Provider proxy = Preset(ProviderPreset::kCustom);
+  proxy.address = "http://localhost:8317/v1";
+  proxy.format = ProviderFormat::kEachModel;
+
+  EXPECT_EQ(FormatOfModel(proxy, "claude-opus-5-5", &*catalog),
+            ProviderFormat::kAnthropicMessages);
+  EXPECT_THAT(catalog->For(proxy, "claude-opus-5-5").efforts,
+              ElementsAre("low", "medium", "high", "xhigh", "max"));
+  EXPECT_EQ(FormatOfModel(proxy, "gpt-5", &*catalog),
+            ProviderFormat::kOpenAiResponses);
+  EXPECT_THAT(catalog->For(proxy, "gpt-5").efforts,
+              ElementsAre("minimal", "low", "medium", "high"));
+  // Anything else, or no catalog yet, goes over chat completions.
+  EXPECT_EQ(FormatOfModel(proxy, "gemini-3-pro", &*catalog),
+            ProviderFormat::kChatCompletions);
+  EXPECT_THAT(catalog->For(proxy, "gemini-3-pro").efforts,
+              ElementsAre("low", "medium", "high"));
+  EXPECT_EQ(FormatOfModel(proxy, "claude-opus-5-5", nullptr),
+            ProviderFormat::kChatCompletions);
+  // A provider with one format keeps it.
+  EXPECT_EQ(FormatOfModel(Preset(ProviderPreset::kOpenAi), "claude-opus-5-5",
+                          &*catalog),
+            ProviderFormat::kOpenAiResponses);
+}
+
 TEST(CatalogTest, TheSavedCopyReadsBackTheSame) {
   const std::optional<ModelCatalog> catalog =
       ModelCatalog::FromModelsDev(kApiJson);

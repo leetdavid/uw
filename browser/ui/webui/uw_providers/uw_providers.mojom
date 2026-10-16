@@ -10,6 +10,7 @@ enum ProviderFormat {
   kOpenAiResponses,
   kOpenAiDecisions,
   kSystemOne,
+  kEachModel,
 };
 
 // Matches uw::ProviderPreset.
@@ -58,6 +59,8 @@ struct Model {
   bool calls_tools;
   // Named as its provider names them. Empty when it takes none.
   array<string> efforts;
+  // The format requests to it go over.
+  ProviderFormat format;
 };
 
 // Matches uw::UpgradeNotice.
@@ -68,8 +71,15 @@ enum UpgradeNotice {
   kFailed,
 };
 
+// The address a preset fills in, which the user can change.
+struct PresetAddress {
+  ProviderPreset preset;
+  string address;
+};
+
 struct ProvidersState {
   array<Provider> providers;
+  array<PresetAddress> preset_addresses;
   ModelChoice? language;
   ModelChoice? decision;
   // Null while chats use the language model.
@@ -79,7 +89,7 @@ struct ProvidersState {
 };
 
 // A provider as the user enters it in the Add provider dialog. A preset
-// brings its own name, address, and format.
+// brings its own name and format, and its address unless one is given.
 struct NewProvider {
   ProviderPreset preset;
   string name;
@@ -134,6 +144,9 @@ interface ProvidersHandler {
   AddProvider(NewProvider provider) => (string? id);
   // An empty key is ignored.
   ReplaceKey(string provider_id, string api_key) => ();
+  // Moves the provider to `address` once its models list there. Returns the
+  // list, which says why when the move did not happen.
+  ChangeAddress(string provider_id, string address) => (ModelList list);
   // Removes its key from the Keychain. Model choices that used it stay, and
   // wait for the user to pick another model.
   RemoveProvider(string provider_id) => ();

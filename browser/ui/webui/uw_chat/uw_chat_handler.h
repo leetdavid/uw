@@ -96,6 +96,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // Runs the agent on the chat's model from now on, marks the switch once
   // the chat has begun, and tells the page.
   void OnModelChanged();
+  void OnModelFormat(const std::string& provider_id,
+                     const std::string& model,
+                     std::optional<ProviderFormat> format);
   // The last line of the log that is not a model switch.
   const base::DictValue* LastLine() const;
   void OnStep(const AgentLoop::Step& step);

@@ -46,6 +46,15 @@ class CatalogStore : public base::SupportsUserData::Data {
   // the first download failed.
   void Get(CatalogCallback done);
 
+  // Runs `done` with the format `model` goes over at `provider`, to keep
+  // with a pick: its maker's when the provider leaves it to each model,
+  // nothing otherwise.
+  using FormatCallback =
+      base::OnceCallback<void(std::optional<ProviderFormat>)>;
+  void FormatOf(const Provider& provider,
+                std::string model,
+                FormatCallback done);
+
  private:
   explicit CatalogStore(Profile* profile);
 

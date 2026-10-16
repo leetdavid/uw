@@ -71,6 +71,32 @@ TEST_F(ProvidersTest, AnEntryThatCannotBeReadIsSkipped) {
   EXPECT_EQ(ReadProviders(prefs_)[0].id, "anthropic");
 }
 
+TEST_F(ProvidersTest, AChoiceKeepsItsModelsFormat) {
+  SetChoice(prefs_, ModelSlot::kLanguage, "custom", "claude-opus-5-5",
+            ProviderFormat::kAnthropicMessages);
+  EXPECT_EQ(ReadChoice(prefs_, ModelSlot::kLanguage)->format,
+            ProviderFormat::kAnthropicMessages);
+  SetChoice(prefs_, ModelSlot::kLanguage, "openai", "gpt-5");
+  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kLanguage)->format);
+}
+
+TEST(ProviderAddressTest, PlainHttpStaysOnThisMacOrAPrivateNetwork) {
+  for (const char* address :
+       {"https://api.openai.com/v1", "http://localhost:8317/v1",
+        "http://127.0.0.1:8317/v1", "http://10.0.0.5:8317/v1",
+        "http://172.20.1.2/v1", "http://192.168.1.20:8317/v1",
+        "http://100.101.102.103:8317/v1", "http://mac-mini.local:8317/v1"}) {
+    EXPECT_TRUE(IsValidProviderEndpoint(address)) << address;
+  }
+  for (const char* address :
+       {"http://api.example.com/v1", "http://8.8.8.8/v1",
+        "http://172.32.0.1/v1", "http://user:pass@localhost/v1",
+        "https://api.example.com/v1#part", "ftp://192.168.1.20/v1",
+        "not an address"}) {
+    EXPECT_FALSE(IsValidProviderEndpoint(address)) << address;
+  }
+}
+
 TEST_F(ProvidersTest, AnEffortStaysWithItsModel) {
   SetEffort(prefs_, ModelSlot::kAgent, "high");
   EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kAgent));

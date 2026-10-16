@@ -12,7 +12,6 @@
 #include "base/values.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
-#include "net/base/url_util.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/components/ai_providers/formats.h"
@@ -149,7 +148,9 @@ AiConnectionConfig ConfigForChoice(const PrefService& prefs,
   }
   config.endpoint = provider->address;
   config.preset = provider->preset;
-  config.format = *format;
+  config.format = provider->format == ProviderFormat::kEachModel
+                      ? choice.format.value_or(*format)
+                      : *format;
   config.model = choice.model;
   config.effort = choice.effort;
   config.key_account = provider->key_account;
@@ -262,18 +263,6 @@ DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs) {
   config.model = choice->model;
   config.key_account = provider->key_account;
   return config;
-}
-
-bool IsValidProviderEndpoint(std::string_view endpoint) {
-  const GURL url(endpoint);
-  if (!url.is_valid() || url.has_username() || url.has_password() ||
-      url.has_ref()) {
-    return false;
-  }
-  if (url.SchemeIs("https")) {
-    return true;
-  }
-  return url.SchemeIs("http") && net::IsLocalhost(url);
 }
 
 GURL LanguageModelUrl(std::string_view endpoint, ProviderFormat format) {

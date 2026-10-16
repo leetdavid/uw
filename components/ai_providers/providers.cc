@@ -13,6 +13,9 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
+#include "net/base/ip_address.h"
+#include "net/base/url_util.h"
+#include "url/gurl.h"
 
 namespace uw {
 namespace {
@@ -66,14 +69,6 @@ std::optional<ProviderPreset> PresetFrom(std::optional<int> value) {
   return static_cast<ProviderPreset>(*value);
 }
 
-std::optional<ProviderFormat> FormatFrom(std::optional<int> value) {
-  if (!value || *value < static_cast<int>(ProviderFormat::kChatCompletions) ||
-      *value > static_cast<int>(ProviderFormat::kSystemOne)) {
-    return std::nullopt;
-  }
-  return static_cast<ProviderFormat>(*value);
-}
-
 std::optional<Provider> ProviderFrom(const base::Value& entry) {
   const base::DictValue* dict = entry.GetIfDict();
   if (!dict) {
@@ -106,6 +101,14 @@ base::DictValue DictFrom(const Provider& provider) {
 }
 
 }  // namespace
+
+std::optional<ProviderFormat> FormatFrom(std::optional<int> value) {
+  if (!value || *value < static_cast<int>(ProviderFormat::kChatCompletions) ||
+      *value > static_cast<int>(ProviderFormat::kEachModel)) {
+    return std::nullopt;
+  }
+  return static_cast<ProviderFormat>(*value);
+}
 
 void RegisterProviderPrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kProvidersPref);
@@ -219,16 +222,21 @@ std::optional<ModelChoice> ReadChoice(const PrefService& prefs,
     return std::nullopt;
   }
   const std::string* effort = dict.FindString(kEffort);
-  return ModelChoice{*provider, *model, effort ? *effort : std::string()};
+  return ModelChoice{*provider, *model, FormatFrom(dict.FindInt(kFormat)),
+                     effort ? *effort : std::string()};
 }
 
 void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
-               std::string_view model) {
-  prefs.SetDict(
-      ChoicePref(slot),
-      base::DictValue().Set(kProvider, provider_id).Set(kModel, model));
+               std::string_view model,
+               std::optional<ProviderFormat> format) {
+  base::DictValue choice =
+      base::DictValue().Set(kProvider, provider_id).Set(kModel, model);
+  if (format) {
+    choice.Set(kFormat, static_cast<int>(*format));
+  }
+  prefs.SetDict(ChoicePref(slot), std::move(choice));
 }
 
 void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort) {
@@ -247,6 +255,10 @@ std::optional<ProviderFormat> LanguageFormatOf(const Provider& provider) {
     case ProviderFormat::kAnthropicMessages:
     case ProviderFormat::kOpenAiResponses:
       return provider.format;
+    // A model the catalog does not name a maker for goes over chat
+    // completions.
+    case ProviderFormat::kEachModel:
+      return ProviderFormat::kChatCompletions;
     case ProviderFormat::kOpenAiDecisions:
     case ProviderFormat::kSystemOne:
       return std::nullopt;
@@ -264,8 +276,40 @@ std::optional<ProviderFormat> DecisionFormatOf(const Provider& provider) {
     case ProviderFormat::kChatCompletions:
     case ProviderFormat::kAnthropicMessages:
     case ProviderFormat::kOpenAiResponses:
+    case ProviderFormat::kEachModel:
       return std::nullopt;
   }
+}
+
+bool IsValidProviderEndpoint(std::string_view endpoint) {
+  const GURL url(endpoint);
+  if (!url.is_valid() || url.has_username() || url.has_password() ||
+      url.has_ref()) {
+    return false;
+  }
+  if (url.SchemeIs("https")) {
+    return true;
+  }
+  if (!url.SchemeIs("http")) {
+    return false;
+  }
+  if (net::IsLocalhost(url) || url.host().ends_with(".local")) {
+    return true;
+  }
+  net::IPAddress address;
+  if (!net::ParseURLHostnameToAddress(url.host(), &address) ||
+      !address.IsIPv4()) {
+    return false;
+  }
+  static constexpr std::pair<net::IPAddress, size_t> kPrivate[] = {
+      {net::IPAddress(10, 0, 0, 0), 8},
+      {net::IPAddress(172, 16, 0, 0), 12},
+      {net::IPAddress(192, 168, 0, 0), 16},
+      {net::IPAddress(100, 64, 0, 0), 10},
+  };
+  return std::ranges::any_of(kPrivate, [&](const auto& range) {
+    return net::IPAddressMatchesPrefix(address, range.first, range.second);
+  });
 }
 
 }  // namespace uw

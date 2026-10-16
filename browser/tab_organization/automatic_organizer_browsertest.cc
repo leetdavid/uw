@@ -2069,8 +2069,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 }
 
 // A language model at a provider that speaks Anthropic Messages gets the
-// naming request in that format, with Anthropic's key header, and its answer
-// names the task.
+// naming request in that format, and its answer names the task. A Custom
+// provider sends the key both ways, as proxies read either.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        ALanguageModelOverAnthropicMessagesNamesTheNewTask) {
   UseDecisionModel(ProviderFormat::kSystemOne);
@@ -2089,7 +2089,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_EQ(requests.size(), 2u);
   EXPECT_EQ(requests[1].path, "/v1/messages");
   EXPECT_EQ(requests[1].anthropic_key, "anthropic-key");
-  EXPECT_EQ(requests[1].authorization, "");
+  EXPECT_EQ(requests[1].authorization, "Bearer anthropic-key");
   EXPECT_NE(requests[1].body.find(R"("model":"claude-model")"),
             std::string::npos);
   EXPECT_NE(requests[1].body.find(R"("system":)"), std::string::npos);

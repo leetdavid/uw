@@ -42,6 +42,7 @@ const FORMAT_BADGES: Record<ProviderFormat, string> = {
   [ProviderFormat.kAnthropicMessages]: "Messages",
   [ProviderFormat.kOpenAiResponses]: "Responses",
   [ProviderFormat.kOpenAiDecisions]: "Decisions",
+  [ProviderFormat.kEachModel]: "Each model's",
   [ProviderFormat.kSystemOne]: "System One",
 };
 
@@ -356,6 +357,7 @@ function ProvidersList({
         open={adding}
         onOpenChange={setAdding}
         providers={data.providers}
+        presetAddresses={data.presetAddresses}
         onAdded={onChanged}
       />
     </>
@@ -384,6 +386,9 @@ function Providers() {
         },
         lists,
         upgradeNotice: state.upgradeNotice,
+        presetAddresses: Object.fromEntries(
+          state.presetAddresses.map(({ preset, address }) => [preset, address]),
+        ),
       };
     });
   }, []);

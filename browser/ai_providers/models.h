@@ -99,10 +99,6 @@ AiConnectionConfig ConfigForChoice(const PrefService& prefs,
                                    const ModelChoice& choice);
 DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
 
-// Accepts https URLs, plus http loopback for local testing. Rejects
-// credentials, fragments, and invalid URLs.
-bool IsValidProviderEndpoint(std::string_view endpoint);
-
 // Request URLs under a base endpoint like https://api.openai.com/v1. A
 // language model takes requests at its format's own path.
 GURL LanguageModelUrl(std::string_view endpoint, ProviderFormat format);

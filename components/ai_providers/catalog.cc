@@ -169,7 +169,9 @@ std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
 ModelAbilities ModelCatalog::For(const Provider& provider,
                                  std::string_view model) const {
   std::optional<std::string> key;
-  if (provider.preset == ProviderPreset::kCustom) {
+  if (provider.format == ProviderFormat::kEachModel) {
+    key = MakerKeyOf(model);
+  } else if (provider.preset == ProviderPreset::kCustom) {
     key = KeyAt(provider.address);
   } else if (const std::optional<std::string_view> preset_key =
                  CatalogKey(provider.preset)) {
@@ -190,6 +192,36 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
     }
   }
   return abilities;
+}
+
+std::optional<std::string> ModelCatalog::MakerKeyOf(
+    std::string_view model) const {
+  for (const char* maker : {"anthropic", "openai"}) {
+    const base::DictValue* models = models_.FindDict(maker);
+    if (models && models->FindDict(model)) {
+      return maker;
+    }
+  }
+  return std::nullopt;
+}
+
+ProviderFormat ModelCatalog::MakerFormatOf(std::string_view model) const {
+  const std::optional<std::string> maker = MakerKeyOf(model);
+  if (!maker) {
+    return ProviderFormat::kChatCompletions;
+  }
+  return *maker == "anthropic" ? ProviderFormat::kAnthropicMessages
+                               : ProviderFormat::kOpenAiResponses;
+}
+
+ProviderFormat FormatOfModel(const Provider& provider,
+                             std::string_view model,
+                             const ModelCatalog* catalog) {
+  if (provider.format != ProviderFormat::kEachModel) {
+    return LanguageFormatOf(provider).value_or(provider.format);
+  }
+  return catalog ? catalog->MakerFormatOf(model)
+                 : ProviderFormat::kChatCompletions;
 }
 
 bool CatalogCovers(ProviderPreset preset) {
