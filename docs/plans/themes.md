@@ -94,12 +94,47 @@ Stages:
 Acceptance checks:
 
 1. With Same as window, pages behave as they do today.
-2. In a light window with Dark pages, a website and the chat page see `prefers-color-scheme: dark`, the sidebar and toolbar stay light, and Settings stays light.
+2. In a light window with Dark pages, a website and the chat page see `prefers-color-scheme: dark`, the sidebar stays light, the toolbar takes the [page color](#page-colors), and Settings stays light.
 3. In a dark window with Light pages, the reverse.
 4. In a light window with Dark pages, the card is `#0A0A0A` before a page paints.
 5. Changing the row changes open pages without a reload.
 6. Two profiles keep two page modes. Incognito pages follow macOS.
 7. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
+## Page colors
+
+Status: scope agreed with the user on 2026-10-16. Not built. The design, T109, comes first.
+
+Implementability: **5/10**. Chromium already reports each page's background color and tells the browser when it changes, and uw's color mixer already sets the toolbar's colors. The new parts are an observer of each window's shown tab, a way to give one window its own toolbar colors, and a fade that uw paints itself, since rebuilding the window's colors on every frame of a fade is too slow. Chromium colors made from the toolbar's, such as the address bar's dropdown and infobars, change with it and need checking.
+
+Agreed:
+
+- The toolbar and the bookmarks bar under it take the [page color](../CONTEXT.md#language): the color the page paints behind its content. A red page gives a red toolbar. The sidebar, the theme around the card, and the card's gray edge in dark mode stay as they are.
+- Every page counts: websites, uw's pages, and Chromium's. The terminal's black page keeps today's black toolbar.
+- The toolbar follows the page whatever the window mode and page mode. A white page in a dark window gives a white toolbar. This replaces "the toolbar stays light" in [Page mode](#page-mode).
+- The toolbar takes each color as soon as Chromium reports it, also while a page loads. Until a tab's page has reported one, the toolbar keeps today's color: white in light mode, `#0A0A0A` in dark mode.
+- The change is a smooth fade, on a tab switch and when a page changes its color.
+- Always on. No setting.
+
+Proposed by uw, for the design to settle:
+
+- The fade takes about 200 ms. Icons and text switch to their new color halfway through.
+- Icons and text are near-black or white, whichever reads better on the page color, as on the theme. The address field is the page color moved a little toward the text color.
+- In a split view, the toolbar takes the color of the page that has focus. Private windows follow the same rules.
+
+Stages:
+
+1. T109: page colors drawn on the canvas's "Themes" page and signed off by the user: a red page, a white page in a dark window, the terminal, and the fade. The toolbar in T101's two frames is redrawn to follow the page.
+2. T110: page colors built.
+
+Acceptance checks:
+
+1. A page with a red background gives a red toolbar and bookmarks bar with white icons and text, in light and dark mode. The sidebar and the theme do not change.
+2. The terminal tab's toolbar is `#0A0A0A`, as today.
+3. Switching between a red tab and a white tab fades the toolbar from one color to the other and ends on the new one.
+4. A page that changes its background, such as from a script, changes the toolbar without a reload.
+5. A white page in a dark window gives a white toolbar. Text in the address field keeps a 4.5:1 contrast ratio on every page color.
+6. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
 
