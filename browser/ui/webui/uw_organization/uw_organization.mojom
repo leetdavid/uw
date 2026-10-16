@@ -12,13 +12,11 @@ struct Thresholds {
 };
 
 // Why automatic organization does not run while it is turned on. The models
-// are picked and tested on uw://providers.
+// are picked on uw://providers.
 enum Waiting {
   kNothing,
   // Neither a language model nor a decision model is picked.
   kNoModel,
-  kLanguageTest,
-  kDecisionTest,
 };
 
 struct State {

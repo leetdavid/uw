@@ -53,9 +53,9 @@ enum class PauseMode {
 void RegisterAiConnectionProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry);
 
-// True when automatic organization may send requests: the user turned it on,
-// at least one of its models is complete, and every picked one passed its
-// test.
+// True when automatic organization may send requests: the user turned it on
+// and at least one of its models is complete. A model need not pass a test
+// first.
 bool OrganizationReady(const PrefService* prefs);
 
 // The user's thresholds. A stored value outside the range counts as the

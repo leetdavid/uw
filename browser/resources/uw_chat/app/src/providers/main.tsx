@@ -91,23 +91,12 @@ function testSentence(slot: ModelSlot, result: ModelTestResult) {
 
 function TestLine({
   slot,
-  tested,
   result,
 }: {
   slot: ModelSlot;
-  tested: boolean;
-  result?: ModelTestResult;
+  result: ModelTestResult;
 }) {
   const [details, setDetails] = useState(false);
-  if (!result) {
-    return (
-      <p role="status" className="text-[12.5px] text-muted-foreground">
-        {tested
-          ? "Passed its test."
-          : "Not tested yet. Automatic organization waits until it passes."}
-      </p>
-    );
-  }
   const passed = result.outcome === TestOutcome.kPassed;
   return (
     <div role="status" className="text-[12.5px]">
@@ -299,9 +288,9 @@ function ProvidersList({
                   <span />
                 )}
               </div>
-              {testable && (
+              {testable && tests[slot] && (
                 <div className="mt-1.5">
-                  <TestLine slot={slot} tested={choice.tested} result={tests[slot]} />
+                  <TestLine slot={slot} result={tests[slot]} />
                 </div>
               )}
             </div>

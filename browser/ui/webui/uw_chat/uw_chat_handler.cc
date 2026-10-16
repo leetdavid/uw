@@ -85,8 +85,7 @@ std::optional<ModelChoice> ModelFrom(const base::DictValue* value) {
   if (!provider || !model) {
     return std::nullopt;
   }
-  return ModelChoice{*provider, *model, false,
-                     effort ? *effort : std::string()};
+  return ModelChoice{*provider, *model, effort ? *effort : std::string()};
 }
 
 mojom::ChatModelPtr PageModel(const std::optional<ModelChoice>& choice) {
@@ -670,7 +669,7 @@ void UwChatHandler::SetModel(const std::string& provider_id,
   if (!loaded_ || provider_id.empty() || model.empty()) {
     return;
   }
-  model_ = ModelChoice{provider_id, model, false, std::string()};
+  model_ = ModelChoice{provider_id, model, std::string()};
   OnModelChanged();
 }
 

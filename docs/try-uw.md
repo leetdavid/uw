@@ -93,7 +93,7 @@ Click `Organize` at the foot of the sidebar.
 
 Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, and Custom. uw lists the provider's models before it adds it, and the key goes to the Keychain. Then pick a language model, a decision model, or both, and an agent model for chats. Click a provider to see its address, key, format, and models, or to remove it.
 
-Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. A newly picked model says `Not tested yet`. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
+Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
 
 uw reaches OpenAI's models over OpenAI Responses and Anthropic's over Anthropic Messages, so a chat, a task name, or a Test with one of them goes over that format. Every other provider gets chat completions.
 
@@ -101,7 +101,7 @@ A provider's page shows whether each model calls tools and which effort levels i
 
 ### Automatic organization
 
-Pick and test a decision model, a language model, or both at `uw://providers`. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says what it still waits for, such as a model that has not passed its test. Then open a link in a new tab.
+Pick a decision model, a language model, or both at `uw://providers`; `Test` is optional. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says so while no model is picked. Then open a link in a new tab.
 
 Expected result: when the model is confident, the tab moves into a task. A card such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with the tab's title and an `Undo` button. Nothing shows while the model is asked, and nothing when it leaves the tab where it is. If a request fails, the card says so once, such as `The request failed: HTTP 401`, and stays quiet about failures until a request works again. With `Show organizer activity` on, the card also shows each request on its way and the model's numbers.
 

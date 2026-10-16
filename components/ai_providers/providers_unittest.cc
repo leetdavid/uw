@@ -71,18 +71,6 @@ TEST_F(ProvidersTest, AnEntryThatCannotBeReadIsSkipped) {
   EXPECT_EQ(ReadProviders(prefs_)[0].id, "anthropic");
 }
 
-TEST_F(ProvidersTest, ANewPickIsUntestedUntilItsTestPasses) {
-  SetChoice(prefs_, ModelSlot::kLanguage, "anthropic", "claude-haiku-5-5");
-  const ModelChoice picked = *ReadChoice(prefs_, ModelSlot::kLanguage);
-  EXPECT_FALSE(picked.tested);
-
-  MarkTested(prefs_, ModelSlot::kLanguage, picked);
-  EXPECT_TRUE(ReadChoice(prefs_, ModelSlot::kLanguage)->tested);
-
-  SetChoice(prefs_, ModelSlot::kLanguage, "anthropic", "claude-opus-5-5");
-  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kLanguage)->tested);
-}
-
 TEST_F(ProvidersTest, AnEffortStaysWithItsModel) {
   SetEffort(prefs_, ModelSlot::kAgent, "high");
   EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kAgent));
@@ -94,17 +82,6 @@ TEST_F(ProvidersTest, AnEffortStaysWithItsModel) {
 
   SetChoice(prefs_, ModelSlot::kAgent, "openai", "gpt-6");
   EXPECT_EQ(ReadChoice(prefs_, ModelSlot::kAgent)->effort, "");
-}
-
-TEST_F(ProvidersTest, ATestOfAModelNoLongerPickedChangesNothing) {
-  SetChoice(prefs_, ModelSlot::kDecision, "jev", "jev-latest");
-  const ModelChoice old = *ReadChoice(prefs_, ModelSlot::kDecision);
-  SetChoice(prefs_, ModelSlot::kDecision, "openai", "gpt-6-luna");
-
-  MarkTested(prefs_, ModelSlot::kDecision, old);
-
-  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kDecision)->tested);
-  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kAgent));
 }
 
 TEST_F(ProvidersTest, AChoiceOutlivesItsProvider) {

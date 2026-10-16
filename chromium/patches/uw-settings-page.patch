@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..daf9b780aa461b4ca17e7fda17809d3ca46813a4 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..79faca5edcd002bdc78dea884e42554c523fdce6 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,85 @@
+@@ -3904,6 +3904,79 @@
          System
        </message>
      </if>
@@ -38,12 +38,6 @@ index 63c989a76dadc13953e35513998e83326ee3612b..daf9b780aa461b4ca17e7fda17809d3c
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_NO_MODEL" desc="Says what automatic organization waits for when it has no model.">
 +        Pick a language model or a decision model on AI providers.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_LANGUAGE_TEST" desc="Says what automatic organization waits for when its language model has not passed a test.">
-+        Test the language model on AI providers. Automatic organization starts once it passes.
-+      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_DECISION_TEST" desc="Says what automatic organization waits for when its decision model has not passed a test.">
-+        Test the decision model on AI providers. Automatic organization starts once it passes.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_TITLE" desc="Title of the row that opens the uw://providers page.">
 +        AI providers

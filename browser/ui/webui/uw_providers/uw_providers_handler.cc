@@ -91,7 +91,7 @@ mojom::ProviderPtr PageProvider(const Provider& provider) {
 mojom::ModelChoicePtr PageChoice(const PrefService& prefs, ModelSlot slot) {
   const std::optional<ModelChoice> choice = ReadChoice(prefs, slot);
   return choice ? mojom::ModelChoice::New(choice->provider_id, choice->model,
-                                          choice->tested, choice->effort)
+                                          choice->effort)
                 : nullptr;
 }
 
@@ -366,7 +366,6 @@ void UwProvidersHandler::OnTested(ModelSlot slot,
   result->seconds = (base::TimeTicks::Now() - sent_at).InSecondsF();
   if (outcome.ok && test.reads.Run(outcome.body)) {
     result->outcome = mojom::TestOutcome::kPassed;
-    MarkTested(*profile_->GetPrefs(), slot, choice);
   } else if (outcome.ok) {
     result->outcome = mojom::TestOutcome::kUnusable;
   } else if (outcome.net_error != net::OK) {

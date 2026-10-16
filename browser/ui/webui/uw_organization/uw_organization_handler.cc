@@ -23,10 +23,6 @@ namespace uw {
 namespace {
 
 mojom::Waiting WaitingFor(const PrefService* prefs) {
-  if (const std::optional<ModelSlot> untested = UntestedModel(prefs)) {
-    return untested == ModelSlot::kDecision ? mojom::Waiting::kDecisionTest
-                                            : mojom::Waiting::kLanguageTest;
-  }
   return IsComplete(ReadDecisionModelConfig(prefs)) ||
                  IsComplete(ReadAiConnectionConfig(prefs))
              ? mojom::Waiting::kNothing
@@ -61,10 +57,6 @@ void UwOrganizationHandler::AddLoadTimeData(
        IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES_AND_NAMES},
       {"uwOrganizationWaitingNoModel",
        IDS_UW_SETTINGS_ORGANIZATION_WAITING_NO_MODEL},
-      {"uwOrganizationWaitingLanguageTest",
-       IDS_UW_SETTINGS_ORGANIZATION_WAITING_LANGUAGE_TEST},
-      {"uwOrganizationWaitingDecisionTest",
-       IDS_UW_SETTINGS_ORGANIZATION_WAITING_DECISION_TEST},
       {"uwOrganizationProvidersTitle",
        IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_TITLE},
       {"uwOrganizationProvidersNote",

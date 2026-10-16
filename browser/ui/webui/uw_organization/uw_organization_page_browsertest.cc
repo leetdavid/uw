@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "base/functional/bind.h"
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -92,10 +93,17 @@ class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 };
 
-// The models are picked and tested on uw://providers. The switch turns
-// automatic organization on, and the status says what it still waits for.
+// The models are picked on uw://providers. The switch turns automatic
+// organization on, and the status says what it still waits for.
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheSwitchWaitsForAPickedAndTestedModel) {
+                       TheSwitchWaitsForAPickedModel) {
+  // A switch that throws once the browser answers shows as a console error.
+  content::WebContentsConsoleObserver console(
+      browser()->tab_strip_model()->GetActiveWebContents());
+  console.SetFilter(base::BindRepeating(
+      [](const content::WebContentsConsoleObserver::Message& message) {
+        return message.log_level == blink::mojom::ConsoleMessageLevel::kError;
+      }));
   OpenPage();
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_OFF));
   EXPECT_EQ(TextOf("statusDetail"),
@@ -115,13 +123,6 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
       AddProvider(*prefs(), PresetProvider(ProviderPreset::kOllama));
   SetChoice(*prefs(), ModelSlot::kLanguage, ollama, "llama3.2");
   OpenPage();
-  EXPECT_EQ(TextOf("statusDetail"),
-            String(IDS_UW_SETTINGS_ORGANIZATION_WAITING_LANGUAGE_TEST));
-  EXPECT_FALSE(OrganizationReady(prefs()));
-
-  MarkTested(*prefs(), ModelSlot::kLanguage,
-             *ReadChoice(*prefs(), ModelSlot::kLanguage));
-  OpenPage();
   EXPECT_EQ(TextOf("status"), String(IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON));
   EXPECT_EQ(
       TextOf("statusDetail"),
@@ -133,6 +134,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   ClickSwitch();
   EXPECT_FALSE(prefs()->GetBoolean(kOrganizationEnabledPref));
   EXPECT_FALSE(OrganizationReady(prefs()));
+  EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

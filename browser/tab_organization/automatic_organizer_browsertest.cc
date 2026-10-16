@@ -152,8 +152,7 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
 
   // Picks `model` at a provider at the test server that speaks `format`, as
-  // uw://providers saves it once the model passed its test, and turns
-  // automatic organization on.
+  // uw://providers saves it, and turns automatic organization on.
   void UseModel(ModelSlot slot,
                 ProviderFormat format,
                 const std::string& model,
@@ -167,7 +166,6 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, key));
     UpdateProvider(*prefs(), provider);
     SetChoice(*prefs(), slot, provider.id, model);
-    MarkTested(*prefs(), slot, *ReadChoice(*prefs(), slot));
     prefs()->SetBoolean(kOrganizationEnabledPref, true);
   }
 
@@ -1997,7 +1995,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   prefs()->SetString(kDecisionKeyAccountPref, "decision");
   prefs()->SetBoolean(kOrganizationEnabledPref, true);
 
-  MoveConnectionsToProviders(prefs(), /*tested=*/true);
+  MoveConnectionsToProviders(prefs());
 
   // The language and agent connections shared an address and a key.
   const std::vector<Provider> providers = ReadProviders(*prefs());
@@ -2009,15 +2007,13 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(providers[1].preset, ProviderPreset::kJev);
   EXPECT_EQ(keys.GetKey(providers[1].key_account), "jev-key");
 
-  // Automatic organization was on, so its models had passed their tests.
+  // Automatic organization goes on with the moved models at once.
   const ModelChoice language = *ReadChoice(*prefs(), ModelSlot::kLanguage);
   EXPECT_EQ(language.provider_id, providers[0].id);
   EXPECT_EQ(language.model, "language-model");
-  EXPECT_TRUE(language.tested);
   const ModelChoice decision = *ReadChoice(*prefs(), ModelSlot::kDecision);
   EXPECT_EQ(decision.provider_id, providers[1].id);
   EXPECT_EQ(decision.model, "jev-latest");
-  EXPECT_TRUE(decision.tested);
   EXPECT_EQ(ReadChoice(*prefs(), ModelSlot::kAgent)->model, "agent-model");
   EXPECT_TRUE(OrganizationReady(prefs()));
   EXPECT_EQ(ReadDecisionModelConfig(prefs()).format,
@@ -2034,7 +2030,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   }
   EXPECT_EQ(prefs()->GetInteger(kUpgradeNoticePref),
             static_cast<int>(UpgradeNotice::kMerged));
-  MoveConnectionsToProviders(prefs(), /*tested=*/true);
+  MoveConnectionsToProviders(prefs());
   EXPECT_EQ(ReadProviders(*prefs()).size(), 2u);
 }
 
@@ -2049,32 +2045,27 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_EQ(providers.size(), 1u);
   EXPECT_EQ(providers[0].preset, ProviderPreset::kOllama);
   EXPECT_EQ(providers[0].key_account, "");
-  // Automatic organization was off, so nothing says the model passed a test.
-  EXPECT_FALSE(ReadChoice(*prefs(), ModelSlot::kLanguage)->tested);
+  EXPECT_EQ(ReadChoice(*prefs(), ModelSlot::kLanguage)->model, "llama3.2");
   EXPECT_EQ(prefs()->GetInteger(kUpgradeNoticePref),
             static_cast<int>(UpgradeNotice::kMoved));
 }
 
-// A model picked on uw://providers waits for its test before automatic
-// organization sends it anything.
+// A model picked on uw://providers is used at once, without a test.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       ANewlyPickedModelWaitsForItsTest) {
+                       ANewlyPickedModelIsUsedAtOnce) {
   Answer("/v1/chat/completions",
          ChatAnswer(R"({\"task\":\"none\",\"confidence\":0.9,)"
                     R"(\"new_task\":0.95,\"task_name\":\"Plan a trip\"})"));
   UseLanguageModel();
   const ModelChoice picked = *ReadChoice(*prefs(), ModelSlot::kLanguage);
   SetChoice(*prefs(), ModelSlot::kLanguage, picked.provider_id, "other-model");
-  EXPECT_FALSE(OrganizationReady(prefs()));
-  EXPECT_EQ(UntestedModel(prefs()), ModelSlot::kLanguage);
+  EXPECT_TRUE(OrganizationReady(prefs()));
 
   Browse(InitialTab(), "flights");
-  ASSERT_TRUE(SettleAfter(0));
-  EXPECT_TRUE(Requests().empty());
-
-  MarkTested(*prefs(), ModelSlot::kLanguage,
-             *ReadChoice(*prefs(), ModelSlot::kLanguage));
-  EXPECT_TRUE(OrganizationReady(prefs()));
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_FALSE(Requests().empty());
+  EXPECT_NE(Requests()[0].body.find(R"("model":"other-model")"),
+            std::string::npos);
 }
 
 // A language model at a provider that speaks Anthropic Messages gets the

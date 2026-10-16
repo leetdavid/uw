@@ -84,9 +84,8 @@ void RegisterModelPrefs(PrefRegistrySimple* registry);
 // Turns the connections saved before uw://providers into providers, once.
 // Connections with the same address and key become one provider. The old
 // preferences and Keychain accounts go once every key has moved; until then
-// they stay, and the next launch tries again. `tested` says whether the saved
-// language and decision models had passed their tests.
-void MoveConnectionsToProviders(PrefService* prefs, bool tested);
+// they stay, and the next launch tries again.
+void MoveConnectionsToProviders(PrefService* prefs);
 
 // The models picked on uw://providers. Empty when the slot holds no model, or
 // its provider is gone or cannot serve it.
@@ -118,10 +117,6 @@ bool IsComplete(const DecisionModelConfig& config);
 // and DeepSeek send {"error": {"message": ...}}, TypeSafe sends
 // {"detail": {"message": ...}}, and Ollama sends {"error": "..."}.
 std::string ProviderMessage(const std::string& body);
-
-// The language or decision model that is picked but has not passed its test
-// since. Automatic organization waits for it.
-std::optional<ModelSlot> UntestedModel(const PrefService* prefs);
 
 }  // namespace uw
 

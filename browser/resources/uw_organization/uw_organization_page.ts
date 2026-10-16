@@ -43,8 +43,6 @@ interface ThresholdRow {
 const WAITING_TEXT: Record<Waiting, string> = {
   [Waiting.kNothing]: '',
   [Waiting.kNoModel]: 'uwOrganizationWaitingNoModel',
-  [Waiting.kLanguageTest]: 'uwOrganizationWaitingLanguageTest',
-  [Waiting.kDecisionTest]: 'uwOrganizationWaitingDecisionTest',
 };
 
 export class SettingsUwOrganizationPageElement extends CrLitElement {
@@ -138,8 +136,10 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   }
 
   protected async onEnabledChange_(e: CustomEvent<boolean>) {
+    // The event has finished dispatching by the time the answer comes.
+    const toggle = e.currentTarget as CrToggleElement;
     this.state_ = await this.browserProxy_.setEnabled(e.detail);
-    (e.currentTarget as CrToggleElement).checked = this.state_.enabled;
+    toggle.checked = this.state_.enabled;
   }
 
   protected onProvidersClick_() {

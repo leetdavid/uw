@@ -137,11 +137,7 @@ AutomaticOrganizer::AutomaticOrganizer(BrowserWindowInterface* window,
   // An off-the-record profile writes its prefs to memory only, so the move
   // waits for a normal window.
   if (!profile()->IsOffTheRecord()) {
-    // Saving a connection tested it, and automatic organization was on only
-    // while every saved one passed.
-    MoveConnectionsToProviders(
-        profile()->GetPrefs(),
-        profile()->GetPrefs()->GetBoolean(kOrganizationEnabledPref));
+    MoveConnectionsToProviders(profile()->GetPrefs());
   }
   prefs_.Init(profile()->GetPrefs());
   for (const char* pref : {kOrganizationEnabledPref, kOrganizationPauseModePref,

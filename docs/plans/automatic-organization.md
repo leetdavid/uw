@@ -34,7 +34,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - The row is hidden without a language model and in a private window.
   - It works while automatic organization is paused or off. This is the one request uw sends then, and only on a click.
 - Naming moves nothing and is not an undo step.
-- Changed on 2026-10-15 with T77: the models are picked and tested on `uw://providers`, and automatic organization runs while its switch is on and every picked model passed its test. See the [AI providers plan](ai-providers.md#agreed-scope). The rules below about saving describe the settings page before that change.
+- Changed on 2026-10-15 with T77: the models are picked on `uw://providers`, and automatic organization runs while its switch is on and a model is picked. Since 2026-10-16 it no longer waits for a passed test. See the [AI providers plan](ai-providers.md#agreed-scope). The rules below about saving describe the settings page before that change.
 - Automatic organization is off until every configured connection validates. A save that fails validation turns it off.
 - "Save and validate" turns automatic organization off, stores both connections, then sends one test request to each connection that is set. The language model counts as set when its model field is filled. With nothing set, it stays off.
 - Each connection has "Test connection". It sends one test request for that connection as entered and saves nothing. Beside a decision model, the language model's test asks for a task name; alone, it asks for a placement. Agreed on 2026-10-12.

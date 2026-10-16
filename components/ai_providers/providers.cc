@@ -25,7 +25,6 @@ constexpr char kFormat[] = "format";
 constexpr char kKeyAccount[] = "key_account";
 constexpr char kProvider[] = "provider";
 constexpr char kModel[] = "model";
-constexpr char kTested[] = "tested";
 constexpr char kEffort[] = "effort";
 
 const char* ChoicePref(ModelSlot slot) {
@@ -220,18 +219,16 @@ std::optional<ModelChoice> ReadChoice(const PrefService& prefs,
     return std::nullopt;
   }
   const std::string* effort = dict.FindString(kEffort);
-  return ModelChoice{*provider, *model, dict.FindBool(kTested).value_or(false),
-                     effort ? *effort : std::string()};
+  return ModelChoice{*provider, *model, effort ? *effort : std::string()};
 }
 
 void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
                std::string_view model) {
-  prefs.SetDict(ChoicePref(slot), base::DictValue()
-                                      .Set(kProvider, provider_id)
-                                      .Set(kModel, model)
-                                      .Set(kTested, false));
+  prefs.SetDict(
+      ChoicePref(slot),
+      base::DictValue().Set(kProvider, provider_id).Set(kModel, model));
 }
 
 void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort) {
@@ -242,15 +239,6 @@ void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort) {
 
 void ClearChoice(PrefService& prefs, ModelSlot slot) {
   prefs.ClearPref(ChoicePref(slot));
-}
-
-void MarkTested(PrefService& prefs, ModelSlot slot, const ModelChoice& tested) {
-  const std::optional<ModelChoice> current = ReadChoice(prefs, slot);
-  if (!current || current->provider_id != tested.provider_id ||
-      current->model != tested.model) {
-    return;
-  }
-  ScopedDictPrefUpdate(&prefs, ChoicePref(slot))->Set(kTested, true);
 }
 
 std::optional<ProviderFormat> LanguageFormatOf(const Provider& provider) {

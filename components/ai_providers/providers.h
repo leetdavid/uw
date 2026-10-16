@@ -60,9 +60,6 @@ enum class ModelSlot { kLanguage, kDecision, kAgent };
 struct ModelChoice {
   std::string provider_id;
   std::string model;
-  // Whether the model passed a test since it was picked. Only the language
-  // and decision models are tested.
-  bool tested = false;
   // One of the model's effort levels, or empty for the provider's default.
   std::string effort;
 };
@@ -88,7 +85,6 @@ void RemoveProvider(PrefService& prefs, std::string_view id);
 std::string KeyAccountFor(std::string_view provider_id);
 
 std::optional<ModelChoice> ReadChoice(const PrefService& prefs, ModelSlot slot);
-// A new pick has not been tested yet.
 void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
@@ -97,9 +93,6 @@ void ClearChoice(PrefService& prefs, ModelSlot slot);
 // Sets the effort of the model the slot holds. Empty is the provider's
 // default. Picking another model starts on the default again.
 void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort);
-// Records a passed test of `tested`, unless the slot holds another model by
-// now.
-void MarkTested(PrefService& prefs, ModelSlot slot, const ModelChoice& tested);
 
 // The format of the provider's language and agent models, or nullopt when it
 // serves only decision models.

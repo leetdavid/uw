@@ -36,7 +36,6 @@ void RegisterAiConnectionProfilePrefs(
 
 bool OrganizationReady(const PrefService* prefs) {
   return prefs && prefs->GetBoolean(kOrganizationEnabledPref) &&
-         !UntestedModel(prefs) &&
          (IsComplete(ReadDecisionModelConfig(prefs)) ||
           IsComplete(ReadAiConnectionConfig(prefs)));
 }

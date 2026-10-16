@@ -173,7 +173,7 @@ void RegisterModelPrefs(PrefRegistrySimple* registry) {
   RegisterProviderPrefs(registry);
 }
 
-void MoveConnectionsToProviders(PrefService* prefs, bool tested) {
+void MoveConnectionsToProviders(PrefService* prefs) {
   std::vector<OldConnection> old = OldConnections(*prefs);
   if (old.empty()) {
     return;
@@ -214,9 +214,6 @@ void MoveConnectionsToProviders(PrefService* prefs, bool tested) {
   }
   for (size_t i = 0; i < old.size(); ++i) {
     SetChoice(*prefs, old[i].slot, ids[i], old[i].model);
-    if (tested && old[i].slot != ModelSlot::kAgent) {
-      MarkTested(*prefs, old[i].slot, *ReadChoice(*prefs, old[i].slot));
-    }
   }
   for (const char* pref :
        {kOrganizationModePref, kOrganizationEndpointPref,
@@ -320,17 +317,6 @@ std::string ProviderMessage(const std::string& body) {
   return message ? std::string(
                        base::TruncateUTF8ToByteSize(*message, kMaxMessageBytes))
                  : std::string();
-}
-
-std::optional<ModelSlot> UntestedModel(const PrefService* prefs) {
-  for (ModelSlot slot : {ModelSlot::kLanguage, ModelSlot::kDecision}) {
-    const std::optional<ModelChoice> choice =
-        prefs ? ReadChoice(*prefs, slot) : std::nullopt;
-    if (choice && !choice->tested) {
-      return slot;
-    }
-  }
-  return std::nullopt;
 }
 
 }  // namespace uw

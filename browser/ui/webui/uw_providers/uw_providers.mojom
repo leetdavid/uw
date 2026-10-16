@@ -47,8 +47,6 @@ struct Provider {
 struct ModelChoice {
   string provider_id;
   string model;
-  // Whether the model passed a test since it was picked.
-  bool tested;
   // Empty for the provider's default.
   string effort;
 };

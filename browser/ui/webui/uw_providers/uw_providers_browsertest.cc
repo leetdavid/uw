@@ -240,7 +240,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
-                       ALanguageModelWaitsForItsTestUntilItAnswers) {
+                       ALanguageModelPassesItsTestWhenItAnswers) {
   const std::string id = AddTestServer(ProviderFormat::kChatCompletions);
   models_.Answer("/v1/models", kTwoModels);
   models_.Answer("/v1/chat/completions", ChatAnswer("Hello"));
@@ -251,15 +251,12 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   ASSERT_TRUE(choice);
   EXPECT_EQ(choice->provider_id, id);
   EXPECT_EQ(choice->model, "chat-b");
-  EXPECT_FALSE(choice->tested);
+  // Picking sends nothing; only Test does.
+  EXPECT_THAT(RequestsTo("/v1/chat/completions"), IsEmpty());
 
   EXPECT_THAT(Test("Language model"), HasSubstr("chat-b answered in"));
-  EXPECT_TRUE(ReadChoice(prefs(), ModelSlot::kLanguage)->tested);
   EXPECT_THAT(RequestsTo("/v1/chat/completions"),
               ElementsAre("POST Bearer sk-test"));
-
-  Pick("Language model", "chat-a");
-  EXPECT_FALSE(ReadChoice(prefs(), ModelSlot::kLanguage)->tested);
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
@@ -272,7 +269,6 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   Pick("Language model", "chat-a");
   EXPECT_THAT(Test("Language model"),
               HasSubstr("chat-a answered, but not with text."));
-  EXPECT_FALSE(ReadChoice(prefs(), ModelSlot::kLanguage)->tested);
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
@@ -293,7 +289,6 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                       "return true;"));
   Pick("Decision model", "chat-a");
   EXPECT_THAT(Test("Decision model"), HasSubstr("chat-a answered in"));
-  EXPECT_TRUE(ReadChoice(prefs(), ModelSlot::kDecision)->tested);
   EXPECT_THAT(RequestsTo("/v1/decisions"), ElementsAre("POST Bearer sk-test"));
 }
 
@@ -330,14 +325,13 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, ANewKeyListsTheModelsAgain) {
                       "return true;"));
 
   models_.Answer("/v1/models", kTwoModels);
-  EXPECT_EQ(true,
-            Run("withText('button', 'Add a key').click();"
-                "await until(() => field('New key'));"
-                "type('New key', 'sk-new');"
-                "await until(() => !withText('button', 'Save').disabled);"
-                "withText('button', 'Save').click();"
-                "await until(() => modelRow('chat-b'));"
-                "return true;"));
+  EXPECT_EQ(true, Run("withText('button', 'Add a key').click();"
+                      "await until(() => field('New key'));"
+                      "type('New key', 'sk-new');"
+                      "await until(() => !withText('button', 'Save').disabled);"
+                      "withText('button', 'Save').click();"
+                      "await until(() => modelRow('chat-b'));"
+                      "return true;"));
   EXPECT_THAT(RequestsTo("/v1/models"),
               ElementsAre("GET ", "GET Bearer sk-new"));
 }
