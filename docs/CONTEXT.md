@@ -12,8 +12,12 @@ The regular tabs of one browsing task in one window, shown as a folder in the si
 _Avoid_: Group, tab group, task group, workspace, space.
 
 **Workspace**:
-One browser profile, as in Arc's profiles: its own logins, cookies, history, extensions, theme, and pinned tabs. Workspaces separate areas such as work and personal; tasks organize the tabs inside one.
+A named area of browsing that the user swipes between, as Arc's spaces are, such as work and personal. Each belongs to one profile; tasks organize the tabs inside it.
 _Avoid_: Space.
+
+**Profile**:
+The logins, cookies, history, and extensions that one or more workspaces share, as in Arc's profiles.
+_Avoid_: Account, user.
 
 **Theme**:
 The colors uw draws its window in: the tint behind the sidebar and the page card. A profile has one theme, shared by all its windows.
