@@ -54,15 +54,15 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 | Key | What it does |
 | --- | --- |
 | Return | Runs the selected row. |
-| Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message and the tab that was selected attached, so the agent reads that page first. The chat opens in front, below that tab's branch. |
-| Option+Return | Runs the text as a shell command in this task's terminal and brings that terminal to the front. |
-| Tab | Chromium's site search, as in the address bar. |
+| Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message. The tab that was selected is handed to the agent as its tab 1: the agent is told it is the page the user asked from, reads it first, and can act in it with the usual approvals. The tab stays where it is. The chat opens in front, where a blank new tab would. Changed on 2026-10-16: before, the tab was only attached. |
+| Option+Return | Runs the text as a shell command in a new terminal tab, which opens in front where a blank new tab would. Changed on 2026-10-16: before, in this task's terminal. |
+| Tab | Turns the completion after the caret into typed text, as in Chromium's address bar. With no completion, on a site search keyword such as `gh`, it starts that site search. |
 
 - Cmd+K on the text offers "Add to <chat>" for a chat that is already open, "Ask without this tab", and "Ask in the background", which opens the chat without selecting it.
-- This task's terminal is the one Ctrl+\` goes to, per the [terminal key](keyboard-and-mouse.md#terminal-key). With none, or with a [busy terminal](../CONTEXT.md#language), a new terminal opens where a blank new tab would and runs the text.
 - Cmd+K on the text offers "Run in a new terminal" and "Run and stay here", which runs it without leaving the current tab.
 - A `>` at the start of the field marks a shell command, and Return runs it as Option+Return does. Cmd+Shift+P puts it there. Typing `>` in an empty field does the same, and Backspace in an empty field removes it.
 - Ctrl+Return keeps Chromium's meaning: it adds `www.` and `.com` to the typed word and opens it.
+- An address is completed inline after the caret, as in Chromium's address bar, and Return opens the completed address. Chromium completes an address with a path once it was typed twice, and a bare host once. Added on 2026-10-16.
 
 ### Models
 
@@ -101,21 +101,22 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
 - What uw learns from picks, aliases, recorded keys, and the default currency are profile prefs. A history deletion clears what uw learned.
-- Cmd+Return opens `uw://chat` the way New chat does, with the text and the attached tab.
+- Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
+- Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed. The chat's agent adopts the selected tab as tab 1, as it adopts its own tabs after a restart.
 - Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
 - The math library is pinned to an exact version in `package.json`, like ghostty-web. Proposal: mathjs, which has units and lets uw add each currency as a unit. The rates are fetched by the browser process.
 - Translation is one chat request to the language model, through the connection automatic organization already uses.
 
 ## Stages
 
-Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-15.
+Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-16: T99, T82, and T81 moved ahead of T61 at the user's request, and T82 no longer waits for T54.
 
 1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler.
 2. T98: the command bar opens what is picked, in the design's look, from Chromium's instant results. Added on 2026-10-16 so Cmd+T opens pages before T61.
-3. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
-4. T81: Cmd+Return sends the text to a new chat.
-5. T54, from the [keyboard and mouse plan](keyboard-and-mouse.md#stages): Ctrl+\` goes to the task's terminal, which T82 needs.
-6. T82: Option+Return and Cmd+Shift+P run the text in a terminal.
+3. T99: addresses complete inline, Tab takes the completion, and Return opens the completed address. Added on 2026-10-16.
+4. T82: Option+Return, `>`, and Cmd+Shift+P run the text in a new terminal.
+5. T81: Cmd+Return sends the text to a new chat, with the selected tab handed to the agent.
+6. T61: the command bar on Cmd+T, with its sources, one ranked list, and the most-used items before typing.
 7. T66: math, units, currency, the default currency setting, and translation.
 8. T62: Cmd+L and the address click open it.
 9. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
@@ -135,8 +136,8 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 9. Cmd+Shift+A shows open and recently closed tabs only.
 10. Cmd+T, Cmd+L, Cmd+Shift+A, and Cmd+Shift+P work with a terminal tab selected.
 11. A test model server receives no request while text is typed, and one request when a translation row is picked or Cmd+Return is pressed.
-12. Cmd+Return opens a chat in front, below the selected tab's branch, with the text as its first message and the tab attached.
-13. Option+Return runs the text in the task's terminal and selects it. With that terminal busy, a new terminal runs it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
+12. Cmd+Return opens a chat in front, with the text as its first message and the selected tab as the agent's tab 1, which the agent can read.
+13. Option+Return runs the text in a new terminal and selects it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
 14. An alias runs its command. A recorded key without Cmd is refused, a key in use is refused with its owner named, and a recorded key runs its command after a restart.
 15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 N/W, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 

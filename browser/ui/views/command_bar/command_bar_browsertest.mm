@@ -9,9 +9,15 @@
 #include <string>
 #include <string_view>
 
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
+#include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -19,6 +25,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/search_test_utils.h"
@@ -31,11 +38,14 @@
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
+#include "ui/base/page_transition_types.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_tab.h"
 
 namespace uw {
 namespace {
@@ -81,13 +91,49 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // A key as the field's own key handling sees it.
-  void PressInField(std::string_view key) {
+  // `with` names a modifier, such as "metaKey", held with it.
+  void PressInField(std::string_view key, std::string_view with = "") {
     ASSERT_TRUE(content::ExecJs(
         bar()->page(),
         content::JsReplace("document.querySelector('#field').dispatchEvent("
-                           "new KeyboardEvent('keydown', {key: $1}))",
-                           key)));
+                           "new KeyboardEvent('keydown', {key: $1, [$2]: "
+                           "true}))",
+                           key, with.empty() ? "none" : with)));
   }
+
+  std::string FieldAndSelection() {
+    return content::EvalJs(bar()->page(),
+                           "(f => `${f.value}|${f.selectionStart}-"
+                           "${f.selectionEnd}`)("
+                           "document.querySelector('#field'))")
+        .ExtractString();
+  }
+
+  // Visits `url` twice as if its address were typed: Chromium completes an
+  // address with a path once it was typed twice.
+  void VisitTyped(const GURL& url) {
+    for (int i = 0; i < 2; ++i) {
+      NavigateParams params(browser(), url, ui::PAGE_TRANSITION_TYPED);
+      ui_test_utils::NavigateToURL(&params);
+    }
+  }
+
+  // A file a test command writes, and its text once it is there.
+  base::FilePath Marker() {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    if (!folder_.IsValid()) {
+      EXPECT_TRUE(folder_.CreateUniqueTempDir());
+    }
+    return folder_.GetPath().AppendASCII("ran");
+  }
+  std::string MarkerText() {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    std::string text;
+    base::ReadFileToString(Marker(), &text);
+    return text;
+  }
+
+  base::ScopedTempDir folder_;
 
   // Each row's kind label, in order.
   std::string Kinds() {
@@ -344,6 +390,130 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
   SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
                            bar()->page()->GetNativeView()),
                        "command-bar-panel");
+
+  Type(">");
+  Type("ls -la ~/dev");
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(
+      views::Widget::GetTopLevelWidgetForNativeView(
+          bar()->page()->GetNativeView()),
+      "command-bar-shell");
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdReturnAsksInANewChat) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("what is on this page");
+  PressInField("Enter", "metaKey");
+
+  TabStripModel* tabs = browser()->tab_strip_model();
+  EXPECT_TRUE(Eventually(
+      [&] {
+        return tabs->GetActiveWebContents()->GetVisibleURL().host() ==
+                   kChatHost &&
+               tabs->GetActiveWebContents()->GetTitle() ==
+                   u"what is on this page";
+      },
+      base::Seconds(5)));
+  EXPECT_FALSE(bar()->IsShowing());
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
+                       OptionReturnRunsTheTextInANewTerminal) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  const int count = browser()->tab_strip_model()->count();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("printf ran > '" + Marker().value() + "'");
+  PressInField("Enter", "altKey");
+
+  EXPECT_TRUE(
+      Eventually([&] { return MarkerText() == "ran"; }, base::Seconds(10)));
+  EXPECT_EQ(count + 1, browser()->tab_strip_model()->count());
+  EXPECT_TRUE(IsTerminalUrl(
+      browser()->tab_strip_model()->GetActiveWebContents()->GetVisibleURL()));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AShellCommandRunsOnReturn) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type(">");
+  EXPECT_EQ(">",
+            content::EvalJs(bar()->page(),
+                            "document.querySelector('#chip').textContent"));
+  Type("printf ran > '" + Marker().value() + "'");
+  EXPECT_EQ(0, Rows());
+  PressInField("Enter");
+
+  EXPECT_TRUE(
+      Eventually([&] { return MarkerText() == "ran"; }, base::Seconds(10)));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
+                       CmdShiftPOpensItForAShellCommand) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_P, NSEventModifierFlagCommand | NSEventModifierFlagShift);
+
+  EXPECT_TRUE(bar()->IsShowing());
+  EXPECT_TRUE(Eventually([&] {
+    return content::EvalJs(bar()->page(),
+                           "(c => c.hidden ? '' : c.textContent)("
+                           "document.querySelector('#chip'))") == ">";
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TabTurnsTheCompletionIntoText) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  VisitTyped(page);
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  // Typed as people type addresses, without the scheme.
+  const std::string start =
+      base::StrCat({page.host(), ":", page.port(), "/titl"});
+  const std::string whole = start + "e2.html";
+  const std::string size = base::NumberToString(whole.size());
+  ASSERT_TRUE(Eventually(
+      [&] {
+        Type(start);
+        Wait(base::Milliseconds(100));
+        return FieldAndSelection() ==
+               whole + "|" + base::NumberToString(start.size()) + "-" + size;
+      },
+      base::Seconds(5)))
+      << FieldAndSelection();
+  PressInField("Tab");
+  EXPECT_EQ(whole + "|" + size + "-" + size, FieldAndSelection());
+}
+
+// Return opens the completed address, even when pressed before the rows for
+// the last letter arrived.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ReturnOpensTheCompletedAddress) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  VisitTyped(page);
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int count = tabs->count();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  const std::string start =
+      base::StrCat({page.host(), ":", page.port(), "/titl"});
+  // History completes the typed visit once it has it in memory.
+  ASSERT_TRUE(Eventually(
+      [&] {
+        Type(start);
+        Wait(base::Milliseconds(100));
+        return FieldAndSelection().starts_with(start + "e2.html|");
+      },
+      base::Seconds(5)));
+  Type(start);
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    return tabs->count() == count + 1 &&
+           tabs->GetActiveWebContents()->GetVisibleURL() == page;
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TypingListsSuggestions) {

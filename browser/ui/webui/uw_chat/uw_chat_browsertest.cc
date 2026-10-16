@@ -1224,6 +1224,35 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatSwitchesModelAndEffort) {
 
 // A chat whose provider was removed says so, and sends nothing until the
 // user picks another model.
+// Cmd+Return in the command bar opens a chat that asks the typed text, with
+// the tab it was asked from handed to the agent as tab 1.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       AChatAskedFromTheCommandBarHasItsTab) {
+  UseAgentModel();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(Form())));
+  tabs::TabInterface* asked_from = tabs()->GetActiveTab();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Answer("It books a tour.")});
+
+  AskInNewChat(browser(), asked_from, "What is this page for?");
+  content::WebContents* chat = tabs()->GetActiveWebContents();
+  WaitForChat(chat);
+
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 2; }));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("I asked this from tab 1"));
+  EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr(Form()));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("What is this page for?"));
+  EXPECT_THAT(model_.Requests()[1], ::testing::HasSubstr("Your name"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return chat->GetTitle() == u"What is this page for?"; }));
+  EXPECT_EQ(asked_from->GetContents()->GetLastCommittedURL(), GURL(Form()));
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatWaitsWhenItsProviderIsGone) {
   UseAgentModel();
   model_.Script({ScriptedModel::Answer("First.")});

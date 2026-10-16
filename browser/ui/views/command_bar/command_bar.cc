@@ -37,7 +37,9 @@
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/webview/webview.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
 namespace uw {
@@ -58,15 +60,16 @@ constexpr base::TimeDelta kLongestHold = base::Seconds(1);
 // the browser also refuses keys for it, so a refused key stays held and is
 // tried again a frame later.
 class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
-                         public content::RenderWidgetHost::InputEventObserver {
+                         public content::RenderWidgetHost::InputEventObserver,
+                         public CommandBarActions {
  public:
-  using Opener = base::RepeatingCallback<void(const content::OpenURLParams&)>;
-
-  Page(Profile* profile, Opener open)
+  Page(Profile* profile, CommandBar* bar)
       : WebUIContentsWrapperT(GURL(kCommandBarUrl),
                               profile,
                               IDS_UW_COMMAND_BAR),
-        open_(std::move(open)) {}
+        bar_(bar) {
+    SetCommandBarActions(web_contents(), this);
+  }
 
   void HoldKeys() {
     held_.clear();
@@ -101,8 +104,14 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
       const content::OpenURLParams& params,
       base::OnceCallback<void(content::NavigationHandle&)>
           navigation_handle_callback) override {
-    open_.Run(params);
+    bar_->OpenPicked(params);
     return nullptr;
+  }
+
+  // CommandBarActions:
+  void AskUw(const std::string& text) override { bar_->AskUw(text); }
+  void RunInTerminal(const std::string& text) override {
+    bar_->RunInTerminal(text);
   }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
@@ -161,7 +170,7 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
     holding_ = false;
   }
 
-  Opener open_;
+  const raw_ptr<CommandBar> bar_;
   bool holding_ = false;
   bool sending_ = false;
   bool refused_ = false;
@@ -200,6 +209,16 @@ bool CommandBar::Open(BrowserWindowInterface* window) {
   return true;
 }
 
+bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
+  CommandBar* bar = From(window);
+  if (!bar || !bar->contents_) {
+    return false;
+  }
+  StartShellCommand(bar->page());
+  bar->Show();
+  return true;
+}
+
 bool CommandBar::IsShowing() const {
   return bubble_ && bubble_->GetWidget() && bubble_->GetWidget()->IsVisible();
 }
@@ -212,9 +231,7 @@ void CommandBar::OnSettingChanged() {
   const bool on =
       window_->GetProfile()->GetPrefs()->GetBoolean(kCommandBarEnabledPref);
   if (on && !contents_) {
-    contents_ = std::make_unique<Page>(
-        window_->GetProfile(),
-        base::BindRepeating(&CommandBar::OpenPicked, base::Unretained(this)));
+    contents_ = std::make_unique<Page>(window_->GetProfile(), this);
     webui::SetBrowserWindowInterface(contents_->web_contents(), window_);
   } else if (!on && contents_) {
     if (bubble_) {
@@ -263,6 +280,21 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
                                                         : std::nullopt));
   }
   Navigate(&navigate);
+}
+
+void CommandBar::AskUw(const std::string& text) {
+  tabs::TabInterface* asked_from = window_->GetTabStripModel()->GetActiveTab();
+  if (bubble_) {
+    bubble_->CloseUI();
+  }
+  AskInNewChat(window_, asked_from, text);
+}
+
+void CommandBar::RunInTerminal(const std::string& text) {
+  if (bubble_) {
+    bubble_->CloseUI();
+  }
+  OpenTerminalTabRunning(window_, text);
 }
 
 }  // namespace uw

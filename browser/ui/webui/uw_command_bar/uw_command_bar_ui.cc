@@ -3,8 +3,11 @@
 
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
+#include <memory>
 #include <utility>
 
+#include "base/memory/raw_ptr.h"
+#include "base/supports_user_data.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/grit/uw_command_bar_resources.h"
@@ -18,6 +21,37 @@
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_handler.h"
 
 namespace uw {
+namespace {
+
+const void* const kActionsKey = &kActionsKey;
+
+struct ActionsData : base::SupportsUserData::Data {
+  raw_ptr<CommandBarActions> actions;
+};
+
+}  // namespace
+
+CommandBarActions* GetCommandBarActions(content::WebContents* page) {
+  auto* data = static_cast<ActionsData*>(page->GetUserData(kActionsKey));
+  return data ? data->actions.get() : nullptr;
+}
+
+void SetCommandBarActions(content::WebContents* page,
+                          CommandBarActions* actions) {
+  auto data = std::make_unique<ActionsData>();
+  data->actions = actions;
+  page->SetUserData(kActionsKey, std::move(data));
+}
+
+void StartShellCommand(content::WebContents* page) {
+  content::WebUI* web_ui = page->GetWebUI();
+  if (UwCommandBarUI* ui =
+          web_ui ? web_ui->GetController()->GetAs<UwCommandBarUI>() : nullptr) {
+    if (ui->handler_) {
+      ui->handler_->StartShellCommand();
+    }
+  }
+}
 
 bool UwCommandBarUIConfig::ShouldAutoResizeHost() {
   return true;

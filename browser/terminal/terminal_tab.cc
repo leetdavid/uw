@@ -25,19 +25,48 @@ namespace uw {
 namespace {
 
 const void* const kFolderKey = &kFolderKey;
+const void* const kStartCommandKey = &kStartCommandKey;
 
 struct FolderData : base::SupportsUserData::Data {
   base::FilePath folder;
 };
 
+struct StartCommandData : base::SupportsUserData::Data {
+  std::string command;
+};
+
+GURL TerminalUrl() {
+  return GURL(base::StrCat({content::kChromeUIScheme,
+                            url::kStandardSchemeSeparator, kTerminalHost}));
+}
+
 }  // namespace
 
 void OpenTerminalTab(BrowserWindowInterface* window) {
-  chrome::AddTabAt(
-      window,
-      GURL(base::StrCat({content::kChromeUIScheme,
-                         url::kStandardSchemeSeparator, kTerminalHost})),
-      -1, true);
+  chrome::AddTabAt(window, TerminalUrl(), -1, true);
+}
+
+void OpenTerminalTabRunning(BrowserWindowInterface* window,
+                            const std::string& command) {
+  content::WebContents* contents =
+      chrome::AddAndReturnTabAt(window, TerminalUrl(), -1, true);
+  if (!contents) {
+    return;
+  }
+  auto data = std::make_unique<StartCommandData>();
+  data->command = command;
+  contents->SetUserData(kStartCommandKey, std::move(data));
+}
+
+std::string TakeStartCommand(content::WebContents* contents) {
+  auto* data =
+      static_cast<StartCommandData*>(contents->GetUserData(kStartCommandKey));
+  if (!data) {
+    return std::string();
+  }
+  std::string command = std::move(data->command);
+  contents->RemoveUserData(kStartCommandKey);
+  return command;
 }
 
 bool IsTerminalUrl(const GURL& url) {

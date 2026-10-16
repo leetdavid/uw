@@ -243,6 +243,7 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
     id_ = ChatFile::NewChatId();
   }
   OpenChats().insert(id_);
+  start_ = TakeChatStart(contents_);
   Profile* profile =
       Profile::FromBrowserContext(contents_->GetBrowserContext());
   if (ChatIndex* index = ChatIndex::For(profile)) {
@@ -285,7 +286,8 @@ void UwChatHandler::Send(const std::string& text) {
     title_ = text;
   }
   Log(base::DictValue().Set("kind", "user").Set("text", text));
-  agent_->Send(text);
+  agent_->Send(handed_over_ + text);
+  handed_over_.clear();
   Save();
 }
 
@@ -578,6 +580,9 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
   OnChatsChanged();
+  if (start_) {
+    page_->OnAsk(start_->text);
+  }
 }
 
 bool UwChatHandler::Start() {
@@ -616,6 +621,18 @@ bool UwChatHandler::Start() {
     }
   }
   saved_tabs_.clear();
+  // The tab the user asked from, from the command bar, is the agent's tab 1.
+  if (start_) {
+    if (tabs::TabInterface* asked_from = start_->tab.Get()) {
+      agent_->tools().Adopt(1, *asked_from);
+      content::WebContents* page = asked_from->GetContents();
+      handed_over_ = base::StrCat({"I asked this from tab 1, \"",
+                                   base::UTF16ToUTF8(page->GetTitle()),
+                                   "\" at ", page->GetLastCommittedURL().spec(),
+                                   ". Read tab 1 first.\n\n"});
+    }
+    start_.reset();
+  }
   return true;
 }
 

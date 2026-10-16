@@ -103,6 +103,35 @@
         color: var(--muted);
       }
 
+      #chip {
+        align-items: center;
+        background: var(--field);
+        border-radius: 8px;
+        display: flex;
+        flex: none;
+        font-size: 13px;
+        font-weight: 500;
+        height: 26px;
+        padding: 0 10px;
+      }
+
+      #chip[hidden] {
+        display: none;
+      }
+
+      #chip.shell {
+        background: var(--text);
+        color: var(--card);
+        font: 700 15px ui-monospace, 'SF Mono', Menlo, monospace;
+        justify-content: center;
+        padding: 0;
+        width: 26px;
+      }
+
+      #chip.shell + #field {
+        font: 17px ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+
       #results {
         list-style: none;
         padding: 6px 8px 8px;
@@ -196,6 +225,11 @@
         opacity: 0.6;
       }
 
+      #keys.shell .rows,
+      #keys:not(.shell) .run {
+        display: none;
+      }
+
       #keys .end {
         margin-left: auto;
       }
@@ -218,23 +252,25 @@
     </svg>
     <div id="query">
       <svg><use href="#search"/></svg>
+      <span id="chip" hidden></span>
       <input id="field" spellcheck="false" autocomplete="off"
           placeholder="Search tabs, tasks, commands, or the web">
       <kbd>esc</kbd>
     </div>
     <ul id="results" role="listbox"></ul>
     <div id="keys">
-      <span class="typed">
+      <span class="typed rows">
         <kbd><svg><use href="#enter"/></svg></kbd>
         <span id="action">Open</span>
       </span>
-      <span class="typed later"
-          title="Comes with T81: Cmd+Return sends the text to a new chat">
-        <kbd>Cmd <svg><use href="#enter"/></svg></kbd> Ask uw (T81)
+      <span class="typed rows">
+        <kbd>Cmd <svg><use href="#enter"/></svg></kbd> Ask uw
       </span>
-      <span class="typed later"
-          title="Comes with T82: Option+Return runs the text in this task's terminal">
-        <kbd>Option <svg><use href="#enter"/></svg></kbd> Run in terminal (T82)
+      <span class="typed rows">
+        <kbd>Option <svg><use href="#enter"/></svg></kbd> Run in terminal
+      </span>
+      <span class="run">
+        <kbd><svg><use href="#enter"/></svg></kbd> Run in terminal
       </span>
       <span class="end later"
           title="Comes with T63: Cmd+K shows what you can do with a row">

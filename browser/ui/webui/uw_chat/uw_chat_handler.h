@@ -24,6 +24,7 @@
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
@@ -170,6 +171,10 @@ class UwChatHandler : public mojom::ChatHandler,
   // The message that could not be sent because the chat had no agent, for
   // Try again.
   std::optional<std::string> unsent_;
+  // What the command bar opened this chat with, until it is asked.
+  std::optional<ChatStart> start_;
+  // Tells the agent about the tab handed to it, before the first message.
+  std::string handed_over_;
   // The skill the agent asked to save, and its answer.
   base::DictValue proposed_skill_;
   base::OnceCallback<void(base::DictValue)> skill_answer_;

@@ -4,6 +4,8 @@
 #ifndef UW_BROWSER_TERMINAL_TERMINAL_TAB_H_
 #define UW_BROWSER_TERMINAL_TERMINAL_TAB_H_
 
+#include <string>
+
 class BrowserWindowInterface;
 class GURL;
 
@@ -27,6 +29,15 @@ inline constexpr char kTerminalHost[] = "terminal";
 
 // Opens a terminal tab where a blank new tab would open.
 void OpenTerminalTab(BrowserWindowInterface* window);
+
+// Opens a terminal tab the same way, and runs `command` in its shell once the
+// shell starts.
+void OpenTerminalTabRunning(BrowserWindowInterface* window,
+                            const std::string& command);
+
+// The command a terminal tab opened by OpenTerminalTabRunning runs, taken
+// once. Empty for any other tab.
+std::string TakeStartCommand(content::WebContents* contents);
 
 bool IsTerminalUrl(const GURL& url);
 

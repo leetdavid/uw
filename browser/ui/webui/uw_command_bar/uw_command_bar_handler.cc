@@ -5,10 +5,14 @@
 
 #include <utility>
 
+#include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/omnibox/browser/actions/omnibox_action.h"
+#include "components/omnibox/browser/autocomplete_controller.h"
 #include "components/omnibox/browser/autocomplete_match.h"
+#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
 namespace uw {
 namespace {
@@ -46,6 +50,10 @@ std::string Kind(const AutocompleteMatch& match,
 
 UwCommandBarHandler::~UwCommandBarHandler() = default;
 
+void UwCommandBarHandler::StartShellCommand() {
+  page()->SetInputText(">");
+}
+
 void UwCommandBarHandler::OpenAutocompleteMatch(
     uint8_t line,
     const GURL& url,
@@ -53,6 +61,20 @@ void UwCommandBarHandler::OpenAutocompleteMatch(
     uint8_t mouse_button,
     searchbox::mojom::ActionModifiersPtr modifiers,
     bool via_keyboard) {
+  if (modifiers->meta_key || modifiers->alt_key) {
+    const std::string text = std::string(base::TrimWhitespaceASCII(
+        base::UTF16ToUTF8(autocomplete_controller()->input().text()),
+        base::TRIM_ALL));
+    CommandBarActions* actions = GetCommandBarActions(web_contents_);
+    if (actions && !text.empty()) {
+      if (modifiers->meta_key) {
+        actions->AskUw(text);
+      } else {
+        actions->RunInTerminal(text);
+      }
+    }
+    return;
+  }
   if (const AutocompleteMatch* match = GetMatchWithUrl(line, url)) {
     if (const std::optional<uint8_t> action = TabSwitchAction(*match)) {
       ExecuteAction(line, *action, url, base::TimeTicks::Now(), mouse_button,

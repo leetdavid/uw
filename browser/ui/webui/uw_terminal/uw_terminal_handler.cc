@@ -108,6 +108,11 @@ void UwTerminalHandler::Start(int32_t columns, int32_t rows) {
   }
   session_ = std::make_unique<ShellSession>(
       base::BindOnce(&UserShell, Clamp(columns), Clamp(rows)), this);
+  // A command from the command bar, run as if typed and entered.
+  if (const std::string command = TakeStartCommand(contents_);
+      !command.empty()) {
+    Write(command + "\r");
+  }
 }
 
 void UwTerminalHandler::Write(const std::string& text) {

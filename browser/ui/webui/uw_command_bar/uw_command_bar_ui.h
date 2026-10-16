@@ -5,6 +5,7 @@
 #define UW_BROWSER_UI_WEBUI_UW_COMMAND_BAR_UW_COMMAND_BAR_UI_H_
 
 #include <memory>
+#include <string>
 #include <string_view>
 
 #include "chrome/browser/ui/webui/top_chrome/top_chrome_web_ui_controller.h"
@@ -15,12 +16,38 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 
+namespace content {
+class WebContents;
+}
+
 namespace uw {
 
 class UwCommandBarHandler;
 
 inline constexpr char kCommandBarHost[] = "uw-command-bar.top-chrome";
 inline constexpr char kCommandBarUrl[] = "chrome://uw-command-bar.top-chrome/";
+
+// What the command bar's page asks its window to do with the typed text.
+class CommandBarActions {
+ public:
+  // Cmd+Return: asks uw in a new chat.
+  virtual void AskUw(const std::string& text) = 0;
+  // Option+Return, or Return after a ">": runs it in a new terminal.
+  virtual void RunInTerminal(const std::string& text) = 0;
+
+ protected:
+  virtual ~CommandBarActions() = default;
+};
+
+// Gives the command bar's page in `page` its window's actions.
+void SetCommandBarActions(content::WebContents* page,
+                          CommandBarActions* actions);
+// The actions of the command bar's page in `page`, or null.
+CommandBarActions* GetCommandBarActions(content::WebContents* page);
+
+// Readies the command bar's page in `page` for a shell command, as a typed
+// ">" does.
+void StartShellCommand(content::WebContents* page);
 
 class UwCommandBarUI;
 
@@ -51,6 +78,8 @@ class UwCommandBarUI : public TopChromeWebUIController,
       mojo::PendingReceiver<searchbox::mojom::PageHandlerFactory> receiver);
 
  private:
+  friend void StartShellCommand(content::WebContents* page);
+
   // searchbox::mojom::PageHandlerFactory:
   void CreatePageHandler(
       mojo::PendingRemote<searchbox::mojom::Page> page,

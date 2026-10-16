@@ -165,6 +165,9 @@ interface ChatPage {
   // The agent's tabs, the one it acted in last, and whether the chat sits
   // beside that tab in split view, after every change.
   OnTabs(array<AgentTab> tabs, int32 current, bool side_by_side);
+  // The chat was opened to ask `text`, from the command bar. The page sends
+  // it as if typed.
+  OnAsk(string text);
   // The agent asks to save a new skill. AnswerSkill gives the user's answer.
   OnSkillProposal(SkillProposal proposal);
   // A step waits for the user. AnswerApproval gives the answer. Only the

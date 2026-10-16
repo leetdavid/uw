@@ -947,6 +947,8 @@ function TabStrip({
 
 function Chat() {
   const [opened, setOpened] = useState(false);
+  // Text the command bar opened this chat to ask, until it is sent.
+  const [asked, setAsked] = useState<string | null>(null);
   const [chatId, setChatId] = useState("");
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [agentTabs, setAgentTabs] = useState<AgentTab[]>([]);
@@ -1004,6 +1006,7 @@ function Chat() {
         setModel(picked),
       ),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
+      chatPage.onAsk.addListener((text: string) => setAsked(text)),
       chatPage.onTabs.addListener(
         (tabs: AgentTab[], current: number, split: boolean) => {
           setAgentTabs(tabs);
@@ -1170,6 +1173,14 @@ function Chat() {
     setSince(Date.now());
     chatHandler.send(message);
   };
+
+  // Sends what the command bar asked, as if typed, once the chat is open.
+  useEffect(() => {
+    if (asked && opened) {
+      setAsked(null);
+      send(asked);
+    }
+  }, [asked, opened]);
 
   const resume = () => {
     setLines((before) => [

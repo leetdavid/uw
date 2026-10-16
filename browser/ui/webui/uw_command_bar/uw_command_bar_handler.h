@@ -12,13 +12,17 @@ namespace uw {
 
 // Chromium's searchbox handler, changed for the command bar: it asks for
 // instant results only, opens a picked row in a new tab, switches to a row's
-// open tab, and tells the page which kind of row each one is.
+// open tab, and tells the page which kind of row each one is. Opened with Cmd
+// it asks uw the typed text, and with Option it runs the text in a terminal.
 class UwCommandBarHandler : public RealboxHandler {
  public:
   using RealboxHandler::RealboxHandler;
   UwCommandBarHandler(const UwCommandBarHandler&) = delete;
   UwCommandBarHandler& operator=(const UwCommandBarHandler&) = delete;
   ~UwCommandBarHandler() override;
+
+  // Readies the page for a shell command, as a typed ">" does.
+  void StartShellCommand();
 
   // searchbox::mojom::PageHandler:
   void OpenAutocompleteMatch(uint8_t line,

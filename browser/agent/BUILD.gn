@@ -47,9 +47,11 @@ source_set("chat_tab") {
     "chat_tab.cc",
     "chat_tab.h",
   ]
+  public_deps = [ "//components/tabs:public" ]
   deps = [
     "//base",
     "//chrome/browser/ui/browser_window",
+    "//content/public/browser",
     "//content/public/common",
     "//url",
   ]
