@@ -74,6 +74,7 @@ source_set("browser_tests") {
     "//net:test_support",
     "//testing/gmock",
     "//testing/gtest",
+    "//ui/base",
     "//url",
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",

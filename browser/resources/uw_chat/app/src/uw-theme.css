@@ -73,30 +73,35 @@
   --surface-1: #faf9fd;
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --muted-foreground: #a1a1a1;
-  --accent: #262626;
-  --border: rgb(255 255 255 / 0.09);
-  --primary: #ededed;
-  --primary-foreground: #0a0a0a;
-  --focus-ring: #9db0ff;
-  --destructive: #f28b82;
-  --info: #9db0ff;
-  --success: #81c995;
-  --warning: #fcad70;
-  --hover: rgb(255 255 255 / 0.06);
-  --active: rgb(255 255 255 / 0.1);
-  --selected: #1a1a1a;
-  --surface-1: #0a0a0a;
-  --surface-2: #111111;
-  --surface-3: #171717;
-  --surface-4: #1a1a1a;
-  --surface-5: #1f1f1f;
-  --surface-6: #262626;
-  --surface-7: #2e2e2e;
-  --surface-8: #333333;
+/* The system's dark mode, not the `.dark` class: the page's script adds that
+   class only once its bundle has run, and a new chat would show a white
+   frame until then. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted-foreground: #a1a1a1;
+    --accent: #262626;
+    --border: rgb(255 255 255 / 0.09);
+    --primary: #ededed;
+    --primary-foreground: #0a0a0a;
+    --focus-ring: #9db0ff;
+    --destructive: #f28b82;
+    --info: #9db0ff;
+    --success: #81c995;
+    --warning: #fcad70;
+    --hover: rgb(255 255 255 / 0.06);
+    --active: rgb(255 255 255 / 0.1);
+    --selected: #1a1a1a;
+    --surface-1: #0a0a0a;
+    --surface-2: #111111;
+    --surface-3: #171717;
+    --surface-4: #1a1a1a;
+    --surface-5: #1f1f1f;
+    --surface-6: #262626;
+    --surface-7: #2e2e2e;
+    --surface-8: #333333;
+  }
 }
 
 html,

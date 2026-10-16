@@ -41,6 +41,7 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "ui/base/ui_base_switches.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -1248,6 +1249,27 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatWaitsWhenItsProviderIsGone) {
   Pick(chat, "test-agent", /*effort=*/false);
   EXPECT_EQ(Until(chat, "!document.getElementById('model-gone')"), true);
   EXPECT_EQ(Ask(chat, "Again"), "Second.");
+}
+
+// A chat in dark mode is dark from its first frame: its colors follow the
+// system's dark mode, not the class the page's script adds once its bundle
+// has run.
+class UwChatDarkModeBrowserTest : public UwChatBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    UwChatBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(switches::kForceDarkMode);
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(UwChatDarkModeBrowserTest,
+                       TheChatIsDarkBeforeItsScriptMarksIt) {
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(content::EvalJs(
+                chat,
+                "document.documentElement.classList.remove('dark');"
+                "getComputedStyle(document.body).backgroundColor"),
+            "rgb(10, 10, 10)");
 }
 
 }  // namespace
