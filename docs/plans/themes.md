@@ -116,10 +116,11 @@ Agreed:
 - The change is a smooth fade, on a tab switch and when a page changes its color.
 - Always on. No setting.
 
-Proposed by uw, for the design to settle:
+Proposed by uw and drawn for T109 on the canvas's "Themes" page, as "Page colors: a red page" and "Page colors: every state". The numbers are in the `uw-themes` guide.
 
-- The fade takes about 200 ms. Icons and text switch to their new color halfway through.
-- Icons and text are near-black or white, whichever reads better on the page color, as on the theme. The address field is the page color moved a little toward the text color.
+- The fade takes 200 ms. Icons and text switch to their new color halfway through.
+- Icons and text are near-black or white, whichever reads better on the page color, as on the theme. The address field and the line under the bars are the text color at a low strength over the page color.
+- A page whose color is today's toolbar color gets today's toolbar exactly, so the terminal does not change.
 - In a split view, the toolbar takes the color of the page that has focus. Private windows follow the same rules.
 
 Stages:
