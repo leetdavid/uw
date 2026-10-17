@@ -79,6 +79,7 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 Widened on 2026-10-15. Before, unit conversions were a non-goal.
 
 - Math, units, and currencies are worked out on the Mac and shown as the first row. Return copies the result.
+- The answer shows when the text has a number, is not only a number, and mathjs reads all of it apart from an unfinished end: `5 * pi` answers, and `pi`, `cup`, and `2024` show nothing. A no-answer card shows only when the text also has an operator or "to", "in", or "as", and a unit mathjs knows: `1/2 cup flour` says flour is not a unit. Other text gets no card, so `covid-19` and `iphone 15 pro` stay searches. Agreed on 2026-10-17.
 - Units and currencies mix in one sum: `10 HKD + 10 EUR to USD`, or `20 kg * 10 m/s/s / 5W`, which shows 40 s/m.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
 - `min` is minutes, unless `(` follows it.
