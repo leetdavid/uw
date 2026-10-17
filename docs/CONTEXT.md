@@ -147,7 +147,7 @@ A language-model request for a task name. It is sent only when the placement ans
 The question in a placement request that asks whether a tab is the same piece of work as the tabs that make up its task. A tab that is, and yet fits no task name, shows that its task has outgrown its name. It is asked only about a generated name.
 
 **Generated name**:
-A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced, until the user hands it back with the name lock or asks for a new one with "Suggest a name" in the task's menu.
+A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced, until the user hands it back with the name lock or asks for a new one with "Name Task".
 
 **Name lock**:
 The small lock on the sidebar row of a task whose name the user typed. A click hands the name back to uw, which then treats it as a generated name.
