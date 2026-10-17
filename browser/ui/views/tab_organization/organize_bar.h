@@ -16,6 +16,7 @@
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/layout/flex_layout_view.h"
+#include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -28,6 +29,7 @@ enum class VerticalTabStripCollapseState;
 }
 
 namespace views {
+class BubbleDialogDelegate;
 class MdTextButton;
 class MenuRunner;
 }  // namespace views
@@ -39,7 +41,7 @@ class NewButton;
 class ThemePicker;
 
 // Sits at the foot of the tab sidebar. Holds the Organize button with its
-// menu, and the new button at the right end. Above them, a card names the
+// card, and the new button at the right end. Above them, a card names the
 // task after each automatic move, with an Undo button, and says when a
 // request fails. With "Show organizer activity" on, the card also shows each
 // request and what every answer was. It never takes focus by itself. The
@@ -50,9 +52,8 @@ class OrganizeBar : public views::FlexLayoutView,
   METADATA_HEADER(OrganizeBar, views::FlexLayoutView)
 
  public:
-  // Apart from kNewTask, these are the window commands of the menu bar.
+  // The window commands of the menu bar.
   enum Command {
-    kNewTask = 1,
     kUndo = TabOrganizationController::kUndo,
     kPauseForAnHour = kPauseOrganizationForAnHour,
     kPauseUntilLaunch = kPauseOrganizationUntilLaunch,
@@ -71,6 +72,9 @@ class OrganizeBar : public views::FlexLayoutView,
   bool card_visible() const;
   const ActivityCard* card() const { return card_; }
   NewButton* new_button() { return new_button_; }
+  // The Organize card while it is open.
+  views::Widget* organize_card() { return card_widget_.get(); }
+  void ShowMenu();
   // Reverses the last organization action and puts the card away.
   void Undo();
   // Carries out the suggestion the card shows.
@@ -91,8 +95,8 @@ class OrganizeBar : public views::FlexLayoutView,
 
  private:
   void OnCollapseChanged(tabs::VerticalTabStripCollapseState state);
-  void ShowMenu();
   void OnMenuClosed();
+  void OnCardClosed(views::Widget::ClosedReason reason);
   bool ShowsActivityDetails() const;
   void OnOrganizerEvent(const AutomaticOrganizer::Event& event);
   void HideCard();
@@ -106,6 +110,9 @@ class OrganizeBar : public views::FlexLayoutView,
   bool collapsed_ = false;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  // The Organize card's bubble outlives its widget.
+  std::unique_ptr<views::BubbleDialogDelegate> card_bubble_;
+  std::unique_ptr<views::Widget> card_widget_;
   std::unique_ptr<ThemePicker> theme_picker_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
   base::OneShotTimer card_timer_;

@@ -12,6 +12,7 @@
 #include "ui/color/color_recipe.h"
 #include "ui/color/color_transform.h"
 #include "ui/gfx/color_utils.h"
+#include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/page_color.h"
 #include "uw/components/look/theme.h"
@@ -27,6 +28,28 @@ constexpr SkAlpha kFillOnLightAlpha = 0x75;
 constexpr SkAlpha kFillOnDarkAlpha = 0x14;
 // The active tab on black: white at 12%.
 constexpr float kActiveTabOnBlack = 0.12f;
+
+// uw's menu cards, in light mode and on black. They follow the mode, not the
+// theme.
+void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
+  mixer[kColorMenuCardBackground] = {dark ? kBlackCardField : SK_ColorWHITE};
+  mixer[kColorMenuCardHover] = {dark ? kBlackCardEdge
+                                     : SkColorSetRGB(0xF2, 0xF1, 0xF8)};
+  mixer[kColorMenuCardText] = {dark ? SkColorSetRGB(0xED, 0xED, 0xED)
+                                    : kDarkTextOnTint};
+  mixer[kColorMenuCardIcon] = {dark ? SkColorSetRGB(0xA1, 0xA1, 0xA1)
+                                    : SkColorSetRGB(0x4A, 0x47, 0x60)};
+  mixer[kColorMenuCardMuted] = {dark ? SkColorSetRGB(0x73, 0x73, 0x73)
+                                     : SkColorSetRGB(0x77, 0x74, 0x8C)};
+  mixer[kColorMenuCardDisabled] = {dark ? SkColorSetRGB(0x52, 0x52, 0x52)
+                                        : SkColorSetRGB(0xAD, 0xAA, 0xBB)};
+  mixer[kColorMenuCardLine] = {dark ? kBlackCardEdge
+                                    : SkColorSetARGB(0x17, 0x1E, 0x1B, 0x2E)};
+  mixer[kColorMenuCardChipHover] = {dark ? SkColorSetRGB(0x33, 0x33, 0x33)
+                                         : SkColorSetRGB(0xE4, 0xE2, 0xEF)};
+  mixer[kColorMenuCardAccent] = {dark ? SkColorSetRGB(0x9D, 0xB0, 0xFF)
+                                      : SkColorSetRGB(0x3B, 0x5B, 0xDB)};
+}
 
 // Custom themes bring their own frame and tab colors.
 bool UsesTint(const ui::ColorProviderKey& key) {
@@ -99,6 +122,7 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
   ui::ColorMixer& mixer = provider->AddMixer();
   mixer[kColorPageCardEdge] = {SK_ColorTRANSPARENT};
   AddPageFieldDefaults(mixer);
+  AddMenuCardColors(mixer, IsDarkMode(key));
   if (!UsesTint(key)) {
     return;
   }

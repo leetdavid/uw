@@ -64,17 +64,19 @@ PauseMode ReadPauseState(const PrefService* prefs) {
     return PauseMode::kOff;
   }
   switch (prefs->GetInteger(kOrganizationPauseModePref)) {
-    case static_cast<int>(PauseMode::kTimed): {
-      const base::Time until = base::Time::FromDeltaSinceWindowsEpoch(
-          base::Microseconds(static_cast<int64_t>(
-              prefs->GetDouble(kOrganizationPauseUntilPref))));
-      return base::Time::Now() < until ? PauseMode::kTimed : PauseMode::kOff;
-    }
+    case static_cast<int>(PauseMode::kTimed):
+      return base::Time::Now() < PausedUntil(prefs) ? PauseMode::kTimed
+                                                    : PauseMode::kOff;
     case static_cast<int>(PauseMode::kIndefinite):
       return PauseMode::kIndefinite;
     default:
       return PauseMode::kOff;
   }
+}
+
+base::Time PausedUntil(const PrefService* prefs) {
+  return base::Time::FromDeltaSinceWindowsEpoch(base::Microseconds(
+      static_cast<int64_t>(prefs->GetDouble(kOrganizationPauseUntilPref))));
 }
 
 void SetPauseState(PrefService* prefs,

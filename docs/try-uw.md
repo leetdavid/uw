@@ -80,14 +80,15 @@ Expected result: a blank tab opens, selected, one level under that tab and above
 
 ### Organize button
 
-Click `Organize` at the foot of the sidebar.
+Click `Organize` at the foot of the sidebar. A card opens above it.
 
-- `New Task` opens a new tab in a new task of its own. Ctrl+Cmd+N does the same. Cmd-T still opens a tab beside the current one, inside its task.
+- Its first line says what automatic organization is doing: `Organizing`, `Paused, resuming in 42 min`, `Paused until uw restarts`, `Paused`, `Off`, or `Needs a model`. The countdown follows the clock while the card is open.
+- While organizing, `Pause` offers `1 hour`, `Until restart`, and `Until I resume`. While paused, the row is `Resume`. While off, it is `Turn On`, and while no model is set, `Set Up`, which opens `uw://providers`.
+- Ctrl+Cmd+N opens a new tab in a new task of its own, and so does `New Task` in the new button's menu. Cmd-T still opens a tab beside the current one, inside its task.
 - The new button sits at the right end of the foot. Its `+` does what Cmd-T does. Its `▾` lists `New Tab`, `New Task`, `New Chat`, `New Terminal`, and `New Split View`, each with its key. There is no `+` under the tab list. Collapse the sidebar: a lone `+` stays at its foot, and a right-click on it opens the same menu.
-- `Undo Tab Organization` reverses the last move, as in the tab menu. Option+Cmd+Z does the same at any time, also after the card above the button has gone.
-- The pause items stop and resume automatic organization. While automatic organization is off they are grayed out, and the settings page hides them.
-- `Show Organizer Activity` makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
-- `Tab Organization Settings…` opens the settings page.
+- `Undo Move` names the move it reverses, such as `SFO to LIS flights → Plan Lisbon trip`, and reverses it, as in the tab menu. Option+Cmd+Z does the same at any time. With nothing to undo, the row is grayed and says `Nothing to undo`.
+- The `Show Activity` switch makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
+- `Settings…` opens the settings page.
 
 ### AI providers
 
@@ -107,13 +108,13 @@ To use [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), add a Custom
 
 Pick a decision model, a language model, or both at `uw://providers`; `Test` is optional. Then turn on the switch at the top of `uw://settings/uwOrganization`; it says so while no model is picked. Then open a link in a new tab.
 
-Expected result: when the model is confident, the tab moves into a task. A card such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with the tab's title and an `Undo` button. Nothing shows while the model is asked, and nothing when it leaves the tab where it is. If a request fails, the card says so once, such as `The request failed: HTTP 401`, and stays quiet about failures until a request works again. With `Show organizer activity` on, the card also shows each request on its way and the model's numbers.
+Expected result: when the model is confident, the tab moves into a task. A card such as `Moved to Plan Lisbon trip` shows above `Organize` for a few seconds, with the tab's title and an `Undo` button. Nothing shows while the model is asked, and nothing when it leaves the tab where it is. If a request fails, the card says so once, such as `The request failed: HTTP 401`, and stays quiet about failures until a request works again. With `Show Activity` on, the card also shows each request on its way and the model's numbers.
 
 Then press Cmd-T inside a named task and go to a page that has nothing to do with it.
 
-Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard. A page that clearly starts something of its own moves at once into a task called `New task`, after every other task. A spinner turns on that task's row, and with `Show organizer activity` on the card says `Naming the task`. When the name arrives the task takes it and the card says `Created task …` with `Undo`. Tabs nested under the page go with it, except ones that still fit the old task.
+Expected result: the tab leaves the task. `Moved to Scratchpad` shows for a one-off page such as a sign-in page or a dashboard. A page that clearly starts something of its own moves at once into a task called `New task`, after every other task. A spinner turns on that task's row, and with `Show Activity` on the card says `Naming the task`. When the name arrives the task takes it and the card says `Created task …` with `Undo`. Tabs nested under the page go with it, except ones that still fit the old task.
 
-Then choose `New task` from the `Organize` menu and open a page in it.
+Then press Ctrl+Cmd+N and open a page in the new task.
 
 Expected result: with a language model set, the task called `New task` takes a name within a few seconds of a page that starts a piece of work. A sign-in page, a home page, or a feed names nothing. If the model returns nothing usable, the next such page tries again.
 

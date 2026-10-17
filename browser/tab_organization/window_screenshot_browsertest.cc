@@ -7,6 +7,7 @@
 
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
+#include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -34,6 +35,8 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
+#include "uw/browser/ui/views/tab_organization/organize_card.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace uw {
 namespace {
@@ -91,6 +94,27 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
       }
     }
     return nullptr;
+  }
+
+  // Opens the Organize card and waits for its rows.
+  OrganizeCard* OpenOrganizeCard() {
+    bar()->ShowMenu();
+    views::Widget* widget = bar()->organize_card();
+    return widget ? views::AsViewClass<OrganizeCard>(
+                        widget->widget_delegate()->GetContentsView())
+                  : nullptr;
+  }
+
+  views::Button* Row(OrganizeCard* card, int id) {
+    base::RunLoop().RunUntilIdle();
+    return views::AsViewClass<views::Button>(card->GetViewByID(id));
+  }
+
+  void SetUpAModel() {
+    PrefService* prefs = browser()->GetProfile()->GetPrefs();
+    SetChoice(*prefs, ModelSlot::kLanguage,
+              AddProvider(*prefs, PresetProvider(ProviderPreset::kOllama)),
+              "llama3.2");
   }
 
   static void Click(views::Button* button) {
@@ -159,6 +183,89 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   EXPECT_TRUE(button->plus()->GetVisible());
   EXPECT_FALSE(button->caret()->GetVisible());
   SaveWindowScreenshot(browser(), "new-button-narrow");
+}
+
+// The Organize card says what organization is doing and offers the one step
+// that applies: Turn On, Set Up, the three pause lengths, or Resume.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       TheOrganizeCardSaysWhatOrganizationIsDoing) {
+  StageSidebar();
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetBoolean(kOrganizationEnabledPref, false);
+  OrganizeCard* card = OpenOrganizeCard();
+  ASSERT_TRUE(card);
+  EXPECT_EQ(card->StatusForTesting(), u"Off");
+  Click(Row(card, OrganizeCard::kTurnOnId));
+  EXPECT_TRUE(prefs->GetBoolean(kOrganizationEnabledPref));
+  ASSERT_TRUE(Row(card, OrganizeCard::kSetUpId)) << card->StatusForTesting();
+  EXPECT_EQ(card->StatusForTesting(), u"Needs a model");
+
+  SetUpAModel();
+  bar()->organize_card()->Close();
+  ASSERT_TRUE(base::test::RunUntil([&] { return !bar()->organize_card(); }));
+  card = OpenOrganizeCard();
+  EXPECT_EQ(card->StatusForTesting(), u"Organizing");
+  SaveWidgetScreenshot(bar()->organize_card(), "organize-card-organizing");
+  Click(Row(card, OrganizeCard::kPauseHourId));
+  ASSERT_TRUE(Row(card, OrganizeCard::kResumeId));
+  EXPECT_EQ(card->StatusForTesting(), u"Paused, resuming in 1 hour");
+  EXPECT_EQ(ReadPauseState(prefs), PauseMode::kTimed);
+  SaveWidgetScreenshot(bar()->organize_card(), "organize-card");
+
+  SetPauseState(prefs, PauseMode::kTimed, base::Minutes(42));
+  Row(card, OrganizeCard::kResumeId);
+  EXPECT_EQ(card->StatusForTesting(), u"Paused, resuming in 42 min");
+  Click(Row(card, OrganizeCard::kResumeId));
+  EXPECT_EQ(ReadPauseState(prefs), PauseMode::kOff);
+  Click(Row(card, OrganizeCard::kPauseUntilRestartId));
+  Row(card, OrganizeCard::kResumeId);
+  EXPECT_EQ(card->StatusForTesting(), u"Paused until uw restarts");
+  Click(Row(card, OrganizeCard::kResumeId));
+  Click(Row(card, OrganizeCard::kPauseUntilResumedId));
+  Row(card, OrganizeCard::kResumeId);
+  EXPECT_EQ(card->StatusForTesting(), u"Paused");
+  Click(Row(card, OrganizeCard::kResumeId));
+  EXPECT_EQ(ReadPauseState(prefs), PauseMode::kOff);
+
+  const bool activity = prefs->GetBoolean(kOrganizationShowActivityPref);
+  Click(Row(card, OrganizeCard::kActivityId));
+  EXPECT_NE(prefs->GetBoolean(kOrganizationShowActivityPref), activity);
+}
+
+// Undo Move names the move it reverses and closes the card. With nothing
+// left to undo, the row is grayed.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       UndoMoveNamesTheMoveItReverses) {
+  StageSidebar();
+  OrganizeCard* card = OpenOrganizeCard();
+  ASSERT_TRUE(card);
+  views::Button* undo = Row(card, OrganizeCard::kUndoId);
+  ASSERT_TRUE(undo && undo->GetEnabled());
+  EXPECT_EQ(undo->GetViewAccessibility().GetCachedDescription(),
+            u"SFO to LIS flights \u2192 Plan Lisbon trip");
+  Click(undo);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !bar()->organize_card(); }));
+  EXPECT_TRUE(
+      TabOrganizationController::From(browser())->tree().Tasks().empty());
+
+  while (TabOrganizationController::From(browser())->CanUndo()) {
+    TabOrganizationController::From(browser())->Undo();
+  }
+  card = OpenOrganizeCard();
+  EXPECT_FALSE(Row(card, OrganizeCard::kUndoId)->GetEnabled());
+}
+
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, TheOrganizeCardInDarkMode) {
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  StageSidebar();
+  SetUpAModel();
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetBoolean(kOrganizationEnabledPref, true);
+  SetPauseState(prefs, PauseMode::kTimed, base::Hours(1));
+  OpenOrganizeCard();
+  base::RunLoop().RunUntilIdle();
+  SaveWidgetScreenshot(bar()->organize_card(), "organize-card-dark");
 }
 
 }  // namespace

@@ -67,6 +67,8 @@ Thresholds ReadThresholds(const PrefService* prefs);
 void SaveThresholds(PrefService* prefs, const Thresholds& thresholds);
 
 PauseMode ReadPauseState(const PrefService* prefs);
+// When a pause of PauseMode::kTimed ends.
+base::Time PausedUntil(const PrefService* prefs);
 // `duration` applies to PauseMode::kTimed.
 void SetPauseState(PrefService* prefs,
                    PauseMode mode,

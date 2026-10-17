@@ -1,6 +1,6 @@
 # Sidebar menus
 
-Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T114 to T116 are being built.
+Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T116, the Organize menu, is built and in review. T114 and T115 are being built.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Naming a task already runs through the language model, and the activity card already reports failures. The risk is editing a name on Chromium's task row and putting uw's card where Chromium opens its group editor without breaking what Chromium still uses that editor for. Each Chromium update can move the views both touch.
 
@@ -62,6 +62,16 @@ On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Sidebar 
 - "Sidebar menus: every state": renaming on the row, a new task, Name Task asking and failed, the Organize menu organizing, paused until restart, off, and waiting for a model, and both cards in dark mode.
 
 The rules, with every size and color, are in the `uw-menus` guide. Two details the designs added: both cards are 264px wide so the pause chips fit, and Undo Move cuts the tab's title before the task's name.
+
+## How the cards are built
+
+Chosen by uw for T116 on 2026-10-17.
+
+- Each card is a plain view inside Chromium's `views::BubbleDialogDelegate`. Chromium keeps its own bubble view class and widget-owned delegates to a fixed list of classes, so the Organize bar owns the bubble and its widget, and deletes both after the card closes.
+- The rows, chips, separators, and colors are shared in `browser/ui/views/tab_organization/menu_card_row.h` and `browser/ui/look/menu_card.h`. The colors are uw color ids set by uw's color mixer.
+- A click that changes the card, such as Pause, rebuilds it after the click ends, because rebuilding deletes the row that was clicked.
+- Keys show as macOS writes them, such as ⌥⌘Z. The frames spell them out only because the canvas's font has no key symbols.
+- The icons are Chromium's Material icons closest to the frames': pencil, sparkle, pause, play, undo, eye, gear, and link.
 
 ## Stages
 

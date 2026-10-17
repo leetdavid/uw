@@ -371,7 +371,7 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
     return std::nullopt;
   }
   const std::string task = tab_groups::TabGroupId::GenerateNew().ToString();
-  Record();
+  Record(roots, task);
   LeaveBehind(roots, staying);
   tree_.MoveToNewTask(roots.front(), task);
   for (size_t i = 1; i < roots.size(); ++i) {
@@ -397,7 +397,7 @@ bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
   if (roots.empty() || !GroupFor(task)) {
     return false;
   }
-  Record();
+  Record(roots, task);
   LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
     tree_.MoveToTask(root, task);
@@ -417,7 +417,7 @@ bool TabOrganizationController::MoveToScratchpad(
   if (roots.empty()) {
     return false;
   }
-  Record();
+  Record(roots, std::string());
   LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
     tree_.MoveToTask(root, std::string());
@@ -430,7 +430,7 @@ bool TabOrganizationController::MoveToScratchpad(
 }
 
 bool TabOrganizationController::Nest(const PageId& id) {
-  Record();
+  Record({id});
   if (!tree_.Nest(id)) {
     undo_.pop_back();
     return false;
@@ -470,7 +470,7 @@ std::optional<PageId> TabOrganizationController::OpenBlankTab(
 }
 
 bool TabOrganizationController::Outdent(const PageId& id) {
-  Record();
+  Record({id});
   if (!tree_.Outdent(id)) {
     undo_.pop_back();
     return false;
@@ -481,7 +481,7 @@ bool TabOrganizationController::Outdent(const PageId& id) {
 }
 
 bool TabOrganizationController::MoveUp(const PageId& id) {
-  Record();
+  Record({id});
   if (!tree_.MoveUp(id)) {
     undo_.pop_back();
     return false;
@@ -492,7 +492,7 @@ bool TabOrganizationController::MoveUp(const PageId& id) {
 }
 
 bool TabOrganizationController::MoveDown(const PageId& id) {
-  Record();
+  Record({id});
   if (!tree_.MoveDown(id)) {
     undo_.pop_back();
     return false;
@@ -611,6 +611,21 @@ void TabOrganizationController::Remember(const std::optional<PageId>& id) {
   if (id) {
     recent_.insert(recent_.begin(), *id);
   }
+}
+
+std::optional<TabOrganizationController::UndoMove>
+TabOrganizationController::NextUndo() const {
+  if (undo_.empty()) {
+    return std::nullopt;
+  }
+  const Snapshot& snapshot = undo_.back();
+  UndoMove move{snapshot.tab, {}};
+  if (snapshot.task) {
+    move.place = snapshot.task->empty()
+                     ? l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD)
+                     : TaskTitle(*snapshot.task);
+  }
+  return move;
 }
 
 void TabOrganizationController::Undo() {
@@ -1032,8 +1047,13 @@ void TabOrganizationController::ApplyWhenIdle() {
   Apply();
 }
 
-void TabOrganizationController::Record() {
-  Snapshot snapshot{tree_, {}};
+void TabOrganizationController::Record(const std::vector<PageId>& roots,
+                                       std::optional<std::string> task) {
+  Snapshot snapshot{tree_, {}, {}, std::move(task)};
+  if (const tabs::TabInterface* tab =
+          roots.empty() ? nullptr : TabFor(roots.front())) {
+    snapshot.tab = tab->GetContents()->GetTitle();
+  }
   if (tabs_->SupportsTabGroups()) {
     for (const tab_groups::TabGroupId& group :
          tabs_->group_model()->ListTabGroups()) {

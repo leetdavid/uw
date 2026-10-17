@@ -146,6 +146,14 @@ class TabOrganizationController : public TabStripModelObserver,
   bool SelectTask(const std::string& task);
   bool CanUndo() const { return !undo_.empty(); }
   void Undo();
+  // What Undo would reverse: the title of the first tab the action moved, and
+  // the task it went to, or the Scratchpad. `place` is empty for a move
+  // within the tree, such as nesting a tab.
+  struct UndoMove {
+    std::u16string tab;
+    std::u16string place;
+  };
+  std::optional<UndoMove> NextUndo() const;
 
   // A tab drag reorders the strip natively. The tree follows each step, and
   // the strip is put in tree order once the drag ends.
@@ -179,6 +187,9 @@ class TabOrganizationController : public TabStripModelObserver,
   struct Snapshot {
     PageTree tree;
     std::map<std::string, tab_groups::TabGroupVisualData> tasks;
+    std::u16string tab;
+    // The task the action moved tabs into; empty for the Scratchpad.
+    std::optional<std::string> task;
   };
   struct PendingTask {
     std::u16string title;
@@ -227,7 +238,10 @@ class TabOrganizationController : public TabStripModelObserver,
   void ApplyOrder();
   void ScheduleApply();
   void ApplyWhenIdle();
-  void Record();
+  // Saves the window for Undo before an action that moves `roots`, into
+  // `task` when the action changes their task.
+  void Record(const std::vector<PageId>& roots,
+              std::optional<std::string> task = std::nullopt);
   void ScheduleUpdate();
   void Update();
 

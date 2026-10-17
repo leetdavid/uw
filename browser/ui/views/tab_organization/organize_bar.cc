@@ -9,7 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/app/chrome_command_ids.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -22,6 +22,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
@@ -32,6 +33,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
+#include "uw/browser/ui/views/tab_organization/organize_card.h"
 #include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
@@ -107,7 +109,9 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
   OnCollapseChanged(state->GetCollapseState());
 }
 
-OrganizeBar::~OrganizeBar() = default;
+OrganizeBar::~OrganizeBar() {
+  card_widget_.reset();
+}
 
 bool OrganizeBar::card_visible() const {
   return card_->GetVisible();
@@ -132,28 +136,21 @@ bool OrganizeBar::IsCommandIdChecked(int command_id) const {
 }
 
 bool OrganizeBar::IsCommandIdEnabled(int command_id) const {
-  return command_id == kNewTask || CanRunWindowCommand(window_, command_id);
+  return CanRunWindowCommand(window_, command_id);
 }
 
 void OrganizeBar::ExecuteCommand(int command_id, int event_flags) {
-  switch (command_id) {
-    case kNewTask:
-      TabOrganizationController::OpenNewTask(window_);
-      break;
-    case kUndo:
-      Undo();
-      break;
-    default:
-      RunWindowCommand(window_, command_id);
+  if (command_id == kUndo) {
+    Undo();
+    return;
   }
+  RunWindowCommand(window_, command_id);
 }
 
 bool OrganizeBar::GetAcceleratorForCommandId(
     int command_id,
     ui::Accelerator* accelerator) const {
-  return GetCommandAccelerator(
-      window_, command_id == kNewTask ? IDC_CREATE_NEW_TAB_GROUP : command_id,
-      accelerator);
+  return GetCommandAccelerator(window_, command_id, accelerator);
 }
 
 void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
@@ -170,31 +167,28 @@ void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
 }
 
 void OrganizeBar::ShowMenu() {
-  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-  menu_model_->AddItemWithStringId(kNewTask, IDS_UW_NEW_TASK_MAC);
-  menu_model_->AddItemWithStringId(kUndo, IDS_UW_UNDO_ORGANIZATION_MAC);
-  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu_model_->AddItemWithStringId(kPauseForAnHour, IDS_UW_PAUSE_1HOUR_MAC);
-  menu_model_->AddItemWithStringId(kPauseUntilLaunch,
-                                   IDS_UW_PAUSE_UNTIL_LAUNCH_MAC);
-  menu_model_->AddItemWithStringId(kPauseIndefinitely,
-                                   IDS_UW_PAUSE_INDEFINITE_MAC);
-  menu_model_->AddItemWithStringId(kResume, IDS_UW_PAUSE_RESUME_MAC);
-  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu_model_->AddCheckItemWithStringId(kShowActivity,
-                                        IDS_UW_SHOW_ACTIVITY_MAC);
-  menu_model_->AddItemWithStringId(kSettings, IDS_UW_ORGANIZATION_SETTINGS_MAC);
-
+  if (card_widget_) {
+    return;
+  }
+  card_bubble_ = OrganizeCard::CreateBubble(button_, this, window_);
+  card_widget_ = views::BubbleDialogDelegate::CreateBubble(
+      card_bubble_.get(),
+      base::BindOnce(&OrganizeBar::OnCardClosed, base::Unretained(this)));
   hover_lock_ =
       BrowserView::GetBrowserViewForBrowser(window_)
           ->tab_strip_view()
           ->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepCurrentState);
-  menu_runner_ = std::make_unique<views::MenuRunner>(
-      menu_model_.get(), views::MenuRunner::HAS_MNEMONICS,
-      base::BindRepeating(&OrganizeBar::OnMenuClosed, base::Unretained(this)));
-  menu_runner_->RunMenuAt(GetWidget(), nullptr, button_->GetBoundsInScreen(),
-                          views::MenuAnchorPosition::kTopLeft,
-                          ui::mojom::MenuSourceType::kNone);
+  card_widget_->Show();
+}
+
+// The card closes from inside its own widget, so it is deleted afterwards,
+// the widget before the bubble it uses.
+void OrganizeBar::OnCardClosed(views::Widget::ClosedReason reason) {
+  hover_lock_.reset();
+  base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+      FROM_HERE, std::move(card_widget_));
+  base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+      FROM_HERE, std::move(card_bubble_));
 }
 
 void OrganizeBar::ShowContextMenuForViewImpl(

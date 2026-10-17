@@ -1123,7 +1123,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   OneTask();
   UseDecisionModel(ProviderFormat::kOpenAiDecisions);
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
-  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  TabOrganizationController::OpenNewTask(browser());
   tabs::TabInterface* opened = tabs()->GetActiveTab();
   const std::optional<tab_groups::TabGroupId> unnamed = opened->GetGroup();
   ASSERT_TRUE(unnamed);
@@ -1166,7 +1166,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   bar()->ExecuteCommand(OrganizeBar::kShowActivity, 0);
   Answer("/v1/decisions", DecisionsAnswer("none", 0.99, 0.1));
   Answer("/v1/chat/completions", ChatAnswer(""));
-  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  TabOrganizationController::OpenNewTask(browser());
   tabs::TabInterface* opened = tabs()->GetActiveTab();
   const std::optional<tab_groups::TabGroupId> task = opened->GetGroup();
   ASSERT_TRUE(task);
@@ -1361,7 +1361,7 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        OnlyANameTheUserTypedIsLocked) {
   UseDecisionModel(ProviderFormat::kOpenAiDecisions);
-  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  TabOrganizationController::OpenNewTask(browser());
   base::RunLoop().RunUntilIdle();
   const std::optional<tab_groups::TabGroupId> task =
       tabs()->GetActiveTab()->GetGroup();
@@ -1805,7 +1805,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   tabs()->ActivateTabAt(1);
   const int before = tabs()->count();
 
-  bar()->ExecuteCommand(OrganizeBar::kNewTask, 0);
+  TabOrganizationController::OpenNewTask(browser());
 
   ASSERT_EQ(tabs()->count(), before + 1);
   tabs::TabInterface* opened = tabs()->GetActiveTab();
