@@ -83,6 +83,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - Units and currencies mix in one sum: `10 HKD + 10 EUR to USD`, or `20 kg * 10 m/s/s / 5W`, which shows 40 s/m.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
 - `min` is minutes, unless `(` follows it.
+- A cup is always the metric cup of 250 ml, a teaspoon (`tsp`) 5 ml, and a tablespoon (`tbsp`) 15 ml, so `1/2 cup to tsp` shows 25 tsp. Agreed on 2026-10-17.
 - Units run together read as their product, as `Wh` does: `Wm` is W·m, and `Nm` is N·m. A sum reads left to right, so `200 N / 5 Wm/s` shows 40 m⁻², and `200 N / (5 Wm/s)` shows 40 s²/m². Agreed on 2026-10-17.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
 - The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
@@ -145,7 +146,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 12. Cmd+Return opens a chat in front, with the text as its first message and the selected tab as the agent's tab 1, which the agent can read.
 13. Option+Return runs the text in a new terminal and selects it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
 14. An alias runs its command. A recorded key without Cmd is refused, a key in use is refused with its owner named, and a recorded key runs its command after a restart.
-15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
+15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, `1/2 cup to tsp` shows 25 tsp, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
