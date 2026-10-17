@@ -83,6 +83,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - Units and currencies mix in one sum: `10 HKD + 10 EUR to USD`, or `20 kg * 10 m/s/s / 5W`, which shows 40 s/m.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
 - `min` is minutes, unless `(` follows it.
+- Units run together read as their product, as `Wh` does: `Wm` is W·m, and `Nm` is N·m. A sum reads left to right, so `200 N / 5 Wm/s` shows 40 m⁻², and `200 N / (5 Wm/s)` shows 40 s²/m². Agreed on 2026-10-17.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
 - The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
 - A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
