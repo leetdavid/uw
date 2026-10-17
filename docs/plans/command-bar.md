@@ -83,6 +83,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
 - `min` is minutes, unless `(` follows it.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
+- The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
 - A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
 - Currency uses the European Central Bank's daily reference rates, fetched at most once a day. Fetching them sends nothing the user typed. Offline, the last rates fetched are used and their date is shown.
 - The default currency is the currency of the Mac's region. A "Default currency" setting in the Command bar section of uw's settings page picks another. `in EUR` picks one for a single sum.
