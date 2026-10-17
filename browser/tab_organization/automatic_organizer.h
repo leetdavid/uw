@@ -85,6 +85,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
       kAnswerUnreadable,
       // The tab changed or was moved before the answer arrived.
       kDropped,
+      // No name came of the name the user asked for with Name Task. `detail`
+      // is the task's name, and `page` why, when there is a reason to give.
+      kNameFailed,
     };
     Kind kind;
     // The tab's title.
@@ -98,6 +101,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
     std::u16string model;
     // How long its answer took. Zero while the request is out.
     base::TimeDelta took;
+    // The task, for kNameFailed.
+    std::string task;
   };
 
   AutomaticOrganizer(BrowserWindowInterface* window,
@@ -117,13 +122,14 @@ class AutomaticOrganizer : public TabStripModelObserver {
   base::CallbackListSubscription ObserveNaming(base::RepeatingClosure callback);
   // True when the user can ask for a name: there is a language model, and
   // the window is not a private one. Automatic organization need not be on.
-  bool CanSuggestName() const;
-  // Asks the language model to name `task` now, from the tabs it holds. The
-  // user asked, so the name replaces one they typed, and it is uw's from then
-  // on. `on_failed` runs when no name came of it, with the reason when there
-  // is one to give.
-  using NameFailedCallback = base::OnceCallback<void(const std::u16string&)>;
-  void SuggestName(const std::string& task, NameFailedCallback on_failed);
+  bool CanAskForName() const;
+  // Name Task: asks the language model to name `task` now, from the tabs it
+  // holds. The user asked, so the name replaces one they typed, and it is
+  // uw's from then on. When no name comes of it, a kNameFailed event says so.
+  void AskForName(const std::string& task);
+  // Forgets the name asked for `task`, so its answer changes nothing. The
+  // user is typing a name.
+  void DropAskedName(const std::string& task);
   base::WeakPtr<AutomaticOrganizer> AsWeakPtr();
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
@@ -207,7 +213,6 @@ class AutomaticOrganizer : public TabStripModelObserver {
   struct AskedName {
     std::unique_ptr<RemoteModelClient> client;
     OrganizerExchange exchange;
-    NameFailedCallback on_failed;
   };
 
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
@@ -253,6 +258,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
             AnswerHandler on_answer);
   void OnDecision(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
+  void NameFailed(const std::string& task, std::u16string reason);
   void OnAskedName(const std::string& task, RemoteModelClient::Outcome outcome);
   // Decides about the branch `page` is in from the answers kept about its
   // tabs, and carries that out. It waits while a request about one of those

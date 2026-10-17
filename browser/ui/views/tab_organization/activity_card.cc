@@ -75,6 +75,7 @@ const gfx::VectorIcon& IconFor(Kind kind) {
       return vector_icons::kLightbulbIcon;
     case Kind::kRequestFailed:
     case Kind::kAnswerUnreadable:
+    case Kind::kNameFailed:
       return vector_icons::kWarningIcon;
     case Kind::kAsking:
     case Kind::kNaming:
@@ -107,6 +108,9 @@ std::u16string Headline(const Event& event) {
       return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_ANSWER_UNREADABLE);
     case Kind::kDropped:
       return l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_DROPPED);
+    case Kind::kNameFailed:
+      return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_COULD_NOT_NAME,
+                                        event.detail);
   }
 }
 
@@ -142,8 +146,11 @@ std::unique_ptr<views::Label> Line(int size_delta, gfx::Font::Weight weight) {
 }  // namespace
 
 ActivityCard::ActivityCard(base::RepeatingClosure undo,
-                           base::RepeatingClosure accept)
-    : undo_(std::move(undo)), accept_(std::move(accept)) {
+                           base::RepeatingClosure accept,
+                           RetryCallback retry)
+    : undo_(std::move(undo)),
+      accept_(std::move(accept)),
+      retry_(std::move(retry)) {
   SetOrientation(views::LayoutOrientation::kVertical);
   SetInteriorMargin(gfx::Insets(kCardPadding));
   SetBackground(views::CreateRoundedRectBackground(ui::kColorSysHeaderContainer,
@@ -215,7 +222,8 @@ void ActivityCard::Show(const Event& event, bool details) {
   // A request that failed may never have been answered. While a name is
   // asked for, the line names the language model.
   source_->SetVisible(details && event.kind != Kind::kAsking &&
-                      event.kind != Kind::kRequestFailed);
+                      event.kind != Kind::kRequestFailed &&
+                      event.kind != Kind::kNameFailed);
   source_->SetText(
       event.kind == Kind::kNaming
           ? l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING, event.detail)
@@ -237,9 +245,13 @@ void ActivityCard::Show(const Event& event, bool details) {
   confidence_->SetCustomTooltipText(hint);
 
   accepts_ = event.kind == Kind::kUnsure;
-  action_->SetVisible(accepts_ || OffersUndo(event.kind));
-  action_->SetText(
-      l10n_util::GetStringUTF16(accepts_ ? IDS_CONFIRM : IDS_UW_AUTO_UNDO));
+  retry_task_ = event.kind == Kind::kNameFailed ? event.task : std::string();
+  action_->SetVisible(accepts_ || !retry_task_.empty() ||
+                      OffersUndo(event.kind));
+  action_->SetText(l10n_util::GetStringUTF16(accepts_ ? IDS_CONFIRM
+                                             : retry_task_.empty()
+                                                 ? IDS_UW_AUTO_UNDO
+                                                 : IDS_UW_TRY_AGAIN));
   SetVisible(true);
 }
 
@@ -273,14 +285,22 @@ bool ActivityCard::waiting() const {
 }
 
 bool ActivityCard::offers_undo() const {
-  return action_->GetVisible() && !accepts_;
+  return action_->GetVisible() && !accepts_ && retry_task_.empty();
 }
 
 bool ActivityCard::offers_accept() const {
   return action_->GetVisible() && accepts_;
 }
 
+bool ActivityCard::offers_retry() const {
+  return action_->GetVisible() && !retry_task_.empty();
+}
+
 void ActivityCard::OnActionPressed() {
+  if (!retry_task_.empty()) {
+    retry_.Run(retry_task_);
+    return;
+  }
   (accepts_ ? accept_ : undo_).Run();
 }
 

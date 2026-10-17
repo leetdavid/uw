@@ -83,8 +83,8 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
           [](const Page& page) { return page.task.empty(); });
     case kRenameTask:
       return SelectedTask(window).has_value();
-    case kSuggestTaskName:
-      return organizer && organizer->CanSuggestName() &&
+    case kNameTask:
+      return organizer && organizer->CanAskForName() &&
              SelectedTask(window).has_value();
     case kConfirmSuggestion:
       return organizer && organizer->HasSuggestion();
@@ -120,17 +120,22 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
     case kGoToScratchpad:
       controller->SelectTask(std::string());
       break;
-    case kRenameTask:
-      if (TabGroupHeaderView* header =
-              HeaderFor(BrowserView::GetBrowserViewForBrowser(window),
-                        *SelectedTask(window))) {
+    case kRenameTask: {
+      // The sidebar renames on the task's row. Horizontal tabs open
+      // Chromium's task editor, which has the name field.
+      BrowserView* view = BrowserView::GetBrowserViewForBrowser(window);
+      if (view->ShouldDrawVerticalTabStrip()) {
+        controller->RenameOnItsRow(SelectedTask(window)->ToString());
+      } else if (TabGroupHeaderView* header =
+                     HeaderFor(view, *SelectedTask(window))) {
         header->ShowContextMenuForViewImpl(
             header, gfx::Point(), ui::mojom::MenuSourceType::kKeyboard);
       }
       break;
-    case kSuggestTaskName:
-      AutomaticOrganizer::From(window)->SuggestName(
-          SelectedTask(window)->ToString(), base::DoNothing());
+    }
+    case kNameTask:
+      AutomaticOrganizer::From(window)->AskForName(
+          SelectedTask(window)->ToString());
       break;
     case kConfirmSuggestion:
       AutomaticOrganizer::From(window)->AcceptSuggestion();

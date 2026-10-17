@@ -9,7 +9,7 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..098c2091fe033fac5c9622f267abf4ba5a9be22a 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd729e1670 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -277,6 +277,103 @@ are declared in tools/grit/grit_args.gni.
@@ -38,12 +38,10 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..098c2091fe033fac5c9622f267abf4ba
 +      <message name="IDS_UW_ACTIVITY_CONFIDENCE_HINT" desc="Tooltip of the confidence bar on the sidebar card.">The model's confidence was <ph name="VALUE">$1<ex>0.39</ex></ph>. uw acts at <ph name="NEEDED">$2<ex>0.90</ex></ph> or more.</message>
 +      <message name="IDS_UW_ACTIVITY_SOURCE" desc="Last line of the sidebar card: the model that answered and how many seconds it took.">Answered by <ph name="MODEL">$1<ex>jev-latest</ex></ph> in <ph name="SECONDS">$2<ex>0.4</ex></ph> s</message>
 +      <message name="IDS_UW_NAME_LOCK" desc="Tooltip of the small lock on a task in the tab sidebar. The lock shows that the user typed the task's name, so uw does not rename the task. uw is the product name and stays lowercase.">Named by you. Click to let uw rename this task.</message>
-+      <message name="IDS_UW_SUGGESTING_NAME" desc="In Title Case: Text of the Suggest a Name row in a task's menu while the language model is asked for a name.">Suggesting a Name…</message>
 +      <message name="IDS_UW_NEW_TERMINAL" desc="In Title Case: Menu item that opens a tab with the user's shell in it.">New Terminal</message>
 +      <message name="IDS_UW_NEW_CHAT" desc="In Title Case: Menu item that opens a chat with uw's agent, which browses for the user.">New Chat</message>
 +      <message name="IDS_UW_MORE_NEW_ITEMS" desc="Tooltip of the caret on the sidebar's new button, which opens a menu of new tabs, tasks, chats, terminals, and split views.">More new items</message>
 +      <message name="IDS_UW_TERMINAL_NO_SHELL" desc="Shown in a terminal tab when the user's shell could not be started.">uw could not start your shell.</message>
-+      <message name="IDS_UW_SUGGEST_NAME_FAILED" desc="Text of the Suggest a name row in a task's menu after the language model gave no name that could be used.">Could not suggest a name</message>
 +      <message name="IDS_UW_TASKS_MENU_MAC" desc="In Title Case: The title of the Mac menu that holds the task commands. A task is a group of tabs for one piece of work.">Tasks</message>
 +      <message name="IDS_UW_NEW_TASK_MAC" desc="In Title Case: Opens a new tab in a new task of its own.">New Task</message>
 +      <message name="IDS_UW_MOVE_TO_NEW_TASK_MAC" desc="In Title Case: Moves the selected tab branches to a new task.">Move to New Task</message>
@@ -51,7 +49,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..098c2091fe033fac5c9622f267abf4ba
 +      <message name="IDS_UW_GO_TO_TASK_MAC" desc="In Title Case: Submenu that selects a task by its place in the tab list.">Go to Task</message>
 +      <message name="IDS_UW_TASK_NUMBER_MAC" desc="In Title Case: Selects the task at this place in the tab list.">Task <ph name="NUMBER">$1<ex>3</ex></ph></message>
 +      <message name="IDS_UW_RENAME_TASK_MAC" desc="In Title Case: Opens the name field of the selected tab's task.">Rename Task</message>
-+      <message name="IDS_UW_SUGGEST_NAME_MAC" desc="In Title Case: Asks the language model for a name for the selected tab's task.">Suggest a Name</message>
++      <message name="IDS_UW_NAME_TASK_MAC" desc="In Title Case: Asks the language model for a name for a task now. The name replaces the one the task has.">Name Task</message>
 +      <message name="IDS_UW_CLOSE_TASK_MAC" desc="In Title Case: Closes the selected tab's task and every tab in it.">Close Task</message>
 +      <message name="IDS_UW_CONFIRM_SUGGESTION_MAC" desc="In Title Case: Carries out the organizer's last suggestion for a tab.">Confirm Suggestion</message>
 +      <message name="IDS_UW_UNDO_ORGANIZATION_MAC" desc="In Title Case: Reverses one tab organization action.">Undo Tab Organization</message>
@@ -73,6 +71,8 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..098c2091fe033fac5c9622f267abf4ba
 +      <message name="IDS_UW_HIDDEN_TABS" desc="Tooltip of the number at the end of a tab in the tab sidebar whose nested tabs are hidden.">{COUNT, plural, =1 {1 hidden tab} other {# hidden tabs}}</message>
 +      <message name="IDS_UW_NEW_CHILD_TAB_MAC" desc="In Title Case: Opens a blank tab nested directly under the selected tab.">New Child Tab</message>
 +      <message name="IDS_UW_COMMAND_BAR" desc="Name of uw's command bar in the task manager. The command bar is a panel for opening pages and running commands from the keyboard.">Command bar</message>
++      <message name="IDS_UW_ACTIVITY_COULD_NOT_NAME" desc="Headline of the sidebar card after the language model gave no name for a task the user asked to name.">Couldn't name <ph name="TASK">$1<ex>Plan Lisbon trip</ex></ph></message>
++      <message name="IDS_UW_TRY_AGAIN" desc="In Title Case: Button on the sidebar card that asks the language model again for a task's name after it gave none.">Try Again</message>
 +      <message name="IDS_UW_ORGANIZE_ORGANIZING" desc="Status line of the Organize menu while automatic tab organization runs.">Organizing</message>
 +      <message name="IDS_UW_ORGANIZE_PAUSED" desc="Status line of the Organize menu while automatic tab organization is paused until the user resumes it. It also starts the other paused status lines, and is shown in bold there.">Paused</message>
 +      <message name="IDS_UW_ORGANIZE_PAUSED_HOUR" desc="Status line of the Organize menu right after the user paused automatic tab organization for an hour.">Paused, resuming in 1 hour</message>
@@ -588,18 +588,27 @@ index cdc7c0f..a260033 100644
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..b7608137f3d1b553faf545585a5c559d7fb2c7eb 100644
+index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639eee3eff6b 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-@@ -3,6 +3,7 @@
- // found in the LICENSE file.
- 
- #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
+@@ -32,6 +32,7 @@
+ #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
++#include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+ #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
+@@ -44,6 +45,8 @@
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+ #include "ui/views/view_utils.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/ui/views/tab_organization/task_card.h"
  
- #include <variant>
- 
-@@ -452,6 +453,12 @@ void TabStripCollectionController::ShowTabContextMenu(
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/ash/boca/on_task/on_task_locked_controller.h"
+@@ -452,6 +455,12 @@ void TabStripCollectionController::ShowTabContextMenu(
        browser_view_->browser()->GetFeatures().tab_menu_model_delegate(), model_,
        tab_index.value());
  
@@ -612,6 +621,36 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..b7608137f3d1b553faf545585a5c559d
    CHECK(browser_view_->tab_strip_view());
    expand_on_hover_lock_ = browser_view_->tab_strip_view()->GetExpandOnHoverLock(
        ExpandOnHoverLockType::kKeepCurrentState);
+@@ -475,6 +484,13 @@ void TabStripCollectionController::ShowGroupEditorBubble(
+     const TabCollectionNode* group_node) {
+   auto* group_header_view =
+       views::AsViewClass<TabGroupView>(group_node->view())->group_header();
++  // uw: a new task in the sidebar starts with its name field, not a menu.
++  if (auto* uw_controller =
++          uw::TabOrganizationController::From(browser_view_->browser());
++      uw_controller && browser_view_->ShouldDrawVerticalTabStrip()) {
++    uw_controller->RenameOnItsRow(group_header_view->group().ToString());
++    return;
++  }
+   group_header_view->ShowContextMenuForViewImpl(
+       group_header_view, gfx::Point(), ui::mojom::MenuSourceType::kNone);
+ }
+@@ -484,6 +500,15 @@ TabStripCollectionController::ShowGroupEditorBubble(
+     const tab_groups::TabGroupId& group_id,
+     views::View* anchor_view,
+     bool stop_context_menu_propagation) {
++  // uw: the sidebar's task menu is uw's card, under the task's row.
++  if (browser_view_->ShouldDrawVerticalTabStrip()) {
++    views::View* row = anchor_view;
++    while (row && !views::IsViewClass<TabGroupHeaderView>(row)) {
++      row = row->parent();
++    }
++    return uw::TaskCard::Show(browser_view_->browser(), group_id,
++                              row ? row : anchor_view);
++  }
+   return TabGroupEditorBubbleView::Show(
+       browser_view_->browser(), group_id,
+       /*anchor_view=*/anchor_view, /*anchor_rect=*/std::nullopt,
 diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
 index 88df244c596b07dbd0f5049ae59824bc80e47698..227dca7a68309a6b16caed4c50b3fbbebfdd4cf9 100644
 --- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
@@ -1067,18 +1106,10 @@ index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..dce44bd6668be9a13ab9c72123eb81e1
    new_tab_button_pressed_subscription_ =
        new_tab_button->RegisterWillInvokeActionCallback(
 diff --git a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
-index a6c53969ea00adc6c6ca3b6c1f3611003b626650..1abd2d46e83c17b2718568be4101bbd7be8ef34e 100644
+index a6c53969ea00adc6c6ca3b6c1f3611003b626650..76b6e36adebcfb3bc4832c875e52229c11ba0f7a 100644
 --- a/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
 +++ b/chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.cc
-@@ -3,6 +3,7 @@
- // found in the LICENSE file.
- 
- #include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.h"
-+#include "uw/browser/ui/views/tab_organization/suggest_name_item.h"
- 
- #include <memory>
- #include <optional>
-@@ -462,10 +463,9 @@ std::u16string TabGroupEditorBubbleView::GetTextForCloseButton() const {
+@@ -462,10 +462,9 @@ std::u16string TabGroupEditorBubbleView::GetTextForCloseButton() const {
    return l10n_util::GetStringUTF16(IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP);
  }
  
@@ -1091,15 +1122,6 @@ index a6c53969ea00adc6c6ca3b6c1f3611003b626650..1abd2d46e83c17b2718568be4101bbd7
  }
  
  bool TabGroupEditorBubbleView::CanShareGroups() const {
-@@ -562,6 +562,8 @@ void TabGroupEditorBubbleView::RebuildMenuContents() {
- 
-   title_field_ = AddChildView(title_field ? std::move(title_field)
-                                           : BuildTitleField(title_at_opening_));
-+  AddChildView(std::make_unique<uw::SuggestNameItem>(browser_, group_,
-+                                                     GetControlInsets()));
-   color_selector_ = AddChildView(BuildColorPicker());
-   AddChildView(BuildSeparator());
- 
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 index fd63fdec82640fdb42de8388dfd691900f706674..f57ac25a21e3cc634c12fddaf2527c91eb515c60 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm

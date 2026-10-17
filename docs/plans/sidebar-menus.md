@@ -1,6 +1,6 @@
 # Sidebar menus
 
-Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T116, the Organize menu, is built and in review. T114 and T115 are being built.
+Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T116, the Organize menu, was built that day, and T114 and T115, the task menu and naming in place, on 2026-10-18. All three are in review.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Naming a task already runs through the language model, and the activity card already reports failures. The risk is editing a name on Chromium's task row and putting uw's card where Chromium opens its group editor without breaking what Chromium still uses that editor for. Each Chromium update can move the views both touch.
 
@@ -65,13 +65,18 @@ The rules, with every size and color, are in the `uw-menus` guide. Two details t
 
 ## How the cards are built
 
-Chosen by uw for T116 on 2026-10-17.
+Chosen by uw for T116 on 2026-10-17, and for T114 and T115 on 2026-10-18.
 
 - Each card is a plain view inside Chromium's `views::BubbleDialogDelegate`. Chromium keeps its own bubble view class and widget-owned delegates to a fixed list of classes, so the Organize bar owns the bubble and its widget, and deletes both after the card closes.
 - The rows, chips, separators, and colors are shared in `browser/ui/views/tab_organization/menu_card_row.h` and `browser/ui/look/menu_card.h`. The colors are uw color ids set by uw's color mixer.
 - A click that changes the card, such as Pause, rebuilds it after the click ends, because rebuilding deletes the row that was clicked.
 - Keys show as macOS writes them, such as ⌥⌘Z. The frames spell them out only because the canvas's font has no key symbols.
-- The icons are Chromium's Material icons closest to the frames': pencil, sparkle, pause, play, undo, eye, gear, and link.
+- The icons are Chromium's Material icons closest to the frames': pencil, sparkle, pause, play, undo, eye, gear, and link, and on the task card add to library, move group, ungroup, and close.
+- The sidebar's tab strip asks one place for Chromium's group editor, and there uw opens the task card instead. Chromium's tab strip keeps that widget, so the task card's bubble deletes itself once the widget is gone.
+- Chromium also opens its editor for a group it has just made, such as tabs added to a new group from its tab menu or a bookmark folder. In the sidebar, that task starts with its name field instead.
+- The name field is a text field uw adds to Chromium's task row, beside the name it hides while the user types. It draws its own ring in the primary color, because the row repaints its own background. A rename request goes through the window's controller, so a row made later, such as a new task's, still picks it up.
+- A double-click's first click collapses or opens the task and its second click undoes that, so the task ends as it was.
+- The color dots use the colors of the task's folder on its row, so a dot always matches its folder.
 
 ## Stages
 

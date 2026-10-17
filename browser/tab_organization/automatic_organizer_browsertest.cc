@@ -37,7 +37,6 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
-#include "chrome/browser/ui/views/tabs/groups/tab_group_editor_bubble_view.h"
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/os_crypt/common/os_crypt_switches.h"
 #include "components/prefs/pref_service.h"
@@ -53,6 +52,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
@@ -80,7 +80,8 @@
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/name_lock.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
-#include "uw/browser/ui/views/tab_organization/suggest_name_item.h"
+#include "uw/browser/ui/views/tab_organization/task_card.h"
+#include "uw/browser/ui/views/tab_organization/task_name_field.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -217,34 +218,22 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
         BrowserView::GetBrowserViewForBrowser(browser()), group);
   }
 
-  // Opens the menu of the task `group`, as its row's menu button does.
-  std::unique_ptr<views::Widget> OpenMenuOf(
+  // Opens the card of the task `group` under its row, as the row's menu
+  // button does.
+  std::unique_ptr<views::Widget> OpenCardOf(
       const tab_groups::TabGroupId& group) {
-    return TabGroupEditorBubbleView::Show(browser(), group, NameLockOf(group),
-                                          std::nullopt, false);
+    return TaskCard::Show(browser(), group, NameLockOf(group)->parent());
   }
 
-  // The "Suggest a Name" row of an open task menu.
-  static SuggestNameItem* SuggestItemOf(views::Widget* menu) {
-    for (views::View* row :
-         menu->widget_delegate()->GetContentsView()->children()) {
-      if (SuggestNameItem* item = views::AsViewClass<SuggestNameItem>(row)) {
-        return item;
-      }
-    }
-    return nullptr;
+  // The row `id` of an open task card, or null.
+  static views::Button* CardRow(views::Widget* card, TaskCard::Id id) {
+    return views::AsViewClass<views::Button>(
+        card->widget_delegate()->GetContentsView()->GetViewByID(id));
   }
 
-  static std::u16string TextOf(SuggestNameItem* item) {
-    return std::u16string(item->button()->GetText());
-  }
-
-  // The name in the field of an open task menu.
-  static std::u16string NameFieldOf(views::Widget* menu) {
-    return std::u16string(
-        views::AsViewClass<views::Textfield>(
-            menu->widget_delegate()->GetInitiallyFocusedView())
-            ->GetText());
+  // The name field on the row of the task `group`.
+  TaskNameField* NameFieldOf(const tab_groups::TabGroupId& group) {
+    return TaskNameField::On(NameLockOf(group)->parent());
   }
 
   // A window with one task named `name` that holds the pages "flights" and
@@ -1835,101 +1824,129 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(link->GetGroup(), task);
 }
 
-// "Suggest a Name" in a task's menu asks the language model for a name from
-// the tabs the task holds, while automatic organization is paused too. The
-// name lands in the field and on the task as one uw gave, in place of the
-// name the user had typed.
+// Name Task on a task's card asks the language model for a name from the
+// tabs the task holds, while automatic organization is paused too. The card
+// closes at once. The name replaces the one the user had typed and is uw's
+// from then on.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       SuggestANameNamesTheTaskFromItsTabs) {
+                       NameTaskNamesTheTaskFromItsTabs) {
   UseLanguageModel();
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
   const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
   ASSERT_TRUE(NameLockOf(task)->GetVisible());
 
-  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
-  SuggestNameItem* item = SuggestItemOf(menu.get());
-  ASSERT_TRUE(item);
-  ASSERT_TRUE(item->GetVisible());
-  EXPECT_EQ(TextOf(item), u"Suggest a Name");
-  EXPECT_EQ(NameFieldOf(menu.get()), u"Lisbon");
-  SaveWidgetScreenshot(menu.get(), "suggest-a-name");
+  std::unique_ptr<views::Widget> card = OpenCardOf(task);
+  views::Button* name = CardRow(card.get(), TaskCard::kNameId);
+  ASSERT_TRUE(name);
+  EXPECT_TRUE(name->GetEnabled());
+  views::test::ButtonTestApi(name).NotifyDefaultMouseClick();
+  ASSERT_TRUE(base::test::RunUntil([&] { return card->IsClosed(); }));
 
-  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return TitleOf(task) == u"Plan Lisbon trip"; }));
   ASSERT_EQ(Requests().size(), 1u);
   EXPECT_EQ(Requests()[0].path, "/v1/chat/completions");
   EXPECT_NE(Requests()[0].body.find("Title: flights\\n"), std::string::npos);
   EXPECT_NE(Requests()[0].body.find("- hotels"), std::string::npos);
-  EXPECT_EQ(NameFieldOf(menu.get()), u"Plan Lisbon trip");
-  EXPECT_EQ(TextOf(item), u"Suggest a Name");
-  EXPECT_TRUE(item->button()->GetEnabled());
   EXPECT_TRUE(controller()->HasGeneratedName(task.ToString()));
   EXPECT_FALSE(NameLockOf(task)->GetVisible());
   EXPECT_EQ(organizer()->pending_requests(), 0u);
 }
 
-// The row is only there with a language model to ask. While the model is
-// asked the row says so and takes no click, the task's row shows its
-// spinner, and no second request goes out.
+// The name comes with no window open. Meanwhile the task's row shows its
+// spinner, the card offers no second Name Task, and none goes out.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       SuggestANameWaitsForTheLanguageModel) {
-  UseDecisionModel(ProviderFormat::kSystemOne);
-  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
-  {
-    std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
-    ASSERT_TRUE(SuggestItemOf(menu.get()));
-    EXPECT_FALSE(SuggestItemOf(menu.get())->GetVisible());
-  }
-
+                       NameTaskRunsWithTheCardClosed) {
   UseLanguageModel();
   Hold("/v1/chat/completions");
-  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
-  SuggestNameItem* item = SuggestItemOf(menu.get());
-  ASSERT_TRUE(item);
-  ASSERT_TRUE(item->GetVisible());
-  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
-  EXPECT_EQ(TextOf(item), u"Suggesting a Name\u2026");
-  EXPECT_FALSE(item->button()->GetEnabled());
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  {
+    std::unique_ptr<views::Widget> card = OpenCardOf(task);
+    views::test::ButtonTestApi(CardRow(card.get(), TaskCard::kNameId))
+        .NotifyDefaultMouseClick();
+    ASSERT_TRUE(base::test::RunUntil([&] { return card->IsClosed(); }));
+  }
   EXPECT_TRUE(organizer()->IsNaming(task.ToString()));
   EXPECT_TRUE(SpinnerOf(task)->spinning());
   ASSERT_TRUE(base::test::RunUntil([&] { return Requests().size() == 1u; }));
-  SaveWidgetScreenshot(menu.get(), "suggesting-a-name");
-  SaveWindowScreenshot(browser(), "suggesting-a-name-window");
+  SaveWindowScreenshot(browser(), "name-task-window");
 
-  organizer()->SuggestName(task.ToString(), base::DoNothing());
+  std::unique_ptr<views::Widget> card = OpenCardOf(task);
+  EXPECT_FALSE(CardRow(card.get(), TaskCard::kNameId)->GetEnabled());
+  organizer()->AskForName(task.ToString());
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(Requests().size(), 1u);
   EXPECT_EQ(TitleOf(task), u"Lisbon");
 }
 
-// When no name comes of it the row says so, with the reason in its tooltip,
-// and the task keeps its name as the user's. A click asks again.
+// Name Task is only offered with a language model to ask.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
-                       SuggestANameSaysWhenNoNameCame) {
+                       NameTaskNeedsALanguageModel) {
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  EXPECT_FALSE(organizer()->CanAskForName());
+  std::unique_ptr<views::Widget> card = OpenCardOf(task);
+  EXPECT_FALSE(CardRow(card.get(), TaskCard::kNameId));
+  EXPECT_TRUE(CardRow(card.get(), TaskCard::kRenameId));
+}
+
+// When no name comes of Name Task, the card at the foot of the sidebar says
+// so and why, even with Show Activity off, and the task keeps its name as
+// the user's. Try Again asks again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AFailedNameTaskSaysSoAndTriesAgain) {
   UseLanguageModel();
   Fail("/v1/chat/completions", 401);
+  prefs()->SetBoolean(kOrganizationShowActivityPref, false);
   const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
 
-  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
-  SuggestNameItem* item = SuggestItemOf(menu.get());
-  ASSERT_TRUE(item);
-  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return TextOf(item) == u"Could not suggest a name"; }));
-  EXPECT_EQ(item->button()->GetTooltipText(), u"The request failed: HTTP 401");
-  EXPECT_TRUE(item->button()->GetEnabled());
+  organizer()->AskForName(task.ToString());
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return bar()->card()->GetVisible(); }));
+  EXPECT_EQ(bar()->card()->headline(), u"Couldn't name Lisbon");
+  EXPECT_EQ(bar()->card()->page(), u"The request failed: HTTP 401");
+  EXPECT_EQ(bar()->card()->source(), u"");
+  EXPECT_TRUE(bar()->card()->offers_retry());
+  EXPECT_FALSE(bar()->card()->offers_undo());
   EXPECT_EQ(TitleOf(task), u"Lisbon");
   EXPECT_TRUE(controller()->HasManualName(task.ToString()));
-  SaveWidgetScreenshot(menu.get(), "could-not-suggest-a-name");
+  EXPECT_FALSE(organizer()->IsNaming(task.ToString()));
+  SaveWindowScreenshot(browser(), "name-task-failed");
 
   Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
-  views::test::ButtonTestApi(item->button()).NotifyDefaultMouseClick();
+  bar()->AskForNameAgain(task.ToString());
+  EXPECT_FALSE(bar()->card()->GetVisible());
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return TitleOf(task) == u"Plan Lisbon trip"; }));
   EXPECT_EQ(Requests().size(), 2u);
-  EXPECT_EQ(TextOf(item), u"Suggest a Name");
-  EXPECT_TRUE(item->button()->GetTooltipText().empty());
+}
+
+// Typing a name while Name Task waits drops the request: the user's name
+// stays, and a late answer changes nothing.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TypingANameWinsOverNameTask) {
+  UseLanguageModel();
+  Hold("/v1/chat/completions");
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  organizer()->AskForName(task.ToString());
+  ASSERT_TRUE(organizer()->IsNaming(task.ToString()));
+
+  controller()->RenameOnItsRow(task.ToString());
+  TaskNameField* field = NameFieldOf(task);
+  ASSERT_TRUE(field);
+  ASSERT_TRUE(base::test::RunUntil([&] { return field->editing(); }));
+  EXPECT_FALSE(organizer()->IsNaming(task.ToString()));
+  EXPECT_FALSE(SpinnerOf(task)->GetVisible());
+  field->SetText(u"Lisbon in May");
+  field->HandleKeyEvent(field, ui::KeyEvent(ui::EventType::kKeyPressed,
+                                            ui::VKEY_RETURN, ui::EF_NONE));
+  EXPECT_FALSE(field->editing());
+  EXPECT_EQ(TitleOf(task), u"Lisbon in May");
+  EXPECT_TRUE(controller()->HasManualName(task.ToString()));
+
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(TitleOf(task), u"Lisbon in May");
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
@@ -2115,18 +2132,18 @@ void CollectTexts(const views::View* view, std::vector<std::u16string>& texts) {
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        TheTaskMenuSaysTaskAndKeepsNoClosedTasks) {
   const auto [ungrouped, task] = OneTask();
-  std::unique_ptr<views::Widget> menu = OpenMenuOf(task);
+  std::unique_ptr<views::Widget> menu = OpenCardOf(task);
   std::vector<std::u16string> texts;
   CollectTexts(menu->widget_delegate()->GetContentsView(), texts);
-  EXPECT_THAT(texts, testing::IsSupersetOf(
-                         {u"New Tab in Task", u"Move Task to New Window",
-                          u"Move Tabs to Scratchpad", u"Close Task"}));
+  EXPECT_THAT(texts, testing::IsSupersetOf({u"Rename Task", u"New Tab in Task",
+                                            u"Move Task to New Window",
+                                            u"Move Tabs to Scratchpad",
+                                            u"Close Task"}));
   EXPECT_THAT(texts, testing::Not(testing::Contains(u"Delete Task")));
   for (const std::u16string& text : texts) {
     EXPECT_EQ(text.find(u"group"), std::u16string::npos) << text;
     EXPECT_EQ(text.find(u"Group"), std::u16string::npos) << text;
   }
-  SaveWidgetScreenshot(menu.get(), "task-menu");
 }
 }  // namespace
 }  // namespace uw

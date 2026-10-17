@@ -29,11 +29,12 @@
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
-#include "ui/views/interaction/element_tracker_views.h"
+#include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/task_name_field.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
@@ -43,6 +44,21 @@ constexpr NSEventModifierFlags kCtrlCmd =
     NSEventModifierFlagControl | NSEventModifierFlagCommand;
 constexpr NSEventModifierFlags kOptionCmd =
     NSEventModifierFlagOption | NSEventModifierFlagCommand;
+
+// The name field on the row of `task` under `view`.
+TaskNameField* NameFieldOf(views::View* view,
+                           const tab_groups::TabGroupId& task) {
+  if (TaskNameField* field = views::AsViewClass<TaskNameField>(view);
+      field && field->group() == task) {
+    return field;
+  }
+  for (views::View* child : view->children()) {
+    if (TaskNameField* field = NameFieldOf(child, task)) {
+      return field;
+    }
+  }
+  return nullptr;
+}
 
 NSMenuItem* MenuItemWithTag(NSMenu* menu, int tag) {
   for (NSMenuItem* item in menu.itemArray) {
@@ -143,7 +159,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
       {IDC_CLOSE_TAB_GROUP, @"w", kCtrlCmd},
       {kConfirmSuggestion, @"\r", kCtrlCmd},
       {TabOrganizationController::kUndo, @"z", kOptionCmd},
-      {kSuggestTaskName, @"", 0},
+      {kNameTask, @"", 0},
       {kShowOrganizerActivity, @"", 0},
       {kPauseOrganizationForAnHour, @"", 0},
       {kPauseOrganizationUntilLaunch, @"", 0},
@@ -314,18 +330,21 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   EXPECT_FALSE(CanRunWindowCommand(browser(), kGoToTask1 + 2));
 }
 
-IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdROpensTheTaskName) {
+// In the sidebar the task's name turns into a field on its row.
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdRRenamesTheTaskOnItsRow) {
   tabs::TabInterface* tab = tabs()->GetTabAtIndex(0);
-  ASSERT_TRUE(controller()->MoveToNewTask({Id(tab)}, u"Plan"));
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask({Id(tab)}, u"Plan");
+  ASSERT_TRUE(task);
   base::RunLoop().RunUntilIdle();
+  TaskNameField* field =
+      NameFieldOf(BrowserView::GetBrowserViewForBrowser(browser()), *task);
+  ASSERT_TRUE(field);
+  EXPECT_FALSE(field->editing());
 
   Press(ui::VKEY_R, kCtrlCmd);
-  ASSERT_TRUE(base::test::RunUntil([&] {
-    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
-        kTabGroupEditorBubbleId,
-        views::ElementTrackerViews::GetContextForView(
-            BrowserView::GetBrowserViewForBrowser(browser())));
-  }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return field->editing(); }));
+  EXPECT_EQ(field->GetText(), u"Plan");
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,

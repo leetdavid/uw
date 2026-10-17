@@ -91,6 +91,8 @@ const char* ResultName(Kind kind) {
       return "unreadable";
     case Kind::kDropped:
       return "dropped";
+    case Kind::kNameFailed:
+      return "name_failed";
     case Kind::kNaming:
       return "new_task";
     case Kind::kAsking:
@@ -187,14 +189,13 @@ base::CallbackListSubscription AutomaticOrganizer::ObserveNaming(
   return naming_changed_.Add(std::move(callback));
 }
 
-bool AutomaticOrganizer::CanSuggestName() const {
+bool AutomaticOrganizer::CanAskForName() const {
   return !profile()->IsOffTheRecord() &&
          IsComplete(ReadAiConnectionConfig(profile()->GetPrefs()));
 }
 
-void AutomaticOrganizer::SuggestName(const std::string& task,
-                                     NameFailedCallback on_failed) {
-  if (!CanSuggestName() || IsNaming(task)) {
+void AutomaticOrganizer::AskForName(const std::string& task) {
+  if (!CanAskForName() || IsNaming(task)) {
     return;
   }
   // The request describes the first tab of the task and lists the others.
@@ -214,15 +215,28 @@ void AutomaticOrganizer::SuggestName(const std::string& task,
   std::unique_ptr<RemoteModelClient> client =
       first ? PrepareNaming(request, MemberTitles(*first)) : nullptr;
   if (!client) {
-    std::move(on_failed).Run(std::u16string());
+    NameFailed(task, std::u16string());
     return;
   }
   RemoteModelClient* sender = client.get();
-  asked_names_[task] = AskedName{std::move(client), std::move(request.naming),
-                                 std::move(on_failed)};
+  asked_names_[task] = AskedName{std::move(client), std::move(request.naming)};
   UpdateNaming();
   sender->Send(base::BindOnce(&AutomaticOrganizer::OnAskedName,
                               weak_factory_.GetWeakPtr(), task));
+}
+
+void AutomaticOrganizer::DropAskedName(const std::string& task) {
+  if (asked_names_.erase(task)) {
+    UpdateNaming();
+  }
+}
+
+void AutomaticOrganizer::NameFailed(const std::string& task,
+                                    std::u16string reason) {
+  Event event{Event::Kind::kNameFailed, std::move(reason),
+              controller_->TaskTitle(task)};
+  event.task = task;
+  events_.Notify(event);
 }
 
 base::WeakPtr<AutomaticOrganizer> AutomaticOrganizer::AsWeakPtr() {
@@ -926,7 +940,7 @@ void AutomaticOrganizer::OnAskedName(const std::string& task,
   if (name) {
     controller_->NameTask(task, *name);
   } else {
-    std::move(asked.on_failed).Run(reason);
+    NameFailed(task, reason);
   }
 }
 

@@ -15,7 +15,7 @@ enum WindowCommand {
   kGoToTask9 = kGoToTask1 + 8,
   kGoToScratchpad,
   kRenameTask,
-  kSuggestTaskName,
+  kNameTask,
   kConfirmSuggestion,
   kPauseOrganizationForAnHour,
   kPauseOrganizationUntilLaunch,

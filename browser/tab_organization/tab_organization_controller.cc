@@ -158,8 +158,12 @@ bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
   chrome::NewTab(window, NewTabTypes::kNewTabCommand);
   if (const std::optional<PageId> page =
           self->IdFor(self->tabs_->GetActiveTab())) {
-    self->MoveToNewTask({*page},
-                        l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
+    const std::optional<tab_groups::TabGroupId> task = self->MoveToNewTask(
+        {*page}, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
+    // The user made the task, so it opens ready for its name.
+    if (task && self->Vertical()) {
+      self->RenameOnItsRow(task->ToString());
+    }
   }
   return true;
 }
@@ -611,6 +615,24 @@ void TabOrganizationController::Remember(const std::optional<PageId>& id) {
   if (id) {
     recent_.insert(recent_.begin(), *id);
   }
+}
+
+void TabOrganizationController::RenameOnItsRow(const std::string& task) {
+  rename_ = task;
+  renames_.Notify();
+}
+
+bool TabOrganizationController::TakeRename(const std::string& task) {
+  if (task.empty() || rename_ != task) {
+    return false;
+  }
+  rename_.clear();
+  return true;
+}
+
+base::CallbackListSubscription TabOrganizationController::ObserveRenames(
+    base::RepeatingClosure callback) {
+  return renames_.Add(std::move(callback));
 }
 
 std::optional<TabOrganizationController::UndoMove>

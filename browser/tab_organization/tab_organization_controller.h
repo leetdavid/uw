@@ -175,6 +175,14 @@ class TabOrganizationController : public TabStripModelObserver,
   // one uw gave: uw replaces it once the task has outgrown it.
   void NameAutomatically(const std::string& task);
 
+  // Asks the row of `task` in the sidebar to turn its name into a field, now
+  // or once the row is shown. Rows that show tasks observe the requests and
+  // take the one for their task.
+  void RenameOnItsRow(const std::string& task);
+  bool TakeRename(const std::string& task);
+  base::CallbackListSubscription ObserveRenames(
+      base::RepeatingClosure callback);
+
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
   // Runs with the pages the user moved by a command, a drag, a native group
   // change, or an undo. Each moved branch is listed in full.
@@ -274,6 +282,9 @@ class TabOrganizationController : public TabStripModelObserver,
   bool dragging_ = false;
   bool update_pending_ = false;
   base::RepeatingClosureList changed_;
+  // The task whose row should turn its name into a field.
+  std::string rename_;
+  base::RepeatingClosureList renames_;
   base::RepeatingCallbackList<void(const std::vector<PageId>&)> manual_moves_;
   ui::ScopedUnownedUserData<TabOrganizationController> user_data_;
   base::WeakPtrFactory<TabOrganizationController> weak_factory_{this};

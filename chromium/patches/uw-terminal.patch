@@ -98,7 +98,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..26a0ebe085a96ed6013bc9873efddc6ca0e42380 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b0531aceb 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -214,7 +214,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..26a0ebe085a96ed6013bc9873efddc6c
 +          Item().is_separator(),
 +          Item(IDS_UW_GO_TO_TASK_MAC).submenu(std::move(go_to_task)),
 +          Item(IDS_UW_RENAME_TASK_MAC).command_id(uw::kRenameTask),
-+          Item(IDS_UW_SUGGEST_NAME_MAC).command_id(uw::kSuggestTaskName),
++          Item(IDS_UW_NAME_TASK_MAC).command_id(uw::kNameTask),
 +          Item(IDS_UW_CLOSE_TASK_MAC)
 +              .command_id(IDC_CLOSE_TAB_GROUP)
 +              .key_equivalent(@"w", NSEventModifierFlagCommand |

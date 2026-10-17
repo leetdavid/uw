@@ -36,8 +36,12 @@ class ActivityCard : public views::FlexLayoutView {
 
  public:
   // `undo` reverses the move the card reports. `accept` carries out the
-  // suggestion it shows.
-  ActivityCard(base::RepeatingClosure undo, base::RepeatingClosure accept);
+  // suggestion it shows. `retry` asks again for the name of the task whose
+  // Name Task failed.
+  using RetryCallback = base::RepeatingCallback<void(const std::string&)>;
+  ActivityCard(base::RepeatingClosure undo,
+               base::RepeatingClosure accept,
+               RetryCallback retry);
   ActivityCard(const ActivityCard&) = delete;
   ActivityCard& operator=(const ActivityCard&) = delete;
   ~ActivityCard() override;
@@ -58,13 +62,18 @@ class ActivityCard : public views::FlexLayoutView {
   bool offers_undo() const;
   // True while the card shows a suggestion the user can confirm.
   bool offers_accept() const;
+  // True while the card offers to ask again for a name that did not come.
+  bool offers_retry() const;
 
  private:
   void OnActionPressed();
 
   base::RepeatingClosure undo_;
   base::RepeatingClosure accept_;
+  RetryCallback retry_;
   bool accepts_ = false;
+  // The task to name again, while the card reports a failed Name Task.
+  std::string retry_task_;
   raw_ptr<views::Throbber> throbber_ = nullptr;
   raw_ptr<views::ImageView> icon_ = nullptr;
   raw_ptr<views::Label> headline_ = nullptr;
@@ -72,7 +81,8 @@ class ActivityCard : public views::FlexLayoutView {
   raw_ptr<views::ProgressBar> meter_ = nullptr;
   raw_ptr<views::Label> confidence_ = nullptr;
   raw_ptr<views::Label> source_ = nullptr;
-  // Undo after a move, Confirm under a suggestion.
+  // Undo after a move, Confirm under a suggestion, Try Again after a failed
+  // Name Task.
   raw_ptr<views::MdTextButton> action_ = nullptr;
 };
 

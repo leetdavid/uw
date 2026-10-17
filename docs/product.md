@@ -156,7 +156,7 @@ Agreed: one Undo reverses a complete organization action, including task creatio
 
 Agreed: expose organization controls through a custom button menu inside the tab sidebar, so manual organization remains usable while automatic behavior is developed.
 
-Built: an "Organize" pill at the foot of the sidebar. Its menu has "New Task", "Undo Tab Organization", the pause choices, "Show Organizer Activity", and "Tab Organization Settings…", in title case like the other menus. Tab and branch actions such as "Move to new task" and "Close branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize menu when they are built. Changing: the [sidebar menus plan](plans/sidebar-menus.md#organize-menu), agreed on 2026-10-17, makes the Organize menu a card with a status line and one pause row, and the task menu a card with naming on the task's row.
+Built: an "Organize" pill at the foot of the sidebar. It opens a card with a status line, one pause row, "Undo Move", "Show Activity", and "Settings…". A task's ⋮ button and a right-click on its row open the task's card, and a task is renamed on its own row. See the [sidebar menus plan](plans/sidebar-menus.md). Tab and branch actions such as "Move to New Task" and "Close Branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize card when they are built.
 
 Agreed on 2026-10-15: the [new button](plans/keyboard-and-mouse.md#new-button), a "+" with a menu, sits at the right end of the sidebar's foot, across from Organize, and replaces the "+" under the tab list.
 

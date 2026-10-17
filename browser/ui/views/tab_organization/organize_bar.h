@@ -79,6 +79,8 @@ class OrganizeBar : public views::FlexLayoutView,
   void Undo();
   // Carries out the suggestion the card shows.
   void AcceptSuggestion();
+  // Try Again after a failed Name Task.
+  void AskForNameAgain(const std::string& task);
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override;

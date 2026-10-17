@@ -28,7 +28,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Move to Scratchpad | Ctrl+Cmd+S | menu only |
 | Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | new. Selects the tab last used in that task. |
 | Go to the Scratchpad | Ctrl+Cmd+0 | new |
-| Rename task | Ctrl+Cmd+R | new. Opens the task's name field. |
+| Rename task | Ctrl+Cmd+R | new. Turns the name on the task's row into a field. With horizontal tabs, opens Chromium's task editor. |
 | Close task, next task, previous task | Ctrl+Cmd+W, X, Z | Chromium's, unchanged |
 | Confirm the organizer's suggestion | Ctrl+Cmd+Return | button on the activity card |
 | Undo tab organization | Option+Cmd+Z | exists |
@@ -36,7 +36,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
 | New terminal | Ctrl+Shift+\` | new |
 | Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
-| Move to task, pause, organizer activity, Suggest a name | menu, and the command bar later | no key |
+| Move to task, pause, organizer activity, Name Task | menu, and the command bar later | no key |
 
 ### Terminal key
 
