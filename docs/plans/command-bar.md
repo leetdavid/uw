@@ -86,6 +86,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - A cup is always the metric cup of 250 ml, a teaspoon (`tsp`) 5 ml, and a tablespoon (`tbsp`) 15 ml, so `1/2 cup to tsp` shows 25 tsp. Agreed on 2026-10-17.
 - Units run together read as their product, as `Wh` does: `Wm` is W·m, and `Nm` is N·m. A sum reads left to right, so `200 N / 5 Wm/s` shows 40 m⁻², and `200 N / (5 Wm/s)` shows 40 s²/m². Agreed on 2026-10-17.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
+- Plain math shows up to 10 significant digits, an answer with units up to 3, and a currency up to 2 decimals: `2/3` shows 0.6666666667, `5 km` shows 3.11 mi, and `100 usd` shows HK$777.40. Trailing zeros are dropped, except a currency's cents. Return copies the answer as shown. Agreed on 2026-10-17.
 - The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
 - A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
 - Currency uses the European Central Bank's daily reference rates, fetched at most once a day. Fetching them sends nothing the user typed. Offline, the last rates fetched are used and their date is shown.
