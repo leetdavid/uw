@@ -1,6 +1,6 @@
 # Sidebar menus
 
-Status: scope agreed on 2026-10-17. The designs, T113, are next. Not built.
+Status: scope agreed on 2026-10-17, and the designs, T113, drawn the same day for sign-off. Not built.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Naming a task already runs through the language model, and the activity card already reports failures. The risk is editing a name on Chromium's task row and putting uw's card where Chromium opens its group editor without breaking what Chromium still uses that editor for. Each Chromium update can move the views both touch.
 
@@ -55,7 +55,13 @@ The task menu and the Organize menu become uw cards in the [Arc-style look](arc-
 
 ## Design
 
-To be drawn on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Sidebar menus", as T113.
+On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Sidebar menus", drawn on 2026-10-17:
+
+- "Task menu: the card": the card open under a task's row.
+- "Organize menu: the card": the card over the Organize button, paused with 42 minutes left.
+- "Sidebar menus: every state": renaming on the row, a new task, Name Task asking and failed, the Organize menu organizing, paused until restart, off, and waiting for a model, and both cards in dark mode.
+
+The rules, with every size and color, are in the `uw-menus` guide. Two details the designs added: both cards are 264px wide so the pause chips fit, and Undo Move cuts the tab's title before the task's name.
 
 ## Stages
 
