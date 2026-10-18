@@ -111,7 +111,7 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 
 - The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar and in horizontal tabs.
 - Once the command bar lands, the task row's "+" opens it instead of a blank tab.
-- The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16.
+- The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
 
 ### Menu of empty sidebar space
 
