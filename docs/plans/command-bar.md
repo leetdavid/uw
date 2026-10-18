@@ -84,6 +84,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
 - A power or a current times any time answers in watt-hours or amp-hours, with the prefix typed: `2 kW * 30 min` shows 1 kWh, and `500 mA * 90 min` shows 750 mAh. Agreed on 2026-10-19.
 - `min` is minutes, unless `(` follows it.
+- Spelled-out unit names and currency codes ignore case: `milliAmp`, `Kilometers`, and `usd` work. Unit symbols keep it, so `mA` and `MA` stay different. Agreed on 2026-10-19.
 - A cup is always the metric cup of 250 ml, a teaspoon (`tsp`) 5 ml, and a tablespoon (`tbsp`) 15 ml, so `1/2 cup to tsp` shows 25 tsp. Agreed on 2026-10-17.
 - Units run together read as their product, as `Wh` does: `Wm` is W·m, and `Nm` is N·m. A sum reads left to right, so `200 N / 5 Wm/s` shows 40 m⁻², and `200 N / (5 Wm/s)` shows 40 s²/m². Agreed on 2026-10-17.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
