@@ -257,32 +257,51 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
   EXPECT_TRUE(clicks.ends_with("m\n")) << clicks;
 }
 
-// A Cmd-click on a link goes to a program that asks for the mouse, which opens
-// the link itself, as in Ghostty. The page opens no tab of its own.
+// A Cmd-click is the browser's: the page opens the link, and a program that
+// asks for the mouse never sees the click. Such a program gets other clicks,
+// such as the Ctrl-click herdr opens links on, and the page opens no tab.
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
-                       ACmdClickedLinkGoesOnlyToAProgramThatAsksForTheMouse) {
+                       ACmdClickOpensALinkThatOtherClicksLeaveToTheProgram) {
   content::WebContents* terminal = OpenTerminal();
-  const int tabs = browser()->tab_strip_model()->count();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int count = tabs->count();
   Type(u"cd " + Folder() +
        u" && printf '\\033[2J\\033[Hhttps://example.com/link\\n"
-       u"\\033[?1000h\\033[?1006h\\033]0;link\\007' && cat -v > clicks\r");
+       u"\\033[?1000h\\033[?1006h\\033]0;link\\007' && stty -icanon && "
+       u"cat > clicks\r");
   // The file appears once cat has started. The title follows the request for
   // the mouse, so it shows once the page has read it.
   WaitForFile("clicks", [](const std::string&) { return true; });
   EXPECT_TRUE(base::test::RunUntil([&] {
     return terminal->GetTitle() == u"link";
   })) << terminal->GetTitle();
-  content::SimulateMouseClickAt(contents(), blink::WebInputEvent::kMetaKey,
-                                blink::WebMouseEvent::Button::kLeft,
-                                gfx::Point(40, 14));
-  Type(u"\r");
-  Press('d', ui::DomCode::US_D, ui::VKEY_D, /*control=*/true, false, false);
+  // The link is in the first row.
+  const gfx::Point link(40, 14);
+  content::SimulateMouseClickAt(terminal, blink::WebInputEvent::kControlKey,
+                                blink::WebMouseEvent::Button::kLeft, link);
+  // Ctrl is reported as 16, in a press and a release.
+  WaitForFile("clicks", [](const std::string& text) {
+    return text.starts_with("\x1b[<16;") && text.ends_with('m');
+  });
+  EXPECT_EQ(tabs->count(), count);
+
+  content::SimulateMouseClickAt(terminal, blink::WebInputEvent::kMetaKey,
+                                blink::WebMouseEvent::Button::kLeft, link);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetVisibleURL() ==
+          GURL("https://example.com/link")) {
+        return true;
+      }
+    }
+    return false;
+  }));
+  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(terminal));
+  Type(u"x");
   const std::string clicks = WaitForFile(
-      "clicks", [](const std::string& text) { return text.ends_with('\n'); });
-  // Cmd is reported as 8. The click is in the link's first row.
-  EXPECT_TRUE(clicks.starts_with("^[[<8;")) << clicks;
-  EXPECT_NE(clicks.find(";1M"), std::string::npos) << clicks;
-  EXPECT_EQ(browser()->tab_strip_model()->count(), tabs);
+      "clicks", [](const std::string& text) { return text.ends_with('x'); });
+  EXPECT_EQ(clicks.find("\x1b[<8;"), std::string::npos) << clicks;
+  EXPECT_EQ(tabs->count(), count + 1);
 }
 
 // A program that asks for the mouse gets the wheel as mouse buttons, also on

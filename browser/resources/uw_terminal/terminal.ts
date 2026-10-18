@@ -155,13 +155,17 @@ terminal.attachCustomWheelEventHandler((event: WheelEvent) => {
   return true;
 });
 
-// A program that asks for the mouse gets a Cmd-click and opens a link itself,
-// as in Ghostty. ghostty-web would open the link as well.
-window.addEventListener('click', (event: MouseEvent) => {
-  if ((event.metaKey || event.ctrlKey) && terminal.hasMouseTracking()) {
+// A Cmd-click is the browser's, as Cmd keys are: ghostty-web opens the link,
+// and a program that asks for the mouse never sees the click. ghostty-web
+// would report it as an Alt-click too, which herdr ignores; herdr opens links
+// on Ctrl-click, which a Mac page gets no click event for.
+function keepCmdClickFromProgram(event: MouseEvent) {
+  if (event.metaKey && terminal.hasMouseTracking()) {
     event.stopPropagation();
   }
-}, {capture: true});
+}
+window.addEventListener('mousedown', keepCmdClickFromProgram, {capture: true});
+window.addEventListener('mouseup', keepCmdClickFromProgram, {capture: true});
 
 let layout: KeyboardLayoutMap|undefined;
 function readLayout() {
