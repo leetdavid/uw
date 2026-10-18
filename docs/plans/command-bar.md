@@ -82,10 +82,12 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - The answer shows when the text has a number, is not only a number, and mathjs reads all of it apart from an unfinished end: `5 * pi` answers, and `pi`, `cup`, and `2024` show nothing. A no-answer card shows only when the text also has an operator or "to", "in", or "as", and a unit mathjs knows: `1/2 cup flour` says flour is not a unit. Other text gets no card, so `covid-19` and `iphone 15 pro` stay searches. Agreed on 2026-10-17.
 - Units and currencies mix in one sum: `10 HKD + 10 EUR to USD`, or `20 kg * 10 m/s/s / 5W`, which shows 40 s/m.
 - The answer is in mathjs's units, which combine base units into named ones, so kg·m/s² becomes N. Typed units that multiply into a unit with its own name stay in it: `100 W * 3h` shows 300 Wh, and `2 A * 3 h` shows 6 Ah. `to N/W` converts to another unit. Changed on 2026-10-17: before, the typed units were kept.
+- A power or a current times any time answers in watt-hours or amp-hours, with the prefix typed: `2 kW * 30 min` shows 1 kWh, and `500 mA * 90 min` shows 750 mAh. Agreed on 2026-10-19.
 - `min` is minutes, unless `(` follows it.
 - A cup is always the metric cup of 250 ml, a teaspoon (`tsp`) 5 ml, and a tablespoon (`tbsp`) 15 ml, so `1/2 cup to tsp` shows 25 tsp. Agreed on 2026-10-17.
 - Units run together read as their product, as `Wh` does: `Wm` is W·m, and `Nm` is N·m. A sum reads left to right, so `200 N / 5 Wm/s` shows 40 m⁻², and `200 N / (5 Wm/s)` shows 40 s²/m². Agreed on 2026-10-17.
 - A half-typed sum shows the answer for the part that is complete: `10m *` shows 10 m.
+- The answer is one card, with no rows of the same value in other units under it. `to ft` converts. Agreed on 2026-10-19.
 - Plain math shows up to 10 significant digits, an answer with units up to 3, and a currency up to 2 decimals: `2/3` shows 0.6666666667, `5 km` shows 3.11 mi, and `100 usd` shows HK$777.40. Trailing zeros are dropped, except a currency's cents. Return copies the answer as shown. Agreed on 2026-10-17.
 - The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
 - A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
