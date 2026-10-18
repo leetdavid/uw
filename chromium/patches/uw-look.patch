@@ -161,7 +161,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
  
  SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8407eeeac 100644
+index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef656d97e09 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -9,6 +9,7 @@
@@ -224,7 +224,20 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
    }
  
    sync_icon_->SetProperty(views::kMarginsKey,
-@@ -338,6 +361,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -265,6 +288,12 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
+ }
+ 
+ bool TabGroupHeaderView::OnKeyPressed(const ui::KeyEvent& event) {
++  // uw: keys typed into the task's name field are not the row's.
++  if (uw::TaskNameField* field = uw::TaskNameField::On(this);
++      field && field->editing()) {
++    return false;
++  }
++
+   if ((event.key_code() == ui::VKEY_SPACE ||
+        event.key_code() == ui::VKEY_RETURN) &&
+       !delegate_->IsGroupFocused()) {
+@@ -338,6 +367,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
      views::ElementTrackerViews::GetInstance()->NotifyViewActivated(
          kTabGroupHeaderElementId, this);
    }
@@ -238,7 +251,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
  }
  
  void TabGroupHeaderView::OnGestureEvent(ui::GestureEvent* event) {
-@@ -388,9 +418,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+@@ -388,9 +424,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    }
    UpdateEditorBubbleButtonVisibility();
@@ -252,7 +265,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
  #if BUILDFLAG(IS_LINUX)
    // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
    // Wayland/X11 due to asynchronous cursor updates during mouse exit events.
-@@ -527,18 +561,26 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -527,18 +567,26 @@ void TabGroupHeaderView::OnDataChanged(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
      SkColor foreground_color = GetForegroundColor();
@@ -281,7 +294,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
      }
      if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
-@@ -557,16 +599,12 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -557,16 +605,12 @@ void TabGroupHeaderView::OnDataChanged(
  
      // Update collapse icon.
      if (collapse_icon_) {
@@ -302,7 +315,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
      }
  
      // Update background.
-@@ -627,6 +665,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -627,6 +671,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    UpdateAccessibleName();
  }
  
@@ -318,7 +331,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..7dc41b696fe38fbaac2da1b8e2a04ce8
  void TabGroupHeaderView::UpdateAccessibleName() {
    if (features::IsTabGroupHoverCardsEnabled()) {
      GetViewAccessibility().SetName(tab_groups::GetHoverCardAccessibilityText(
-@@ -673,6 +720,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -673,6 +726,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {

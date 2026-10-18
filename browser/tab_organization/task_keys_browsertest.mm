@@ -19,9 +19,12 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/prefs/pref_service.h"
+#include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gtest_mac.h"
@@ -88,6 +91,15 @@ class TaskKeysBrowserTest : public headless::HeadlessModeBrowserTest {
         browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
     [window performKeyEquivalent:cocoa_test_event_utils::SynthesizeKeyEvent(
                                      window, /*keyDown=*/true, key, modifiers)];
+  }
+
+  // Types a key into the focused view, the way macOS hands the window a key
+  // that is no shortcut.
+  void Type(ui::KeyboardCode key) {
+    NSWindow* window =
+        browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+    [window.contentView keyDown:cocoa_test_event_utils::SynthesizeKeyEvent(
+                                    window, /*keyDown=*/true, key, 0)];
   }
 
   tabs::TabInterface* NewTab() {
@@ -345,6 +357,27 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdRRenamesTheTaskOnItsRow) {
   Press(ui::VKEY_R, kCtrlCmd);
   ASSERT_TRUE(base::test::RunUntil([&] { return field->editing(); }));
   EXPECT_EQ(field->GetText(), u"Plan");
+}
+
+// Space goes into the name, though on the row it opens or collapses the task.
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, SpaceTypesIntoTheNameField) {
+  tabs::TabInterface* tab = tabs()->GetTabAtIndex(0);
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask({Id(tab)}, u"Plan");
+  ASSERT_TRUE(task);
+  base::RunLoop().RunUntilIdle();
+  TaskNameField* field =
+      NameFieldOf(BrowserView::GetBrowserViewForBrowser(browser()), *task);
+  ASSERT_TRUE(field);
+  field->Start();
+  ASSERT_TRUE(field->HasFocus());
+  field->SetText(u"Plan");
+
+  Type(ui::VKEY_SPACE);
+  Type(ui::VKEY_A);
+  EXPECT_EQ(field->GetText(), u"Plan a");
+  EXPECT_FALSE(
+      tabs()->group_model()->GetTabGroup(*task)->visual_data()->is_collapsed());
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
