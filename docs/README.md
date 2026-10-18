@@ -58,6 +58,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Command bar plan](plans/command-bar.md): one panel on Cmd+T and Cmd+L for commands, tasks, tabs, and the web, ranked by use, that can also send the typed text to a chat or a terminal.
 - [Command bar spike](research/command-bar-spike.md): what the panel, the searchbox handler, and headless tests did, and the keyboard checks still open.
 - [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
+- [ADR 0011: uw keeps its own key list](adr/0011-uw-keeps-its-own-key-list.md): why keys are changed in uw's settings and not through macOS App Shortcuts.
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Logo](logo.md): the mark, its colors and files, and what is still undecided.
 

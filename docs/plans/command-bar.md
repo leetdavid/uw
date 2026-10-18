@@ -72,7 +72,7 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 
 - An alias is a short word for a command, such as `mt` for Move to task. Short words for pages stay Chromium's site search shortcuts.
 - The user can record a key for any command from its result menu. It works while a uw window is in front, and nowhere else.
-- A recorded key must include Cmd, so it works in a terminal tab. uw refuses a key already in use and names the command that has it.
+- A recorded key goes into uw's key list and follows its rules: see [Keyboard shortcuts](keyboard-and-mouse.md#keyboard-shortcuts). Changed on 2026-10-19: a key already in use now moves to the new command instead of being refused.
 
 ### Math, units, currency, and translation
 
@@ -110,7 +110,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - Open tabs, history, bookmarks, past searches, and site search shortcuts come from Chromium's suggestion engine, asked for instant results only with `AutocompleteInput::set_omit_asynchronous_matches`, the mode Chromium uses for pasted text. The spike used the new tab page's searchbox handler (`chrome/browser/ui/webui/searchbox/`), which loads a picked page inside the panel. T98 subclasses it as `UwCommandBarHandler`: it opens a picked row in a new tab, runs an open-tab row's switch action, names each row's kind for the page, and asks for instant results only through a hook `uw-command-bar.patch` adds to Chromium's `SearchboxHandler`. The panel's `OpenURLFromTab` hands the page to the window, which opens it where `chrome::NewTab` would put a blank tab. The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
 - Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
-- What uw learns from picks, aliases, recorded keys, and the default currency are profile prefs. A history deletion clears what uw learned.
+- What uw learns from picks, aliases, and the default currency are profile prefs. Recorded keys are the same in every profile. A history deletion clears what uw learned.
 - Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
 - Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed. The chat's agent adopts the selected tab as tab 1, as it adopts its own tabs after a restart.
 - Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
@@ -133,7 +133,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 10. T62: Cmd+L and the address click open it.
 11. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
 12. T64: Cmd+Shift+A opens it narrowed to tabs.
-13. T65: aliases and recorded keys.
+13. T65: aliases, and recording a key from the result menu into T122's key list.
 
 ## Acceptance checks
 
@@ -150,7 +150,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 11. A test model server receives no request while text is typed, and one request when a translation row is picked or Cmd+Return is pressed.
 12. Cmd+Return opens a chat in front, with the text as its first message and the selected tab as the agent's tab 1, which the agent can read.
 13. Option+Return runs the text in a new terminal and selects it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
-14. An alias runs its command. A recorded key without Cmd is refused, a key in use is refused with its owner named, and a recorded key runs its command after a restart.
+14. An alias runs its command. A key recorded from the result menu shows in the Keyboard shortcuts section and runs its command after a restart.
 15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, `1/2 cup to tsp` shows 25 tsp, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
@@ -158,4 +158,4 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 ## Open questions
 
 - Which other address bar habits Cmd+L must keep: paste and go, dragging the address out, the site search chip, and extensions' address bar keywords.
-- Where aliases and recorded keys are listed and edited: a section of uw's settings page, the command bar alone, or both.
+- Where aliases are listed and edited: a section of uw's settings page, the command bar alone, or both. Keys are listed and edited in the [Keyboard shortcuts](keyboard-and-mouse.md#keyboard-shortcuts) section, agreed on 2026-10-19.

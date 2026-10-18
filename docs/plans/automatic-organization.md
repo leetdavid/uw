@@ -44,7 +44,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - uw waits 30 seconds for an answer, in a test and while browsing, so a test that passes means the model is fast enough to use.
 - A switch at the top of the settings page turns automatic organization off and on. Off sends nothing and keeps both connections. On saves and tests the connections like "Save and validate", and stays off when a test fails. Agreed on 2026-10-12.
 - "Load available models" lists a connection's models with `GET <base>/models`. When the endpoint has no such list, the user types the model ID.
-- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). A terminal tab sends its shell's folder instead of an excerpt, with the home folder written as `~`. For a tab in a task that uw named, a decision model's request also lists the titles of up to 20 of the tabs that make up that task, for the [name check](#name-check). A naming call for a task that already holds tabs lists them too.
+- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). A terminal tab sends its shell's folder instead of an excerpt, with the home folder written as `~`. For a tab in a task that uw named, a decision model's request also lists the titles of up to 20 of the tabs that make up that task, for the [name check](#name-check). A naming call for a task that already holds tabs lists them too. Agreed on 2026-10-19 as T121, to be built only if a replay of the log shows more right joins: every request lists the titles of up to 20 tabs of each task, so the model judges a task by its tabs as well as its name. The settings page's list of what is sent changes with it.
 - Pinned tabs are outside the tab tree. The organizer sends nothing about a pinned tab and never moves one. Pinning a tab drops the request that was out for it. A tab opened from a pinned tab is a regular tab. Agreed on 2026-10-12.
 - The source-tab relationship is sent only for a tab that a link opened and that has followed links since. A blank new tab, and a tab the user took elsewhere by typing an address, searching, or picking a bookmark, has no source tab.
 - A request asks two questions about placement. See [Placement rules](#placement-rules). Agreed on 2026-10-12.
@@ -54,10 +54,19 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - A decision model is also asked, about every tab, whether the page is a [hub](#hub-pages) or about one subject. uw never makes a hub into a task. Agreed on 2026-10-13.
 - A task that still has the provisional name `New task` is not offered as an answer, because its name says nothing about it. A branch inside one leaves only to join a named task. It does not start a second task: the task it is in is the one it starts, and gets its name then.
 - The settings page has three sliders, one for each [threshold](#thresholds): move a tab, start a task, and rename a task. Each runs from `0.50` to `0.95` in steps of `0.05` and shows its value. A change applies to the next answer. The user asked for a bar for each threshold on 2026-10-12, for now. It replaces the single "Sorting" slider of earlier that day, whose number for moving a tab had also come to decide renames.
-- A tab is asked about when a link opens it, when its title changes, and when it goes to another site, 750 ms after the latest such change. A new path or new parameters under the same title on the same site ask nothing and leave an outstanding request alone: web apps keep their state in the address. The user asked for this on 2026-10-12 as "only when the title changes"; counting a change of site is uw's addition and open to review.
+- A tab is asked about once it opens here and has a title, 750 ms after the latest change. After that, uw asks again only when it shows something else. Agreed on 2026-10-19 as T120. Until then every title change asked again, as the user asked on 2026-10-12.
+  - A tab in a task is asked again only when it goes to another site, or when the user starts something new in it: types an address, searches from the address bar, or picks a bookmark. A title change on the same site asks nothing. On 2026-10-16 and 17 the log held 388 repeat requests, and 357 of them followed a title change on the same site. One tab moved five times in two minutes inside one web app.
+  - A tab in the Scratchpad, and a [hub](#hub-pages) anywhere, is asked again on the same site only when its title and its address both differ from the ones uw last asked about. A page that updates its own title, such as a clock or an unread count, asks nothing. In the whole log 346 of 765 title changes on the same site kept the address.
+  - A reload, or a return to a title and address uw already asked about, asks nothing.
 - A page that is still loading and has no title yet is not looked at until it has one or has finished loading, so its address is not sent as its title.
 - Restored tabs and tabs dragged in from another window wait for their next change, or until [their branch is about to change](#branch-moves). A change invalidates that tab's outstanding request. Closing a branch or moving it to another window invalidates it too.
-- A manual move holds the branch until that tab's next title or site change. A child nested by hand is held longer: see [Branch moves](#branch-moves). A response that arrives after a manual move is dropped. Commands, drags, native group changes, and undo all count as manual moves.
+- A manual move holds the branch until that tab goes to another site or the user starts something new in it. Changed on 2026-10-19; before, the next title change ended the hold. A child nested by hand is held longer: see [Branch moves](#branch-moves). A response that arrives after a manual move is dropped. Commands, drags, native group changes, and undo all count as manual moves.
+- **Keep here** makes a [kept tab](../CONTEXT.md#language): uw never asks about it and never moves it, in a task or in the Scratchpad. Agreed on 2026-10-19 as T120, after ChatGPT tabs the user opened for a question about their task left it at least 7 times in the log.
+  - It is in the tab's right-click menu and the Tab menu, on Ctrl+Cmd+K. With several tabs selected it keeps all of them.
+  - Running it again, or moving the tab by hand, lets the tab go.
+  - A mark on the tab's row shows it. The mark waits for a design.
+  - A kept tab under a page that leaves stays behind, like a tab placed by hand.
+  - The hold survives a restart. It is not an organization action, so undo does not reverse it.
 - Tabs that sit under each other and agree move together. The top one detaches from its old parent. See [Branch moves](#branch-moves).
 - Every automatic action is one undoable organization action. It shows the activity card at the foot of the sidebar with Undo, tints the moved tab for a moment, and never takes focus. After the card disappears, "Undo tab organization" in the Organize menu and its [shortcut](native-tab-tree.md#scope) still work. Closed pages are never reopened.
 - By default the activity card shows only a move or a new task: "Moved to <task>" or "Created task <task>", the tab's title, and Undo. It also shows the first request that fails after one that worked, with the HTTP status or network error, and then stays quiet about failures until a request works again. Agreed on 2026-10-15. Before, it always showed each request on its way and the model's numbers.
@@ -89,7 +98,9 @@ Agreed on 2026-10-12. `components/tab_organization/placement` holds them. The th
 | The same, short of either threshold | Nothing. |
 
 - A [hub](#hub-pages) outside every task is a one-off whatever its other scores are: it starts no task and gives none a name.
+- A hub in a task stays there. See [Hub pages](#hub-pages).
 - Joining another task comes before the name check.
+- Agreed on 2026-10-19 as T121, to be built only if a replay of the log shows a gain: a tab in a task leaves it, for another task, a new task, or the Scratchpad, only when the model also says it is a different piece of work from the task's other tabs, at the move threshold. Not fitting the task's name is no longer enough. The [name check](#name-check) question is asked for every task with other tabs, including names the user typed. Only a generated name is ever replaced. In the log the "uw" task lost doop.design twice, and a tab the model scored `0.98` the same work as its task moved to another one.
 - A tab opened from another tab starts in that tab's task. It leaves on its own, like any other tab, when the page above it stays.
 - The table reads one answer. [Branch moves](#branch-moves) says how the answers about the tabs of a branch combine.
 
@@ -117,8 +128,9 @@ Agreed on 2026-10-13. `PlaceBranch` in `components/tab_organization/placement` h
 Agreed on 2026-10-13. A hub is a page the user comes back to for many things: a home page, a feed, an inbox, a dashboard, a list. The user asked that the model tell these apart and that uw never make one into a task. A feed page in the Scratchpad had been going into the task that the first article opened from it started.
 
 - Every decision request asks one more choice question: is the page a `hub`, or about one `subject`? A page is a hub when the model gives `hub` half or more. That bar is fixed.
-- A hub that fits no task goes to the Scratchpad, or stays there. It starts no task, names none, and renames none.
-- A hub that fits a task by name still joins it or stays in it.
+- A hub stays where it was opened. In a task it does not leave on its own. It starts no task, names none, and renames none. Changed on 2026-10-19 as T120. Before, a hub that fit no task left for the Scratchpad: on 2026-10-16 and 17 that was 9 of 45 moves, and ChatGPT's empty home page left every task it was opened in.
+- A hub in the Scratchpad that fits a task by name still joins it.
+- A hub is asked again when its title and address change, even on the same site, because it shows what it is for only once the user does something in it. See [Agreed scope](#agreed-scope).
 - A hub never goes along with the page above it, and a tab under it never takes it along.
 - The chat format has no such question, so with a language model alone uw cannot tell a hub.
 
@@ -236,6 +248,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 2. Organizer on native tab groups: requests, staleness checks, apply, undo, pause.
 3. Settings page: decision model, language model, pause, and validation that gates enablement.
 4. Branch moves and the same-work name check.
+5. T120: ask less, hubs stay, and Keep here.
+6. T121: judge a task by its tabs, after a replay of the log.
 
 ## Acceptance checks
 
@@ -276,6 +290,11 @@ Each stage is a ticket on the [board](roadmap.md#board).
 33. When the name arrives, the task takes it, the spinner goes, and the card says "Created task <name>" with Undo. `AutomaticOrganizerBrowserTest.JevDecidesAndTheLanguageModelNamesTheNewTask` checks it.
 34. A feed page stays in the Scratchpad when a tab opened from it starts a task, and does not start a task itself whatever its other scores. The request carries the question. `AutomaticOrganizerBrowserTest.AFeedStaysWhenATabOpenedFromItStartsATask` and `PlacementTest.AHubIsNeverMadeIntoATask` check it.
 35. With a language model set, a task's card shows Name Task. A click closes the card and sends one naming call that lists the task's tabs, while automatic organization is paused too. The name lands on the task without a lock, in place of a name the user typed. While the model is asked, the row spins, Name Task is grayed, and no second request goes out. A failed call leaves the name alone, and the activity card says so with the reason and Try Again, with Show Activity off too. A name typed meanwhile wins. Without a language model Name Task is hidden. `AutomaticOrganizerBrowserTest.NameTaskNamesTheTaskFromItsTabs`, `NameTaskRunsWithTheCardClosed`, `NameTaskNeedsALanguageModel`, `AFailedNameTaskSaysSoAndTriesAgain`, and `TypingANameWinsOverNameTask` check it.
+36. A tab in a task whose title changes on the same site sends nothing. Going to another site, typing an address, or opening a bookmark in it sends a request. A reload sends nothing.
+37. A tab in the Scratchpad whose title changes while its address stays sends nothing. A new title at a new address sends a request.
+38. A hub opened in a task stays there when the model puts it outside every task. When its title and address change, it is asked again.
+39. Keep here marks the tab. A kept tab sends no request when it changes and stays when the page above it leaves. Keep here again, or a manual move, lets it go. The hold survives a restart.
+40. With T121, a tab that fits no task name but that the model calls the same work as its task's tabs stays in the task, and each request lists up to 20 titles per task.
 
 ## Later stages
 
@@ -283,11 +302,10 @@ Each stage is a ticket on the [board](roadmap.md#board).
 - User-directed proposals and "Reorganize all tabs".
 - Managed local runtime and Anthropic-format providers.
 - A card with Undo for a new task name.
-- Not asking again when a title only flips on the same page, such as an unread counter.
 - A browser test for an answer that waits while another request about its branch is out. The test server can hold back every request to one address, not the request about one tab, so only the unit tests cover the rule.
 - A browser test for a name that arrives after another move, where the card stays quiet.
 - Telling a hub with a language model alone.
 - Leaving tabs that sat unfiled in a task before a restart out of the name check.
-- Describing a task to the model by the tabs in it, so a task named `New task` can be an answer. That sends more tab titles per request than this plan allows.
+- Offering a task named `New task` as an answer once requests list the tabs of each task (T121).
 
 Update the roadmap with measured accuracy, confidence calibration, and latency before expanding scope.

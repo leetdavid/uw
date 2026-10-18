@@ -101,6 +101,10 @@ The always-visible section holding ungrouped regular tabs and candidate branches
 **Manual adjustment**:
 A user-made change to tab grouping, ordering, or a task's name.
 
+**Kept tab**:
+A tab the user told uw to leave where it is, in its task or in the Scratchpad. The organizer does not ask about it or move it until the user moves it or lets it go.
+_Avoid_: Pinned tab, locked tab, held tab.
+
 **Task extraction**:
 Separating a tab branch or selected tabs into a task of their own.
 

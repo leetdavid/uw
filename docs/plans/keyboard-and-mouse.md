@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -9,7 +9,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 ## Agreed scope
 
 - Every uw command has a menu bar entry with its key. Tab and branch commands go in Chromium's Tab menu. Task and organizer commands go in a new Tasks menu. Context menus show the same keys.
-- Help → Search finds any of them by name. macOS System Settings → Keyboard → App Shortcuts can rebind any of them by title.
+- Help → Search finds any of them by name. The [Keyboard shortcuts](#keyboard-shortcuts) section lists every key and changes uw's.
 - Every key includes Cmd, so it still works while a [terminal tab](../CONTEXT.md#language) has focus. A page that handles a key itself keeps it, as Chromium does for its own keys.
 - Tasks do not nest. A [tab branch](../CONTEXT.md#language) is the only level below a task. [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) stands.
 
@@ -26,6 +26,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | New task | Ctrl+Cmd+N | changes. Was Chromium's Ctrl+Cmd+P, which is removed. |
 | Move to new task | Shift+Ctrl+Cmd+N | changes. Was Ctrl+Cmd+N. |
 | Move to Scratchpad | Ctrl+Cmd+S | menu only |
+| Keep here | Ctrl+Cmd+K | new. Makes a [kept tab](../CONTEXT.md#language), or lets it go. See [Automatic organization](automatic-organization.md#agreed-scope). |
 | Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | new. Selects the tab last used in that task. |
 | Go to the Scratchpad | Ctrl+Cmd+0 | new |
 | Rename task | Ctrl+Cmd+R | new. Turns the name on the task's row into a field. With horizontal tabs, opens Chromium's task editor. |
@@ -43,6 +44,20 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 - Ctrl+\` selects the terminal tab used last in the current task, or in the Scratchpad when the selected tab is ungrouped. With none there, it opens one where a blank new tab would open.
 - Pressed in a terminal tab, Ctrl+\` returns to the tab selected before it.
 - Ctrl+Shift+\` always opens a new terminal tab.
+
+### Keyboard shortcuts
+
+Agreed on 2026-10-19 as T122. uw keeps its own list of keys, so the same code can serve a Windows build. See [ADR 0011](../adr/0011-uw-keeps-its-own-key-list.md).
+
+- A Keyboard shortcuts section in uw's settings, at `uw://settings/shortcuts`, lists every command in the menu bar with its key, grouped by menu: uw's and Chromium's.
+- A click on a uw command's key lets the user press a new one, in the key recorder Chromium uses on `chrome://extensions/shortcuts`. Chromium's own keys show but cannot be changed yet.
+- A key must include Cmd, so it works while a terminal tab has focus. On Windows that would be Ctrl.
+- A key already in use moves to the new command, whether a uw or a Chromium command had it. The row that lost it reads "No key" and shows the old key.
+- Each row has Reset, back to uw's default, and can have no key. The section has Reset all.
+- The keys are the same in every profile and workspace.
+- Settings search finds a command by name. Help → Keyboard Shortcuts… opens the section, and so will the command bar.
+- A key recorded from the [command bar](command-bar.md#aliases-and-recorded-keys) lands in the same list.
+- The section waits for a design.
 
 ### New child tab
 
@@ -63,7 +78,7 @@ Agreed on 2026-10-15, at the user's request.
 Agreed on 2026-10-15. A tab's right-click menu groups moves together, tree commands together, and every close at the end:
 
 1. New tab below, New child tab, and Chromium's split view items.
-2. Move to task ▸ (its list ends with New task), Move to new task, Move to Scratchpad, and Move to another window ▸.
+2. Move to task ▸ (its list ends with New task), Move to new task, Move to Scratchpad, Move to another window ▸, and Keep here.
 3. Nest under previous tab, Move up one level, Collapse branch, and Undo tab organization.
 4. Reload, Duplicate, Pin, and Mute site.
 5. Chromium's Read later and Send to your devices.
@@ -127,7 +142,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 
 - Tasks inside tasks.
 - Keys that work outside uw.
-- Recording your own keys. That is in the [command bar plan](command-bar.md).
+- Changing Chromium's own keys, such as Find Next. That is T123, later.
 
 ## Design
 
@@ -142,6 +157,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - `TabStripModel::IsTabCollapsed` also asks `HiddenTabs`, which the controller provides through the window. Ctrl+Tab and the choice of the next tab after a close already skip collapsed groups through it.
 - The mouse switches are profile prefs read by the views they change.
 - "New child tab" is a `TabOrganizationController::Command`. The page tree places the new tab as the first child.
+- uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
 
 ## Stages
@@ -160,6 +176,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 10. T87: the tab menu in the agreed order.
 11. T88: the new button. Design first.
 12. T90: Ctrl+Cmd+N for New task and Shift+Ctrl+Cmd+N for Move to new task.
+13. T122: the Keyboard shortcuts section. Design first.
 
 T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
@@ -178,6 +195,8 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 11. A tab's right-click menu lists its items in the order of [Tab menu](#tab-menu), with no "Add tab to new group" or "Remove from group".
 12. A click on the foot's "+" does what Cmd+T does, "▾" lists its five items with their keys, and the tab list has no "+". A collapsed sidebar shows a lone "+" whose right-click opens the same menu.
 13. Ctrl+Cmd+N opens a new task, Shift+Ctrl+Cmd+N moves the selected branch to a new task, and Ctrl+Cmd+P does nothing.
+14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults.
+15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tab menu.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
