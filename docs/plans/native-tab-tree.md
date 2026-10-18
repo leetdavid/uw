@@ -19,7 +19,19 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - "New task" opens a new tab in a new task of its own, named `New task`. The sidebar's "+" button and Ctrl+Cmd+N do the same. The key was Chromium's Ctrl+Cmd+P until 2026-10-15; see [Keys](keyboard-and-mouse.md#keys). Cmd-T still opens a tab beside the active tab, in its task. Agreed on 2026-10-12.
 - [Organization undo](../product.md#organization-undo) reverses one organization action and keeps tabs opened since.
 - Option+Cmd+Z runs "Undo tab organization" in the focused window. Each press goes back one action, the user's or uw's, whether or not the activity card is showing. Nothing extra is shown. The Organize menu shows the key beside the item. Agreed on 2026-10-13.
-- Parent links survive session restore.
+- The tree survives a restart. See [Restore](#restore).
+
+## Restore
+
+Agreed on 2026-10-18, at the user's request.
+
+- Restoring keeps the user's work: every tab, its place in the tree, its task, and its chat. View state, such as how far the sidebar was scrolled, is not kept.
+- The whole tree comes back: each tab's parent, sibling order, collapsed branches, task names, and who named each task. A child nested by hand keeps its hold once T74 adds it, per [Branch moves](automatic-organization.md#branch-moves).
+- It comes back after quitting uw, after uw crashed or was killed, and after the last window closed while uw kept running and a new one opened.
+- Every launch restores without asking, per [Product](../product.md#pinned-tabs).
+- A chat's agent tabs come back under the chat. Its tab cards fill in again at the agent's next step.
+- A terminal tab comes back in its place with a new shell. Its folder, command history, and scrollback are later work in the [terminal plan](terminal-tab.md).
+- Later: Cmd+Shift+T on a closed tab, branch, or task puts it back in its place in the tree.
 
 ## Non-goals
 
@@ -35,6 +47,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - When the user changes tabs natively, the controller adopts the new order. A parent link survives only while the child still sits inside its parent's branch.
 - uw adds three things to Chromium's vertical tab strip: indentation, the Scratchpad label, and the Organize bar at its foot. The bar holds the Organize button and the [automatic-move message](automatic-organization.md#agreed-scope). No uw view replaces or wraps a Chromium container.
 - Chromium edits stay in `chromium/patches/` as small hooks.
+- The tree is saved as per-tab data in Chromium's session file: see [ADR 0010](../adr/0010-the-tab-tree-is-saved-in-chromiums-session-file.md). Chromium drops that data when it rewrites the file, so `SessionService` keeps each tab's data and writes it again in the rewrite. After a crash Chromium saves nothing until its restore has run, so uw writes every tab's data again once saving is back on.
 - The [Arc-style look](../product.md#minimum-usable-version) is separate work: it restyles Chromium's own views and does not change this structure.
 
 ## Stages
@@ -44,6 +57,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 1. Page tree model with unit tests.
 2. Window controller on native tab groups. Deletes the old tree model, coordinator, and adapter.
 3. Sidebar additions: indentation, Scratchpad label, Organize button.
+4. T117: the tree survives every restart.
+5. T118: every launch restores.
 
 Automatic organization builds on these stages. See [Automatic organization](automatic-organization.md).
 
@@ -57,8 +72,9 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 6. Dragging a child out of its parent's branch removes the indentation. Dragging a tab never changes another tab's task.
 7. One undo reverses a move or task creation as a whole. Tabs opened since stay open.
 8. Collapse, rename, color, and drag of a task behave exactly as they do in stock Chromium.
-9. Indentation and task membership survive restart with session restore.
+9. After a quit, a crash, and the last window closing, the tree comes back whole: depth, order, collapse, task names, and who named each task. Each case is also checked after Chromium has rewritten its session file.
 10. Switching to horizontal tabs and back keeps tasks and parent links.
 11. Option+Cmd+Z undoes one organization action per press. `UndoShortcutBrowserTest.OptionCmdZUndoesOneOrganizationActionPerPress` checks it.
+12. A launch restores the last session without a prompt, after a quit and after a crash, with the macOS setting on or off.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`.

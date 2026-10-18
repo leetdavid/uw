@@ -28,6 +28,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [ADR 0001: classification requests include page excerpts](adr/0001-classification-requests-include-page-excerpts.md): why classification calls send a short readable-text excerpt.
 - [ADR 0002: tasks are native tab groups](adr/0002-tasks-are-native-tab-groups.md): why uw stopped drawing its own task containers.
 - [ADR 0003: a decision model sits beside the language model](adr/0003-decision-model-beside-the-language-model.md): which providers decide tab placement and how.
+- [ADR 0010: the tab tree is saved in Chromium's session file](adr/0010-the-tab-tree-is-saved-in-chromiums-session-file.md): why the tree rides in Chromium's restore instead of a sidebar file of uw's own.
 
 ### Agent automation
 

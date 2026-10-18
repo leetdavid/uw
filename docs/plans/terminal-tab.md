@@ -16,7 +16,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - The tab's title is the one the shell sets, otherwise the folder's name. The terminal resizes with the window.
 - Cmd-click on an `http` or `https` address the shell printed opens it as a child tab of the terminal tab. While a program asks for the mouse, such as herdr, the click goes to that program alone, as in Ghostty, and the program opens the link. Changed on 2026-10-16: ghostty-web passed the click on and opened the link too, so herdr's links opened twice.
 - Closing a [busy terminal](../CONTEXT.md#language) asks first. This covers closing the tab, closing its branch or task, closing the window, and quitting uw. One dialog names every command that would be killed. An idle shell closes without a question, and closing the tab kills the shell.
-- After a restart, a terminal tab comes back in its last folder with a new shell. uw restores the folder only and never reruns a command. The shell starts the first time the tab is shown.
+- After a restart, a terminal tab comes back in its place in the tab tree with a new shell. uw never reruns a command. The shell starts the first time the tab is shown. Its folder, command history, and scrollback come back with T37: see [Later stages](#later-stages). Changed on 2026-10-18: before, only the folder came back, and scrollback was a non-goal.
 - A "Terminal" section on uw's settings page sets the font, its size, and a theme from a short built-in list. The default theme follows light and dark mode.
 - Memory saver never discards a terminal tab.
 
@@ -24,7 +24,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 - uw's models reading or typing in a terminal.
 - Commands from any source but the user. That is [stage two](#later-stages).
-- Find in terminal, split panes, and scrollback saved across a restart.
+- Find in terminal and split panes.
 - A switch for the Option key, and reading the user's Ghostty config.
 - A key lock that sends Ctrl+Tab and Ctrl+\` to the shell. Revisit it if a program the user runs needs a key uw keeps.
 
@@ -63,7 +63,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 3. T34: the terminal page, its link to the shell host, the opening controls, and the organizer filing it by title and folder.
 4. T35: links open as child tabs.
 5. T36: the busy terminal warning.
-6. T37: restore in the same folder.
+6. T37: restore in the same folder, with command history and scrollback.
 7. T38: the settings section.
 
 ## Spike
@@ -83,7 +83,7 @@ The [findings](../research/terminal-spike.md) say what passed, what was not chec
 4. A page, an extension, and a `uw://terminal` address with extra text cannot put a character into the shell.
 5. Cmd-click on a printed `http://localhost` address opens it indented under the terminal tab.
 6. Each of Cmd-W, "Close branch", closing the window, and Cmd-Q asks before killing a running `sleep 600`, and none asks for an idle prompt.
-7. After a restart with session restore, a terminal left in `/tmp` comes back titled `tmp` and starts no shell until selected. Once selected, `pwd` prints `/tmp`.
+7. After a restart, a terminal left in `/tmp` comes back titled `tmp` and starts no shell until selected. Once selected, `pwd` prints `/tmp`, the lines printed before the restart are above the prompt, and up-arrow brings back the last command.
 8. Changing the font, size, or theme on the settings page changes an open terminal.
 9. Closing a terminal tab leaves no shell process behind.
 
@@ -91,6 +91,7 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 
 ## Later stages
 
+- **Restore, T37.** Agreed on 2026-10-18, deferred at the user's request. A restored terminal tab comes back in its last folder, with its command history and its scrollback. On quit, uw lets each shell exit on its own so the shell writes its history file. The page saves its scrollback during the session, so a crash keeps it, and replays it before the new shell starts. Saved scrollback can hold secrets and sits in the profile. Estimate: 5/10.
 - **Stage two: commands from other sources.** Agreed direction: other parts of uw, and pages the user allows, may ask to run a command, and each needs the user's approval. The prompt and what uw remembers are open. One proposal, not agreed: Chromium's site permission decides which sites may ask, and a three-button prompt (run once, always run this exact command from this site, don't run) decides each command. This stage needs its own plan. Estimate: 4/10.
 - **Native libghostty.** See the [research note](../research/native-libghostty-terminal.md) for what it needs and when to reopen it. Estimate: 3/10.
 
