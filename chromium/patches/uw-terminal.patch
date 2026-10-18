@@ -98,7 +98,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b0531aceb 100644
+index 4a178fc76a14d7fe6550ef2332dd610648ce3d93..b09d9eca316734c69393f3123786a2b01d387586 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -109,7 +109,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
  #include "build/branding_buildflags.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/browser/browser_features.h"
-@@ -28,6 +29,10 @@
+@@ -27,6 +28,10 @@
  #include "ui/base/l10n/l10n_util.h"
  #import "ui/base/l10n/l10n_util_mac.h"
  #include "ui/strings/grit/ui_strings.h"
@@ -120,7 +120,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
  
  #if !defined(__MAC_27_0)
  
-@@ -136,6 +141,12 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
+@@ -139,6 +144,12 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
                Item(IDS_NEW_TAB_MAC)
                    .command_id(IDC_NEW_TAB)
                    .remove_if(is_pwa),
@@ -133,17 +133,17 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
                Item(IDS_NEW_WINDOW_MAC)
                    .command_id(IDC_NEW_WINDOW),
                Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
-@@ -328,6 +339,9 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -329,6 +340,9 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+               Item(IDS_VERTICAL_TABS_VIEW_MENU_TOGGLE_COLLAPSE)
                    .command_id(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE)
-                   .key_equivalent(@"L", NSEventModifierFlagCommand)
-                   .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
+                   .key_equivalent(@"L", NSEventModifierFlagCommand),
 +              Item(IDS_UW_THEME_MENU)
 +                  .command_id(uw::kShowThemePicker)
 +                  .remove_if(is_pwa),
                Item(IDS_CUSTOMIZE_TOUCH_BAR)
                    .tag(IDC_CUSTOMIZE_TOUCH_BAR)
                    .action(@selector(toggleTouchBarCustomizationPalette:))
-@@ -562,12 +576,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -563,12 +577,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                    .command_id(IDC_PIN_TARGET_TAB)
                    .is_alternate()
                    .key_equivalent(@"", NSEventModifierFlagOption),
@@ -156,7 +156,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
                Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
                    .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
                Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
-@@ -583,12 +591,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -584,12 +592,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -246,7 +246,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +729,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -645,6 +730,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,
@@ -254,20 +254,20 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
             &BuildWindowMenu,
             &BuildHelpMenu,
         }) {
-diff --git a/chrome/browser/ui/views/tabs/new_tab_button.cc b/chrome/browser/ui/views/tabs/new_tab_button.cc
-index b316adf2f9b6facc57dab99083b3015ecb9c0f71..223b60634e62555a71835cec86d3281be10358a7 100644
---- a/chrome/browser/ui/views/tabs/new_tab_button.cc
-+++ b/chrome/browser/ui/views/tabs/new_tab_button.cc
-@@ -23,6 +23,8 @@
+diff --git a/chrome/browser/ui/views/tabs/shared/new_tab_button_menu_model.cc b/chrome/browser/ui/views/tabs/shared/new_tab_button_menu_model.cc
+index 1802a7dcca65fc49af716529b880920e763540c0..cb8f3267a56b4db0ddc87f1706689ffb543dfc88 100644
+--- a/chrome/browser/ui/views/tabs/shared/new_tab_button_menu_model.cc
++++ b/chrome/browser/ui/views/tabs/shared/new_tab_button_menu_model.cc
+@@ -22,6 +22,8 @@
+ #include "ui/base/accelerators/accelerator.h"
+ #include "ui/base/interaction/element_identifier.h"
  #include "ui/base/l10n/l10n_util.h"
- #include "ui/base/ui_base_features.h"
- #include "ui/views/view_class_properties.h"
 +#include "uw/browser/agent/chat_tab.h"
 +#include "uw/browser/terminal/terminal_tab.h"
  
  DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(NewTabButtonMenuModel, kNewTab);
  DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(NewTabButtonMenuModel, kNewTabInGroup);
-@@ -81,6 +83,8 @@ NewTabButtonMenuModel::NewTabButtonMenuModel(BrowserWindowInterface* browser)
+@@ -36,6 +38,8 @@ NewTabButtonMenuModel::NewTabButtonMenuModel(BrowserWindowInterface* browser)
    // Build the menu.
    AddItemWithStringId(IDC_NEW_TAB, IDS_NEW_TAB);
    SetElementIdentifierAt(GetIndexOfCommandId(IDC_NEW_TAB).value(), kNewTab);

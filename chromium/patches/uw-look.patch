@@ -126,10 +126,10 @@ index a8b7ef68008b132ec786b91ddcb232c16a0c5750..542eb8b79437be476858fe676b1806af
      case LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding:
        return 12;
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
-diff --git a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60767676bd 100644
---- a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-+++ b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
+diff --git a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+index dd7a0a899fae671287402c2672ffd7931b773636..8ff228054cf00765cc3a09011079a621f6e46d9d 100644
+--- a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
 @@ -24,6 +24,7 @@
  #include "ui/gfx/scoped_canvas.h"
  #include "ui/views/view_utils.h"
@@ -138,7 +138,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
  
  VerticalTabStyleViews::VerticalTabStyleViews(
      std::unique_ptr<TabStyleViewDelegate> delegate)
-@@ -142,7 +143,11 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+@@ -154,7 +155,11 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
                                      hovered)) {
      cc::PaintFlags flags;
      flags.setAntiAlias(true);
@@ -151,7 +151,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
      canvas->DrawRect(gfx::ScaleToEnclosingRect(
                           delegate_->GetView()->GetLocalBounds(), scale),
                       flags);
-@@ -178,7 +183,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+@@ -191,7 +196,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
      return true;
    }
  
@@ -161,7 +161,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
  
  SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef656d97e09 100644
+index c7c218422c02361443a66e01f0d4d8850d9c9347..d3fbc9d0fb52c3875c1d7a7f4aa976f244e3256b 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -9,6 +9,7 @@
@@ -172,7 +172,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
  #include "chrome/browser/ui/tabs/tab_group_data.h"
  #include "chrome/browser/ui/tabs/tab_group_theme.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -45,6 +46,8 @@
+@@ -48,6 +49,8 @@
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
  #include "ui/views/widget/widget.h"
@@ -180,8 +180,8 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
 +#include "uw/browser/ui/views/tab_organization/task_name_field.h"
  
  namespace {
- constexpr int kGroupHeaderCornerRadius = 8;
-@@ -54,6 +57,7 @@ constexpr int kFocusRingInset = 2;
+ constexpr int kIconSize = 16;
+@@ -55,6 +58,7 @@ constexpr int kFocusRingInset = 2;
  constexpr int kAttentionIndicatorWidth = 8;
  // The amount of padding between the label and any sync icon.
  constexpr int kSyncIconLabelPadding = 2;
@@ -189,7 +189,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
  
  views::ScrollView* GetScrollView(views::View* view) {
    views::View* ancestor = view;
-@@ -169,6 +173,25 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -170,6 +174,25 @@ TabGroupHeaderView::TabGroupHeaderView(
        editor_bubble_tracker_.RegisterOnBubbleClosed(base::BindRepeating(
            &TabGroupHeaderView::OnBubbleClosed, base::Unretained(this)));
  
@@ -213,9 +213,9 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
 +  }
 +
    SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
-   SetInteriorMargin(gfx::Insets::VH(0, kGroupHeaderHorizontalInset));
+   SetInteriorMargin(gfx::Insets::VH(0, GetHorizontalInset()));
    SetDefault(views::kFlexBehaviorKey,
-@@ -199,7 +222,7 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -200,7 +223,7 @@ TabGroupHeaderView::TabGroupHeaderView(
          views::kFlexBehaviorKey,
          views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
                                   views::MaximumFlexSizeRule::kPreferred));
@@ -224,7 +224,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
    }
  
    sync_icon_->SetProperty(views::kMarginsKey,
-@@ -265,6 +288,12 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
+@@ -268,6 +291,12 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
  }
  
  bool TabGroupHeaderView::OnKeyPressed(const ui::KeyEvent& event) {
@@ -237,7 +237,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
    if ((event.key_code() == ui::VKEY_SPACE ||
         event.key_code() == ui::VKEY_RETURN) &&
        !delegate_->IsGroupFocused()) {
-@@ -338,6 +367,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -341,6 +370,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
      views::ElementTrackerViews::GetInstance()->NotifyViewActivated(
          kTabGroupHeaderElementId, this);
    }
@@ -251,7 +251,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
  }
  
  void TabGroupHeaderView::OnGestureEvent(ui::GestureEvent* event) {
-@@ -388,9 +424,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+@@ -391,9 +427,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    }
    UpdateEditorBubbleButtonVisibility();
@@ -265,7 +265,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
  #if BUILDFLAG(IS_LINUX)
    // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
    // Wayland/X11 due to asynchronous cursor updates during mouse exit events.
-@@ -527,18 +567,26 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -530,18 +570,26 @@ void TabGroupHeaderView::OnDataChanged(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
      SkColor foreground_color = GetForegroundColor();
@@ -294,7 +294,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
      }
      if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
-@@ -557,16 +605,12 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -560,16 +608,12 @@ void TabGroupHeaderView::OnDataChanged(
  
      // Update collapse icon.
      if (collapse_icon_) {
@@ -315,7 +315,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
      }
  
      // Update background.
-@@ -627,6 +671,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -630,6 +674,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    UpdateAccessibleName();
  }
  
@@ -331,7 +331,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
  void TabGroupHeaderView::UpdateAccessibleName() {
    if (features::IsTabGroupHoverCardsEnabled()) {
      GetViewAccessibility().SetName(tab_groups::GetHoverCardAccessibilityText(
-@@ -673,6 +726,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -676,6 +729,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
@@ -343,17 +343,18 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..6170d6f4724a7343efda3162c072eef6
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
-index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c80d9b2988 100644
+index 29caf0cd7f2aabe7ce265ae5c463fbc104a89e63..be6d2212bea646d3e9e41f98456c1db227eab0ba 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.h
-@@ -134,12 +134,14 @@ class TabGroupHeaderView : public views::FlexLayoutView,
+@@ -136,6 +136,7 @@ class TabGroupHeaderView : public views::FlexLayoutView,
    void UpdateTooltipText();
    void UpdateIsCollapsed();
    void UpdateAttentionState(bool needs_attention);
 +  void UpdateFolderIcon();
  
-   SkColor GetForegroundColor() const;
- 
+   int GetCornerRadius() const;
+   int GetHorizontalInset() const;
+@@ -145,6 +146,7 @@ class TabGroupHeaderView : public views::FlexLayoutView,
    tab_groups::TabGroupVisualData tab_group_visual_data_;
    bool needs_attention_ = false;
    bool is_shared_ = false;
@@ -362,18 +363,18 @@ index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c8
    // The sync icon that is displayed in the tab group header of saved groups in
    // the tabstrip.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4cdafdd34 100644
+index 29dfbde914c55ad1453a1c70998c9299b49c1132..9e509b0c4494601d1f05fc7e520d87f55ce85d67 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-@@ -47,6 +47,7 @@
- #include "ui/views/controls/separator.h"
+@@ -54,6 +54,7 @@
+ #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
  #include "ui/views/view_utils.h"
 +#include "uw/browser/ui/look/page_card.h"
  
  #if BUILDFLAG(IS_MAC)
  #include "chrome/browser/ui/fullscreen_util_mac.h"
-@@ -761,6 +762,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -821,6 +822,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        const int inset_amount = horizontal_layout.vertical_tab_strip_width -
                                 GetVerticalTabStripContentOverlap();
        params.InsetHorizontal(inset_amount, /*leading=*/true);
@@ -384,7 +385,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
  
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
-@@ -1150,8 +1155,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1214,8 +1219,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      }
    }
  
@@ -397,8 +398,8 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
 +  } else if (in_glass_mode()) {
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
-         !is_fullscreen(layout_data_->window_state) &&
-@@ -1613,11 +1621,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+         !is_fullscreen(layout_data_->window_state)) {
+@@ -1709,11 +1717,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      case TabStripType::kVertical: {
        // Curve trailing corner when it becomes the top trailing corner of the
        // browser.
@@ -418,10 +419,10 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
        break;
      }
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b862a1747 100644
+index 8354a9179ef79627b05447f3810808ccd6a0e78a..c3fde1b9a894e44f72665ad0b4e4f6964c086156 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-@@ -37,6 +37,7 @@
+@@ -38,6 +38,7 @@
  #include "chrome/browser/ui/views/frame/browser_widget.h"
  #include "chrome/browser/ui/views/frame/caption_button_placeholder_container.h"
  #include "chrome/browser/ui/views/frame/glass_frame_service.h"
@@ -429,7 +430,7 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b
  #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/tab_strip.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
-@@ -65,6 +66,7 @@
+@@ -66,6 +67,7 @@
  #include "ui/views/controls/label.h"
  #include "ui/views/layout/layout_types.h"
  #include "ui/views/widget/widget.h"
@@ -437,22 +438,22 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b
  
  namespace {
  
-@@ -506,7 +508,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
-                                     : kBrowserFrameAlphaLight;
-     canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
-   } else {
--    canvas->DrawColor(frame_color);
-+    if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
-+      uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
-+                    *GetBrowserView()->GetProfile()->GetPrefs());
-+      uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
-+                            GetBrowserView()->multi_contents_view());
-+    } else {
-+      canvas->DrawColor(frame_color);
-+    }
+@@ -507,7 +509,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
  
-     auto* theme_service = ThemeServiceFactory::GetForProfile(
-         GetBrowserView()->browser()->GetProfile());
+   const SkColor frame_color =
+       GetFrameColor(BrowserFrameActiveState::kUseCurrent);
+-  canvas->DrawColor(frame_color);
++  if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
++    uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
++                  *GetBrowserView()->GetProfile()->GetPrefs());
++    uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
++                          GetBrowserView()->multi_contents_view());
++  } else {
++    canvas->DrawColor(frame_color);
++  }
+ 
+   auto* theme_service = ThemeServiceFactory::GetForProfile(
+       GetBrowserView()->browser()->GetProfile());
 diff --git a/chrome/browser/themes/theme_service.cc b/chrome/browser/themes/theme_service.cc
 index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..9eb22fd7d53c9efee3c6a57ba67e5b242e45d9f3 100644
 --- a/chrome/browser/themes/theme_service.cc
@@ -516,18 +517,18 @@ index 73f2984811f4e4f5b7cd0e89b58a4fad8025c082..149ba1a647f04e4a00f0da4dc8657914
    public_deps = [
      "//base",
 diff --git a/chrome/browser/ui/views/frame/browser_widget.cc b/chrome/browser/ui/views/frame/browser_widget.cc
-index e6483eae651ee77f6bac3140fe46cb8be3e58296..eaf66bcdd0cebe298ec1eba23b8305b2e2fca5ae 100644
+index a335e2d5ccd0e9d54b0335d58642f4440b22b992..45cff133c0c1179c962c346af85808ab2190c98f 100644
 --- a/chrome/browser/ui/views/frame/browser_widget.cc
 +++ b/chrome/browser/ui/views/frame/browser_widget.cc
-@@ -41,6 +41,7 @@
- #include "ui/color/color_provider_key.h"
+@@ -42,6 +42,7 @@
  #include "ui/views/controls/menu/menu_runner.h"
+ #include "ui/views/input_protection/widget_stationarity_monitor.h"
  #include "ui/views/widget/native_widget.h"
 +#include "uw/browser/ui/look/page_color.h"
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "chromeos/ui/base/window_properties.h"
-@@ -496,6 +497,9 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
+@@ -507,6 +508,9 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
    // Apply BrowserWidget overrides:
    key.app_controller =
        web_app::AppBrowserController::From(browser_view_->browser());

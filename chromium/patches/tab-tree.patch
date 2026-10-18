@@ -9,7 +9,7 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd729e1670 100644
+index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b10b65ee56 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -277,6 +277,103 @@ are declared in tools/grit/grit_args.gni.
@@ -116,25 +116,25 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1778,7 +1875,7 @@ are declared in tools/grit/grit_args.gni.
-           R&amp;eopen closed window
-         </message>
-         <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
--          Reopen closed group
-+          Reopen closed task
-         </message>
-         <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
-           Reopen closed split view
-@@ -1831,7 +1928,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1794,7 +1891,7 @@ are declared in tools/grit/grit_args.gni.
+         R&amp;eopen closed window
+       </message>
+       <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
+-        Reopen closed group
++        Reopen closed task
+       </message>
+       <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
+         Reopen closed split view
+@@ -1825,7 +1922,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen Closed Window
          </message>
-         <message name="IDS_REOPEN_GROUP" desc="In Title Case: The text label of the Reopen Closed Group menu item">
+         <message name="IDS_REOPEN_GROUP_MAC" desc="In Title Case: The text label of the Reopen Closed Group menu item">
 -          Reopen Closed Group
 +          Reopen Closed Task
          </message>
-         <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
+         <message name="IDS_REOPEN_SPLIT_MAC" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -11140,7 +11237,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+@@ -11284,7 +11381,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
        <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
@@ -143,7 +143,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        </message>
        <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
          <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
-@@ -12077,9 +12174,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12221,9 +12318,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add tabs to reading list}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -154,7 +154,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12099,7 +12194,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12243,7 +12338,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move tab into split view
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -163,7 +163,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove from group
-@@ -12193,9 +12288,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12343,9 +12438,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add Tabs to Reading List}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -174,7 +174,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12215,7 +12308,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12365,7 +12458,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move Tab into Split View
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -183,7 +183,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove From Group
-@@ -12720,7 +12813,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12858,7 +12951,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
  
        <!-- Tab Group Editor Bubble -->
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
@@ -192,119 +192,64 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
            {MEMBER_COUNT, plural,
-@@ -12730,22 +12823,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12867,22 +12960,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+           }
        </message>
-       <if expr="not use_titlecase">
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
--          New tab in group
-+          New tab in task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HOME" desc="Home option in tab group bubble">
-           Home
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNGROUP" desc="The label of the tab group header context menu item for ungrouping the current group.">
--          Ungroup
-+          Move tabs to Scratchpad
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_FOCUS_GROUP" desc="The label for focus group in the tab group editor bubble.">
--          Focus group
-+          Focus task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNFOCUS_GROUP" desc="The label for unfocus group in the tab group editor bubble.">
--          Unfocus group
-+          Unfocus task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_SHARE_GROUP" desc="The label of the tab group header context menu item for sharing the current group.">
--          Share group
-+          Share task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
-           Recent activity
-@@ -12754,16 +12847,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
-           Manage sharing
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
--          Close group
-+          Close task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HIDE_GROUP" desc="The label of the tab group header context menu item for hiding a saved group into the bookmarks bar.">
-           Hide group
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP" desc="The label of the tab group header context menu item for deleting all tabs in the current group.">
--          Delete group
-+          Delete task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_MOVE_GROUP_TO_NEW_WINDOW" desc="The label of the tab group header context menu item for moving the entire group to a new window.">
--          Move group to new window
-+          Move task to new window
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
-           Open group in new window
-@@ -12781,28 +12874,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
-           Send feedback
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
--          Name this group
-+          Name this task
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
+-        New tab in group
++        New tab in task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_HOME" desc="Home option in tab group bubble">
+         Home
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNGROUP" desc="The label of the tab group header context menu item for ungrouping the current group.">
+-        Ungroup
++        Move tabs to Scratchpad
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_FOCUS_GROUP" desc="The label for focus group in the tab group editor bubble.">
+-        Focus group
++        Focus task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNFOCUS_GROUP" desc="The label for unfocus group in the tab group editor bubble.">
+-        Unfocus group
++        Unfocus task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_SHARE_GROUP" desc="The label of the tab group header context menu item for sharing the current group.">
+-        Share group
++        Share task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
+         Recent activity
+@@ -12891,16 +12984,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+         Manage sharing
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
+-        Close group
++        Close task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_HIDE_GROUP" desc="The label of the tab group header context menu item for hiding a saved group into the bookmarks bar.">
+         Hide group
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP" desc="The label of the tab group header context menu item for deleting all tabs in the current group.">
+-        Delete group
++        Delete task
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_MOVE_GROUP_TO_NEW_WINDOW" desc="The label of the tab group header context menu item for moving the entire group to a new window.">
+-        Move group to new window
++        Move task to new window
+       </message>
+       <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
+         Open group in new window
+@@ -12928,7 +13021,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
          </message>
        </if>
+       <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
+-        Name this group
++        Name this task
+       </message>
  
-       <if expr="use_titlecase">
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="In Title Case: The label of the tab group header context menu item for adding a new tab into the current group.">
--          New Tab in Group
-+          New Tab in Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HOME" desc="Home option in tab group bubble">
-           Home
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNGROUP" desc="In Title Case: The label of the tab group header context menu item for ungrouping the current group.">
--          Ungroup
-+          Move Tabs to Scratchpad
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_FOCUS_GROUP" desc="The label for focus group in the tab group editor bubble.">
--          Focus Group
-+          Focus Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_UNFOCUS_GROUP" desc="The label for unfocus group in the tab group editor bubble.">
--          Unfocus Group
-+          Unfocus Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_SHARE_GROUP" desc="The label of the tab group header context menu item for sharing the current group.">
--          Share Group
-+          Share Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
-           Recent Activity
-@@ -12811,16 +12904,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
-           Manage Sharing
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="In Title Case: The label of the tab group header context menu item for closing all tabs in the current group.">
--          Close Group
-+          Close Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_HIDE_GROUP" desc="The label of the tab group header context menu item for hiding a saved group into the bookmarks bar.">
-           Hide Group
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_DELETE_GROUP" desc="The label of the tab group header context menu item for deleting all tabs in the current group.">
--          Delete Group
-+          Delete Task
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_MOVE_GROUP_TO_NEW_WINDOW" desc="In Title Case: The label of the tab group header context menu item for moving the entire group to a new window.">
--          Move Group to New Window
-+          Move Task to New Window
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="In Title Case: The label of the saved tab group button context menu item for opening the entire group in a new window.">
-           Open Group in New Window
-@@ -12838,7 +12931,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
-           Send Feedback
-         </message>
-         <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="In Title Case: The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
--          Name This Group
-+          Name This Task
-         </message>
-       </if>
- 
-@@ -16925,10 +17018,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+     <!-- Data Sharing -->
+@@ -17063,10 +17156,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
        </message>
        <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
@@ -317,7 +262,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        </message>
        <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
-@@ -16949,10 +17042,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17087,10 +17180,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          </message>
        </if>
        <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
@@ -330,7 +275,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        </message>
        <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
          Collapsed
-@@ -16997,16 +17090,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17135,16 +17228,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Tab moved to end of tabstrip
        </message>
        <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
@@ -351,15 +296,21 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f062913ebd35479652e6d4e351304bfd
        </message>
        <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
            Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
-@@ -19308,7 +19401,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
-         Select any text or image to ask Gemini
+@@ -19459,12 +19552,12 @@ Please help our engineers fix this problem. Tell us what happened right before y
        </message>
-       <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">
--        Ask Gemini about this group
-+        Ask Gemini about this task
-       </message>
+       <if expr="use_titlecase">
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="In Title Case: The label of the tab group context menu item to ask Gemini about the tab group.">
+-          Ask Gemini about This Group
++          Ask Gemini about This Task
+         </message>
+       </if>
+       <if expr="not use_titlecase">
+         <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">
+-          Ask Gemini about this group
++          Ask Gemini about this task
+         </message>
+       </if>
        <message name="IDS_COPIED_TO_CLIPBOARD_TOAST_BODY" desc="Text on a toast notification that is shown when an item has been copied to clipboard.">
-         Copied to clipboard
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e..54b0c39 100644
 --- a/chrome/browser/ui/BUILD.gn
@@ -409,11 +360,11 @@ index c8e946c..307bd0f 100644
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..a334643147ea86418c5b26c4b68da9e4b1d479f1 100644
+index ef3ebaa68ad6ea801d151fb0bbf2b17851db44ce..6668f5636b0e35a4236d1a07cf1f64a55f4f3929 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,9 @@ source_set("internal") {
-     public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+@@ -62,6 +62,9 @@ source_set("internal") {
+     ]
  
      deps += [
 +      "//uw/browser/tab_organization",
@@ -499,19 +450,19 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..1d0e0344bbad5dfe7107f5ad34fb22c4
  
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_
 diff --git a/chrome/browser/ui/navigator/BUILD.gn b/chrome/browser/ui/navigator/BUILD.gn
-index eb3a78a..7c047d3 100644
+index 812ea8e40e06db0bdf630133757315f5f0dd053e..4f103818b20cc78e7e518c8d669399c653f7c818 100644
 --- a/chrome/browser/ui/navigator/BUILD.gn
 +++ b/chrome/browser/ui/navigator/BUILD.gn
-@@ -89,6 +89,7 @@ source_set("impl") {
+@@ -83,6 +83,7 @@ source_set("impl") {
      ]
  
      deps += [
 +      "//uw/browser/tab_organization",
        "//chrome/browser/apps/app_service",
        "//chrome/browser/apps/link_capturing",
-       "//chrome/browser/ui:status_bubble",
+       "//chrome/browser/ui:browser_init_state",
 diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
-index f8d51fa..9ae6552 100644
+index 5029e2640598dfffb79ec88703f4a9fc13d0f4db..b02547bbba9b6f1fb729123d515b0b33e1d18595 100644
 --- a/chrome/browser/ui/navigator/browser_navigator.cc
 +++ b/chrome/browser/ui/navigator/browser_navigator.cc
 @@ -3,6 +3,7 @@
@@ -522,7 +473,7 @@ index f8d51fa..9ae6552 100644
  
  #include <algorithm>
  #include <memory>
-@@ -990,6 +991,17 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+@@ -1001,6 +1002,17 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
          std::move(tab_to_insert), params->tabstrip_index, params->transition,
          params->tabstrip_add_types, group);
  
@@ -538,21 +489,21 @@ index f8d51fa..9ae6552 100644
 +    }
 +
      // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
-     // "already split" case is handled in Browser::OpenURLFromTab().
-     if (params->disposition == WindowOpenDisposition::NEW_SPLIT_VIEW &&
+     // "already split" case is handled in
+     // BrowserWebContentsDelegate::OpenURLFromTab().
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 9354e0d5497b85db204ebae5d6adcd41973ea01a..20eba10da629d12b9099a21e8facdf169342dc58 100644
+index 2494eac3f3e20d71c2f32d29b79b38da510e89f9..1daa614e52d2d0b4133b8441728e45c31f42ffb2 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
-@@ -77,6 +77,8 @@ source_set("impl") {
+@@ -87,6 +87,8 @@ source_set("impl") {
    ]
  
    deps = [
 +    "//uw/browser/tab_organization",
 +    "//uw/browser/ui/views/tab_organization",
-     "//chrome/browser:primitives",
-     "//chrome/browser/dictation",
-     "//chrome/browser/glic",
+     "//base:i18n",
+     "//cc/paint",
+     "//chrome/app/theme:theme_resources",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 index cdc7c0f..a260033 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
@@ -588,10 +539,10 @@ index cdc7c0f..a260033 100644
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639eee3eff6b 100644
+index 9d34a6658aba1a536bbb20f2091b1ca32b5fb492..58222005b49c7c638029c730a79eb1b08f225e35 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-@@ -32,6 +32,7 @@
+@@ -35,6 +35,7 @@
  #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
  #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
  #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
@@ -599,7 +550,7 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639e
  #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
  #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
-@@ -44,6 +45,8 @@
+@@ -50,6 +51,8 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/view_utils.h"
@@ -608,8 +559,8 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639e
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "chrome/browser/ash/boca/on_task/on_task_locked_controller.h"
-@@ -452,6 +455,12 @@ void TabStripCollectionController::ShowTabContextMenu(
-       browser_view_->browser()->GetFeatures().tab_menu_model_delegate(), model_,
+@@ -458,6 +461,12 @@ void TabStripCollectionController::ShowTabContextMenu(
+       TabMenuModelDelegate::From(browser_view_->browser()), model_,
        tab_index.value());
  
 +  if (auto* organizer =
@@ -621,7 +572,7 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639e
    CHECK(browser_view_->tab_strip_view());
    expand_on_hover_lock_ = browser_view_->tab_strip_view()->GetExpandOnHoverLock(
        ExpandOnHoverLockType::kKeepCurrentState);
-@@ -475,6 +484,13 @@ void TabStripCollectionController::ShowGroupEditorBubble(
+@@ -480,6 +489,13 @@ void TabStripCollectionController::ShowGroupEditorBubble(
      const TabCollectionNode* group_node) {
    auto* group_header_view =
        views::AsViewClass<TabGroupView>(group_node->view())->group_header();
@@ -635,7 +586,7 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..ebbfdb9f15ff982f357a23df7740639e
    group_header_view->ShowContextMenuForViewImpl(
        group_header_view, gfx::Point(), ui::mojom::MenuSourceType::kNone);
  }
-@@ -484,6 +500,15 @@ TabStripCollectionController::ShowGroupEditorBubble(
+@@ -489,6 +505,15 @@ TabStripCollectionController::ShowGroupEditorBubble(
      const tab_groups::TabGroupId& group_id,
      views::View* anchor_view,
      bool stop_context_menu_propagation) {
@@ -665,28 +616,28 @@ index 88df244c596b07dbd0f5049ae59824bc80e47698..227dca7a68309a6b16caed4c50b3fbbe
      "//chrome/app/vector_icons",
      "//chrome/browser:browser_process",
 diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-index a06ae504557fd293fc7a8fe01d368539f379dc23..119a576ab5d42b285971a9029f2de72ad8883dff 100644
+index d0e6a244aa53dd7c090ec139f43daec6e0cd9a76..67654a157f87783ed4e8b603a6a68dcfabe2286f 100644
 --- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
 +++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-@@ -8,6 +8,8 @@
+@@ -9,6 +9,8 @@
  #include "extensions/buildflags/buildflags.h"
  #include "ui/gfx/geometry/rect.h"
  #include "ui/views/controls/menu/menu_runner.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/tab_organization/window_commands.h"
  
- #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
  #include "chrome/browser/extensions/context_menu_matcher.h"
-@@ -52,6 +54,8 @@ void TabContextMenuController::CloseMenu() {
+@@ -53,6 +55,8 @@ void TabContextMenuController::CloseMenu() {
  }
  
  bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
 +  if (uw::TabOrganizationController::IsCommand(command_id))
 +    return false;
- #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -65,6 +69,14 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
+@@ -66,6 +70,14 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
  }
  
  bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
@@ -698,10 +649,10 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..119a576ab5d42b285971a9029f2de72a
 +    return organizer && organizer->CanExecute(
 +                            command_id, organizer->TargetsFor(command_id, tab));
 +  }
- #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -93,11 +105,22 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
+@@ -94,11 +106,22 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
  }
  
  bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
@@ -721,10 +672,10 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..119a576ab5d42b285971a9029f2de72a
 +    }
 +    return;
 +  }
- #if BUILDFLAG(ENABLE_EXTENSIONS)
+ #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -114,6 +137,13 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+@@ -115,6 +138,13 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
    }
  #endif
    if (auto* tab = tab_handle_.Get()) {
@@ -738,7 +689,7 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..119a576ab5d42b285971a9029f2de72a
      delegate_->ExecuteContextMenuCommand(
          tab, static_cast<TabStripModel::ContextMenuCommand>(command_id),
          event_flags);
-@@ -123,5 +153,10 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+@@ -124,5 +154,10 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
  bool TabContextMenuController::GetAcceleratorForCommandId(
      int command_id,
      ui::Accelerator* accelerator) const {
@@ -845,12 +796,12 @@ index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0c
  std::optional<BrowserRootView::DropIndex>
  UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..397943a376515aa3088ac117c5540fb01910765e 100644
+index 962216bdc7d15faea7d2bb9c4bc84a8d9be80a7d..412c44b785a62858f2694f658ad16bb540ffbb7b 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-@@ -58,6 +58,9 @@ class UnpinnedTabContainerView
-   // layout passes.
+@@ -64,6 +64,9 @@ class UnpinnedTabContainerView
    void SetAvailableSpace(views::SizeBound space) { available_space_ = space; }
+   views::SizeBound available_space() const { return available_space_; }
  
 +  // views::View:
 +  void OnPaint(gfx::Canvas* canvas) override;
@@ -858,7 +809,7 @@ index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..397943a376515aa3088ac117c5540fb0
   private:
    // DraggedTabsContainer:
    views::ScrollView* GetScrollViewForContainer() const override;
-@@ -83,6 +86,7 @@ class UnpinnedTabContainerView
+@@ -89,6 +92,7 @@ class UnpinnedTabContainerView
    const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
  
    base::CallbackListSubscription node_destroyed_subscription_;
@@ -1093,13 +1044,13 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..825c28094f67254047a39408f93f2fd5
      return MainMenuCommand(cmdNum);
  
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
-index 08d127e8a47a42a0d2d13f9a9e7cb21769e08d79..dce44bd6668be9a13ab9c72123eb81e1e927dfd9 100644
+index bc3b0459edfcc191f305b44cc3d66fab29ecd391..bedb8e249dbba0d159ea95cfb15bdf00de0aa57b 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
 @@ -35,6 +35,8 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
-       GetLayoutConstant(LayoutConstant::kVerticalTabStripNewTabButtonSize),
-       GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
-   new_tab_button->set_context_menu_controller(this);
+   new_tab_button->SetOnContextMenuClosedCallback(base::BindRepeating(
+       &VerticalTabStripBottomContainer::OnNewTabButtonContextMenuClosed,
+       base::Unretained(this)));
 +  // uw's new button at the foot of the sidebar takes its place.
 +  new_tab_button->SetVisible(false);
  
@@ -1162,7 +1113,7 @@ index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..bdcf2716a55ceb93087e497014193110
        ":tab_model",
        ":tab_strip",
 diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
-index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442feb4963696 100644
+index 01f863a9f43a8edb16b70e4513521144bee8cdaa..74bf86d544388ba54dce391be457c645f8d2ab08 100644
 --- a/chrome/browser/ui/tabs/tab_strip_model.cc
 +++ b/chrome/browser/ui/tabs/tab_strip_model.cc
 @@ -117,6 +117,7 @@
@@ -1173,7 +1124,7 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442fe
  
  using base::UserMetricsAction;
  using content::WebContents;
-@@ -1514,7 +1515,14 @@ bool TabStripModel::IsTabPinned(int index) const {
+@@ -1528,7 +1529,14 @@ bool TabStripModel::IsTabPinned(int index) const {
  
  bool TabStripModel::IsTabCollapsed(int index) const {
    std::optional<tab_groups::TabGroupId> group = GetTabGroupForTab(index);
@@ -1189,26 +1140,30 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442fe
  }
  
  bool TabStripModel::IsGroupCollapsed(
-@@ -3459,17 +3467,13 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
-     const gfx::Range& block_tab_range) const {
-   // Check tabs from the end of the block.
-   for (int i = block_tab_range.end(); i < count(); ++i) {
--    std::optional<tab_groups::TabGroupId> current_group = GetTabGroupForTab(i);
--    if (!current_group.has_value() ||
--        (!IsGroupCollapsed(current_group.value()))) {
-+    if (!IsTabCollapsed(i)) {
-       return i;
+@@ -3510,10 +3518,7 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
+     int current_index = block_tab_range.end();
+     for (auto it = at(GetTabAtIndex(current_index)); it != end();
+          ++it, ++current_index) {
+-      tabs::TabInterface* tab = *it;
+-      std::optional<tab_groups::TabGroupId> current_group = tab->GetGroup();
+-      if (!current_group.has_value() ||
+-          (!IsGroupCollapsed(current_group.value()))) {
++      if (!IsTabCollapsed(current_index)) {
+         return current_index;
+       }
      }
-   }
-   // Then check tabs before start_index, iterating backwards.
-   for (int i = block_tab_range.start() - 1; i >= 0; --i) {
--    std::optional<tab_groups::TabGroupId> current_group = GetTabGroupForTab(i);
--    if (!current_group.has_value() ||
--        (!IsGroupCollapsed(current_group.value()))) {
-+    if (!IsTabCollapsed(i)) {
-       return i;
+@@ -3524,10 +3529,7 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
+     auto start_it = at(GetTabAtIndex(current_index));
+     for (auto it = std::make_reverse_iterator(++start_it); it != rend();
+          ++it, --current_index) {
+-      tabs::TabInterface* tab = *it;
+-      std::optional<tab_groups::TabGroupId> current_group = tab->GetGroup();
+-      if (!current_group.has_value() ||
+-          (!IsGroupCollapsed(current_group.value()))) {
++      if (!IsTabCollapsed(current_index)) {
+         return current_index;
+       }
      }
-   }
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
 index e8d8cb4facb9428bab15389a8fb137ada0982a21..c5e77f3f34371d341023d217280e623962c7ce25 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
