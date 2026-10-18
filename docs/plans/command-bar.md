@@ -93,6 +93,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - The answer shows beside the sum as mathjs read it, so the user can check it against what they meant. It is not tidied, only spelled with × and ÷: `10 m/s/s` shows 10 m ÷ s ÷ s. Under it, the units it read are named in words, such as "meters, seconds". A name that is not a unit or currency gives no answer, and the card says so; only an unfinished end is set aside. Agreed on 2026-10-17.
 - A bare amount converts: a unit to the other measurement system, so `10 kg` shows pounds, and a currency to the default currency.
 - Currency uses the European Central Bank's daily reference rates, fetched at most once a day. Fetching them sends nothing the user typed. Offline, the last rates fetched are used and their date is shown.
+- Amounts can be typed with codes or symbols. `$` is always the US dollar; other dollars take their prefix, as in `HK$`, `A$`, `C$`, `NZ$`, and `S$`. `€` is the euro, `£` the pound, `₩` the won, `₹` the rupee, `¥` the yen, and `CN¥` the yuan. Agreed on 2026-10-19.
 - The default currency is the currency of the Mac's region. A "Default currency" setting in the Command bar section of uw's settings page picks another. `in EUR` picks one for a single sum.
 - A "Translate … to <browser language>" row appears when the text looks like another language, or after typing "translate". It asks the language model only when picked. The answer shows in the command bar with a Copy action. Split into T112 on 2026-10-17, after T66.
 
