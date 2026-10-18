@@ -1325,3 +1325,56 @@ index d8f32a1ca60e441fd998fbb05e3df7aeb1fd8dd6..ed003ac952f2729b20db09a8e607ea7d
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
    registry->RegisterBooleanPref(
        prefs::kShowManagedBookmarksInBookmarkBar, true,
+diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
+index 781d2e2f7ef99797284888c446e290488cdc1620..4a02a0cbb8445a04d3bdb93e232ef093b179b503 100644
+--- a/chrome/browser/sessions/session_service.cc
++++ b/chrome/browser/sessions/session_service.cc
+@@ -354,6 +354,8 @@ void SessionService::AddTabExtraData(SessionID window_id,
+     return;
+   }
+ 
++  // Kept even while saving is off, as it is until a restore after a crash.
++  tab_extra_data_[tab_id][key] = data;
+   ScheduleCommand(sessions::CreateAddTabExtraDataCommand(tab_id, key, data));
+ }
+ 
+@@ -381,6 +383,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
+   if (i != tab_to_available_range()->end()) {
+     tab_to_available_range()->erase(i);
+   }
++  tab_extra_data_.erase(tab_id);
+ 
+   if (pending_window_close_ids_.contains(window_id)) {
+     // Tab is in last window and the window is being closed. Don't commit it
+@@ -663,6 +666,16 @@ void SessionService::BuildCommandsForTab(
+     command_storage_manager()->AppendRebuildCommand(
+         sessions::CreateSplitTabCommand(session_id, std::move(split)));
+   }
++
++  // uw: without this, a rebuild drops the data uw keeps for each tab, such as
++  // its place in the tab tree.
++  if (auto data = tab_extra_data_.find(session_id);
++      data != tab_extra_data_.end()) {
++    for (const auto& [key, value] : data->second) {
++      command_storage_manager()->AppendRebuildCommand(
++          sessions::CreateAddTabExtraDataCommand(session_id, key, value));
++    }
++  }
+ }
+ 
+ void SessionService::ScheduleResetCommands() {
+diff --git a/chrome/browser/sessions/session_service.h b/chrome/browser/sessions/session_service.h
+index 92d191c30c8f4919631d1a1e06a1929afac29225..534473c7cb98dc8d45c6489bb6e170f15a9c8d98 100644
+--- a/chrome/browser/sessions/session_service.h
++++ b/chrome/browser/sessions/session_service.h
+@@ -303,6 +303,10 @@ class SessionService : public SessionServiceBase {
+   // mapping since we no longer need it after the first write to disk.
+   std::map<tab_groups::TabGroupId, std::string> local_to_sync_id_mapping_;
+ 
++  // uw: the last data each tab was given under each key, which a rebuild of
++  // the session file writes again.
++  std::map<SessionID, std::map<std::string, std::string>> tab_extra_data_;
++
+   base::WeakPtrFactory<SessionService> weak_factory_{this};
+ };
+ 
