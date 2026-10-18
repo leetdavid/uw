@@ -114,7 +114,7 @@ Widened on 2026-10-15. Before, unit conversions were a non-goal.
 - Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
 - Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed. The chat's agent adopts the selected tab as tab 1, as it adopts its own tabs after a restart.
 - Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
-- The math library is pinned to an exact version in `package.json`, like ghostty-web. mathjs 15.2.0, agreed on 2026-10-17. It has units and lets uw add each currency as a unit. The rates are fetched by the browser process.
+- The math library is pinned to an exact version in `package.json`, like ghostty-web. mathjs 15.2.0, agreed on 2026-10-17. It has units and lets uw add each currency as a unit. The rates are fetched by the browser process: `ExchangeRates` downloads the bank's daily file, reads it with Chromium's data decoder, and keeps it in profile prefs. The page asks for them over `uw_command_bar.mojom`, which also copies an answer and closes the command bar.
 - Translation is one chat request to the language model, through the connection automatic organization already uses.
 
 ## Stages

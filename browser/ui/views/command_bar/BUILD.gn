@@ -47,11 +47,13 @@ source_set("browser_tests") {
     "//content/test:test_support",
     "//net:test_support",
     "//testing/gtest",
+    "//ui/base/clipboard",
     "//ui/events:test_support",
     "//ui/views",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
+    "//uw/browser/ui/webui/uw_command_bar",
   ]
 }

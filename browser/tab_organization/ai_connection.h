@@ -43,6 +43,13 @@ inline constexpr char kAgentApprovalModePref[] = "uw.agent.approval_mode";
 // Whether Cmd+T opens the command bar instead of a blank tab.
 inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
 
+// The European Central Bank's rates the command bar last downloaded: "date",
+// "fetched" in seconds since the epoch, and "per_euro".
+inline constexpr char kCommandBarRatesPref[] = "uw.command_bar.rates";
+
+// The currency a bare amount converts to. Empty for the Mac's region's.
+inline constexpr char kCommandBarCurrencyPref[] = "uw.command_bar.currency";
+
 // Global suspension of automatic organization per the product pause choices.
 // "Until next launch" is process state: it resets when uw next starts.
 enum class PauseMode {

@@ -29,6 +29,8 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterListPref(kAgentDisabledSkillsPref);
   registry->RegisterStringPref(kAgentApprovalModePref, "auto");
   registry->RegisterBooleanPref(kCommandBarEnabledPref, true);
+  registry->RegisterDictionaryPref(kCommandBarRatesPref);
+  registry->RegisterStringPref(kCommandBarCurrencyPref, "");
   registry->RegisterIntegerPref(kOrganizationPauseModePref,
                                 static_cast<int>(PauseMode::kOff));
   registry->RegisterDoublePref(kOrganizationPauseUntilPref, 0);

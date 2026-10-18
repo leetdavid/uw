@@ -83,10 +83,10 @@ index 63c989a76dadc13953e35513998e83326ee3612b..79faca5edcd002bdc78dea884e42554c
        <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
          Use graphics acceleration when available
 diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2c2c9c14d 100644
+index 8a0281a596af3532fa6342b5653f93e913261023..91aa03e4b5ab2ff780f4a64d47560d91265f1569 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -223,6 +223,19 @@
+@@ -223,6 +223,20 @@
  #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
  #endif
  
@@ -98,6 +98,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2
 +#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
 +#include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
++#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar.mojom.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 +#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
 +#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
@@ -106,7 +107,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2
  namespace chrome::internal {
  
  using content::RegisterWebUIControllerInterfaceBinder;
-@@ -361,6 +374,17 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -361,6 +375,19 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
                                           WhatsNewUI>(map);
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
  
@@ -119,12 +120,14 @@ index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2
 +                                         uw::UwProvidersUI, uw::UwChatUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ThemePickerHandlerFactory,
 +                                         uw::UwThemePickerUI>(map);
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::CalculatorHandler,
++                                         uw::UwCommandBarUI>(map);
 +#endif
 +
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
    RegisterWebUIControllerInterfaceBinder<
        feature_showcase::mojom::DefaultBrowserPageHandlerFactory,
-@@ -393,7 +417,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -393,7 +420,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
  
    RegisterWebUIControllerInterfaceBinder<searchbox::mojom::PageHandlerFactory,
                                           NewTabPageUI, OmniboxPopupUI,
@@ -134,7 +137,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..6cf83e60dbec0bac61589bd2a0de43d2
  
    RegisterWebUIControllerInterfaceBinder<
        omnibox_everywhere_debug::mojom::PageHandlerFactory, OmniboxEverywhereUI>(
-@@ -676,6 +701,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -676,6 +704,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
  #if !BUILDFLAG(IS_CHROMEOS)
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()

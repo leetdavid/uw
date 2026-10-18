@@ -7,17 +7,22 @@
 #include <utility>
 
 #include "base/memory/raw_ptr.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/supports_user_data.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/grit/uw_command_bar_resources.h"
 #include "chrome/grit/uw_command_bar_resources_map.h"
 #include "components/favicon_base/favicon_url_parser.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/url_data_source.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/webui/webui_util.h"
+#include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_handler.h"
 
 namespace uw {
@@ -75,6 +80,31 @@ void UwCommandBarUI::BindInterface(
     mojo::PendingReceiver<searchbox::mojom::PageHandlerFactory> receiver) {
   factory_.reset();
   factory_.Bind(std::move(receiver));
+}
+
+void UwCommandBarUI::BindInterface(
+    mojo::PendingReceiver<mojom::CalculatorHandler> receiver) {
+  calculator_.reset();
+  calculator_.Bind(std::move(receiver));
+}
+
+void UwCommandBarUI::GetCurrencies(GetCurrenciesCallback callback) {
+  Profile* profile = Profile::FromWebUI(web_ui());
+  ExchangeRates* rates = ExchangeRates::For(profile);
+  std::string currency = profile->GetPrefs()->GetString(kCommandBarCurrencyPref);
+  if (currency.empty()) {
+    currency = RegionCurrency();
+  }
+  std::move(callback).Run(rates->Saved(), currency);
+  rates->Refresh();
+}
+
+void UwCommandBarUI::CopyAnswer(const std::string& text) {
+  ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste)
+      .WriteText(base::UTF8ToUTF16(text));
+  if (embedder()) {
+    embedder()->CloseUI();
+  }
 }
 
 void UwCommandBarUI::CreatePageHandler(

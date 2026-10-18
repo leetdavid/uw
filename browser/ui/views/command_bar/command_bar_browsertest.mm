@@ -17,6 +17,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
+#include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -38,6 +39,8 @@
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
+#include "ui/base/clipboard/clipboard.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
@@ -46,6 +49,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 
 namespace uw {
 namespace {
@@ -157,6 +161,16 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
     base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE, loop.QuitClosure(), delay);
     loop.Run();
+  }
+
+  // The calculator card's sum, answer, and answer's name, or "" without one.
+  std::string Card() {
+    return content::EvalJs(bar()->page(),
+                           "document.querySelector('#calc').hidden ? '' : "
+                           "['#sum', '#answer', '#answerName']"
+                           ".map(id => document.querySelector(id).textContent)"
+                           ".join('|')")
+        .ExtractString();
   }
 
   // Asks the page every 20 ms until `within` has passed.
@@ -362,6 +376,106 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
 
   PressInField("Enter");
   EXPECT_TRUE(Eventually([&] { return searches > 0; }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ReturnCopiesTheAnswerOfASum) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("20 kg * 10 m/s/s / 5W");
+  EXPECT_EQ("20 kg × 10 m ÷ s ÷ s ÷ 5 W|40 s/m|Seconds per meter", Card());
+  EXPECT_EQ(true, content::EvalJs(bar()->page(), "document.querySelector("
+                                                 "'#calc').classList.contains("
+                                                 "'selected')"));
+
+  PressInField("Enter");
+  EXPECT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  base::test::TestFuture<std::u16string> copied;
+  ui::Clipboard::GetForCurrentThread()->ReadText(
+      ui::ClipboardBuffer::kCopyPaste, /*data_dst=*/std::nullopt,
+      copied.GetCallback());
+  EXPECT_EQ(u"40 s/m", copied.Get());
+  EXPECT_EQ(1, browser()->tab_strip_model()->count());
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AWordThatIsNotAUnitHasNoAnswer) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("1/2 cup flour");
+  EXPECT_EQ("1 ÷ 2 cup flour|“flour” is not a unit|No answer", Card());
+  EXPECT_EQ(false, content::EvalJs(bar()->page(), "document.querySelector("
+                                                  "'#calc').classList.contains("
+                                                  "'selected')"));
+  Type("covid-19");
+  EXPECT_EQ("", Card());
+}
+
+// Serves the European Central Bank's daily file with two rates, from before
+// the command bar's page first asks for it.
+class CommandBarRatesBrowserTest : public CommandBarBrowserTest {
+ protected:
+  void SetUp() override {
+    embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
+        [](const net::test_server::HttpRequest& request)
+            -> std::unique_ptr<net::test_server::HttpResponse> {
+          if (request.relative_url != "/eurofxref-daily.xml") {
+            return nullptr;
+          }
+          auto response =
+              std::make_unique<net::test_server::BasicHttpResponse>();
+          response->set_content_type("text/xml");
+          response->set_content(R"(<?xml version="1.0" encoding="UTF-8"?>
+<gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01"
+    xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+  <gesmes:subject>Reference rates</gesmes:subject>
+  <gesmes:Sender><gesmes:name>European Central Bank</gesmes:name></gesmes:Sender>
+  <Cube>
+    <Cube time="2026-10-15">
+      <Cube currency="USD" rate="1.0800"/>
+      <Cube currency="HKD" rate="8.4000"/>
+    </Cube>
+  </Cube>
+</gesmes:Envelope>)");
+          return response;
+        }));
+    ASSERT_TRUE(embedded_test_server()->InitializeAndListen());
+    ExchangeRates::SetSourceForTesting(
+        embedded_test_server()->GetURL("/eurofxref-daily.xml"));
+    CommandBarBrowserTest::SetUp();
+  }
+
+  void SetUpOnMainThread() override {
+    CommandBarBrowserTest::SetUpOnMainThread();
+    embedded_test_server()->StartAcceptingConnections();
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(CommandBarRatesBrowserTest,
+                       ASumOfCurrenciesUsesTheDaysRates) {
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  prefs->SetString(kCommandBarCurrencyPref, "HKD");
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  // The page asks again each time the panel shows.
+  ASSERT_TRUE(Eventually(
+      [&] {
+        EXPECT_TRUE(content::ExecJs(bar()->page(),
+                                    "window.dispatchEvent(new Event('focus'))"));
+        return prefs->GetDict(kCommandBarRatesPref).FindDict("per_euro");
+      },
+      base::Seconds(10)));
+  ASSERT_TRUE(content::ExecJs(bar()->page(),
+                              "window.dispatchEvent(new Event('focus'))"));
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  ASSERT_TRUE(Eventually([&] {
+    Type("10 HKD + 10 EUR to USD");
+    return !Card().empty();
+  }));
+  EXPECT_EQ("10 HKD + 10 EUR|$12.09|US dollars", Card());
+  EXPECT_EQ("HK$10 = $1.29 · €10 = $10.80 · ECB rates of Oct 15, 2026",
+            content::EvalJs(bar()->page(),
+                            "document.querySelector('#calcNote').textContent"));
+  Type("100 usd");
+  EXPECT_EQ("100 USD|HK$777.78|Hong Kong dollars", Card());
 }
 
 // The look, for comparing with the design: run in the VM with

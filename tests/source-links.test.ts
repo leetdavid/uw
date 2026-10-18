@@ -12,7 +12,7 @@ function fixture(t: TestContext) {
   const source = join(root, "src");
   const repository = join(root, "product");
   mkdirSync(source); mkdirSync(repository);
-  for (const name of ["browser", "components", "node_modules/ghostty-web"]) {
+  for (const name of ["browser", "components", "node_modules/ghostty-web", "node_modules/mathjs"]) {
     mkdirSync(join(repository, name), { recursive: true });
   }
   const file = join(repository, "browser", "feature.cc");

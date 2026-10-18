@@ -6,11 +6,25 @@ import {SuggestInventory} from '//resources/mojo/components/omnibox/browser/fuse
 import type {AutocompleteMatch, AutocompleteResult} from '//resources/mojo/components/omnibox/browser/searchbox.mojom-webui.js';
 import {InputMethod, PageCallbackRouter, PageHandlerFactory, PageHandlerRemote} from '//resources/mojo/components/omnibox/browser/searchbox.mojom-webui.js';
 
+import {Calculator} from './calculator.js';
+import type {Calculation, Ink, MathJsLibrary} from './calculator.js';
+import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
+
+// mathjs, which command_bar.html loads first.
+declare const math: MathJsLibrary;
+
 const field = document.querySelector<HTMLInputElement>('#field')!;
 const chip = document.querySelector<HTMLElement>('#chip')!;
 const results = document.querySelector<HTMLUListElement>('#results')!;
 const keys = document.querySelector<HTMLElement>('#keys')!;
 const action = document.querySelector<HTMLElement>('#action')!;
+const card = document.querySelector<HTMLElement>('#calc')!;
+const sum = document.querySelector<HTMLElement>('#sum')!;
+const sumName = document.querySelector<HTMLElement>('#sumName')!;
+const answer = document.querySelector<HTMLElement>('#answer')!;
+const answerName = document.querySelector<HTMLElement>('#answerName')!;
+const arrowIcon = document.querySelector<SVGUseElement>('#arrowIcon')!;
+const note = document.querySelector<HTMLElement>('#calcNote')!;
 
 const router = new PageCallbackRouter();
 const handler = new PageHandlerRemote();
@@ -30,6 +44,9 @@ const SVG = 'http://www.w3.org/2000/svg';
 const NO_ROW = 255;
 const PLACEHOLDER = field.placeholder;
 
+const calculator = new Calculator(math);
+const calculatorHandler = CalculatorHandler.getRemote();
+
 let queryId = 0;
 // What the user typed. The field can also hold a completion after it.
 let typed = '';
@@ -37,7 +54,10 @@ let typed = '';
 let rows: Array<{match: AutocompleteMatch, line: number}> = [];
 // The typed text the shown rows are for.
 let shownFor = '';
+// The selected row, or -1 for the calculator's answer.
 let selected = 0;
+// The calculator's card for what is typed, if it reads as math.
+let calculation: Calculation|null = null;
 // A Return pressed before the rows for the latest text arrived.
 let pendingReturn = false;
 // After a `>` or Cmd+Shift+P, the text is a shell command.
@@ -111,14 +131,70 @@ function describe(match: AutocompleteMatch): [string, string] {
   return [match.description, site];
 }
 
+function answered(): boolean {
+  return !!calculation && !calculation.why;
+}
+
 function select(index: number) {
   selected = index;
+  card.classList.toggle('selected', index === -1);
+  card.setAttribute('aria-selected', String(index === -1));
   results.querySelectorAll('li').forEach((row, i) => {
     row.classList.toggle('selected', i === index);
     row.setAttribute('aria-selected', String(i === index));
   });
-  action.textContent =
-      rows[index]?.match.type === 'tab' ? 'Switch to tab' : 'Open';
+  action.textContent = index === -1 ? `Copy ${calculation?.copy ?? ''}` :
+      rows[index]?.match.type === 'tab' ? 'Switch to tab' :
+                                          'Open';
+}
+
+// Draws numbers in full ink, units lighter, operators lightest, and what was
+// set aside underlined. A piece's leading space stays outside its span.
+function draw(element: HTMLElement, ink: Ink[]) {
+  element.replaceChildren(...ink.flatMap(part => {
+    const span = document.createElement('span');
+    span.textContent = part.text.trimStart();
+    if (part.kind !== 'number') {
+      span.className = `ink-${part.kind}`;
+    }
+    return span.textContent === part.text ? [span] : [' ', span];
+  }));
+}
+
+// Works out the typed text at once, before Chromium's rows arrive, and
+// selects the answer when there is one.
+function calculate() {
+  calculation = shell || !typed ? null : calculator.calculate(typed);
+  card.hidden = !calculation;
+  note.hidden = !calculation?.note;
+  if (calculation) {
+    card.classList.toggle('no', !!calculation.why);
+    draw(sum, calculation.sum);
+    sumName.textContent = calculation.sumName;
+    if (calculation.why) {
+      answer.textContent = calculation.why;
+      answerName.textContent = 'No answer';
+    } else {
+      draw(answer, calculation.answer);
+      answerName.textContent = calculation.answerName;
+    }
+    arrowIcon.setAttribute(
+        'href', calculation.why ? '#no-answer' : '#arrow-right');
+    note.textContent = calculation.note;
+  }
+  select(answered() ? -1 : 0);
+}
+
+function copyAnswer() {
+  if (calculation && !calculation.why) {
+    calculatorHandler.copyAnswer(calculation.copy);
+  }
+}
+
+async function refreshCurrencies() {
+  const {rates, currency} = await calculatorHandler.getCurrencies();
+  calculator.setCurrencies(
+      rates ? {date: rates.date, perEuro: rates.perEuro} : null, currency);
 }
 
 // The field's text without a completion still selected after the caret.
@@ -151,14 +227,15 @@ function show(result: AutocompleteResult) {
     row.addEventListener('click', () => open(index, false));
     return row;
   }));
-  select(0);
+  select(answered() ? -1 : 0);
   keywords.onSelectedMatchChanged(rows[0]?.match ?? null);
 
   // Complete the typed text with the first row, as the address bar does,
-  // while the caret is at the end of what was typed.
+  // while the caret is at the end of what was typed. A sum is not completed.
   const first = rows[0]?.match;
-  if (first?.allowedToBeDefaultMatch && first.inlineAutocompletion &&
-      field.value === typed && field.selectionStart === typed.length) {
+  if (!answered() && first?.allowedToBeDefaultMatch &&
+      first.inlineAutocompletion && field.value === typed &&
+      field.selectionStart === typed.length) {
     field.value = typed + first.inlineAutocompletion;
     field.setSelectionRange(typed.length, field.value.length);
   }
@@ -192,6 +269,7 @@ function showRows(on: boolean) {
 
 function query(preventInlineAutocomplete: boolean) {
   typed = field.value;
+  calculate();
   if (shell) {
     return;
   }
@@ -231,6 +309,7 @@ function sendText(key: {metaKey?: boolean, altKey?: boolean}) {
 function setShell(on: boolean) {
   shell = on;
   if (on) {
+    calculate();
     keywords.exit();
     showRows(false);
     handler.stopAutocomplete(/*clearResult=*/ true);
@@ -242,6 +321,7 @@ function clear() {
   field.value = '';
   typed = '';
   pendingReturn = false;
+  calculate();
   keywords.exit();
   setShell(false);
   showRows(false);
@@ -271,9 +351,11 @@ field.addEventListener('input', event => {
 field.addEventListener('keydown', event => {
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
-    if (rows.length) {
+    const top = answered() ? -1 : 0;
+    const count = rows.length - top;
+    if (count > 0) {
       const step = event.key === 'ArrowDown' ? 1 : -1;
-      select((selected + step + rows.length) % rows.length);
+      select((selected - top + step + count) % count + top);
     }
   } else if (event.key === 'Tab' && !event.shiftKey) {
     // Tab turns a completion into typed text, or starts a site search.
@@ -297,6 +379,8 @@ field.addEventListener('keydown', event => {
       sendText({metaKey: true});
     } else if (event.altKey || shell) {
       sendText({altKey: true});
+    } else if (selected === -1) {
+      copyAnswer();
     } else if (!event.ctrlKey) {
       if (shownFor === typed) {
         open(selected, true);
@@ -327,8 +411,19 @@ document.addEventListener('visibilitychange', () => {
 // whenever the panel goes and takes it again each time the panel shows. It
 // waits one task: during the window's focus event the browser has not yet heard
 // which frame has focus, and ignores the field's.
-window.addEventListener('focus', () => setTimeout(() => field.focus()));
+window.addEventListener('focus', () => {
+  setTimeout(() => field.focus());
+  refreshCurrencies();
+});
 window.addEventListener('blur', () => field.blur());
+card.addEventListener('mousemove', () => {
+  if (answered() && selected !== -1) {
+    select(-1);
+  }
+});
+card.addEventListener('click', copyAnswer);
+
+refreshCurrencies();
 if (document.hasFocus()) {
   field.focus();
 }
