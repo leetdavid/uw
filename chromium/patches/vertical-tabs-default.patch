@@ -12,7 +12,7 @@ index ca0afc6fd02f5124a956e145bdfec3f2bea12c81..ce4370390a47c6c492dc711216f0be97
        prefs::kVerticalTabsExpandOnHoverEnabled,
        tabs::kVerticalTabsExpandOnHoverDefaultEnabled.Get());
 diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest.cc b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest.cc
-index 3380d7f29188e0561788a534d31e52b98d97d519..87162fef3c18aafd15a97f0735760642b1d6a8dc 100644
+index 3380d7f29188e0561788a534d31e52b98d97d519..d63ebb91c4b85a0259fb83b768dd1aa972092348 100644
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest.cc
 +++ b/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest.cc
 @@ -54,6 +54,8 @@ class VerticalTabStripStateControllerTest : public testing::Test {
@@ -24,14 +24,13 @@ index 3380d7f29188e0561788a534d31e52b98d97d519..87162fef3c18aafd15a97f0735760642
      SessionID test_session_id = SessionID::FromSerializedValue(kSessionIDValue);
  
      EXPECT_CALL(mock_browser_window_interface_, GetUnownedUserDataHost)
-@@ -93,6 +95,14 @@ class VerticalTabStripStateControllerTest : public testing::Test {
+@@ -93,6 +95,13 @@ class VerticalTabStripStateControllerTest : public testing::Test {
    MockBrowserWindowInterface mock_browser_window_interface_;
  };
  
 +TEST(VerticalTabStripPrefsTest, DefaultsToVerticalTabs) {
 +  sync_preferences::TestingPrefServiceSyncable pref_service;
 +  tabs::RegisterProfilePrefs(pref_service.registry());
-+  EXPECT_TRUE(tabs::IsVerticalTabsFeatureEnabled());
 +  EXPECT_TRUE(pref_service.GetBoolean(prefs::kVerticalTabsEnabled));
 +  EXPECT_FALSE(pref_service.HasPrefPath(prefs::kVerticalTabsEnabled));
 +}
