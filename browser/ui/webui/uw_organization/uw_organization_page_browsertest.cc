@@ -236,6 +236,10 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
     EXPECT_TRUE(prefs()->GetBoolean(pref)) << pref;
   }
   OpenPage();
+  ASSERT_EQ(true, Run("const toggle = part('optionClickToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "return true;"));
   SaveWindowScreenshot(browser(), "settings-mouse");
   for (const auto& [toggle, pref] : switches) {
     ASSERT_EQ(true,

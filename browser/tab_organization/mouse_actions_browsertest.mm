@@ -49,6 +49,7 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/task_name_field.h"
 
@@ -471,6 +472,7 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
                 views::kElementIdentifierKey),
             kTabGroupEditorBubbleButtonElementId);
   EXPECT_EQ(plus->GetTooltipText(), u"New tab in task");
+  SaveWindowScreenshot(browser(), "task-row-plus");
 
   prefs()->SetBoolean(kTaskRowNewTabPref, false);
   tree.d->GetContents()->Focus();
