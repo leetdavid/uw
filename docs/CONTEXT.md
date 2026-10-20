@@ -199,11 +199,19 @@ Instructions that teach uw's agent how to do one kind of request, with a name an
 _Avoid_: Prompt, routine, workflow.
 
 **Approval**:
-The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none.
+The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program.
 
 **Approval mode**:
-How much a chat asks before it acts. Ask first asks before every click and typing. Auto, the default, asks before each change on a site and each sign-in. Full auto never asks. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
+How much a chat asks before it acts. Ask first asks before every click, typing, and terminal command. Auto, the default, asks before each change on a site, each sign-in, and each command the command check finds dangerous. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
 _Avoid_: permission mode, autonomy level.
+
+**Command check**:
+A quick model call uw makes before the agent runs a terminal command or sends keys to a running program, to judge whether it is potentially dangerous and whether it may read a sensitive file. It sees the user's messages and the agent's actions, never page text or command output. An unsure or missing answer counts as dangerous.
+_Avoid_: Classifier, guard, safety check.
+
+**Sensitive file**:
+A file that holds secrets, such as a `.env` file, a key or certificate, a password store, or the credentials of a tool such as ssh, AWS, or gcloud. The agent reads one only through a command the user approved, in every approval mode.
+_Avoid_: Secret file, private file.
 
 **Steer**:
 To send a chat a message while its agent works. The agent reads it after its current step, before it asks the model again. A queued message instead waits until the agent has answered.

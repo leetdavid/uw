@@ -188,6 +188,7 @@ Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent b
 
 - A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
 - The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](CONTEXT.md#language), Auto. Ask first also asks before every click and typing; Full auto never asks.
+- Agreed on 2026-10-20: the agent can run commands on this Mac in a [terminal tab](CONTEXT.md#language) under its chat. In Auto, a [command check](CONTEXT.md#language) asks only before potentially dangerous commands, as Claude Code's auto mode does, and every mode asks before a command reads a [sensitive file](CONTEXT.md#language).
 - [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
 
 Example use cases:
@@ -239,7 +240,7 @@ Agreed on 2026-10-14, as a later addition outside the minimum usable version:
 
 - A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
 - The organizer files a terminal tab like any other tab. A model gets its title and the shell's folder, never what the shell printed. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
-- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
+- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command. Agreed on 2026-10-20: the agent's commands reach terminal tabs it opened, never ones the user opened.
 - Closing a busy terminal asks first, however it is closed.
 
 The [terminal tab plan](plans/terminal-tab.md) has the full scope and what is left out.
