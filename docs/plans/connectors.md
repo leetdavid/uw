@@ -61,7 +61,14 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 
 ## Design
 
-The canvas page "AI page and connectors" on the [Doop canvas](../../AGENTS.md#designs) will hold the designs: `uw://ai` with its three sections, the connectors view in every state, adding by paste, a connector open with its tools, the approval card's Allow once caret, the "+" menu, the `/` menu with prompt fields, and the skill tags.
+The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, drawn on 2026-10-21 for T134, and the `uw-ai-providers` guide has their rules. They are proposals until the user signs off.
+
+- "AI page: connectors (Fluid)": `uw://ai/connectors` with the section list and a connector in each common state.
+- "AI page: a connector open (Fluid)": its tools with Reads only, Always allowed, and a switch each.
+- "AI page: add a connector (Fluid)": the paste box and what uw found in it.
+- "AI page: skills (Fluid)": the Only you and Only the agent tags.
+- "Chat: a connector call waits for you (Fluid)": the approval card with the Allow once caret open.
+- "Connectors and /: every state (Fluid)": the "+" and `/` menus, prompt fields, every connector state, paste errors, and a private chat's caret.
 
 Proposed code layout, to settle as each stage starts:
 
