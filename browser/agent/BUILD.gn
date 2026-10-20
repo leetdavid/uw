@@ -20,10 +20,12 @@ source_set("agent") {
     "//uw/browser/ai_providers",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/components/agent",
+    "//uw/components/connectors",
     "//uw/components/terminal",
   ]
   deps = [
     "//chrome/browser/actor",
+    "//uw/browser/connectors",
     "//chrome/browser/history",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
@@ -39,6 +41,19 @@ source_set("agent") {
     "//ui/base",
     "//uw/browser/terminal",
   ]
+}
+
+# Where skills live, which chats and uw://ai/skills both read.
+source_set("skill_folders") {
+  sources = [
+    "skill_folders.cc",
+    "skill_folders.h",
+  ]
+  public_deps = [
+    "//base",
+    "//uw/components/agent",
+  ]
+  deps = [ "//chrome/common:constants" ]
 }
 
 # The saved chats and the list of them, which the sidebar reads too.

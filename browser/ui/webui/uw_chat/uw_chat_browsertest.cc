@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "base/base_paths.h"
 #include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -25,7 +26,6 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/optimization_guide/browser_test_util.h"
-#include "chrome/browser/platform_util_internal.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -37,6 +37,7 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/optimization_guide/core/filters/optimization_hints_component_update_listener.h"
 #include "components/prefs/pref_service.h"
+#include "components/prefs/scoped_user_pref_update.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -55,7 +56,9 @@
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/catalog_store.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -132,7 +135,10 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     // The test's own folder stands in for ~/.agents/skills.
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(home_.CreateUniqueTempDir());
-    UwChatHandler::SetAgentsSkillsFolderForTesting(AgentsSkills());
+    SetAgentsSkillsFolderForTesting(AgentsSkills());
+    // Connectors live in the test's own folder, and start through sh.
+    Connectors::SetUpForTesting(home_.GetPath().AppendASCII("connectors"),
+                                base::FilePath("/bin/sh"));
     notifications_ = std::make_unique<NotificationDisplayServiceTester>(
         browser()->GetProfile());
   }
@@ -140,7 +146,8 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
   void TearDownOnMainThread() override {
     notifications_.reset();
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
-    UwChatHandler::SetAgentsSkillsFolderForTesting(base::FilePath());
+    SetAgentsSkillsFolderForTesting(base::FilePath());
+    Connectors::SetUpForTesting(base::FilePath(), base::FilePath());
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
@@ -407,6 +414,42 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
                   attribute, id)));
   }
 
+  // Adds the test connector "fake" and waits until it runs.
+  static void AddFakeConnector() {
+    Connectors::Get().Start();
+    ASSERT_TRUE(
+        base::test::RunUntil([] { return Connectors::Get().loaded(); }));
+    base::FilePath program;
+    ASSERT_TRUE(base::PathService::Get(base::DIR_EXE, &program));
+    ConnectorConfig fake;
+    fake.name = "fake";
+    fake.command = program.AppendASCII("uw_fake_mcp_server").value();
+    std::vector<ConnectorConfig> added;
+    added.push_back(std::move(fake));
+    ASSERT_TRUE(Connectors::Get().Add(std::move(added)).has_value());
+    ASSERT_TRUE(base::test::RunUntil([] {
+      return Connectors::Get().Find("fake")->state == Connectors::State::kReady;
+    }));
+  }
+
+  // Waits for the approval card, opens the caret on its first answer, and
+  // picks `option`: "chat" or "always".
+  static std::string CaretScript(std::string_view option) {
+    return content::JsReplace(
+        "(function pick() {"
+        "  const caret = document.querySelector("
+        "      '#approval [data-option-menu]');"
+        "  if (!caret) { setTimeout(pick, 20); return; }"
+        "  caret.click();"
+        "  (function choose() {"
+        "    const item = document.querySelector('[data-option=\"' + $1 + "
+        "        '\"]');"
+        "    item ? item.click() : setTimeout(choose, 20);"
+        "  })();"
+        "})();",
+        option);
+  }
+
   static base::FilePath UwSkills() {
     base::FilePath data;
     EXPECT_TRUE(base::PathService::Get(chrome::DIR_USER_DATA, &data));
@@ -417,17 +460,19 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     return home_.GetPath().AppendASCII(".agents").AppendASCII("skills");
   }
 
+  // `more` holds more front matter lines, each ending in a newline.
   static void WriteSkillFile(const base::FilePath& folder,
                              const std::string& name,
                              const std::string& description,
-                             const std::string& instructions) {
+                             const std::string& instructions,
+                             const std::string& more = "") {
     base::ScopedAllowBlockingForTesting allow_blocking;
     const base::FilePath skill = folder.AppendASCII(name);
     ASSERT_TRUE(base::CreateDirectory(skill));
     ASSERT_TRUE(base::WriteFile(skill.AppendASCII("SKILL.md"),
                                 "---\nname: " + name +
-                                    "\ndescription: " + description +
-                                    "\n---\n\n" + instructions + "\n"));
+                                    "\ndescription: " + description + "\n" +
+                                    more + "---\n\n" + instructions + "\n"));
   }
 
   std::string Checkout() {
@@ -895,28 +940,12 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillTurnedOffIsLeftOut) {
                  "Read primary sources.");
   UseAgentModel();
   model_.Script({ScriptedModel::Answer("Done.")});
+  // uw://ai/skills turns it off; UwProvidersBrowserTest clicks its switch.
+  ScopedListPrefUpdate(browser()->GetProfile()->GetPrefs(),
+                       kAgentDisabledSkillsPref)
+      ->Append("research");
   content::WebContents* chat = OpenChat();
 
-  ASSERT_TRUE(content::ExecJs(
-      chat,
-      "document.getElementById('skills').click();"
-      "new Promise(resolve => {"
-      "  const check = () => {"
-      "    const row = document.querySelector('[data-skill=\"research\"]');"
-      "    row ? (row.click(), resolve()) : setTimeout(check, 20);"
-      "  };"
-      "  check();"
-      "});"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return browser()
-        ->GetProfile()
-        ->GetPrefs()
-        ->GetList(kAgentDisabledSkillsPref)
-        .contains("research");
-  }));
-  SaveWindowScreenshot(browser(), "skills");
-  ASSERT_TRUE(
-      content::ExecJs(chat, "document.getElementById('skills').click();"));
   EXPECT_EQ(Ask(chat, "Book a tour"), "Done.");
 
   EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr("- book-activities:"));
@@ -924,26 +953,288 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillTurnedOffIsLeftOut) {
               ::testing::Not(::testing::HasSubstr("- research:")));
 }
 
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheSkillsFolderOpensFromTheChat) {
-  // Finder stays shut.
-  platform_util::internal::DisableShellOperationsForTesting();
+// Typing a skill's name starts it, even one only the user may start: the
+// model gets its instructions with what followed the name, and the chat
+// shows the message as typed.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TypingASkillsNameStartsIt) {
+  WriteSkillFile(AgentsSkills(), "handoff", "Hands the work off.",
+                 "Write a handoff for: $ARGUMENTS.",
+                 "disable-model-invocation: true\n");
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Done.")});
   content::WebContents* chat = OpenChat();
 
-  ASSERT_TRUE(content::ExecJs(
-      chat,
-      "document.getElementById('skills').click();"
-      "new Promise(resolve => {"
-      "  const check = () => {"
-      "    const button = document.getElementById('open-skills-folder');"
-      "    button ? (button.click(), resolve()) : setTimeout(check, 20);"
-      "  };"
-      "  check();"
-      "});"));
+  EXPECT_EQ(Ask(chat, "/handoff next session finishes T137"), "Done.");
 
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    return base::DirectoryExists(UwSkills());
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("Write a handoff for: next session finishes "
+                                   "T137."));
+  EXPECT_THAT(requests[0], ::testing::Not(::testing::HasSubstr("- handoff:")));
+  EXPECT_EQ(Steps(chat), std::vector<std::string>{"Used the handoff skill"});
+  EXPECT_EQ(Lines(chat, ".mine"),
+            std::vector<std::string>{"/handoff next session finishes T137"});
+}
+
+// A skill only the user may start is not listed for the agent, and the
+// skill tool will not load it.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentCannotPickASkillOnlyForYou) {
+  WriteSkillFile(AgentsSkills(), "handoff", "Hands the work off.",
+                 "Write a handoff.", "disable-model-invocation: true\n");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.",
+                 "Read primary sources.");
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "skill", base::DictValue().Set("name", "handoff")))),
+       ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(Ask(chat, "Hand this off"), "Done.");
+
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("- research:"));
+  EXPECT_THAT(requests[0], ::testing::Not(::testing::HasSubstr("- handoff:")));
+  EXPECT_THAT(requests[1], ::testing::HasSubstr("There is no such skill"));
+}
+
+// "/" opens a menu of the skills the user may start; Enter picks one, and
+// its hint shows until the user types more.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheSlashMenuOffersTheUsersSkills) {
+  WriteSkillFile(AgentsSkills(), "handoff", "Hands the work off.",
+                 "Write a handoff.",
+                 "disable-model-invocation: true\nargument-hint: What will "
+                 "the next session be used for?\n");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.",
+                 "Read primary sources.");
+  WriteSkillFile(UwSkills(), "site-manners", "Acts politely on sites.",
+                 "Refuse cookies.", "user-invocable: false\n");
+  content::WebContents* chat = OpenChat();
+  constexpr char kType[] =
+      "const field = document.getElementById('message');"
+      "const type = (text) => {"
+      "  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+      "      'value').set.call(field, text);"
+      "  field.dispatchEvent(new Event('input', {bubbles: true}));"
+      "};"
+      "const until = (probe) => new Promise((resolve) => {"
+      "  const check = () => probe() ? resolve(probe())"
+      "      : setTimeout(check, 20);"
+      "  check();"
+      "});"
+      "const commands = () => [...document.querySelectorAll("
+      "    '#slash-menu [data-command]')].map((row) => row.textContent);";
+
+  EXPECT_EQ(
+      content::EvalJs(chat, base::StrCat({kType,
+                                          "type('/');"
+                                          "until(() => commands().length"
+                                          "    && commands().join(' | '));"}))
+          .ExtractString(),
+      "/handoffOnly youHands the work off. | /researchResearches a "
+      "question.");
+  SaveWindowScreenshot(browser(), "slash-menu");
+
+  EXPECT_EQ(
+      content::EvalJs(
+          chat, base::StrCat({kType,
+                              "type('/ha');"
+                              "until(() => commands().length === 1).then("
+                              "    () => {"
+                              "  field.dispatchEvent(new KeyboardEvent("
+                              "      'keydown', {key: 'Enter',"
+                              "      bubbles: true}));"
+                              "  return until(() =>"
+                              "      document.getElementById('slash-hint'))"
+                              "      .then((hint) => field.value + '|' +"
+                              "          hint.textContent);"
+                              "});"}))
+          .ExtractString(),
+      "/handoff |What will the next session be used for?");
+  SaveWindowScreenshot(browser(), "slash-hint");
+}
+
+// The agent loads a connector by its name from the instructions, and then
+// calls its tools as its own. A tool that only reads asks nothing in Auto.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentLoadsAConnectorAndUsesIt) {
+  AddFakeConnector();
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "connector", base::DictValue().Set("name", "fake")))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "fake__echo", base::DictValue().Set("text", "hello from fake")))),
+       ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(Ask(chat, "Echo something"), "Done.");
+
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 3u);
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("- fake\\n  - echo: Says the text back."));
+  EXPECT_THAT(requests[0],
+              ::testing::Not(::testing::HasSubstr("\"fake__echo\"")));
+  EXPECT_THAT(requests[1], ::testing::HasSubstr("\"name\":\"fake__echo\""));
+  EXPECT_THAT(requests[2], ::testing::HasSubstr("hello from fake"));
+  EXPECT_EQ(Steps(chat),
+            (std::vector<std::string>{"Loaded fake · 5 tools",
+                                      "Used echo · hello from fake"}));
+}
+
+// A tool that doesn't say it only reads asks in Auto. Allow for this chat
+// stops the asking in that chat only.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AllowForThisChatAsksOnce) {
+  AddFakeConnector();
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "connector", base::DictValue().Set("name", "fake")))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "fake__save_note", base::DictValue().Set("title", "one")))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "fake__save_note", base::DictValue().Set("title", "two")))),
+       ScriptedModel::Answer("Saved both.")});
+  content::WebContents* chat = OpenChat();
+
+  // A second approval would never be answered, and the chat would not end.
+  EXPECT_EQ(
+      UntilTheEnd(chat, SendScript("Save two notes") + CaretScript("chat")),
+      "Saved both.");
+  EXPECT_EQ(Steps(chat),
+            (std::vector<std::string>{"Loaded fake · 5 tools",
+                                      "Used save_note · Saved one",
+                                      "Used save_note · Saved two"}));
+  EXPECT_TRUE(Connectors::Get().Find("fake")->always_allowed.empty());
+}
+
+// Always allow stops the asking in every chat, until it is taken back.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AlwaysAllowCountsInEveryChat) {
+  AddFakeConnector();
+  UseAgentModel();
+  const auto save = [](std::string_view title) {
+    return ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+        "fake__save_note", base::DictValue().Set("title", title))));
+  };
+  const auto load = [] {
+    return ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+        "connector", base::DictValue().Set("name", "fake"))));
+  };
+  model_.Script({load(), save("one"), ScriptedModel::Answer("Saved one."),
+                 load(), save("two"), ScriptedModel::Answer("Saved two.")});
+  content::WebContents* first = OpenChat();
+  EXPECT_EQ(
+      UntilTheEnd(first, SendScript("Save a note") + CaretScript("always")),
+      "Saved one.");
+  EXPECT_THAT(Connectors::Get().Find("fake")->always_allowed,
+              ::testing::ElementsAre("save_note"));
+
+  content::WebContents* second = OpenChat();
+  EXPECT_EQ(Ask(second, "Save another"), "Saved two.");
+}
+
+// A chat can leave a connector out from its "+" menu: the model is not told
+// about it.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatCanLeaveAConnectorOut) {
+  AddFakeConnector();
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+
+  ASSERT_EQ(true, content::EvalJs(chat, R"((async () => {
+    const until = (probe) => new Promise((resolve) => {
+      const check = () => probe() ? resolve(probe()) : setTimeout(check, 20);
+      check();
+    });
+    const within = (probe) => Promise.race([until(probe),
+        new Promise((resolve) => setTimeout(() => resolve(null), 3000))]);
+    const rows = () => [...document.querySelectorAll('[role^="menuitem"]')]
+        .map((item) => item.getAttribute('aria-label')).join(', ');
+    const plus = document.getElementById('plus');
+    plus.dispatchEvent(new PointerEvent('pointerdown',
+        {bubbles: true, button: 0, pointerType: 'mouse'}));
+    const sub = await within(() => [...document.querySelectorAll(
+        '[role^="menuitem"]')].find((row) =>
+        row.getAttribute('aria-label') === 'Connectors'));
+    if (!sub) {
+      return 'no Connectors in: ' + rows() + ' / ' + plus.outerHTML;
+    }
+    sub.click();
+    const row = await within(
+        () => document.querySelector('[data-chat-connector="fake"]'));
+    if (!row) {
+      return 'no row in: ' + rows();
+    }
+    row.click();
+    return true;
+  })())"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat,
+                           "document.querySelector('[data-chat-connector="
+                           "\"fake\"]')?.getAttribute('aria-checked')")
+               .ExtractString() == "false";
   }));
+  SaveWindowScreenshot(browser(), "plus-menu");
+
+  EXPECT_EQ(Ask(chat, "Hi"), "Done.");
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::Not(::testing::HasSubstr("- fake")));
+}
+
+// A connector's prompt in the / menu takes its arguments in fields, and its
+// messages go to the model as the user's message.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AConnectorsPromptTakesItsArguments) {
+  AddFakeConnector();
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Hello, Ada!")});
+  content::WebContents* chat = OpenChat();
+
+  EXPECT_EQ(UntilTheEnd(chat, R"(
+    const field = document.getElementById('message');
+    const set = (element, text, prototype) => {
+      Object.getOwnPropertyDescriptor(prototype, 'value')
+          .set.call(element, text);
+      element.dispatchEvent(new Event('input', {bubbles: true}));
+    };
+    set(field, '/fake:greet ', HTMLTextAreaElement.prototype);
+    (function fill() {
+      const name = document.querySelector(
+          '#prompt-fields [data-argument="name"]');
+      if (!name) { setTimeout(fill, 20); return; }
+      set(name, 'Ada', HTMLInputElement.prototype);
+      setTimeout(() => name.dispatchEvent(new KeyboardEvent('keydown',
+          {key: 'Enter', bubbles: true})), 50);
+    })();
+  )"),
+            "Hello, Ada!");
+
+  EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr("Say hello to Ada"));
+  EXPECT_EQ(Steps(chat),
+            std::vector<std::string>{"Used the fake:greet prompt"});
+}
+
+// The Skills row opens uw://ai/skills, and goes back to that tab after.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheSkillsRowOpensTheAiPage) {
+  content::WebContents* chat = OpenChat();
+  const int count = tabs()->count();
+  const GURL skills("chrome://ai/skills");
+
+  ASSERT_TRUE(
+      content::ExecJs(chat, "document.getElementById('skills').click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs()->count() == count + 1 &&
+           tabs()->GetActiveWebContents()->GetVisibleURL() == skills;
+  }));
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
+  ASSERT_TRUE(
+      content::ExecJs(chat, "document.getElementById('skills').click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs()->GetActiveWebContents()->GetVisibleURL() == skills;
+  }));
+  EXPECT_EQ(tabs()->count(), count + 1);
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillIsSavedOnlyWhenTheUserSaysSo) {
@@ -1131,7 +1422,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, WithoutAnAgentModelItSaysWhatToDo) {
   content::WebContents* chat = OpenChat();
 
   EXPECT_EQ(Ask(chat, "Book a tour for Ada"),
-            "Pick a model on AI providers first.");
+            "Pick a model on the AI page first.");
   EXPECT_TRUE(model_.Requests().empty());
 }
 
@@ -1269,7 +1560,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   model_.Script({ScriptedModel::Answer("Booked.")});
   content::WebContents* chat = OpenChat();
   ASSERT_EQ(Ask(chat, "Book a tour for Ada"),
-            "Pick a model on AI providers first.");
+            "Pick a model on the AI page first.");
 
   UseAgentModel();
   EXPECT_EQ(UntilTheEnd(chat, "document.getElementById('try-again').click();"),

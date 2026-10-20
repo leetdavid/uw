@@ -332,7 +332,7 @@ index 7b00df716ccbf2adc37f38fd2c71f9bdc1997c29..45ad069d886ebfc17d5b65a061629282
      <div slot="view" id="reset">
        <template is="dom-if" if="[[renderPlugin_(
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-index efde1c73dfca6509223b6a626ab426faeed9af76..d80464f0e1faeeb14e73e7ad10386df400115e33 100644
+index efde1c73dfca6509223b6a626ab426faeed9af76..4ab916bd61e71c73b4bef4d9e925ab6960fd0a22 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
 @@ -17,7 +17,8 @@
@@ -369,7 +369,7 @@ index efde1c73dfca6509223b6a626ab426faeed9af76..d80464f0e1faeeb14e73e7ad10386df4
 +          <cr-ripple></cr-ripple>
 +        </a>
 +        <a role="menuitem" id="uwProvidersLink" class="cr-nav-menu-item"
-+            href="chrome://providers/" target="_blank"
++            href="chrome://ai/providers" target="_blank"
 +            hidden="[[!pageVisibility_.uwOrganization]]">
 +          <cr-icon icon="settings20:data-connectors-system"></cr-icon>
 +          <span>$i18n{uwOrganizationProvidersTitle}</span>

@@ -17,6 +17,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/types/expected.h"
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
@@ -26,6 +27,7 @@
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/connectors/connector_tools.h"
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -94,8 +96,22 @@ class AgentLoop {
   void SetModel(AgentModel model) { model_ = std::move(model); }
   // Asks for approval as `mode` says from the next step on. Auto until set.
   void SetMode(ApprovalMode mode) { mode_ = mode; }
-  // The skills the agent may load from now on.
+  // The skills the agent may load from now on: those of `skills` that are
+  // not only for the user.
   void SetSkills(const std::vector<Skill>& skills);
+  // The user started `skill` with its name, so for the rest of the chat the
+  // agent may read its files, even if it is only for the user.
+  void StartedSkill(const Skill& skill);
+  // The connectors this chat may use, with the tools the user left on. The
+  // model loads one with the connector tool. See docs/plans/connectors.md.
+  void SetConnectors(std::vector<ConnectorTools> connectors);
+  // Whether the model sees images. A connector's images are left out for one
+  // that does not.
+  void SetSeesImages(bool sees) { sees_images_ = sees; }
+  // Turns a connector off or on for this chat, which keeps it.
+  void SetConnectorOn(std::string_view name, bool on) {
+    context_->SetConnectorOn(name, on);
+  }
   // Asks the user whether to save the skill a save_skill call describes,
   // saves it if so, and answers with what the model is told.
   using SaveSkill =
@@ -107,7 +123,15 @@ class AgentLoop {
   // The user's answer to a step that needs approval. A decline may carry a
   // note for the model.
   struct ApprovalAnswer {
-    enum class Choice { kApprove, kDecline, kStop };
+    // A connector's tool can also be allowed for the rest of the chat, or
+    // always.
+    enum class Choice {
+      kApprove,
+      kDecline,
+      kStop,
+      kAllowForChat,
+      kAlwaysAllow,
+    };
     Choice choice = Choice::kDecline;
     std::string note;
   };
@@ -126,6 +150,15 @@ class AgentLoop {
   void OnModel(RemoteModelClient::Outcome outcome);
   void RunCall(ModelTurn turn, size_t index);
   void LoadSkill(ModelTurn turn, size_t index, base::DictValue args);
+  void UpdateConnectorTools();
+  void LoadConnector(ModelTurn turn, size_t index, base::DictValue args);
+  // Whether the user must approve a call to the connector tool `name`.
+  bool ConnectorNeedsApproval(const std::string& name) const;
+  void CallConnector(ModelTurn turn, size_t index, base::DictValue args);
+  void OnConnectorAnswer(ModelTurn turn,
+                         size_t index,
+                         base::DictValue args,
+                         base::expected<mcp::Content, std::string> answer);
   void CallTool(ModelTurn turn, size_t index, base::DictValue args);
   void OnApproval(ModelTurn turn,
                   size_t index,
@@ -150,8 +183,21 @@ class AgentLoop {
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
   const std::unique_ptr<AgentContext> context_;
   const base::RepeatingClosure on_change_;
-  // Each skill's SKILL.md by the skill's name.
+  // Each skill's SKILL.md by the skill's name: those the agent may pick, and
+  // those the user started.
   std::map<std::string, base::FilePath> skills_;
+  std::map<std::string, base::FilePath> started_skills_;
+  std::vector<ConnectorTools> connectors_;
+  // Each loaded connector's tools by the name the model calls them.
+  struct ConnectorTool {
+    std::string connector;
+    mcp::Tool tool;
+  };
+  std::map<std::string, ConnectorTool> connector_tools_;
+  bool sees_images_ = true;
+  // Images connectors' tools answered with in the current answer, shown to
+  // the model before it is asked again.
+  std::vector<std::pair<std::string, std::vector<std::string>>> tool_images_;
   SaveSkill save_skill_;
   Approve approve_;
   ApprovalMode mode_ = ApprovalMode::kAuto;

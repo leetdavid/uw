@@ -14,7 +14,7 @@ class PrefService;
 
 namespace uw {
 
-// The providers the user saved on uw://providers, and the three model
+// The providers the user saved on uw://ai/providers, and the three model
 // choices that pick from them. See docs/plans/ai-providers.md. Keys live in
 // the Keychain under KeyAccountFor(id); only the account name lives here.
 inline constexpr char kProvidersPref[] = "uw.providers.list";

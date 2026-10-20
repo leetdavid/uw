@@ -1,4 +1,4 @@
-// Builds the uw://chat and uw://providers pages for Chromium's build: checks its types, bundles
+// Builds the uw://chat and uw://ai pages for Chromium's build: checks its types, bundles
 // its script, writes its stylesheet, and puts them in one folder with the
 // page's HTML, icon, and fonts. GN runs it with Chromium's
 // node from the build directory:

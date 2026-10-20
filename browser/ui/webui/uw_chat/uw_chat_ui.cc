@@ -53,7 +53,8 @@ void UwChatUI::CreateHandler(
 void UwChatUI::BindInterface(
     mojo::PendingReceiver<mojom::ProvidersHandler> receiver) {
   providers_ = std::make_unique<UwProvidersHandler>(
-      Profile::FromWebUI(web_ui()), std::move(receiver));
+      Profile::FromWebUI(web_ui()), web_ui()->GetWebContents(),
+      std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(UwChatUI)

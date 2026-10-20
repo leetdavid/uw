@@ -136,7 +136,78 @@ struct ModelTestResult {
   string detail;
 };
 
-// Profile-scoped backend of uw://providers.
+// Where a skill comes from. Matches uw::Skill::Source.
+enum SkillSource {
+  kUw,
+  kAgents,
+  kChat,
+};
+
+struct SkillInfo {
+  string name;
+  string description;
+  SkillSource source;
+  bool on;
+  // Whether the agent may pick it, and whether the user may start it by
+  // typing / and its name.
+  bool for_agent;
+  bool for_user;
+  // What to type after its name.
+  string argument_hint;
+};
+
+// How a connector stands. Matches uw::Connectors::State.
+enum ConnectorState {
+  kOff,
+  kStarting,
+  kReady,
+  kNeedsSignIn,
+  kSigningIn,
+  kCantSignIn,
+  kFailed,
+};
+
+struct ConnectorTool {
+  string name;
+  string description;
+  // The server says it only reads.
+  bool read_only;
+  bool on;
+  bool always_allowed;
+};
+
+struct ConnectorPrompt {
+  string name;
+  string description;
+};
+
+// A connector as uw://ai/connectors shows it.
+struct ConnectorInfo {
+  string name;
+  bool remote;
+  // Its address, or the command uw starts.
+  string address;
+  bool on;
+  ConnectorState state;
+  // Why it failed, or what it last said.
+  string error;
+  // The MCP version it speaks, once it has answered.
+  string version;
+  array<ConnectorTool> tools;
+  array<ConnectorPrompt> prompts;
+  // The names of its secrets, whose values stay in Keychain.
+  array<string> secret_names;
+};
+
+// A connector in pasted JSON, before it is added.
+struct NewConnector {
+  string name;
+  bool remote;
+  string address;
+  array<string> secret_names;
+};
+
+// Profile-scoped backend of uw://ai, and of the chat page's model chips.
 interface ProvidersHandler {
   GetState() => (ProvidersState state);
   ListModels(string provider_id) => (ModelList list);
@@ -163,4 +234,35 @@ interface ProvidersHandler {
   // the model tested.
   TestModel(ModelSlot slot) => (ModelTestResult result);
   DismissUpgradeNotice() => ();
+  // Every skill the agent can use, and the folder that holds uw's own.
+  GetSkills() => (array<SkillInfo> skills, string folder);
+  // Turns the skill `name` on or off for every chat.
+  SetSkillOn(string name, bool on);
+  // Shows uw's skills folder in Finder, making it first if need be.
+  OpenSkillsFolder();
+  // Shows uw://ai/<section> in this window: in its uw://ai tab if one is
+  // open, or in a new tab.
+  ShowAiPage(string section);
+
+  GetConnectors() => (array<ConnectorInfo> connectors);
+  // Answers the next time a connector changes.
+  WaitForConnectorChange() => ();
+  // What pasted JSON holds, or what is wrong with it.
+  ReadConnectors(string json) => (array<NewConnector> connectors,
+                                  string error);
+  // Adds what the JSON holds and starts it. An empty error means it worked.
+  AddConnectors(string json) => (string error);
+  RemoveConnector(string name);
+  SetConnectorOn(string name, bool on);
+  SetConnectorToolOn(string name, string tool, bool on);
+  SetToolAlwaysAllowed(string name, string tool, bool allowed);
+  // Starts a failed connector again.
+  RestartConnector(string name);
+  // Opens the connector's sign-in page in a new tab.
+  SignInConnector(string name);
+  CancelSignIn(string name);
+  SignOutConnector(string name);
+  // Opens a terminal tab running a local connector's command, with its
+  // environment.
+  OpenConnectorInTerminal(string name);
 };

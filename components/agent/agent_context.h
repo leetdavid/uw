@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -52,6 +53,31 @@ class AgentContext {
   // Lists `skills`, one per line, in the instructions every request starts
   // with. Empty for none.
   void SetSkills(std::string_view skills);
+  // Says `connectors`, as ConnectorsForInstructions() writes them, in the
+  // instructions. Empty for none.
+  void SetConnectors(std::string_view connectors);
+  // Tools every request offers beside uw's own: the connector tool and the
+  // tools of each connector the model loaded.
+  void SetExtraTools(base::ListValue tools) { extra_tools_ = std::move(tools); }
+  // A connector the model loaded, whose tools it keeps for the rest of the
+  // chat.
+  void LoadConnector(std::string_view name);
+  const std::set<std::string>& loaded_connectors() const {
+    return loaded_connectors_;
+  }
+  // A connector's tool the user allowed for the rest of the chat.
+  void AllowForChat(std::string_view connector, std::string_view tool);
+  bool AllowedForChat(std::string_view connector, std::string_view tool) const;
+  // A connector the user turned off in this chat.
+  void SetConnectorOn(std::string_view name, bool on);
+  bool ConnectorOn(std::string_view name) const;
+  const std::set<std::string>& connectors_off() const {
+    return connectors_off_;
+  }
+  // Images a connector's tool answered with, shown to the model in a message
+  // of their own, numbered with the chat's other images.
+  void AddToolImages(std::string_view tool,
+                     const std::vector<std::string>& images);
   // Answers each tool call of the model's last turn that has no result yet
   // with `error`. A model refuses a request with an unanswered call.
   void CloseOpenCalls(std::string_view error);
@@ -82,11 +108,20 @@ class AgentContext {
   };
 
   static bool CanShorten(const Result& result);
+  // The instructions, with the skills and connectors.
+  void UpdateInstructions();
   void Shorten(Result& result);
   void Shorten(Image& image);
   const Image* FindImage(int number) const;
 
   base::ListValue messages_;
+  std::string skills_;
+  std::string connectors_;
+  base::ListValue extra_tools_;
+  std::set<std::string> loaded_connectors_;
+  // "connector/tool".
+  std::set<std::string> allowed_for_chat_;
+  std::set<std::string> connectors_off_;
   std::vector<Result> results_;
   // A recalled image appears again under its own number.
   std::vector<Image> images_;

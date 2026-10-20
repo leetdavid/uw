@@ -104,10 +104,25 @@ std::optional<SkillFrontMatter> ReadSkillFrontMatter(std::string_view text) {
     }
     const std::string_view key =
         base::TrimWhitespaceASCII(line.substr(0, colon), base::TRIM_ALL);
-    if (key != "name" && key != "description") {
+    if (key == "disable-model-invocation") {
+      front.for_agent = !base::EqualsCaseInsensitiveASCII(
+          Unquote(line.substr(colon + 1)), "true");
       continue;
     }
-    value = key == "name" ? &front.name : &front.description;
+    if (key == "user-invocable") {
+      front.for_user = !base::EqualsCaseInsensitiveASCII(
+          Unquote(line.substr(colon + 1)), "false");
+      continue;
+    }
+    if (key == "name") {
+      value = &front.name;
+    } else if (key == "description") {
+      value = &front.description;
+    } else if (key == "argument-hint") {
+      value = &front.argument_hint;
+    } else {
+      continue;
+    }
     const std::string_view rest =
         base::TrimWhitespaceASCII(line.substr(colon + 1), base::TRIM_ALL);
     *value = rest == ">" || rest == ">-" || rest == "|" || rest == "|-"
@@ -124,6 +139,17 @@ std::string_view SkillInstructions(std::string_view text) {
   std::optional<FrontMatter> split = SplitFrontMatter(text);
   return base::TrimWhitespaceASCII(split ? text.substr(split->body) : text,
                                    base::TRIM_ALL);
+}
+
+std::string StartedSkillMessage(std::string_view instructions,
+                                std::string_view arguments) {
+  std::string message(instructions);
+  if (message.find("$ARGUMENTS") != std::string::npos) {
+    base::ReplaceSubstringsAfterOffset(&message, 0, "$ARGUMENTS", arguments);
+  } else if (!arguments.empty()) {
+    base::StrAppend(&message, {"\n\n", arguments});
+  }
+  return message;
 }
 
 bool IsSkillName(std::string_view name) {
@@ -151,11 +177,17 @@ std::vector<Skill> FindSkills(const base::FilePath& folder,
     if (!front) {
       continue;
     }
-    skills.push_back({std::move(front->name), std::move(front->description),
-                      file,
-                      agents_folder         ? Skill::Source::kAgents
-                      : front->made_in_chat ? Skill::Source::kChat
-                                            : Skill::Source::kUw});
+    Skill skill;
+    skill.name = std::move(front->name);
+    skill.description = std::move(front->description);
+    skill.file = file;
+    skill.source = agents_folder         ? Skill::Source::kAgents
+                   : front->made_in_chat ? Skill::Source::kChat
+                                         : Skill::Source::kUw;
+    skill.for_agent = front->for_agent;
+    skill.for_user = front->for_user;
+    skill.argument_hint = std::move(front->argument_hint);
+    skills.push_back(std::move(skill));
   }
   std::ranges::sort(skills, {}, &Skill::name);
   return skills;

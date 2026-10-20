@@ -57,7 +57,7 @@ constexpr SkColor kOrganizingColor = SkColorSetRGB(0x18, 0x80, 0x38);
 constexpr SkColor kPausedColor = SkColorSetRGB(0xE8, 0x71, 0x0A);
 // The countdown is shown in minutes, so this keeps it within a few seconds.
 constexpr base::TimeDelta kCountdownStep = base::Seconds(5);
-constexpr char kProvidersUrl[] = "chrome://providers/";
+constexpr char kProvidersUrl[] = "chrome://ai/providers";
 
 enum class State { kOrganizing, kPaused, kOff, kNeedsModel };
 

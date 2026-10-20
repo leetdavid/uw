@@ -20,11 +20,12 @@ namespace uw {
 UwProvidersUI::UwProvidersUI(content::WebUI* web_ui)
     : ui::MojoWebUIController(web_ui) {
   content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      web_ui->GetWebContents()->GetBrowserContext(), kProvidersHost);
+      web_ui->GetWebContents()->GetBrowserContext(), kAiHost);
   // The page is built with the chat page and ships in its pak.
   webui::SetupWebUIDataSource(source, kUwChatResources,
                               IDR_UW_CHAT_PROVIDERS_HTML);
-  // uw://providers/<id> opens one provider.
+  // Each section has its own address, such as uw://ai/skills, and
+  // uw://ai/providers/<id> opens one provider.
   source->SetDefaultResource(IDR_UW_CHAT_PROVIDERS_HTML);
   // Lets one fixed style of Radix's scroll area through; see
   // trusted-types.ts.
@@ -37,6 +38,7 @@ UwProvidersUI::~UwProvidersUI() = default;
 void UwProvidersUI::BindInterface(
     mojo::PendingReceiver<mojom::ProvidersHandler> receiver) {
   handler_ = std::make_unique<UwProvidersHandler>(Profile::FromWebUI(web_ui()),
+                                                  web_ui()->GetWebContents(),
                                                   std::move(receiver));
 }
 

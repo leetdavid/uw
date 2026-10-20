@@ -37,7 +37,7 @@ inline constexpr char kAgentEndpointPref[] = "uw.agent.endpoint";
 inline constexpr char kAgentModelPref[] = "uw.agent.model";
 inline constexpr char kAgentKeyAccountPref[] = "uw.agent.key_account";
 
-// What uw://providers says once after the connections moved. Holds an
+// What uw://ai/providers says once after the connections moved. Holds an
 // UpgradeNotice.
 inline constexpr char kUpgradeNoticePref[] = "uw.providers.upgrade_notice";
 
@@ -87,8 +87,8 @@ void RegisterModelPrefs(PrefRegistrySimple* registry);
 // they stay, and the next launch tries again.
 void MoveConnectionsToProviders(PrefService* prefs);
 
-// The models picked on uw://providers. Empty when the slot holds no model, or
-// its provider is gone or cannot serve it.
+// The models picked on uw://ai/providers. Empty when the slot holds no model,
+// or its provider is gone or cannot serve it.
 AiConnectionConfig ReadAiConnectionConfig(const PrefService* prefs);
 // The model a new chat starts on: the agent model, or the language model
 // until one is picked.

@@ -8,26 +8,42 @@
 #include <utility>
 #include <vector>
 
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/task/thread_pool.h"
 #include "base/values.h"
+#include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/singleton_tabs.h"  // nogncheck
 #include "components/prefs/pref_service.h"
+#include "components/prefs/scoped_user_pref_update.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/storage_partition.h"
+#include "content/public/common/url_constants.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "ui/base/page_transition_types.h"
+#include "ui/base/window_open_disposition.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/ai_providers/formats.h"
+#include "uw/components/connectors/connector_config.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 
 namespace uw {
@@ -179,10 +195,14 @@ UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
 
 UwProvidersHandler::UwProvidersHandler(
     Profile* profile,
+    content::WebContents* contents,
     mojo::PendingReceiver<mojom::ProvidersHandler> receiver)
     : profile_(profile),
+      contents_(contents),
       receiver_(this, std::move(receiver)),
-      lister_(profile) {}
+      lister_(profile) {
+  connectors_observation_.Observe(&Connectors::Get());
+}
 
 UwProvidersHandler::~UwProvidersHandler() = default;
 
@@ -436,6 +456,259 @@ void UwProvidersHandler::OnTested(ModelSlot slot,
                                     .value_or(*test.body)
                               : *test.body)});
   std::move(callback).Run(std::move(result));
+}
+
+void UwProvidersHandler::GetSkills(GetSkillsCallback callback) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()},
+      base::BindOnce(&FindAllSkills, UwSkillsFolder(), AgentsSkillsFolder()),
+      base::BindOnce(&UwProvidersHandler::ReplySkills,
+                     weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void UwProvidersHandler::ReplySkills(GetSkillsCallback callback,
+                                     std::vector<Skill> skills) {
+  const base::ListValue& off =
+      profile_->GetPrefs()->GetList(kAgentDisabledSkillsPref);
+  std::vector<mojom::SkillInfoPtr> infos;
+  for (const Skill& skill : skills) {
+    mojom::SkillSource source = mojom::SkillSource::kUw;
+    switch (skill.source) {
+      case Skill::Source::kUw:
+        source = mojom::SkillSource::kUw;
+        break;
+      case Skill::Source::kAgents:
+        source = mojom::SkillSource::kAgents;
+        break;
+      case Skill::Source::kChat:
+        source = mojom::SkillSource::kChat;
+        break;
+    }
+    infos.push_back(mojom::SkillInfo::New(
+        skill.name, skill.description, source, !off.contains(skill.name),
+        skill.for_agent, skill.for_user, skill.argument_hint));
+  }
+  std::move(callback).Run(std::move(infos), UwSkillsFolder().AsUTF8Unsafe());
+}
+
+void UwProvidersHandler::SetSkillOn(const std::string& name, bool on) {
+  ScopedListPrefUpdate off(profile_->GetPrefs(), kAgentDisabledSkillsPref);
+  off->EraseValue(base::Value(name));
+  if (!on) {
+    off->Append(name);
+  }
+}
+
+void UwProvidersHandler::OpenSkillsFolder() {
+  base::ThreadPool::PostTaskAndReply(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce(base::IgnoreResult(&base::CreateDirectory),
+                     UwSkillsFolder()),
+      base::BindOnce(
+          [](base::WeakPtr<UwProvidersHandler> self) {
+            if (self) {
+              platform_util::OpenItem(self->profile_, UwSkillsFolder(),
+                                      platform_util::OPEN_FOLDER, {});
+            }
+          },
+          weak_factory_.GetWeakPtr()));
+}
+
+void UwProvidersHandler::ShowAiPage(const std::string& section) {
+  tabs::TabInterface* tab =
+      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
+  if (!tab) {
+    return;
+  }
+  NavigateParams params = GetSingletonTabNavigateParams(
+      tab->GetBrowserWindowInterface(),
+      GURL(base::StrCat(
+          {content::kChromeUIScheme, "://", kAiHost, "/", section})));
+  // Any uw://ai tab will do; it goes to the section.
+  params.path_behavior = NavigateParams::IGNORE_AND_NAVIGATE;
+  ShowSingletonTabOverwritingNTP(&params);
+}
+
+namespace {
+
+mojom::ConnectorState StateFor(Connectors::State state) {
+  switch (state) {
+    case Connectors::State::kOff:
+      return mojom::ConnectorState::kOff;
+    case Connectors::State::kStarting:
+      return mojom::ConnectorState::kStarting;
+    case Connectors::State::kReady:
+      return mojom::ConnectorState::kReady;
+    case Connectors::State::kNeedsSignIn:
+      return mojom::ConnectorState::kNeedsSignIn;
+    case Connectors::State::kSigningIn:
+      return mojom::ConnectorState::kSigningIn;
+    case Connectors::State::kCantSignIn:
+      return mojom::ConnectorState::kCantSignIn;
+    case Connectors::State::kFailed:
+      return mojom::ConnectorState::kFailed;
+  }
+}
+
+std::vector<std::string> SecretNames(const ConnectorConfig& config) {
+  std::vector<std::string> names;
+  for (const auto& values : {config.env, config.headers}) {
+    for (const auto& [key, value] : values) {
+      names.push_back(key);
+    }
+  }
+  return names;
+}
+
+std::string AddressOf(const ConnectorConfig& config) {
+  if (config.remote()) {
+    return config.url;
+  }
+  std::string address = config.command;
+  for (const std::string& arg : config.args) {
+    base::StrAppend(&address, {" ", arg});
+  }
+  return address;
+}
+
+}  // namespace
+
+void UwProvidersHandler::GetConnectors(GetConnectorsCallback callback) {
+  Connectors::Get().Start();
+  std::vector<mojom::ConnectorInfoPtr> connectors;
+  for (const Connectors::Info& info : Connectors::Get().list()) {
+    auto connector = mojom::ConnectorInfo::New();
+    connector->name = info.config.name;
+    connector->remote = info.config.remote();
+    connector->address = AddressOf(info.config);
+    connector->on = info.on;
+    connector->state = StateFor(info.state);
+    connector->error = info.error;
+    connector->version = info.version;
+    for (const mcp::Tool& tool : info.tools) {
+      connector->tools.push_back(
+          mojom::ConnectorTool::New(tool.name, tool.description, tool.read_only,
+                                    !info.tools_off.contains(tool.name),
+                                    info.always_allowed.contains(tool.name)));
+    }
+    for (const mcp::Prompt& prompt : info.prompts) {
+      connector->prompts.push_back(
+          mojom::ConnectorPrompt::New(prompt.name, prompt.description));
+    }
+    connector->secret_names = SecretNames(info.config);
+    connectors.push_back(std::move(connector));
+  }
+  std::move(callback).Run(std::move(connectors));
+}
+
+void UwProvidersHandler::WaitForConnectorChange(
+    WaitForConnectorChangeCallback callback) {
+  waiting_for_change_.push_back(std::move(callback));
+}
+
+void UwProvidersHandler::OnConnectorsChanged() {
+  for (WaitForConnectorChangeCallback& callback :
+       std::exchange(waiting_for_change_, {})) {
+    std::move(callback).Run();
+  }
+}
+
+void UwProvidersHandler::ReadConnectors(const std::string& json,
+                                        ReadConnectorsCallback callback) {
+  base::expected<std::vector<ConnectorConfig>, std::string> read =
+      ParseConnectors(json);
+  std::vector<mojom::NewConnectorPtr> connectors;
+  if (!read.has_value()) {
+    std::move(callback).Run(std::move(connectors), read.error());
+    return;
+  }
+  for (const ConnectorConfig& config : *read) {
+    connectors.push_back(mojom::NewConnector::New(
+        config.name, config.remote(), AddressOf(config), SecretNames(config)));
+  }
+  std::move(callback).Run(std::move(connectors), std::string());
+}
+
+void UwProvidersHandler::AddConnectors(const std::string& json,
+                                       AddConnectorsCallback callback) {
+  base::expected<std::vector<ConnectorConfig>, std::string> read =
+      ParseConnectors(json);
+  if (!read.has_value()) {
+    std::move(callback).Run(read.error());
+    return;
+  }
+  base::expected<void, std::string> added =
+      Connectors::Get().Add(std::move(read).value());
+  std::move(callback).Run(added.has_value() ? std::string() : added.error());
+}
+
+void UwProvidersHandler::RemoveConnector(const std::string& name) {
+  Connectors::Get().Remove(name);
+}
+
+void UwProvidersHandler::SetConnectorOn(const std::string& name, bool on) {
+  Connectors::Get().SetOn(name, on);
+}
+
+void UwProvidersHandler::SetConnectorToolOn(const std::string& name,
+                                            const std::string& tool,
+                                            bool on) {
+  Connectors::Get().SetToolOn(name, tool, on);
+}
+
+void UwProvidersHandler::SetToolAlwaysAllowed(const std::string& name,
+                                              const std::string& tool,
+                                              bool allowed) {
+  Connectors::Get().SetAlwaysAllowed(name, tool, allowed);
+}
+
+void UwProvidersHandler::RestartConnector(const std::string& name) {
+  Connectors::Get().Restart(name);
+}
+
+void UwProvidersHandler::SignInConnector(const std::string& name) {
+  Connectors::Get().SignIn(
+      name,
+      base::BindOnce(
+          [](base::WeakPtr<UwProvidersHandler> self,
+             const GURL& url) -> content::WebContents* {
+            tabs::TabInterface* tab =
+                self && self->contents_
+                    ? tabs::TabInterface::MaybeGetFromContents(self->contents_)
+                    : nullptr;
+            if (!tab) {
+              return nullptr;
+            }
+            NavigateParams params(tab->GetBrowserWindowInterface(), url,
+                                  ui::PAGE_TRANSITION_LINK);
+            params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+            Navigate(&params);
+            return params.navigated_or_inserted_contents.get();
+          },
+          weak_factory_.GetWeakPtr()));
+}
+
+void UwProvidersHandler::CancelSignIn(const std::string& name) {
+  Connectors::Get().CancelSignIn(name);
+}
+
+void UwProvidersHandler::SignOutConnector(const std::string& name) {
+  Connectors::Get().SignOut(name);
+}
+
+void UwProvidersHandler::OpenConnectorInTerminal(const std::string& name) {
+  tabs::TabInterface* tab =
+      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
+  const std::string command = Connectors::Get().CommandLine(name);
+  if (!tab || command.empty()) {
+    return;
+  }
+  base::EnvironmentMap environment;
+  for (const auto& [key, value] : Connectors::Get().Environment(name)) {
+    environment[key] = value;
+  }
+  OpenTerminalTabRunning(tab->GetBrowserWindowInterface(), command,
+                         std::move(environment));
 }
 
 }  // namespace uw

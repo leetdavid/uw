@@ -41,7 +41,7 @@ const char* ChoicePref(ModelSlot slot) {
   }
 }
 
-// The start of a preset's ids, as in uw://providers/openai.
+// The start of a preset's ids, as in uw://ai/providers/openai.
 const char* Slug(ProviderPreset preset) {
   switch (preset) {
     case ProviderPreset::kCustom:

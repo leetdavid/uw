@@ -28,15 +28,9 @@ interface ChatHandler {
   // Puts the chat beside the agent's tab `number`, or its latest tab when
   // `number` is 0, in split view; or ends the split when `on` is false.
   SetSideBySide(bool on, int32 number);
-  // Every skill the agent can use, and the folder that holds uw's own.
-  GetSkills() => (array<SkillInfo> skills, string folder);
   // What a new chat suggests, written by the language model from recent
   // chats and sites. Empty until there are some.
   GetSuggestions() => (array<string> suggestions);
-  // Turns the skill `name` on or off for every chat.
-  SetSkillOn(string name, bool on);
-  // Shows uw's skills folder in Finder, making it first if need be.
-  OpenSkillsFolder();
   // The user's answer to the last OnSkillProposal.
   AnswerSkill(bool save);
   // The user's answer to the last OnApproval. A decline may carry a note for
@@ -56,9 +50,22 @@ interface ChatHandler {
   // A message while the agent works. It goes in after the step under way;
   // while a step waits for approval it declines that step, as its note.
   Steer(string text, array<string> images);
+  // The connectors that are on, and whether this chat uses each.
+  GetConnectors() => (array<ChatConnector> connectors);
+  // Turns a connector off or on for this chat from the next step.
+  SetConnectorOn(string name, bool on);
+  // Sends a connector's prompt, with `values` for its arguments, as the
+  // user's message. The chat shows it as `shown`.
+  SendPrompt(string connector,
+             string prompt,
+             map<string, string> values,
+             string shown);
+  // Whether the chat's model sees images, which the page knows from the
+  // model list.
+  SetSeesImages(bool sees);
 };
 
-// The model a chat runs on, from a provider on uw://providers.
+// The model a chat runs on, from a provider on uw://ai/providers.
 struct ChatModel {
   string provider_id;
   string model;
@@ -117,20 +124,6 @@ struct ChatSummary {
   ChatState state;
 };
 
-// Where a skill comes from. Matches uw::Skill::Source.
-enum SkillSource {
-  kUw,
-  kAgents,
-  kChat,
-};
-
-struct SkillInfo {
-  string name;
-  string description;
-  SkillSource source;
-  bool on;
-};
-
 // A step that waits for the user's approval: its tab and site, what it does,
 // and why it needs approval. A terminal step has its folder in place of a
 // site, and its command, or the text and keys it sends with what the
@@ -145,12 +138,51 @@ struct Approval {
   string text;
   array<string> keys;
   string screen;
+  // A connector's tool, with the arguments the model sent as JSON. Always
+  // allow is not offered in a private chat.
+  string connector;
+  string tool;
+  string arguments;
+  bool can_always_allow;
 };
 
 enum ApprovalChoice {
   kApprove,
   kDecline,
   kStop,
+  // For a connector's tool: no more asking for the rest of the chat, or
+  // ever.
+  kAllowForChat,
+  kAlwaysAllow,
+};
+
+// How a connector stands, as the "+" menu shows it.
+enum ChatConnectorState {
+  kReady,
+  kStarting,
+  kNeedsSignIn,
+  kFailed,
+};
+
+struct PromptArgument {
+  string name;
+  string description;
+  bool required;
+};
+
+// A prompt a connector offers in the / menu.
+struct ChatPrompt {
+  string name;
+  string description;
+  array<PromptArgument> arguments;
+};
+
+// A connector that is on, and whether this chat uses it.
+struct ChatConnector {
+  string name;
+  bool on;
+  ChatConnectorState state;
+  array<ChatPrompt> prompts;
 };
 
 // Matches uw::ApprovalMode.
@@ -210,4 +242,6 @@ interface ChatPage {
   // `program` in the agent's terminal tab `tab` waits for a password, which
   // only the user types there; or with 0, nothing waits any more.
   OnPassword(int32 tab, string program);
+  // A connector changed: added, removed, turned on or off, or started.
+  OnConnectorsChanged();
 };

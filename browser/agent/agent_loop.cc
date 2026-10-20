@@ -9,6 +9,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
 #include "base/location.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -21,6 +22,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "uw/browser/connectors/connectors.h"
 
 namespace uw {
 namespace {
@@ -94,9 +96,12 @@ AgentLoop::AgentLoop(tabs::TabInterface& chat,
 AgentLoop::~AgentLoop() = default;
 
 void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
-  skills_.clear();
+  skills_ = started_skills_;
   std::string list;
   for (const Skill& skill : skills) {
+    if (!skill.for_agent) {
+      continue;
+    }
     skills_[skill.name] = skill.file;
     base::StrAppend(&list, {list.empty() ? "" : "\n", "- ", skill.name, ": ",
                             skill.description});
@@ -169,6 +174,9 @@ void AgentLoop::AskModel() {
   }
   if (!recalled_images_.empty()) {
     context_->ShowImages(std::exchange(recalled_images_, {}));
+  }
+  for (const auto& [tool, images] : std::exchange(tool_images_, {})) {
+    context_->AddToolImages(tool, images);
   }
   if (steer_) {
     const Message steer = *std::exchange(steer_, std::nullopt);
@@ -264,6 +272,33 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     LoadSkill(std::move(turn), index, std::move(*args));
     return;
   }
+  if (call.name == kLoadConnectorTool) {
+    LoadConnector(std::move(turn), index, std::move(*args));
+    return;
+  }
+  if (auto tool = connector_tools_.find(call.name);
+      tool != connector_tools_.end()) {
+    if (!approve_ || !ConnectorNeedsApproval(call.name)) {
+      CallConnector(std::move(turn), index, std::move(*args));
+      return;
+    }
+    AgentTools::Approval approval;
+    approval.connector = tool->second.connector;
+    approval.tool = tool->second.tool.name;
+    approval.action = base::StrCat({"Run ", approval.tool});
+    approval.arguments = base::WriteJsonWithOptions(
+                             *args, base::JSONWriter::OPTIONS_PRETTY_PRINT)
+                             .value_or("{}");
+    approval.reason =
+        mode_ == ApprovalMode::kAskFirst
+            ? "Ask first asks before every connector tool."
+            : "This tool doesn't say it only reads, so Auto asks.";
+    approve_.Run(
+        std::move(approval),
+        base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
+                       std::move(turn), index, std::move(*args)));
+    return;
+  }
   if (call.name == "save_skill") {
     if (!save_skill_) {
       OnTool(std::move(turn), index, std::move(*args),
@@ -354,9 +389,32 @@ void AgentLoop::OnApproval(ModelTurn turn,
                            size_t index,
                            base::DictValue args,
                            ApprovalAnswer answer) {
+  const std::string name = turn.calls[index].name;
+  const auto connector_tool = connector_tools_.find(name);
+  const bool connector = connector_tool != connector_tools_.end();
   switch (answer.choice) {
+    case ApprovalAnswer::Choice::kAllowForChat:
+    case ApprovalAnswer::Choice::kAlwaysAllow:
+      if (!connector) {
+        CallTool(std::move(turn), index, std::move(args));
+        return;
+      }
+      if (answer.choice == ApprovalAnswer::Choice::kAlwaysAllow) {
+        Connectors::Get().SetAlwaysAllowed(connector_tool->second.connector,
+                                           connector_tool->second.tool.name,
+                                           true);
+      } else {
+        context_->AllowForChat(connector_tool->second.connector,
+                               connector_tool->second.tool.name);
+      }
+      CallConnector(std::move(turn), index, std::move(args));
+      return;
     case ApprovalAnswer::Choice::kApprove:
-      CallTool(std::move(turn), index, std::move(args));
+      if (connector) {
+        CallConnector(std::move(turn), index, std::move(args));
+      } else {
+        CallTool(std::move(turn), index, std::move(args));
+      }
       return;
     case ApprovalAnswer::Choice::kDecline: {
       base::DictValue result =
@@ -372,6 +430,117 @@ void AgentLoop::OnApproval(ModelTurn turn,
       Finish(StoppedByUser());
       return;
   }
+}
+
+void AgentLoop::SetConnectors(std::vector<ConnectorTools> connectors) {
+  connectors_ = std::move(connectors);
+  context_->SetConnectors(ConnectorsForInstructions(connectors_));
+  UpdateConnectorTools();
+}
+
+void AgentLoop::UpdateConnectorTools() {
+  connector_tools_.clear();
+  base::ListValue tools;
+  if (!connectors_.empty()) {
+    tools.Append(LoadConnectorToolSchema());
+  }
+  for (const ConnectorTools& connector : connectors_) {
+    if (!context_->loaded_connectors().contains(connector.name)) {
+      continue;
+    }
+    for (const mcp::Tool& tool : connector.tools) {
+      const std::string name = ModelToolName(connector.name, tool.name);
+      if (connector_tools_.contains(name)) {
+        continue;
+      }
+      connector_tools_[name] = {connector.name, tool};
+      tools.Append(ModelToolSchema(connector.name, tool));
+    }
+  }
+  context_->SetExtraTools(std::move(tools));
+}
+
+void AgentLoop::LoadConnector(ModelTurn turn,
+                              size_t index,
+                              base::DictValue args) {
+  const std::string* name = args.FindString("name");
+  const auto connector =
+      name ? std::ranges::find(connectors_, *name, &ConnectorTools::name)
+           : connectors_.end();
+  if (connector == connectors_.end()) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("There is no connector by that name. Use a name from the "
+                 "list."));
+    return;
+  }
+  context_->LoadConnector(*name);
+  UpdateConnectorTools();
+  base::ListValue tools;
+  for (const mcp::Tool& tool : connector->tools) {
+    tools.Append(ModelToolName(connector->name, tool.name));
+  }
+  OnTool(
+      std::move(turn), index, std::move(args),
+      base::DictValue().Set("connector", *name).Set("tools", std::move(tools)));
+}
+
+bool AgentLoop::ConnectorNeedsApproval(const std::string& name) const {
+  const ConnectorTool& tool = connector_tools_.at(name);
+  if (mode_ == ApprovalMode::kFullAuto ||
+      context_->AllowedForChat(tool.connector, tool.tool.name)) {
+    return false;
+  }
+  if (const Connectors::Info* info = Connectors::Get().Find(tool.connector);
+      info && info->always_allowed.contains(tool.tool.name)) {
+    return false;
+  }
+  return mode_ == ApprovalMode::kAskFirst || !tool.tool.read_only;
+}
+
+void AgentLoop::CallConnector(ModelTurn turn,
+                              size_t index,
+                              base::DictValue args) {
+  const ConnectorTool& tool = connector_tools_.at(turn.calls[index].name);
+  const std::string connector = tool.connector;
+  const std::string name = tool.tool.name;
+  base::DictValue asked = args.Clone();
+  Connectors::Get().CallTool(
+      connector, name, std::move(args),
+      base::BindOnce(&AgentLoop::OnConnectorAnswer, weak_factory_.GetWeakPtr(),
+                     std::move(turn), index, std::move(asked)));
+}
+
+void AgentLoop::OnConnectorAnswer(
+    ModelTurn turn,
+    size_t index,
+    base::DictValue args,
+    base::expected<mcp::Content, std::string> answer) {
+  if (!answer.has_value()) {
+    OnTool(std::move(turn), index, std::move(args), Error(answer.error()));
+    return;
+  }
+  base::DictValue result;
+  if (answer->failed) {
+    result.Set("error",
+               answer->text.empty() ? "The tool failed." : answer->text);
+  } else {
+    result.Set("text", answer->text);
+  }
+  if (!answer->images.empty()) {
+    if (sees_images_) {
+      result.Set("images", static_cast<int>(answer->images.size()));
+      tool_images_.emplace_back(turn.calls[index].name,
+                                std::move(answer->images));
+    } else {
+      result.Set("images", "[image left out: this model can't see images]");
+    }
+  }
+  OnTool(std::move(turn), index, std::move(args), std::move(result));
+}
+
+void AgentLoop::StartedSkill(const Skill& skill) {
+  started_skills_[skill.name] = skill.file;
+  skills_[skill.name] = skill.file;
 }
 
 void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {
@@ -430,6 +599,7 @@ void AgentLoop::Finish(Step step) {
   stopping_ = false;
   steer_.reset();
   recalled_images_.clear();
+  tool_images_.clear();
   context_->ShortenAll();
   working_ = false;
   on_step_.Run(step);

@@ -7,26 +7,28 @@ import {
   ChatHandlerRemote,
   ChatPageCallbackRouter,
   ChatState,
-  SkillSource,
+  ChatConnectorState,
   StepKind,
 } from "uw-chat-mojom";
 import type {
   AgentTab,
   Approval,
+  ChatConnector,
   ChatModel,
+  ChatPrompt,
   ChatSummary,
-  SkillInfo,
   SkillProposal,
   Step,
 } from "uw-chat-mojom";
 
-export { ApprovalChoice, ApprovalMode, ChatState, SkillSource, StepKind };
+export { ApprovalChoice, ApprovalMode, ChatState, ChatConnectorState, StepKind };
 export type {
   AgentTab,
   Approval,
+  ChatConnector,
   ChatModel,
+  ChatPrompt,
   ChatSummary,
-  SkillInfo,
   SkillProposal,
   Step,
 };

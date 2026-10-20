@@ -23,20 +23,35 @@ struct Skill {
   // The skill's SKILL.md. Its folder may hold more files the skill refers to.
   base::FilePath file;
   Source source = Source::kUw;
+  // Whether the agent may pick it, and whether the user may start it by
+  // typing / and its name. From disable-model-invocation and user-invocable.
+  bool for_agent = true;
+  bool for_user = true;
+  // What to type after its name, from argument-hint.
+  std::string argument_hint;
 };
 
-// The name and description between the "---" lines that open a SKILL.md.
-// Nothing when either is missing.
+// What the "---" lines that open a SKILL.md say, in the form Claude Code
+// reads. Nothing when the name or the description is missing.
 struct SkillFrontMatter {
   std::string name;
   std::string description;
   // Written by uw when the agent saved the skill from a chat.
   bool made_in_chat = false;
+  bool for_agent = true;
+  bool for_user = true;
+  std::string argument_hint;
 };
 std::optional<SkillFrontMatter> ReadSkillFrontMatter(std::string_view text);
 
 // What follows the front matter: the skill's instructions.
 std::string_view SkillInstructions(std::string_view text);
+
+// What the model is told when the user starts a skill by typing its name
+// and `arguments`: its instructions, with the arguments in place of
+// $ARGUMENTS, or after the instructions when there is no $ARGUMENTS.
+std::string StartedSkillMessage(std::string_view instructions,
+                                std::string_view arguments);
 
 // A skill's name: 1 to 64 lowercase letters, digits, and hyphens.
 bool IsSkillName(std::string_view name);

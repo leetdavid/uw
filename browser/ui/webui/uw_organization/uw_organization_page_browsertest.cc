@@ -145,7 +145,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   ASSERT_EQ(true, Run("part('providersLink').click(); return true;"));
   content::WebContents* providers = opened.GetWebContents();
   EXPECT_TRUE(content::WaitForLoadStop(providers));
-  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
+  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://ai/providers"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

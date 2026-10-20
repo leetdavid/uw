@@ -1,6 +1,6 @@
 # Connectors and the AI page
 
-Status: scope agreed on 2026-10-21 for v2.1. Nothing is built yet. The design comes first, T134, and the user signs it off before T135 to T142 change any page.
+Status: scope agreed on 2026-10-21 for v2.1. The design, T134, is drawn and waits for the user's sign-off. On the user's word to "finish all of them", T135 to T142 were built the same day to that design, and are in review; [Built](#built) lists where they differ from it.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The pages, menus, and skill changes reuse what T72, T77, and T107 built. The hard parts:
 
@@ -70,11 +70,24 @@ The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the 
 - "Chat: a connector call waits for you (Fluid)": the approval card with the Allow once caret open.
 - "Connectors and /: every state (Fluid)": the "+" and `/` menus, prompt fields, every connector state, paste errors, and a private chat's caret.
 
-Proposed code layout, to settle as each stage starts:
+## Built
 
-- `components/connectors/`: the MCP client, which turns requests and answers into JSON-RPC for both versions, reads tool lists, prompts, and results, and parses the pasted JSON. No I/O, so unit tests cover it.
-- `browser/connectors/`: the local and remote transports, the shared list in local state, Keychain, sign-in, and the service that starts connectors with uw.
-- `browser/ui/webui/uw_ai/`: the `uw://ai` page, in the React package of the chat page per [ADR 0006](../adr/0006-the-chat-page-is-react-with-fluid-functionalism.md).
+Built on 2026-10-21. The code:
+
+- `components/connectors/`, without I/O: the pasted JSON (`connector_config.h`), MCP's messages in both versions (`mcp.h`), the names and schemas the model sees (`connector_tools.h`), and OAuth's metadata, PKCE, and token forms (`oauth.h`).
+- `browser/connectors/`: `Connectors` (`connectors.h`), the one list for every profile, kept in `connectors/` in the user data folder with each connector's tools beside it and its secrets in Keychain. `LocalTransport` and `RemoteTransport` carry the messages, `McpClient` works out the version and lists what a connector offers, and `ConnectorSignIn` signs a web connector in. `uw_fake_mcp_server` plays a connector in tests.
+- The agent: `AgentLoop` adds the `connector` tool and each loaded connector's tools, asks for approval by the rules above, and keeps the chat's allows, loaded connectors, and switches in its saved context.
+- `uw://ai` is still served from `browser/ui/webui/uw_providers/`, whose names stayed, and its page from `browser/resources/uw_chat/app/src/providers/`. A terminal tab can start with an environment the screen never shows, which Open in terminal uses for a connector's keys.
+
+Where the build differs from the design:
+
+- A connector's tile is a globe or a terminal icon, not the site's favicon. Reads only has no eye icon, since Fluid's badge holds text only.
+- The "+" menu's Connectors list marks each connector with a check, Fluid's own menu item, not a switch.
+- The approval card asks "Run save_issue in linear?": uw knows a tool's name, not what it does in words.
+- Pasted JSON that does not parse says "That isn't JSON: the problem is at line 4.", since the parser's own words are not plain.
+- Not supported: MCP's `x-mcp-header` tool parameters, a tool that asks for more input (it fails with a sentence saying so), and `subscriptions/listen`. A modern connector's tool list refreshes each time it starts.
+
+Tests: `ConnectorConfigTest.*`, `McpTest.*`, `ConnectorToolsTest.*`, `OAuthTest.*`, and `SkillsTest.*` in unit_tests; `ConnectorsBrowserTest.*`, `UwProvidersBrowserTest.*`, and `UwChatBrowserTest.*` in browser_tests. Live servers such as Linear and Doop are for the user to check: the tests play a local program, a test web server, and a fake sign-in server.
 
 ## Stages
 

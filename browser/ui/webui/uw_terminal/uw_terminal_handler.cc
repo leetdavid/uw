@@ -31,10 +31,15 @@ int Clamp(int32_t cells) {
   return std::clamp(cells, 1, 1000);
 }
 
-ShellHost::Options UserShell(int columns, int rows) {
+ShellHost::Options UserShell(int columns,
+                             int rows,
+                             base::EnvironmentMap environment) {
   ShellHost::Options options = ShellHost::ForUser();
   options.columns = columns;
   options.rows = rows;
+  for (auto& [key, value] : environment) {
+    options.environment[key] = std::move(value);
+  }
   return options;
 }
 
@@ -110,12 +115,15 @@ void UwTerminalHandler::Start(int32_t columns, int32_t rows) {
   if (session_) {
     return;
   }
+  StartCommand start = TakeStartCommand(contents_);
   session_ = std::make_unique<ShellSession>(
-      base::BindOnce(&UserShell, Clamp(columns), Clamp(rows)), this);
-  // A command from the command bar, run as if typed and entered.
-  if (const std::string command = TakeStartCommand(contents_);
-      !command.empty()) {
-    Write(command + "\r");
+      base::BindOnce(&UserShell, Clamp(columns), Clamp(rows),
+                     std::move(start.environment)),
+      this);
+  // A command from the command bar or the connectors page, run as if typed
+  // and entered.
+  if (!start.command.empty()) {
+    Write(start.command + "\r");
   }
 }
 

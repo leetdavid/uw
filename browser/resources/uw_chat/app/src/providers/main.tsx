@@ -1,12 +1,14 @@
-// uw://providers: the AI providers the user saves once, and the language,
-// decision, and agent models that pick from them. Built from Fluid
-// Functionalism's parts; see the "(Fluid)" frames on the canvas page "AI
-// providers" and docs/plans/ai-providers.md.
+// uw://ai: the AI providers the user saves once, the language, decision, and
+// agent models that pick from them, and skills. Each section has its own
+// address: uw://ai/providers, which uw://ai also opens, uw://ai/providers/<id>,
+// uw://ai/skills, uw://ai/connectors, and uw://ai/connectors/<name>. Built from Fluid Functionalism's parts; see the "(Fluid)"
+// frames on the canvas page "AI providers", docs/plans/ai-providers.md, and
+// docs/plans/connectors.md#the-ai-page.
 import "@/trusted-types";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { ChevronRight, Plus } from "lucide-react";
+import { Blocks, ChevronRight, Plug, Plus, Sparkles } from "lucide-react";
 import {
   Banner,
   BannerAction,
@@ -15,9 +17,12 @@ import {
   BannerTitle,
 } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AddProviderDialog } from "./add-provider";
 import { EffortChip, ModelChip } from "./model-chip";
 import { ProviderPage } from "./provider-page";
+import { ConnectorsSection } from "./connectors";
+import { SkillsSection } from "./skills";
 import {
   FORMAT_NAMES,
   ProviderTile,
@@ -197,7 +202,7 @@ function ProvidersList({
 
   return (
     <>
-      <h1 className="text-[20px] font-semibold tracking-[-0.01em]">AI providers</h1>
+      <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Providers</h1>
       <p className="mt-1 text-[13.5px] text-muted-foreground">
         Add each provider once. Every model in uw comes from one of them.
       </p>
@@ -322,7 +327,7 @@ function ProvidersList({
           return (
             <a
               key={provider.id}
-              href={`/${encodeURIComponent(provider.id)}`}
+              href={`/providers/${encodeURIComponent(provider.id)}`}
               className="grid h-[54px] grid-cols-[32px_minmax(0,1fr)_128px_92px_132px_16px] items-center gap-3 border-border pl-3 pr-3.5 [&+&]:border-t"
             >
               <ProviderTile preset={provider.preset} />
@@ -364,9 +369,54 @@ function ProvidersList({
   );
 }
 
-function Providers() {
+// The page's sections, each at its own address.
+const SECTIONS = [
+  { path: "providers", name: "Providers", icon: Plug },
+  { path: "skills", name: "Skills", icon: Sparkles },
+  { path: "connectors", name: "Connectors", icon: Blocks },
+];
+
+function SectionList({
+  section,
+  counts,
+}: {
+  section: string;
+  counts: Record<string, string>;
+}) {
+  return (
+    <nav aria-label="AI" className="flex flex-col gap-0.5 border-r border-border px-2 py-4">
+      <h2 className="px-2.5 pb-2.5 text-[15px] font-semibold">AI</h2>
+      {SECTIONS.map(({ path, name, icon: Icon }) => (
+        <a
+          key={path}
+          id={`section-${path}`}
+          href={`/${path}`}
+          aria-current={section === path ? "page" : undefined}
+          className={cn(
+            "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-foreground hover:bg-hover",
+            section === path && "bg-accent font-semibold",
+          )}
+        >
+          <Icon aria-hidden className="size-4 text-muted-foreground" />
+          <span className="flex-1">{name}</span>
+          <span className="text-xs font-normal tabular-nums text-muted-foreground">
+            {counts[path]}
+          </span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function AiPage() {
   const [data, setData] = useState<PageData | null>(null);
-  const id = decodeURIComponent(location.pathname.slice(1));
+  const [skillsOn, setSkillsOn] = useState<number | null>(null);
+  const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
+  // "/providers/<id>" opens one provider; "/" is the providers list.
+  const [section = "providers", id = ""] = location.pathname
+    .split("/")
+    .filter(Boolean)
+    .map(decodeURIComponent);
 
   // `relist` names a provider whose models to list again, such as one with a
   // new key.
@@ -419,22 +469,54 @@ function Providers() {
     }
   }, [unlisted]);
 
-  const provider = data?.providers.find((each) => each.id === id);
   useEffect(() => {
-    document.title = provider ? `${provider.name} – AI providers` : "AI providers";
-  }, [provider]);
+    providersHandler
+      .getSkills()
+      .then(({ skills }) => setSkillsOn(skills.filter((skill) => skill.on).length));
+    providersHandler
+      .getConnectors()
+      .then(({ connectors }) =>
+        setConnectorsOn(connectors.filter((connector) => connector.on).length),
+      );
+  }, []);
+
+  const provider =
+    section === "providers"
+      ? data?.providers.find((each) => each.id === id)
+      : undefined;
+  const sectionName =
+    SECTIONS.find((each) => each.path === section)?.name ?? "Providers";
+  useEffect(() => {
+    document.title = `${provider ? provider.name : section === "connectors" && id ? id : sectionName} – AI`;
+  }, [provider, section, id, sectionName]);
 
   return (
-    <main className="min-h-full overflow-auto pb-10 pt-[26px]">
-      <div className="mx-auto w-[740px] max-w-[calc(100%-32px)]">
-        {data &&
-          (provider ? (
-            <ProviderPage provider={provider} data={data} onChanged={refresh} />
+    <div className="grid min-h-full grid-cols-[220px_minmax(0,1fr)]">
+      <SectionList
+        section={section}
+        counts={{
+          providers: data ? String(data.providers.length) : "",
+          skills: skillsOn === null ? "" : `${skillsOn} on`,
+          connectors: connectorsOn === null ? "" : `${connectorsOn} on`,
+        }}
+      />
+      <main className="min-h-full overflow-auto pb-10 pt-[26px]">
+        <div className="mx-auto w-[740px] max-w-[calc(100%-32px)]">
+          {section === "skills" ? (
+            <SkillsSection onCount={setSkillsOn} />
+          ) : section === "connectors" ? (
+            <ConnectorsSection name={id} onCount={setConnectorsOn} />
           ) : (
-            <ProvidersList data={data} onChanged={refresh} />
-          ))}
-      </div>
-    </main>
+            data &&
+            (provider ? (
+              <ProviderPage provider={provider} data={data} onChanged={refresh} />
+            ) : (
+              <ProvidersList data={data} onChanged={refresh} />
+            ))
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -448,7 +530,7 @@ dark.addEventListener("change", followScheme);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
-      <Providers />
+      <AiPage />
     </MotionConfig>
   </StrictMode>,
 );

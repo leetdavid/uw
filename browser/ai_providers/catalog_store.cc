@@ -43,7 +43,7 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
           "can do: whether each calls tools, and which effort levels it "
           "takes."
         trigger:
-          "uw://providers or a chat's model menu needs the catalog, at most "
+          "uw://ai/providers or a chat's model menu needs the catalog, at most "
           "once a day."
         data: "None. The request carries no cookies and nothing about the user."
         destination: OTHER

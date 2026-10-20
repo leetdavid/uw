@@ -7,30 +7,41 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/ai_providers/model_lister.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
+#include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
 
 class Profile;
 
+namespace content {
+class WebContents;
+}
+
 namespace uw {
 
-// Mojo backend of uw://providers. Profile-scoped: it touches profile prefs
-// and the providers' Keychain accounts. Keys never reach prefs, logs, or the
-// page.
-class UwProvidersHandler : public mojom::ProvidersHandler {
+// Mojo backend of uw://ai, and of the chat page's model chips. Profile-scoped:
+// it touches profile prefs and the providers' Keychain accounts. Keys never
+// reach prefs, logs, or the page.
+class UwProvidersHandler : public mojom::ProvidersHandler,
+                           public Connectors::Observer {
  public:
   // The request that tests a model, and how its answer is read.
   struct ModelTest;
 
+  // `contents` is the page's tab.
   UwProvidersHandler(Profile* profile,
+                     content::WebContents* contents,
                      mojo::PendingReceiver<mojom::ProvidersHandler> receiver);
   UwProvidersHandler(const UwProvidersHandler&) = delete;
   UwProvidersHandler& operator=(const UwProvidersHandler&) = delete;
@@ -62,6 +73,32 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
                  SetEffortCallback callback) override;
   void TestModel(mojom::ModelSlot slot, TestModelCallback callback) override;
   void DismissUpgradeNotice(DismissUpgradeNoticeCallback callback) override;
+  void GetSkills(GetSkillsCallback callback) override;
+  void SetSkillOn(const std::string& name, bool on) override;
+  void OpenSkillsFolder() override;
+  void ShowAiPage(const std::string& section) override;
+  void GetConnectors(GetConnectorsCallback callback) override;
+  void WaitForConnectorChange(WaitForConnectorChangeCallback callback) override;
+  void ReadConnectors(const std::string& json,
+                      ReadConnectorsCallback callback) override;
+  void AddConnectors(const std::string& json,
+                     AddConnectorsCallback callback) override;
+  void RemoveConnector(const std::string& name) override;
+  void SetConnectorOn(const std::string& name, bool on) override;
+  void SetConnectorToolOn(const std::string& name,
+                          const std::string& tool,
+                          bool on) override;
+  void SetToolAlwaysAllowed(const std::string& name,
+                            const std::string& tool,
+                            bool allowed) override;
+  void RestartConnector(const std::string& name) override;
+  void SignInConnector(const std::string& name) override;
+  void CancelSignIn(const std::string& name) override;
+  void SignOutConnector(const std::string& name) override;
+  void OpenConnectorInTerminal(const std::string& name) override;
+
+  // Connectors::Observer:
+  void OnConnectorsChanged() override;
 
  private:
   // A request the page waits on. Several model lists can be on their way at
@@ -89,7 +126,13 @@ class UwProvidersHandler : public mojom::ProvidersHandler {
                        ChangeAddressCallback callback,
                        ModelListing listing);
 
+  void ReplySkills(GetSkillsCallback callback, std::vector<Skill> skills);
+
   const raw_ptr<Profile> profile_;
+  const raw_ptr<content::WebContents> contents_;
+  std::vector<WaitForConnectorChangeCallback> waiting_for_change_;
+  base::ScopedObservation<Connectors, Connectors::Observer>
+      connectors_observation_{this};
   mojo::Receiver<mojom::ProvidersHandler> receiver_;
   ModelLister lister_;
   std::map<int, std::unique_ptr<RemoteModelClient>> requests_;

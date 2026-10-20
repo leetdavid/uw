@@ -51,6 +51,39 @@ TEST(SkillsTest, RefusesAFileWithoutANameOrADescription) {
   EXPECT_FALSE(ReadSkillFrontMatter("---\nname: a\ndescription: b\n"));
 }
 
+TEST(SkillsTest, ReadsWhoMayStartASkill) {
+  const std::optional<SkillFrontMatter> handoff = ReadSkillFrontMatter(
+      "---\nname: handoff\ndescription: Hands off.\nargument-hint: \"What "
+      "will the next session be used for?\"\ndisable-model-invocation: "
+      "true\n---\n");
+  ASSERT_TRUE(handoff);
+  EXPECT_FALSE(handoff->for_agent);
+  EXPECT_TRUE(handoff->for_user);
+  EXPECT_EQ(handoff->argument_hint, "What will the next session be used for?");
+
+  const std::optional<SkillFrontMatter> manners = ReadSkillFrontMatter(
+      "---\nname: site-manners\ndescription: Acts politely.\n"
+      "user-invocable: False\n---\n");
+  ASSERT_TRUE(manners);
+  EXPECT_TRUE(manners->for_agent);
+  EXPECT_FALSE(manners->for_user);
+
+  const std::optional<SkillFrontMatter> both = ReadSkillFrontMatter(
+      "---\nname: a\ndescription: b\ndisable-model-invocation: false\n---\n");
+  EXPECT_TRUE(both->for_agent);
+  EXPECT_TRUE(both->for_user);
+  EXPECT_EQ(both->argument_hint, "");
+}
+
+TEST(SkillsTest, AStartedSkillTakesWhatTheUserTyped) {
+  EXPECT_EQ(StartedSkillMessage("Write it for: $ARGUMENTS.", "T137"),
+            "Write it for: T137.");
+  EXPECT_EQ(StartedSkillMessage("Hand off the work.", "T137 next"),
+            "Hand off the work.\n\nT137 next");
+  EXPECT_EQ(StartedSkillMessage("Hand off the work.", ""),
+            "Hand off the work.");
+}
+
 TEST(SkillsTest, InstructionsFollowTheFrontMatter) {
   EXPECT_EQ(SkillInstructions("---\nname: a\ndescription: b\n---\n\n# Steps\n"
                               "1. Compare.\n"),

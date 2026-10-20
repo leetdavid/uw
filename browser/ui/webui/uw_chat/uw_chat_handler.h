@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -25,6 +26,7 @@
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
@@ -45,6 +47,7 @@ namespace uw {
 // Until approvals land, nothing here asks before a click or a keystroke.
 class UwChatHandler : public mojom::ChatHandler,
                       public ChatIndex::Observer,
+                      public Connectors::Observer,
                       public content::WebContentsObserver {
  public:
   UwChatHandler(content::WebContents* contents,
@@ -54,9 +57,6 @@ class UwChatHandler : public mojom::ChatHandler,
   UwChatHandler& operator=(const UwChatHandler&) = delete;
   ~UwChatHandler() override;
 
-  // Reads the skills that other agents share from `folder` in place of
-  // ~/.agents/skills. An empty path restores it.
-  static void SetAgentsSkillsFolderForTesting(base::FilePath folder);
 
   // mojom::ChatHandler:
   void Send(const std::string& text,
@@ -68,10 +68,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void DeleteChat(const std::string& id) override;
   void ShowTab(int32_t number) override;
   void SetSideBySide(bool on, int32_t number) override;
-  void GetSkills(GetSkillsCallback callback) override;
   void GetSuggestions(GetSuggestionsCallback callback) override;
-  void SetSkillOn(const std::string& name, bool on) override;
-  void OpenSkillsFolder() override;
   void AnswerSkill(bool save) override;
   void AnswerApproval(mojom::ApprovalChoice choice,
                       const std::string& note) override;
@@ -80,6 +77,17 @@ class UwChatHandler : public mojom::ChatHandler,
   void SetEffort(const std::string& effort) override;
   void SetMode(mojom::ApprovalMode mode) override;
   void Stop() override;
+  void GetConnectors(GetConnectorsCallback callback) override;
+  void SetConnectorOn(const std::string& name, bool on) override;
+  void SendPrompt(const std::string& connector,
+                  const std::string& prompt,
+                  const base::flat_map<std::string, std::string>& values,
+                  const std::string& shown) override;
+  void SetSeesImages(bool sees) override;
+
+  // Connectors::Observer:
+  void OnConnectorsChanged() override;
+
   void Steer(const std::string& text,
              const std::vector<std::string>& images) override;
 
@@ -132,7 +140,30 @@ class UwChatHandler : public mojom::ChatHandler,
   void LoadSkills(base::OnceClosure done);
   void OnSkillsLoaded(base::OnceClosure done, std::vector<Skill> skills);
   std::vector<Skill> EnabledSkills() const;
-  void ReplySkills(GetSkillsCallback callback);
+  // The skill `text` starts with as "/name", if the user may start one by
+  // that name, and what they typed after it.
+  std::optional<std::pair<Skill, std::string>> UserSkill(
+      std::string_view text) const;
+  std::vector<ConnectorTools> ChatConnectors() const;
+  // Gives the agent the chat's connectors, as they are now.
+  void UpdateConnectors();
+  void OnPrompt(std::string shown,
+                std::string name,
+                base::expected<mcp::Content, std::string> answer);
+  // Sends `text`, which started `skill`, once its SKILL.md has been read.
+  void SendStartedSkill(std::string text,
+                        std::vector<std::string> images,
+                        Skill skill,
+                        std::string arguments,
+                        std::optional<std::string> file);
+  // Sends a message the chat shows as `shown` and the model gets as `sent`.
+  // `started` is "skill" or "prompt" when the message started one, called
+  // `name`.
+  void SendToAgent(const std::string& shown,
+                   const std::string& sent,
+                   const std::vector<std::string>& images,
+                   std::string_view started = {},
+                   std::string_view name = {});
   // The agent's save_skill call: shows the page the skill, and answers once
   // the user does.
   void AskToSaveSkill(base::DictValue args,
@@ -185,6 +216,13 @@ class UwChatHandler : public mojom::ChatHandler,
   int current_tab_ = 0;
   std::vector<Skill> skills_;
   bool skills_loaded_ = false;
+  // A started skill's SKILL.md or a connector's prompt is being read.
+  bool preparing_ = false;
+  // The connectors this chat turned off, kept here before its agent starts.
+  std::set<std::string> connectors_off_;
+  bool sees_images_ = true;
+  base::ScopedObservation<Connectors, Connectors::Observer>
+      connectors_observation_{this};
   struct Message {
     std::string text;
     // data: URLs.

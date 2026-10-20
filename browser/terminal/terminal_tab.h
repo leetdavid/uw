@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include "base/environment.h"
+
 class BrowserWindowInterface;
 class GURL;
 
@@ -31,13 +33,24 @@ inline constexpr char kTerminalHost[] = "terminal";
 void OpenTerminalTab(BrowserWindowInterface* window);
 
 // Opens a terminal tab the same way, and runs `command` in its shell once the
-// shell starts.
+// shell starts. The shell starts with `environment` set, which the screen
+// never shows.
 void OpenTerminalTabRunning(BrowserWindowInterface* window,
-                            const std::string& command);
+                            const std::string& command,
+                            base::EnvironmentMap environment = {});
 
-// The command a terminal tab opened by OpenTerminalTabRunning runs, taken
+// What a terminal tab opened by OpenTerminalTabRunning starts with, taken
 // once. Empty for any other tab.
-std::string TakeStartCommand(content::WebContents* contents);
+struct StartCommand {
+  StartCommand();
+  StartCommand(StartCommand&&);
+  StartCommand& operator=(StartCommand&&);
+  ~StartCommand();
+
+  std::string command;
+  base::EnvironmentMap environment;
+};
+StartCommand TakeStartCommand(content::WebContents* contents);
 
 GURL TerminalUrl();
 bool IsTerminalUrl(const GURL& url);

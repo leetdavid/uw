@@ -47,7 +47,7 @@ export function ModelChip({
   needsTools?: boolean;
   // The chosen model is no longer offered.
   gone?: boolean;
-  // Ends the menu with a link to uw://providers.
+  // Ends the menu with a link to uw://ai/providers.
   manage?: boolean;
   className?: string;
   onOpen?: () => void;
@@ -153,7 +153,7 @@ export function ModelChip({
         index={index++}
         icon={Plug}
         label="Manage providers"
-        onSelect={() => open("chrome://providers/")}
+        onSelect={() => open("chrome://ai/providers")}
       />,
     );
   }

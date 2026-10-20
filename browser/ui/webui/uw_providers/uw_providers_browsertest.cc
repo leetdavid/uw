@@ -5,12 +5,20 @@
 #include <string>
 #include <vector>
 
+#include "base/base_paths.h"
+#include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/path_service.h"
 #include "base/strings/strcat.h"
+#include "base/test/run_until.h"
+#include "base/threading/thread_restrictions.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/platform_util_internal.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
@@ -20,11 +28,15 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/connectors/connectors.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -90,7 +102,7 @@ constexpr char kCatalog[] = R"({"openrouter": {"models": {
 constexpr char kCatalogModels[] =
     R"({"data":[{"id":"maker/thinker"},{"id":"maker/talker"}]})";
 
-// Drives the real uw://providers page against a local server that plays the
+// Drives the real uw://ai page against a local server that plays the
 // providers.
 class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -99,12 +111,50 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(embedded_test_server()->Start());
     CatalogStore::SetSourceForTesting(
         embedded_test_server()->GetURL("/v1/catalog.json"));
+    // The test's own folder stands in for ~/.agents/skills.
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(home_.CreateUniqueTempDir());
+    SetAgentsSkillsFolderForTesting(AgentsSkills());
+    Connectors::SetUpForTesting(home_.GetPath().AppendASCII("connectors"),
+                                base::FilePath("/bin/sh"));
+  }
+
+  void TearDownOnMainThread() override {
+    SetAgentsSkillsFolderForTesting(base::FilePath());
+    Connectors::SetUpForTesting(base::FilePath(), base::FilePath());
+    HeadlessModeBrowserTest::TearDownOnMainThread();
+  }
+
+  static base::FilePath UwSkills() {
+    base::FilePath data;
+    EXPECT_TRUE(base::PathService::Get(chrome::DIR_USER_DATA, &data));
+    return data.AppendASCII("skills");
+  }
+
+  base::FilePath AgentsSkills() {
+    return home_.GetPath().AppendASCII(".agents").AppendASCII("skills");
+  }
+
+  // `more` holds more front matter lines, each ending in a newline.
+  static void WriteSkillFile(const base::FilePath& folder,
+                             const std::string& name,
+                             const std::string& description,
+                             const std::string& more = "") {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    const base::FilePath skill = folder.AppendASCII(name);
+    ASSERT_TRUE(base::CreateDirectory(skill));
+    ASSERT_TRUE(base::WriteFile(skill.AppendASCII("SKILL.md"),
+                                "---\nname: " + name +
+                                    "\ndescription: " + description + "\n" +
+                                    more + "---\n\nSteps.\n"));
   }
 
   PrefService& prefs() { return *browser()->GetProfile()->GetPrefs(); }
   content::WebContents* page() {
     return browser()->tab_strip_model()->GetActiveWebContents();
   }
+
+  base::ScopedTempDir home_;
 
   std::string Address() { return embedded_test_server()->GetURL("/v1").spec(); }
 
@@ -133,10 +183,10 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
     return Save(std::move(provider));
   }
 
-  // Opens uw://providers, or one provider's page, once it has drawn.
+  // Opens uw://ai/providers, or one provider's page, once it has drawn.
   void Open(const std::string& id = "") {
-    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(),
-                                             GURL("chrome://providers/" + id)));
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), GURL("chrome://ai/providers/" + id)));
     ASSERT_EQ(true, Run("await until(() => document.querySelector('h1'));"
                         "return true;"));
   }
@@ -305,7 +355,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                       "withText('button', 'Remove provider').click();"
                       "return true;"));
   back_to_list.Wait();
-  EXPECT_EQ(page()->GetLastCommittedURL(), GURL("chrome://providers/"));
+  EXPECT_EQ(page()->GetLastCommittedURL(), GURL("chrome://ai/providers"));
   EXPECT_FALSE(FindProvider(prefs(), id));
   EXPECT_FALSE(ApiKeyStore().GetKey(KeyAccountFor(id)));
   EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->model, "chat-a");
@@ -366,14 +416,14 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
 }
 
-// The settings sidebar lists AI providers under uw, like Extensions, and
-// opens the page in a new tab.
+// The settings sidebar lists AI under uw, like Extensions, and opens the
+// page in a new tab.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                        TheSettingsSidebarOpensAiProviders) {
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL("chrome://settings/")));
   content::WebContentsAddedObserver opened;
-  EXPECT_EQ("chrome://providers/",
+  EXPECT_EQ("chrome://ai/providers",
             Run("const find = (root) => root.querySelector('#uwProvidersLink')"
                 "    ?? all('*', root).map((element) => element.shadowRoot &&"
                 "        find(element.shadowRoot)).find(Boolean);"
@@ -382,7 +432,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                 "return link.getAttribute('href');"));
   content::WebContents* providers = opened.GetWebContents();
   EXPECT_TRUE(content::WaitForLoadStop(providers));
-  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://providers/"));
+  EXPECT_EQ(providers->GetLastCommittedURL(), GURL("chrome://ai/providers"));
 }
 
 // Anthropic takes its key in its own header alone, for the model list and
@@ -627,6 +677,157 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, OllamaSaysWhatItsModelsCanDo) {
   EXPECT_EQ("qwen3No tool callslowmediumhigh",
             Run("return await until(() => modelRow('qwen3'));"));
   EXPECT_THAT(RequestsTo("/v1/catalog.json"), IsEmpty());
+}
+
+// uw://ai opens on its providers, and each section has its own address.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, UwAiOpensOnItsProviders) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/")));
+  EXPECT_EQ("Providers – AI",
+            Run("await until(() => withText('h1', 'Providers'));"
+                "return document.title;"));
+  EXPECT_EQ("page", Run("return document.getElementById('section-providers')"
+                        "    .getAttribute('aria-current');"));
+  EXPECT_EQ("/skills", Run("return document.getElementById('section-skills')"
+                           "    .getAttribute('href');"));
+}
+
+// uw://ai/skills lists the skills of both folders, and a switch turns one off
+// for every chat.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsSectionTurnsASkillOff) {
+  WriteSkillFile(UwSkills(), "book-activities", "Books tours and tickets.");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.");
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/skills")));
+  EXPECT_EQ("2 on", Run("return await until(() => {"
+                        "  const count = document.querySelector("
+                        "      '#section-skills span:last-child').textContent;"
+                        "  return count === '2 on' && count;"
+                        "});"));
+  EXPECT_EQ("1 on",
+            Run("document.querySelector('[data-skill=\"research\"]').click();"
+                "return await until(() => {"
+                "  const count = document.querySelector("
+                "      '#section-skills span:last-child').textContent;"
+                "  return count === '1 on' && count;"
+                "});"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return prefs().GetList(kAgentDisabledSkillsPref).contains("research");
+  }));
+  SaveWindowScreenshot(browser(), "skills");
+}
+
+// A skill only one side may start says which.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsSectionSaysWhoStarts) {
+  WriteSkillFile(AgentsSkills(), "handoff", "Hands the work off.",
+                 "disable-model-invocation: true\n");
+  WriteSkillFile(UwSkills(), "site-manners", "Acts politely on sites.",
+                 "user-invocable: false\n");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.");
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/skills")));
+  // uw's own skills come first.
+  EXPECT_EQ("site-manners: Only the agent | handoff: Only you | research: ",
+            Run("await until(() => all('[data-skill-row]').length === 3);"
+                "return all('[data-skill-row]').map((row) =>"
+                "    row.dataset.skillRow + ': ' +"
+                "    (row.querySelector('[data-who]')?.textContent ?? ''))"
+                "    .join(' | ');"));
+}
+
+// The test connector program.
+std::string FakeServer() {
+  base::FilePath program;
+  EXPECT_TRUE(base::PathService::Get(base::DIR_EXE, &program));
+  return program.AppendASCII("uw_fake_mcp_server").value();
+}
+
+// uw://ai/connectors adds a connector from pasted JSON and starts it, and its
+// page turns one of its tools off.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/connectors")));
+  const std::string json =
+      base::StrCat({R"({"mcpServers": {"fake": {"command": ")", FakeServer(),
+                    R"(", "env": {"FAKE_KEY": "s3cret"}}}})"});
+  EXPECT_THAT(
+      Run(content::JsReplace(
+              "(await until(() => document.getElementById('add-connector')))"
+              "    .click();"
+              "const box = await until(() =>"
+              "    document.getElementById('connector-json'));"
+              "Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+              "    'value').set.call(box, $1);"
+              "box.dispatchEvent(new Event('input', {bubbles: true}));"
+              "const found = await until(() =>"
+              "    document.querySelector('[data-found=\"fake\"]'));"
+              "const said = found.textContent;"
+              "document.getElementById('add-connectors').click();"
+              "const row = await until(() => {"
+              "  const row = document.querySelector('[data-row=\"fake\"]');"
+              "  return row && row.textContent.includes('Running') && row;"
+              "});"
+              "return said + ' | ' + row.textContent;",
+              json))
+          .ExtractString(),
+      ::testing::AllOf(::testing::HasSubstr("FAKE_KEY goes to Keychain"),
+                       ::testing::HasSubstr("5 tools"),
+                       ::testing::HasSubstr("Running")));
+  SaveWindowScreenshot(browser(), "connectors");
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://ai/connectors/fake")));
+  ASSERT_EQ(true, Run("(await until(() => document.querySelector("
+                      "    '[data-tool-switch=\"crash\"]'))).click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([] {
+    return Connectors::Get().Find("fake")->tools_off.contains("crash");
+  }));
+  EXPECT_THAT(Run("return document.querySelector('[data-tool=\"echo\"]')"
+                  "    .textContent;")
+                  .ExtractString(),
+              ::testing::HasSubstr("Reads only"));
+  SaveWindowScreenshot(browser(), "connector");
+}
+
+// A connector that fails shows its last error, and Open in terminal runs its
+// command in a terminal tab.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       AFailedConnectorOpensInTerminal) {
+  Connectors::Get().Start();
+  ASSERT_TRUE(base::test::RunUntil([] { return Connectors::Get().loaded(); }));
+  ConnectorConfig failing;
+  failing.name = "railway";
+  failing.command = FakeServer();
+  failing.args = {"--fail=Unauthorized. Please login with railway login"};
+  std::vector<ConnectorConfig> added;
+  added.push_back(std::move(failing));
+  ASSERT_TRUE(Connectors::Get().Add(std::move(added)).has_value());
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/connectors")));
+  EXPECT_EQ("Unauthorized. Please login with railway login",
+            Run("const row = await until(() => document.querySelector("
+                "    '[data-row=\"railway\"] [data-action=\"Open in "
+                "terminal\"]'));"
+                "row.click();"
+                "return document.querySelector("
+                "    '[data-row=\"railway\"] [data-line]').textContent;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return IsTerminalUrl(page()->GetVisibleURL()); }));
+}
+
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsFolderOpens) {
+  // Finder stays shut.
+  platform_util::internal::DisableShellOperationsForTesting();
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/skills")));
+  ASSERT_EQ(true, Run("(await until(() =>"
+                      "    document.getElementById('open-skills-folder')))"
+                      "    .click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    return base::DirectoryExists(UwSkills());
+  }));
 }
 
 }  // namespace

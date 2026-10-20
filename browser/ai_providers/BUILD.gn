@@ -1,5 +1,5 @@
 # The AI providers as the browser reaches them: the models picked on
-# uw://providers, their keys in the Keychain, and requests to them. Chats and
+# uw://ai/providers, their keys in the Keychain, and requests to them. Chats and
 # the organizer both use it. See docs/plans/ai-providers.md.
 source_set("ai_providers") {
   sources = [

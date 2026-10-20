@@ -24,7 +24,6 @@
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 // //chrome/browser depends on this target, so it cannot depend back.
-#include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -52,6 +51,7 @@
 #include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -224,53 +224,6 @@ int TabOf(const AgentLoop::Step& step) {
       step.result.FindInt("tab").value_or(0));
 }
 
-// uw's own skills, and those made in chats: beside the profiles.
-base::FilePath UwSkillsFolder() {
-  base::FilePath data;
-  base::PathService::Get(chrome::DIR_USER_DATA, &data);
-  return data.AppendASCII("skills");
-}
-
-base::FilePath& AgentsSkillsFolderForTesting() {
-  static base::NoDestructor<base::FilePath> folder;
-  return *folder;
-}
-
-// The skills other agents share.
-base::FilePath AgentsSkillsFolder() {
-  if (!AgentsSkillsFolderForTesting().empty()) {
-    return AgentsSkillsFolderForTesting();
-  }
-  base::FilePath home;
-  base::PathService::Get(base::DIR_HOME, &home);
-  return home.AppendASCII(".agents").AppendASCII("skills");
-}
-
-// uw's skills first; a skill in ~/.agents/skills with the same name as one
-// of uw's is left out. Blocks.
-std::vector<Skill> FindAllSkills(base::FilePath uw, base::FilePath agents) {
-  std::vector<Skill> skills = FindSkills(uw, /*agents_folder=*/false);
-  for (Skill& skill : FindSkills(agents, /*agents_folder=*/true)) {
-    if (std::ranges::none_of(skills, [&](const Skill& kept) {
-          return kept.name == skill.name;
-        })) {
-      skills.push_back(std::move(skill));
-    }
-  }
-  return skills;
-}
-
-mojom::SkillSource SourceFor(Skill::Source source) {
-  switch (source) {
-    case Skill::Source::kUw:
-      return mojom::SkillSource::kUw;
-    case Skill::Source::kAgents:
-      return mojom::SkillSource::kAgents;
-    case Skill::Source::kChat:
-      return mojom::SkillSource::kChat;
-  }
-}
-
 }  // namespace
 
 UwChatHandler::UwChatHandler(content::WebContents* contents,
@@ -293,6 +246,8 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
     index_observation_.Observe(index);
   }
   LoadSkills(base::DoNothing());
+  Connectors::Get().Start();
+  connectors_observation_.Observe(&Connectors::Get());
   if (profile->IsOffTheRecord()) {
     OnLoaded(std::nullopt);
     return;
@@ -302,18 +257,13 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
       base::BindOnce(&UwChatHandler::OnLoaded, weak_factory_.GetWeakPtr()));
 }
 
-// static
-void UwChatHandler::SetAgentsSkillsFolderForTesting(base::FilePath folder) {
-  AgentsSkillsFolderForTesting() = std::move(folder);
-}
-
 UwChatHandler::~UwChatHandler() {
   OpenChats().erase(id_);
 }
 
 void UwChatHandler::Send(const std::string& text,
                          const std::vector<std::string>& images) {
-  if (!loaded_ || Working()) {
+  if (!loaded_ || Working() || preparing_) {
     return;
   }
   if (!skills_loaded_) {
@@ -329,9 +279,220 @@ void UwChatHandler::Send(const std::string& text,
   if (title_.empty()) {
     title_ = text;
   }
+  UpdateConnectors();
+  if (std::optional<std::pair<Skill, std::string>> started = UserSkill(text)) {
+    preparing_ = true;
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock()},
+        base::BindOnce(
+            [](base::FilePath file) -> std::optional<std::string> {
+              std::string text;
+              if (!base::ReadFileToStringWithMaxSize(file, &text, 256 * 1024)) {
+                return std::nullopt;
+              }
+              return text;
+            },
+            started->first.file),
+        base::BindOnce(&UwChatHandler::SendStartedSkill,
+                       weak_factory_.GetWeakPtr(), text, images,
+                       std::move(started->first), std::move(started->second)));
+    return;
+  }
+  SendToAgent(text, text, images);
+}
+
+std::optional<std::pair<Skill, std::string>> UwChatHandler::UserSkill(
+    std::string_view text) const {
+  if (!text.starts_with("/")) {
+    return std::nullopt;
+  }
+  const size_t end = text.find_first_of(" \t\n");
+  const std::string_view name = text.substr(1, end - 1);
+  for (const Skill& skill : EnabledSkills()) {
+    if (skill.for_user && skill.name == name) {
+      return std::make_pair(
+          skill, end == std::string_view::npos
+                     ? std::string()
+                     : std::string(base::TrimWhitespaceASCII(text.substr(end),
+                                                             base::TRIM_ALL)));
+    }
+  }
+  return std::nullopt;
+}
+
+void UwChatHandler::SendStartedSkill(std::string text,
+                                     std::vector<std::string> images,
+                                     Skill skill,
+                                     std::string arguments,
+                                     std::optional<std::string> file) {
+  preparing_ = false;
+  if (!agent_) {
+    return;
+  }
+  if (!file) {
+    SendToAgent(text, text, images);
+    return;
+  }
+  agent_->StartedSkill(skill);
+  SendToAgent(text, StartedSkillMessage(SkillInstructions(*file), arguments),
+              images, "skill", skill.name);
+}
+
+void UwChatHandler::SendPrompt(
+    const std::string& connector,
+    const std::string& prompt,
+    const base::flat_map<std::string, std::string>& values,
+    const std::string& shown) {
+  if (!loaded_ || Working() || preparing_ || !skills_loaded_) {
+    return;
+  }
+  if (!agent_ && !Start()) {
+    return;
+  }
+  agent_->SetSkills(EnabledSkills());
+  UpdateConnectors();
+  if (title_.empty()) {
+    title_ = shown;
+  }
+  base::DictValue args;
+  for (const auto& [key, value] : values) {
+    args.Set(key, value);
+  }
+  preparing_ = true;
+  Connectors::Get().GetPrompt(
+      connector, prompt, std::move(args),
+      base::BindOnce(&UwChatHandler::OnPrompt, weak_factory_.GetWeakPtr(),
+                     shown, base::StrCat({connector, ":", prompt})));
+}
+
+void UwChatHandler::OnPrompt(std::string shown,
+                             std::string name,
+                             base::expected<mcp::Content, std::string> answer) {
+  preparing_ = false;
+  if (!agent_) {
+    return;
+  }
+  if (!answer.has_value()) {
+    Log(UserLine(shown, {}));
+    const std::string failure =
+        base::StrCat({"The ", name, " prompt didn't come: ", answer.error()});
+    Log(base::DictValue().Set("kind", "failed").Set("text", failure));
+    page_->OnStep(Failed(failure));
+    Save();
+    return;
+  }
+  SendToAgent(shown, answer->text, answer->images, "prompt", name);
+}
+
+void UwChatHandler::GetConnectors(GetConnectorsCallback callback) {
+  std::vector<mojom::ChatConnectorPtr> connectors;
+  for (const Connectors::Info& info : Connectors::Get().list()) {
+    if (!info.on) {
+      continue;
+    }
+    auto connector = mojom::ChatConnector::New();
+    connector->name = info.config.name;
+    connector->on = !connectors_off_.contains(info.config.name);
+    switch (info.state) {
+      case Connectors::State::kReady:
+        connector->state = mojom::ChatConnectorState::kReady;
+        break;
+      case Connectors::State::kStarting:
+      case Connectors::State::kOff:
+        connector->state = mojom::ChatConnectorState::kStarting;
+        break;
+      case Connectors::State::kNeedsSignIn:
+      case Connectors::State::kSigningIn:
+      case Connectors::State::kCantSignIn:
+        connector->state = mojom::ChatConnectorState::kNeedsSignIn;
+        break;
+      case Connectors::State::kFailed:
+        connector->state = mojom::ChatConnectorState::kFailed;
+        break;
+    }
+    for (const mcp::Prompt& prompt : info.prompts) {
+      std::vector<mojom::PromptArgumentPtr> arguments;
+      for (const mcp::Prompt::Argument& argument : prompt.arguments) {
+        arguments.push_back(mojom::PromptArgument::New(
+            argument.name, argument.description, argument.required));
+      }
+      connector->prompts.push_back(mojom::ChatPrompt::New(
+          prompt.name, prompt.description, std::move(arguments)));
+    }
+    connectors.push_back(std::move(connector));
+  }
+  std::move(callback).Run(std::move(connectors));
+}
+
+void UwChatHandler::SetConnectorOn(const std::string& name, bool on) {
+  if (on) {
+    connectors_off_.erase(name);
+  } else {
+    connectors_off_.insert(name);
+  }
+  if (agent_) {
+    agent_->SetConnectorOn(name, on);
+    UpdateConnectors();
+    Save();
+  }
+}
+
+void UwChatHandler::SetSeesImages(bool sees) {
+  sees_images_ = sees;
+  if (agent_) {
+    agent_->SetSeesImages(sees);
+  }
+}
+
+void UwChatHandler::OnConnectorsChanged() {
+  UpdateConnectors();
+  page_->OnConnectorsChanged();
+}
+
+std::vector<ConnectorTools> UwChatHandler::ChatConnectors() const {
+  std::vector<ConnectorTools> connectors;
+  for (const Connectors::Info& info : Connectors::Get().list()) {
+    if (!info.on || info.tools.empty() ||
+        connectors_off_.contains(info.config.name)) {
+      continue;
+    }
+    ConnectorTools tools;
+    tools.name = info.config.name;
+    for (const mcp::Tool& tool : info.tools) {
+      if (!info.tools_off.contains(tool.name)) {
+        tools.tools.push_back(tool);
+      }
+    }
+    connectors.push_back(std::move(tools));
+  }
+  return connectors;
+}
+
+void UwChatHandler::UpdateConnectors() {
+  if (agent_) {
+    agent_->SetConnectors(ChatConnectors());
+    agent_->SetSeesImages(sees_images_);
+  }
+}
+
+void UwChatHandler::SendToAgent(const std::string& shown,
+                                const std::string& sent,
+                                const std::vector<std::string>& images,
+                                std::string_view started,
+                                std::string_view name) {
   const std::vector<std::string> usable = UsableImages(images);
-  Log(UserLine(text, usable));
-  agent_->Send(handed_over_ + text, usable);
+  Log(UserLine(shown, usable));
+  if (!started.empty()) {
+    const base::DictValue args = base::DictValue().Set("name", name);
+    Log(base::DictValue().Set("kind", started).Set("name", name));
+    auto step = mojom::Step::New();
+    step->kind = mojom::StepKind::kTool;
+    step->tool = std::string(started);
+    step->args = Json(&args);
+    step->result = "{}";
+    page_->OnStep(std::move(step));
+  }
+  agent_->Send(handed_over_ + sent, usable);
   handed_over_.clear();
   Save();
 }
@@ -377,6 +538,7 @@ void UwChatHandler::Resume() {
     return;
   }
   agent_->SetSkills(EnabledSkills());
+  UpdateConnectors();
   Log(base::DictValue().Set("kind", "resumed"));
   agent_->Resume();
   Save();
@@ -487,23 +649,6 @@ void UwChatHandler::SetSideBySide(bool on, int32_t number) {
   SendTabs();
 }
 
-void UwChatHandler::OpenSkillsFolder() {
-  base::ThreadPool::PostTaskAndReply(
-      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
-      base::BindOnce(base::IgnoreResult(&base::CreateDirectory),
-                     UwSkillsFolder()),
-      base::BindOnce(
-          [](base::WeakPtr<UwChatHandler> self) {
-            if (self) {
-              platform_util::OpenItem(Profile::FromBrowserContext(
-                                          self->contents_->GetBrowserContext()),
-                                      UwSkillsFolder(),
-                                      platform_util::OPEN_FOLDER, {});
-            }
-          },
-          weak_factory_.GetWeakPtr()));
-}
-
 void UwChatHandler::GetSuggestions(GetSuggestionsCallback callback) {
   ChatSuggestions* suggestions = ChatSuggestions::For(
       Profile::FromBrowserContext(contents_->GetBrowserContext()));
@@ -512,21 +657,6 @@ void UwChatHandler::GetSuggestions(GetSuggestionsCallback callback) {
     return;
   }
   suggestions->Get(std::move(callback));
-}
-
-void UwChatHandler::GetSkills(GetSkillsCallback callback) {
-  LoadSkills(base::BindOnce(&UwChatHandler::ReplySkills,
-                            weak_factory_.GetWeakPtr(), std::move(callback)));
-}
-
-void UwChatHandler::SetSkillOn(const std::string& name, bool on) {
-  ScopedListPrefUpdate off(
-      Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs(),
-      kAgentDisabledSkillsPref);
-  off->EraseValue(base::Value(name));
-  if (!on) {
-    off->Append(name);
-  }
 }
 
 void UwChatHandler::AnswerSkill(bool save) {
@@ -571,6 +701,12 @@ void UwChatHandler::AnswerApproval(mojom::ApprovalChoice choice,
       break;
     case mojom::ApprovalChoice::kStop:
       answer.choice = AgentLoop::ApprovalAnswer::Choice::kStop;
+      break;
+    case mojom::ApprovalChoice::kAllowForChat:
+      answer.choice = AgentLoop::ApprovalAnswer::Choice::kAllowForChat;
+      break;
+    case mojom::ApprovalChoice::kAlwaysAllow:
+      answer.choice = AgentLoop::ApprovalAnswer::Choice::kAlwaysAllow;
       break;
   }
   std::move(approval_answer_).Run(std::move(answer));
@@ -620,6 +756,9 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
     }
     if (const base::DictValue* context = saved->FindDict("context")) {
       saved_context_ = AgentContext::FromValue(*context);
+      if (saved_context_) {
+        connectors_off_ = saved_context_->connectors_off();
+      }
     }
     if (const base::ListValue* tabs = saved->FindList("tabs")) {
       for (const base::Value& entry : *tabs) {
@@ -675,7 +814,7 @@ bool UwChatHandler::Start() {
   }
   std::optional<AgentModel> model = AgentModelNow();
   if (!model) {
-    page_->OnStep(Failed("Pick a model on AI providers first."));
+    page_->OnStep(Failed("Pick a model on the AI page first."));
     return false;
   }
   agent_ = std::make_unique<AgentLoop>(
@@ -688,6 +827,9 @@ bool UwChatHandler::Start() {
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
+  for (const std::string& name : connectors_off_) {
+    agent_->SetConnectorOn(name, false);
+  }
   agent_->tools().SetOnPassword(
       base::BindRepeating(&UwChatHandler::OnPassword, base::Unretained(this)));
   if (TabOrganizationController* tree =
@@ -871,6 +1013,15 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
     line->tool = tool ? *tool : std::string();
     line->args = Json(step.FindDict("args"));
     line->result = Json(step.FindDict("result"));
+  } else if (*kind == "skill" || *kind == "prompt") {
+    // The user started a skill by its name, or sent a connector's prompt.
+    const std::string* name = entry.FindString("name");
+    const base::DictValue args =
+        base::DictValue().Set("name", name ? *name : std::string());
+    line->kind = mojom::StepKind::kTool;
+    line->tool = *kind;
+    line->args = Json(&args);
+    line->result = "{}";
   } else if (*kind == "user") {
     line->kind = mojom::StepKind::kUser;
     if (const base::ListValue* images = entry.FindList("images")) {
@@ -1084,20 +1235,6 @@ std::vector<Skill> UwChatHandler::EnabledSkills() const {
   return on;
 }
 
-void UwChatHandler::ReplySkills(GetSkillsCallback callback) {
-  const base::ListValue& off =
-      Profile::FromBrowserContext(contents_->GetBrowserContext())
-          ->GetPrefs()
-          ->GetList(kAgentDisabledSkillsPref);
-  std::vector<mojom::SkillInfoPtr> skills;
-  for (const Skill& skill : skills_) {
-    skills.push_back(mojom::SkillInfo::New(skill.name, skill.description,
-                                           SourceFor(skill.source),
-                                           !off.contains(skill.name)));
-  }
-  std::move(callback).Run(std::move(skills), UwSkillsFolder().AsUTF8Unsafe());
-}
-
 void UwChatHandler::AskToSaveSkill(
     base::DictValue args,
     base::OnceCallback<void(base::DictValue)> answer) {
@@ -1132,14 +1269,19 @@ void UwChatHandler::AskApproval(
     base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
   approval_answer_ = std::move(answer);
   Notify("Waits for your approval",
-         approval.folder.empty()
+         !approval.connector.empty()
+             ? base::StrCat({approval.action, " in ", approval.connector, "?"})
+         : approval.folder.empty()
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",
                              base::NumberToString(approval.tab), "?"}));
-  page_->OnApproval(
-      mojom::Approval::New(approval.tab, approval.site, approval.action,
-                           approval.reason, approval.folder, approval.command,
-                           approval.text, approval.keys, approval.screen));
+  page_->OnApproval(mojom::Approval::New(
+      approval.tab, approval.site, approval.action, approval.reason,
+      approval.folder, approval.command, approval.text, approval.keys,
+      approval.screen, approval.connector, approval.tool, approval.arguments,
+      /*can_always_allow=*/
+      !Profile::FromBrowserContext(contents_->GetBrowserContext())
+          ->IsOffTheRecord()));
   UpdateIndex();
 }
 

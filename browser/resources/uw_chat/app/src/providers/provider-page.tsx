@@ -1,4 +1,4 @@
-// uw://providers/<id>: one provider's address, key, format, and models. See
+// uw://ai/providers/<id>: one provider's address, key, format, and models. See
 // the frame "Providers page: a provider open (Fluid)" on the canvas page
 // "AI providers".
 import { useState, type ReactNode } from "react";
@@ -102,17 +102,17 @@ export function ProviderPage({
 
   const remove = async () => {
     await providersHandler.removeProvider(provider.id);
-    location.assign("/");
+    location.assign("/providers");
   };
 
   return (
     <>
       <a
-        href="/"
+        href="/providers"
         className="inline-flex h-6 items-center gap-1 text-[12.5px] font-medium text-muted-foreground"
       >
         <ChevronLeft aria-hidden className="size-3.5" />
-        AI providers
+        Providers
       </a>
       <div className="mt-2.5 flex items-center gap-3.5">
         <ProviderTile preset={provider.preset} large />

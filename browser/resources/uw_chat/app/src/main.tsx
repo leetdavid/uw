@@ -14,10 +14,12 @@ import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import {
   Columns2,
-  FolderOpen,
   Loader2,
   Pause,
-  Paperclip,
+  Blocks,
+  ImageIcon,
+  Info,
+  Link2,
   Plus,
   Shield,
   Sparkles,
@@ -42,6 +44,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import {
+  DropdownContent,
+  DropdownEmpty,
+  DropdownMenu,
+  DropdownSeparator,
+  DropdownSub,
+  DropdownSubContent,
+  DropdownSubTrigger,
+  DropdownTrigger,
+} from "@/components/ui/dropdown";
+import { MenuItem } from "@/components/ui/menu-item";
+import {
   InputMessage,
   type QueuedMessage,
 } from "@/components/ui/input-message";
@@ -62,7 +75,6 @@ import {
   type SidebarMenuButtonProps,
 } from "@/components/ui/sidebar";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { Switch } from "@/components/ui/switch";
 import {
   ThinkingStep,
   ThinkingSteps,
@@ -72,6 +84,15 @@ import { fontWeights } from "@/lib/font-weight";
 import type { IconComponent, IconName } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { EffortChip, ModelChip } from "./providers/model-chip";
+import {
+  PromptFields,
+  SlashCommandMark,
+  SlashMenu,
+  missingArgument,
+  pickedPrompt,
+  useSlashMenu,
+  type SlashItem,
+} from "./slash-menu";
 import { ModeChip } from "./mode-chip";
 import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
 import { ProviderIcon } from "./providers/provider-parts";
@@ -84,16 +105,17 @@ import {
   ApprovalChoice,
   ApprovalMode,
   ChatState,
+  ChatConnectorState,
   chatHandler,
   chatPage,
   connect,
-  SkillSource,
   StepKind,
   type AgentTab,
   type Approval,
+  type ChatConnector,
   type ChatModel,
+  type ChatPrompt,
   type ChatSummary,
-  type SkillInfo,
   type SkillProposal,
   type Step,
 } from "@/chat-api";
@@ -199,13 +221,25 @@ function keysSent(args: { text?: string; keys?: string[] }): string {
 }
 
 // A terminal step the user declined, which did not happen.
+// A connector's tool, as the model calls it: "linear__save_issue".
+const connectorTool = (tool: string) => {
+  const at = tool.indexOf("__");
+  return at > 0 ? { connector: tool.slice(0, at), tool: tool.slice(at + 2) } : null;
+};
+
 function declined(step: Step): boolean {
   return (
-    (step.tool === "run" || step.tool === "keys") &&
+    (step.tool === "run" || step.tool === "keys" || !!connectorTool(step.tool)) &&
     String(JSON.parse(step.result).error ?? "").startsWith(
       "The user did not approve",
     )
   );
+}
+
+// The first line of a connector tool's answer, short enough for a step.
+function firstLine(text: string): string {
+  const line = text.trim().split("\n")[0] ?? "";
+  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 }
 
 // One step in plain words, with what it acted on in bold, as the chat and
@@ -214,6 +248,14 @@ function describe(step: Step): ReactNode {
   const args = JSON.parse(step.args);
   const result = JSON.parse(step.result);
   const inTab = args.tab ? ` in tab ${args.tab}` : "";
+  if (declined(step) && connectorTool(step.tool)) {
+    return (
+      <>
+        Didn't run <Command>{connectorTool(step.tool)?.tool}</Command> in{" "}
+        {connectorTool(step.tool)?.connector}
+      </>
+    );
+  }
   if (declined(step)) {
     return step.tool === "run" ? (
       <>
@@ -309,8 +351,42 @@ function describe(step: Step): ReactNode {
           skill
         </>
       );
-    default:
-      return step.tool;
+    case "connector":
+      return (
+        <>
+          Loaded <b>{result.connector}</b>
+          <span className="text-muted-foreground">
+            {" "}
+            · {result.tools.length} tool{result.tools.length === 1 ? "" : "s"}
+          </span>
+        </>
+      );
+    case "prompt":
+      return (
+        <>
+          Used the <b>{args.name}</b> prompt
+        </>
+      );
+    default: {
+      const called = connectorTool(step.tool);
+      if (!called) {
+        return step.tool;
+      }
+      const said = [
+        firstLine(result.text ?? ""),
+        typeof result.images === "number"
+          ? `${result.images} image${result.images === 1 ? "" : "s"}`
+          : result.images,
+      ].filter(Boolean);
+      return (
+        <>
+          Used <Command>{called.tool}</Command>
+          {said.length > 0 && (
+            <span className="text-muted-foreground"> · {said.join(" · ")}</span>
+          )}
+        </>
+      );
+    }
   }
 }
 
@@ -326,6 +402,8 @@ const TOOL_ICONS: Record<string, IconName> = {
   recall: "rotate-ccw",
   skill: "lightbulb",
   save_skill: "check",
+  connector: "link",
+  prompt: "message-circle",
 };
 
 // A message from the user, with its images as data: URLs.
@@ -404,7 +482,11 @@ function StepLine({ step, last }: { step: Step; last: boolean }) {
   return (
     <ThinkingStep
       className={failed ? "step error text-destructive" : "step"}
-      icon={failed ? "x" : (TOOL_ICONS[step.tool] ?? "dot")}
+      icon={
+        failed
+          ? "x"
+          : (TOOL_ICONS[step.tool] ?? (connectorTool(step.tool) ? "link" : "dot"))
+      }
       isLast={last}
       label={failed ? describe(step) : <StepText>{describe(step)}</StepText>}
     >
@@ -510,7 +592,7 @@ function Line({
               <BannerAction id="try-again" variant="primary" onClick={onTryAgain}>
                 Try again
               </BannerAction>
-              <BannerAction id="providers" onClick={() => open("chrome://providers/")}>
+              <BannerAction id="providers" onClick={() => open("chrome://ai/providers")}>
                 AI providers
               </BannerAction>
             </BannerActions>
@@ -593,15 +675,11 @@ function when(updated: number): string {
 function ChatList({
   chats,
   current,
-  view,
   skillsOn,
-  onView,
 }: {
   chats: ChatSummary[];
   current: string;
-  view: View;
-  skillsOn: number;
-  onView: (view: View) => void;
+  skillsOn: number | null;
 }) {
   const [query, setQuery] = useState("");
   const wanted = query.trim().toLowerCase();
@@ -646,11 +724,9 @@ function ChatList({
                     data-chat={chat.id}
                     data-title={chat.title}
                     data-state={STATE_NAMES[chat.state]}
-                    isActive={chat.id === current && view === "chat"}
+                    isActive={chat.id === current}
                     onClick={() => {
-                      if (chat.id === current) {
-                        onView("chat");
-                      } else {
+                      if (chat.id !== current) {
                         chatHandler.openChat(chat.id);
                       }
                     }}
@@ -683,139 +759,17 @@ function ChatList({
             <SidebarMenuButton
               id="skills"
               icon={Sparkles}
-              isActive={view === "skills"}
-              onClick={() => onView(view === "skills" ? "chat" : "skills")}
+              onClick={() => providersHandler.showAiPage("skills")}
             >
               <span className="flex-1">Skills</span>
               <span className="text-muted-foreground tabular-nums">
-                {skillsOn} on
+                {skillsOn === null ? "" : `${skillsOn} on`}
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-type View = "chat" | "skills";
-
-const SOURCES: { source: SkillSource | null; label: string }[] = [
-  { source: null, label: "All" },
-  { source: SkillSource.kUw, label: "uw" },
-  { source: SkillSource.kAgents, label: "~/.agents/skills" },
-  { source: SkillSource.kChat, label: "Made in chats" },
-];
-
-const SOURCE_NAMES: Record<SkillSource, string> = {
-  [SkillSource.kUw]: "uw",
-  [SkillSource.kAgents]: "~/.agents/skills",
-  [SkillSource.kChat]: "Made in a chat",
-};
-
-// Every skill the agent can use, each with a switch. Turning one off keeps
-// it from every chat until it is turned on again.
-function SkillsView({
-  skills,
-  folder,
-  onToggle,
-}: {
-  skills: SkillInfo[];
-  folder: string;
-  onToggle: (skill: SkillInfo) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [source, setSource] = useState<SkillSource | null>(null);
-  const wanted = query.trim().toLowerCase();
-  const shown = skills.filter(
-    (skill) =>
-      (source === null || skill.source === source) &&
-      `${skill.name} ${skill.description}`.toLowerCase().includes(wanted),
-  );
-  const on = skills.filter((skill) => skill.on).length;
-  return (
-    <main className="flex-1 overflow-y-auto">
-      <div className="mx-auto flex max-w-[860px] flex-col gap-4 px-8 py-5">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-base font-semibold">Skills</h1>
-          <span className="text-muted-foreground">
-            {on} on, {skills.length - on} off
-          </span>
-          <Button
-            id="open-skills-folder"
-            variant="secondary"
-            size="compact"
-            leadingIcon={FolderOpen}
-            className="ml-auto"
-            onClick={() => chatHandler.openSkillsFolder()}
-          >
-            Open skills folder
-          </Button>
-        </div>
-        <p className="max-w-[640px] text-muted-foreground">
-          The agent sees each skill's one-line description and reads a
-          skill's instructions only when a request calls for it. Scripts in a
-          skill do not run. Add a skill by putting its folder in {folder}, or
-          ask a chat to make one.
-        </p>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <input
-            aria-label="Search skills"
-            placeholder="Search skills"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="h-9 w-64 rounded-lg bg-accent px-3 outline-none placeholder:text-muted-foreground"
-          />
-          <div className="flex gap-0.5 rounded-[10px] bg-accent p-[3px]">
-            {SOURCES.map((choice) => (
-              <button
-                key={choice.label}
-                type="button"
-                onClick={() => setSource(choice.source)}
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-muted-foreground",
-                  source === choice.source &&
-                    "bg-background font-semibold text-foreground shadow-sm",
-                )}
-              >
-                {choice.label}
-                <span className="font-normal text-muted-foreground">
-                  {
-                    skills.filter(
-                      (skill) =>
-                        choice.source === null || skill.source === choice.source,
-                    ).length
-                  }
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-border">
-          {shown.map((skill) => (
-            <div
-              key={skill.name}
-              className="flex items-start gap-4 border-t border-border px-4 py-2.5 first:border-t-0"
-            >
-              <div className="min-w-0 flex-1">
-                <Switch
-                  data-skill={skill.name}
-                  label={skill.name}
-                  checked={skill.on}
-                  onToggle={() => onToggle(skill)}
-                />
-                <p className="truncate pl-11 text-xs text-muted-foreground">
-                  {skill.description}
-                </p>
-              </div>
-              <span className="w-36 shrink-0 truncate pt-2 text-xs text-muted-foreground">
-                {SOURCE_NAMES[skill.source]}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </main>
   );
 }
 
@@ -869,18 +823,37 @@ function ApprovalCard({
     chatHandler.answerApproval(
       choice === "approve"
         ? ApprovalChoice.kApprove
-        : choice === "stop"
-          ? ApprovalChoice.kStop
-          : ApprovalChoice.kDecline,
+        : choice === "chat"
+          ? ApprovalChoice.kAllowForChat
+          : choice === "always"
+            ? ApprovalChoice.kAlwaysAllow
+            : choice === "stop"
+              ? ApprovalChoice.kStop
+              : ApprovalChoice.kDecline,
       given?.otherText ?? "",
     );
   };
   const terminal = Boolean(approval.folder);
+  const connector = Boolean(approval.connector);
   const options = [
     {
       id: "approve",
-      title: "Approve",
-      description: terminal ? undefined : approval.reason,
+      title: connector ? "Allow once" : "Approve",
+      description: terminal || connector ? undefined : approval.reason,
+      menu: connector
+        ? [
+            { id: "chat", title: "Allow for this chat", description: "Until this chat ends" },
+            ...(approval.canAlwaysAllow
+              ? [
+                  {
+                    id: "always",
+                    title: "Always allow",
+                    description: "In every chat, until you take it back",
+                  },
+                ]
+              : []),
+          ]
+        : undefined,
     },
     { id: "decline", title: "Not this one" },
     { id: "stop", title: "Stop the chat" },
@@ -889,7 +862,12 @@ function ApprovalCard({
     <div id="approval">
       <AskUserQuestions
         label={
-          terminal ? (
+          connector ? (
+            <span className="flex items-center gap-1.5">
+              <Link2 aria-hidden className="size-3.5" />
+              {approval.connector} · <span className="font-mono text-xs">{approval.tool}</span>
+            </span>
+          ) : terminal ? (
             <span className="flex items-center gap-1.5">
               <TerminalIcon aria-hidden className="size-3.5" />
               Terminal · Tab {approval.tab} · {approval.folder}
@@ -901,12 +879,18 @@ function ApprovalCard({
         questions={[
           {
             id: "approval",
-            title: terminal
-              ? approval.command
-                ? "Run this command?"
-                : "Send keys to the running program?"
-              : `${approval.action}?`,
-            detail: terminal && <TerminalApproval approval={approval} />,
+            title: connector
+              ? `Run ${approval.tool} in ${approval.connector}?`
+              : terminal
+                ? approval.command
+                  ? "Run this command?"
+                  : "Send keys to the running program?"
+                : `${approval.action}?`,
+            detail: connector ? (
+              <ConnectorApproval approval={approval} />
+            ) : (
+              terminal && <TerminalApproval approval={approval} />
+            ),
             options,
             allowOther: true,
             otherPlaceholder: "Tell the agent why, or what to do instead",
@@ -914,6 +898,106 @@ function ApprovalCard({
         ]}
         onComplete={(answers) => answer(answers.approval)}
       />
+    </div>
+  );
+}
+
+// The composer's "+": images, and the connectors this chat uses.
+function PlusMenu({
+  connectors,
+  canAttach,
+  onAttach,
+}: {
+  connectors: ChatConnector[];
+  canAttach: boolean;
+  onAttach: () => void;
+}) {
+  const NOTES: Partial<Record<ChatConnectorState, string>> = {
+    [ChatConnectorState.kNeedsSignIn]: "Sign in",
+    [ChatConnectorState.kFailed]: "Failed",
+    [ChatConnectorState.kStarting]: "Starting",
+  };
+  return (
+    <DropdownMenu>
+      <DropdownTrigger
+        render={
+          <button
+            type="button"
+            id="plus"
+            aria-label="Add images or connectors"
+            title="Add images or connectors"
+            className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-muted-foreground hover:text-foreground"
+          >
+            <Plus aria-hidden className="size-4" />
+          </button>
+        }
+      />
+      <DropdownContent side="top" align="start" className="w-[200px]">
+        <MenuItem
+          index={0}
+          icon={ImageIcon}
+          label="Add images"
+          disabled={!canAttach}
+          onSelect={onAttach}
+        />
+        <DropdownSub>
+          <DropdownSubTrigger index={1} icon={Blocks} label="Connectors" />
+          <DropdownSubContent className="w-[240px]">
+            {connectors.length ? (
+              connectors.map((connector, at) => (
+                <MenuItem
+                  key={connector.name}
+                  index={at}
+                  label={connector.name}
+                  checked={connector.on}
+                  closeOnClick={false}
+                  data-chat-connector={connector.name}
+                  data-note={NOTES[connector.state]}
+                  className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+                  onSelect={() => chatHandler.setConnectorOn(connector.name, !connector.on)}
+                />
+              ))
+            ) : (
+              <DropdownEmpty>No connectors yet</DropdownEmpty>
+            )}
+            <DropdownSeparator />
+            <MenuItem
+              index={connectors.length}
+              label="Manage connectors"
+              onSelect={() => providersHandler.showAiPage("connectors")}
+            />
+          </DropdownSubContent>
+        </DropdownSub>
+      </DropdownContent>
+    </DropdownMenu>
+  );
+}
+
+// What a connector tool's approval shows: the arguments the model sent, then
+// why it asks.
+function ConnectorApproval({ approval }: { approval: Approval }) {
+  let entries: [string, unknown][] = [];
+  try {
+    entries = Object.entries(JSON.parse(approval.arguments));
+  } catch {}
+  return (
+    <div className="flex flex-col gap-2">
+      {entries.length > 0 && (
+        <dl className="approval-arguments grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 rounded-lg bg-surface-1 px-3 py-2 text-[12.5px] leading-[1.45]">
+          {entries.map(([key, value]) => (
+            <Fragment key={key}>
+              <dt className="font-mono text-[11.5px] text-muted-foreground">{key}</dt>
+              <dd className="break-words text-foreground">
+                {typeof value === "string" ? value : JSON.stringify(value)}
+              </dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
+      <p className="approval-reason flex gap-1.5 text-[12.5px] text-muted-foreground">
+        <Info aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+        {approval.reason}
+      </p>
     </div>
   );
 }
@@ -1197,9 +1281,11 @@ function Chat() {
   const [agentTabs, setAgentTabs] = useState<AgentTab[]>([]);
   const [currentTab, setCurrentTab] = useState(0);
   const [sideBySide, setSideBySide] = useState(false);
-  const [view, setView] = useState<View>("chat");
-  const [skills, setSkills] = useState<SkillInfo[]>([]);
-  const [skillsFolder, setSkillsFolder] = useState("");
+  const [skillsOn, setSkillsOn] = useState<number | null>(null);
+  // What the / menu offers: the skills the user may start.
+  const [slashItems, setSlashItems] = useState<SlashItem[]>([]);
+  // The connectors that are on, and whether this chat uses each.
+  const [connectors, setConnectors] = useState<ChatConnector[]>([]);
   const [proposal, setProposal] = useState<SkillProposal | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
   // A program in the agent's terminal tab that waits for the user's password.
@@ -1223,6 +1309,23 @@ function Chat() {
   const [since, setSince] = useState(0);
   const [, setNow] = useState(0);
   const [draft, setDraft] = useState("");
+  // A prompt's argument values, while one is picked.
+  const [promptValues, setPromptValues] = useState<Record<string, string>>({});
+  const menuItems: SlashItem[] = [
+    ...slashItems,
+    ...connectors
+      .filter((connector) => connector.on)
+      .flatMap((connector) =>
+        connector.prompts.map((prompt) => ({
+          command: `${connector.name}:${prompt.name}`,
+          description: prompt.description,
+          prompt: { connector: connector.name, prompt },
+        })),
+      ),
+  ];
+  const slash = useSlashMenu(draft, setDraft, menuItems);
+  const promptItem = pickedPrompt(draft, menuItems);
+  const composerBox = useRef<HTMLDivElement>(null);
   const [suggestions, setSuggestions] = useState(EXAMPLES);
   const end = useRef<HTMLDivElement>(null);
 
@@ -1270,6 +1373,7 @@ function Chat() {
         setProposal(asked),
       ),
       chatPage.onApproval.addListener((asked: Approval) => setApproval(asked)),
+      chatPage.onConnectorsChanged.addListener(() => loadConnectors()),
       chatPage.onPassword.addListener((tab: number, program: string) =>
         setPassword(tab ? { tab, program } : null),
       ),
@@ -1286,6 +1390,7 @@ function Chat() {
     ];
     connect();
     loadSkills();
+    loadConnectors();
     loadProviders();
     chatHandler.getSuggestions().then(({ suggestions }) => {
       if (suggestions.length) {
@@ -1360,27 +1465,24 @@ function Chat() {
     }
   };
 
+  const loadConnectors = () => {
+    chatHandler.getConnectors().then(({ connectors }) => setConnectors(connectors));
+  };
+
   const loadSkills = () => {
-    chatHandler.getSkills().then(({ skills, folder }) => {
-      setSkills(skills);
-      setSkillsFolder(folder);
+    providersHandler.getSkills().then(({ skills }) => {
+      setSkillsOn(skills.filter((skill) => skill.on).length);
+      setSlashItems(
+        skills
+          .filter((skill) => skill.on && skill.forUser)
+          .map((skill) => ({
+            command: skill.name,
+            description: skill.description,
+            tag: skill.forAgent ? undefined : "Only you",
+            hint: skill.argumentHint || undefined,
+          })),
+      );
     });
-  };
-
-  const toggleSkill = (skill: SkillInfo) => {
-    chatHandler.setSkillOn(skill.name, !skill.on);
-    setSkills((before) =>
-      before.map((kept) =>
-        kept.name === skill.name ? { ...kept, on: !kept.on } : kept,
-      ),
-    );
-  };
-
-  const showView = (next: View) => {
-    if (next === "skills") {
-      loadSkills();
-    }
-    setView(next);
   };
 
   useEffect(() => {
@@ -1405,6 +1507,12 @@ function Chat() {
           : "";
 
   // The chat's model takes no images, as the model catalog says.
+  // The browser leaves a connector's images out for a model that can't see
+  // them.
+  useEffect(() => {
+    chatHandler.setSeesImages(chosenModel?.seesImages !== false);
+  }, [chosenModel?.seesImages]);
+
   const cannotSee = (attached: File[]) =>
     attached.length > 0 && chosenModel?.seesImages === false;
 
@@ -1415,7 +1523,8 @@ function Chat() {
       working ||
       !opened ||
       gone ||
-      cannotSee(attached)
+      cannotSee(attached) ||
+      missingArgument(promptItem, promptValues)
     ) {
       return;
     }
@@ -1425,6 +1534,27 @@ function Chat() {
     // The first message names the tab.
     if (message && !lines.some((line) => line.kind === StepKind.kUser)) {
       document.title = message;
+    }
+    if (promptItem?.prompt) {
+      const values = Object.fromEntries(
+        promptItem.prompt.prompt.arguments
+          .filter((argument) => promptValues[argument.name]?.trim())
+          .map((argument) => [argument.name, promptValues[argument.name].trim()]),
+      );
+      const shown = [
+        `/${promptItem.command}`,
+        ...Object.entries(values).map(([name, value]) => `${name}: ${value}`),
+      ].join("\n");
+      setLines((before) => [...before, userLine(shown, [])]);
+      setDraft("");
+      setPromptValues({});
+      chatHandler.sendPrompt(
+        promptItem.prompt.connector,
+        promptItem.prompt.prompt.name,
+        values,
+        shown,
+      );
+      return;
     }
     setLines((before) => [...before, userLine(message, images)]);
     setDraft("");
@@ -1556,6 +1686,20 @@ function Chat() {
           <BannerDescription>Pick a model to go on with this chat.</BannerDescription>
         </Banner>
       )}
+      <div
+        ref={composerBox}
+        className="relative"
+        onKeyDownCapture={slash.onKeyDownCapture}
+      >
+      <SlashMenu shown={slash.shown} highlight={slash.highlight} onPick={slash.pick} />
+      {promptItem?.prompt && (
+        <PromptFields
+          prompt={promptItem.prompt.prompt}
+          values={promptValues}
+          onChange={setPromptValues}
+          onSubmit={() => send(draft)}
+        />
+      )}
       <InputMessage
         value={draft}
         onValueChange={setDraft}
@@ -1577,24 +1721,20 @@ function Chat() {
         maxFiles={MAX_IMAGES}
         filePreviewSize={64}
         notice={notice}
-        sendBlocked={cannotSee(files)}
+        sendBlocked={cannotSee(files) || missingArgument(promptItem, promptValues)}
         leftSlot={({ openFilePicker }) => (
           <div className="flex min-w-0 items-center gap-1.5">
-            <button
-              type="button"
-              id="attach"
-              aria-label="Attach images"
-              title="Attach images"
-              disabled={files.length >= MAX_IMAGES}
-              onClick={() => openFilePicker(IMAGE_TYPES)}
-              className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-hover hover:text-foreground disabled:opacity-35"
-            >
-              <Paperclip aria-hidden className="size-4" />
-            </button>
+            <PlusMenu
+              connectors={connectors}
+              canAttach={files.length < MAX_IMAGES}
+              onAttach={() => openFilePicker(IMAGE_TYPES)}
+            />
             {chips}
           </div>
         )}
       />
+      <SlashCommandMark draft={draft} items={menuItems} field={composerBox} />
+      </div>
       <p id="approval-note" className="px-1 pt-2 text-right text-xs text-muted-foreground">
         {approval
           ? "Enter declines the step with this note · Cmd+Enter queues"
@@ -1609,15 +1749,10 @@ function Chat() {
       <ChatList
         chats={chats}
         current={chatId}
-        view={view}
-        skillsOn={skills.filter((skill) => skill.on).length}
-        onView={showView}
+        skillsOn={skillsOn}
       />
       <SidebarInset className="flex h-full flex-row">
-      {view === "skills" && (
-        <SkillsView skills={skills} folder={skillsFolder} onToggle={toggleSkill} />
-      )}
-      <div className={cn("flex min-w-0 flex-1 flex-col", !title && "justify-center", view === "skills" && "hidden")}>
+      <div className={cn("flex min-w-0 flex-1 flex-col", !title && "justify-center")}>
       {agentTabs.length > 0 && (
         <TabStrip tabs={agentTabs} current={currentTab} sideBySide={sideBySide} />
       )}
@@ -1724,7 +1859,7 @@ function Chat() {
         {composer}
       </div>
       </div>
-      {agentTabs.length > 0 && view === "chat" && (
+      {agentTabs.length > 0 && (
         <AgentTabs
           tabs={agentTabs}
           current={currentTab}

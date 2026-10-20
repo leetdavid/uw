@@ -37,6 +37,67 @@ export interface AskUserOption {
   id?: string;
   title: string;
   description?: string;
+  /** More answers behind a caret at the row's end. Picking one answers the
+   *  question with its id. */
+  menu?: AskUserOption[];
+}
+
+// The caret on a row with more answers, and the menu it opens.
+function OptionMenu({
+  items,
+  onPick,
+}: {
+  items: AskUserOption[];
+  onPick: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ChevronDown = useIcons()["chevron-down"];
+  return (
+    <span
+      className="absolute top-0 right-9 bottom-0 flex items-center"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        data-option-menu
+        aria-label="More choices"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        onBlur={() => setOpen(false)}
+        className="grid h-full w-[30px] place-items-center border-l border-border text-muted-foreground hover:text-foreground"
+      >
+        <ChevronDown size={13} strokeWidth={2} />
+      </button>
+      {open && (
+        <span
+          role="menu"
+          className="absolute top-full right-0 z-20 mt-1 flex w-[250px] flex-col rounded-[10px] bg-popover p-[5px] shadow-lg ring-1 ring-border"
+        >
+          {items.map((item, at) => (
+            <button
+              key={item.id ?? at}
+              type="button"
+              role="menuitem"
+              data-option={item.id}
+              // Keeps the caret focused until the click lands.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                onPick(item.id ?? item.title);
+              }}
+              className="flex flex-col items-start rounded-[7px] px-2.5 py-1.5 text-left hover:bg-accent"
+            >
+              <span className="text-[13px] font-medium text-foreground">{item.title}</span>
+              {item.description && (
+                <span className="text-xs text-muted-foreground">{item.description}</span>
+              )}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export interface AskUserQuestion {
@@ -1108,6 +1169,9 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                     </>
                   )}
                 </span>
+              )}
+              {opt.menu && !isMulti && (
+                <OptionMenu items={opt.menu} onPick={handleSingleSelect} />
               )}
             </Row>
           );

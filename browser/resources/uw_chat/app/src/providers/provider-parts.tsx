@@ -1,4 +1,4 @@
-// Small parts every view of uw://providers shares.
+// Small parts every view of uw://ai/providers shares.
 import { Link2, Split } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {

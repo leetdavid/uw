@@ -76,6 +76,11 @@ class AgentTools {
     std::string text;
     std::vector<std::string> keys;
     std::string screen;
+    // A connector's tool: the connector, the tool, and the arguments the
+    // model sent, as JSON.
+    std::string connector;
+    std::string tool;
+    std::string arguments;
   };
   // Whether `tool` works in a terminal tab. Until the command check, every
   // terminal step asks in every mode.

@@ -6,7 +6,7 @@
  * @fileoverview uw settings: whether automatic tab organization runs, how
  * eagerly it moves tabs, the global pause controls, a row that opens the theme
  * picker, the command bar, and the tab list's mouse actions. The models live
- * on uw://providers.
+ * on uw://ai/providers.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -88,7 +88,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   override connectedCallback() {
     super.connectedCallback();
     this.refresh_();
-    // The models are picked and tested on uw://providers, often in another
+    // The models are picked and tested on uw://ai/providers, often in another
     // tab, so the status follows when this one is shown again.
     document.addEventListener('visibilitychange', this.onVisible_);
   }
@@ -164,7 +164,7 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
   }
 
   protected onProvidersClick_() {
-    window.open('chrome://providers/');
+    window.open('chrome://ai/providers');
   }
 
   protected thresholdRows_(): ThresholdRow[] {

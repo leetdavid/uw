@@ -14,7 +14,7 @@
 
 namespace uw {
 
-inline constexpr char kProvidersHost[] = "providers";
+inline constexpr char kAiHost[] = "ai";
 
 class UwProvidersHandler;
 class UwProvidersUI;
@@ -22,11 +22,11 @@ class UwProvidersUI;
 class UwProvidersUIConfig : public content::DefaultWebUIConfig<UwProvidersUI> {
  public:
   UwProvidersUIConfig()
-      : DefaultWebUIConfig(content::kChromeUIScheme, kProvidersHost) {}
+      : DefaultWebUIConfig(content::kChromeUIScheme, kAiHost) {}
 };
 
-// The controller of uw://providers: the AI providers and the models that
-// pick from them.
+// The controller of uw://ai: the AI providers and the models that pick from
+// them, skills, and connectors. See docs/plans/connectors.md#the-ai-page.
 class UwProvidersUI : public ui::MojoWebUIController {
  public:
   explicit UwProvidersUI(content::WebUI* web_ui);

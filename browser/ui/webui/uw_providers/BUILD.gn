@@ -1,5 +1,5 @@
-# The uw://providers page's browser side. Its page is built with the chat
-# page; see //uw/browser/resources/uw_chat.
+# The uw://ai page's browser side. Its page is built with the chat page; see
+# //uw/browser/resources/uw_chat.
 import("//mojo/public/tools/bindings/mojom.gni")
 
 mojom("mojo_bindings") {
@@ -26,12 +26,19 @@ source_set("uw_providers") {
   ]
   deps = [
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
     "//components/prefs",
+    "//components/tabs:public",
     "//content/public/common",
     "//net",
     "//services/network/public/cpp",
+    "//ui/base",
     "//url",
+    "//uw/browser/agent:skill_folders",
+    "//uw/browser/connectors",
     "//uw/browser/resources/uw_chat:resources",
+    "//uw/browser/terminal",
     "//uw/components/agent",
     "//uw/components/tab_organization",
   ]
@@ -41,9 +48,13 @@ source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "uw_providers_browsertest.cc" ]
+  data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]
   deps = [
     ":uw_providers",
     "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser:platform_util_internal",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui",
@@ -57,7 +68,10 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/ai_providers",
+    "//uw/browser/agent:skill_folders",
     "//uw/browser/ai_providers:test_support",
+    "//uw/browser/connectors",
+    "//uw/browser/terminal",
     "//uw/browser/tab_organization:test_support",
     "//uw/components/ai_providers",
   ]

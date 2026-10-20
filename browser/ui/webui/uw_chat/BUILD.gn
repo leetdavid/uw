@@ -42,6 +42,8 @@ source_set("uw_chat") {
     "//ui/gfx",
     "//ui/gfx/codec",
     "//uw/browser/agent:chat_notification",
+    "//uw/browser/agent:skill_folders",
+    "//uw/browser/connectors",
     "//uw/browser/ai_providers",
     "//uw/browser/resources/uw_chat:resources",
     "//uw/browser/tab_organization",
@@ -55,12 +57,12 @@ source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "uw_chat_browsertest.cc" ]
+  data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]
   deps = [
     ":uw_chat",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
-    "//chrome/browser:platform_util_internal",
     "//chrome/browser/actor",
     "//chrome/browser/actor:test_support",
     "//chrome/browser/headless:browser_tests",
@@ -83,7 +85,9 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:skill_folders",
     "//uw/browser/agent:test_support",
+    "//uw/browser/connectors",
     "//uw/browser/ai_providers",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
