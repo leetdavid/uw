@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. Not built. The designs, T128, come first.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129 is in progress. Nothing else is built.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -10,7 +10,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 - A [workspace](../CONTEXT.md#language) is Arc's space: a name, an emoji icon, and a theme. Each belongs to one [profile](../CONTEXT.md#language), and a profile can have several. Workspaces separate areas such as work and personal. They do not replace tasks, which organize the tabs inside a workspace.
 - Every workspace shows in the switcher at the foot of the sidebar, in every window, from launch. A workspace can be deleted but not hidden.
-- Switch by clicking a workspace's icon, with Ctrl+1 to 9, with Cmd+Option+← / →, or with a two-finger swipe on the sidebar. As in Arc, only the sidebar's contents slide, following the fingers, while the theme blends; a half swipe snaps back. The page stays put and fades to the other workspace's page once the swipe lands. Cmd+Option+← / → stop switching tabs; Ctrl+Tab and Cmd+Shift+[ / ] still do. A swipe on the page stays back and forward.
+- Switch by clicking a workspace's icon, with Ctrl+1 to 9, with Cmd+Option+← / →, or with a two-finger swipe on the sidebar. As in Arc, only the sidebar's contents slide, following the fingers, while the theme blends; a half swipe snaps back. The page stays put. Once the swipe lands it crossfades to the other workspace's page, with a 12px nudge in the swipe's direction. Cmd+Option+← / → stop switching tabs; Ctrl+Tab and Cmd+Shift+[ / ] still do. A swipe on the page stays back and forward.
 - A window shows one workspace at a time. Switching replaces the window with its partner for the other workspace, at the same place and size. Switching back shows the tabs as they were. Several windows can show the same workspace. See [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md).
 - Cmd+N opens a window in the current window's workspace.
 - Closing a window closes all of its workspaces. Cmd+Shift+T brings them back together.
@@ -32,7 +32,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 ## Design
 
-On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Workspaces", drawn on 2026-10-21 for T128 and waiting for sign-off:
+On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Workspaces", drawn on 2026-10-21 for T128 and signed off the same day:
 
 - "Workspaces: the sidebar": one row at the sidebar's foot, as in Arc, with Organize as an icon at the left, the workspaces centered, and the new button at the right. New Workspace moves into the new button's menu. The workspace's name sits under the pins. The user picked this row over two rows on 2026-10-21, "for now"; both are in "Sidebar foot: two balanced layouts".
 - "Workspaces: the swipe": both windows sliding with the fingers.
