@@ -51,6 +51,7 @@ Added on 2026-10-20, with Claude Code's auto mode as the model:
 - In every mode, a command that may read a [sensitive file](../CONTEXT.md#language) asks first, naming the file. In Full auto the check runs for that question alone. This differs from Claude Code, which lets its agent read `.env` files.
 - The check sees the user's messages and the agent's actions, never page text or command output. [ADR 0012](../adr/0012-a-command-check-judges-the-agents-terminal-commands.md) records why.
 - The user's own allow, ask, and never rules, like Claude Code's, come later.
+- A chat's tab row in the sidebar ends with the chat's state, as the chat page's list shows it: a spinner while the agent works, an amber dot while a step or a password waits for the user, a pause sign once it stopped early, and a dot for an answer not yet seen. Asked for with T124's sign-off.
 
 ## Releases
 
