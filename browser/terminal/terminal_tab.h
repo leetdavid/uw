@@ -39,7 +39,14 @@ void OpenTerminalTabRunning(BrowserWindowInterface* window,
 // once. Empty for any other tab.
 std::string TakeStartCommand(content::WebContents* contents);
 
+GURL TerminalUrl();
 bool IsTerminalUrl(const GURL& url);
+
+// Marks the terminal tab showing `contents` as one a chat's agent opened.
+// Only those reach the agent's tools; a terminal tab the user opened never
+// does.
+void MarkAsAgentTerminal(content::WebContents* contents);
+bool IsAgentTerminal(content::WebContents* contents);
 
 // The folder the shell of a terminal tab is in. Empty until the shell reports
 // it, and for any other tab.

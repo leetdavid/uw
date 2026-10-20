@@ -55,6 +55,7 @@
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/terminal/terminal_shell.h"
 #include "uw/components/agent/agent_context.h"
 
 namespace uw {
@@ -206,6 +207,8 @@ mojom::ChatState StateFor(ChatIndex::State state) {
 // sharp screens.
 constexpr int kPictureWidth = 480;
 constexpr int kPictureQuality = 70;
+// About what a card's picture holds of a terminal's text.
+constexpr int kCardLines = 14;
 
 std::string DataUrl(std::string_view type, base::span<const uint8_t> bytes) {
   return base::StrCat({"data:", type, ";base64,", base::Base64Encode(bytes)});
@@ -685,6 +688,8 @@ bool UwChatHandler::Start() {
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
+  agent_->tools().SetOnPassword(
+      base::BindRepeating(&UwChatHandler::OnPassword, base::Unretained(this)));
   if (TabOrganizationController* tree =
           TabOrganizationController::From(tab->GetBrowserWindowInterface())) {
     for (const auto& [number, page] : saved_tabs_) {
@@ -968,8 +973,15 @@ void UwChatHandler::OnToolStep(const AgentLoop::Step& step) {
       card.favicon = DataUrl("image/png", *png);
     }
   }
-  if (content::RenderWidgetHostView* view =
-          contents->GetRenderWidgetHostView()) {
+  card.terminal = agent_->tools().IsTerminalTab(number);
+  if (card.terminal) {
+    if (TerminalShell* shell = TerminalShell::From(contents)) {
+      shell->Read(-kCardLines,
+                  base::BindOnce(&UwChatHandler::OnScreen,
+                                 weak_factory_.GetWeakPtr(), number));
+    }
+  } else if (content::RenderWidgetHostView* view =
+                 contents->GetRenderWidgetHostView()) {
     const gfx::Size size = view->GetViewBounds().size();
     if (!size.IsEmpty()) {
       view->CopyFromSurface(
@@ -1004,6 +1016,13 @@ void UwChatHandler::OnPicture(int number,
   }
 }
 
+void UwChatHandler::OnScreen(int number,
+                             const std::string& text,
+                             int cursor_line) {
+  cards_[number].screen = text;
+  SendTabs();
+}
+
 void UwChatHandler::SendTabs() {
   const std::map<int, tabs::TabInterface*> open =
       agent_ ? agent_->tools().OpenTabs()
@@ -1017,6 +1036,8 @@ void UwChatHandler::SendTabs() {
     sent->favicon = card.favicon;
     sent->picture = card.picture;
     sent->closed = !open.contains(number);
+    sent->terminal = card.terminal;
+    sent->screen = card.screen;
     cards.push_back(std::move(sent));
   }
   tabs::TabInterface* chat =
@@ -1111,9 +1132,25 @@ void UwChatHandler::AskApproval(
     base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
   approval_answer_ = std::move(answer);
   Notify("Waits for your approval",
-         base::StrCat({approval.action, " on ", approval.site, "?"}));
-  page_->OnApproval(mojom::Approval::New(approval.tab, approval.site,
-                                         approval.action, approval.reason));
+         approval.folder.empty()
+             ? base::StrCat({approval.action, " on ", approval.site, "?"})
+             : base::StrCat({approval.action, " in tab ",
+                             base::NumberToString(approval.tab), "?"}));
+  page_->OnApproval(
+      mojom::Approval::New(approval.tab, approval.site, approval.action,
+                           approval.reason, approval.folder, approval.command,
+                           approval.text, approval.keys, approval.screen));
+  UpdateIndex();
+}
+
+void UwChatHandler::OnPassword(int number, const std::string& program) {
+  password_tab_ = number;
+  page_->OnPassword(number, program);
+  if (number) {
+    Notify("Waits for your password",
+           base::StrCat({program, " wants your password in tab ",
+                         base::NumberToString(number), "."}));
+  }
   UpdateIndex();
 }
 
@@ -1151,7 +1188,7 @@ void UwChatHandler::UpdateIndex() {
   const base::DictValue* last = LastLine();
   const std::string* kind = last ? last->FindString("kind") : nullptr;
   ChatIndex::State state = ChatIndex::State::kDone;
-  if (approval_answer_) {
+  if (approval_answer_ || password_tab_) {
     state = ChatIndex::State::kWaiting;
   } else if (Working()) {
     state = ChatIndex::State::kRunning;

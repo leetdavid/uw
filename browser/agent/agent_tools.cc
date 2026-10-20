@@ -39,6 +39,7 @@
 #include "url/gurl.h"
 #include "url/origin.h"
 #include "url/url_constants.h"
+#include "uw/browser/terminal/terminal_tab.h"
 
 namespace uw {
 namespace {
@@ -177,6 +178,18 @@ AgentTools::~AgentTools() {
 void AgentTools::Call(std::string_view tool,
                       const base::DictValue& args,
                       Done done) {
+  if (tool == "run") {
+    Run(args, std::move(done));
+    return;
+  }
+  if (tool == "screen") {
+    Screen(args, std::move(done));
+    return;
+  }
+  if (tool == "keys") {
+    Keys(args, std::move(done));
+    return;
+  }
   if (!engine_ || !engine_->GetTask(task_)) {
     std::move(done).Run(Error("Chromium's agent engine is not running."));
     return;
@@ -202,11 +215,14 @@ std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
     std::string_view tool,
     const base::DictValue& args,
     bool every_step) {
+  if (IsTerminalTool(tool)) {
+    return TerminalApprovalFor(tool, args, every_step);
+  }
   if (tool != "click" && tool != "type") {
     return std::nullopt;
   }
   std::string error;
-  Tab* tab = TabFrom(args, error);
+  Tab* tab = WebTabFrom(args, error);
   const PageElement* element = tab ? ElementFrom(*tab, args, error) : nullptr;
   if (!element) {
     // The step fails on its own.
@@ -271,8 +287,15 @@ std::map<int, tabs::TabInterface*> AgentTools::OpenTabs() const {
   return open;
 }
 
+bool AgentTools::IsTerminalTab(int number) const {
+  const auto tab = tabs_.find(number);
+  return tab != tabs_.end() && tab->second.terminal;
+}
+
 void AgentTools::Adopt(int number, tabs::TabInterface& tab) {
-  if (!engine_ || !engine_->GetTask(task_) || tabs_.contains(number)) {
+  if (!engine_ || !engine_->GetTask(task_) || tabs_.contains(number) ||
+      IsTerminalUrl(tab.GetContents()->GetLastCommittedURL()) ||
+      IsTerminalUrl(tab.GetContents()->GetVisibleURL())) {
     return;
   }
   tabs_[number].handle = tab.GetHandle();
@@ -332,7 +355,7 @@ void AgentTools::Open(const base::DictValue& args, Done done) {
 
 void AgentTools::Navigate(const base::DictValue& args, Done done) {
   std::string error;
-  Tab* tab = TabFrom(args, error);
+  Tab* tab = WebTabFrom(args, error);
   const std::string* spec = args.FindString("url");
   const GURL url(spec ? *spec : std::string());
   if (tab && !url.SchemeIsHTTPOrHTTPS()) {
@@ -348,7 +371,7 @@ void AgentTools::Navigate(const base::DictValue& args, Done done) {
 
 void AgentTools::Read(const base::DictValue& args, Done done) {
   std::string error;
-  Tab* tab = TabFrom(args, error);
+  Tab* tab = WebTabFrom(args, error);
   if (!tab) {
     std::move(done).Run(Error(error));
     return;
@@ -392,7 +415,7 @@ void AgentTools::Read(const base::DictValue& args, Done done) {
 
 void AgentTools::Click(const base::DictValue& args, Done done) {
   std::string error;
-  Tab* tab = TabFrom(args, error);
+  Tab* tab = WebTabFrom(args, error);
   const PageElement* element = tab ? ElementFrom(*tab, args, error) : nullptr;
   if (!element) {
     std::move(done).Run(Error(error));
@@ -406,7 +429,7 @@ void AgentTools::Click(const base::DictValue& args, Done done) {
 
 void AgentTools::Type(const base::DictValue& args, Done done) {
   std::string error;
-  Tab* tab = TabFrom(args, error);
+  Tab* tab = WebTabFrom(args, error);
   const PageElement* element = tab ? ElementFrom(*tab, args, error) : nullptr;
   const std::string* text = args.FindString("text");
   if (element && !text) {
@@ -436,6 +459,17 @@ AgentTools::Tab* AgentTools::TabFrom(const base::DictValue& args,
     return nullptr;
   }
   return &tab->second;
+}
+
+AgentTools::Tab* AgentTools::WebTabFrom(const base::DictValue& args,
+                                        std::string& error) {
+  Tab* tab = TabFrom(args, error);
+  if (tab && tab->terminal) {
+    error = base::StrCat({"Tab ", base::NumberToString(*args.FindInt("tab")),
+                          " is a terminal. Use run, screen, or keys there."});
+    return nullptr;
+  }
+  return tab;
 }
 
 const PageElement* AgentTools::ElementFrom(const Tab& tab,

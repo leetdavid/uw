@@ -19,8 +19,10 @@ import {
   Pause,
   Paperclip,
   Plus,
+  Shield,
   Sparkles,
   Square,
+  Terminal as TerminalIcon,
   TriangleAlert,
   Trash2,
 } from "lucide-react";
@@ -154,9 +156,12 @@ const EXAMPLES = [
 
 // What the note under the composer says while the agent waits, by mode.
 const MODE_NOTES: Record<ApprovalMode, string> = {
-  [ApprovalMode.kAskFirst]: "Every click and typing waits for your approval",
-  [ApprovalMode.kAuto]: "Changes on a site wait for your approval",
-  [ApprovalMode.kFullAuto]: "Full auto: the agent acts without asking",
+  [ApprovalMode.kAskFirst]:
+    "Every click, typing, and command waits for your approval",
+  [ApprovalMode.kAuto]:
+    "Changes on a site and every command wait for your approval",
+  [ApprovalMode.kFullAuto]:
+    "Full auto: the agent acts without asking, except to run a command",
 };
 
 // How long the agent has worked on the current request, as the chat's
@@ -177,11 +182,51 @@ function shortAddress(url: string): string {
   }
 }
 
+function Command({ children }: { children: ReactNode }) {
+  return (
+    <code className="command font-mono text-[0.92em] text-foreground">
+      {children}
+    </code>
+  );
+}
+
+// What a keys step sent: its text in quotes, then each key.
+function keysSent(args: { text?: string; keys?: string[] }): string {
+  return [
+    ...(args.text ? [`"${args.text}"`] : []),
+    ...(args.keys ?? []),
+  ].join(" ");
+}
+
+// A terminal step the user declined, which did not happen.
+function declined(step: Step): boolean {
+  return (
+    (step.tool === "run" || step.tool === "keys") &&
+    String(JSON.parse(step.result).error ?? "").startsWith(
+      "The user did not approve",
+    )
+  );
+}
+
 // One step in plain words, with what it acted on in bold, as the chat and
 // its tests show it.
 function describe(step: Step): ReactNode {
   const args = JSON.parse(step.args);
   const result = JSON.parse(step.result);
+  const inTab = args.tab ? ` in tab ${args.tab}` : "";
+  if (declined(step)) {
+    return step.tool === "run" ? (
+      <>
+        Didn't run <Command>{args.command}</Command>
+        {inTab}
+      </>
+    ) : (
+      <>
+        Didn't send <b>{keysSent(args)}</b>
+        {inTab}
+      </>
+    );
+  }
   if (result.error) {
     return `${step.tool}: ${result.error}`;
   }
@@ -218,6 +263,29 @@ function describe(step: Step): ReactNode {
           Typed into <b>{element}</b> in tab {args.tab}
         </>
       );
+    case "run":
+      return result.running ? (
+        <>
+          Running <Command>{args.command}</Command> in tab {result.tab} ·{" "}
+          {result.waited}
+        </>
+      ) : (
+        <>
+          Ran <Command>{args.command}</Command> in tab {result.tab}
+        </>
+      );
+    case "screen":
+      return (
+        <>
+          Read <b>{result.title || result.folder}</b> in tab {args.tab}
+        </>
+      );
+    case "keys":
+      return (
+        <>
+          Sent <b>{keysSent(args)}</b> in tab {args.tab}
+        </>
+      );
     case "recall":
       return (
         <>
@@ -252,6 +320,9 @@ const TOOL_ICONS: Record<string, IconName> = {
   read: "square-library",
   click: "corner-down-right",
   type: "pencil",
+  run: "terminal",
+  screen: "terminal",
+  keys: "keyboard",
   recall: "rotate-ccw",
   skill: "lightbulb",
   save_skill: "check",
@@ -312,15 +383,55 @@ function StepLine({ step, last }: { step: Step; last: boolean }) {
       />
     );
   }
-  const failed = Boolean(JSON.parse(step.result).error);
+  const result = JSON.parse(step.result);
+  if (declined(step)) {
+    return (
+      <ThinkingStep
+        className="step declined"
+        icon="x"
+        isLast={last}
+        label={<StepText>{describe(step)}</StepText>}
+      >
+        {result.user_said && (
+          <p className="step-note mt-1 text-xs text-muted-foreground">
+            {result.user_said}
+          </p>
+        )}
+      </ThinkingStep>
+    );
+  }
+  const failed = Boolean(result.error);
   return (
     <ThinkingStep
       className={failed ? "step error text-destructive" : "step"}
       icon={failed ? "x" : (TOOL_ICONS[step.tool] ?? "dot")}
       isLast={last}
       label={failed ? describe(step) : <StepText>{describe(step)}</StepText>}
-    />
+    >
+      {!failed && step.tool === "run" && result.output && (
+        <pre className="step-output mt-1.5 max-w-full overflow-x-auto rounded-lg bg-surface-1 px-2.5 py-1.5 font-mono text-[11.5px] leading-[1.5] text-muted-foreground">
+          {outputPreview(result.output)}
+        </pre>
+      )}
+      {!failed && step.tool === "run" && result.running && (
+        <p className="still-running mt-1 text-xs text-muted-foreground">
+          Still running after {result.waited}, so the agent went on.
+        </p>
+      )}
+    </ThinkingStep>
   );
+}
+
+// A command's output under its step: its first and last lines when long.
+function outputPreview(output: string): string {
+  const lines = output.split("\n");
+  return lines.length <= 12
+    ? output
+    : [
+        ...lines.slice(0, 4),
+        `… ${lines.length - 10} more lines`,
+        ...lines.slice(-6),
+      ].join("\n");
 }
 
 // Where the chat's model or its effort changed. See the frame "AI
@@ -744,9 +855,17 @@ function SkillProposalCard({ proposal }: { proposal: SkillProposal }) {
 }
 
 // A step that waits for the user. Nothing on a page can answer it.
-function ApprovalCard({ approval }: { approval: Approval }) {
+// The card goes once answered: an approved command may run for minutes.
+function ApprovalCard({
+  approval,
+  onAnswered,
+}: {
+  approval: Approval;
+  onAnswered: () => void;
+}) {
   const answer = (given: AskUserAnswer | undefined) => {
     const choice = given?.selectedIds[0];
+    onAnswered();
     chatHandler.answerApproval(
       choice === "approve"
         ? ApprovalChoice.kApprove
@@ -756,25 +875,91 @@ function ApprovalCard({ approval }: { approval: Approval }) {
       given?.otherText ?? "",
     );
   };
+  const terminal = Boolean(approval.folder);
+  const options = [
+    {
+      id: "approve",
+      title: "Approve",
+      description: terminal ? undefined : approval.reason,
+    },
+    { id: "decline", title: "Not this one" },
+    { id: "stop", title: "Stop the chat" },
+  ];
   return (
     <div id="approval">
       <AskUserQuestions
-        label={`${approval.site} · Tab ${approval.tab}`}
+        label={
+          terminal ? (
+            <span className="flex items-center gap-1.5">
+              <TerminalIcon aria-hidden className="size-3.5" />
+              Terminal · Tab {approval.tab} · {approval.folder}
+            </span>
+          ) : (
+            `${approval.site} · Tab ${approval.tab}`
+          )
+        }
         questions={[
           {
             id: "approval",
-            title: `${approval.action}?`,
-            options: [
-              { id: "approve", title: "Approve", description: approval.reason },
-              { id: "decline", title: "Not this one" },
-              { id: "stop", title: "Stop the chat" },
-            ],
+            title: terminal
+              ? approval.command
+                ? "Run this command?"
+                : "Send keys to the running program?"
+              : `${approval.action}?`,
+            detail: terminal && <TerminalApproval approval={approval} />,
+            options,
             allowOther: true,
             otherPlaceholder: "Tell the agent why, or what to do instead",
           },
         ]}
         onComplete={(answers) => answer(answers.approval)}
       />
+    </div>
+  );
+}
+
+// What a command's or keys' approval shows: the command after a prompt, or
+// what the program last printed and the keys, then why it asks.
+function TerminalApproval({ approval }: { approval: Approval }) {
+  const [first, ...rest] = approval.reason.split(/(?<=\.)\s+/);
+  return (
+    <div className="flex flex-col gap-2">
+      {approval.command ? (
+        <pre className="approval-command whitespace-pre-wrap break-all rounded-lg bg-[#1e1b2e] px-3 py-2 font-mono text-[12.5px] leading-[1.5] text-[#edebf7]">
+          <span className="text-[#8e8aa6]">% </span>
+          {approval.command}
+        </pre>
+      ) : (
+        <>
+          {approval.screen && (
+            <pre className="approval-screen whitespace-pre-wrap break-all rounded-lg bg-surface-1 px-3 py-2 font-mono text-[11.5px] leading-[1.5] text-muted-foreground">
+              {approval.screen}
+            </pre>
+          )}
+          <div className="approval-keys flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            {approval.text && (
+              <kbd className="rounded-md border border-border px-1.5 py-0.5 font-mono text-foreground">
+                {approval.text}
+              </kbd>
+            )}
+            {approval.keys.map((key, at) => (
+              <kbd
+                key={at}
+                className="rounded-md border border-border px-1.5 py-0.5 font-sans text-foreground"
+              >
+                {key}
+              </kbd>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="approval-reason flex gap-1.5 text-[13px] leading-[1.45] text-muted-foreground">
+        <Shield aria-hidden className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        <span>
+          <b className="font-semibold text-foreground">{first}</b>
+          {rest.length > 0 && ` ${rest.join(" ")}`}
+        </span>
+      </p>
     </div>
   );
 }
@@ -823,7 +1008,8 @@ function TabCard({
   tab: AgentTab;
   current: boolean;
   working: boolean;
-  waiting: boolean;
+  // What the tab's step waits for, if anything.
+  waiting: "approval" | "password" | null;
   doing: ReactNode;
 }) {
   return (
@@ -835,21 +1021,32 @@ function TabCard({
       className={cn(
         "tab-card rounded-xl border border-border bg-background p-1 text-left",
         current && !tab.closed && "border-focus-ring/45 ring-3 ring-focus-ring/10",
+        waiting && "border-warning/45 ring-3 ring-warning/10",
         tab.closed && "opacity-60",
       )}
     >
-      <div className="h-[136px] overflow-hidden rounded-lg bg-surface-1">
-        {tab.picture && (
-          <img
-            src={tab.picture}
-            alt=""
-            className="h-full w-full object-cover object-top"
-          />
-        )}
-      </div>
+      {tab.terminal ? (
+        <pre className="tab-screen flex h-[136px] flex-col justify-end overflow-hidden whitespace-pre-wrap break-all rounded-lg bg-surface-1 px-2 py-1.5 font-mono text-[8.5px] leading-[1.5] text-muted-foreground">
+          {tab.screen}
+        </pre>
+      ) : (
+        <div className="h-[136px] overflow-hidden rounded-lg bg-surface-1">
+          {tab.picture && (
+            <img
+              src={tab.picture}
+              alt=""
+              className="h-full w-full object-cover object-top"
+            />
+          )}
+        </div>
+      )}
       <div className="px-1.5 pt-2 pb-1">
         <div className="flex items-center gap-1.5 font-medium">
-          {tab.favicon && <img src={tab.favicon} alt="" className="size-3.5" />}
+          {tab.terminal ? (
+            <TerminalIcon aria-hidden className="size-3.5 shrink-0" />
+          ) : (
+            tab.favicon && <img src={tab.favicon} alt="" className="size-3.5" />
+          )}
           <span className="tab-title truncate">{tab.title || tab.url}</span>
         </div>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -857,8 +1054,12 @@ function TabCard({
             <Loader2 className="size-3 shrink-0 animate-spin" />
           )}
           {waiting && <span className="size-1.5 shrink-0 rounded-full bg-warning" />}
-          <span className="tab-doing truncate [&_b]:font-normal">
-            {tab.closed ? "Closed" : waiting ? "Waits for your approval" : doing}
+          <span className="tab-doing truncate [&_b]:font-normal [&_code]:text-muted-foreground">
+            {tab.closed
+              ? "Closed"
+              : waiting
+                ? `Waits for your ${waiting}`
+                : doing}
           </span>
           <span className="ml-auto shrink-0">Tab {tab.number}</span>
         </div>
@@ -890,14 +1091,16 @@ function AgentTabs({
   current,
   working,
   waiting,
+  waitingFor,
   sideBySide,
   lines,
 }: {
   tabs: AgentTab[];
   current: number;
   working: boolean;
-  // The tab whose step waits for approval, or 0.
+  // The tab whose step waits for approval, or for a password, or 0.
   waiting: number;
+  waitingFor: "approval" | "password";
   sideBySide: boolean;
   lines: Step[];
 }) {
@@ -922,13 +1125,17 @@ function AgentTabs({
           tab={tab}
           current={tab.number === current}
           working={working}
-          waiting={tab.number === waiting}
+          waiting={tab.number === waiting ? waitingFor : null}
           doing={doing.get(tab.number) ?? ""}
         />
       ))}
       <p className="mt-auto text-xs text-muted-foreground">
-        Click a card to go to its tab. Each picture is the tab after the
-        agent's last step there.
+        {tabs.some((tab) => tab.terminal)
+          ? "The agent's commands run in its own terminal, under this chat, " +
+            "in your login shell. You can type there, or press Ctrl-C. It " +
+            "never uses a terminal you opened."
+          : "Click a card to go to its tab. Each picture is the tab after " +
+            "the agent's last step there."}
       </p>
     </aside>
   );
@@ -995,6 +1202,11 @@ function Chat() {
   const [skillsFolder, setSkillsFolder] = useState("");
   const [proposal, setProposal] = useState<SkillProposal | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
+  // A program in the agent's terminal tab that waits for the user's password.
+  const [password, setPassword] = useState<{
+    tab: number;
+    program: string;
+  } | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
   // The model the chat runs on, the providers it can pick from, and each
   // provider's models once listed.
@@ -1058,6 +1270,9 @@ function Chat() {
         setProposal(asked),
       ),
       chatPage.onApproval.addListener((asked: Approval) => setApproval(asked)),
+      chatPage.onPassword.addListener((tab: number, program: string) =>
+        setPassword(tab ? { tab, program } : null),
+      ),
       chatPage.onStep.addListener((step: Step) => {
         setApproval(null);
         if (step.tool === "save_skill") {
@@ -1277,11 +1492,13 @@ function Chat() {
     ended === StepKind.kFailed || ended === StepKind.kStoppedByUser;
   const state = approval
     ? "Waits for your approval"
-    : working
-      ? workingFor(since)
-      : stopped
-        ? "Stopped"
-        : "";
+    : password
+      ? "Waits for your password"
+      : working
+        ? workingFor(since)
+        : stopped
+          ? "Stopped"
+          : "";
   const chips = providers && (
     <div id="model-chips" className="flex min-w-0 items-center gap-1.5">
       <ModelChip
@@ -1414,7 +1631,7 @@ function Chat() {
               id="chat-state"
               className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-accent px-2.5 text-xs text-muted-foreground"
             >
-              {approval ? (
+              {approval || password ? (
                 <span className="size-1.5 rounded-full bg-warning" />
               ) : working ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -1458,8 +1675,35 @@ function Chat() {
             ),
           )}
           {proposal && <SkillProposalCard proposal={proposal} />}
-          {approval && <ApprovalCard approval={approval} />}
-          {working && !proposal && !approval && (
+          {password && (
+            <Banner id="password" status="warning">
+              <BannerTitle>
+                {password.program} wants your password in tab {password.tab}.
+              </BannerTitle>
+              <BannerDescription>
+                Type it in the tab. The agent never types passwords.
+              </BannerDescription>
+              <BannerActions>
+                <BannerAction
+                  id="go-to-password"
+                  variant="primary"
+                  onClick={() => chatHandler.showTab(password.tab)}
+                >
+                  Go to tab {password.tab}
+                </BannerAction>
+                <BannerAction id="stop-for-password" onClick={() => chatHandler.stop()}>
+                  Stop the chat
+                </BannerAction>
+              </BannerActions>
+            </Banner>
+          )}
+          {approval && (
+            <ApprovalCard
+              approval={approval}
+              onAnswered={() => setApproval(null)}
+            />
+          )}
+          {working && !proposal && !approval && !password && (
             <ThinkingIndicator id="working" />
           )}
           <div ref={end} />
@@ -1485,7 +1729,8 @@ function Chat() {
           tabs={agentTabs}
           current={currentTab}
           working={working}
-          waiting={approval?.tab ?? 0}
+          waiting={approval?.tab ?? password?.tab ?? 0}
+          waitingFor={approval ? "approval" : "password"}
           sideBySide={sideBySide}
           lines={lines}
         />

@@ -124,6 +124,7 @@ class UwChatHandler : public mojom::ChatHandler,
   // new picture of that tab.
   void OnToolStep(const AgentLoop::Step& step);
   void OnPicture(int number, const content::CopyFromSurfaceResult& result);
+  void OnScreen(int number, const std::string& text, int cursor_line);
   // Tells the page about the agent's tabs.
   void SendTabs();
 
@@ -141,6 +142,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // answers once the user does.
   void AskApproval(AgentTools::Approval approval,
                    base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer);
+  // A program in the agent's terminal tab `number` waits for a password,
+  // which only the user types; 0 once nothing waits.
+  void OnPassword(int number, const std::string& program);
 
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::ChatPage> page_;
@@ -171,6 +175,10 @@ class UwChatHandler : public mojom::ChatHandler,
     std::string url;
     std::string favicon;
     std::string picture;
+    // A terminal tab shows the last lines of its screen in place of a
+    // picture.
+    bool terminal = false;
+    std::string screen;
   };
   std::map<int, Card> cards_;
   // The tab the agent acted in last.
@@ -197,6 +205,8 @@ class UwChatHandler : public mojom::ChatHandler,
   base::OnceCallback<void(base::DictValue)> skill_answer_;
   // The answer to the step that waits for the user's approval.
   base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval_answer_;
+  // The agent's terminal tab that waits for the user's password, or 0.
+  int password_tab_ = 0;
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::WeakPtrFactory<UwChatHandler> weak_factory_{this};

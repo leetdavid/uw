@@ -37,4 +37,10 @@ interface TerminalPage {
 
   // The name of the folder the shell is in.
   SetFolder(string name);
+
+  // For the agent: the screen and its scrollback as text, without colors,
+  // from the line `from` through the cursor's line, and the cursor line's
+  // number. Lines count from the top of the scrollback; a negative `from`
+  // counts back from the cursor's line.
+  Read(int32 from) => (string text, int32 cursor_line);
 };

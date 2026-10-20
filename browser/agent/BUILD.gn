@@ -4,16 +4,14 @@ source_set("agent") {
   sources = [
     "agent_loop.cc",
     "agent_loop.h",
+    "agent_terminal_tools.cc",
     "agent_tools.cc",
     "agent_tools.h",
-    "chat_file.cc",
-    "chat_file.h",
-    "chat_index.cc",
-    "chat_index.h",
     "chat_suggestions.cc",
     "chat_suggestions.h",
   ]
   public_deps = [
+    ":chats",
     "//base",
     "//components/actor/core:task_id",
     "//components/history/core/browser",
@@ -22,6 +20,7 @@ source_set("agent") {
     "//uw/browser/ai_providers",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/components/agent",
+    "//uw/components/terminal",
   ]
   deps = [
     "//chrome/browser/actor",
@@ -38,7 +37,20 @@ source_set("agent") {
     "//net",
     "//services/network/public/cpp",
     "//ui/base",
+    "//uw/browser/terminal",
   ]
+}
+
+# The saved chats and the list of them, which the sidebar reads too.
+source_set("chats") {
+  sources = [
+    "chat_file.cc",
+    "chat_file.h",
+    "chat_index.cc",
+    "chat_index.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//chrome/browser/profiles:profile" ]
 }
 
 # What the browser's commands need to open a chat.
@@ -125,6 +137,8 @@ source_set("browser_tests") {
     "//ui/gfx/geometry",
     "//url",
     "//uw/browser/tab_organization",
+    "//uw/browser/terminal",
     "//uw/components/ai_providers",
+    "//uw/components/terminal",
   ]
 }

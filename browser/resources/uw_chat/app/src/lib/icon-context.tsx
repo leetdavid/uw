@@ -76,6 +76,8 @@ import {
   Folder,
   SlidersHorizontal,
   Info,
+  Terminal,
+  Keyboard,
 } from "lucide-react";
 
 // The whole contract an icon has to meet. Components pass `strokeWidth` and
@@ -107,7 +109,7 @@ export type IconName =
   | "home" | "message-circle" | "inbox"
   | "pencil" | "scaling" | "skip-forward" | "corner-down-right" | "corner-down-left"
   | "panel-left" | "panel-right" | "chevrons-up-down" | "more-horizontal" | "more-vertical" | "calendar" | "folder"
-  | "sliders-horizontal" | "info";
+  | "sliders-horizontal" | "info" | "terminal" | "keyboard";
 
 export const defaultIcons: Record<IconName, IconComponent> = {
   "chevron-right": ChevronRight,
@@ -169,6 +171,8 @@ export const defaultIcons: Record<IconName, IconComponent> = {
   "folder": Folder,
   "sliders-horizontal": SlidersHorizontal,
   "info": Info,
+  "terminal": Terminal,
+  "keyboard": Keyboard,
 };
 
 const IconContext = createContext<Record<IconName, IconComponent> | null>(null);

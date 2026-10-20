@@ -141,6 +141,7 @@ void AgentLoop::Stop() {
     return;
   }
   stopping_ = true;
+  tools_.EndWait();
 }
 
 void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
@@ -157,6 +158,8 @@ void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
     return;
   }
   steer_ = Message{std::string(text), std::move(images)};
+  // A command left running is the agent's to look at with the message.
+  tools_.EndWait();
 }
 
 void AgentLoop::AskModel() {
@@ -274,7 +277,9 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
                        std::move(turn), index, std::move(asked)));
     return;
   }
-  if (approve_ && mode_ != ApprovalMode::kFullAuto) {
+  // Until the command check, a command asks even in Full auto.
+  if (approve_ && (mode_ != ApprovalMode::kFullAuto ||
+                   AgentTools::IsTerminalTool(call.name))) {
     if (std::optional<AgentTools::Approval> approval = tools_.ApprovalFor(
             call.name, *args,
             /*every_step=*/mode_ == ApprovalMode::kAskFirst)) {

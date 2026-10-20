@@ -26,6 +26,7 @@ namespace {
 
 const void* const kFolderKey = &kFolderKey;
 const void* const kStartCommandKey = &kStartCommandKey;
+const void* const kAgentKey = &kAgentKey;
 
 struct FolderData : base::SupportsUserData::Data {
   base::FilePath folder;
@@ -35,12 +36,12 @@ struct StartCommandData : base::SupportsUserData::Data {
   std::string command;
 };
 
+}  // namespace
+
 GURL TerminalUrl() {
   return GURL(base::StrCat({content::kChromeUIScheme,
                             url::kStandardSchemeSeparator, kTerminalHost}));
 }
-
-}  // namespace
 
 void OpenTerminalTab(BrowserWindowInterface* window) {
   chrome::AddTabAt(window, TerminalUrl(), -1, true);
@@ -71,6 +72,16 @@ std::string TakeStartCommand(content::WebContents* contents) {
 
 bool IsTerminalUrl(const GURL& url) {
   return url.SchemeIs(content::kChromeUIScheme) && url.host() == kTerminalHost;
+}
+
+void MarkAsAgentTerminal(content::WebContents* contents) {
+  contents->SetUserData(kAgentKey,
+                        std::make_unique<base::SupportsUserData::Data>());
+}
+
+bool IsAgentTerminal(content::WebContents* contents) {
+  return contents->GetUserData(kAgentKey) &&
+         IsTerminalUrl(contents->GetLastCommittedURL());
 }
 
 base::FilePath TerminalFolder(content::WebContents* contents) {

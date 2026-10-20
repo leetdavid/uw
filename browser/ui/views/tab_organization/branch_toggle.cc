@@ -24,6 +24,7 @@
 #include "ui/views/layout/proposed_layout.h"
 #include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/chat_mark.h"
 
 namespace uw {
 namespace {
@@ -167,6 +168,7 @@ END_METADATA
 void AddBranchControls(views::View* row, tabs::TabHandle tab) {
   row->AddChildView(std::make_unique<HiddenCount>());
   row->AddChildView(std::make_unique<BranchToggle>(tab));
+  row->AddChildView(std::make_unique<ChatMark>(tab));
 }
 
 void LayOutBranchControls(views::View* icon,
@@ -176,7 +178,8 @@ void LayOutBranchControls(views::View* icon,
   views::View* row = icon->parent();
   BranchToggle* toggle = ChildOfClass<BranchToggle>(row);
   HiddenCount* count = ChildOfClass<HiddenCount>(row);
-  if (!toggle || !count) {
+  ChatMark* mark = ChildOfClass<ChatMark>(row);
+  if (!toggle || !count || !mark) {
     return;
   }
   views::ChildLayout* icon_layout = layout.GetLayoutFor(icon);
@@ -195,6 +198,16 @@ void LayOutBranchControls(views::View* icon,
     icon_layout->visible = false;
   }
 
+  // A chat's state ends its row, after the hidden count.
+  gfx::Rect mark_bounds(mark->GetPreferredSize());
+  const bool show_mark = titled && mark->shown();
+  if (show_mark) {
+    gfx::Rect& text = title_layout->bounds;
+    mark_bounds.set_origin({text.right() - mark_bounds.width(),
+                            text.CenterPoint().y() - mark_bounds.height() / 2});
+    text.set_width(std::max(0, text.width() - mark_bounds.width() - kCountGap));
+  }
+
   gfx::Rect count_bounds(count->GetPreferredSize());
   const bool show_count = branch && toggle->collapsed();
   if (show_count) {
@@ -210,6 +223,7 @@ void LayOutBranchControls(views::View* icon,
   // point to, so it comes last.
   layout.child_layouts.push_back({toggle, show_toggle, toggle_bounds});
   layout.child_layouts.push_back({count, show_count, count_bounds});
+  layout.child_layouts.push_back({mark, show_mark, mark_bounds});
 }
 
 }  // namespace uw

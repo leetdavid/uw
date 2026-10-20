@@ -1,6 +1,8 @@
-# Opening a terminal tab and telling one from a page tab.
+# Opening a terminal tab, telling one from a page tab, and reaching its shell.
 source_set("terminal") {
   sources = [
+    "terminal_shell.cc",
+    "terminal_shell.h",
     "terminal_tab.cc",
     "terminal_tab.h",
   ]

@@ -1,11 +1,13 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -47,6 +49,8 @@
 #include "ui/base/ui_base_switches.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/message_center/public/cpp/notification.h"
+#include "ui/views/view_utils.h"
+#include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -55,6 +59,9 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/components/ai_providers/providers.h"
 
@@ -1645,6 +1652,187 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatInViewOrStoppedDoesNotNotify) {
                         "    .click();"),
             "You stopped the chat.");
   EXPECT_TRUE(ChatNotifications().empty());
+}
+
+// The agent's terminal, and what a chat's tab row shows.
+class UwChatTerminalBrowserTest : public UwChatBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    UwChatBrowserTest::SetUpOnMainThread();
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
+    // zsh finds none of the user's startup files in an empty folder.
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+  }
+
+  // The state the chat tab's row shows: the mark of the one row that shows
+  // one, or nothing.
+  std::optional<ChatIndex::State> MarkedState(bool* spinning = nullptr) {
+    views::Widget* widget =
+        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+    widget->LayoutRootViewIfNecessary();
+    std::optional<ChatIndex::State> shown;
+    const std::function<void(views::View*)> visit = [&](views::View* view) {
+      if (auto* mark = views::AsViewClass<ChatMark>(view);
+          mark && mark->GetVisible() && mark->state()) {
+        shown = mark->state();
+        if (spinning) {
+          *spinning = mark->children()[0]->GetVisible();
+        }
+      }
+      for (views::View* child : view->children()) {
+        visit(child);
+      }
+    };
+    visit(widget->GetRootView());
+    return shown;
+  }
+
+  static std::string RunCall(const std::string& command) {
+    return ScriptedModel::Calls(base::ListValue().Append(
+        ScriptedModel::Call("run", base::DictValue().Set("command", command))));
+  }
+
+  base::ScopedTempDir zdotdir_;
+};
+
+// A command waits on a card of its own. Once approved, it runs in a terminal
+// tab under the chat, and its output shows under its step and on its card.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       ACommandWaitsOnItsCardAndItsOutputShows) {
+  UseAgentModel();
+  model_.Script(
+      {RunCall("echo hi-$((40+2))"), ScriptedModel::Answer("It said hi.")});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.getElementById('approval-note')"
+                            "    .textContent"),
+            "Changes on a site and every command wait for your approval");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Say hi in a terminal")));
+
+  const std::string card = Approval(chat);
+  EXPECT_THAT(card, ::testing::HasSubstr("Terminal · Tab 1 · ~"));
+  EXPECT_THAT(card, ::testing::HasSubstr("Run this command?"));
+  EXPECT_THAT(card, ::testing::HasSubstr(
+                        "For now, every command waits for your approval."));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('.approval-command')"
+                            "    .textContent"),
+            "% echo hi-$((40+2))");
+  SaveWindowScreenshot(browser(), "chat-command-waits");
+
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "It said hi.");
+  const std::vector<std::string> steps = Steps(chat);
+  ASSERT_EQ(steps.size(), 1u);
+  EXPECT_THAT(steps[0],
+              ::testing::StartsWith("Ran echo hi-$((40+2)) in tab 1"));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('.step-output')"
+                            "    .textContent"),
+            "hi-42");
+  EXPECT_THAT(Until(chat,
+                    "document.querySelector('.tab-screen')?.textContent"
+                    "    .includes('hi-42') && document.querySelector("
+                    "    '.tab-screen').textContent")
+                  .ExtractString(),
+              ::testing::HasSubstr("echo hi-$((40+2))"));
+  SaveWindowScreenshot(browser(), "chat-command-ran");
+}
+
+// A password prompt hands the tab to the user: the chat says so, waits, and
+// goes on once they have typed it.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       APasswordPromptWaitsForTheUser) {
+  UseAgentModel();
+  model_.Script(
+      {RunCall("bash -c 'stty -echo; printf Password:; read p; stty echo; "
+               "echo thanks-$((40+2))'"),
+       ScriptedModel::Answer("Signed in.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Sign in to the server")));
+  ASSERT_TRUE(content::ExecJs(chat, ChooseScript("Approve")));
+
+  EXPECT_THAT(Until(chat, "document.getElementById('password')?.textContent")
+                  .ExtractString(),
+              ::testing::StartsWith("bash wants your password in tab 1."));
+  EXPECT_EQ(Until(chat, "document.getElementById('chat-state')?.textContent"),
+            "Waits for your password");
+  EXPECT_EQ(Until(chat,
+                  "document.querySelector('button[data-chat]')"
+                  "    ?.dataset.state === 'waiting' && 'waiting'"),
+            "waiting");
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MarkedState() == ChatIndex::State::kWaiting; }));
+  SaveWindowScreenshot(browser(), "chat-password-waits");
+
+  tabs::TabInterface* terminal = nullptr;
+  for (int i = 0; i < tabs()->count(); ++i) {
+    if (IsAgentTerminal(tabs()->GetWebContentsAt(i))) {
+      terminal = tabs()->GetTabAtIndex(i);
+    }
+  }
+  ASSERT_TRUE(terminal);
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.getElementById('go-to-password').click();"));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return tabs()->GetActiveTab() == terminal; }));
+  // The user types it in the tab.
+  TerminalShell::From(terminal->GetContents())->Write("hunter2\r");
+
+  EXPECT_EQ(Until(chat, "document.querySelector('.answer')?.textContent"),
+            "Signed in.");
+  EXPECT_EQ(content::EvalJs(chat, "!document.getElementById('password')"),
+            true);
+  const std::string output =
+      content::EvalJs(chat,
+                      "document.querySelector('.step-output')"
+                      "    .textContent")
+          .ExtractString();
+  EXPECT_THAT(output, ::testing::HasSubstr("thanks-42"));
+  EXPECT_THAT(output, ::testing::Not(::testing::HasSubstr("hunter2")));
+}
+
+// The chat tab's row shows what the chat page's list shows: a spinner while
+// the agent works, a pause once it stopped early, an amber dot while a step
+// waits, and a dot for an answer not yet seen.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       TheChatsTabRowShowsHowTheChatStands) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(MarkedState(), std::nullopt);
+
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MarkedState() == ChatIndex::State::kRunning; }));
+  bool spinning = false;
+  MarkedState(&spinning);
+  EXPECT_TRUE(spinning);
+  SaveWindowScreenshot(browser(), "chat-row-running");
+
+  Reopen(chat);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MarkedState() == ChatIndex::State::kStopped; }));
+  MarkedState(&spinning);
+  EXPECT_FALSE(spinning);
+
+  ScriptOrder("Ordered.");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Place the order")));
+  Approval(chat);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MarkedState() == ChatIndex::State::kWaiting; }));
+  SaveWindowScreenshot(browser(), "chat-row-waiting");
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Ordered.");
+  ASSERT_TRUE(base::test::RunUntil([&] { return !MarkedState(); }));
+
+  model_.Script({ScriptedModel::Answer("Booked.")});
+  HideChat();
+  Ask(chat, "Book it");
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MarkedState() == ChatIndex::State::kUnread; }));
+  SaveWindowScreenshot(browser(), "chat-row-unread");
+  tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !MarkedState(); }));
 }
 
 }  // namespace
