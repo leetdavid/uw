@@ -82,8 +82,9 @@ test("a bare amount converts to the other measurement system", () => {
   assert.equal(answer("5 W"), undefined);
 });
 
-test("a word that is not a unit gets no answer, only in a sum", () => {
-  assert.equal(calculator().calculate("1/2 cup flour")?.why, "“flour” is not a unit");
+test("a word that is not a unit shows no card, and units that do not fit show why", () => {
+  assert.equal(calculator().calculate("1/2 cup flour"), null);
+  assert.equal(calculator().calculate("100 usd to xyz"), null);
   assert.equal(calculator().calculate("10 kg + 5 m")?.why, "Cannot add a mass to a length");
 });
 

@@ -276,8 +276,6 @@ interface Reading {
   ink: Ink[];
   // The units read, in words, each once.
   words: string[];
-  // The first word that is neither a unit nor a currency.
-  unknown: string;
   // Explicit operators, functions, and conversions.
   operators: number;
   units: number;
@@ -330,7 +328,6 @@ export class Calculator {
     const reading: Reading = {
       ink: [],
       words: [],
-      unknown: '',
       operators: 0,
       units: 0,
       constants: 0,
@@ -347,7 +344,7 @@ export class Calculator {
       reading.ink.push({text: inkText(parsed.aside), kind: 'aside'});
     }
     if (reading.operators === 0 && reading.units === 0 &&
-        reading.constants === 0 && !reading.unknown) {
+        reading.constants === 0) {
       return null;
     }
     const sumName = reading.words.length ? reading.words.join(', ') :
@@ -363,9 +360,6 @@ export class Calculator {
       note: '',
     } :
                                                                         null;
-    if (reading.unknown) {
-      return noAnswer(`“${reading.unknown}” is not a unit`);
-    }
     const node = parsed.node.transform(n => reading.replace.get(n) ?? n);
     let value: unknown;
     try {
@@ -428,7 +422,6 @@ export class Calculator {
       reading.operators++;
       const ignored: Reading = {...reading, ink: [], words: []};
       this.readNode_(to, ignored);
-      reading.unknown ||= ignored.unknown;
       return to;
     }
     this.readNode_(node, reading);
@@ -587,8 +580,7 @@ export class Calculator {
         }
       }
     }
-    reading.unknown ||= name;
-    reading.ink.push({text: name, kind: 'aside'});
+    throw new Error('unit');
   }
 
   private isUnit_(name: string): boolean {
