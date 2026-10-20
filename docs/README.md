@@ -53,6 +53,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 ### Look and controls
 
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
+- [Workspaces plan](plans/workspaces.md): Arc-style workspaces you swipe between, several to a profile, and pinned tabs shared by every window of a profile.
 - [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, black dark mode, a page mode apart from the window's, and a toolbar in each page's color.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Sidebar menus plan](plans/sidebar-menus.md): the task menu and the Organize menu as uw cards, and naming a task on its row.

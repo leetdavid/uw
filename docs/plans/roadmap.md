@@ -135,6 +135,12 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T125 | The agent's terminal | in progress | 5/10 | `run`, `screen`, and `keys` tools in a terminal tab under the chat, with the 2-minute wait, the password hand-off, and the user's own terminal tabs out of reach, per the [agent chats plan](agent-chats.md#design). Until T126, every command and set of keys asks, in every mode. Agreed on 2026-10-20. Done when `AgentLoopBrowserTest` and `UwChatBrowserTest` cases run a command and read its output, leave a long command running and read it later, send keys to a program waiting for input, hand a `sudo` password prompt to the user, and find no way to a terminal tab the user opened. |
 | T126 | Command check | backlog | 5/10 | Auto asks only before commands the [command check](../CONTEXT.md#language) finds potentially dangerous, every mode asks before a [sensitive file](../CONTEXT.md#language) is read, and Full auto runs the rest, per [ADR 0012](../adr/0012-a-command-check-judges-the-agents-terminal-commands.md). Agreed on 2026-10-20. Done when browser tests show the check never sees page text or output, and an unsure or missing answer asks; and a set of example commands, run against the user's models by a script, has every dangerous and sensitive example ask and at least 4 in 5 safe ones run. |
 | T127 | A chat's state on its tab | in progress | 7/10 | The chat tab's row in the sidebar ends with what the chat page's list shows: a spinner while the agent works, an amber dot while a step or a password waits for the user, a pause sign once it stopped early, and a dot for an answer not yet seen, per the [agent chats plan](agent-chats.md#agreed-scope). The user asked for it on 2026-10-20 with T124's sign-off; the frame "Agent terminal: a command waits for you (Fluid)" draws the amber dot. Done when a `UwChatBrowserTest` case finds each mark on the chat tab's row as the chat runs, waits, stops, and answers out of sight. |
+| T128 | Workspaces and pins design | in progress | 8/10 | The frames listed in the [workspaces plan](workspaces.md#design) on a new canvas page "Workspaces". Agreed on 2026-10-21. Done when the user signs them off. |
+| T129 | Pins shared by a profile's windows | todo | 8/10 | The same pins and home URLs in every window of a profile, in the same order. Cmd-W does nothing on a pin, double-click and Reset to home load the home URL, and the two home URL items work, per [Pinned tabs](../product.md#pinned-tabs). Each window loads its own page until T133. Done when acceptance checks 1 and 2 of the [workspaces plan](workspaces.md#acceptance-checks) pass in headless browser tests. |
+| T130 | Workspaces | todo | 5/10 | The switcher, Ctrl+1 to 9 and Cmd+Option+← / →, the window swap of [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md), creating, renaming, and deleting, the profile button removed, closing and restoring, the command bar, Move to workspace, and providers shared by every profile, per the [workspaces plan](workspaces.md#agreed-scope). Switching is instant until T132. Needs T128. Done when acceptance checks 3 to 9, 11, and 12 pass. |
+| T131 | A theme per workspace | todo | 5/10 | Everything the theme picker sets belongs to the workspace, so two workspaces on one profile can look different. Chromium works out a window's colors from its profile's color, so uw hands each window its workspace's color instead. Needs T130. Done when acceptance check 10 passes and `TintBrowserTest.*` passes with two workspaces in place of two profiles. |
+| T132 | A swipe that follows the fingers | todo | 3/10 | A two-finger swipe on the sidebar slides to the next workspace as the fingers move, and a half swipe snaps back. The windows are separate, so the slide is drawn from pictures of them, and a hidden window's picture is kept from when it was last shown. Needs T130. Done when acceptance check 13 passes in the VM. |
+| T133 | One live pin page across windows | todo | 4/10 | A prototype first, then the build, per [Shared pinned tabs](../architecture.md#shared-pinned-tabs). Needs T129. Done when acceptance check 14 passes. |
 
 ## 1. Choose the browser foundation
 
@@ -188,6 +194,12 @@ Agreed on 2026-10-14 as a later addition outside the minimum usable version. Run
 
 Done when the plan's [acceptance checks](terminal-tab.md#acceptance-checks) pass and the user has used a terminal tab for real work without falling back to a terminal app.
 
+## Workspaces and shared pins
+
+Agreed on 2026-10-21. Build the [workspaces plan](workspaces.md) in its stage order, T128 to T133: the designs, pins shared by a profile's windows, workspaces, a theme per workspace, the swipe, and the live pin page.
+
+Done when the plan's [acceptance checks](workspaces.md#acceptance-checks) pass and the user has switched workspaces through a day of work.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -206,7 +218,9 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Arc-style look](arc-style-look.md) | 4/10 | Chromium already has settings for the sizes, colors, and rounded page corners. The tint gradient, the user's own tint, and the task folder row need custom drawing, and each Chromium update can move the views it touches. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
 | [Pinned-tab Peek previews](../product.md#pinned-tabs) | 6/10 | Same-site navigation remains in the pin; off-site links open a temporary preview that can promote into Scratchpad. |
-| [Shared live pinned-page state](../product.md#pinned-tabs) | 3/10 | The live page transfers between windows and remains alive without a browser window. Every launch restores the last session; Chromium ownership and lifecycle need a trial. |
+| [Shared live pinned-page state](../product.md#pinned-tabs) | 4/10 | The live page transfers between windows and remains alive without a browser window. Every launch restores the last session; Chromium ownership and lifecycle need a trial. Up from 3/10 on 2026-10-21: Chromium already moves a live tab between two windows of one profile when a tab is dragged across. |
+| [Workspaces](workspaces.md) | 5/10 | A Chromium window cannot change profile, so switching swaps the window for a hidden partner. The theme has to move from the profile to the workspace. |
+| [Swipe that follows the fingers](workspaces.md#stages) | 3/10 | The two workspaces are separate windows, so the slide is drawn from pictures of them. |
 | [Required Chrome-extension compatibility](../product.md#required-extensions) | 7/10 | Browser integration and interactions between the named extensions need validation on macOS. |
 | [Explicit AI setup](../product.md#ai-connections) | 9/10 | A bounded connection-selection flow. |
 | [Managed local models](../product.md#ai-connections) | 6/10 | Device compatibility, download management, and resource use. |

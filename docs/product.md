@@ -30,7 +30,7 @@ Agreed: keep uw branding minimal and use native vertical tabs by default. Preser
 
 Agreed on 2026-10-14, for now: the logo is the two-ink double u in [Logo](logo.md). It is the app icon on macOS. Logos inside the browser are still Chromium's.
 
-Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. The tint is a two-color gradient that the user can change on uw's settings page, with a light and a dark default. Text on the tint turns white or near-black, whichever reads better, and a color that would leave it hard to read is made lighter or darker. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups. The [plan](plans/arc-style-look.md) has the details. Changed on 2026-10-16: the tint becomes a [theme](plans/themes.md), as in Arc: up to three colors with intensity and grain, picked over the window, one per profile. Dark mode is black by default, with a switch to show the theme instead.
+Agreed on 2026-10-11: the look follows Arc browser. The window is tinted, the page sits in a rounded card, pinned tabs are tiles, and a task reads as a folder. The tint is a two-color gradient that the user can change on uw's settings page, with a light and a dark default. Text on the tint turns white or near-black, whichever reads better, and a color that would leave it hard to read is made lighter or darker. Underneath, tabs and tasks stay Chromium's native vertical tabs and tab groups. The [plan](plans/arc-style-look.md) has the details. Changed on 2026-10-16: the tint becomes a [theme](plans/themes.md), as in Arc: up to three colors with intensity and grain, picked over the window, one per profile. Dark mode is black by default, with a switch to show the theme instead. Changed on 2026-10-21: one theme per [workspace](#workspaces).
 
 Agreed: manual setup is acceptable for the first usable version. Automatic browser-data import is not required for that version.
 
@@ -251,7 +251,11 @@ Agreed future direction: explore [full libghostty in a native view](research/nat
 
 ## Browser experience
 
-Agreed: use [automatic tab organization](#automatic-tab-organization) to help track the current task and its tabs. This replaces the earlier Arc-style workspace proposal, which did not solve the user's task-tracking problem.
+Agreed: use [automatic tab organization](#automatic-tab-organization) to help track the current task and its tabs. An earlier proposal to track tasks with Arc-style workspaces was dropped, since it did not solve that problem. Workspaces came back on 2026-10-21 for a different job; see [Workspaces](#workspaces).
+
+### Workspaces
+
+Agreed on 2026-10-21: [workspaces](CONTEXT.md#language) work as Arc's spaces. The user swipes between them in the sidebar, each has its own theme, and several can share one [profile](CONTEXT.md#language)'s logins and history. Switching replaces the window with its partner for that workspace. Tasks still organize the tabs inside a workspace. The [workspaces plan](plans/workspaces.md) has the details.
 
 Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
 
@@ -267,7 +271,7 @@ Agreed: each pin represents one continuing live page session shared across windo
 
 Agreed: only one window displays a pinned page session at a time. Selecting the pin in another window transfers the live page there. The previous window retains a hazed, inactive pinned view rather than a second live copy. Selecting that inactive view transfers the live page back.
 
-Agreed: pins are shared across all windows in one browser profile and separate between profiles.
+Agreed: pins are shared across all windows in one browser profile and separate between profiles. Since 2026-10-21 that includes every [workspace](#workspaces) on the profile.
 
 Agreed: Cmd-W while the pinned page itself is active is a no-op. It does not close the page or window, remove the pin, return the page to its home URL, or affect its state in other windows.
 
@@ -297,7 +301,7 @@ Agreed: require an explicit "Enable Jev tab classification" choice before sendin
 | Ollama | Connect to an Ollama endpoint and choose an available model. |
 | Online provider | Support OpenAI API, Anthropic API, OpenRouter, Vercel AI Gateway, and custom endpoints in any format uw speaks. |
 
-Agreed on 2026-10-15 for v2.1: the user saves each [provider](CONTEXT.md#language) once, with its key, and every model choice picks from them: the language model, the decision model, and the agent model. Each chat can switch its model and effort. See the [AI providers plan](plans/ai-providers.md).
+Agreed on 2026-10-15 for v2.1: the user saves each [provider](CONTEXT.md#language) once, with its key, and every model choice picks from them: the language model, the decision model, and the agent model. Each chat can switch its model and effort. See the [AI providers plan](plans/ai-providers.md). Agreed on 2026-10-21: every profile shares the same providers, and each profile picks its own models.
 
 Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
 
