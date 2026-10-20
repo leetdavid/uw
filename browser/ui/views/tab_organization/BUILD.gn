@@ -8,10 +8,10 @@ source_set("tab_organization") {
     "chat_mark.h",
     "menu_card_row.cc",
     "menu_card_row.h",
-    "name_lock.cc",
-    "name_lock.h",
     "mouse_actions.h",
     "mouse_actions.mm",
+    "name_lock.cc",
+    "name_lock.h",
     "new_button.cc",
     "new_button.h",
     "organize_bar.cc",
@@ -66,7 +66,7 @@ source_set("tab_organization") {
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/terminal",
     "//uw/browser/ui/look",
+    "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/theme_picker",
   ]
-    "//uw/browser/ui/views/command_bar",
 }

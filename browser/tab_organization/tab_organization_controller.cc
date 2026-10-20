@@ -531,16 +531,6 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
       false);
 }
 
-bool TabOrganizationController::IsHidden(const PageId& id) const {
-  return Vertical() && InCollapsedBranch(id);
-}
-
-bool TabOrganizationController::InCollapsedBranch(const PageId& id) const {
-  const Page* page = tree_.Find(id);
-  for (const Page* up = page ? tree_.Find(page->parent) : nullptr; up;
-       up = tree_.Find(up->parent)) {
-    if (collapsed_.contains(up->id)) {
-      return true;
 void TabOrganizationController::CloseTask(const tab_groups::TabGroupId& task) {
   if (!tabs_->SupportsTabGroups() ||
       !tabs_->group_model()->ContainsTabGroup(task)) {
@@ -587,6 +577,16 @@ void TabOrganizationController::PlaceInTask(
   ScheduleUpdate();
 }
 
+bool TabOrganizationController::IsHidden(const PageId& id) const {
+  return Vertical() && InCollapsedBranch(id);
+}
+
+bool TabOrganizationController::InCollapsedBranch(const PageId& id) const {
+  const Page* page = tree_.Find(id);
+  for (const Page* up = page ? tree_.Find(page->parent) : nullptr; up;
+       up = tree_.Find(up->parent)) {
+    if (collapsed_.contains(up->id)) {
+      return true;
     }
   }
   return false;

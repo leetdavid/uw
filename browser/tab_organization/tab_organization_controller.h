@@ -127,7 +127,6 @@ class TabOrganizationController : public TabStripModelObserver,
   bool MoveUp(const PageId& id);
   bool MoveDown(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);
-
   // Closes `task` and its tabs. A task that holds every tab leaves a blank
   // tab behind, so the window stays.
   void CloseTask(const tab_groups::TabGroupId& task);
@@ -137,6 +136,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // opens the task if it is collapsed.
   void PlaceInTask(const tabs::TabInterface* tab,
                    const tab_groups::TabGroupId& task);
+
   // A collapsed branch hides the tabs under its top page. Collapsing is not
   // an organization action, so undo leaves it alone.
   bool IsCollapsed(const PageId& id) const { return collapsed_.contains(id); }
