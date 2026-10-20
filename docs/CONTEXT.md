@@ -36,7 +36,7 @@ The color a page paints behind its content. The toolbar above the page and the b
 _Avoid_: Theme color, site color, tint.
 
 **Pinned tab**:
-A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared across windows in its browser profile.
+A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
 **Inactive pinned view**:
 A hazed placeholder where a pinned page's live session is currently displayed in another window. Selecting it transfers the session back.
