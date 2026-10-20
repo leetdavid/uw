@@ -1338,10 +1338,22 @@ index 92d191c30c8f4919631d1a1e06a1929afac29225..534473c7cb98dc8d45c6489bb6e170f1
  };
  
 diff --git a/chrome/browser/ui/ui_features.cc b/chrome/browser/ui/ui_features.cc
-index 7a0e331dedf4563a6be3f5a9e4874d0293abce1c..1984a4bb6a374637a6fca786bc897ff5951f3579 100644
+index 7a0e331dedf4563a6be3f5a9e4874d0293abce1c..68ac8b6ab5ef0dcabf206268519d83fcff121c12 100644
 --- a/chrome/browser/ui/ui_features.cc
 +++ b/chrome/browser/ui/ui_features.cc
-@@ -385,11 +385,12 @@ BASE_FEATURE(kRespectShouldTriggerSessionRestoreOnDesktop,
+@@ -131,8 +131,9 @@ bool IsSettingsRefresh2026Enabled() {
+ }
+ 
+ bool ShouldUseActionsForBrowserCommands() {
+-  return base::FeatureList::IsEnabled(kUseActionsForBrowserCommands) ||
+-         base::FeatureList::IsEnabled(kAppMenuGlowUp);
++  // uw: commands stay with the plain updater. The action-backed one only runs
++  // commands that have a Chromium action, which uw's own commands do not.
++  return false;
+ }
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+@@ -385,11 +386,12 @@ BASE_FEATURE(kRespectShouldTriggerSessionRestoreOnDesktop,
  
  BASE_FEATURE(kSessionRestoreInfobar, base::FEATURE_ENABLED_BY_DEFAULT);
  
