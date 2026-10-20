@@ -43,6 +43,11 @@ inline constexpr char kAgentApprovalModePref[] = "uw.agent.approval_mode";
 // Whether Cmd+T opens the command bar instead of a blank tab.
 inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
 
+// Whether a launch after a crash restores the last session without Chromium's
+// "Restore pages?" prompt. The prompt's checkbox turns it on.
+inline constexpr char kRestoreAfterCrashPref[] =
+    "uw.session.restore_after_crash";
+
 // The European Central Bank's rates the command bar last downloaded: "date",
 // "fetched" in seconds since the epoch, and "per_euro".
 inline constexpr char kCommandBarRatesPref[] = "uw.command_bar.rates";

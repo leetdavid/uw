@@ -282,7 +282,7 @@ Agreed: closing the window that displays a pinned page detaches its live session
 
 Agreed: pinned page sessions remain live when the last browser window closes while uw remains running. Opening a new window restores their exact state, subject to measured resource limits.
 
-Agreed: every launch restores the last session without asking, as Arc does, after a quit or a crash and whatever the macOS "Close windows when quitting an application" setting says. Pinned pages come back at their last live URLs, with Chromium-recoverable session state, alongside regular tabs. Chromium's "On startup" setting still lets the user start blank. Changed on 2026-10-18: before, a "Restore tabs" popup offered restoration. See [Restore](plans/native-tab-tree.md#restore).
+Agreed: every launch after a quit restores the last session without asking, as Arc does. Pinned pages come back at their last live URLs, with Chromium-recoverable session state, alongside regular tabs. Chromium's "On startup" setting still lets the user start blank. After a crash, Chromium's "Restore pages?" prompt asks first. Its "Always restore after a crash" checkbox starts unticked; once ticked, later crashes restore without asking. uw follows Chromium's own Session Restore Infobar work and drops its parts once Chromium ships them. Changed on 2026-10-18: before, a "Restore tabs" popup offered restoration. The crash checkbox was agreed on 2026-10-20. See [Restore](plans/native-tab-tree.md#restore).
 
 ## AI connections
 

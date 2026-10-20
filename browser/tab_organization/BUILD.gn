@@ -10,6 +10,7 @@ source_set("tab_organization") {
     "tab_organization_controller.h",
   ]
   public_deps = [
+    ":ai_connection",
     ":hidden_tabs",
     "//base",
     "//chrome/browser/ui/tabs:tab_strip",
@@ -19,7 +20,6 @@ source_set("tab_organization") {
     "//uw/components/tab_organization",
   ]
   deps = [
-    ":ai_connection",
     "//uw/browser/ai_providers",
     "//base:i18n",
     "//chrome:strings",
@@ -65,6 +65,7 @@ source_set("browser_tests") {
     ":test_support",
     "//base",
     "//chrome/browser",
+    "//chrome:strings",
     "//chrome/browser:global_keyboard_shortcuts_mac",
     "//chrome/browser/tab_group_sync:factories",
     "//chrome/browser/headless:browser_tests",

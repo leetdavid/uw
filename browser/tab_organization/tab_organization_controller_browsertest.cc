@@ -36,11 +36,14 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
+#include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/session_crashed_bubble_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/common/pref_names.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
@@ -63,12 +66,17 @@
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/menus/simple_menu_model.h"
+#include "ui/base/l10n/l10n_util.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/button/checkbox.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/styled_label.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 
 namespace uw {
@@ -247,6 +255,20 @@ class TabOrganizationControllerBrowserTest
     }));
     Collapse(b);
     // Lets the session take the tabs' data.
+    base::RunLoop().RunUntilIdle();
+  }
+
+  // Opens `a` with `b` under it and waits until both pages are committed,
+  // which session restore needs.
+  void OpenAWithBUnderIt() {
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(),
+                                             GURL("chrome://version/?a")));
+    tabs::TabInterface* b =
+        OpenLinkFrom(InitialTab(), GURL("chrome://version/?b"));
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      return b->GetContents()->GetLastCommittedURL() ==
+             GURL("chrome://version/?b");
+    }));
     base::RunLoop().RunUntilIdle();
   }
 
@@ -1122,6 +1144,82 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_EQ(GlobalBrowserCollection::GetInstance()->GetSize(), 1u);
   SetBrowser(GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser());
   EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == kRestoredTree; }))
+      << TreeShape();
+}
+
+// A launch restores the last session, though the user set nothing.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PRE_ALaunchRestoresTheLastSession) {
+  OpenAWithBUnderIt();
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ALaunchRestoresTheLastSession) {
+  EXPECT_EQ(SessionStartupPref::GetStartupPref(browser()->GetProfile()).type,
+            SessionStartupPref::LAST);
+  EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == "a0 b1"; }))
+      << TreeShape();
+}
+
+// After a crash Chromium asks before it restores. Its prompt has a box,
+// unticked, that makes every later crash restore without asking.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TickingAlwaysRestoreInTheCrashPromptKeepsIt) {
+  PrefService* prefs = browser()->GetProfile()->GetPrefs();
+  ASSERT_FALSE(prefs->GetBoolean(kRestoreAfterCrashPref));
+  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(browser(), true);
+  views::BubbleDialogDelegate* prompt =
+      SessionCrashedBubbleView::GetInstanceForTest();
+  ASSERT_TRUE(prompt);
+  // The prompt draws a checkbox's words as a label beside the box. This
+  // build offers no other checkbox there.
+  std::vector<views::Checkbox*> boxes;
+  bool labelled = false;
+  const std::u16string label =
+      l10n_util::GetStringUTF16(IDS_UW_SESSION_CRASHED_ALWAYS_RESTORE);
+  const std::function<void(views::View*)> find = [&](views::View* view) {
+    if (auto* box = views::AsViewClass<views::Checkbox>(view)) {
+      boxes.push_back(box);
+    }
+    if (auto* text = views::AsViewClass<views::StyledLabel>(view)) {
+      labelled |= text->GetText() == label;
+    }
+    if (auto* text = views::AsViewClass<views::Label>(view)) {
+      labelled |= text->GetText() == label;
+    }
+    for (views::View* child : view->children()) {
+      find(child);
+    }
+  };
+  find(prompt->GetWidget()->GetRootView());
+  ASSERT_EQ(boxes.size(), 1u);
+  EXPECT_TRUE(labelled);
+  views::Checkbox* always = boxes[0];
+  EXPECT_FALSE(always->GetChecked());
+
+  views::test::ButtonTestApi(always).NotifyClick(
+      ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
+                     ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
+  prompt->AcceptDialog();
+  EXPECT_TRUE(prefs->GetBoolean(kRestoreAfterCrashPref));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PRE_OnceTickedACrashRestoresWithoutTheCrashPrompt) {
+  // Starting blank keeps this launch's own restore out of the way.
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::DEFAULT));
+  OpenAWithBUnderIt();
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       OnceTickedACrashRestoresWithoutTheCrashPrompt) {
+  ASSERT_EQ(TreeShape(), "");
+  browser()->GetProfile()->GetPrefs()->SetBoolean(kRestoreAfterCrashPref,
+                                                  true);
+  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(browser(), true);
+  EXPECT_FALSE(SessionCrashedBubbleView::GetInstanceForTest());
+  EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == "a0 b1"; }))
       << TreeShape();
 }
 
