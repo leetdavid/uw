@@ -18,7 +18,8 @@ struct VectorIcon;
 
 namespace ui {
 class Accelerator;
-}
+class KeyEvent;
+}  // namespace ui
 
 namespace views {
 class BubbleDialogDelegate;
@@ -52,6 +53,7 @@ class MenuCardRow : public views::Button {
   void StateChanged(ButtonState old_state) override;
   void OnFocus() override;
   void OnBlur() override;
+  KeyClickAction GetKeyClickActionForEvent(const ui::KeyEvent& event) override;
 
  private:
   void Update();
@@ -75,10 +77,19 @@ class MenuCardChip : public views::LabelButton {
   void StateChanged(ButtonState old_state) override;
   void OnFocus() override;
   void OnBlur() override;
+  KeyClickAction GetKeyClickActionForEvent(const ui::KeyEvent& event) override;
 
  private:
   void Update();
 };
+
+// Lets a row, chip, or dot of a menu card take focus, so the arrow keys
+// reach it with Full Keyboard Access off, as they reach a macOS menu's items.
+// The hover fill marks it instead of a focus ring.
+void SetUpMenuCardFocus(views::Button* button);
+// What a key does to a focused row, chip, or dot of a menu card. Return runs
+// it, as in a macOS menu, though Chromium's buttons on macOS take only Space.
+views::Button::KeyClickAction MenuCardKeyClickAction(const ui::KeyEvent& event);
 
 // The same icon and label as a row, for a row that takes no click.
 std::unique_ptr<views::View> MakeMenuCardHeader(const gfx::VectorIcon& icon,

@@ -82,7 +82,7 @@ class ColorDot : public views::Button {
            bool current)
       : Button(std::move(callback)), color_(color), current_(current) {
     SetPreferredSize(gfx::Size(kDotSize + kDotSpacing, kMenuRowHeight));
-    SetInstallFocusRingOnFocus(false);
+    SetUpMenuCardFocus(this);
     GetViewAccessibility().SetRole(ax::mojom::Role::kRadioButton);
     GetViewAccessibility().SetName(
         tab_groups::GetTabGroupColorLabelMap().at(color));
@@ -108,6 +108,10 @@ class ColorDot : public views::Button {
                                              : kColorMenuCardMuted));
     canvas->DrawCircle(
         center, kDotSize / 2.0f + kDotRingGap + kDotRingWidth / 2.0f, flags);
+  }
+
+  KeyClickAction GetKeyClickActionForEvent(const ui::KeyEvent& event) override {
+    return MenuCardKeyClickAction(event);
   }
 
   void OnFocus() override {

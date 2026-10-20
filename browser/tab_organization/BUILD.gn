@@ -52,6 +52,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "automatic_organizer_browsertest.cc",
+    "sidebar_menus_browsertest.mm",
     "tab_organization_controller_browsertest.cc",
     "task_keys_browsertest.mm",
     "undo_shortcut_browsertest.mm",

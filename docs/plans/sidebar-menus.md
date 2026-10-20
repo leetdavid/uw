@@ -1,6 +1,6 @@
 # Sidebar menus
 
-Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T116, the Organize menu, was built that day, and T114 and T115, the task menu and naming in place, on 2026-10-18. All three are in review.
+Status: scope agreed on 2026-10-17, and the designs, T113, signed off the same day. T116, the Organize menu, was built that day, and T114 and T115, the task menu and naming in place, on 2026-10-18. All three were checked in a real window and done on 2026-10-21.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Naming a task already runs through the language model, and the activity card already reports failures. The risk is editing a name on Chromium's task row and putting uw's card where Chromium opens its group editor without breaking what Chromium still uses that editor for. Each Chromium update can move the views both touch.
 
@@ -77,6 +77,10 @@ Chosen by uw for T116 on 2026-10-17, and for T114 and T115 on 2026-10-18.
 - The name field is a text field uw adds to Chromium's task row, beside the name it hides while the user types. It draws its own ring in the primary color, because the row repaints its own background. A rename request goes through the window's controller, so a row made later, such as a new task's, still picks it up.
 - A double-click's first click collapses or opens the task and its second click undoes that, so the task ends as it was.
 - The color dots use the colors of the task's folder on its row, so a dot always matches its folder.
+- Rows, chips, and dots always take focus, so the arrow keys reach them with Full Keyboard Access off, as macOS ships. Chromium's buttons on macOS take focus only with it on. Return runs the focused one, where Chromium's buttons on macOS take only Space.
+- The name field never shrinks below one character. The row's layout hides a child it gives no width, and hiding the field would take the keyboard from it while a new task's row grows in.
+- Rename Task in the menu bar raises Chromium's own "open the task editor" event, so the sidebar renames on the row and horizontal tabs open Chromium's editor.
+- `browser/tab_organization/sidebar_menus_browsertest.mm` checks both cards and the name field with real clicks and keys. Run it with `pnpm run window-tests --gtest_filter='SidebarMenusBrowserTest.MANUAL_*'`.
 
 ## Stages
 
