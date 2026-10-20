@@ -82,6 +82,15 @@ test("a bare amount converts to the other measurement system", () => {
   assert.equal(answer("5 W"), undefined);
 });
 
+test("a whole number shows every digit, and a unit spelled as a word takes its plural", () => {
+  assert.equal(answer("1 week to minutes"), "10,080 min");
+  assert.equal(answer("66 days to hours"), "1,584 h");
+  assert.equal(answer("12345678901 * 1"), "12,345,678,901");
+  assert.equal(answer("66 days to weeks"), "9.43 weeks");
+  assert.equal(answer("7 days to weeks"), "1 week");
+  assert.equal(answer("2 lb to oz"), "32 oz");
+});
+
 test("a word that is not a unit shows no card, and units that do not fit show why", () => {
   assert.equal(calculator().calculate("1/2 cup flour"), null);
   assert.equal(calculator().calculate("100 usd to xyz"), null);

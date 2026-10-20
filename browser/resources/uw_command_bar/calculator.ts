@@ -146,6 +146,7 @@ const WORDS: Record<string, [string, string]> = {
   g: ['gram', 'grams'],
   t: ['tonne', 'tonnes'],
   s: ['second', 'seconds'],
+  min: ['minute', 'minutes'],
   minute: ['minute', 'minutes'],
   h: ['hour', 'hours'],
   hr: ['hour', 'hours'],
@@ -654,7 +655,7 @@ export class Calculator {
     }
     const parts = (shownUnit as MathUnit).units;
     const number = this.number_(amount, 3);
-    const unitText = this.unitSymbols_(parts);
+    const unitText = this.unitSymbols_(parts, amount !== 1);
     return {
       answer: [{text: number, kind: 'number'}, {text: unitText, kind: 'unit'}],
       answerName: sentenceCase(this.unitWords_(shownUnit as MathUnit, amount !== 1)),
@@ -827,31 +828,45 @@ export class Calculator {
       return name;
     }
     let shortest = name;
-    for (const [other, def] of Object.entries(units)) {
-      if (other.length < shortest.length && def.base === unit.base &&
-          String(def.value) === String(unit.value) &&
-          String(def.offset) === String(unit.offset)) {
+    for (const other of Object.keys(units)) {
+      if (other.length < shortest.length && this.sameUnit_(name, other)) {
         shortest = other;
       }
     }
     return shortest;
   }
 
-  private unitSymbols_(parts: UnitPart[]): string {
-    const symbol = (part: UnitPart, power: number) => {
+  private sameUnit_(name: string, other: string): boolean {
+    const units = this.math_.Unit.UNITS;
+    const unit = units[name];
+    const def = units[other];
+    return !!unit && !!def && def.base === unit.base &&
+        String(def.value) === String(unit.value) &&
+        String(def.offset) === String(unit.offset);
+  }
+
+  // A unit spelled as a word, such as "week", takes its plural.
+  private unitSymbols_(parts: UnitPart[], plural: boolean): string {
+    const symbol = (part: UnitPart, power: number, many = false) => {
       const short = Object.entries(PREFIXES).find(
                         ([, name]) => name === part.prefix.name)?.[0];
       const prefix = short ?? part.prefix.name;
       const name = this.symbolOf_(part.unit.name);
-      return (prefix === 'u' ? 'µ' : prefix) + (SYMBOL_TEXT[name] ?? name) +
-          superscript(power);
+      const text = many && !WORDS[name] && this.sameUnit_(name, `${name}s`) ?
+          `${name}s` :
+          SYMBOL_TEXT[name] ?? name;
+      return (prefix === 'u' ? 'µ' : prefix) + text + superscript(power);
     };
     const above = parts.filter(part => part.power > 0);
     const below = parts.filter(part => part.power < 0);
     if (!above.length) {
       return below.map(part => symbol(part, part.power)).join('·');
     }
-    const top = above.map(part => symbol(part, part.power)).join('·');
+    const top = above
+                    .map((part, index) => symbol(
+                             part, part.power,
+                             plural && index === above.length - 1))
+                    .join('·');
     if (!below.length) {
       return top;
     }
@@ -877,7 +892,7 @@ export class Calculator {
     const size = Math.abs(value);
     const scientific = size >= 1e15 || (size > 0 && size < 1e-6);
     return new Intl.NumberFormat(this.locale_, {
-             maximumSignificantDigits: digits,
+             maximumSignificantDigits: Number.isInteger(value) ? 21 : digits,
              notation: scientific ? 'scientific' : 'standard',
            })
         .format(value);
