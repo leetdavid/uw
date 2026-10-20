@@ -25,6 +25,7 @@
 #include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
+#include "uw/browser/ui/views/tab_organization/kept_mark.h"
 
 namespace uw {
 namespace {
@@ -169,6 +170,7 @@ void AddBranchControls(views::View* row, tabs::TabHandle tab) {
   row->AddChildView(std::make_unique<HiddenCount>());
   row->AddChildView(std::make_unique<BranchToggle>(tab));
   row->AddChildView(std::make_unique<ChatMark>(tab));
+  row->AddChildView(std::make_unique<KeptMark>(tab));
 }
 
 void LayOutBranchControls(views::View* icon,
@@ -179,7 +181,8 @@ void LayOutBranchControls(views::View* icon,
   BranchToggle* toggle = ChildOfClass<BranchToggle>(row);
   HiddenCount* count = ChildOfClass<HiddenCount>(row);
   ChatMark* mark = ChildOfClass<ChatMark>(row);
-  if (!toggle || !count || !mark) {
+  KeptMark* kept = ChildOfClass<KeptMark>(row);
+  if (!toggle || !count || !mark || !kept) {
     return;
   }
   views::ChildLayout* icon_layout = layout.GetLayoutFor(icon);
@@ -198,7 +201,18 @@ void LayOutBranchControls(views::View* icon,
     icon_layout->visible = false;
   }
 
-  // A chat's state ends its row, after the hidden count.
+  // A kept tab's anchor ends its row, after a chat's state and the hidden
+  // count.
+  gfx::Rect kept_bounds(kept->GetPreferredSize());
+  const bool show_kept = titled && kept->kept();
+  if (show_kept) {
+    gfx::Rect& text = title_layout->bounds;
+    kept_bounds.set_origin({text.right() - kept_bounds.width(),
+                            text.CenterPoint().y() - kept_bounds.height() / 2});
+    text.set_width(std::max(0, text.width() - kept_bounds.width()));
+  }
+
+  // A chat's state comes next, after the hidden count.
   gfx::Rect mark_bounds(mark->GetPreferredSize());
   const bool show_mark = titled && mark->shown();
   if (show_mark) {
@@ -224,6 +238,7 @@ void LayOutBranchControls(views::View* icon,
   layout.child_layouts.push_back({toggle, show_toggle, toggle_bounds});
   layout.child_layouts.push_back({count, show_count, count_bounds});
   layout.child_layouts.push_back({mark, show_mark, mark_bounds});
+  layout.child_layouts.push_back({kept, show_kept, kept_bounds});
 }
 
 }  // namespace uw

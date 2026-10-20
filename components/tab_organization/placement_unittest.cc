@@ -224,32 +224,47 @@ TEST(PlacementTest, AHubIsNeverMadeIntoATask) {
   // Whatever the model makes of it otherwise, it starts no task.
   const ClassificationAnswer feed = Hub(Answer(kNewTaskOption, 0.99, 0.99));
   EXPECT_EQ(PlaceIn(std::string(), feed).action, Action::kLeave);
-  Placement placement = PlaceIn("task-1", feed);
-  EXPECT_EQ(placement.action, Action::kApply);
-  EXPECT_EQ(placement.target, kScratchpadOption);
-  placement = PlaceIn("task-1", Hub(Answer(kNewTaskOption, 0.5, 0.99)));
-  EXPECT_EQ(placement.action, Action::kSuggest);
-  EXPECT_EQ(placement.target, kScratchpadOption);
 
   // It gives no task a name, a first one or a new one.
   EXPECT_EQ(
       Place(feed, {std::string(), /*in_unnamed_task=*/true}, kNeeded).action,
       Action::kLeave);
   EXPECT_EQ(
-      PlaceIn("task-1", Hub(Answer(kNewTaskOption, 0.99, 0.99, 0.99))).target,
-      kScratchpadOption);
+      PlaceIn("task-1", Hub(Answer(kNewTaskOption, 0.99, 0.99, 0.99))).action,
+      Action::kLeave);
 
-  // A hub that fits a task by name still joins it, or stays in it.
-  placement = PlaceIn("task-1", Hub(Answer("task-2", 0.95)));
+  // A hub in the Scratchpad that fits a task by name still joins it.
+  const Placement placement =
+      PlaceIn(std::string(), Hub(Answer("task-2", 0.95)));
   EXPECT_EQ(placement.action, Action::kApply);
   EXPECT_EQ(placement.target, "task-2");
-  EXPECT_EQ(PlaceIn("task-1", Hub(Answer("task-1", 0.95))).action,
-            Action::kLeave);
 
   // Short of even odds, the page is not a hub.
   ClassificationAnswer page = Answer(kNewTaskOption, 0.99, 0.99);
   page.hub = 0.49;
   EXPECT_EQ(PlaceIn(std::string(), page).target, kNewTaskOption);
+}
+
+// A chat assistant's home page opened in a task fits no task by name. It stays
+// there, whatever else the model says about it, and suggests nothing.
+TEST(PlacementTest, AHubInATaskStaysThere) {
+  for (const ClassificationAnswer& answer :
+       {Hub(Answer(kScratchpadOption, 0.99)),
+        Hub(Answer(kNewTaskOption, 0.99, 0.99)),
+        Hub(Answer(kNewTaskOption, 0.5, 0.99)), Hub(Answer("task-2", 0.99))}) {
+    const Placement placement = PlaceIn("task-1", answer);
+    EXPECT_EQ(placement.action, Action::kLeave);
+    EXPECT_EQ(placement.target, "task-1");
+    EXPECT_EQ(Place(answer, {std::string(), /*in_unnamed_task=*/true}, kNeeded)
+                  .action,
+              Action::kLeave);
+  }
+  const PageTree tree({{Id("chat"), "task-1", PageId()}});
+  const std::vector<BranchPlacement> placements = PlaceBranch(
+      tree, Id("chat"), {{Id("chat"), {Hub(Answer(kScratchpadOption, 0.99))}}},
+      {"task-1", /*in_unnamed_task=*/false}, kNeeded);
+  ASSERT_EQ(placements.size(), 1u);
+  EXPECT_EQ(placements[0].placement.action, Action::kLeave);
 }
 
 // A feed in the Scratchpad and an article opened from it. The article starts
@@ -284,9 +299,8 @@ TEST(PlacementTest, TabsUnderAHubLeaveWithoutIt) {
 }
 
 TEST(PlacementTest, AHubNeverGoesAlongWithThePageAboveIt) {
-  // The search leaves for a task of its own. A hub under it that the model
-  // is not sure about stays, and one that fits no task goes to the
-  // Scratchpad, not into the new task.
+  // The search leaves for a task of its own. The hubs under it stay in the
+  // task, sure of their answer or not.
   std::vector<BranchPlacement> placements =
       PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.9)}},
                    {Id("result"), {Hub(Answer(kNewTaskOption, 0.5, 0.9))}},
@@ -297,10 +311,9 @@ TEST(PlacementTest, AHubNeverGoesAlongWithThePageAboveIt) {
   EXPECT_EQ(placements[0].staying, Ids({"result", "other"}));
   EXPECT_EQ(placements[0].placement.target, kNewTaskOption);
   EXPECT_EQ(placements[1].top, Id("result"));
-  EXPECT_EQ(placements[1].placement.action, Action::kSuggest);
+  EXPECT_EQ(placements[1].placement.action, Action::kLeave);
   EXPECT_EQ(placements[2].top, Id("other"));
-  EXPECT_EQ(placements[2].placement.action, Action::kApply);
-  EXPECT_EQ(placements[2].placement.target, kScratchpadOption);
+  EXPECT_EQ(placements[2].placement.action, Action::kLeave);
 
   // Its own score cannot make the tabs around it a task either.
   placements =

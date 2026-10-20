@@ -106,8 +106,8 @@ void TabOrganizationController::AddCommands(
     insert(at, kNewChildTab, IDS_UW_NEW_CHILD_TAB_MAC);
   }
 
-  // The moves sit after Move to task and before Move to another window. The
-  // tree's own commands follow them.
+  // The moves sit after Move to task and before Move to another window, and
+  // Keep here after them. The tree's own commands follow.
   const auto window = [&] {
     return find({TabStripModel::CommandMoveToExistingWindow,
                  TabStripModel::CommandMoveTabsToNewWindow});
@@ -120,6 +120,8 @@ void TabOrganizationController::AddCommands(
   if (const std::optional<size_t> moves_window = window()) {
     at = std::max(at, *moves_window + 1);
   }
+  insert(at, kKeepHere,
+         KeepsTabs(ids) ? IDS_UW_KEEP_HERE_MAC : IDS_UW_STOP_KEEPING_HERE_MAC);
   menu->InsertSeparatorAt(at++, ui::NORMAL_SEPARATOR);
   insert(at, kNest, IDS_UW_NEST_BRANCH_MAC);
   insert(at, kOutdent, IDS_UW_OUTDENT_BRANCH_MAC);
@@ -222,6 +224,9 @@ void TabOrganizationController::RestoreTab(
   if (state->FindBool("collapsed").value_or(false)) {
     self->collapsed_.insert(PageId(*id));
   }
+  if (state->FindBool("kept").value_or(false)) {
+    self->kept_[PageId(*id)] = TaskOf(tab);
+  }
   const std::string* task_name = state->FindString("task_name");
   if (task_name && tab->GetGroup()) {
     self->generated_names_.try_emplace(TaskOf(tab),
@@ -301,6 +306,8 @@ bool TabOrganizationController::CanExecute(
   switch (command) {
     case kNewChildTab:
       return ids.size() == 1;
+    case kKeepHere:
+      return true;
     case kNewTask:
       return tabs_->SupportsTabGroups();
     case kScratchpad:
@@ -358,6 +365,9 @@ void TabOrganizationController::Execute(int command,
       break;
     case kToggleBranch:
       ToggleBranches(ids);
+      break;
+    case kKeepHere:
+      ToggleKept(ids);
       break;
     case kUndo:
       Undo();
@@ -604,6 +614,33 @@ bool TabOrganizationController::CollapsesBranches(
          std::ranges::any_of(parents, [this](const PageId& id) {
            return !collapsed_.contains(id);
          });
+}
+
+bool TabOrganizationController::IsKept(const PageId& id) const {
+  const auto kept = kept_.find(id);
+  const Page* page = tree_.Find(id);
+  return kept != kept_.end() && page && page->task == kept->second;
+}
+
+bool TabOrganizationController::KeepsTabs(
+    const std::vector<PageId>& ids) const {
+  return std::ranges::any_of(
+      ids, [this](const PageId& id) { return !IsKept(id); });
+}
+
+void TabOrganizationController::ToggleKept(const std::vector<PageId>& ids) {
+  if (KeepsTabs(ids)) {
+    for (const PageId& id : ids) {
+      if (const Page* page = tree_.Find(id)) {
+        kept_[id] = page->task;
+      }
+    }
+  } else {
+    for (const PageId& id : ids) {
+      kept_.erase(id);
+    }
+  }
+  ScheduleUpdate();
 }
 
 void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
@@ -1161,6 +1198,9 @@ void TabOrganizationController::Update() {
                restored_parents_,
                [&](const auto& link) { return link.second == id; });
   });
+  // A kept tab the user moved to another task or to the Scratchpad is let go.
+  std::erase_if(kept_,
+                [this](const auto& entry) { return !IsKept(entry.first); });
   std::map<PageId, std::string> states;
   for (const auto& [handle, id] : ids_) {
     const Page* page = tree_.Find(id);
@@ -1174,6 +1214,9 @@ void TabOrganizationController::Update() {
     state.Set("parent", page->parent.value());
     if (collapsed_.contains(id)) {
       state.Set("collapsed", true);
+    }
+    if (IsKept(id)) {
+      state.Set("kept", true);
     }
     if (HasGeneratedName(page->task)) {
       state.Set("task_name", generated_names_[page->task]);

@@ -126,6 +126,21 @@ bool FollowedLinksOnly(content::WebContents* contents) {
   return true;
 }
 
+// True when the user went to the page themselves: typed an address, searched
+// from the address bar, or picked a bookmark. Going back or forward is not.
+bool StartedByUser(const content::NavigationEntry& entry) {
+  const ui::PageTransition type = entry.GetTransitionType();
+  if (type & ui::PAGE_TRANSITION_FORWARD_BACK) {
+    return false;
+  }
+  constexpr ui::PageTransition kByUser[] = {
+      ui::PAGE_TRANSITION_TYPED, ui::PAGE_TRANSITION_GENERATED,
+      ui::PAGE_TRANSITION_AUTO_BOOKMARK, ui::PAGE_TRANSITION_KEYWORD};
+  return std::ranges::any_of(kByUser, [type](ui::PageTransition core) {
+    return ui::PageTransitionCoreTypeIs(type, core);
+  });
+}
+
 }  // namespace
 
 DEFINE_USER_DATA(AutomaticOrganizer);
@@ -315,33 +330,50 @@ void AutomaticOrganizer::Scan() {
       continue;
     }
     Activity& activity = pages_[page.id];
+    const std::u16string& title = contents->GetTitle();
     const bool first_sight = activity.revision == 0;
-    // A tab shows something else when its title changes or it goes to another
-    // site. A new path or new parameters under the same title are the same
-    // page to the organizer: web apps keep their state in the address. A
-    // shell sets a new title for every command, so a terminal tab shows
+    const bool changed = activity.title != title || activity.url != url ||
+                         activity.folder != folder;
+    // A shell sets a new title for every command, so a terminal tab shows
     // something else only in another folder.
-    const bool same_page =
-        !first_sight &&
-        (terminal ? activity.folder == folder
-                  : activity.title == contents->GetTitle() &&
-                        (activity.url == url ||
-                         url::IsSameOriginWith(activity.url, url)));
+    const bool shows_else =
+        first_sight ||
+        (changed &&
+         (terminal ? activity.folder != folder
+                   : ShowsSomethingElse(page, activity, entry, title, url)));
     activity.url = url;
     activity.folder = folder;
-    activity.title = contents->GetTitle();
-    if (same_page) {
+    activity.title = title;
+    if (controller_->IsKept(page.id)) {
+      // A kept tab is never asked about. A request already out for it is
+      // dropped, and its branch need not wait for it.
+      if (first_sight || activity.asking ||
+          activity.requested < activity.revision) {
+        CancelRequestsFor(page.id);
+        activity.requested = ++activity.revision;
+        activity.asking = false;
+        ScheduleSettle();
+      }
+      activity.placed = true;
+      activity.by_hand = true;
+      kept_.erase(page.id);
+      NoteAsked(page.id, activity);
+      continue;
+    }
+    if (!shows_else) {
       continue;
     }
     ++activity.revision;
     activity.asking = false;
     activity.placed = false;
+    activity.by_hand = false;
     kept_.erase(page.id);
     // A page is filed when it opens here or changes, not for being there:
     // restored tabs and tabs opened while organization is off keep their
     // place.
     if (!enabled || (first_sight && !controller_->WasOpenedHere(page.id))) {
       activity.requested = activity.revision;
+      NoteAsked(page.id, activity);
       continue;
     }
     CancelRequestsFor(page.id);
@@ -354,6 +386,45 @@ void AutomaticOrganizer::Scan() {
   }
 }
 
+bool AutomaticOrganizer::ShowsSomethingElse(
+    const Page& page,
+    const Activity& activity,
+    const content::NavigationEntry* entry,
+    const std::u16string& title,
+    const GURL& url) const {
+  if (!url::IsSameOriginWith(activity.asked_url, url)) {
+    return true;
+  }
+  // A reload, or a return to what uw last asked about, is nothing new.
+  const bool new_title = title != activity.asked_title;
+  const bool new_address = url != activity.asked_url;
+  if (!new_title && !new_address) {
+    return false;
+  }
+  if (new_title && entry && entry->GetUniqueID() != activity.asked_entry &&
+      StartedByUser(*entry)) {
+    return true;
+  }
+  // On the same site a tab in a task stays the same piece of work. A tab in
+  // the Scratchpad, or a hub, shows what it is for as the user moves on in
+  // it. A page that only updates its own title, such as a clock or an unread
+  // count, keeps its address.
+  return !activity.by_hand && (page.task.empty() || activity.hub) &&
+         new_title && new_address;
+}
+
+void AutomaticOrganizer::NoteAsked(const PageId& page,
+                                   Activity& activity) const {
+  const tabs::TabInterface* tab = controller_->TabFor(page);
+  const content::NavigationEntry* entry =
+      tab && tab->GetContents()
+          ? tab->GetContents()->GetController().GetLastCommittedEntry()
+          : nullptr;
+  activity.asked_title = activity.title;
+  activity.asked_url = activity.url;
+  activity.asked_entry = entry ? entry->GetUniqueID() : 0;
+}
+
 void AutomaticOrganizer::OnManualMove(const std::vector<PageId>& pages) {
   ++moves_;
   for (const PageId& page : pages) {
@@ -362,6 +433,8 @@ void AutomaticOrganizer::OnManualMove(const std::vector<PageId>& pages) {
       activity->second.requested = ++activity->second.revision;
       activity->second.asking = false;
       activity->second.placed = true;
+      activity->second.by_hand = true;
+      NoteAsked(page, activity->second);
     }
     kept_.erase(page);
     CancelRequestsFor(page);
@@ -379,6 +452,7 @@ void AutomaticOrganizer::Dispatch() {
       continue;
     }
     activity.requested = activity.revision;
+    NoteAsked(id, activity);
     const tabs::TabInterface* tab = controller_->TabFor(id);
     content::WebContents* contents = tab ? tab->GetContents() : nullptr;
     content::RenderFrameHost* frame =
@@ -444,6 +518,7 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
     return false;
   }
   CancelRequestsFor(id);
+  NoteAsked(id, activity->second);
   const PrefService* prefs = profile()->GetPrefs();
   const DecisionModelConfig decision = ReadDecisionModelConfig(prefs);
   const AiConnectionConfig language = ReadAiConnectionConfig(prefs);
@@ -642,6 +717,7 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
     Report(Event::Kind::kAnswerUnreadable, request);
   } else {
     request.new_name = answer->same_work;
+    activity->second.hub = IsHub(*answer);
     kept_.insert_or_assign(page, Kept{std::move(request), std::move(*answer)});
   }
   Settle(page);
@@ -715,11 +791,15 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
   std::map<PageId, TabAnswer> tabs;
   for (const PageId& id : tree.BranchOf(top)) {
     const auto activity = pages_.find(id);
-    if (activity == pages_.end()) {
+    const bool kept_tab = controller_->IsKept(id);
+    if (activity == pages_.end() && !kept_tab) {
       continue;
     }
     TabAnswer& tab = tabs[id];
-    tab.placed = activity->second.placed;
+    tab.placed = kept_tab || activity->second.placed;
+    if (activity == pages_.end()) {
+      continue;
+    }
     const auto kept = kept_.find(id);
     if (kept == kept_.end()) {
       continue;

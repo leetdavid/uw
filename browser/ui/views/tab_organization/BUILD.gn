@@ -6,6 +6,8 @@ source_set("tab_organization") {
     "branch_toggle.h",
     "chat_mark.cc",
     "chat_mark.h",
+    "kept_mark.cc",
+    "kept_mark.h",
     "menu_card_row.cc",
     "menu_card_row.h",
     "mouse_actions.h",

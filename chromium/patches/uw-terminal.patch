@@ -42,7 +42,7 @@ index 7274b66570dd11e3e6899974ef0f1307697f22c6..f496d60f28f4ffa040c27aa5b6a39dbf
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510bc65a451 100644
+index 12d6be60e250efa15872027b297baab899e250c9..358e0e7d5dad650f2f5f94c3e76cb8b64c5be006 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -19,6 +19,9 @@
@@ -55,7 +55,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
  
  namespace {
  
-@@ -42,6 +45,41 @@ const struct AcceleratorMapping {
+@@ -42,6 +45,43 @@ const struct AcceleratorMapping {
      {IDC_NEW_INCOGNITO_WINDOW, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
       ui::VKEY_N},
      {IDC_NEW_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_T},
@@ -78,6 +78,8 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
 +     ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_N},
 +    {uw::TabOrganizationController::kScratchpad,
 +     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_S},
++    {uw::TabOrganizationController::kKeepHere,
++     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_K},
 +    {uw::TabOrganizationController::kUndo,
 +     ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_Z},
 +    {uw::kGoToTask1, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_1},
@@ -98,7 +100,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..a44f5b00ba6703bfde35e616e18e1510
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b0531aceb 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..959466f7cd4ae22f9d4ba1901ed91246f86519b1 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -156,7 +158,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
                Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
                    .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
                Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
-@@ -583,12 +591,89 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +591,91 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -211,6 +213,8 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
 +              .command_id(uw::TabOrganizationController::kNewTask),
 +          Item(IDS_UW_MOVE_TO_SCRATCHPAD_MAC)
 +              .command_id(uw::TabOrganizationController::kScratchpad),
++          Item(IDS_UW_KEEP_HERE_MAC)
++              .command_id(uw::TabOrganizationController::kKeepHere),
 +          Item().is_separator(),
 +          Item(IDS_UW_GO_TO_TASK_MAC).submenu(std::move(go_to_task)),
 +          Item(IDS_UW_RENAME_TASK_MAC).command_id(uw::kRenameTask),
@@ -246,7 +250,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..0d39c0c994e978ef9116b0d27296544b
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +729,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +731,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,

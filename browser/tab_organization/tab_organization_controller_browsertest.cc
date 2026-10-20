@@ -804,6 +804,41 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_TRUE(icon->GetVisible());
 }
 
+// A kept tab's row ends in an anchor, after a collapsed branch's count. A
+// click on the anchor lets the tab go.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       AKeptTabsRowEndsInAnAnchor) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  OpenLinkFrom(page);
+  EXPECT_TRUE(controller()->KeepsTabs({Id(page)}));
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(page)});
+  EXPECT_TRUE(controller()->IsKept(Id(page)));
+  EXPECT_FALSE(controller()->KeepsTabs({Id(page)}));
+  Collapse(page);
+  ASSERT_TRUE(base::test::RunUntil([&] { return VisibleRows().size() == 1u; }));
+  views::View* row = VisibleRows()[0];
+  views::View* anchor = PartOf(row, "KeptMark");
+  views::View* count = PartOf(row, "HiddenCount");
+  views::View* title = PartOf(row, "TabTitle");
+  ASSERT_TRUE(anchor);
+  ASSERT_TRUE(count);
+  ASSERT_TRUE(title);
+  SaveWindowScreenshot(browser(), "kept-tab-waiting");
+  ASSERT_TRUE(base::test::RunUntil([&] { return count->GetVisible(); }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return anchor->GetVisible(); }));
+  EXPECT_LE(title->GetBoundsInScreen().right(), count->GetBoundsInScreen().x());
+  EXPECT_LE(count->GetBoundsInScreen().right(),
+            anchor->GetBoundsInScreen().x());
+  SaveWindowScreenshot(browser(), "kept-tab");
+
+  views::test::ButtonTestApi(views::Button::AsButton(anchor))
+      .NotifyDefaultMouseClick();
+  EXPECT_FALSE(controller()->IsKept(Id(page)));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !anchor->GetVisible(); }));
+}
+
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        TheTaskChevronTakesTheFolderIconsPlace) {
   const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(

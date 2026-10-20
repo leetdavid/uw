@@ -302,6 +302,16 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     base::RunLoop().RunUntilIdle();
   }
 
+  // Follows a link to `name` in `tab` itself.
+  void FollowLink(tabs::TabInterface* tab, const std::string& name) {
+    content::WebContents* contents = tab->GetContents();
+    contents->GetController().LoadURL(
+        embedded_test_server()->GetURL("/page/" + name), content::Referrer(),
+        ui::PAGE_TRANSITION_LINK, std::string());
+    EXPECT_TRUE(content::WaitForLoadStop(contents));
+    base::RunLoop().RunUntilIdle();
+  }
+
   // Returns once any page-text read the organizer started for `tab` is back.
   void WaitForPageText(tabs::TabInterface* tab) {
     base::RunLoop loop;
@@ -1655,6 +1665,144 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   ASSERT_EQ(lines.size(), 3u);
   EXPECT_EQ(*lines[0].FindString("page"), Id(link).value());
   EXPECT_EQ(*lines[2].FindString("page"), Id(link).value());
+}
+
+// On one site a tab in a task stays the same piece of work: following links
+// and reloading ask nothing. An address the user typed asks again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATabInATaskIsAskedAgainOnlyForSomethingNew) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.99));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99));
+  const auto nothing_sent = [&] {
+    organizer()->DispatchNowForTesting();
+    WaitForPageText(link);
+    return Requests().size() == 1u && organizer()->pending_requests() == 0u;
+  };
+
+  FollowLink(link, "radar");
+  EXPECT_TRUE(nothing_sent());
+  link->GetContents()->GetController().Reload(content::ReloadType::NORMAL,
+                                              false);
+  ASSERT_TRUE(content::WaitForLoadStop(link->GetContents()));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(nothing_sent());
+  EXPECT_EQ(link->GetGroup(), task);
+
+  Browse(link, "weather");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_FALSE(link->GetGroup());
+}
+
+// In the Scratchpad a page that updates its own title, as an unread count
+// does, keeps its address and asks nothing. A new title at a new address asks
+// again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AScratchpadTabIsAskedAgainForANewTitleAtANewAddress) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "inbox");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_FALSE(link->GetGroup());
+
+  ASSERT_TRUE(
+      content::ExecJs(link->GetContents(), "document.title = 'inbox (3)'"));
+  base::RunLoop().RunUntilIdle();
+  organizer()->DispatchNowForTesting();
+  WaitForPageText(link);
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(organizer()->pending_requests(), 0u);
+
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.99));
+  FollowLink(link, "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(link->GetGroup(), task);
+}
+
+// A hub opened in a task, such as a chat assistant's home page, stays there.
+// It shows what it is for once its title and address change, and is asked
+// about again then.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest, AHubStaysInItsTask) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  AnswerAbout("assistant", SystemOneAnswer("none", 0.99, 0.9, std::nullopt,
+                                           /*hub=*/0.97));
+  AnswerAbout("postcodes", SystemOneAnswer("none", 0.99, 0.1, std::nullopt,
+                                           /*hub=*/0.02));
+  tabs::TabInterface* chat =
+      OpenLinkFrom(tabs()->GetTabAtIndex(0), "assistant");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(chat->GetGroup(), task);
+
+  FollowLink(chat, "postcodes");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_FALSE(chat->GetGroup());
+}
+
+// A kept tab stays where the user left it. uw does not ask about it, and it
+// stays behind when the page above it leaves. Keep here again, or a move by
+// hand, lets it go.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AKeptTabStaysWhereTheUserLeftIt) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
+  tabs::TabInterface* kept = OpenLinkFrom(page, "assistant");
+  ASSERT_EQ(kept->GetGroup(), task);
+  ASSERT_EQ(controller()->DepthFor(kept), controller()->DepthFor(page) + 1);
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(kept)});
+  ASSERT_TRUE(controller()->IsKept(Id(kept)));
+
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99));
+  Browse(kept, "weather");
+  Browse(page, "radar");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_EQ(kept->GetGroup(), task);
+  EXPECT_TRUE(RequestAbout("weather").empty());
+
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(kept)});
+  EXPECT_FALSE(controller()->IsKept(Id(kept)));
+  Browse(kept, "forecast");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_FALSE(kept->GetGroup());
+
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(kept)});
+  ASSERT_TRUE(controller()->IsKept(Id(kept)));
+  controller()->MoveToTask({Id(kept)}, task);
+  EXPECT_EQ(kept->GetGroup(), task);
+  EXPECT_FALSE(controller()->IsKept(Id(kept)));
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       PRE_AKeptTabIsKeptAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  Browse(InitialTab(), "notes");
+  controller()->Execute(TabOrganizationController::kKeepHere,
+                        {Id(InitialTab())});
+  ASSERT_TRUE(controller()->IsKept(Id(InitialTab())));
+  // Lets the session take the tab's data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AKeptTabIsKeptAfterARestart) {
+  tabs::TabInterface* notes = nullptr;
+  for (int i = 0; i < tabs()->count(); ++i) {
+    tabs::TabInterface* tab = tabs()->GetTabAtIndex(i);
+    if (tab->GetContents()->GetLastCommittedURL().path() == "/page/notes" ||
+        tab->GetContents()->GetVisibleURL().path() == "/page/notes") {
+      notes = tab;
+    }
+  }
+  ASSERT_TRUE(notes);
+  EXPECT_TRUE(controller()->IsKept(Id(notes)));
 }
 
 // A pinned tab is not in the tab tree, so the organizer leaves it alone.

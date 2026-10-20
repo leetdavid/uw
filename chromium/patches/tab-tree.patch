@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b0158589be4 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..a933bddd19d4fd1ade265ecc3cfa2882625108ad 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,105 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,108 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -47,6 +47,9 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
 +      <message name="IDS_UW_NEW_TASK_MAC" desc="In Title Case: Opens a new tab in a new task of its own.">New Task</message>
 +      <message name="IDS_UW_MOVE_TO_NEW_TASK_MAC" desc="In Title Case: Moves the selected tab branches to a new task.">Move to New Task</message>
 +      <message name="IDS_UW_MOVE_TO_SCRATCHPAD_MAC" desc="In Title Case: Removes the selected tab branches from their task.">Move to Scratchpad</message>
++      <message name="IDS_UW_KEEP_HERE_MAC" desc="In Title Case: Keeps the selected tabs where they are, so automatic organization neither asks about them nor moves them.">Keep Here</message>
++      <message name="IDS_UW_STOP_KEEPING_HERE_MAC" desc="In Title Case: Lets automatic organization file the selected kept tabs again.">Stop Keeping Here</message>
++      <message name="IDS_UW_KEPT_TAB" desc="Tooltip and accessible name of the anchor at the end of a kept tab's row in the sidebar. A click lets automatic organization move the tab again.">Kept here. Click to let uw move this tab.</message>
 +      <message name="IDS_UW_GO_TO_TASK_MAC" desc="In Title Case: Submenu that selects a task by its place in the tab list.">Go to Task</message>
 +      <message name="IDS_UW_TASK_NUMBER_MAC" desc="In Title Case: Selects the task at this place in the tab list.">Task <ph name="NUMBER">$1<ex>3</ex></ph></message>
 +      <message name="IDS_UW_RENAME_TASK_MAC" desc="In Title Case: Opens the name field of the selected tab's task.">Rename Task</message>
@@ -118,7 +121,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1778,7 +1877,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1778,7 +1880,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen closed window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
@@ -127,7 +130,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
            Reopen closed split view
-@@ -1831,7 +1930,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1831,7 +1933,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen Closed Window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="In Title Case: The text label of the Reopen Closed Group menu item">
@@ -136,7 +139,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -11140,7 +11239,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+@@ -11140,7 +11242,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
        <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
@@ -145,7 +148,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        </message>
        <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
          <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
-@@ -12077,9 +12176,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12077,9 +12179,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add tabs to reading list}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -156,7 +159,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12099,7 +12196,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12099,7 +12199,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move tab into split view
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -165,7 +168,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove from group
-@@ -12193,9 +12290,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12193,9 +12293,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add Tabs to Reading List}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -176,7 +179,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12215,7 +12310,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12215,7 +12313,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move Tab into Split View
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -185,7 +188,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove From Group
-@@ -12720,7 +12815,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12720,7 +12818,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
  
        <!-- Tab Group Editor Bubble -->
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
@@ -194,7 +197,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
            {MEMBER_COUNT, plural,
-@@ -12730,22 +12825,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12730,22 +12828,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
        </message>
        <if expr="not use_titlecase">
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
@@ -222,7 +225,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent activity
-@@ -12754,16 +12849,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12754,16 +12852,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -242,7 +245,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open group in new window
-@@ -12781,28 +12876,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12781,28 +12879,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -277,7 +280,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent Activity
-@@ -12811,16 +12906,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12811,16 +12909,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage Sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="In Title Case: The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -297,7 +300,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="In Title Case: The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open Group in New Window
-@@ -12838,7 +12933,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12838,7 +12936,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send Feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="In Title Case: The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -306,7 +309,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
          </message>
        </if>
  
-@@ -16925,10 +17020,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16925,10 +17023,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
        </message>
        <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
@@ -319,7 +322,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        </message>
        <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
-@@ -16949,10 +17044,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16949,10 +17047,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          </message>
        </if>
        <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
@@ -332,7 +335,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        </message>
        <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
          Collapsed
-@@ -16997,16 +17092,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16997,16 +17095,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Tab moved to end of tabstrip
        </message>
        <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
@@ -353,7 +356,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..cc8e95e31464aefd9e3ac37f9e108b01
        </message>
        <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
            Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
-@@ -19308,7 +19403,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -19308,7 +19406,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Select any text or image to ask Gemini
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">

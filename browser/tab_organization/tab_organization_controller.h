@@ -55,7 +55,8 @@ class TabOrganizationController : public TabStripModelObserver,
     kMoveDown,
     kToggleBranch,
     kNewChildTab,
-    kLastCommand = kNewChildTab,
+    kKeepHere,
+    kLastCommand = kKeepHere,
   };
   static bool IsCommand(int command);
 
@@ -150,6 +151,17 @@ class TabOrganizationController : public TabStripModelObserver,
   // them when all are collapsed. The selected tab never hides: the top page
   // of its branch is selected in its place.
   void ToggleBranches(const std::vector<PageId>& ids);
+  // A kept tab stays where the user left it: the organizer neither asks about
+  // it nor moves it, until the user lets it go or moves it to another task or
+  // to the Scratchpad. Keeping a tab is not an organization action, so undo
+  // leaves it alone.
+  bool IsKept(const PageId& id) const;
+  // True when ToggleKept would keep the tabs of `ids`, false when it would
+  // let them go.
+  bool KeepsTabs(const std::vector<PageId>& ids) const;
+  // Keeps the tabs of `ids`, or lets them go when all are kept.
+  void ToggleKept(const std::vector<PageId>& ids);
+
   // Selects the tab used last in `task`, or in the Scratchpad when `task` is
   // empty. Returns false when it holds no tab.
   bool SelectTask(const std::string& task);
@@ -280,6 +292,8 @@ class TabOrganizationController : public TabStripModelObserver,
   std::map<std::string, std::u16string> generated_names_;
   // Pages whose branch is collapsed. Saved with the session.
   std::set<PageId> collapsed_;
+  // Kept tabs, each with the task it was kept in. Saved with the session.
+  std::map<PageId, std::string> kept_;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;

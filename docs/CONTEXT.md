@@ -102,7 +102,7 @@ The always-visible section holding ungrouped regular tabs and candidate branches
 A user-made change to tab grouping, ordering, or a task's name.
 
 **Kept tab**:
-A tab the user told uw to leave where it is, in its task or in the Scratchpad. The organizer does not ask about it or move it until the user moves it or lets it go.
+A tab the user told uw to leave where it is, in its task or in the Scratchpad. The organizer does not ask about it or move it until the user lets it go or moves it to another task or to the Scratchpad.
 _Avoid_: Pinned tab, locked tab, held tab.
 
 **Task extraction**:
