@@ -15,7 +15,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 - Cmd+N opens a window in the current window's workspace.
 - Closing a window closes all of its workspaces. Cmd+Shift+T brings them back together.
 - After a quit, each window comes back showing the workspace it showed. Its other workspaces come back behind it with their tabs, which load only when shown.
-- "+" after the workspace icons and File → New Workspace open a form with a name, an emoji icon, and a profile. The profile defaults to the current workspace's. "New profile…" asks only for a name, with no Google sign-in. The window then switches to the new workspace and the theme picker opens.
+- New Workspace, in the new button's menu and in File, opens a form with a name, an emoji icon, and a profile. The profile defaults to the current workspace's. "New profile…" asks only for a name, with no Google sign-in. The window then switches to the new workspace and the theme picker opens.
 - Right-clicking a workspace's icon offers Rename, Change icon, Theme…, and Delete. Delete asks first, then removes the workspace and its tabs. When it is the profile's last workspace, uw also asks "Also delete the profile 'Work' and its logins and history?", with Keep as the default.
 - Each existing profile becomes a workspace, with the profile's name and theme.
 - Chromium's profile button and menu are removed, and its profile picker never shows. Chromium's settings pages stay.
@@ -34,13 +34,13 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Workspaces", drawn on 2026-10-21 for T128 and waiting for sign-off:
 
-- "Workspaces: the sidebar": the switcher in its own row at the sidebar's foot, and the workspace's name under the pins.
+- "Workspaces: the sidebar": one row at the sidebar's foot, as in Arc, with Organize as an icon at the left, the workspaces centered, and the new button at the right. New Workspace moves into the new button's menu. The workspace's name sits under the pins. The user picked this row over two rows on 2026-10-21, "for now"; both are in "Sidebar foot: two balanced layouts".
 - "Workspaces: the swipe": both windows sliding with the fingers.
 - "New workspace: the card": name, emoji, and profile.
-- "Workspaces: every state": the switcher with seven or more workspaces and in dark mode, the workspace menu, the profile list, a new profile, both delete questions, and Move to Workspace.
+- "Workspaces: every state": the foot with five or more workspaces and in dark mode, the new button's menu, the Organize icon, the workspace menu, renaming, the profile list, a new profile, both delete questions, and Move to Workspace.
 - "Pins: every state": the pin menu, Edit Home URL, one set of pins in two windows, and in two workspaces of one profile.
 
-The rules are in the `uw-workspaces` guide. The name row, the dots from seven workspaces on, and starting a new workspace on an unused suggested theme are uw's proposals.
+The rules are in the `uw-workspaces` guide. The name row, the dots from five workspaces on, and starting a new workspace on an unused suggested theme are uw's proposals.
 
 ## Stages
 
