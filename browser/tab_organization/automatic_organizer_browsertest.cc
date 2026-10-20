@@ -2135,11 +2135,11 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   std::unique_ptr<views::Widget> menu = OpenCardOf(task);
   std::vector<std::u16string> texts;
   CollectTexts(menu->widget_delegate()->GetContentsView(), texts);
-  EXPECT_THAT(texts, testing::IsSupersetOf({u"Rename Task", u"New Tab in Task",
-                                            u"Move Task to New Window",
-                                            u"Move Tabs to Scratchpad",
-                                            u"Close Task"}));
-  EXPECT_THAT(texts, testing::Not(testing::Contains(u"Delete Task")));
+  EXPECT_THAT(texts, testing::IsSupersetOf({u"Rename Task", u"New tab in task",
+                                            u"Move task to new window",
+                                            u"Move tabs to Scratchpad",
+                                            u"Close task"}));
+  EXPECT_THAT(texts, testing::Not(testing::Contains(u"Delete task")));
   for (const std::u16string& text : texts) {
     EXPECT_EQ(text.find(u"group"), std::u16string::npos) << text;
     EXPECT_EQ(text.find(u"Group"), std::u16string::npos) << text;
