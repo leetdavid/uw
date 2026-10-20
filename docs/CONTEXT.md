@@ -195,14 +195,18 @@ What uw's agent keeps between chats: plain sentences about the user, one a memor
 _Avoid_: Notes, knowledge base, context
 
 **Skill**:
-Instructions that teach uw's agent how to do one kind of request, with a name and a one-line description. The agent sees every skill's description and reads a skill's instructions only when a request calls for it. Unlike agent memory, a skill says how to do something, not what is true about the user.
+Instructions that teach uw's agent how to do one kind of request, with a name and a one-line description. The agent sees every skill's description and reads a skill's instructions only when a request calls for it, or when the user starts the skill by typing `/` and its name. A skill can be for the user only, which the agent never sees, or for the agent only. Unlike agent memory, a skill says how to do something, not what is true about the user.
 _Avoid_: Prompt, routine, workflow.
 
+**Connector**:
+A program on this Mac, or a web address, that gives uw's agent more tools. uw says "connector" wherever it shows one. Underneath, a connector is an MCP server; say "MCP server" only for that mechanism.
+_Avoid_: Integration, plugin, tool server.
+
 **Approval**:
-The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program.
+The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program. For a connector, it lets one tool call run, or every call of that tool for the rest of the chat or for good.
 
 **Approval mode**:
-How much a chat asks before it acts. Ask first asks before every click, typing, and terminal command. Auto, the default, asks before each change on a site, each sign-in, and each command the command check finds dangerous. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
+How much a chat asks before it acts. Ask first asks before every click, typing, terminal command, and connector tool call. Auto, the default, asks before each change on a site, each sign-in, each command the command check finds dangerous, and each connector tool not marked as only reading. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
 _Avoid_: permission mode, autonomy level.
 
 **Command check**:

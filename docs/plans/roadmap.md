@@ -141,6 +141,15 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T131 | A theme per workspace | todo | 5/10 | Everything the theme picker sets belongs to the workspace, so two workspaces on one profile can look different. Chromium works out a window's colors from its profile's color, so uw hands each window its workspace's color instead. Needs T130. Done when acceptance check 10 passes and `TintBrowserTest.*` passes with two workspaces in place of two profiles. |
 | T132 | A swipe that follows the fingers | todo | 3/10 | A two-finger swipe on the sidebar slides to the next workspace as the fingers move, and a half swipe snaps back. The windows are separate, so the slide is drawn from pictures of them, and a hidden window's picture is kept from when it was last shown. Needs T130. Done when acceptance check 13 passes in the VM. |
 | T133 | One live pin page across windows | todo | 4/10 | A prototype first, then the build, per [Shared pinned tabs](../architecture.md#shared-pinned-tabs). Needs T129. Done when acceptance check 14 passes. |
+| T134 | AI page and connectors design | in progress | 8/10 | `uw://ai` with Providers, Skills, and Connectors; the connectors view in every state; adding by paste; a connector open with its tools; the approval card's Allow once caret; the composer's "+" menu; the `/` menu with prompt fields; and the Only you and Only the agent tags, per the [connectors plan](connectors.md#agreed-scope). The user signs off before T135. |
+| T135 | `uw://ai` with Providers and Skills | todo | 7/10 | `uw://ai` replaces `uw://providers`, with Providers and Skills at their own addresses. The chat page's Skills row and the settings link open it. Needs T134. Done when the providers and skills browser tests pass on the new addresses. |
+| T136 | Skills only you start, and `/name` | todo | 7/10 | `disable-model-invocation` and `user-invocable` in SKILL.md, the skill tags, and the `/` menu in the composer with `$ARGUMENTS`, per the [connectors plan](connectors.md#skills-only-you-start). Needs T135. Done when acceptance check 1 passes. |
+| T137 | Local connectors | todo | 5/10 | The MCP client in both versions, adding by paste, Keychain for `env`, starting through the login shell with uw, the tool list on disk, the `connector` tool, calls and results, Open in terminal, and logs. Done when acceptance check 2 passes against a test server. |
+| T138 | Remote connectors | todo | 5/10 | Streamable HTTP in both versions, with keys in headers. Needs T137. Done when a test server's tools run from a chat over each version. |
+| T139 | Connector sign-in | todo | 4/10 | OAuth with Dynamic Client Registration and PKCE, the return address caught in the sign-in tab, refresh, and Sign out. Needs T138. Done when acceptance check 3 passes against a test sign-in server; live servers are for the user to check. |
+| T140 | Connector approvals and tool switches | todo | 6/10 | Ask first, Auto, and Full auto for connector tools, the Allow once caret, the always-allowed list, and a switch for each tool. Needs T137. Done when acceptance check 4 passes. |
+| T141 | Connectors per chat | todo | 7/10 | The composer's "+" menu with a switch per connector, saved with the chat. Needs T137. Done when acceptance check 5 passes. |
+| T142 | Connector prompts in the `/` menu | todo | 7/10 | A connector's prompts in the `/` menu, with a field per argument. Needs T136 and T137. Done when a test server's prompt sends its messages from the composer. |
 
 ## 1. Choose the browser foundation
 
@@ -200,6 +209,12 @@ Agreed on 2026-10-21. Build the [workspaces plan](workspaces.md) in its stage or
 
 Done when the plan's [acceptance checks](workspaces.md#acceptance-checks) pass and the user has switched workspaces through a day of work.
 
+## Connectors and the AI page
+
+Connectors, skills only the user starts, and the `uw://ai` page, agreed on 2026-10-21 for v2.1. The [connectors plan](connectors.md) has the scope and stages, T134 to T142 on the board.
+
+Done when the plan's [acceptance checks](connectors.md#acceptance-checks) pass and the user's own connectors work in a chat.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -227,6 +242,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Ollama connection](../product.md#ai-connections) | 9/10 | An established API with a small configuration flow. |
 | [Online provider connections](../product.md#ai-connections) | 8/10 | Several API formats and model capabilities to support. |
 | [AI providers](ai-providers.md) | 6/10 | Providers saved once and a model and effort picker in each chat. Two formats are new to uw, and saved connections must move without loss. What each model can do comes from the models.dev catalog, so no model is tested. |
+| [Connectors](connectors.md) | 5/10 | uw's own MCP client in C++ over two protocol versions, and OAuth sign-in that meets each server's quirks only live. The pages and menus reuse the chat page's parts. |
 | [Decision model connection](../architecture.md#tab-organization-models) | 7/10 | Jev, the OpenAI Decisions API, or a compatible endpoint decides placement. Request shapes come from public documentation; no provider has been called live yet. |
 | [On-demand AI tab reorganization](../product.md#automatic-tab-organization) | 5/10 | The [branch rules](automatic-organization.md#branch-moves) can run over every branch in the window and already keep manual choices. A first run over many loose tabs would start one task per branch without merging related ones, and each name takes the language model several seconds. |
 | [Automatic task-based tree organization](../product.md#automatic-tab-organization) | 5/10 | The initial title/URL/source fast path must meet the agreed latency budget, then a clearer excerpt-informed pass may correct it. Background LLM discovery handles unmatched Scratchpad branches, with stale-result cancellation. |

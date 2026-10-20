@@ -58,7 +58,7 @@ Added on 2026-10-20, with Claude Code's auto mode as the model:
 | Release | Contents |
 | --- | --- |
 | v2.0 | Engine spike, Agent model setting, tools, agent loop, chat page, short context, saved chats, the redesigned chat page with tab cards, skills, approvals, Markdown answers, Ask box on the new tab page, Chats list, history and open-tab access, scheduled chats, private chats. |
-| v2.1 | Chat cards on the new tab page, giving the agent a tab (it works in place, with Stop and Take over), agent memory, [AI providers](ai-providers.md) with a model and effort picker in each chat, passwords and passkeys. |
+| v2.1 | Chat cards on the new tab page, giving the agent a tab (it works in place, with Stop and Take over), agent memory, [AI providers](ai-providers.md) with a model and effort picker in each chat, passwords and passkeys, [connectors and the AI page](connectors.md). |
 | v2.2 | Outside agents on the tool server. |
 | Later | Cloud runs. |
 

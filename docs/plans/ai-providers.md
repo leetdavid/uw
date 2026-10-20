@@ -1,6 +1,6 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16.
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16. Changed on 2026-10-21: the page moves to `uw://ai/providers`, per the [connectors plan](connectors.md#the-ai-page).
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss.
 
