@@ -10,7 +10,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 - A [workspace](../CONTEXT.md#language) is Arc's space: a name, an emoji icon, and a theme. Each belongs to one [profile](../CONTEXT.md#language), and a profile can have several. Workspaces separate areas such as work and personal. They do not replace tasks, which organize the tabs inside a workspace.
 - Every workspace shows in the switcher at the foot of the sidebar, in every window, from launch. A workspace can be deleted but not hidden.
-- Switch by clicking a workspace's icon, with Ctrl+1 to 9, with Cmd+Option+← / →, or with a two-finger swipe on the sidebar. The slide follows the fingers, and a half swipe snaps back. Cmd+Option+← / → stop switching tabs; Ctrl+Tab and Cmd+Shift+[ / ] still do. A swipe on the page stays back and forward.
+- Switch by clicking a workspace's icon, with Ctrl+1 to 9, with Cmd+Option+← / →, or with a two-finger swipe on the sidebar. As in Arc, only the sidebar's contents slide, following the fingers, while the theme blends; a half swipe snaps back. The page stays put and fades to the other workspace's page once the swipe lands. Cmd+Option+← / → stop switching tabs; Ctrl+Tab and Cmd+Shift+[ / ] still do. A swipe on the page stays back and forward.
 - A window shows one workspace at a time. Switching replaces the window with its partner for the other workspace, at the same place and size. Switching back shows the tabs as they were. Several windows can show the same workspace. See [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md).
 - Cmd+N opens a window in the current window's workspace.
 - Closing a window closes all of its workspaces. Cmd+Shift+T brings them back together.
