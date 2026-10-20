@@ -109,7 +109,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 [`chromium/patches/series`](chromium/patches/series) lists patches in application order:
 
 - `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. It points the app bundle at uw's [app icon](docs/logo.md#app-icon). Chromium's logos inside the browser and most secondary strings remain.
-- `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
+- `vertical-tabs-default.patch` changes the registered tab-orientation default. Since Chromium 155, vertical tabs need no feature flag.
 - `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
 - `ai-organization.patch` registers the automatic organization preferences.
 - `uw-settings-page.patch` adds the uw page and its strings to Chromium's settings.
@@ -210,7 +210,11 @@ On Apple Silicon, the wrapper selects Apple's linker with `use_lld = false`. The
 
 Xcode is a host dependency. Matching source pins alone does not guarantee identical binaries.
 
-To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Mac&num=1), verify its upstream tag and commit, and update the pins. Check that revision's SDK requirement, then rerun sync, build, and smoke. Review and refresh any conflicting patches, then run the [customization acceptance checks](#customization-verification).
+To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Mac&num=1), verify its upstream tag and commit, and update the pins. Check that revision's SDK requirement. Work in a second checkout, such as a git worktree with its own `.chromium`, so the current one keeps building. Rerun sync, build, and smoke there. Review and refresh any conflicting patches, then run `pnpm run verify`, `pnpm run window-tests`, and the [customization acceptance checks](#customization-verification).
+
+- To refresh a conflicting patch, commit each patch onto the old Chromium revision, cherry-pick those commits onto the new one with a three-way merge, and regenerate only the file sections that no longer apply.
+- uw's unbranded build applies Chromium's field-trial testing config, `testing/variations/fieldtrial_testing_config.json`, in tests and in the app. Check what a new release turns on there. In 155 it turned on action-backed browser commands, which ignored uw's own commands.
+- `window-tests` waits only for runs from its own checkout. Check `tart list` before starting it while a second checkout exists.
 
 ## CI
 
@@ -252,6 +256,8 @@ On 2026-09-24, the customized application built and passed the headless smoke te
 On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `TintTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `UwOrganizationPageBrowserTest.*`, `WindowScreenshotBrowserTest.*`, and `TintBrowserTest.*` in `browser_tests`. The organizer and settings tests use a local test server.
 
 On 2026-10-12, TypeSafe's live API answered the validation request that uw sends for Jev, sent by hand, in the shape uw expects. Its model list uses `models[].name`, which uw now reads. A DeepSeek chat model validated from the settings page in a real window. With Jev deciding, the same model then failed validation as the namer: it thinks before it answers, and the naming request allowed 32 tokens. Chat requests now allow 4096. That fix has not been rechecked against DeepSeek. The built app's "Test connection" passed against the live Jev API in 0.4 seconds, run headless with a throwaway profile, and showed each provider's own message for a wrong key. Filing tabs with a live provider has not been checked.
+
+On 2026-10-21, uw moved to Chromium 155.0.8059.85 on the same host. The sync took 32 minutes, and the first full build took 8 hours at low priority beside other builds. The checkout uses 43 GiB, including 11 GiB of build output; `uw.app` is 595 MiB. The smoke test reported `uw 155.0.8059.85`. The focused unit and browser suites pass, apart from `CommandBarBrowserTest.AWordThatIsNotAUnitHasNoAnswer`, which also fails at 153: it still expects the card that commit `f101378` hid. uw's real-window tests pass in the VM.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 

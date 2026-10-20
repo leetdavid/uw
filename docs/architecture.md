@@ -32,7 +32,14 @@ Organize by feature within those directories. For example, page-watch scheduling
 
 Avoid whole-file Chromium replacements, macro-based source interception, and a general rewrite engine until a concrete integration requires them. Keep platform conditions and packaging in this repository while macOS is the only target.
 
-Implementability: **7/10** for this organization including ongoing Chromium updates, using the [roadmap convention](plans/roadmap.md#implementability-estimates). A successful version-bump trial is still needed to measure maintenance cost.
+Implementability: **7/10** for this organization including ongoing Chromium updates, using the [roadmap convention](plans/roadmap.md#implementability-estimates).
+
+The first version bump, from Chromium 153 to 155 in October 2026, took about two days from new pins to passing tests, most of it builds:
+
+- 5 of the 10 patches no longer applied; 22 file sections were regenerated from three-way merges. Upstream had moved two patched files and removed a function one uw test called.
+- 10 uw files and 2 patches needed small fixes for changed Chromium APIs, such as test helpers that now take `BrowserWindowInterface*` and new searchbox arguments.
+- The tests caught one behavior change: an experiment that ran browser commands as actions ignored uw's own commands. A three-line patch keeps the old path.
+- The sync took 32 minutes and the first full build 8 hours at low priority.
 
 ### Native lifetime rules
 
@@ -125,7 +132,7 @@ Ad blocking needs integration-level evaluation. Do not assume a particular exten
 
 | Decision | What must be resolved |
 | --- | --- |
-| Chromium updates | Patch repair cost across a version bump, extension compatibility, and time to ship security updates. |
+| Chromium updates | Extension compatibility and time to ship security updates. The [first version bump](#code-organization) measured the patch repair cost. |
 | Platform support | Hardware requirements and packaging for the [initial platform](product.md#minimum-usable-version), plus support for later platforms. |
 | Managed local AI | Runtime, model licenses, hardware fit, download source, integrity checks, and model updates. |
 | Tab organization models | Call each provider live, check its data handling, then measure task accuracy, confidence calibration, and context-to-placement latency. |
