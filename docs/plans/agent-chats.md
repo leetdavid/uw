@@ -76,6 +76,16 @@ The "Agent chats" page on the [Doop canvas](../../AGENTS.md#designs) holds the d
 
 Added on 2026-10-16: "Chat page: images in a message (Fluid)" and "Chat page: images, stop, steer, queue (Fluid)" draw T106 and T107: image tiles in the composer and above a sent message, the attach button, a drop target, the warning for a model that can't see images, Stop, steering, queued messages, and declining a step from the composer. The user approved them before they were drawn.
 
+Added on 2026-10-20 for T124: "Agent terminal: a command waits for you (Fluid)" and "Agent terminal: every state (Fluid)" draw the agent's terminal. They are uw's proposals until the user signs off.
+
+- A command's approval card is the usual card with the label `Terminal · Tab 1 · ~/Downloads`. Its question is "Run this command?", "Let the agent read .env.local?", or "Send keys to the running program?". The command shows in a dark block after a `%` prompt, and the check's reason follows with a shield icon, its first sentence in bold. A sensitive file's card shows a key icon and an amber "Full auto" chip when that mode is on. Keys show as key caps under what the program last printed. The options stay Approve, Not this one, Stop the chat, and a note.
+- Steps read "Ran `git status` in tab 1", "Running `pnpm dev` in tab 2 · 2 min" with a spinner, and "Didn't run `rm -rf node_modules` in tab 1" with the user's note under it. Output shows under its step in mono, its first and last lines when long. After a 2-minute wait a quiet line says "Still running after 2 min, so the agent went on."
+- A password prompt is an amber banner, "sudo wants your password in tab 1.", with Go to tab 1 and Stop the chat. The chat's row turns amber as for an approval.
+- A terminal tab card shows the screen's last lines in mono, the tab's title, and Running, Waits for your approval, or Ran 1 min ago.
+- The notes under the composer become "Every click, typing, and command waits for your approval", "Changes on a site and risky commands wait for your approval", and "Full auto: the agent acts without asking, except to read a sensitive file".
+
+How the chat is built:
+
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages. uw turns off the engine's Gemini-only pieces: the toolbar task icon, the take-over button, the overlay over the agent's tab, and the "Gemini is working" toast. The task icon brought Gemini's button with it, and clicking that button aborted uw on 2026-10-15. The blue icon on the agent's tab stays.
 - **Tools.** `browser/agent/agent_tools.h` holds uw's tools over the engine: open a child tab, navigate, read a page, click, and type. Each tool takes and returns JSON, so the agent loop and later outside agents use the same calls. Scroll and wait come when a chat needs them.
 - **Reading a page.** `components/agent/page_text.h` turns Chromium's annotated page content into lines of text. Each link, field, and button gets a number, such as `[2] button "Send"`, and the agent clicks or types by that number. A password's value is never shown, and ads are left out.
