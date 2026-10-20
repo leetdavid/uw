@@ -16,6 +16,7 @@ import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 import type {CrSliderElement} from 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 import type {CrToggleElement} from 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 
+import {getCss as getMdSelectCss} from 'chrome://resources/cr_elements/md_select_lit.css.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
@@ -29,6 +30,13 @@ import {getHtml} from './uw_organization_page.html.js';
 const MIN_THRESHOLD = 0.5;
 const MAX_THRESHOLD = 0.95;
 const THRESHOLD_STEP = 0.05;
+
+// One choice of the Default currency menu.
+interface CurrencyOption {
+  code: string;
+  name: string;
+  selected: boolean;
+}
 
 // One slider of the page: what the threshold is for, the slider's last stop
 // and current stop, and the threshold as shown beside it.
@@ -48,6 +56,10 @@ const WAITING_TEXT: Record<Waiting, string> = {
 export class SettingsUwOrganizationPageElement extends CrLitElement {
   static get is() {
     return 'settings-uw-organization-page';
+  }
+
+  static override get styles() {
+    return getMdSelectCss();
   }
 
   override render() {
@@ -187,6 +199,33 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
 
   protected async onCommandBarChange_(e: CustomEvent<boolean>) {
     await this.browserProxy_.setCommandBar(e.detail);
+    this.refresh_();
+  }
+
+  // The Mac's region first, then the currencies the rates cover, by name.
+  protected currencyOptions_(): CurrencyOption[] {
+    const state = this.state_;
+    if (!state) {
+      return [];
+    }
+    const names = new Intl.DisplayNames(undefined, {type: 'currency'});
+    const name = (code: string) => names.of(code) ?? code;
+    const others =
+        state.currencies.map(code => ({code, name: `${name(code)} (${code})`}))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    return [
+      {
+        code: '',
+        name: loadTimeData.getStringF(
+            'uwCommandBarCurrencyRegion', name(state.regionCurrency)),
+      },
+      ...others,
+    ].map(option => ({...option, selected: option.code === state.currency}));
+  }
+
+  protected async onCurrencySelectChange_(e: Event) {
+    const select = e.currentTarget as HTMLSelectElement;
+    await this.browserProxy_.setCurrency(select.value);
     this.refresh_();
   }
 

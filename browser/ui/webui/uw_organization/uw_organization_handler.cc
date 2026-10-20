@@ -3,6 +3,7 @@
 
 #include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
@@ -17,6 +18,7 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/components/tab_organization/placement.h"
 
 namespace uw {
@@ -76,6 +78,11 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwCommandBarTitle", IDS_UW_SETTINGS_COMMAND_BAR_TITLE},
       {"uwCommandBarToggle", IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE},
       {"uwCommandBarNote", IDS_UW_SETTINGS_COMMAND_BAR_NOTE},
+      {"uwCommandBarCurrency", IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY},
+      {"uwCommandBarCurrencyDescription",
+       IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_DESCRIPTION},
+      {"uwCommandBarCurrencyRegion",
+       IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_REGION},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
@@ -134,6 +141,9 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   state->thresholds = CurrentThresholds();
   state->command_bar = prefs->GetBoolean(kCommandBarEnabledPref);
+  state->currency = prefs->GetString(kCommandBarCurrencyPref);
+  state->region_currency = RegionCurrency();
+  state->currencies = Currencies();
   return state;
 }
 
@@ -154,6 +164,26 @@ void UwOrganizationHandler::OpenThemePicker() {
 void UwOrganizationHandler::SetCommandBar(bool on,
                                           SetCommandBarCallback callback) {
   profile_->GetPrefs()->SetBoolean(kCommandBarEnabledPref, on);
+  std::move(callback).Run();
+}
+
+std::vector<std::string> UwOrganizationHandler::Currencies() const {
+  std::vector<std::string> codes;
+  if (mojom::ExchangeRatesPtr rates = ExchangeRates::For(profile_)->Saved()) {
+    for (const auto& [code, rate] : rates->per_euro) {
+      codes.push_back(code);
+    }
+    codes.push_back("EUR");
+    std::ranges::sort(codes);
+  }
+  return codes;
+}
+
+void UwOrganizationHandler::SetCurrency(const std::string& code,
+                                        SetCurrencyCallback callback) {
+  if (code.empty() || std::ranges::contains(Currencies(), code)) {
+    profile_->GetPrefs()->SetString(kCommandBarCurrencyPref, code);
+  }
   std::move(callback).Run();
 }
 

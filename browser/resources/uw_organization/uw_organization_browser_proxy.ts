@@ -14,6 +14,7 @@ export interface UwOrganizationBrowserProxy {
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
   openThemePicker(): void;
   setCommandBar(on: boolean): Promise<void>;
+  setCurrency(code: string): Promise<void>;
 }
 
 export class UwOrganizationBrowserProxyImpl implements
@@ -44,6 +45,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setCommandBar(on: boolean) {
     await this.handler.setCommandBar(on);
+  }
+
+  async setCurrency(code: string) {
+    await this.handler.setCurrency(code);
   }
 
   static getInstance(): UwOrganizationBrowserProxy {

@@ -15,6 +15,7 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
+#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar.mojom.h"
 
 namespace content {
 class WebContents;
@@ -63,9 +64,11 @@ class UwCommandBarUIConfig
 };
 
 // The command bar's page. Its suggestions come from the searchbox handler
-// behind the new tab page's search box.
+// behind the new tab page's search box, and its calculator's rates from
+// ExchangeRates.
 class UwCommandBarUI : public TopChromeWebUIController,
-                       public searchbox::mojom::PageHandlerFactory {
+                       public searchbox::mojom::PageHandlerFactory,
+                       public mojom::CalculatorHandler {
  public:
   explicit UwCommandBarUI(content::WebUI* web_ui);
   UwCommandBarUI(const UwCommandBarUI&) = delete;
@@ -76,6 +79,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
 
   void BindInterface(
       mojo::PendingReceiver<searchbox::mojom::PageHandlerFactory> receiver);
+  void BindInterface(mojo::PendingReceiver<mojom::CalculatorHandler> receiver);
 
  private:
   friend void StartShellCommand(content::WebContents* page);
@@ -85,8 +89,13 @@ class UwCommandBarUI : public TopChromeWebUIController,
       mojo::PendingRemote<searchbox::mojom::Page> page,
       mojo::PendingReceiver<searchbox::mojom::PageHandler> handler) override;
 
+  // mojom::CalculatorHandler:
+  void GetCurrencies(GetCurrenciesCallback callback) override;
+  void CopyAnswer(const std::string& text) override;
+
   std::unique_ptr<UwCommandBarHandler> handler_;
   mojo::Receiver<searchbox::mojom::PageHandlerFactory> factory_{this};
+  mojo::Receiver<mojom::CalculatorHandler> calculator_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();
 };

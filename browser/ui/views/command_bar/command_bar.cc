@@ -28,11 +28,13 @@
 #include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/webview/webview.h"
@@ -249,11 +251,24 @@ void CommandBar::Show() {
       BrowserView::GetBrowserViewForBrowser(window_)->contents_container();
   const gfx::Rect area = card->GetBoundsInScreen();
   const gfx::Rect anchor(area.CenterPoint().x(), area.y() + kTopInset, 0, 0);
+  // The page's last size is in pixels at the scale it was laid out at.
+  content::RenderWidgetHostView* page_view = page()->GetRenderWidgetHostView();
+  const float scale = page_view ? page_view->GetDeviceScaleFactor() : 0;
   auto view = std::make_unique<WebUIBubbleDialogView>(
       card, contents_->GetWeakPtr(), anchor, views::BubbleBorder::TOP_CENTER,
       /*autosize=*/true);
   bubble_ = view->GetWeakPtr();
   views::BubbleDialogDelegateView::CreateBubble(std::move(view));
+  // Chromium sizes the panel while its new window is still on the main screen,
+  // by that screen's scale. With a Retina main screen and this window on a 1x
+  // display, the panel came up at half size and stayed so, since the page,
+  // back at its own scale once over this window, reports no new size.
+  const std::optional<gfx::Size>& size =
+      page()->GetPrimaryMainFrame()->GetFrameSize();
+  if (scale && size) {
+    bubble_->ResizeDueToAutoResize(page(),
+                                   gfx::ScaleToCeiledSize(*size, 1.f / scale));
+  }
   contents_->HoldKeys();
   bubble_->ShowUI();
 }

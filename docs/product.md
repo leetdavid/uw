@@ -96,7 +96,7 @@ Agreed:
 - Each regular tab has one home position in the hierarchy. Separate tabs showing the same page may belong to different task groups.
 - Preserve the user's expanded/collapsed group choices. The organizer does not change them when tasks switch.
 - When a selected tab moves into a collapsed task group, keep the group collapsed and show a brief destination cue rather than changing the user's expansion choice.
-- Let the user change grouping and ordering. Manual placement takes priority while the tab serves the same browsing task. A later clear change of activity makes the tab eligible for automatic regrouping again; ordinary navigation within the same task preserves the correction. Exception: a child tab the user nested by hand stays under its parent until the user moves it or the parent closes. Agreed on 2026-10-15.
+- Let the user change grouping and ordering. Manual placement takes priority while the tab serves the same browsing task. A later clear change of activity makes the tab eligible for automatic regrouping again; ordinary navigation within the same task preserves the correction. Exception: a child tab the user nested by hand stays under its parent until the user moves it or the parent closes. Agreed on 2026-10-15. The user can also keep any tab where it is with Keep here, agreed on 2026-10-19; see [Automatic organization](plans/automatic-organization.md#agreed-scope).
 - For the first release, treat a manual correction as applying only to that tab or branch while its activity remains the same. Do not infer a broader placement rule from one correction.
 - Provide a "Reorganize all tabs" button for an additional on-demand AI pass across all tabs in the current window, including the current task group.
 
@@ -188,6 +188,7 @@ Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent b
 
 - A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
 - The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](CONTEXT.md#language), Auto. Ask first also asks before every click and typing; Full auto never asks.
+- Agreed on 2026-10-20: the agent can run commands on this Mac in a [terminal tab](CONTEXT.md#language) under its chat. In Auto, a [command check](CONTEXT.md#language) asks only before potentially dangerous commands, as Claude Code's auto mode does, and every mode asks before a command reads a [sensitive file](CONTEXT.md#language).
 - [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
 
 Example use cases:
@@ -239,7 +240,7 @@ Agreed on 2026-10-14, as a later addition outside the minimum usable version:
 
 - A [terminal tab](CONTEXT.md#language) is the user's own shell in a regular tab, so it can sit in the same task as the pages it belongs with.
 - The organizer files a terminal tab like any other tab. A model gets its title and the shell's folder, never what the shell printed. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
-- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command.
+- In the first version, text reaches the shell only from the user's keyboard, paste, or drop. A terminal's address never carries a command. Agreed on 2026-10-20: the agent's commands reach terminal tabs it opened, never ones the user opened.
 - Closing a busy terminal asks first, however it is closed.
 
 The [terminal tab plan](plans/terminal-tab.md) has the full scope and what is left out.
@@ -282,7 +283,7 @@ Agreed: closing the window that displays a pinned page detaches its live session
 
 Agreed: pinned page sessions remain live when the last browser window closes while uw remains running. Opening a new window restores their exact state, subject to measured resource limits.
 
-Agreed: every launch restores the last session without asking, as Arc does, after a quit or a crash and whatever the macOS "Close windows when quitting an application" setting says. Pinned pages come back at their last live URLs, with Chromium-recoverable session state, alongside regular tabs. Chromium's "On startup" setting still lets the user start blank. Changed on 2026-10-18: before, a "Restore tabs" popup offered restoration. See [Restore](plans/native-tab-tree.md#restore).
+Agreed: every launch after a quit restores the last session without asking, as Arc does. Pinned pages come back at their last live URLs, with Chromium-recoverable session state, alongside regular tabs. Chromium's "On startup" setting still lets the user start blank. After a crash, Chromium's "Restore pages?" prompt asks first. Its "Always restore after a crash" checkbox starts unticked; once ticked, later crashes restore without asking. uw follows Chromium's own Session Restore Infobar work and drops its parts once Chromium ships them. Changed on 2026-10-18: before, a "Restore tabs" popup offered restoration. The crash checkbox was agreed on 2026-10-20. See [Restore](plans/native-tab-tree.md#restore).
 
 ## AI connections
 

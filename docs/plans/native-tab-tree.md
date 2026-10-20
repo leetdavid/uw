@@ -28,7 +28,7 @@ Agreed on 2026-10-18, at the user's request.
 - Restoring keeps the user's work: every tab, its place in the tree, its task, and its chat. View state, such as how far the sidebar was scrolled, is not kept.
 - The whole tree comes back: each tab's parent, sibling order, collapsed branches, task names, and who named each task. A child nested by hand keeps its hold once T74 adds it, per [Branch moves](automatic-organization.md#branch-moves).
 - It comes back after quitting uw, after uw crashed or was killed, and after the last window closed while uw kept running and a new one opened.
-- Every launch restores without asking, per [Product](../product.md#pinned-tabs).
+- Every launch after a quit restores without asking. After a crash, Chromium's prompt asks until the user ticks its "Always restore after a crash" box, per [Product](../product.md#pinned-tabs).
 - A chat's agent tabs come back under the chat. Its tab cards fill in again at the agent's next step.
 - A terminal tab comes back in its place with a new shell. Its folder, command history, and scrollback are later work in the [terminal plan](terminal-tab.md).
 - Later: Cmd+Shift+T on a closed tab, branch, or task puts it back in its place in the tree.
@@ -75,6 +75,6 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 9. After a quit, a crash, and the last window closing, the tree comes back whole: depth, order, collapse, task names, and who named each task. Each case is also checked after Chromium has rewritten its session file.
 10. Switching to horizontal tabs and back keeps tasks and parent links.
 11. Option+Cmd+Z undoes one organization action per press. `UndoShortcutBrowserTest.OptionCmdZUndoesOneOrganizationActionPerPress` checks it.
-12. A launch restores the last session without a prompt, after a quit and after a crash, with the macOS setting on or off.
+12. A launch after a quit restores the last session without a prompt. After a crash, the "Restore pages?" prompt shows an unticked "Always restore after a crash" box. Once it is ticked, the next crash restores without the prompt.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`.

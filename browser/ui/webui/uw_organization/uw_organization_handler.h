@@ -5,6 +5,7 @@
 #define UW_BROWSER_UI_WEBUI_UW_ORGANIZATION_UW_ORGANIZATION_HANDLER_H_
 
 #include <string>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -43,8 +44,12 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
                      SetThresholdsCallback callback) override;
   void OpenThemePicker() override;
   void SetCommandBar(bool on, SetCommandBarCallback callback) override;
+  void SetCurrency(const std::string& code,
+                   SetCurrencyCallback callback) override;
 
  private:
+  // The codes the last exchange rates cover, or none before the first.
+  std::vector<std::string> Currencies() const;
   mojom::StatePtr CurrentState() const;
   mojom::ThresholdsPtr CurrentThresholds() const;
 

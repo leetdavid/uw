@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b10b65ee56 100644
+index 29f655d33e0447e556f75e6e9fc546e6e586f66f..8d5912cdefbe750a63ff58796f9dbf2a49ae21d1 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,103 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,104 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -64,6 +64,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
 +      <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
 +      <message name="IDS_UW_MOVE_BRANCH_DOWN_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, below the tab after it at the same level.">Move Branch Down</message>
 +      <message name="IDS_UW_CLOSE_BRANCH_MAC" desc="In Title Case: Closes the selected tab and every tab nested under it.">Close Branch</message>
++      <message name="IDS_UW_SESSION_CRASHED_ALWAYS_RESTORE" desc="Checkbox in the dialog shown after the browser crashed, which offers to restore the tabs that were open. When it is ticked and the user restores, later crashes restore the tabs without showing the dialog.">Always restore after a crash</message>
 +      <message name="IDS_UW_COLLAPSE_BRANCH" desc="Hides the tabs nested under a tab in the tab sidebar.">Collapse branch</message>
 +      <message name="IDS_UW_EXPAND_BRANCH" desc="Shows the tabs nested under a tab again in the tab sidebar.">Expand branch</message>
 +      <message name="IDS_UW_COLLAPSE_BRANCH_MAC" desc="In Title Case: Hides the tabs nested under the selected tab in the tab sidebar.">Collapse Branch</message>
@@ -116,7 +117,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1794,7 +1891,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1794,7 +1892,7 @@ are declared in tools/grit/grit_args.gni.
          R&amp;eopen closed window
        </message>
        <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
@@ -125,7 +126,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
          Reopen closed split view
-@@ -1825,7 +1922,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1825,7 +1923,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen Closed Window
          </message>
          <message name="IDS_REOPEN_GROUP_MAC" desc="In Title Case: The text label of the Reopen Closed Group menu item">
@@ -134,7 +135,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
          </message>
          <message name="IDS_REOPEN_SPLIT_MAC" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -11284,7 +11381,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+@@ -11284,7 +11382,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
        <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
@@ -143,7 +144,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
          <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
-@@ -12221,9 +12318,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12221,9 +12319,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add tabs to reading list}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -154,7 +155,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12243,7 +12338,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12243,7 +12339,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move tab into split view
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -163,7 +164,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove from group
-@@ -12343,9 +12438,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12343,9 +12439,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add Tabs to Reading List}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -174,7 +175,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12365,7 +12458,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12365,7 +12459,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move Tab into Split View
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -183,7 +184,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove From Group
-@@ -12858,7 +12951,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12858,7 +12952,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
  
        <!-- Tab Group Editor Bubble -->
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
@@ -192,7 +193,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
            {MEMBER_COUNT, plural,
-@@ -12867,22 +12960,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12867,22 +12961,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            }
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
@@ -220,7 +221,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
          Recent activity
-@@ -12891,16 +12984,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12891,16 +12985,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
          Manage sharing
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -240,7 +241,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
          Open group in new window
-@@ -12928,7 +13021,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12928,7 +13022,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
          </message>
        </if>
        <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -249,7 +250,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
  
      <!-- Data Sharing -->
-@@ -17063,10 +17156,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17063,10 +17157,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
        </message>
        <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
@@ -262,7 +263,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
-@@ -17087,10 +17180,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17087,10 +17181,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          </message>
        </if>
        <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
@@ -275,7 +276,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
          Collapsed
-@@ -17135,16 +17228,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17135,16 +17229,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Tab moved to end of tabstrip
        </message>
        <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
@@ -296,7 +297,7 @@ index 29f655d33e0447e556f75e6e9fc546e6e586f66f..bf52c597a9b862eb7fb883f7e02918b1
        </message>
        <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
            Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
-@@ -19459,12 +19552,12 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -19459,12 +19553,12 @@ Please help our engineers fix this problem. Tell us what happened right before y
        </message>
        <if expr="use_titlecase">
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="In Title Case: The label of the tab group context menu item to ask Gemini about the tab group.">
@@ -1283,3 +1284,146 @@ index d8f32a1ca60e441fd998fbb05e3df7aeb1fd8dd6..ed003ac952f2729b20db09a8e607ea7d
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
    registry->RegisterBooleanPref(
        prefs::kShowManagedBookmarksInBookmarkBar, true,
+diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
+index 2293349695e51d7d62e37329219e5dbfcae4efc2..92144100cf2b1aefe86424b50396ff6baa17829f 100644
+--- a/chrome/browser/sessions/session_service.cc
++++ b/chrome/browser/sessions/session_service.cc
+@@ -370,6 +370,8 @@ void SessionService::AddTabExtraData(SessionID window_id,
+     return;
+   }
+ 
++  // Kept even while saving is off, as it is until a restore after a crash.
++  tab_extra_data_[tab_id][key] = data;
+   ScheduleCommand(sessions::CreateAddTabExtraDataCommand(tab_id, key, data));
+ }
+ 
+@@ -397,6 +399,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
+   if (i != tab_to_available_range()->end()) {
+     tab_to_available_range()->erase(i);
+   }
++  tab_extra_data_.erase(tab_id);
+ 
+   if (pending_window_close_ids_.contains(window_id)) {
+     // Tab is in last window and the window is being closed. Don't commit it
+@@ -681,6 +684,16 @@ void SessionService::BuildCommandsForTab(
+     command_storage_manager()->AppendRebuildCommand(
+         sessions::CreateSplitTabCommand(session_id, std::move(split)));
+   }
++
++  // uw: without this, a rebuild drops the data uw keeps for each tab, such as
++  // its place in the tab tree.
++  if (auto data = tab_extra_data_.find(session_id);
++      data != tab_extra_data_.end()) {
++    for (const auto& [key, value] : data->second) {
++      command_storage_manager()->AppendRebuildCommand(
++          sessions::CreateAddTabExtraDataCommand(session_id, key, value));
++    }
++  }
+ }
+ 
+ void SessionService::ScheduleResetCommands() {
+diff --git a/chrome/browser/sessions/session_service.h b/chrome/browser/sessions/session_service.h
+index 92d191c30c8f4919631d1a1e06a1929afac29225..534473c7cb98dc8d45c6489bb6e170f15a9c8d98 100644
+--- a/chrome/browser/sessions/session_service.h
++++ b/chrome/browser/sessions/session_service.h
+@@ -303,6 +303,10 @@ class SessionService : public SessionServiceBase {
+   // mapping since we no longer need it after the first write to disk.
+   std::map<tab_groups::TabGroupId, std::string> local_to_sync_id_mapping_;
+ 
++  // uw: the last data each tab was given under each key, which a rebuild of
++  // the session file writes again.
++  std::map<SessionID, std::map<std::string, std::string>> tab_extra_data_;
++
+   base::WeakPtrFactory<SessionService> weak_factory_{this};
+ };
+ 
+diff --git a/chrome/browser/ui/ui_features.cc b/chrome/browser/ui/ui_features.cc
+index 7a0e331dedf4563a6be3f5a9e4874d0293abce1c..1984a4bb6a374637a6fca786bc897ff5951f3579 100644
+--- a/chrome/browser/ui/ui_features.cc
++++ b/chrome/browser/ui/ui_features.cc
+@@ -385,11 +385,12 @@ BASE_FEATURE(kRespectShouldTriggerSessionRestoreOnDesktop,
+ 
+ BASE_FEATURE(kSessionRestoreInfobar, base::FEATURE_ENABLED_BY_DEFAULT);
+ 
++// uw: every launch restores the last session, as Arc does.
+ BASE_FEATURE_PARAM(bool,
+                    kSetDefaultToContinueSession,
+                    &kSessionRestoreInfobar,
+                    "continue_session",
+-                   false);
++                   true);
+ #endif
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
+index 7aa17c1f60efee7fd1272a98e3f24d7526ec400b..79b8ebf05d4a9385f3ce06cd529fbcbc51294fda 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view.cc
+@@ -39,6 +39,7 @@
+ #include "chrome/grit/generated_resources.h"
+ #include "chrome/installer/util/google_update_settings.h"
+ #include "components/strings/grit/components_branded_strings.h"
++#include "components/prefs/pref_service.h"
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/browser_thread.h"
+@@ -57,6 +58,7 @@
+ #include "ui/views/controls/styled_label.h"
+ #include "ui/views/layout/box_layout.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/tab_organization/ai_connection.h"
+ 
+ namespace {
+ 
+@@ -97,6 +99,7 @@ void OpenUmaLink(BrowserWindowInterface* browser, const ui::Event& event) {
+ }
+ 
+ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
++DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kAlwaysRestoreCheckboxId);
+ 
+ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+  public:
+@@ -141,6 +144,12 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+     // won't wait for restore to complete.
+     std::unique_ptr<ExitTypeService::CrashedLock> lock =
+         std::move(crashed_lock_);
++    if (dialog_model()
++            ->GetCheckboxByUniqueId(kAlwaysRestoreCheckboxId)
++            ->is_checked()) {
++      browser->GetProfile()->GetPrefs()->SetBoolean(uw::kRestoreAfterCrashPref,
++                                                    true);
++    }
+     dialog_model()->host()->Close();
+ 
+     RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_RESTORED);
+@@ -225,6 +234,19 @@ void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
+     return;
+   }
+ 
++  // uw: the user ticked "Always restore after a crash", so restore as the
++  // prompt's Restore button does, without the prompt.
++  if (browser->GetProfile()->GetPrefs()->GetBoolean(
++          uw::kRestoreAfterCrashPref)) {
++    std::unique_ptr<ExitTypeService::CrashedLock> lock;
++    if (ExitTypeService* exit_type_service =
++            ExitTypeService::GetInstanceForProfile(browser->GetProfile())) {
++      lock = exit_type_service->CreateCrashedLock();
++    }
++    SessionRestore::RestoreSessionAfterCrash(browser);
++    return;
++  }
++
+   // Observes possible browser removal before Show is called.
+   auto browser_observer =
+       std::make_unique<SessionCrashedBubbleView::BrowserRemovalObserver>(
+@@ -315,6 +337,10 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+             .set_is_secondary());
+   }
+ 
++  dialog_builder.AddCheckbox(
++      kAlwaysRestoreCheckboxId,
++      ui::DialogModelLabel(IDS_UW_SESSION_CRASHED_ALWAYS_RESTORE));
++
+   const SessionStartupPref session_startup_pref =
+       SessionStartupPref::GetStartupPref(browser->GetProfile());
+ 

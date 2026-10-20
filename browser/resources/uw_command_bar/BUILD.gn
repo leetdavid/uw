@@ -1,19 +1,39 @@
 # The command bar's page: a field and the suggestions for what is typed.
+# mathjs works out its sums: its browser script comes from the npm package as
+# shipped, through the link that preparation makes at //uw/mathjs.
 import("//ui/webui/resources/tools/build_webui.gni")
+import("//ui/webui/resources/tools/generate_grd.gni")
 
 assert(!is_android)
+
+generate_grd("mathjs_grdp") {
+  grd_prefix = "uw_command_bar"
+  out_grd = "$target_gen_dir/mathjs_resources.grdp"
+  input_files = [ "math.js" ]
+  input_files_base_dir = rebase_path("//uw/mathjs/lib/browser", "//")
+}
 
 build_webui("build") {
   grd_prefix = "uw_command_bar"
 
   static_files = [ "command_bar.html" ]
-  ts_files = [ "command_bar.ts" ]
+  ts_files = [
+    "calculator.ts",
+    "command_bar.ts",
+  ]
 
   ts_deps = [
     "//ui/webui/resources/cr_components/searchbox:build_ts",
     "//ui/webui/resources/js:build_ts",
     "//ui/webui/resources/mojo:build_ts",
   ]
+
+  mojo_files_deps =
+      [ "//uw/browser/ui/webui/uw_command_bar:mojo_bindings_ts__generator" ]
+  mojo_files = [ "$root_gen_dir/uw/browser/ui/webui/uw_command_bar/uw_command_bar.mojom-webui.ts" ]
+
+  extra_grdp_deps = [ ":mathjs_grdp" ]
+  extra_grdp_files = [ "$target_gen_dir/mathjs_resources.grdp" ]
 
   webui_context_type = "trusted"
 }

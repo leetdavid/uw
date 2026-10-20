@@ -9,6 +9,7 @@ const LINKS = {
   browser: "browser",
   components: "components",
   "ghostty-web": "node_modules/ghostty-web",
+  mathjs: "node_modules/mathjs",
 } as const;
 
 export class SourceLinks {

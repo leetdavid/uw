@@ -11,7 +11,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - A [terminal tab](../CONTEXT.md#language) runs the user's login shell, started as a login shell in their home folder.
 - It opens from "New terminal" on the sidebar's "+" menu and the File menu, from Ctrl+\`, and from `uw://terminal` typed in the address bar. It opens where a blank new tab would. Changed on 2026-10-14: the [keyboard and mouse plan](keyboard-and-mouse.md#terminal-key) makes Ctrl+\` go to the task's terminal and back, and moves New terminal to Ctrl+Shift+\`.
 - It sits in tasks and nests like any regular tab, and the organizer files it like one. A request describes it by its title and the shell's folder, never by what the shell printed. Moving to another folder asks again; a new title alone does not, since the shell sets one for every command. Changed on 2026-10-14. Before, the organizer left terminal tabs alone.
-- Text reaches the shell only from the user's keyboard, paste, or drop, or from the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) where the user typed it. The address never carries a command. Changed on 2026-10-15.
+- Text reaches the shell only from the user's keyboard, paste, or drop, or from the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) where the user typed it. In a terminal tab the agent opened, the agent's commands and keys reach it too, after the [approvals](agent-chats.md#agreed-scope) for them. Added on 2026-10-20. The address never carries a command. Changed on 2026-10-15.
 - Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+\`. Shift+Enter sends what Option+Enter does, so Claude Code starts a new line instead of sending the prompt. Changed on 2026-10-15. Before, it sent Enter.
 - The tab's title is the one the shell sets, otherwise the folder's name. The terminal resizes with the window.
 - Cmd-click on an `http` or `https` address the shell printed opens it as a child tab of the terminal tab. A Cmd-click is uw's, as Cmd keys are: a program that asks for the mouse, such as herdr, never sees it. Other clicks go to such a program, and the page opens no link for them. herdr opens a link on Ctrl-click. Changed on 2026-10-19: from 2026-10-16 a Cmd-click went to the program alone, as in Ghostty, but herdr ignores it, so nothing opened. Before that, the page opened the link and also passed the click on, and the user saw two tabs.
@@ -22,7 +22,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 
 ## Non-goals
 
-- uw's models reading or typing in a terminal.
+- uw's models reading or typing in a terminal the user opened. Changed on 2026-10-20: the agent runs commands in terminal tabs it opens under its chat, per the [agent chats plan](agent-chats.md#agreed-scope). Before, no model read or typed in any terminal.
 - Commands from any source but the user. That is [stage two](#later-stages).
 - Find in terminal and split panes.
 - A switch for the Option key, and reading the user's Ghostty config.
@@ -93,7 +93,7 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 ## Later stages
 
 - **Restore, T37.** Agreed on 2026-10-18, deferred at the user's request. A restored terminal tab comes back in its last folder, with its command history and its scrollback. On quit, uw lets each shell exit on its own so the shell writes its history file. The page saves its scrollback during the session, so a crash keeps it, and replays it before the new shell starts. Saved scrollback can hold secrets and sits in the profile. Estimate: 5/10.
-- **Stage two: commands from other sources.** Agreed direction: other parts of uw, and pages the user allows, may ask to run a command, and each needs the user's approval. The prompt and what uw remembers are open. One proposal, not agreed: Chromium's site permission decides which sites may ask, and a three-button prompt (run once, always run this exact command from this site, don't run) decides each command. This stage needs its own plan. Estimate: 4/10.
+- **Stage two: commands from other sources.** Agreed direction: other parts of uw, and pages the user allows, may ask to run a command, and each needs the user's approval. The agent's commands, agreed on 2026-10-20, follow their own approval rules in the [agent chats plan](agent-chats.md#agreed-scope) and run only in its own tabs. The prompt and what uw remembers are open. One proposal, not agreed: Chromium's site permission decides which sites may ask, and a three-button prompt (run once, always run this exact command from this site, don't run) decides each command. This stage needs its own plan. Estimate: 4/10.
 - **Native libghostty.** See the [research note](../research/native-libghostty-terminal.md) for what it needs and when to reopen it. Estimate: 3/10.
 
 ## Open questions

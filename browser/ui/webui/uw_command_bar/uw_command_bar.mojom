@@ -1,0 +1,21 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+// The European Central Bank's reference rates for one day: how much of each
+// currency one euro buys.
+struct ExchangeRates {
+  // The day the bank set them, as YYYY-MM-DD.
+  string date;
+  map<string, double> per_euro;
+};
+
+// What the command bar's calculator asks of its window.
+interface CalculatorHandler {
+  // The last rates uw downloaded, if any, and the currency a bare amount
+  // converts to. Downloads the day's rates when the last are a day old.
+  GetCurrencies() => (ExchangeRates? rates, string currency);
+  // Copies an answer and closes the command bar.
+  CopyAnswer(string text);
+};

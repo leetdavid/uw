@@ -20,7 +20,7 @@ The logins, cookies, history, and extensions that one or more workspaces share, 
 _Avoid_: Account, user.
 
 **Theme**:
-The colors uw draws its window in: the tint behind the sidebar and the page card. A profile has one theme, shared by all its windows.
+The colors uw draws its window in: the tint behind the sidebar and the page card. Each workspace has its own theme, so two workspaces on one profile can look different.
 _Avoid_: Skin, space color.
 
 **Window mode**:
@@ -36,7 +36,7 @@ The color a page paints behind its content. The toolbar above the page and the b
 _Avoid_: Theme color, site color, tint.
 
 **Pinned tab**:
-A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared across windows in its browser profile.
+A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
 **Inactive pinned view**:
 A hazed placeholder where a pinned page's live session is currently displayed in another window. Selecting it transfers the session back.
@@ -101,6 +101,10 @@ The always-visible section holding ungrouped regular tabs and candidate branches
 **Manual adjustment**:
 A user-made change to tab grouping, ordering, or a task's name.
 
+**Kept tab**:
+A tab the user told uw to leave where it is, in its task or in the Scratchpad. The organizer does not ask about it or move it until the user moves it or lets it go.
+_Avoid_: Pinned tab, locked tab, held tab.
+
 **Task extraction**:
 Separating a tab branch or selected tabs into a task of their own.
 
@@ -117,7 +121,7 @@ One LLM request about where a tab belongs. It says which task the tab belongs to
 The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
 
 **Provider**:
-A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key. One provider can serve both language models and decision models.
+A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key, for every profile. One provider can serve both language models and decision models.
 _Avoid_: Connection, endpoint, backend
 
 **Proxy**:
@@ -195,11 +199,19 @@ Instructions that teach uw's agent how to do one kind of request, with a name an
 _Avoid_: Prompt, routine, workflow.
 
 **Approval**:
-The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none.
+The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program.
 
 **Approval mode**:
-How much a chat asks before it acts. Ask first asks before every click and typing. Auto, the default, asks before each change on a site and each sign-in. Full auto never asks. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
+How much a chat asks before it acts. Ask first asks before every click, typing, and terminal command. Auto, the default, asks before each change on a site, each sign-in, and each command the command check finds dangerous. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
 _Avoid_: permission mode, autonomy level.
+
+**Command check**:
+A quick model call uw makes before the agent runs a terminal command or sends keys to a running program, to judge whether it is potentially dangerous and whether it may read a sensitive file. It sees the user's messages and the agent's actions, never page text or command output. An unsure or missing answer counts as dangerous.
+_Avoid_: Classifier, guard, safety check.
+
+**Sensitive file**:
+A file that holds secrets, such as a `.env` file, a key or certificate, a password store, or the credentials of a tool such as ssh, AWS, or gcloud. The agent reads one only through a command the user approved, in every approval mode.
+_Avoid_: Secret file, private file.
 
 **Steer**:
 To send a chat a message while its agent works. The agent reads it after its current step, before it asks the model again. A queued message instead waits until the agent has answered.

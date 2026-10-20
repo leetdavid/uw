@@ -13,6 +13,9 @@
         --line: rgba(30, 27, 46, 0.09);
         --field: #f2f1f8;
         --primary: #3b5bdb;
+        --error: #d93025;
+        --unit-ink: #6e6a85;
+        --operator-ink: #aba8bc;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -24,6 +27,9 @@
           --line: rgba(255, 255, 255, 0.09);
           --field: #262626;
           --primary: #8da2fb;
+          --error: #f28b82;
+          --unit-ink: #aba7c2;
+          --operator-ink: #6f6b88;
         }
       }
 
@@ -204,6 +210,131 @@
         color: var(--text2);
       }
 
+      #calc {
+        background: var(--field);
+        border-radius: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin: 8px 8px 0;
+        position: relative;
+      }
+
+      #calc[hidden] {
+        display: none;
+      }
+
+      #calc.selected {
+        box-shadow: 0 0 0 2px var(--primary);
+      }
+
+      #calc > div {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: 124px;
+        justify-content: center;
+        min-width: 0;
+        padding: 0 20px;
+        text-align: center;
+      }
+
+      #calc > div + div {
+        border-left: 1px solid var(--line);
+      }
+
+      #sum,
+      #answer {
+        font-variant-numeric: tabular-nums;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #sum {
+        font-size: 20px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+
+      #answer {
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      #calc.no #answer {
+        color: var(--text2);
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+
+      .ink-unit {
+        color: var(--unit-ink);
+      }
+
+      .ink-operator {
+        color: var(--operator-ink);
+      }
+
+      .ink-aside {
+        color: var(--operator-ink);
+        text-decoration: underline dotted 1.5px;
+        text-underline-offset: 5px;
+      }
+
+      .pill {
+        background: var(--card);
+        border-radius: 7px;
+        box-shadow: 0 0 0 1px var(--line);
+        color: var(--text2);
+        font-size: 12px;
+        font-weight: 500;
+        height: 22px;
+        line-height: 22px;
+        max-width: 100%;
+        overflow: hidden;
+        padding: 0 9px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #calc.no #answerName {
+        color: var(--error);
+      }
+
+      #arrow {
+        background: var(--card);
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px var(--line);
+        color: var(--text2);
+        display: grid;
+        height: 28px;
+        left: 50%;
+        margin: -14px 0 0 -14px;
+        place-items: center;
+        position: absolute;
+        top: 50%;
+        width: 28px;
+      }
+
+      #arrow svg {
+        height: 14px;
+        width: 14px;
+      }
+
+      #calcNote {
+        color: var(--muted);
+        font-size: 12px;
+        padding: 8px 18px 0;
+      }
+
+      #calcNote[hidden] {
+        display: none;
+      }
+
       #keys {
         align-items: center;
         border-top: 1px solid var(--line);
@@ -245,6 +376,12 @@
         <symbol id="search" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
         </symbol>
+        <symbol id="arrow-right" viewBox="0 0 24 24">
+          <path d="M5 12h14m-7-7 7 7-7 7"/>
+        </symbol>
+        <symbol id="no-answer" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>
+        </symbol>
         <symbol id="enter" viewBox="0 0 24 24">
           <path d="M9 10 4 15l5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>
         </symbol>
@@ -257,6 +394,18 @@
           placeholder="Search tabs, tasks, commands, or the web">
       <kbd>esc</kbd>
     </div>
+    <div id="calc" role="option" hidden>
+      <div>
+        <span id="sum"></span>
+        <span id="sumName" class="pill"></span>
+      </div>
+      <div>
+        <span id="answer"></span>
+        <span id="answerName" class="pill"></span>
+      </div>
+      <span id="arrow"><svg><use id="arrowIcon" href="#arrow-right"/></svg></span>
+    </div>
+    <div id="calcNote" hidden></div>
     <ul id="results" role="listbox"></ul>
     <div id="keys">
       <span class="typed rows">
@@ -277,6 +426,7 @@
         <kbd>Cmd K</kbd> Actions (T63)
       </span>
     </div>
+    <script src="/math.js"></script>
     <script type="module" src="/command_bar.js"></script>
   </body>
 </html>

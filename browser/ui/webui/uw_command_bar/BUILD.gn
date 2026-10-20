@@ -1,18 +1,30 @@
-# The command bar page's browser side: its controller, and the searchbox
-# handler it hands the page.
+# The command bar page's browser side: its controller, the searchbox
+# handler it hands the page, and the exchange rates its calculator uses.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+mojom("mojo_bindings") {
+  sources = [ "uw_command_bar.mojom" ]
+  webui_module_path = "/"
+}
+
 source_set("uw_command_bar") {
   sources = [
+    "exchange_rates.cc",
+    "exchange_rates.h",
     "uw_command_bar_handler.cc",
     "uw_command_bar_handler.h",
     "uw_command_bar_ui.cc",
     "uw_command_bar_ui.h",
   ]
   public_deps = [
+    ":mojo_bindings",
     "//base",
     "//chrome/browser/ui/webui/top_chrome",
     "//components/omnibox/browser:mojo_bindings",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",
+    "//services/data_decoder/public/cpp",
+    "//url",
   ]
   deps = [
     "//chrome/browser/profiles:profile",
@@ -21,7 +33,12 @@ source_set("uw_command_bar") {
     "//components/bookmarks/browser",
     "//components/favicon_base",
     "//components/omnibox/browser",
+    "//components/prefs",
+    "//net/traffic_annotation",
+    "//services/network/public/cpp",
+    "//ui/base/clipboard",
     "//ui/webui",
     "//uw/browser/resources/uw_command_bar:resources",
+    "//uw/browser/tab_organization:ai_connection",
   ]
 }

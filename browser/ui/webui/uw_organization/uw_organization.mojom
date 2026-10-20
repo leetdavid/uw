@@ -31,6 +31,12 @@ struct State {
   Thresholds thresholds;
   // Whether Cmd+T opens the command bar.
   bool command_bar;
+  // The currency a bare amount in the command bar converts to, as a code.
+  // Empty follows the Mac's region, whose currency is region_currency.
+  string currency;
+  string region_currency;
+  // The currencies the last exchange rates cover.
+  array<string> currencies;
 };
 
 struct PauseResult {
@@ -50,4 +56,6 @@ interface OrganizationHandler {
   OpenThemePicker();
   // Every window follows at once.
   SetCommandBar(bool on) => ();
+  // Empty follows the Mac's region. A code the rates do not cover is ignored.
+  SetCurrency(string code) => ();
 };
