@@ -57,6 +57,17 @@ class ShellHost {
   // The command the shell is running, or nothing while it waits at its prompt.
   std::optional<std::string> RunningCommand() const;
 
+  // What the terminal waits for, read from its settings.
+  struct Activity {
+    // The shell's line editor waits for a command.
+    bool at_prompt = false;
+    // A line is read without being shown, as a password prompt reads one.
+    bool password = false;
+    // The program that has the terminal. Empty while the shell has it.
+    std::string program;
+  };
+  Activity CurrentActivity() const;
+
   // The folder the shell is in. Empty when it cannot be read.
   base::FilePath Folder() const;
 

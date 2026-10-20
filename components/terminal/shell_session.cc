@@ -89,6 +89,10 @@ class ShellSession::Core {
     }
   }
 
+  ShellHost::Activity CurrentActivity() const {
+    return shell_ ? shell_->CurrentActivity() : ShellHost::Activity();
+  }
+
   void WatchOutput() {
     if (shell_) {
       readable_ = base::FileDescriptorWatcher::WatchReadable(
@@ -199,6 +203,11 @@ void ShellSession::Resize(int columns, int rows) {
 
 void ShellSession::AckOutput() {
   core_.AsyncCall(&Core::WatchOutput);
+}
+
+void ShellSession::GetActivity(
+    base::OnceCallback<void(ShellHost::Activity)> done) {
+  core_.AsyncCall(&Core::CurrentActivity).Then(std::move(done));
 }
 
 void ShellSession::OnOutput(std::string text) {

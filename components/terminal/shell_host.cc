@@ -7,9 +7,9 @@
 #include <libproc.h>
 #include <pwd.h>
 #include <signal.h>
-#include <spawn.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 #include <xlocale.h>
@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -61,42 +62,6 @@ base::ScopedFD Prepare(const char* name, int columns, int rows) {
 }
 
 pid_t Spawn(const ShellHost::Options& options, const char* terminal_name) {
-  posix_spawn_file_actions_t actions;
-  if (posix_spawn_file_actions_init(&actions) != 0) {
-    return -1;
-  }
-  // The shell opens the terminal itself after it becomes a session leader,
-  // which makes the terminal its controlling terminal. Job control and Ctrl-C
-  // depend on that.
-  posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, terminal_name,
-                                   O_RDWR, 0);
-  posix_spawn_file_actions_adddup2(&actions, STDIN_FILENO, STDOUT_FILENO);
-  posix_spawn_file_actions_adddup2(&actions, STDIN_FILENO, STDERR_FILENO);
-  if (!options.folder.empty()) {
-    if (__builtin_available(macOS 26, *)) {
-      posix_spawn_file_actions_addchdir(&actions,
-                                        options.folder.value().c_str());
-    } else {
-      posix_spawn_file_actions_addchdir_np(&actions,
-                                           options.folder.value().c_str());
-    }
-  }
-
-  posix_spawnattr_t attributes;
-  if (posix_spawnattr_init(&attributes) != 0) {
-    posix_spawn_file_actions_destroy(&actions);
-    return -1;
-  }
-  sigset_t no_signals;
-  sigset_t all_signals;
-  sigemptyset(&no_signals);
-  sigfillset(&all_signals);
-  posix_spawnattr_setsigmask(&attributes, &no_signals);
-  posix_spawnattr_setsigdefault(&attributes, &all_signals);
-  posix_spawnattr_setflags(&attributes,
-                           POSIX_SPAWN_SETSID | POSIX_SPAWN_CLOEXEC_DEFAULT |
-                               POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
-
   base::EnvironmentMap changes = options.environment;
   changes.try_emplace("TERM", "xterm-256color");
   changes.try_emplace("COLORTERM", "truecolor");
@@ -112,14 +77,68 @@ pid_t Spawn(const ShellHost::Options& options, const char* terminal_name) {
     name.insert(0, "-");
   }
   std::array<char*, 2> arguments = {name.data(), nullptr};
+  const char* shell = options.shell.value().c_str();
+  const char* folder =
+      options.folder.empty() ? nullptr : options.folder.value().c_str();
+  const int open_files = getdtablesize();
+  // The child reports here when it cannot start the shell. A successful exec
+  // closes it, so the parent reads nothing.
+  std::array<int, 2> report;
+  if (pipe(report.data()) != 0) {
+    return -1;
+  }
+  base::ScopedFD failed(report[0]);
+  base::ScopedFD failing(report[1]);
+  if (!base::SetCloseOnExec(failed.get()) ||
+      !base::SetCloseOnExec(failing.get())) {
+    return -1;
+  }
 
-  pid_t pid = -1;
-  const int result =
-      posix_spawn(&pid, options.shell.value().c_str(), &actions, &attributes,
-                  arguments.data(), environment.data());
-  posix_spawn_file_actions_destroy(&actions);
-  posix_spawnattr_destroy(&attributes);
-  return result == 0 ? pid : -1;
+  // posix_spawn opens files before it starts the new session, so the shell
+  // would have no controlling terminal: no job control, no Ctrl-C, and no
+  // /dev/tty for sudo's password. The child takes the terminal as forkpty
+  // does. Until exec, it makes only async-signal-safe calls.
+  const pid_t pid = fork();
+  if (pid < 0) {
+    return -1;
+  }
+  if (pid > 0) {
+    failing.reset();
+    char failure;
+    if (HANDLE_EINTR(read(failed.get(), &failure, 1)) != 0) {
+      HANDLE_EINTR(waitpid(pid, nullptr, 0));
+      return -1;
+    }
+    return pid;
+  }
+  setsid();
+  const int terminal = open(terminal_name, O_RDWR);
+  if (terminal < 0 || ioctl(terminal, TIOCSCTTY, nullptr) != 0) {
+    std::ignore = write(failing.get(), "x", 1);
+    _exit(127);
+  }
+  dup2(terminal, STDIN_FILENO);
+  dup2(terminal, STDOUT_FILENO);
+  dup2(terminal, STDERR_FILENO);
+  for (int file = STDERR_FILENO + 1; file < open_files; ++file) {
+    if (file != failing.get()) {
+      close(file);
+    }
+  }
+  if (folder) {
+    std::ignore = chdir(folder);
+  }
+  struct sigaction default_action = {};
+  default_action.sa_handler = SIG_DFL;
+  for (int number = 1; number < NSIG; ++number) {
+    sigaction(number, &default_action, nullptr);
+  }
+  sigset_t no_signals;
+  sigemptyset(&no_signals);
+  sigprocmask(SIG_SETMASK, &no_signals, nullptr);
+  execve(shell, arguments.data(), environment.data());
+  std::ignore = write(failing.get(), "x", 1);
+  _exit(127);
 }
 
 // The user's language and region as a locale the C library knows, with UTF-8
@@ -225,6 +244,23 @@ std::optional<std::string> ShellHost::RunningCommand() const {
     return std::nullopt;
   }
   return std::string(name.data());
+}
+
+ShellHost::Activity ShellHost::CurrentActivity() const {
+  Activity activity;
+  termios settings;
+  if (tcgetattr(terminal_.get(), &settings) != 0) {
+    return activity;
+  }
+  // A line editor, such as zsh's, reads keys one at a time, and so does a
+  // full-screen program such as vim. A password prompt reads a whole line
+  // with echo off.
+  const bool lines = settings.c_lflag & ICANON;
+  const bool echo = settings.c_lflag & ECHO;
+  activity.at_prompt = tcgetpgrp(terminal_.get()) == shell_.Pid() && !lines;
+  activity.password = lines && !echo;
+  activity.program = RunningCommand().value_or(std::string());
+  return activity;
 }
 
 base::FilePath ShellHost::Folder() const {
