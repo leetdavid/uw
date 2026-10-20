@@ -32,13 +32,15 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 ## Design
 
-T128 draws, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), a new page "Workspaces":
+On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Workspaces", drawn on 2026-10-21 for T128 and waiting for sign-off:
 
-- The sidebar foot with the workspace icons beside Organize and the new button.
-- The new workspace form, with the profile list.
-- A workspace icon's menu, and the delete question for a profile's last workspace.
-- Move to workspace ▸ in a tab's menu.
-- A pin's menu with Reset to home, Replace home URL with current, and Edit home URL….
+- "Workspaces: the sidebar": the switcher in its own row at the sidebar's foot, and the workspace's name under the pins.
+- "Workspaces: the swipe": both windows sliding with the fingers.
+- "New workspace: the card": name, emoji, and profile.
+- "Workspaces: every state": the switcher with seven or more workspaces and in dark mode, the workspace menu, the profile list, a new profile, both delete questions, and Move to Workspace.
+- "Pins: every state": the pin menu, Edit Home URL, one set of pins in two windows, and in two workspaces of one profile.
+
+The rules are in the `uw-workspaces` guide. The name row, the dots from seven workspaces on, and starting a new workspace on an unused suggested theme are uw's proposals.
 
 ## Stages
 
