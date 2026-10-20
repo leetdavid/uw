@@ -20,20 +20,24 @@
 #include "base/test/test_future.h"
 #include "base/thread_annotations.h"
 #include "base/threading/thread_restrictions.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "content/public/test/browser_test.h"
+#include "net/base/url_util.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
-#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/connectors/fake_mcp_server.h"
 #include "uw/components/connectors/connector_config.h"
+#include "uw/components/connectors/oauth.h"
 
 namespace uw {
 namespace {
@@ -65,25 +69,98 @@ class WebConnector {
     return seen_;
   }
 
-  void RequireSignIn() {
+  // Makes /mcp need a token, and serves the sign-in server that gives one.
+  // Without registration, it takes no client registration.
+  void RequireSignIn(bool registration = true) {
     base::AutoLock lock(lock_);
     sign_in_ = true;
+    registration_ = registration;
+  }
+
+  // The token given out stops working.
+  void Expire() {
+    base::AutoLock lock(lock_);
+    access_ = "expired";
   }
 
  private:
+  // The sign-in server's pages.
+  std::unique_ptr<net::test_server::HttpResponse> SignIn(
+      const net::test_server::HttpRequest& request) {
+    base::AutoLock lock(lock_);
+    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+    response->set_content_type("application/json");
+    const std::string base = request.base_url.spec();
+    const std::string issuer = base.substr(0, base.size() - 1);
+    const GURL url = request.GetURL();
+    if (url.path() == "/.well-known/oauth-protected-resource/mcp") {
+      response->set_content(base::StrCat(
+          {R"({"resource": ")", base, R"(mcp", "authorization_servers": [")",
+           issuer, R"("]})"}));
+    } else if (url.path() == "/.well-known/oauth-authorization-server") {
+      response->set_content(base::StrCat(
+          {R"({"issuer": ")", issuer, R"(", "authorization_endpoint": ")", base,
+           R"(authorize", "token_endpoint": ")", base, R"(token",)",
+           registration_ ? base::StrCat({R"("registration_endpoint": ")", base,
+                                         R"(register",)"})
+                         : std::string(),
+           R"("code_challenge_methods_supported": ["S256"]})"}));
+    } else if (url.path() == "/register") {
+      response->set_content(R"({"client_id": "client-1"})");
+    } else if (url.path() == "/authorize") {
+      std::string state;
+      net::GetValueForKeyInQuery(url, "state", &state);
+      net::GetValueForKeyInQuery(url, "code_challenge", &challenge_);
+      response->set_code(net::HTTP_FOUND);
+      response->AddCustomHeader(
+          "Location", net::AppendQueryParameter(
+                          net::AppendQueryParameter(
+                              net::AppendQueryParameter(
+                                  GURL(oauth::kRedirectUri), "code", "code-1"),
+                              "state", state),
+                          "iss", issuer)
+                          .spec());
+    } else if (url.path() == "/token") {
+      const GURL form(base::StrCat({"http://form/?", request.content}));
+      std::string grant;
+      std::string value;
+      net::GetValueForKeyInQuery(form, "grant_type", &grant);
+      if (grant == "authorization_code" &&
+          net::GetValueForKeyInQuery(form, "code_verifier", &value) &&
+          oauth::Challenge(value) == challenge_) {
+        access_ = "access-1";
+        response->set_content(R"({"access_token": "access-1",
+            "refresh_token": "refresh-1", "expires_in": 3600})");
+      } else if (grant == "refresh_token" &&
+                 net::GetValueForKeyInQuery(form, "refresh_token", &value) &&
+                 value == "refresh-1") {
+        access_ = "access-2";
+        response->set_content(R"({"access_token": "access-2"})");
+      } else {
+        response->set_code(net::HTTP_BAD_REQUEST);
+        response->set_content(R"({"error": "invalid_grant"})");
+      }
+    } else {
+      return nullptr;
+    }
+    return response;
+  }
+
   std::unique_ptr<net::test_server::HttpResponse> Handle(
       const net::test_server::HttpRequest& request) {
     if (request.relative_url != "/mcp") {
-      return nullptr;
+      return SignIn(request);
     }
     base::AutoLock lock(lock_);
     auto response = std::make_unique<net::test_server::BasicHttpResponse>();
-    if (sign_in_ && !request.headers.contains("Authorization")) {
+    auto authorization = request.headers.find("Authorization");
+    if (sign_in_ && (authorization == request.headers.end() ||
+                     authorization->second != "Bearer " + access_)) {
       response->set_code(net::HTTP_UNAUTHORIZED);
       response->AddCustomHeader(
           "WWW-Authenticate",
-          "Bearer resource_metadata=\"https://auth.test/.well-known/"
-          "oauth-protected-resource\"");
+          base::StrCat({"Bearer resource_metadata=\"", request.base_url.spec(),
+                        ".well-known/oauth-protected-resource/mcp\""}));
       return response;
     }
     const auto header = [&](const std::string& name) {
@@ -126,6 +203,9 @@ class WebConnector {
   FakeMcpServer fake_ GUARDED_BY(lock_);
   const bool legacy_;
   bool sign_in_ GUARDED_BY(lock_) = false;
+  bool registration_ GUARDED_BY(lock_) = true;
+  std::string access_ GUARDED_BY(lock_) = "none yet";
+  std::string challenge_ GUARDED_BY(lock_);
   std::vector<std::string> seen_ GUARDED_BY(lock_);
 };
 
@@ -147,7 +227,7 @@ class ConnectorsBrowserTest : public headless::HeadlessModeBrowserTest {
   // Starts the connectors as uw does when it starts, with what was saved.
   void StartUw() {
     Connectors::SetUpForTesting(folder_.GetPath(), base::FilePath("/bin/sh"));
-    Connectors::Get().Start(g_browser_process->shared_url_loader_factory());
+    Connectors::Get().Start();
     ASSERT_TRUE(
         base::test::RunUntil([] { return Connectors::Get().loaded(); }));
   }
@@ -378,6 +458,77 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
   EXPECT_EQ(Settled("locked").state, Connectors::State::kNeedsSignIn);
   EXPECT_EQ(Call("locked", "echo", {}).error(),
             "Sign in to locked on uw://ai/connectors first.");
+}
+
+// Opens the sign-in page as the connectors page does: in a new tab.
+ConnectorSignIn::OpenTab OpenInTab(Browser* browser) {
+  return base::BindOnce(
+      [](Browser* browser, const GURL& url) {
+        NavigateParams params(browser, url, ui::PAGE_TRANSITION_LINK);
+        params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+        Navigate(&params);
+        return params.navigated_or_inserted_contents.get();
+      },
+      browser);
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       AWebConnectorSignsInAndRefreshesItsToken) {
+  net::test_server::EmbeddedTestServer server;
+  WebConnector web(server, /*legacy=*/false);
+  web.RequireSignIn();
+  ASSERT_TRUE(server.Start());
+  Add(Web("linear", server.GetURL("/mcp")));
+  ASSERT_EQ(Settled("linear").state, Connectors::State::kNeedsSignIn);
+  const int tabs = browser()->tab_strip_model()->count();
+
+  Connectors::Get().SignIn("linear", OpenInTab(browser()));
+  EXPECT_TRUE(base::test::RunUntil([] {
+    return Connectors::Get().Find("linear")->state == Connectors::State::kReady;
+  })) << Connectors::Get().Find("linear")->error;
+  // The sign-in tab closed itself once the sign-in came back.
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return browser()->tab_strip_model()->count() == tabs; }));
+  EXPECT_EQ(Call("linear", "echo", base::DictValue().Set("text", "in"))->text,
+            "in");
+  EXPECT_THAT(ApiKeyStore().GetKey("connector-oauth:linear").value_or(""),
+              HasSubstr("access-1"));
+  EXPECT_THAT(ApiKeyStore()
+                  .GetKey(ClientAccount(server.base_url().spec().substr(
+                      0, server.base_url().spec().size() - 1)))
+                  .value_or(""),
+              HasSubstr("client-1"));
+
+  // A token that stopped working is refreshed, and the call goes again.
+  web.Expire();
+  EXPECT_EQ(
+      Call("linear", "echo", base::DictValue().Set("text", "again"))->text,
+      "again");
+  EXPECT_THAT(ApiKeyStore().GetKey("connector-oauth:linear").value_or(""),
+              HasSubstr("access-2"));
+
+  Connectors::Get().SignOut("linear");
+  EXPECT_EQ(Connectors::Get().Find("linear")->state,
+            Connectors::State::kNeedsSignIn);
+  EXPECT_FALSE(ApiKeyStore().GetKey("connector-oauth:linear"));
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       ASignInServerWithoutRegistrationCannotSignIn) {
+  net::test_server::EmbeddedTestServer server;
+  WebConnector web(server, /*legacy=*/false);
+  web.RequireSignIn(/*registration=*/false);
+  ASSERT_TRUE(server.Start());
+  Add(Web("notion", server.GetURL("/mcp")));
+  ASSERT_EQ(Settled("notion").state, Connectors::State::kNeedsSignIn);
+  Connectors::Get().SignIn("notion", OpenInTab(browser()));
+  EXPECT_TRUE(base::test::RunUntil([] {
+    return Connectors::Get().Find("notion")->state ==
+           Connectors::State::kCantSignIn;
+  }));
+  EXPECT_EQ(Connectors::Get().Find("notion")->error,
+            "This connector's sign-in needs a registration uw doesn't "
+            "support yet.");
 }
 
 }  // namespace

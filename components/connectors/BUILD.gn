@@ -9,10 +9,17 @@ source_set("connectors") {
     "connector_tools.h",
     "mcp.cc",
     "mcp.h",
+    "oauth.cc",
+    "oauth.h",
   ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//url",
+  ]
   deps = [
     "//components/version_info",
+    "//crypto",
+    "//net",
     "//uw/components/ai_providers",
   ]
 }
@@ -23,10 +30,13 @@ source_set("unit_tests") {
     "connector_config_unittest.cc",
     "connector_tools_unittest.cc",
     "mcp_unittest.cc",
+    "oauth_unittest.cc",
   ]
   deps = [
     ":connectors",
     "//base",
+    "//testing/gmock",
     "//testing/gtest",
+    "//url",
   ]
 }

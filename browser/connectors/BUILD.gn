@@ -10,9 +10,12 @@ source_set("connectors") {
     "mcp_client.h",
     "remote_transport.cc",
     "remote_transport.h",
+    "sign_in.cc",
+    "sign_in.h",
   ]
   public_deps = [
     "//base",
+    "//content/public/browser",
     "//url",
     "//uw/components/connectors",
   ]

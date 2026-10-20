@@ -22,8 +22,10 @@
 #include "base/types/expected.h"
 #include "base/values.h"
 #include "uw/browser/connectors/mcp_client.h"
+#include "uw/browser/connectors/sign_in.h"
 #include "uw/components/connectors/connector_config.h"
 #include "uw/components/connectors/mcp.h"
+#include "uw/components/connectors/oauth.h"
 
 namespace base {
 class SequencedTaskRunner;
@@ -45,6 +47,9 @@ class Connectors {
     kStarting,
     kReady,
     kNeedsSignIn,
+    kSigningIn,
+    // Its sign-in server takes no registration uw can make.
+    kCantSignIn,
     kFailed,
   };
 
@@ -85,8 +90,8 @@ class Connectors {
   Connectors& operator=(const Connectors&) = delete;
 
   // Reads the list and starts every connector that is on, the first time it
-  // is called. `loader` serves web connectors.
-  void Start(scoped_refptr<network::SharedURLLoaderFactory> loader);
+  // is called. uw calls it when its first window opens.
+  void Start();
   bool started() const { return started_; }
   // The saved list has been read; until then nothing can be added.
   bool loaded() const { return read_; }
@@ -105,6 +110,12 @@ class Connectors {
                         bool allowed);
   // Starts a failed connector again.
   void Restart(std::string_view name);
+
+  // Opens a web connector's sign-in page with `open`, and starts the
+  // connector once the sign-in comes back.
+  void SignIn(std::string_view name, ConnectorSignIn::OpenTab open);
+  void CancelSignIn(std::string_view name);
+  void SignOut(std::string_view name);
 
   // Runs a tool. A connector that is still starting runs it once it is
   // ready.
@@ -154,16 +165,28 @@ class Connectors {
                 int generation,
                 base::expected<McpClient::Listing, McpReply> listing);
   void Fail(Info& info, std::string error);
+  std::string AccessToken(std::string_view name) const;
+  void OnSignedIn(std::string name,
+                  base::expected<oauth::Tokens, SignInError> result);
+  // Trades the connector's refresh token for a new access token, once
+  // until it works again. `done` learns whether it did.
+  void Refresh(std::string_view name, base::OnceCallback<void(bool)> done);
+  void OnRefreshed(std::string name,
+                   base::OnceCallback<void(bool)> done,
+                   std::optional<oauth::Tokens> tokens);
+  void KeepTokens(std::string_view name, const oauth::Tokens& tokens);
+  void ForgetTokens(std::string_view name);
   void Request(std::string_view name,
                std::string method,
                base::DictValue params,
                std::string item,
                Done done);
-  void SendRequest(Live& live,
-                   const std::string& method,
-                   base::DictValue params,
-                   const std::string& item,
-                   Done done);
+  void OnAnswer(std::string name,
+                std::string method,
+                base::DictValue retry,
+                std::string item,
+                Done done,
+                McpReply reply);
   void SaveList();
   void SaveCache(const Info& info);
   void Changed();
@@ -182,6 +205,14 @@ class Connectors {
   // started it.
   std::map<std::string, int, std::less<>> restarts_;
   int next_generation_ = 0;
+  std::map<std::string, std::unique_ptr<ConnectorSignIn>, std::less<>>
+      sign_ins_;
+  // Where each web connector's 401 said to read how to sign in.
+  std::map<std::string, std::string, std::less<>> sign_in_hints_;
+  std::map<std::string, oauth::Tokens, std::less<>> tokens_;
+  // Connectors whose token was refreshed since they last worked, which are
+  // not refreshed again before they do.
+  std::set<std::string, std::less<>> refreshed_;
   base::ObserverList<Observer> observers_;
   base::WeakPtrFactory<Connectors> weak_factory_{this};
 };

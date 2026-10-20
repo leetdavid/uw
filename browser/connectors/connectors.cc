@@ -13,7 +13,9 @@
 #include "base/json/json_writer.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
+#include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/common/chrome_paths.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/ai_providers/api_key_store.h"
@@ -34,6 +36,10 @@ constexpr int kRestarts = 1;
 
 std::string SecretsAccount(std::string_view name) {
   return base::StrCat({"connector:", name});
+}
+
+std::string TokensAccount(std::string_view name) {
+  return base::StrCat({"connector-oauth:", name});
 }
 
 base::ListValue ToList(const std::set<std::string>& names) {
@@ -147,6 +153,10 @@ void Connectors::SetUpForTesting(const base::FilePath& folder,
   connectors.list_.clear();
   connectors.eras_.clear();
   connectors.restarts_.clear();
+  connectors.sign_ins_.clear();
+  connectors.sign_in_hints_.clear();
+  connectors.tokens_.clear();
+  connectors.refreshed_.clear();
   connectors.started_ = false;
   connectors.read_ = false;
   connectors.folder_ = folder;
@@ -154,12 +164,14 @@ void Connectors::SetUpForTesting(const base::FilePath& folder,
   connectors.loader_ = nullptr;
 }
 
-void Connectors::Start(scoped_refptr<network::SharedURLLoaderFactory> loader) {
+void Connectors::Start() {
   if (started_) {
     return;
   }
   started_ = true;
-  loader_ = std::move(loader);
+  // Connectors serve every profile, so they use the browser's own network
+  // context, without any profile's cookies.
+  loader_ = g_browser_process->shared_url_loader_factory();
   if (shell_.empty()) {
     shell_ = UserShell();
   }
@@ -287,6 +299,10 @@ void Connectors::Remove(std::string_view name) {
   }
   Stop(name);
   ApiKeyStore().DeleteKey(SecretsAccount(name));
+  ForgetTokens(name);
+  if (auto sign_in = sign_ins_.find(name); sign_in != sign_ins_.end()) {
+    sign_ins_.erase(sign_in);
+  }
   if (auto era = eras_.find(name); era != eras_.end()) {
     eras_.erase(era);
   }
@@ -381,8 +397,19 @@ void Connectors::Launch(Info& info) {
       Fail(info, "uw can't reach the web yet.");
       return;
     }
+    if (!tokens_.contains(name)) {
+      if (std::optional<std::string> saved =
+              ApiKeyStore().GetKey(TokensAccount(name))) {
+        if (std::optional<oauth::Tokens> tokens =
+                oauth::TokensFromJson(*saved)) {
+          tokens_[name] = std::move(*tokens);
+        }
+      }
+    }
     transport = std::make_unique<RemoteTransport>(
-        GURL(config.url), config.headers, loader_, RemoteTransport::Token());
+        GURL(config.url), config.headers, loader_,
+        base::BindRepeating(
+            [](std::string name) { return Get().AccessToken(name); }, name));
   } else {
     transport = std::make_unique<LocalTransport>(
         config, shell_, LogFile(name),
@@ -429,10 +456,29 @@ void Connectors::OnConnected(
   }
   if (!listing.has_value()) {
     if (listing.error().needs_sign_in) {
-      info->state = State::kNeedsSignIn;
-      info->error.clear();
+      sign_in_hints_[name] = listing.error().resource_metadata;
       Stop(name);
-      Changed();
+      const bool signed_in = tokens_.contains(name);
+      Refresh(name, base::BindOnce(
+                        [](std::string name, bool signed_in, bool refreshed) {
+                          Connectors& connectors = Get();
+                          Info* info = connectors.FindInfo(name);
+                          if (!info || !info->on) {
+                            return;
+                          }
+                          if (refreshed) {
+                            connectors.Launch(*info);
+                          } else {
+                            connectors.ForgetTokens(name);
+                            info->state = State::kNeedsSignIn;
+                            info->error =
+                                signed_in ? "Signed out: the sign-in expired "
+                                            "and couldn't refresh."
+                                          : std::string();
+                          }
+                          connectors.Changed();
+                        },
+                        name, signed_in));
       return;
     }
     Fail(*info, listing.error().problem);
@@ -445,6 +491,7 @@ void Connectors::OnConnected(
   info->state = State::kReady;
   info->error.clear();
   live->second->ready = true;
+  refreshed_.erase(name);
   SaveCache(*info);
   std::vector<base::OnceClosure> waiting = std::move(live->second->waiting);
   for (base::OnceClosure& run : waiting) {
@@ -553,8 +600,12 @@ void Connectors::Request(std::string_view name,
   }
   auto live = live_.find(name);
   if (live != live_.end() && live->second->ready) {
-    SendRequest(*live->second, method, std::move(params), item,
-                std::move(done));
+    base::DictValue retry = params.Clone();
+    live->second->client->Request(
+        method, std::move(params), item, kCallTimeout,
+        base::BindOnce(&Connectors::OnAnswer, weak_factory_.GetWeakPtr(),
+                       std::string(name), method, std::move(retry), item,
+                       std::move(done)));
     return;
   }
   if (live != live_.end()) {
@@ -570,30 +621,156 @@ void Connectors::Request(std::string_view name,
           : base::StrCat({name, " isn't running: ", info->error})));
 }
 
-void Connectors::SendRequest(Live& live,
-                             const std::string& method,
-                             base::DictValue params,
-                             const std::string& item,
-                             Done done) {
-  const bool prompt = method == "prompts/get";
-  live.client->Request(
-      method, std::move(params), item, kCallTimeout,
-      base::BindOnce(
-          [](bool prompt, Done done, McpReply reply) {
-            if (!reply.message) {
-              std::move(done).Run(base::unexpected(reply.problem));
-              return;
-            }
-            if (reply.message->error) {
-              std::move(done).Run(base::unexpected(base::StrCat(
-                  {"The connector refused: ", reply.message->error->message})));
-              return;
-            }
-            std::move(done).Run(
-                prompt ? mcp::ParsePromptResult(reply.message->result)
-                       : mcp::ParseToolResult(reply.message->result));
-          },
-          prompt, std::move(done)));
+void Connectors::OnAnswer(std::string name,
+                          std::string method,
+                          base::DictValue retry,
+                          std::string item,
+                          Done done,
+                          McpReply reply) {
+  if (reply.needs_sign_in) {
+    Refresh(
+        name,
+        base::BindOnce(
+            [](std::string name, std::string method, base::DictValue retry,
+               std::string item, Done done, bool refreshed) {
+              if (!refreshed) {
+                Get().SignOut(name);
+                std::move(done).Run(base::unexpected(base::StrCat(
+                    {"Sign in to ", name, " again on uw://ai/connectors."})));
+                return;
+              }
+              Get().Request(name, std::move(method), std::move(retry),
+                            std::move(item), std::move(done));
+            },
+            name, std::move(method), std::move(retry), std::move(item),
+            std::move(done)));
+    return;
+  }
+  if (!reply.message) {
+    std::move(done).Run(base::unexpected(reply.problem));
+    return;
+  }
+  if (reply.message->error) {
+    std::move(done).Run(base::unexpected(base::StrCat(
+        {"The connector refused: ", reply.message->error->message})));
+    return;
+  }
+  std::move(done).Run(method == "prompts/get"
+                          ? mcp::ParsePromptResult(reply.message->result)
+                          : mcp::ParseToolResult(reply.message->result));
+}
+
+void Connectors::SignIn(std::string_view name, ConnectorSignIn::OpenTab open) {
+  Info* info = FindInfo(name);
+  if (!info || !info->config.remote() || !loader_) {
+    return;
+  }
+  Stop(name);
+  info->state = State::kSigningIn;
+  info->error.clear();
+  GURL hint;
+  if (auto found = sign_in_hints_.find(name); found != sign_in_hints_.end()) {
+    hint = GURL(found->second);
+  }
+  sign_ins_[std::string(name)] = std::make_unique<ConnectorSignIn>(
+      GURL(info->config.url), hint, loader_, std::move(open),
+      base::BindOnce(&Connectors::OnSignedIn, weak_factory_.GetWeakPtr(),
+                     std::string(name)));
+  Changed();
+}
+
+void Connectors::CancelSignIn(std::string_view name) {
+  auto sign_in = sign_ins_.find(name);
+  Info* info = FindInfo(name);
+  if (sign_in == sign_ins_.end() || !info) {
+    return;
+  }
+  sign_ins_.erase(sign_in);
+  info->state = State::kNeedsSignIn;
+  info->error.clear();
+  Changed();
+}
+
+void Connectors::SignOut(std::string_view name) {
+  Info* info = FindInfo(name);
+  if (!info || !info->config.remote()) {
+    return;
+  }
+  ForgetTokens(name);
+  Stop(name);
+  info->state = State::kNeedsSignIn;
+  info->error.clear();
+  Changed();
+}
+
+void Connectors::OnSignedIn(std::string name,
+                            base::expected<oauth::Tokens, SignInError> result) {
+  // The sign-in is still in its own call; it is deleted afterwards.
+  if (auto sign_in = sign_ins_.find(name); sign_in != sign_ins_.end()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(sign_in->second));
+    sign_ins_.erase(sign_in);
+  }
+  Info* info = FindInfo(name);
+  if (!info) {
+    return;
+  }
+  if (!result.has_value()) {
+    info->state = result.error().cannot_register ? State::kCantSignIn
+                                                 : State::kNeedsSignIn;
+    info->error = result.error().message;
+    Changed();
+    return;
+  }
+  KeepTokens(name, *result);
+  refreshed_.erase(name);
+  if (info->on) {
+    Launch(*info);
+  }
+  Changed();
+}
+
+std::string Connectors::AccessToken(std::string_view name) const {
+  auto tokens = tokens_.find(name);
+  return tokens == tokens_.end() ? std::string() : tokens->second.access;
+}
+
+void Connectors::Refresh(std::string_view name,
+                         base::OnceCallback<void(bool)> done) {
+  auto tokens = tokens_.find(name);
+  const Info* info = Find(name);
+  if (tokens == tokens_.end() || !info || refreshed_.contains(name) ||
+      !loader_) {
+    std::move(done).Run(false);
+    return;
+  }
+  refreshed_.insert(std::string(name));
+  ConnectorSignIn::Refresh(
+      tokens->second, GURL(info->config.url), loader_,
+      base::BindOnce(&Connectors::OnRefreshed, weak_factory_.GetWeakPtr(),
+                     std::string(name), std::move(done)));
+}
+
+void Connectors::OnRefreshed(std::string name,
+                             base::OnceCallback<void(bool)> done,
+                             std::optional<oauth::Tokens> tokens) {
+  if (tokens) {
+    KeepTokens(name, *tokens);
+  }
+  std::move(done).Run(tokens.has_value());
+}
+
+void Connectors::KeepTokens(std::string_view name,
+                            const oauth::Tokens& tokens) {
+  tokens_[std::string(name)] = tokens;
+  ApiKeyStore().SetKey(TokensAccount(name), oauth::TokensToJson(tokens));
+}
+
+void Connectors::ForgetTokens(std::string_view name) {
+  if (auto tokens = tokens_.find(name); tokens != tokens_.end()) {
+    tokens_.erase(tokens);
+  }
+  ApiKeyStore().DeleteKey(TokensAccount(name));
 }
 
 std::string Connectors::CommandLine(std::string_view name) const {
