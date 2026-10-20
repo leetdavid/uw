@@ -21,7 +21,7 @@
 #include "base/thread_annotations.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
-#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -461,9 +461,9 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
 }
 
 // Opens the sign-in page as the connectors page does: in a new tab.
-ConnectorSignIn::OpenTab OpenInTab(Browser* browser) {
+ConnectorSignIn::OpenTab OpenInTab(BrowserWindowInterface* browser) {
   return base::BindOnce(
-      [](Browser* browser, const GURL& url) {
+      [](BrowserWindowInterface* browser, const GURL& url) {
         NavigateParams params(browser, url, ui::PAGE_TRANSITION_LINK);
         params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
         Navigate(&params);
