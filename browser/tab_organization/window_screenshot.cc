@@ -17,7 +17,7 @@
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
-#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
@@ -97,14 +97,15 @@ void Save(base::FunctionRef<SkBitmap()> pixels, const std::string& name) {
 
 }  // namespace
 
-SkBitmap CaptureWindow(Browser* browser) {
+SkBitmap CaptureWindow(BrowserWindowInterface* browser) {
   views::Widget* widget =
       BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
   widget->SetBounds(kWindowBounds);
   return CaptureSettled(widget);
 }
 
-void SaveWindowScreenshot(Browser* browser, const std::string& name) {
+void SaveWindowScreenshot(BrowserWindowInterface* browser,
+                          const std::string& name) {
   Save([&] { return CaptureWindow(browser); }, name);
 }
 

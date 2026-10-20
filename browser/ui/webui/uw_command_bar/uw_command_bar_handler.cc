@@ -55,6 +55,7 @@ void UwCommandBarHandler::StartShellCommand() {
 }
 
 void UwCommandBarHandler::OpenAutocompleteMatch(
+    uint32_t result_sequence_id,
     uint8_t line,
     const GURL& url,
     bool are_matches_showing,
@@ -75,7 +76,8 @@ void UwCommandBarHandler::OpenAutocompleteMatch(
     }
     return;
   }
-  if (const AutocompleteMatch* match = GetMatchWithUrl(line, url)) {
+  if (const AutocompleteMatch* match =
+          GetMatchWithUrl(result_sequence_id, line, url)) {
     if (const std::optional<uint8_t> action = TabSwitchAction(*match)) {
       ExecuteAction(line, *action, url, base::TimeTicks::Now(), mouse_button,
                     /*alt_key=*/false, /*ctrl_key=*/false, /*meta_key=*/false,
@@ -83,9 +85,9 @@ void UwCommandBarHandler::OpenAutocompleteMatch(
       return;
     }
   }
-  RealboxHandler::OpenAutocompleteMatch(line, url, are_matches_showing,
-                                        mouse_button, std::move(modifiers),
-                                        via_keyboard);
+  RealboxHandler::OpenAutocompleteMatch(result_sequence_id, line, url,
+                                        are_matches_showing, mouse_button,
+                                        std::move(modifiers), via_keyboard);
 }
 
 std::optional<searchbox::mojom::AutocompleteMatchPtr>

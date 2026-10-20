@@ -176,8 +176,8 @@ ActivityCard::ActivityCard(base::RepeatingClosure undo,
 
   meter_ = AddChildView(std::make_unique<views::ProgressBar>());
   meter_->SetPreferredHeight(kMeterHeight);
-  meter_->SetForegroundColorId(ui::kColorSysOnHeaderPrimary);
-  meter_->SetBackgroundColorId(ui::kColorSysOnHeaderDivider);
+  meter_->SetForegroundColor(ui::kColorSysOnHeaderPrimary);
+  meter_->SetBackgroundColor(ui::kColorSysOnHeaderDivider);
   meter_->SetProperty(views::kMarginsKey,
                       gfx::Insets::TLBR(kMeterSpacing, 0, 0, 0));
 

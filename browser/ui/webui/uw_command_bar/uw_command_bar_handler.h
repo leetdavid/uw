@@ -25,7 +25,8 @@ class UwCommandBarHandler : public RealboxHandler {
   void StartShellCommand();
 
   // searchbox::mojom::PageHandler:
-  void OpenAutocompleteMatch(uint8_t line,
+  void OpenAutocompleteMatch(uint32_t result_sequence_id,
+                             uint8_t line,
                              const GURL& url,
                              bool are_matches_showing,
                              uint8_t mouse_button,

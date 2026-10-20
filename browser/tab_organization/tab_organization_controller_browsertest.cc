@@ -27,6 +27,7 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
+#include "chrome/browser/ui/tabs/tab_menu_model_delegate.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
@@ -853,8 +854,8 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(controller()->MoveToNewTask({Id(plan)}, u"Plan"));
   ASSERT_TRUE(controller()->MoveToNewTask({Id(trip)}, u"Trip"));
 
-  TabMenuModel menu(nullptr, browser()->GetFeatures().tab_menu_model_delegate(),
-                    tabs(), tabs()->GetIndexOfTab(plan));
+  TabMenuModel menu(nullptr, TabMenuModelDelegate::From(browser()), tabs(),
+                    tabs()->GetIndexOfTab(plan));
   controller()->AddCommands(&menu, {Id(plan)});
   std::vector<int> order;
   for (size_t i = 0; i < menu.GetItemCount(); ++i) {

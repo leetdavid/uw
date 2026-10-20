@@ -90,7 +90,7 @@ class TintBrowserTest : public headless::HeadlessModeBrowserTest {
   SkColor Color(ui::ColorId id) { return Color(browser(), id); }
 
   // The window's own colors, without the page color on its toolbar.
-  SkColor Color(Browser* window, ui::ColorId id) {
+  SkColor Color(BrowserWindowInterface* window, ui::ColorId id) {
     ui::ColorProviderKey key = BrowserView::GetBrowserViewForBrowser(window)
                                    ->GetWidget()
                                    ->GetColorProviderKeyForTesting();
@@ -377,7 +377,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TwoProfilesKeepTwoThemes) {
   ProfileManager* manager = g_browser_process->profile_manager();
   Profile& second = profiles::testing::CreateProfileSync(
       manager, manager->GenerateNextProfileDirectoryPath());
-  Browser* other = CreateBrowser(&second);
+  BrowserWindowInterface* other = CreateBrowser(&second);
   for (Profile* profile : {browser()->GetProfile(), &second}) {
     ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
         ThemeService::BrowserColorScheme::kLight);

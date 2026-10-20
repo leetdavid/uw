@@ -764,10 +764,10 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb780188
      width = std::max(width, bounds.width());
    }
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0cb44f1ac2 100644
+index 3ff37eb2f462c45960edc557bbc63b6cebaf6af2..7730900fc7c2ce75812d4cdfa99eecbf5546a8ce 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-@@ -26,6 +26,8 @@
+@@ -27,6 +27,8 @@
  #include "ui/views/view_targeter.h"
  #include "ui/views/view_targeter_delegate.h"
  #include "ui/views/view_utils.h"
@@ -776,7 +776,7 @@ index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0c
  
  namespace {
  
-@@ -107,10 +109,18 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
+@@ -108,10 +110,20 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
    node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
        base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
                       base::Unretained(this)));
@@ -788,8 +788,10 @@ index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0c
 +void UnpinnedTabContainerView::OnPaint(gfx::Canvas* canvas) {
 +  views::View::OnPaint(canvas);
 +  if (collection_node_) {
-+    uw::PaintScratchpadLabel(this, collection_node_->GetDirectChildren(),
-+                             canvas);
++    const auto children = collection_node_->GetDirectChildren();
++    uw::PaintScratchpadLabel(
++        this, std::vector<views::View*>(children.begin(), children.end()),
++        canvas);
 +  }
 +}
  
@@ -818,10 +820,10 @@ index 962216bdc7d15faea7d2bb9c4bc84a8d9be80a7d..412c44b785a62858f2694f658ad16bb5
  
  #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05bda371b6 100644
+index 5dd9f7ef1a654962bb86aba3003319015f4c7eec..d9fb834788cc0a61179dcf135d6f4acd3912e9fb 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-@@ -21,6 +21,8 @@
+@@ -23,6 +23,8 @@
  #include "ui/views/layout/proposed_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_utils.h"
@@ -830,19 +832,20 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
  
  namespace {
  constexpr int kTabVerticalPadding = 2;
-@@ -162,6 +164,11 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -223,6 +225,12 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
    int height = 0;
    int dragged_view_bottom = 0;
    auto collapse_state = tab_container_view->GetTabStripCollapseState();
 +  const views::View* scratchpad_top =
 +      collapse_state == tabs::VerticalTabStripCollapseState::kExpanded &&
 +              !focused_group_id.has_value()
-+          ? uw::FirstScratchpadTab(children)
++          ? uw::FirstScratchpadTab(
++                std::vector<views::View*>(children.begin(), children.end()))
 +          : nullptr;
  
    const int horizontal_padding =
        GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
-@@ -172,6 +179,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -233,6 +241,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
                  collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
              ? 0
              : horizontal_padding;
@@ -852,7 +855,7 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
      views::SizeBound child_height_bound = size_bounds.height();
      // In focused mode, pass the scroll viewport height constraint to the child
      // focused group if the incoming size bounds height is unbounded, so that
-@@ -192,7 +202,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -253,7 +264,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
  
      auto drag_data = tab_container_view->GetVisualDataForDraggedView(*child);
      bool should_show_child =
@@ -863,7 +866,7 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
  
      if (!should_show_child) {
        layouts.child_layouts.emplace_back(
-@@ -202,6 +214,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -263,6 +276,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
        continue;
      }
  

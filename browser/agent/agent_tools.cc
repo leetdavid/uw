@@ -165,7 +165,7 @@ AgentTools::AgentTools(tabs::TabInterface& chat)
       actor::TaskSourceInfo(actor::TaskSourceInfo::Client::kExperimentalActor,
                             std::nullopt),
       actor::GetNullEnterprisePolicyChecker(), /*options=*/nullptr,
-      delegate_->GetWeakPtr());
+      delegate_->GetWeakPtr(), engine->GetActorUiStateManager());
 }
 
 AgentTools::~AgentTools() {

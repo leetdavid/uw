@@ -35,6 +35,8 @@ let queryId = 0;
 let typed = '';
 // Each shown row, and the line Chromium knows it by.
 let rows: Array<{match: AutocompleteMatch, line: number}> = [];
+// The result the shown rows came from, as Chromium numbers its results.
+let sequenceId = 0;
 // The typed text the shown rows are for.
 let shownFor = '';
 let selected = 0;
@@ -134,6 +136,7 @@ function show(result: AutocompleteResult) {
     return;
   }
   shownFor = typed;
+  sequenceId = result.sequenceId;
   rows = result.matches.map((match, line) => ({match, line}))
              .filter(row => !row.match.isHidden);
   results.replaceChildren(...rows.map(({match}, index) => {
@@ -175,7 +178,7 @@ function open(index: number, viaKeyboard: boolean) {
     return;
   }
   handler.openAutocompleteMatch(
-      row ? row.line : NO_ROW, row ? row.match.destinationUrl : '',
+      sequenceId, row ? row.line : NO_ROW, row ? row.match.destinationUrl : '',
       /*areMatchesShowing=*/ true, /*mouseButton=*/ 0,
       {altKey: false, ctrlKey: false, metaKey: false, shiftKey: false},
       viaKeyboard);
@@ -202,7 +205,7 @@ function query(preventInlineAutocomplete: boolean) {
   }
   showRows(true);
   handler.queryAutocomplete(
-      ++queryId, typed, preventInlineAutocomplete,
+      ++queryId, /*tabId=*/ null, typed, preventInlineAutocomplete,
       field.selectionStart ?? typed.length, SuggestInventory.kDefault,
       /*isOnFocus=*/ false, keywords.activeKeyword, InputMethod.kKeyboard);
 }
@@ -215,11 +218,11 @@ function sendText(key: {metaKey?: boolean, altKey?: boolean}) {
     return;
   }
   handler.queryAutocomplete(
-      ++queryId, words, /*preventInlineAutocomplete=*/ true, words.length,
-      SuggestInventory.kDefault, /*isOnFocus=*/ false, /*keyword=*/ '',
-      InputMethod.kKeyboard);
+      ++queryId, /*tabId=*/ null, words, /*preventInlineAutocomplete=*/ true,
+      words.length, SuggestInventory.kDefault, /*isOnFocus=*/ false,
+      /*keyword=*/ '', InputMethod.kKeyboard);
   handler.openAutocompleteMatch(
-      NO_ROW, '', /*areMatchesShowing=*/ true, /*mouseButton=*/ 0, {
+      sequenceId, NO_ROW, '', /*areMatchesShowing=*/ true, /*mouseButton=*/ 0, {
         altKey: key.altKey ?? false,
         ctrlKey: false,
         metaKey: key.metaKey ?? false,
@@ -258,7 +261,7 @@ field.addEventListener('input', event => {
     return;
   }
   if (!shell &&
-      keywords.acceptInputTrigger(field.value, field.selectionStart)) {
+      keywords.acceptInputTrigger(field.value, field.selectionStart, event)) {
     return;
   }
   // As the address bar does, nothing is completed while deleting or with the
