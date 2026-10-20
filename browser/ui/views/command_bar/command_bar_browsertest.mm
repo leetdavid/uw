@@ -35,6 +35,7 @@
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_data.h"
 #include "components/search_engines/template_url_service.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -44,6 +45,7 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/switches.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -653,6 +655,55 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TypingListsSuggestions) {
   )"));
 
   EXPECT_TRUE(Eventually([&] { return Rows() > 0; }));
+}
+
+// A Retina main screen, and a 1x display beside it.
+class CommandBarTwoScreensBrowserTest : public CommandBarBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    CommandBarBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitchASCII(
+        switches::kScreenInfo, "{1600x1200 devicePixelRatio=2}{1600x1200}");
+  }
+
+  std::string PanelSize() {
+    return bar()
+        ->page()
+        ->GetRenderWidgetHostView()
+        ->GetViewBounds()
+        .size()
+        .ToString();
+  }
+
+  std::string PageSize() {
+    return content::EvalJs(
+               bar()->page(),
+               "(r => `${Math.ceil(r.width)}x${Math.ceil(r.height)}`)("
+               "document.documentElement.getBoundingClientRect())")
+        .ExtractString();
+  }
+};
+
+// The panel's window is made on the main screen before it moves over the
+// browser window. On the 1x display, the panel still opens at its page's size.
+IN_PROC_BROWSER_TEST_F(CommandBarTwoScreensBrowserTest,
+                       ThePanelOpensAtItsPagesSize) {
+  browser()->GetWindow()->SetBounds(gfx::Rect(900, 50, 1200, 800));
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+
+  for (int open = 1; open <= 2; ++open) {
+    Press(ui::VKEY_T, NSEventModifierFlagCommand);
+    ASSERT_TRUE(bar()->IsShowing());
+    EXPECT_EQ(PageSize(), PanelSize()) << "Open " << open;
+
+    ASSERT_TRUE(Eventually([&] {
+      return content::EvalJs(bar()->page(), "devicePixelRatio") == 1;
+    }));
+    views::Widget::GetTopLevelWidgetForNativeView(
+        bar()->page()->GetNativeView())
+        ->Close();
+    ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  }
 }
 
 }  // namespace

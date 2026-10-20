@@ -49,6 +49,7 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//ui/base/clipboard",
     "//ui/events:test_support",
+    "//ui/gfx:gfx_switches",
     "//ui/views",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/tab_organization:ai_connection",
