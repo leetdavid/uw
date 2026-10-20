@@ -5,7 +5,8 @@
 /**
  * @fileoverview uw settings: whether automatic tab organization runs, how
  * eagerly it moves tabs, the global pause controls, a row that opens the theme
- * picker, and the command bar. The models live on uw://providers.
+ * picker, the command bar, and the tab list's mouse actions. The models live
+ * on uw://providers.
  */
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
@@ -20,7 +21,7 @@ import {getCss as getMdSelectCss} from 'chrome://resources/cr_elements/md_select
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {Waiting} from './uw_organization.mojom-webui.js';
+import {MouseAction, Waiting} from './uw_organization.mojom-webui.js';
 import type {State, Thresholds} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
@@ -46,6 +47,14 @@ interface ThresholdRow {
   stops: number;
   stop: number;
   shown: string;
+}
+
+// One switch of the Mouse section.
+interface MouseActionRow {
+  id: string;
+  label: string;
+  action: MouseAction;
+  on: boolean;
 }
 
 const WAITING_TEXT: Record<Waiting, string> = {
@@ -221,6 +230,46 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       },
       ...others,
     ].map(option => ({...option, selected: option.code === state.currency}));
+  }
+
+  protected mouseActions_(): MouseActionRow[] {
+    const state = this.state_;
+    if (!state) {
+      return [];
+    }
+    return [
+      {
+        id: 'optionClick',
+        label: 'uwMouseOptionClick',
+        action: MouseAction.kOptionClickClosesBranch,
+        on: state.optionClickClosesBranch,
+      },
+      {
+        id: 'taskRowPlus',
+        label: 'uwMouseTaskRowPlus',
+        action: MouseAction.kTaskRowNewTab,
+        on: state.taskRowNewTab,
+      },
+      {
+        id: 'doubleClick',
+        label: 'uwMouseDoubleClick',
+        action: MouseAction.kDoubleClickOpensTab,
+        on: state.doubleClickOpensTab,
+      },
+      {
+        id: 'middleClick',
+        label: 'uwMouseMiddleClick',
+        action: MouseAction.kMiddleClickClosesTask,
+        on: state.middleClickClosesTask,
+      },
+    ];
+  }
+
+  protected async onMouseActionChange_(e: CustomEvent<boolean>) {
+    const toggle = e.currentTarget as CrToggleElement;
+    await this.browserProxy_.setMouseAction(
+        Number(toggle.dataset['action']) as MouseAction, e.detail);
+    this.refresh_();
   }
 
   protected async onCurrencySelectChange_(e: Event) {

@@ -132,12 +132,19 @@ struct SkillInfo {
 };
 
 // A step that waits for the user's approval: its tab and site, what it does,
-// and why it needs approval.
+// and why it needs approval. A terminal step has its folder in place of a
+// site, and its command, or the text and keys it sends with what the
+// program last showed.
 struct Approval {
   int32 tab;
   string site;
   string action;
   string reason;
+  string folder;
+  string command;
+  string text;
+  array<string> keys;
+  string screen;
 };
 
 enum ApprovalChoice {
@@ -171,6 +178,10 @@ struct AgentTab {
   string picture;
   // The tab is closed. Its card stays until the chat ends.
   bool closed;
+  // A terminal tab, whose card shows the last lines of its screen in place
+  // of a picture.
+  bool terminal;
+  string screen;
 };
 
 interface ChatPage {
@@ -196,4 +207,7 @@ interface ChatPage {
   // A step waits for the user. AnswerApproval gives the answer. Only the
   // user answers it: nothing on a page does.
   OnApproval(Approval approval);
+  // `program` in the agent's terminal tab `tab` waits for a password, which
+  // only the user types there; or with 0, nothing waits any more.
+  OnPassword(int32 tab, string program);
 };

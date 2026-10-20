@@ -24,6 +24,19 @@
 namespace uw {
 namespace {
 
+const char* MouseActionPref(mojom::MouseAction action) {
+  switch (action) {
+    case mojom::MouseAction::kOptionClickClosesBranch:
+      return kOptionClickClosesBranchPref;
+    case mojom::MouseAction::kTaskRowNewTab:
+      return kTaskRowNewTabPref;
+    case mojom::MouseAction::kDoubleClickOpensTab:
+      return kDoubleClickOpensTabPref;
+    case mojom::MouseAction::kMiddleClickClosesTask:
+      return kMiddleClickClosesTaskPref;
+  }
+}
+
 mojom::Waiting WaitingFor(const PrefService* prefs) {
   return IsComplete(ReadDecisionModelConfig(prefs)) ||
                  IsComplete(ReadAiConnectionConfig(prefs))
@@ -83,6 +96,11 @@ void UwOrganizationHandler::AddLoadTimeData(
        IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_DESCRIPTION},
       {"uwCommandBarCurrencyRegion",
        IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_REGION},
+      {"uwMouseTitle", IDS_UW_SETTINGS_MOUSE_TITLE},
+      {"uwMouseOptionClick", IDS_UW_SETTINGS_MOUSE_OPTION_CLICK},
+      {"uwMouseTaskRowPlus", IDS_UW_SETTINGS_MOUSE_TASK_ROW_PLUS},
+      {"uwMouseDoubleClick", IDS_UW_SETTINGS_MOUSE_DOUBLE_CLICK},
+      {"uwMouseMiddleClick", IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
@@ -144,6 +162,12 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->currency = prefs->GetString(kCommandBarCurrencyPref);
   state->region_currency = RegionCurrency();
   state->currencies = Currencies();
+  state->option_click_closes_branch =
+      prefs->GetBoolean(kOptionClickClosesBranchPref);
+  state->task_row_new_tab = prefs->GetBoolean(kTaskRowNewTabPref);
+  state->double_click_opens_tab = prefs->GetBoolean(kDoubleClickOpensTabPref);
+  state->middle_click_closes_task =
+      prefs->GetBoolean(kMiddleClickClosesTaskPref);
   return state;
 }
 
@@ -184,6 +208,13 @@ void UwOrganizationHandler::SetCurrency(const std::string& code,
   if (code.empty() || std::ranges::contains(Currencies(), code)) {
     profile_->GetPrefs()->SetString(kCommandBarCurrencyPref, code);
   }
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetMouseAction(mojom::MouseAction action,
+                                           bool on,
+                                           SetMouseActionCallback callback) {
+  profile_->GetPrefs()->SetBoolean(MouseActionPref(action), on);
   std::move(callback).Run();
 }
 

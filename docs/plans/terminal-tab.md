@@ -2,7 +2,7 @@
 
 Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval.
 
-Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started by `posix_spawn` behaves.
+Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started on a pseudo-terminal behaves.
 
 The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-terminal-draws-with-ghostty-web.md). The agreed product behavior is in [Product](../product.md#terminal-tabs). The tab's look and the settings section still need a "Terminal" page on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs). Nothing is drawn there yet.
 
@@ -46,7 +46,7 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - The tab's icon is a dark rounded square with a prompt in it.
 - Until T38, the terminal takes the page card's colors from the `uw-arc-style` guide on the Doop canvas, light or dark with the system, with the task colors as its palette. These are uw's choices and open to review.
 - A Cmd-clicked link asks the browser to open a tab with the terminal tab as its source. The [tab tree](native-tab-tree.md) already nests a tab under its source.
-- The shell host starts the shell with `posix_spawn`, as a session leader that opens the terminal itself. Chromium's `base::LaunchProcess` cannot give a shell a controlling terminal on macOS.
+- The shell host starts the shell as `forkpty` does: the child starts a new session and takes the terminal as its controlling terminal, then runs the shell. Job control, Ctrl-C, and `sudo`'s password prompt depend on that. Until 2026-10-21 it used `posix_spawn`, which opens files before it starts the session, so zsh, which opens its terminal with `O_NOCTTY`, ran without a controlling terminal. Chromium's `base::LaunchProcess` cannot give a shell one on macOS.
 - A shell is busy when the foreground process group of its pseudo-terminal is not the shell's own.
 - The folder is read from the shell's process and saved with the tab's session data, the same route parent links take.
 - Each shell lives on a sequence of its own, behind `ShellSession`. Ending a shell can block for up to two seconds on macOS, and that must not hold up the window or another terminal.

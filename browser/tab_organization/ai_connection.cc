@@ -30,6 +30,11 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterStringPref(kAgentApprovalModePref, "auto");
   registry->RegisterBooleanPref(kCommandBarEnabledPref, true);
   registry->RegisterBooleanPref(kRestoreAfterCrashPref, false);
+  for (const char* mouse_action :
+       {kOptionClickClosesBranchPref, kTaskRowNewTabPref,
+        kDoubleClickOpensTabPref, kMiddleClickClosesTaskPref}) {
+    registry->RegisterBooleanPref(mouse_action, true);
+  }
   registry->RegisterDictionaryPref(kCommandBarRatesPref);
   registry->RegisterStringPref(kCommandBarCurrencyPref, "");
   registry->RegisterIntegerPref(kOrganizationPauseModePref,

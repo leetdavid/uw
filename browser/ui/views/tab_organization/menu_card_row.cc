@@ -8,6 +8,8 @@
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/events/event.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -19,6 +21,7 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/style/platform_style.h"
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/ui/look/menu_card.h"
 
@@ -64,7 +67,7 @@ MenuCardRow::MenuCardRow(PressedCallback callback,
                          const std::u16string& text)
     : Button(std::move(callback)), icon_(icon) {
   views::BoxLayout* layout = SetLayoutManager(RowLayout(this));
-  SetInstallFocusRingOnFocus(false);
+  SetUpMenuCardFocus(this);
   image_ = AddChildView(std::make_unique<views::ImageView>());
   column_ = AddChildView(std::make_unique<views::View>());
   column_->SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -112,6 +115,11 @@ void MenuCardRow::OnBlur() {
   Update();
 }
 
+views::Button::KeyClickAction MenuCardRow::GetKeyClickActionForEvent(
+    const ui::KeyEvent& event) {
+  return MenuCardKeyClickAction(event);
+}
+
 void MenuCardRow::Update() {
   const bool enabled = GetEnabled();
   image_->SetImage(ui::ImageModel::FromVectorIcon(
@@ -126,7 +134,7 @@ void MenuCardRow::Update() {
 
 MenuCardChip::MenuCardChip(PressedCallback callback, const std::u16string& text)
     : LabelButton(std::move(callback), text) {
-  SetInstallFocusRingOnFocus(false);
+  SetUpMenuCardFocus(this);
   SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, kChipInset)));
   SetHorizontalAlignment(gfx::ALIGN_CENTER);
   label()->SetFontList(label()->font_list().DeriveWithSizeDelta(-1));
@@ -155,10 +163,32 @@ void MenuCardChip::OnBlur() {
   Update();
 }
 
+views::Button::KeyClickAction MenuCardChip::GetKeyClickActionForEvent(
+    const ui::KeyEvent& event) {
+  return MenuCardKeyClickAction(event);
+}
+
 void MenuCardChip::Update() {
   SetBackground(views::CreateRoundedRectBackground(
       ShowsFill(this) ? kColorMenuCardChipHover : kColorMenuCardHover,
       kChipHeight / 2));
+}
+
+void SetUpMenuCardFocus(views::Button* button) {
+  button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+  button->SetInstallFocusRingOnFocus(false);
+}
+
+views::Button::KeyClickAction MenuCardKeyClickAction(
+    const ui::KeyEvent& event) {
+  switch (event.key_code()) {
+    case ui::VKEY_RETURN:
+      return views::Button::KeyClickAction::kOnKeyPress;
+    case ui::VKEY_SPACE:
+      return views::PlatformStyle::kKeyClickActionOnSpace;
+    default:
+      return views::Button::KeyClickAction::kNone;
+  }
 }
 
 std::unique_ptr<views::View> MakeMenuCardHeader(const gfx::VectorIcon& icon,

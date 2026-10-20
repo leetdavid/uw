@@ -8,7 +8,7 @@ The look of the window is in the [Arc-style look plan](arc-style-look.md). This 
 
 ## Agreed scope
 
-- A profile has one theme, shared by all its windows. Each profile can look different.
+- A profile has one theme, shared by all its windows. Each profile can look different. Changed on 2026-10-21: each [workspace](workspaces.md) has its own theme, T131.
 - The picker opens over the window, beside the sidebar, from "Theme…" in the menu of empty sidebar space and from View → Theme… in the menu bar. The window changes as the user picks. The "Window tint" section of uw's settings page becomes one row that opens the picker.
 - The picker has, from the top:
   - Light, Dark, and Auto. Auto follows macOS. This is Chromium's own color mode setting, which web pages and uw's pages already follow.

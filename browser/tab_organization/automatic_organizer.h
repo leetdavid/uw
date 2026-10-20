@@ -34,6 +34,10 @@ class BrowserWindowInterface;
 class Profile;
 class TabStripModel;
 
+namespace content {
+class NavigationEntry;
+}
+
 namespace content_extraction {
 struct InnerTextResult;
 }
@@ -155,6 +159,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
     // True for a page that stays where it is until it shows something else:
     // the user placed it, or uw has acted on its answer.
     bool placed = false;
+    // True for a page the user placed by hand or kept. It shows something
+    // else only on another site or once the user starts something new in it.
+    bool by_hand = false;
+    // True when the last answer called the page a hub.
+    bool hub = false;
+    // What the page showed when uw last asked about it, or chose not to: its
+    // title, its address, and the navigation entry that showed them.
+    std::u16string asked_title;
+    GURL asked_url;
+    int asked_entry = 0;
   };
   struct Request {
     PageId page;
@@ -223,6 +237,15 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Notes which pages show something else and starts the debounce timer for
   // them.
   void Scan();
+  // True when `page`, which now shows `title` at `url` through `entry`,
+  // shows something else than uw last asked about.
+  bool ShowsSomethingElse(const Page& page,
+                          const Activity& activity,
+                          const content::NavigationEntry* entry,
+                          const std::u16string& title,
+                          const GURL& url) const;
+  // Notes what `page` shows now as what uw last asked about.
+  void NoteAsked(const PageId& page, Activity& activity) const;
   void OnManualMove(const std::vector<PageId>& pages);
   void Dispatch();
   void OnExcerpt(PageId page,

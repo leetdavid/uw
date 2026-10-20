@@ -47,6 +47,9 @@ class ShellSession {
   void Write(std::string bytes);
   void Resize(int columns, int rows);
   void AckOutput();
+  // Answers with what the terminal waits for. A shell that has not started,
+  // or has ended, answers with nothing.
+  void GetActivity(base::OnceCallback<void(ShellHost::Activity)> done);
 
  private:
   class Core;

@@ -34,7 +34,8 @@ class SharedURLLoaderFactory;
 namespace uw {
 
 // How much a chat asks before it acts. Ask first asks before every click and
-// typing, Auto before each change, and Full auto never. See
+// typing, Auto before each change, and Full auto never. Until the command
+// check, every mode asks before each command and set of keys. See
 // docs/plans/agent-chats.md.
 enum class ApprovalMode { kAskFirst, kAuto, kFullAuto };
 

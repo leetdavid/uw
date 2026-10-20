@@ -8,10 +8,12 @@
 #include <string>
 
 #include "base/memory/raw_ptr.h"
+#include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
 #include "uw/components/terminal/shell_session.h"
 
@@ -22,10 +24,11 @@ class WebContents;
 namespace uw {
 
 // Runs the shell of one terminal tab and carries text between it and the
-// tab's page. Owned by the page's controller, so the shell ends when the tab
-// closes or its page goes away.
+// tab's page, and the agent's tools. Owned by the page's controller, so the
+// shell ends when the tab closes or its page goes away.
 class UwTerminalHandler : public mojom::TerminalHandler,
-                          public ShellSession::Client {
+                          public ShellSession::Client,
+                          public TerminalShell {
  public:
   UwTerminalHandler(content::WebContents* contents,
                     mojo::PendingRemote<mojom::TerminalPage> page,
@@ -47,11 +50,19 @@ class UwTerminalHandler : public mojom::TerminalHandler,
   void OnShellFolderChanged(const base::FilePath& folder) override;
   void OnShellExited(bool started) override;
 
+  // TerminalShell:
+  void GetActivity(base::OnceCallback<void(ShellHost::Activity)> done) override;
+  void Read(int from, ReadDone done) override;
+  base::TimeTicks last_output() const override;
+
  private:
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::TerminalPage> page_;
   mojo::Receiver<mojom::TerminalHandler> receiver_;
   std::unique_ptr<ShellSession> session_;
+  // The page draws the shell's output and has not said it is done.
+  bool drawing_ = false;
+  base::TimeTicks last_output_;
 };
 
 }  // namespace uw

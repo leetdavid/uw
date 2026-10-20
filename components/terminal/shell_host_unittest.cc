@@ -17,6 +17,7 @@
 #include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/process_handle.h"
 #include "base/strings/string_number_conversions.h"
@@ -97,6 +98,45 @@ class ShellHostTest : public testing::Test {
     return false;
   }
 
+  // zsh, as most users run it, with a plain prompt.
+  std::unique_ptr<ShellHost> StartZsh() {
+    if (!zdotdir_.IsValid() &&
+        (!zdotdir_.CreateUniqueTempDir() ||
+         !base::WriteFile(zdotdir_.GetPath().Append(".zshrc"),
+                          "PROMPT='ready> '\n"))) {
+      return nullptr;
+    }
+    ShellHost::Options options;
+    options.shell = base::FilePath("/bin/zsh");
+    options.login = false;
+    options.folder = base::FilePath("/usr");
+    options.environment["ZDOTDIR"] = zdotdir_.GetPath().value();
+    std::unique_ptr<ShellHost> shell = ShellHost::Start(options);
+    if (shell) {
+      ReadUntil(*shell, kPrompt);
+    }
+    return shell;
+  }
+
+  // Waits until the shell's activity reads as `wanted`, reading its output
+  // meanwhile so that it never stops to wait for a reader.
+  bool WaitForActivity(const ShellHost& shell,
+                       bool (*wanted)(const ShellHost::Activity&)) {
+    const base::TimeTicks deadline =
+        base::TimeTicks::Now() + TestTimeouts::action_timeout();
+    while (base::TimeTicks::Now() < deadline) {
+      if (wanted(shell.CurrentActivity())) {
+        return true;
+      }
+      pollfd waiting = {shell.terminal_fd(), POLLIN, 0};
+      if (HANDLE_EINTR(poll(&waiting, 1, 20)) > 0) {
+        std::array<char, 4096> buffer;
+        HANDLE_EINTR(read(shell.terminal_fd(), buffer.data(), buffer.size()));
+      }
+    }
+    return false;
+  }
+
   bool WaitUntilRunning(const ShellHost& shell, std::string_view command) {
     const base::TimeTicks deadline =
         base::TimeTicks::Now() + TestTimeouts::action_timeout();
@@ -110,6 +150,7 @@ class ShellHostTest : public testing::Test {
   }
 
   base::test::TaskEnvironment task_environment_;
+  base::ScopedTempDir zdotdir_;
 };
 
 TEST_F(ShellHostTest, RunsACommandAndReturnsItsOutput) {
@@ -154,6 +195,39 @@ TEST_F(ShellHostTest, NamesARunningCommandAndNothingAtThePrompt) {
   EXPECT_FALSE(shell->RunningCommand());
   Type(*shell, "sleep 300\n");
   EXPECT_TRUE(WaitUntilRunning(*shell, "sleep"));
+}
+
+TEST_F(ShellHostTest, TellsThePromptACommandAndAPasswordPromptApart) {
+  std::unique_ptr<ShellHost> shell = StartZsh();
+  ASSERT_TRUE(shell);
+  const auto at_prompt = [](const ShellHost::Activity& activity) {
+    return activity.at_prompt && !activity.password && activity.program.empty();
+  };
+  EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
+
+  Type(*shell, "sleep 300\n");
+  EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
+    return !activity.at_prompt && !activity.password &&
+           activity.program == "sleep";
+  }));
+  Type(*shell, "\x03");
+  EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
+
+  // zsh's own read, so no other program has the terminal.
+  Type(*shell, "read -s secret\n");
+  EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
+    return !activity.at_prompt && activity.password;
+  }));
+  Type(*shell, "hunter2\n");
+  EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
+
+  Type(*shell, "vi\n");
+  EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
+    return !activity.at_prompt && !activity.password &&
+           !activity.program.empty();
+  }));
+  Type(*shell, "\x1b:q!\n");
+  EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
 }
 
 TEST_F(ShellHostTest, CtrlCInterruptsARunningCommand) {

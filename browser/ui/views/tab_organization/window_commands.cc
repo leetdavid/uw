@@ -15,16 +15,11 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
-#include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "ui/base/mojom/menu_source_type.mojom.h"
-#include "ui/gfx/geometry/point.h"
-#include "ui/views/view.h"
-#include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -40,20 +35,6 @@ std::optional<tab_groups::TabGroupId> SelectedTask(
     BrowserWindowInterface* window) {
   tabs::TabInterface* tab = window->GetTabStripModel()->GetActiveTab();
   return tab ? tab->GetGroup() : std::nullopt;
-}
-
-TabGroupHeaderView* HeaderFor(views::View* view,
-                              const tab_groups::TabGroupId& group) {
-  if (auto* header = views::AsViewClass<TabGroupHeaderView>(view);
-      header && header->group() == group) {
-    return header;
-  }
-  for (views::View* child : view->children()) {
-    if (TabGroupHeaderView* header = HeaderFor(child, group)) {
-      return header;
-    }
-  }
-  return nullptr;
 }
 
 }  // namespace
@@ -120,19 +101,11 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
     case kGoToScratchpad:
       controller->SelectTask(std::string());
       break;
-    case kRenameTask: {
-      // The sidebar renames on the task's row. Horizontal tabs open
-      // Chromium's task editor, which has the name field.
-      BrowserView* view = BrowserView::GetBrowserViewForBrowser(window);
-      if (view->ShouldDrawVerticalTabStrip()) {
-        controller->RenameOnItsRow(SelectedTask(window)->ToString());
-      } else if (TabGroupHeaderView* header =
-                     HeaderFor(view, *SelectedTask(window))) {
-        header->ShowContextMenuForViewImpl(
-            header, gfx::Point(), ui::mojom::MenuSourceType::kKeyboard);
-      }
+    // The sidebar renames on the task's row. Horizontal tabs open Chromium's
+    // task editor, which has the name field.
+    case kRenameTask:
+      window->GetTabStripModel()->OpenTabGroupEditor(*SelectedTask(window));
       break;
-    }
     case kNameTask:
       AutomaticOrganizer::From(window)->AskForName(
           SelectedTask(window)->ToString());

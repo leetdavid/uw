@@ -3,15 +3,23 @@
 
 #include "uw/browser/agent/agent_loop.h"
 
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "base/environment.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/run_loop.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/test/test_timeouts.h"
+#include "base/threading/thread_restrictions.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -27,7 +35,10 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/terminal/shell_host.h"
 
 namespace uw {
 namespace {
@@ -157,7 +168,7 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, FillsAFormAndSaysItIsDone) {
       base::JSONReader::ReadDict(requests[0], base::JSON_PARSE_RFC);
   ASSERT_TRUE(first);
   EXPECT_EQ(*first->FindString("model"), "test-agent");
-  EXPECT_EQ(first->FindList("tools")->size(), 8u);
+  EXPECT_EQ(first->FindList("tools")->size(), 11u);
   const base::ListValue& messages = *first->FindList("messages");
   ASSERT_EQ(messages.size(), 2u);
   EXPECT_EQ(*messages[1].GetDict().FindString("content"),
@@ -455,6 +466,305 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
   agent_->Stop();
   EXPECT_FALSE(agent_->working());
   EXPECT_EQ(steps_.back().kind, Kind::kStoppedByUser);
+}
+
+// The agent's terminal: commands in a terminal tab under the chat, in the
+// user's login shell.
+class AgentTerminalBrowserTest : public AgentLoopBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    AgentLoopBrowserTest::SetUpOnMainThread();
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
+    // zsh finds none of the user's startup files in an empty folder, so the
+    // tests do not depend on them.
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+  }
+
+  static base::ListValue Run(base::DictValue args) {
+    return base::ListValue().Append(
+        ScriptedModel::Call("run", std::move(args)));
+  }
+
+  // What the terminal showing `contents` holds, as the agent reads it.
+  static std::string ScreenOf(content::WebContents* contents) {
+    std::optional<std::string> screen;
+    TerminalShell::From(contents)->Read(
+        -100, base::BindLambdaForTesting(
+                  [&](const std::string& text, int) { screen = text; }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return screen.has_value(); }));
+    return screen.value_or(std::string());
+  }
+
+  // What the terminal showing `contents` waits for.
+  static ShellHost::Activity ActivityOf(content::WebContents* contents) {
+    std::optional<ShellHost::Activity> activity;
+    TerminalShell::From(contents)->GetActivity(base::BindLambdaForTesting(
+        [&](ShellHost::Activity now) { activity = std::move(now); }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return activity.has_value(); }));
+    return activity.value_or(ShellHost::Activity());
+  }
+
+  // Waits until the terminal showing `contents` reads as `wanted`.
+  static bool WaitFor(content::WebContents* contents,
+                      bool (*wanted)(const ShellHost::Activity&)) {
+    const base::TimeTicks deadline =
+        base::TimeTicks::Now() + TestTimeouts::action_timeout();
+    while (base::TimeTicks::Now() < deadline) {
+      if (wanted(ActivityOf(contents))) {
+        return true;
+      }
+      base::RunLoop pause;
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE, pause.QuitClosure(), base::Milliseconds(50));
+      pause.Run();
+    }
+    return false;
+  }
+
+  // Calls the agent's `tool` directly, as the loop would, and waits for it.
+  base::DictValue CallTool(std::string_view tool, base::DictValue args) {
+    std::optional<base::DictValue> result;
+    agent_->tools().Call(tool, args,
+                         base::BindLambdaForTesting([&](base::DictValue done) {
+                           result = std::move(done);
+                         }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return result.has_value(); }));
+    return result ? std::move(*result) : base::DictValue();
+  }
+
+  base::ScopedTempDir zdotdir_;
+};
+
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       RunsACommandInATerminalTabUnderTheChat) {
+  model_.Script({ScriptedModel::Calls(Run(
+                     base::DictValue().Set("command", "echo hi-$((40+2))"))),
+                 ScriptedModel::Answer("It said hi.")});
+
+  EXPECT_EQ(Ask("Say hi in a terminal").kind, Kind::kAnswer);
+
+  ASSERT_EQ(steps_.size(), 2u);
+  const base::DictValue& ran = steps_[0].result;
+  EXPECT_FALSE(ran.contains("error")) << ran.DebugString();
+  EXPECT_EQ(ran.FindInt("tab"), 1);
+  EXPECT_EQ(*ran.FindString("folder"), "~");
+  EXPECT_EQ(*ran.FindString("output"), "hi-42");
+  EXPECT_FALSE(ran.contains("running"));
+  EXPECT_THAT(model_.Requests().back(), HasSubstr("hi-42"));
+  ASSERT_TRUE(agent_->tools().IsTerminalTab(1));
+  content::WebContents* terminal =
+      agent_->tools().OpenTabs().at(1)->GetContents();
+  EXPECT_TRUE(IsAgentTerminal(terminal));
+  // It opened in the background, under the chat.
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveTab(), chat_.get());
+  EXPECT_EQ(browser()->tab_strip_model()->GetOpenerOfTabAt(
+                browser()->tab_strip_model()->GetIndexOfWebContents(terminal)),
+            chat_.get());
+}
+
+// A command still running when the wait ends goes on in its tab. The agent
+// answers it with keys, then reads the tab.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       ACommandLeftRunningTakesKeysAndIsReadLater) {
+  model_.Script(
+      {ScriptedModel::Calls(
+           Run(base::DictValue()
+                   .Set("command", "read -r name && echo hi-$name-$((40+2))")
+                   .Set("wait", 0))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "keys", base::DictValue()
+                       .Set("tab", 1)
+                       .Set("text", "ada")
+                       .Set("keys", base::ListValue().Append("Enter"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("screen", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Answer("It greeted Ada.")});
+
+  EXPECT_EQ(Ask("Greet Ada in a terminal").kind, Kind::kAnswer);
+
+  ASSERT_EQ(steps_.size(), 4u);
+  const base::DictValue& left = steps_[0].result;
+  EXPECT_FALSE(left.contains("error")) << left.DebugString();
+  EXPECT_EQ(left.FindBool("running"), true);
+  EXPECT_THAT(*left.FindString("note"), HasSubstr("keeps running in tab 1"));
+  const base::DictValue& keyed = steps_[1].result;
+  ASSERT_FALSE(keyed.contains("error")) << keyed.DebugString();
+  EXPECT_THAT(*keyed.FindString("text"), HasSubstr("hi-ada-42"));
+  const base::DictValue& read = steps_[2].result;
+  ASSERT_FALSE(read.contains("error")) << read.DebugString();
+  EXPECT_THAT(*read.FindString("text"), HasSubstr("hi-ada-42"));
+  EXPECT_FALSE(read.contains("program"));
+  EXPECT_FALSE(read.contains("password"));
+}
+
+// A password prompt goes to the user, who types it in the tab. The agent
+// never sees it and never types it.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       APasswordPromptWaitsForTheUser) {
+  std::vector<std::pair<int, std::string>> asked;
+  agent_->tools().SetOnPassword(
+      base::BindLambdaForTesting([&](int number, const std::string& program) {
+        asked.emplace_back(number, program);
+        // The user types the first password; the second waits.
+        if (number && asked.size() == 1) {
+          TerminalShell::From(
+              agent_->tools().OpenTabs().at(number)->GetContents())
+              ->Write("hunter2\r");
+        }
+      }));
+  model_.Script(
+      {ScriptedModel::Calls(Run(base::DictValue().Set(
+           "command", "read -rs secret && echo got-${#secret}-letters"))),
+       ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "run", base::DictValue().Set(
+                      "command",
+                      "bash -c 'stty -echo; printf Password:; read p; "
+                      "stty echo'")))),
+       ScriptedModel::Answer("Done.")});
+
+  // The second command waits for a password nobody types, and the user stops
+  // the chat.
+  steps_.clear();
+  agent_->Send("Read a secret");
+  ASSERT_TRUE(base::test::RunUntil([&] { return asked.size() == 3u; }))
+      << asked.size() << " password prompts";
+  EXPECT_EQ(asked[0], std::make_pair(1, std::string("read")));
+  EXPECT_EQ(asked[1], std::make_pair(0, std::string()));
+  EXPECT_EQ(asked[2], std::make_pair(1, std::string("bash")));
+  ASSERT_EQ(steps_.size(), 1u);
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "got-7-letters");
+  agent_->Stop();
+  ASSERT_TRUE(base::test::RunUntil([&] { return !agent_->working(); }));
+  EXPECT_EQ(asked.back(), std::make_pair(0, std::string()));
+  EXPECT_EQ(steps_.back().kind, Kind::kStoppedByUser);
+  for (const std::string& request : model_.Requests()) {
+    EXPECT_THAT(request, Not(HasSubstr("hunter2")));
+  }
+}
+
+// A program that asks for a password after the agent went on takes no keys
+// from the agent.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest, KeysNeverGoToAPasswordPrompt) {
+  const base::DictValue left =
+      CallTool("run", base::DictValue()
+                          .Set("command", "sleep 0.5 && read -rs secret")
+                          .Set("wait", 0));
+  ASSERT_EQ(left.FindBool("running"), true) << left.DebugString();
+  content::WebContents* terminal =
+      agent_->tools().OpenTabs().at(1)->GetContents();
+  ASSERT_TRUE(WaitFor(terminal, [](const ShellHost::Activity& activity) {
+    return activity.password;
+  }));
+
+  const base::DictValue keyed =
+      CallTool("keys", base::DictValue()
+                           .Set("tab", 1)
+                           .Set("text", "guess")
+                           .Set("keys", base::ListValue().Append("Enter")));
+
+  EXPECT_THAT(*keyed.FindString("error"), HasSubstr("waits for a password"));
+  EXPECT_TRUE(ActivityOf(terminal).password);
+}
+
+// Stop ends the wait at once; the command keeps running in its tab.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       StopEndsTheWaitAndTheCommandGoesOn) {
+  model_.Script({ScriptedModel::Calls(
+      Run(base::DictValue().Set("command", "sleep 300")))});
+  steps_.clear();
+  agent_->Send("Wait five minutes");
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::map<int, tabs::TabInterface*> open = agent_->tools().OpenTabs();
+    return open.contains(1) && TerminalShell::From(open.at(1)->GetContents());
+  }));
+  content::WebContents* terminal =
+      agent_->tools().OpenTabs().at(1)->GetContents();
+  ASSERT_TRUE(WaitFor(terminal, [](const ShellHost::Activity& activity) {
+    return activity.program == "sleep";
+  }));
+
+  agent_->Stop();
+  ASSERT_TRUE(base::test::RunUntil([&] { return !agent_->working(); }));
+
+  ASSERT_EQ(steps_.size(), 2u);
+  EXPECT_EQ(steps_[0].result.FindBool("running"), true);
+  EXPECT_THAT(*steps_[0].result.FindString("note"),
+              HasSubstr("stopped the chat"));
+  EXPECT_EQ(steps_[1].kind, Kind::kStoppedByUser);
+  EXPECT_EQ(ActivityOf(terminal).program, "sleep");
+}
+
+// The agent never reaches a terminal tab the user opened, nor one of its web
+// tabs as a terminal.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       TheUsersOwnTerminalIsOutOfReach) {
+  OpenTerminalTab(browser());
+  content::WebContents* mine =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return !TerminalFolder(mine).empty(); }));
+  const auto call = [](std::string_view tool, base::DictValue args) {
+    return ScriptedModel::Calls(
+        base::ListValue().Append(ScriptedModel::Call(tool, std::move(args))));
+  };
+  model_.Script(
+      {call("screen", base::DictValue().Set("tab", 1)),
+       call("keys", base::DictValue().Set("tab", 1).Set("text", "agent-")),
+       call("run", base::DictValue().Set("tab", 1).Set("command",
+                                                       "echo agent-was-here")),
+       call("open", base::DictValue().Set("url", Url("/form"))),
+       call("run", base::DictValue().Set("tab", 1).Set("command",
+                                                       "echo agent-was-here")),
+       call("run", base::DictValue().Set("command", "echo agent-$((40+2))")),
+       ScriptedModel::Answer("Done.")});
+
+  EXPECT_EQ(Ask("Use my terminal").kind, Kind::kAnswer);
+
+  ASSERT_EQ(steps_.size(), 7u);
+  for (size_t step = 0; step < 3; ++step) {
+    EXPECT_THAT(*steps_[step].result.FindString("error"),
+                HasSubstr("not one of the agent's tabs"));
+  }
+  EXPECT_THAT(*steps_[4].result.FindString("error"),
+              HasSubstr("Tab 1 is not one of your terminal tabs"));
+  const base::DictValue& ran = steps_[5].result;
+  ASSERT_FALSE(ran.contains("error")) << ran.DebugString();
+  EXPECT_EQ(ran.FindInt("tab"), 2);
+  EXPECT_EQ(*ran.FindString("output"), "agent-42");
+  EXPECT_NE(agent_->tools().OpenTabs().at(2)->GetContents(), mine);
+  EXPECT_FALSE(IsAgentTerminal(mine));
+  EXPECT_THAT(ScreenOf(mine), Not(HasSubstr("agent-")));
+}
+
+// Until the command check, every command asks, even in Full auto. A declined
+// command does not run, and no terminal tab opens for it.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       EveryCommandAsksEvenInFullAuto) {
+  std::vector<AgentTools::Approval> asked;
+  agent_->SetApprover(base::BindLambdaForTesting(
+      [&](AgentTools::Approval approval,
+          base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
+        asked.push_back(approval);
+        AgentLoop::ApprovalAnswer no;
+        no.choice = AgentLoop::ApprovalAnswer::Choice::kDecline;
+        no.note = "Not in my home folder";
+        std::move(answer).Run(std::move(no));
+      }));
+  agent_->SetMode(ApprovalMode::kFullAuto);
+  model_.Script({ScriptedModel::Calls(Run(
+                     base::DictValue().Set("command", "rm -rf old-builds"))),
+                 ScriptedModel::Answer("I left them.")});
+
+  EXPECT_EQ(Ask("Clear the old builds").kind, Kind::kAnswer);
+
+  ASSERT_EQ(asked.size(), 1u);
+  EXPECT_EQ(asked[0].tab, 1);
+  EXPECT_EQ(asked[0].folder, "~");
+  EXPECT_EQ(asked[0].command, "rm -rf old-builds");
+  EXPECT_EQ(asked[0].reason, "For now, every command waits for your approval.");
+  EXPECT_EQ(*steps_[0].result.FindString("user_said"), "Not in my home folder");
+  EXPECT_TRUE(agent_->tools().OpenTabs().empty());
 }
 
 }  // namespace

@@ -28,10 +28,10 @@ bool Outside(const ClassificationAnswer& answer) {
   return answer.choice == kNewTaskOption || answer.choice == kScratchpadOption;
 }
 
-// True when the model finds it more likely than not that the tab shows a hub:
-// a page the user comes back to for many things.
-bool Hub(const ClassificationAnswer& answer) {
-  return answer.hub >= 0.5;
+// A hub shows what it is for only once the user does something in it, so in
+// a task it stays there.
+bool HubInATask(const ClassificationAnswer& answer, const Position& position) {
+  return IsHub(answer) && (!position.task.empty() || position.in_unnamed_task);
 }
 
 Lean LeanOf(const TabAnswer& tab,
@@ -44,19 +44,21 @@ Lean LeanOf(const TabAnswer& tab,
     return {};
   }
   const ClassificationAnswer& answer = *tab.answer;
-  if (!Outside(answer) && answer.choice == position.task) {
+  if (HubInATask(answer, position) ||
+      (!Outside(answer) && answer.choice == position.task)) {
     return {Lean::Kind::kStays};
   }
   // A hub never goes along with the page above it.
   if (answer.confidence < needed.confidence) {
-    return {Hub(answer) ? Lean::Kind::kStays : Lean::Kind::kFollows};
+    return {IsHub(answer) ? Lean::Kind::kStays : Lean::Kind::kFollows};
   }
   if (!Outside(answer)) {
     return {Lean::Kind::kLeaves, answer.choice};
   }
   // Outside every task a hub is bound for the Scratchpad. That keeps it
   // apart from the tabs around it that may start a task.
-  return {Lean::Kind::kLeaves, Hub(answer) ? kScratchpadOption : kNoTaskOption};
+  return {Lean::Kind::kLeaves,
+          IsHub(answer) ? kScratchpadOption : kNoTaskOption};
 }
 
 // The answer of a group of tabs that go together. Its top tab decides where
@@ -71,7 +73,7 @@ ClassificationAnswer JointAnswer(const BranchPlacement& group,
   for (const PageId& id : group.pages) {
     const auto tab = tabs.find(id);
     if (tab == tabs.end() || !tab->second.answer ||
-        !Outside(*tab->second.answer) || Hub(*tab->second.answer)) {
+        !Outside(*tab->second.answer) || IsHub(*tab->second.answer)) {
       continue;
     }
     const ClassificationAnswer& answer = *tab->second.answer;
@@ -85,6 +87,10 @@ ClassificationAnswer JointAnswer(const BranchPlacement& group,
 
 }  // namespace
 
+bool IsHub(const ClassificationAnswer& answer) {
+  return answer.hub >= 0.5;
+}
+
 double AsThreshold(double value) {
   return std::clamp(std::round(value * 100.0) / 100.0, kMinThreshold,
                     kMaxThreshold);
@@ -94,9 +100,13 @@ Placement Place(const ClassificationAnswer& answer,
                 const Position& position,
                 const Thresholds& needed) {
   using Action = Placement::Action;
+  if (HubInATask(answer, position)) {
+    return {Action::kLeave, position.task, answer.confidence,
+            needed.confidence};
+  }
   const bool sure = answer.confidence >= needed.confidence;
   // A hub outside every task is a one-off, whatever else the model says.
-  const bool hub = Hub(answer) && Outside(answer);
+  const bool hub = IsHub(answer) && Outside(answer);
   const bool starts_task = answer.choice == kNewTaskOption && !hub;
   const double new_task = hub ? 0.0 : answer.new_task;
   Placement placement{Action::kLeave,

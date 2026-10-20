@@ -42,6 +42,8 @@ export interface AskUserOption {
 export interface AskUserQuestion {
   id?: string;
   title: string;
+  /** What the question is about, shown under its title: a command, say. */
+  detail?: ReactNode;
   /** Options to choose from. Optional only because a `freeText` question
    *  has none; every other mode requires at least one. */
   options?: AskUserOption[];
@@ -1290,6 +1292,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
               >
                 {question.title}
               </h3>
+              {question.detail}
 
               {/* freeText: a single open-ended textarea is the whole answer —
                   no option rows, no chips. It auto-focuses (see the freeText

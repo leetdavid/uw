@@ -67,9 +67,13 @@ struct Placement {
   friend bool operator==(const Placement&, const Placement&) = default;
 };
 
+// True when the model finds it more likely than not that the tab shows a hub:
+// a page the user comes back to for many things.
+bool IsHub(const ClassificationAnswer& answer);
+
 // Decides what to do with `answer` for a branch at `position`. A hub outside
 // every task is a one-off whatever else the model says: it starts no task
-// and gives none a name.
+// and gives none a name. A hub in a task stays there.
 Placement Place(const ClassificationAnswer& answer,
                 const Position& position,
                 const Thresholds& needed);
@@ -105,8 +109,9 @@ struct BranchPlacement {
 // has outgrown its name, while any tab of the group can make it the start of
 // a task. A tab that fits where it is, or that is `placed`, stays behind. A
 // tab without a usable answer goes with the page above it. A hub is never
-// made into a task: it is filed on its own answer alone, for a task it fits
-// or for the Scratchpad, and the tabs under it leave without it. `tabs` holds
+// made into a task: it stays in the task it is in, or is filed on its own
+// answer alone, for a task it fits or for the Scratchpad, and the tabs under
+// it leave without it. `tabs` holds
 // what is known about each tab; a tab missing from it was not asked about. The
 // result lists every tab that has an answer, alone or in its group, in tree
 // order.

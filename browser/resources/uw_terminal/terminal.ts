@@ -117,6 +117,24 @@ page.output.addListener((text: string) => {
   }
   handler.ackOutput();
 });
+// A line too long for the screen wraps onto the next, and reads as one.
+page.read.addListener((from: number) => {
+  const buffer = terminal.buffer.active;
+  const cursorLine = buffer.length - terminal.rows + buffer.cursorY;
+  const first = Math.max(0, from < 0 ? cursorLine + from + 1 : from);
+  const lines: string[] = [];
+  for (let y = first; y <= cursorLine; y++) {
+    const line = buffer.getLine(y);
+    const text = line?.translateToString(true) ?? '';
+    if (line?.isWrapped && lines.length) {
+      lines[lines.length - 1] += text;
+    } else {
+      lines.push(text);
+    }
+  }
+  return {text: lines.join('\n'), cursorLine};
+});
+
 terminal.onData((text: string) => handler.write(text));
 terminal.onResize(({cols, rows}) => handler.resize(cols, rows));
 

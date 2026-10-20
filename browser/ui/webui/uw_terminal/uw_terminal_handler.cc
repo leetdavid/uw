@@ -98,9 +98,13 @@ UwTerminalHandler::UwTerminalHandler(
     mojo::PendingReceiver<mojom::TerminalHandler> receiver)
     : contents_(contents),
       page_(std::move(page)),
-      receiver_(this, std::move(receiver)) {}
+      receiver_(this, std::move(receiver)) {
+  TerminalShell::Set(contents_, this);
+}
 
-UwTerminalHandler::~UwTerminalHandler() = default;
+UwTerminalHandler::~UwTerminalHandler() {
+  TerminalShell::Unset(contents_, this);
+}
 
 void UwTerminalHandler::Start(int32_t columns, int32_t rows) {
   if (session_) {
@@ -128,6 +132,8 @@ void UwTerminalHandler::Resize(int32_t columns, int32_t rows) {
 }
 
 void UwTerminalHandler::AckOutput() {
+  drawing_ = false;
+  last_output_ = base::TimeTicks::Now();
   if (session_) {
     session_->AckOutput();
   }
@@ -140,6 +146,7 @@ void UwTerminalHandler::PastePaths(PastePathsCallback callback) {
 }
 
 void UwTerminalHandler::OnShellOutput(std::string text) {
+  drawing_ = true;
   page_->Output(text);
 }
 
@@ -156,6 +163,24 @@ void UwTerminalHandler::OnShellExited(bool started) {
   // A tab that closed at once would explain nothing.
   page_->Output(base::StrCat(
       {l10n_util::GetStringUTF8(IDS_UW_TERMINAL_NO_SHELL), "\r\n"}));
+}
+
+void UwTerminalHandler::GetActivity(
+    base::OnceCallback<void(ShellHost::Activity)> done) {
+  if (!session_) {
+    std::move(done).Run(ShellHost::Activity());
+    return;
+  }
+  session_->GetActivity(std::move(done));
+}
+
+base::TimeTicks UwTerminalHandler::last_output() const {
+  return drawing_ ? base::TimeTicks::Now() : last_output_;
+}
+
+void UwTerminalHandler::Read(int from, ReadDone done) {
+  // The page reads after it has drawn the output sent before this call.
+  page_->Read(from, std::move(done));
 }
 
 }  // namespace uw

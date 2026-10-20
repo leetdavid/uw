@@ -62,10 +62,14 @@ TaskNameField::TaskNameField(const tab_groups::TabGroupId& group,
       kTextInsets));
   SetAccessibleName(l10n_util::GetStringUTF16(
       IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME));
-  SetProperty(views::kFlexBehaviorKey,
-              views::FlexSpecification(views::LayoutOrientation::kHorizontal,
-                                       views::MinimumFlexSizeRule::kScaleToZero,
-                                       views::MaximumFlexSizeRule::kUnbounded));
+  // The row's layout hides a child it gives no width, and hiding the field
+  // takes the keyboard from it, as when a new task's row grows in.
+  SetMinimumWidthInChars(1);
+  SetProperty(
+      views::kFlexBehaviorKey,
+      views::FlexSpecification(views::LayoutOrientation::kHorizontal,
+                               views::MinimumFlexSizeRule::kScaleToMinimum,
+                               views::MaximumFlexSizeRule::kUnbounded));
 }
 
 TaskNameField::~TaskNameField() = default;
