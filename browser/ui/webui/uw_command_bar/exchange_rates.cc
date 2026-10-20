@@ -115,9 +115,9 @@ void ExchangeRates::Refresh() {
   const std::optional<double> fetched =
       profile_->GetPrefs()->GetDict(kCommandBarRatesPref).FindDouble("fetched");
   if (loader_ ||
-      (fetched && base::Time::Now() -
-                          base::Time::FromSecondsSinceUnixEpoch(*fetched) <
-                      kRefreshAfter) ||
+      (fetched &&
+       base::Time::Now() - base::Time::FromSecondsSinceUnixEpoch(*fetched) <
+           kRefreshAfter) ||
       (!tried_.is_null() && base::TimeTicks::Now() - tried_ < kRetryAfter)) {
     return;
   }

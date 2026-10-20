@@ -91,7 +91,8 @@ void UwCommandBarUI::BindInterface(
 void UwCommandBarUI::GetCurrencies(GetCurrenciesCallback callback) {
   Profile* profile = Profile::FromWebUI(web_ui());
   ExchangeRates* rates = ExchangeRates::For(profile);
-  std::string currency = profile->GetPrefs()->GetString(kCommandBarCurrencyPref);
+  std::string currency =
+      profile->GetPrefs()->GetString(kCommandBarCurrencyPref);
   if (currency.empty()) {
     currency = RegionCurrency();
   }

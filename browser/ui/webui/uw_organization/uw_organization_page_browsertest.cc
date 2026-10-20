@@ -6,6 +6,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
+#include "base/values.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -221,6 +222,39 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return !prefs()->GetBoolean(kCommandBarEnabledPref); }));
   SaveWindowScreenshot(browser(), "settings-command-bar");
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheDefaultCurrencyMenuSetsTheCommandBarsCurrency) {
+  prefs()->SetDict(
+      kCommandBarRatesPref,
+      base::DictValue()
+          .Set("date", "2026-10-15")
+          .Set("fetched", 0.0)
+          .Set("per_euro", base::DictValue().Set("USD", 1.08).Set("HKD", 8.4)));
+  OpenPage();
+  EXPECT_EQ(",EUR,HKD,USD",
+            Run("const select = part('currencySelect');"
+                "await until(() => select.options.length > 1);"
+                "return [...select.options].map(o => o.value).join(',');"));
+  EXPECT_EQ(true, Run(R"(return part('currencySelect').options[0]
+                             .textContent.trim().startsWith("Mac's region: ");)"));
+
+  ASSERT_EQ(true, Run("const select = part('currencySelect');"
+                      "select.scrollIntoView({block: 'center'});"
+                      "select.value = 'USD';"
+                      "select.dispatchEvent(new Event('change'));"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return prefs()->GetString(kCommandBarCurrencyPref) == "USD"; }));
+  SaveWindowScreenshot(browser(), "settings-default-currency");
+
+  ASSERT_EQ(true, Run("const select = part('currencySelect');"
+                      "select.value = '';"
+                      "select.dispatchEvent(new Event('change'));"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return prefs()->GetString(kCommandBarCurrencyPref).empty(); }));
 }
 
 }  // namespace

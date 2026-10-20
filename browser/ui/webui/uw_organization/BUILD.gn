@@ -27,6 +27,7 @@ source_set("uw_organization_handler") {
     "//uw/browser/ai_providers",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ui/webui/uw_command_bar",
     "//uw/components/tab_organization",
   ]
 }

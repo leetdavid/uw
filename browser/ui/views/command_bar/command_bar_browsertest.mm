@@ -457,8 +457,8 @@ IN_PROC_BROWSER_TEST_F(CommandBarRatesBrowserTest,
   // The page asks again each time the panel shows.
   ASSERT_TRUE(Eventually(
       [&] {
-        EXPECT_TRUE(content::ExecJs(bar()->page(),
-                                    "window.dispatchEvent(new Event('focus'))"));
+        EXPECT_TRUE(content::ExecJs(
+            bar()->page(), "window.dispatchEvent(new Event('focus'))"));
         return prefs->GetDict(kCommandBarRatesPref).FindDict("per_euro");
       },
       base::Seconds(10)));
@@ -512,6 +512,18 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
       views::Widget::GetTopLevelWidgetForNativeView(
           bar()->page()->GetNativeView()),
       "command-bar-shell");
+
+  Type("");
+  PressInField("Backspace");
+  for (auto [text, name] :
+       {std::pair{"20 kg * 10 m/s/s / 5W", "command-bar-calculator"},
+        std::pair{"1/2 cup flour", "command-bar-no-answer"}}) {
+    Type(text);
+    Wait(base::Milliseconds(300));
+    SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
+                             bar()->page()->GetNativeView()),
+                         name);
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdReturnAsksInANewChat) {

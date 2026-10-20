@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..79faca5edcd002bdc78dea884e42554c523fdce6 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..a7b94874d6bfeb1aab403da0ec1591bad931d696 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,79 @@
+@@ -3904,6 +3904,88 @@
          System
        </message>
      </if>
@@ -75,8 +75,17 @@ index 63c989a76dadc13953e35513998e83326ee3612b..79faca5edcd002bdc78dea884e42554c
 +      <message name="IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE" desc="Label of the switch that makes Cmd+T open the command bar instead of a blank tab.">
 +        Cmd+T opens the command bar
 +      </message>
-+      <message name="IDS_UW_SETTINGS_COMMAND_BAR_NOTE" desc="Explains that the command bar is not finished.">
-+        It can't open pages yet. The + in the sidebar still opens a blank tab, in a new task.
++      <message name="IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY" desc="Label of the menu that picks the currency the command bar converts a bare amount, such as 100 USD, to.">
++        Default currency
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_DESCRIPTION" desc="Second line of the Default currency menu. 'to' is the word typed in the command bar to pick a currency, as in '100 USD to EUR'; keep it as typed.">
++        For a bare amount, and a sum with no "to"
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_BAR_CURRENCY_REGION" desc="The first choice of the Default currency menu: the currency of the Mac's region settings, which it follows if they change.">
++        Mac's region: <ph name="CURRENCY">$1<ex>Hong Kong Dollar</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_BAR_NOTE" desc="Says where the command bar's sums and conversions are worked out. uw is the product name and stays lowercase.">
++        Sums and conversions run on the Mac. uw fetches the European Central Bank's rates once a day and sends nothing you typed.
 +      </message>
 +    </if>
      <if expr="not is_chromeos">

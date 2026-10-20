@@ -148,6 +148,22 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           @change="${this.onCommandBarChange_}">
       </cr-toggle>
     </div>
+    <div class="uw-row">
+      <div id="currencyLabel" class="uw-field">
+        ${this.i18n_('uwCommandBarCurrency')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwCommandBarCurrencyDescription')}
+        </div>
+      </div>
+      <select id="currencySelect" class="md-select"
+          aria-labelledby="currencyLabel"
+          @change="${this.onCurrencySelectChange_}">
+        ${this.currencyOptions_().map(item => html`
+          <option value="${item.code}" ?selected="${item.selected}">
+            ${item.name}
+          </option>`)}
+      </select>
+    </div>
     <div class="uw-note">${this.i18n_('uwCommandBarNote')}</div>
   </div>
 </div>
