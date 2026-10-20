@@ -20,7 +20,7 @@ The logins, cookies, history, and extensions that one or more workspaces share, 
 _Avoid_: Account, user.
 
 **Theme**:
-The colors uw draws its window in: the tint behind the sidebar and the page card. A profile has one theme, shared by all its windows.
+The colors uw draws its window in: the tint behind the sidebar and the page card. Each workspace has its own theme, so two workspaces on one profile can look different.
 _Avoid_: Skin, space color.
 
 **Window mode**:
