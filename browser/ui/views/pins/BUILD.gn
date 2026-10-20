@@ -1,0 +1,25 @@
+# A pin's right-click menu rows and its Edit Home URL card.
+source_set("pins") {
+  sources = [
+    "home_url_card.cc",
+    "home_url_card.h",
+    "pin_menu.cc",
+    "pin_menu.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/tabs:public",
+    "//ui/views",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/strings",
+    "//components/url_formatter",
+    "//ui/base",
+    "//ui/menus",
+    "//url",
+    "//uw/browser/pins",
+    "//uw/browser/ui/look",
+  ]
+}

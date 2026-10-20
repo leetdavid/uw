@@ -110,8 +110,8 @@ For current manual test scenarios and known limits, see [Try the current build](
 
 - `uw-branding.patch` changes the product and About names, macOS bundle identity, and default profile location. It points the app bundle at uw's [app icon](docs/logo.md#app-icon). Chromium's logos inside the browser and most secondary strings remain.
 - `vertical-tabs-default.patch` changes the registered tab-orientation default. The pinned revision already enables the native vertical-tabs launch feature.
-- `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
-- `ai-organization.patch` registers the automatic organization preferences.
+- `tab-tree.patch` hooks the window-owned tab organization controller into tab opening, session restore, tab drags, and the tab context menu. It hooks the [pins shared by a profile's windows](docs/plans/workspaces.md#how-pins-are-kept) into each window, session restore, Cmd-W, the pin's tile, and its menu. It adds the sidebar and menu strings and links the uw tests into Chromium's test binaries. It expects the product source prepared below.
+- `ai-organization.patch` registers the automatic organization and pin preferences.
 - `uw-settings-page.patch` adds the uw page and its strings to Chromium's settings.
 - `uw-scheme-alias.patch` gives every [uw page](docs/CONTEXT.md#language) a `uw://` address. A `uw://` address opens its `chrome://` page, typed in the address bar or opened by the browser. The address bar shows and copies a `chrome://` address as `uw://`. A web page cannot open them, as with `chrome://`.
 - `uw-look.patch` adds the window tint: it hooks uw's colors and gradient into Chromium's frame painting and turns the transparent glass frame off by default.

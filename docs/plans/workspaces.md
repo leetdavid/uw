@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129 is in progress. Nothing else is built.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. Workspaces themselves are not built.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -29,6 +29,17 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 
 - The [pinned-tab behavior](../product.md#pinned-tabs) agreed in Product. A pin belongs to a profile and shows in every window and workspace of it.
 - Until T133, each window loads its own page for a pin.
+
+## How pins are kept
+
+Chosen by uw for T129 on 2026-10-21.
+
+- A profile's pins, each an id and a home URL, are the profile pref `uw.pins`. `PinStore` in `browser/pins` holds them.
+- Each normal window has a `PinSync`. It marks every pinned tab with its pin's id, and the mark stays with the page if the tab moves to another window. Pinning, unpinning, or moving a pin in a window changes the store. A change to the store reaches every window on a later task.
+- A window adds a missing pin as a background tab at its home URL. It closes a copy of a pin that was unpinned elsewhere, keeps one copy of each pin (a restored one first), and adopts pinned tabs the store does not know, such as tabs pinned before uw kept pins.
+- Each pinned tab saves its pin's id in Chromium's session file under `uw.pin`, so a restart brings it back on the page it was on, with no second copy.
+- Cmd-W, a middle-click on the tile, and the tab menu never close a pin. The menu's three rows and the Edit Home URL card are in `browser/ui/views/pins`.
+- Built differently from the design: Reset to Home does not show "Double-click" at its end, since Chromium's menus show only keys there. The card uses Chromium's dialog title and buttons in the shape of a uw card.
 
 ## Design
 

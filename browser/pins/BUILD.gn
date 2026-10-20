@@ -1,0 +1,63 @@
+# Pins shared by every window of a profile. See docs/plans/workspaces.md.
+source_set("pins") {
+  sources = [
+    "pin_store.cc",
+    "pin_store.h",
+    "pin_sync.cc",
+    "pin_sync.h",
+  ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/sessions",
+    "//ui/base/unowned_user_data",
+    "//url",
+  ]
+  deps = [
+    ":prefs",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//components/prefs",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/public/common",
+    "//ui/base",
+  ]
+}
+
+# Kept apart from the pins, so registering the pref pulls in no browser code.
+source_set("prefs") {
+  sources = [
+    "pin_prefs.cc",
+    "pin_prefs.h",
+  ]
+  deps = [ "//components/pref_registry" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "pins_browsertest.cc" ]
+  deps = [
+    ":pins",
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_test_util",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/tabs/common:impl",
+    "//chrome/test:test_support",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//ui/events",
+    "//ui/views",
+    "//url",
+    "//uw/browser/ui/views/pins",
+  ]
+}

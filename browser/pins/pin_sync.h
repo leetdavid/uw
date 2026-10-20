@@ -1,0 +1,97 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+#ifndef UW_BROWSER_PINS_PIN_SYNC_H_
+#define UW_BROWSER_PINS_PIN_SYNC_H_
+
+#include <map>
+#include <string>
+
+#include "base/callback_list.h"
+#include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "components/sessions/core/session_id.h"
+#include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "url/gurl.h"
+#include "uw/browser/pins/pin_store.h"
+
+class BrowserWindowInterface;
+class TabStripModel;
+
+namespace content {
+class WebContents;
+}
+
+namespace tabs {
+class TabInterface;
+}
+
+namespace uw {
+
+// Owned by EmbedderBrowserWindowFeatures. Keeps a window's pinned tabs the
+// same as its profile's PinStore: a tab pinned, unpinned, or moved among the
+// pins here changes the store, and a change to the store from another window
+// is applied here. Each window loads its own page for a pin.
+class PinSync : public TabStripModelObserver {
+ public:
+  DECLARE_USER_DATA(PinSync);
+  static constexpr char kSessionKey[] = "uw.pin";
+
+  explicit PinSync(BrowserWindowInterface* window);
+  PinSync(const PinSync&) = delete;
+  PinSync& operator=(const PinSync&) = delete;
+  ~PinSync() override;
+
+  static PinSync* From(BrowserWindowInterface* window);
+
+  // Marks a restored tab with the pin it showed, from its session data.
+  static void RestoreTab(content::WebContents* page,
+                         const std::map<std::string, std::string>& extra_data);
+
+  // The pin `tab` shows, or null for a tab that shows none.
+  static const PinStore::Pin* PinFor(const tabs::TabInterface* tab);
+  // Whether Cmd-W leaves `window`'s selected tab open because it is a pin.
+  static bool KeepsActiveTab(BrowserWindowInterface* window);
+  // Whether a click or a menu row may close `tab`. Pins are only unpinned.
+  static bool CanClose(const tabs::TabInterface* tab);
+
+  // Loads the pin's home URL in `tab`.
+  static void ResetToHome(const tabs::TabInterface* tab);
+  // Makes the page `tab` shows its pin's home URL, without loading anything.
+  static void ReplaceHomeWithCurrent(const tabs::TabInterface* tab);
+  // Makes `home` the pin's home URL and loads it in `tab`.
+  static void SetHome(const tabs::TabInterface* tab, const GURL& home);
+
+  // TabStripModelObserver:
+  void OnTabStripModelChanged(TabStripModel* model,
+                              const TabStripModelChange& change,
+                              const TabStripSelectionChange& selection) override;
+  void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
+
+ private:
+  void ScheduleApply();
+  // Adopts pinned tabs the store does not know, closes copies of pins it no
+  // longer has, and adds and orders the rest to match it.
+  void Apply();
+  void SaveSession();
+  // Gives the store this window's order of the pins.
+  void ReportOrder();
+
+  const raw_ptr<BrowserWindowInterface> window_;
+  const raw_ptr<TabStripModel> tabs_;
+  const raw_ptr<PinStore> store_;
+  base::CallbackListSubscription store_subscription_;
+  // Set while this class changes the tab strip, so its own changes are not
+  // taken for the user's.
+  bool applying_ = false;
+  bool apply_pending_ = false;
+  // What each tab's session data says, so it is written only on a change.
+  std::map<SessionID, std::string> saved_;
+  ui::ScopedUnownedUserData<PinSync> user_data_;
+  base::WeakPtrFactory<PinSync> weak_factory_{this};
+};
+
+}  // namespace uw
+
+#endif  // UW_BROWSER_PINS_PIN_SYNC_H_
