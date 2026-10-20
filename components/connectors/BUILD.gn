@@ -1,0 +1,32 @@
+# Connectors: MCP servers that give uw's agent more tools. The messages and
+# the pasted JSON, without I/O, so they are tested without a browser. See
+# docs/plans/connectors.md.
+source_set("connectors") {
+  sources = [
+    "connector_config.cc",
+    "connector_config.h",
+    "connector_tools.cc",
+    "connector_tools.h",
+    "mcp.cc",
+    "mcp.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//components/version_info",
+    "//uw/components/ai_providers",
+  ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [
+    "connector_config_unittest.cc",
+    "connector_tools_unittest.cc",
+    "mcp_unittest.cc",
+  ]
+  deps = [
+    ":connectors",
+    "//base",
+    "//testing/gtest",
+  ]
+}

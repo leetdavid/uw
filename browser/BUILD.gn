@@ -2,6 +2,7 @@ group("browser_tests") {
   testonly = true
   deps = [
     "agent:browser_tests",
+    "connectors:browser_tests",
     "tab_organization:browser_tests",
     "ui:browser_tests",
     "ui/look:browser_tests",

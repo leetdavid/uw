@@ -1,0 +1,69 @@
+# Connectors as the browser runs them: programs on this Mac, web addresses,
+# and the list every profile shares. See docs/plans/connectors.md.
+source_set("connectors") {
+  sources = [
+    "connectors.cc",
+    "connectors.h",
+    "local_transport.cc",
+    "local_transport.h",
+    "mcp_client.cc",
+    "mcp_client.h",
+    "remote_transport.cc",
+    "remote_transport.h",
+  ]
+  public_deps = [
+    "//base",
+    "//url",
+    "//uw/components/connectors",
+  ]
+  deps = [
+    "//chrome/common:constants",
+    "//net",
+    "//services/network/public/cpp",
+    "//services/network/public/mojom",
+    "//uw/browser/ai_providers",
+    "//uw/components/terminal",
+  ]
+}
+
+# A connector for tests, as a program and as code a test web server runs.
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "fake_mcp_server.cc",
+    "fake_mcp_server.h",
+  ]
+  deps = [ "//base" ]
+}
+
+executable("uw_fake_mcp_server") {
+  testonly = true
+  sources = [ "fake_mcp_server_main.cc" ]
+  deps = [
+    ":test_support",
+    "//base",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "connectors_browsertest.cc" ]
+  deps = [
+    ":connectors",
+    ":test_support",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/test:test_support",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//services/network/public/cpp",
+    "//testing/gmock",
+    "//testing/gtest",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
+  ]
+  data_deps = [ ":uw_fake_mcp_server" ]
+}

@@ -634,6 +634,7 @@ const TEST_SUITES = {
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
     "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*", "CatalogTest.*",
+    "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
@@ -642,7 +643,7 @@ const TEST_SUITES = {
     "UwTerminalMenuBrowserTest.*",
     "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "AgentLoopBrowserTest.*",
     "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
-    "UwProvidersBrowserTest.*",
+    "UwProvidersBrowserTest.*", "ConnectorsBrowserTest.*",
   ],
 } as const;
 
