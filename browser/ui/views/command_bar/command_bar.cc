@@ -41,6 +41,7 @@
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
@@ -207,6 +208,7 @@ bool CommandBar::Open(BrowserWindowInterface* window) {
   if (!bar || !bar->contents_) {
     return false;
   }
+  bar->task_.reset();
   bar->Show();
   return true;
 }
@@ -216,7 +218,19 @@ bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
   if (!bar || !bar->contents_) {
     return false;
   }
+  bar->task_.reset();
   StartShellCommand(bar->page());
+  bar->Show();
+  return true;
+}
+
+bool CommandBar::OpenForTask(BrowserWindowInterface* window,
+                             const tab_groups::TabGroupId& task) {
+  CommandBar* bar = From(window);
+  if (!bar || !bar->contents_) {
+    return false;
+  }
+  bar->task_ = task;
   bar->Show();
   return true;
 }
@@ -295,6 +309,9 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
                                                         : std::nullopt));
   }
   Navigate(&navigate);
+  if (navigate.disposition != WindowOpenDisposition::SWITCH_TO_TAB) {
+    PlaceInTask();
+  }
 }
 
 void CommandBar::AskUw(const std::string& text) {
@@ -303,6 +320,7 @@ void CommandBar::AskUw(const std::string& text) {
     bubble_->CloseUI();
   }
   AskInNewChat(window_, asked_from, text);
+  PlaceInTask();
 }
 
 void CommandBar::RunInTerminal(const std::string& text) {
@@ -310,6 +328,16 @@ void CommandBar::RunInTerminal(const std::string& text) {
     bubble_->CloseUI();
   }
   OpenTerminalTabRunning(window_, text);
+  PlaceInTask();
+}
+
+void CommandBar::PlaceInTask() {
+  const std::optional<tab_groups::TabGroupId> task = std::exchange(task_, {});
+  TabOrganizationController* controller =
+      TabOrganizationController::From(window_);
+  if (task && controller) {
+    controller->PlaceInTask(window_->GetTabStripModel()->GetActiveTab(), *task);
+  }
 }
 
 }  // namespace uw

@@ -48,6 +48,15 @@ inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
 inline constexpr char kRestoreAfterCrashPref[] =
     "uw.session.restore_after_crash";
 
+// The switches of the tab list's mouse actions. Each is on by default.
+inline constexpr char kOptionClickClosesBranchPref[] =
+    "uw.mouse.option_click_closes_branch";
+inline constexpr char kTaskRowNewTabPref[] = "uw.mouse.task_row_new_tab";
+inline constexpr char kDoubleClickOpensTabPref[] =
+    "uw.mouse.double_click_opens_tab";
+inline constexpr char kMiddleClickClosesTaskPref[] =
+    "uw.mouse.middle_click_closes_task";
+
 // The European Central Bank's rates the command bar last downloaded: "date",
 // "fetched" in seconds since the epoch, and "per_euro".
 inline constexpr char kCommandBarRatesPref[] = "uw.command_bar.rates";

@@ -46,6 +46,9 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetCommandBar(bool on, SetCommandBarCallback callback) override;
   void SetCurrency(const std::string& code,
                    SetCurrencyCallback callback) override;
+  void SetMouseAction(mojom::MouseAction action,
+                      bool on,
+                      SetMouseActionCallback callback) override;
 
  private:
   // The codes the last exchange rates cover, or none before the first.

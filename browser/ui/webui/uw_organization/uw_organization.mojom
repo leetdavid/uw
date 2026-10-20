@@ -37,6 +37,19 @@ struct State {
   string region_currency;
   // The currencies the last exchange rates cover.
   array<string> currencies;
+  // The switches of the tab list's mouse actions.
+  bool option_click_closes_branch;
+  bool task_row_new_tab;
+  bool double_click_opens_tab;
+  bool middle_click_closes_task;
+};
+
+// The tab list's mouse actions that have a switch.
+enum MouseAction {
+  kOptionClickClosesBranch,
+  kTaskRowNewTab,
+  kDoubleClickOpensTab,
+  kMiddleClickClosesTask,
 };
 
 struct PauseResult {
@@ -58,4 +71,6 @@ interface OrganizationHandler {
   SetCommandBar(bool on) => ();
   // Empty follows the Mac's region. A code the rates do not cover is ignored.
   SetCurrency(string code) => ();
+  // Every window follows at once.
+  SetMouseAction(MouseAction action, bool on) => ();
 };

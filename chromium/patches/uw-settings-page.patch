@@ -1,8 +1,8 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..a7b94874d6bfeb1aab403da0ec1591bad931d696 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..a97c6f5e1e0725facf94673ade4e861f109befef 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -3904,6 +3904,88 @@
+@@ -3904,6 +3904,103 @@
          System
        </message>
      </if>
@@ -25,7 +25,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7b94874d6bfeb1aab403da0ec1591ba
 +        Automatic organization is waiting
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_HINT" desc="Hint under the status line when automatic organization is off.">
-+        Turn it on to file each tab branch into a task. Its models are picked on AI providers.
++        Turn it on to file each tab branch into a task. Its models are picked on the AI page.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_DECIDES" desc="Says which model decides tab placement.">
 +        <ph name="MODEL">$1<ex>Jev</ex></ph> decides where tabs go.
@@ -37,16 +37,16 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7b94874d6bfeb1aab403da0ec1591ba
 +        <ph name="MODEL">$1<ex>llama3.2</ex></ph> decides where tabs go and names new tasks.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_WAITING_NO_MODEL" desc="Says what automatic organization waits for when it has no model.">
-+        Pick a language model or a decision model on AI providers.
++        Pick a language model or a decision model on the AI page.
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_TITLE" desc="Title of the row that opens the uw://providers page.">
-+        AI providers
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_TITLE" desc="Title of the row that opens the uw://ai page.">
++        AI
 +      </message>
-+      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_NOTE" desc="Under the title of the row that opens the uw://providers page.">
++      <message name="IDS_UW_SETTINGS_ORGANIZATION_PROVIDERS_NOTE" desc="Under the title of the row that opens the uw://ai page.">
 +        Models and keys moved to their own page
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
-+        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models picked on AI providers. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too.
++        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models picked on the AI page. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_MOVE" desc="Label of the slider that sets how sure a model must be before a tab moves into a task or out of one.">
 +        Move a tab
@@ -86,6 +86,21 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a7b94874d6bfeb1aab403da0ec1591ba
 +      </message>
 +      <message name="IDS_UW_SETTINGS_COMMAND_BAR_NOTE" desc="Says where the command bar's sums and conversions are worked out. uw is the product name and stays lowercase.">
 +        Sums and conversions run on the Mac. uw fetches the European Central Bank's rates once a day and sends nothing you typed.
++      </message>
++      <message name="IDS_UW_SETTINGS_MOUSE_TITLE" desc="Heading of the settings for clicks in the tab list.">
++        Mouse
++      </message>
++      <message name="IDS_UW_SETTINGS_MOUSE_OPTION_CLICK" desc="Label of the switch that makes an Option-click on a tab's close button close the tab and every tab nested under it, its branch.">
++        Option-click a tab's close button to close its branch
++      </message>
++      <message name="IDS_UW_SETTINGS_MOUSE_TASK_ROW_PLUS" desc="Label of the switch that shows a plus button on a task's row in the tab sidebar. A task is a group of tabs.">
++        Show a "+" on a task's row to open a tab in it
++      </message>
++      <message name="IDS_UW_SETTINGS_MOUSE_DOUBLE_CLICK" desc="Label of the switch that makes a double-click on the empty space below the tabs in the sidebar open a new tab.">
++        Double-click below the tabs to open a tab
++      </message>
++      <message name="IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK" desc="Label of the switch that makes a middle-click on a task's row close the task and its tabs. A task is a group of tabs.">
++        Middle-click a task's row to close the task
 +      </message>
 +    </if>
      <if expr="not is_chromeos">

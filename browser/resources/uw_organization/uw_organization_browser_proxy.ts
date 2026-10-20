@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
+import type {MouseAction, PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -15,6 +15,7 @@ export interface UwOrganizationBrowserProxy {
   openThemePicker(): void;
   setCommandBar(on: boolean): Promise<void>;
   setCurrency(code: string): Promise<void>;
+  setMouseAction(action: MouseAction, on: boolean): Promise<void>;
 }
 
 export class UwOrganizationBrowserProxyImpl implements
@@ -49,6 +50,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setCurrency(code: string) {
     await this.handler.setCurrency(code);
+  }
+
+  async setMouseAction(action: MouseAction, on: boolean) {
+    await this.handler.setMouseAction(action, on);
   }
 
   static getInstance(): UwOrganizationBrowserProxy {

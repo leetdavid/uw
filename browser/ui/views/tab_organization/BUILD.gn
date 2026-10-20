@@ -10,6 +10,8 @@ source_set("tab_organization") {
     "menu_card_row.h",
     "name_lock.cc",
     "name_lock.h",
+    "mouse_actions.h",
+    "mouse_actions.mm",
     "new_button.cc",
     "new_button.h",
     "organize_bar.cc",
@@ -66,4 +68,5 @@ source_set("tab_organization") {
     "//uw/browser/ui/look",
     "//uw/browser/ui/views/theme_picker",
   ]
+    "//uw/browser/ui/views/command_bar",
 }

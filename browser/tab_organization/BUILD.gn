@@ -52,6 +52,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "automatic_organizer_browsertest.cc",
+    "mouse_actions_browsertest.mm",
     "sidebar_menus_browsertest.mm",
     "tab_organization_controller_browsertest.cc",
     "task_keys_browsertest.mm",
@@ -93,6 +94,7 @@ source_set("browser_tests") {
     "//ui/views:test_support",
     "//url",
     "//uw/browser/terminal",
+    "//uw/browser/ui/views/command_bar",
     "//chrome/browser/ui/views/tabs/common:impl",
     "//chrome/browser/ui/views/tabs/tab",
     "//uw/browser/ui/views/tab_organization",

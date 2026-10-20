@@ -13,6 +13,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - The [command bar](../CONTEXT.md#language) is a panel centered over the page card. The page dims a little behind it.
 - Cmd+T and File → New Tab open it to open a new page. Escape creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
 - "New child tab" and Ctrl+Cmd+T open it too. A page picked from it opens as the first child of that tab, per [New child tab](keyboard-and-mouse.md#new-child-tab). Agreed on 2026-10-15.
+- The "+" on a task's row opens it for that task, per [Mouse actions](keyboard-and-mouse.md#mouse-actions). A picked page, a Cmd+Return chat, and an Option+Return terminal each open at the end of the task, selected. A row for an open tab still switches to it. Agreed on 2026-10-21.
 - A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T98 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
 - Cmd+L, and a click on the address in the toolbar, open it filled with the current address, selected. A page picked from it loads in the current tab. The lock, star, and zoom icons beside the address keep their own clicks.
 - Cmd+Shift+A opens it narrowed to open and recently closed tabs. Chromium's tab search popup and its toolbar button are hidden.

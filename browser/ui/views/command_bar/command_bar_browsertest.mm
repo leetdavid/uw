@@ -6,6 +6,7 @@
 #import <AppKit/AppKit.h>
 
 #include <atomic>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -28,6 +29,8 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
+#include "components/tabs/public/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/search_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -49,6 +52,7 @@
 #include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
@@ -293,6 +297,95 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
   Settle();
   EXPECT_EQ(blank, tabs->active_index());
   EXPECT_FALSE(bar()->IsShowing());
+}
+
+// The command bar opened by the "+" on the row of a task holding the first
+// tab, with a tab outside the task selected.
+class CommandBarForATaskBrowserTest : public CommandBarBrowserTest {
+ protected:
+  void OpenForATask() {
+    ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+    chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+    Settle();
+    TabOrganizationController* controller =
+        TabOrganizationController::From(browser());
+    task_ = controller->MoveToNewTask(
+        {*controller->IdFor(tabs()->GetTabAtIndex(0))}, u"Plan");
+    Settle();
+    ASSERT_FALSE(tabs()->GetActiveTab()->GetGroup());
+    ASSERT_TRUE(CommandBar::OpenForTask(browser(), *task_));
+  }
+
+  // True once the selected tab passes `is` and sits last in the task, at its
+  // top level.
+  bool LandsAtTheTaskEnd(base::RepeatingCallback<bool(const GURL&)> is) {
+    return Eventually(
+        [&] {
+          tabs::TabInterface* tab = tabs()->GetActiveTab();
+          return is.Run(tab->GetContents()->GetVisibleURL()) &&
+                 tab->GetGroup() == task_ &&
+                 tabs()->GetIndexOfTab(tab) + 1 ==
+                     static_cast<int>(tabs()
+                                          ->group_model()
+                                          ->GetTabGroup(*task_)
+                                          ->ListTabs()
+                                          .end()) &&
+                 TabOrganizationController::From(browser())->DepthFor(tab) == 0;
+        },
+        base::Seconds(5));
+  }
+
+  TabStripModel* tabs() { return browser()->tab_strip_model(); }
+
+  std::optional<tab_groups::TabGroupId> task_;
+};
+
+IN_PROC_BROWSER_TEST_F(CommandBarForATaskBrowserTest,
+                       APickedPageOpensAtTheTaskEnd) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  OpenForATask();
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  Type(page.spec());
+  ASSERT_TRUE(Eventually([&] { return Rows() > 0; }));
+  PressInField("Enter");
+
+  EXPECT_TRUE(LandsAtTheTaskEnd(base::BindRepeating(
+      [](const GURL& page, const GURL& url) { return url == page; }, page)));
+  EXPECT_FALSE(bar()->IsShowing());
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarForATaskBrowserTest, AChatOpensAtTheTaskEnd) {
+  OpenForATask();
+  Type("what is on this page");
+  PressInField("Enter", "metaKey");
+
+  EXPECT_TRUE(LandsAtTheTaskEnd(base::BindRepeating(
+      [](const GURL& url) { return url.host() == kChatHost; })));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarForATaskBrowserTest,
+                       ATerminalOpensAtTheTaskEnd) {
+  OpenForATask();
+  Type("printf ran");
+  PressInField("Enter", "altKey");
+
+  EXPECT_TRUE(LandsAtTheTaskEnd(base::BindRepeating(&IsTerminalUrl)));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarForATaskBrowserTest,
+                       CmdTMakesItOpenWhereCmdTDoes) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  OpenForATask();
+  // Cmd+T while it is still open for the task.
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  Type(page.spec());
+  ASSERT_TRUE(Eventually([&] { return Rows() > 0; }));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually(
+      [&] { return tabs()->GetActiveWebContents()->GetVisibleURL() == page; }));
+  EXPECT_FALSE(tabs()->GetActiveTab()->GetGroup());
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnOpenTabRowSwitchesToIt) {

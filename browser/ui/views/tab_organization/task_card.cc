@@ -295,14 +295,11 @@ void TaskCard::MoveToScratchpad() {
 
 // A task that holds every tab leaves a blank tab behind, so the window stays.
 void TaskCard::CloseTask() {
-  TabStripModel* tabs = window_->GetTabStripModel();
   const tab_groups::TabGroupId group = group_;
   base::WeakPtr<views::Widget> widget = GetWidget()->GetWeakPtr();
-  if (tabs->group_model()->ContainsTabGroup(group)) {
-    if (tabs->count() == tabs->group_model()->GetTabGroup(group)->tab_count()) {
-      tabs->delegate()->AddTabAt(GURL(), -1, true);
-    }
-    tabs->CloseAllTabsInGroup(group);
+  if (TabOrganizationController* controller =
+          TabOrganizationController::From(window_)) {
+    controller->CloseTask(group);
   }
   CloseCard(widget);
 }

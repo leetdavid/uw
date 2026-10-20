@@ -120,12 +120,13 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 | Action | Result |
 | --- | --- |
 | Option-click a tab's close button | Closes its branch, like Close branch. |
-| Hover a task's folder row | Shows a "+" before the task's menu button. A click opens a tab at the end of the task and selects it. Tooltip "New tab in task". |
-| Double-click empty space below the tabs | Does what the foot's "+" does. |
+| Hover a task's folder row | Shows a "+" before the task's menu button. A click opens the [command bar](command-bar.md#opening-it) for the task. Tooltip "New tab in task". With the command bar switched off, a click opens a blank tab at the end of the task and selects it. |
+| Double-click empty space below the tabs | Does what the foot's "+" does. The space still drags the window, but a double-click there no longer zooms it, as in Arc. |
 | Middle-click a task's folder row | Closes the task and its tabs, like Close task. |
 
 - The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar and in horizontal tabs.
-- Once the command bar lands, the task row's "+" opens it instead of a blank tab.
+- The task row's "+" opens the command bar since it landed. Agreed on 2026-10-21.
+- Elsewhere in the window, a double-click on space that drags the window still does what macOS's "Double-click a window's title bar" setting says. A double-click below the tabs did too until T58.
 - The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
 
 ### Menu of empty sidebar space
@@ -156,6 +157,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - Both vertical layouts that `tab-tree.patch` changes give a hidden row no height. The tab row places the chevron and the count from `browser/ui/views/tab_organization/branch_toggle`.
 - `TabStripModel::IsTabCollapsed` also asks `HiddenTabs`, which the controller provides through the window. Ctrl+Tab and the choice of the next tab after a close already skip collapsed groups through it.
 - The mouse switches are profile prefs read by the views they change.
+- The empty space below the tabs drags the window, so macOS, not the views, gets its clicks. While macOS hands out the second click of a double-click, the space counts as the views' instead, and Chromium's double-click-to-zoom never sees it.
 - "New child tab" is a `TabOrganizationController::Command`. The page tree places the new tab as the first child.
 - uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.

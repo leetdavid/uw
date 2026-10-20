@@ -225,6 +225,33 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheMouseSwitchesStartOnAndEachTurnsItsActionOff) {
+  const std::vector<std::pair<std::string, const char*>> switches = {
+      {"optionClickToggle", kOptionClickClosesBranchPref},
+      {"taskRowPlusToggle", kTaskRowNewTabPref},
+      {"doubleClickToggle", kDoubleClickOpensTabPref},
+      {"middleClickToggle", kMiddleClickClosesTaskPref},
+  };
+  for (const auto& [toggle, pref] : switches) {
+    EXPECT_TRUE(prefs()->GetBoolean(pref)) << pref;
+  }
+  OpenPage();
+  SaveWindowScreenshot(browser(), "settings-mouse");
+  for (const auto& [toggle, pref] : switches) {
+    ASSERT_EQ(true,
+              Run(content::JsReplace("const toggle = part($1);"
+                                     "await until(() => toggle.checked);"
+                                     "toggle.scrollIntoView(); toggle.click();"
+                                     "return true;",
+                                     toggle)))
+        << toggle;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return !prefs()->GetBoolean(pref);
+    })) << pref;
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        TheDefaultCurrencyMenuSetsTheCommandBarsCurrency) {
   prefs()->SetDict(
       kCommandBarRatesPref,

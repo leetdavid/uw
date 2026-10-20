@@ -7,6 +7,7 @@ source_set("command_bar") {
   public_deps = [
     "//base",
     "//components/prefs",
+    "//components/tab_groups",
     "//ui/base/unowned_user_data",
   ]
   deps = [
@@ -23,6 +24,7 @@ source_set("command_bar") {
     "//ui/views",
     "//url",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/terminal",
     "//uw/browser/ui/webui/uw_command_bar",
@@ -52,6 +54,8 @@ source_set("browser_tests") {
     "//ui/gfx:gfx_switches",
     "//ui/views",
     "//uw/browser/agent:chat_tab",
+    "//components/tab_groups",
+    "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",

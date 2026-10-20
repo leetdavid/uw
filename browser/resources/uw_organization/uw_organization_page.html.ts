@@ -166,6 +166,17 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     </div>
     <div class="uw-note">${this.i18n_('uwCommandBarNote')}</div>
   </div>
+  <div class="uw-section">
+    <h2 class="uw-heading">${this.i18n_('uwMouseTitle')}</h2>
+    ${this.mouseActions_().map(row => html`
+    <div class="uw-row">
+      <div id="${row.id}Label" class="uw-field">${this.i18n_(row.label)}</div>
+      <cr-toggle id="${row.id}Toggle" data-action="${row.action}"
+          aria-labelledby="${row.id}Label" ?checked="${row.on}"
+          @change="${this.onMouseActionChange_}">
+      </cr-toggle>
+    </div>`)}
+  </div>
 </div>
 <!--_html_template_end_-->`;
   // clang-format on

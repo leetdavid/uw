@@ -541,6 +541,52 @@ bool TabOrganizationController::InCollapsedBranch(const PageId& id) const {
        up = tree_.Find(up->parent)) {
     if (collapsed_.contains(up->id)) {
       return true;
+void TabOrganizationController::CloseTask(const tab_groups::TabGroupId& task) {
+  if (!tabs_->SupportsTabGroups() ||
+      !tabs_->group_model()->ContainsTabGroup(task)) {
+    return;
+  }
+  if (tabs_->count() == tabs_->group_model()->GetTabGroup(task)->tab_count()) {
+    chrome::AddTabAt(window_, GURL(), -1, /*foreground=*/true);
+  }
+  tabs_->CloseAllTabsInGroup(task);
+}
+
+void TabOrganizationController::OpenInTask(const tab_groups::TabGroupId& task) {
+  if (!tabs_->SupportsTabGroups() ||
+      !tabs_->group_model()->ContainsTabGroup(task)) {
+    return;
+  }
+  const int end = static_cast<int>(
+      tabs_->group_model()->GetTabGroup(task)->ListTabs().end());
+  content::WebContents* page = chrome::AddAndReturnTabAt(
+      window_, GURL(), end, /*foreground=*/true, task);
+  if (page) {
+    PlaceInTask(tabs_->GetTabForWebContents(page), task);
+  }
+}
+
+void TabOrganizationController::PlaceInTask(
+    const tabs::TabInterface* tab,
+    const tab_groups::TabGroupId& task) {
+  const std::optional<PageId> id = IdFor(tab);
+  if (!id || !tabs_->SupportsTabGroups() ||
+      !tabs_->group_model()->ContainsTabGroup(task)) {
+    return;
+  }
+  if (tabs_->IsGroupCollapsed(task)) {
+    const tab_groups::TabGroupVisualData* visuals =
+        tabs_->group_model()->GetTabGroup(task)->visual_data();
+    tabs_->ChangeTabGroupVisuals(
+        task, tab_groups::TabGroupVisualData(visuals->title(), visuals->color(),
+                                             /*is_collapsed=*/false));
+  }
+  tree_.MoveToTask(*id, task.ToString());
+  RevealSelected();
+  ScheduleApply();
+  ScheduleUpdate();
+}
+
     }
   }
   return false;
