@@ -4,6 +4,7 @@ group("browser_tests") {
     "agent:browser_tests",
     "connectors:browser_tests",
     "pins:browser_tests",
+    "workspaces:browser_tests",
     "tab_organization:browser_tests",
     "ui:browser_tests",
     "ui/look:browser_tests",

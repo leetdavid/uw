@@ -422,10 +422,10 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..77ea44a1df6f6a92c46c4d003f89ff28
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..ace54a9c7df2f08d86d246c48a50f39efdb9af8a 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..06b1845d1407fffff4ded9ef462cbfe7c7d4238d 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,11 @@ source_set("internal") {
+@@ -58,6 +58,12 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
@@ -434,15 +434,19 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..ace54a9c7df2f08d86d246c48a50f39e
 +      "//uw/browser/tab_organization",
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/views/page_colors",
++      "//uw/browser/workspaces",
        "//chrome/browser:global_features",
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8070b2d4d23896cb44217c6649e4807d0c79ac1b 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..e1629047be522b0b37384a99c4244890efcb7408 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -6,6 +6,12 @@
+@@ -4,8 +4,16 @@
  
+ #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
+ 
++#include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
 +#include "uw/browser/connectors/connectors.h"
@@ -451,10 +455,11 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8070b2d4d23896cb44217c6649e4807d
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
 +#include "uw/browser/ui/views/page_colors/page_colors.h"
++#include "uw/browser/workspaces/workspace_window.h"
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,7 +27,17 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +29,36 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -473,7 +478,14 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8070b2d4d23896cb44217c6649e4807d
  }
  
  void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
-@@ -31,9 +47,12 @@ void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
+     BrowserWindowInterface* browser) {
+-  // Embedder implementation goes here.
++  // Made once the session tracks the window, which saves its workspace.
++  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
++      !browser->GetProfile()->IsOffTheRecord()) {
++    workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
++  }
+ }
  
  void EmbedderBrowserWindowFeatures::InitPostBrowserViewConstruction(
      BrowserView* browser_view) {
@@ -489,10 +501,10 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8070b2d4d23896cb44217c6649e4807d
 +  page_colors_.reset();
  }
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..a3ea90f2b37d7b139a4c449050d600f815b91530 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..234a03aaf40aa5d4398f3904aa8e3637b126c56d 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,16 @@
+@@ -7,6 +7,17 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
@@ -504,12 +516,13 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..a3ea90f2b37d7b139a4c449050d600f8
 +class PageColors;
 +class PinSync;
 +class TabOrganizationController;
++class WorkspaceWindow;
 +}
 +
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +54,11 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +55,12 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
@@ -518,6 +531,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..a3ea90f2b37d7b139a4c449050d600f8
 +  std::unique_ptr<uw::CommandBar> command_bar_;
 +  std::unique_ptr<uw::PageColors> page_colors_;
 +  std::unique_ptr<uw::PinSync> pin_sync_;
++  std::unique_ptr<uw::WorkspaceWindow> workspace_window_;
  };
  
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_
@@ -1104,7 +1118,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
-index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..825c28094f67254047a39408f93f2fd5f17b6fa1 100644
+index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..725fe4aaec865692889b5ebfdef8d3b6249bbf31 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
 @@ -24,6 +24,8 @@
@@ -1116,7 +1130,19 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..825c28094f67254047a39408f93f2fd5
  
  namespace {
  
-@@ -158,13 +160,17 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+@@ -118,8 +120,9 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+       {true,  true,  false, false, kVK_ANSI_LeftBracket,  IDC_SELECT_PREVIOUS_TAB},
+       {false, false, true,  false, kVK_PageDown,          IDC_SELECT_NEXT_TAB},
+       {false, false, true,  false, kVK_PageUp,            IDC_SELECT_PREVIOUS_TAB},
+-      {true,  false, false, true,  kVK_RightArrow,        IDC_SELECT_NEXT_TAB},
+-      {true,  false, false, true,  kVK_LeftArrow,         IDC_SELECT_PREVIOUS_TAB},
++      // uw: Cmd+Option+arrows switch workspace, as in Arc.
++      {true,  false, false, true,  kVK_RightArrow,        uw::kNextWorkspace},
++      {true,  false, false, true,  kVK_LeftArrow,         uw::kPreviousWorkspace},
+       {false, true,  true,  false, kVK_PageDown,          IDC_MOVE_TAB_NEXT},
+       {false, true,  true,  false, kVK_PageUp,            IDC_MOVE_TAB_PREVIOUS},
+ 
+@@ -158,13 +161,26 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
      keys.push_back(
          {true, false, true, false, kVK_ANSI_C, IDC_ADD_NEW_TAB_TO_GROUP});
      keys.push_back(
@@ -1132,10 +1158,19 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..825c28094f67254047a39408f93f2fd5
 +    keys.push_back(
 +        {true, true, false, false, kVK_ANSI_P, uw::kShellCommandBarCommand});
 +
++    // uw: Ctrl+1 to 9 show the workspace at that place in the switcher.
++    constexpr int kDigits[] = {kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3,
++                               kVK_ANSI_4, kVK_ANSI_5, kVK_ANSI_6,
++                               kVK_ANSI_7, kVK_ANSI_8, kVK_ANSI_9};
++    int command = uw::kGoToWorkspace1;
++    for (int digit : kDigits) {
++      keys.push_back({false, false, true, false, digit, command++});
++    }
++
      if (base::FeatureList::IsEnabled(features::kUIDebugTools)) {
        keys.push_back(
            {false, true, true, true, kVK_ANSI_T, IDC_DEBUG_TOGGLE_TABLET_MODE});
-@@ -209,6 +215,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
+@@ -209,6 +225,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
      return NoCommand();
  
    int cmdNum = MenuCommandForKeyEvent(event);
@@ -1447,10 +1482,18 @@ index d8f32a1ca60e441fd998fbb05e3df7aeb1fd8dd6..ed003ac952f2729b20db09a8e607ea7d
    registry->RegisterBooleanPref(
        prefs::kShowManagedBookmarksInBookmarkBar, true,
 diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
-index 781d2e2f7ef99797284888c446e290488cdc1620..4a02a0cbb8445a04d3bdb93e232ef093b179b503 100644
+index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef0102553b 100644
 --- a/chrome/browser/sessions/session_service.cc
 +++ b/chrome/browser/sessions/session_service.cc
-@@ -354,6 +354,8 @@ void SessionService::AddTabExtraData(SessionID window_id,
+@@ -64,6 +64,7 @@
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/session_storage_namespace.h"
+ #include "content/public/browser/web_contents.h"
++#include "uw/browser/workspaces/workspace_window.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/ash/crostini/crostini_util.h"
+@@ -354,12 +355,16 @@ void SessionService::AddTabExtraData(SessionID window_id,
      return;
    }
  
@@ -1459,7 +1502,15 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..4a02a0cbb8445a04d3bdb93e232ef093
    ScheduleCommand(sessions::CreateAddTabExtraDataCommand(tab_id, key, data));
  }
  
-@@ -381,6 +383,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
+ void SessionService::AddWindowExtraData(SessionID window_id,
+                                         const char* key,
+                                         const std::string& data) {
++  // uw: kept, like the tab data, for a rebuild to write again.
++  window_extra_data_[window_id][key] = data;
+   if (!ShouldTrackChangesToWindow(window_id)) {
+     return;
+   }
+@@ -381,6 +386,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
    if (i != tab_to_available_range()->end()) {
      tab_to_available_range()->erase(i);
    }
@@ -1467,7 +1518,15 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..4a02a0cbb8445a04d3bdb93e232ef093
  
    if (pending_window_close_ids_.contains(window_id)) {
      // Tab is in last window and the window is being closed. Don't commit it
-@@ -663,6 +666,16 @@ void SessionService::BuildCommandsForTab(
+@@ -473,6 +479,7 @@ void SessionService::WindowClosing(SessionID window_id) {
+ 
+ void SessionService::WindowClosed(SessionID window_id) {
+   windows_tracking()->erase(window_id);
++  window_extra_data_.erase(window_id);
+   last_selected_tab_in_window()->erase(window_id);
+ 
+   if (window_closing_ids_.contains(window_id)) {
+@@ -663,6 +670,16 @@ void SessionService::BuildCommandsForTab(
      command_storage_manager()->AppendRebuildCommand(
          sessions::CreateSplitTabCommand(session_id, std::move(split)));
    }
@@ -1484,17 +1543,49 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..4a02a0cbb8445a04d3bdb93e232ef093
  }
  
  void SessionService::ScheduleResetCommands() {
+@@ -674,6 +691,17 @@ void SessionService::ScheduleResetCommands() {
+   last_selected_tab_in_window()->clear();
+   set_rebuild_on_next_save(false);
+   BuildCommandsFromBrowsers(tab_to_available_range(), windows_tracking());
++  // uw: without this, a rebuild drops the data uw keeps for each window,
++  // such as its workspace.
++  for (const SessionID window_id : *windows_tracking()) {
++    if (auto data = window_extra_data_.find(window_id);
++        data != window_extra_data_.end()) {
++      for (const auto& [key, value] : data->second) {
++        command_storage_manager()->AppendRebuildCommand(
++            sessions::CreateAddWindowExtraDataCommand(window_id, key, value));
++      }
++    }
++  }
+   if (!windows_tracking()->empty()) {
+     // We're lazily created on startup and won't get an initial batch of
+     // SetWindowType messages. Set these here to make sure our state is correct.
+@@ -736,7 +764,10 @@ bool SessionService::HasOpenTrackableBrowsers(SessionID window_id) const {
+       [this, window_id, &has_open_trackable](BrowserWindowInterface* browser) {
+         const SessionID browser_id = browser->GetSessionID();
+         if (browser_id != window_id &&
+-            !window_closing_ids_.contains(browser_id)) {
++            !window_closing_ids_.contains(browser_id) &&
++            // uw: a hidden workspace window closes with the one it is
++            // behind, so the session keeps both.
++            !uw::WorkspaceWindow::ClosesWith(browser, window_id)) {
+           if (ShouldTrackBrowser(browser)) {
+             has_open_trackable = true;
+           }
 diff --git a/chrome/browser/sessions/session_service.h b/chrome/browser/sessions/session_service.h
-index 92d191c30c8f4919631d1a1e06a1929afac29225..534473c7cb98dc8d45c6489bb6e170f15a9c8d98 100644
+index 92d191c30c8f4919631d1a1e06a1929afac29225..220355c01ee804a9fb3252596f20ddea12191b75 100644
 --- a/chrome/browser/sessions/session_service.h
 +++ b/chrome/browser/sessions/session_service.h
-@@ -303,6 +303,10 @@ class SessionService : public SessionServiceBase {
+@@ -303,6 +303,12 @@ class SessionService : public SessionServiceBase {
    // mapping since we no longer need it after the first write to disk.
    std::map<tab_groups::TabGroupId, std::string> local_to_sync_id_mapping_;
  
 +  // uw: the last data each tab was given under each key, which a rebuild of
 +  // the session file writes again.
 +  std::map<SessionID, std::map<std::string, std::string>> tab_extra_data_;
++  // uw: the same for each window.
++  std::map<SessionID, std::map<std::string, std::string>> window_extra_data_;
 +
    base::WeakPtrFactory<SessionService> weak_factory_{this};
  };

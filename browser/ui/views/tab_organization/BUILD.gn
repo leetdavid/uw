@@ -70,5 +70,6 @@ source_set("tab_organization") {
     "//uw/browser/ui/look",
     "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/theme_picker",
+    "//uw/browser/workspaces",
   ]
 }

@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, started on 2026-10-21.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, started on 2026-10-21: switching, the keys, and closing and restoring are built.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -40,6 +40,19 @@ Chosen by uw for T129 on 2026-10-21.
 - Each pinned tab saves its pin's id in Chromium's session file under `uw.pin`, so a restart brings it back on the page it was on, with no second copy.
 - Cmd-W, a middle-click on the tile, and the tab menu never close a pin. The menu's three rows and the Edit Home URL card are in `browser/ui/views/pins`.
 - Built differently from the design: Reset to Home does not show "Double-click" at its end, since Chromium's menus show only keys there. The card uses Chromium's dialog title and buttons in the shape of a uw card.
+
+## How workspace windows work
+
+Chosen by uw for T130 on 2026-10-21.
+
+- The workspaces are the local state pref `uw.workspaces`: each one's id, name, emoji, and profile folder, in the switcher's order. `WorkspaceList` in `browser/workspaces` holds them. At first use, each profile becomes a workspace with its name and an unused emoji.
+- Each normal window that is not private has a `WorkspaceWindow`. It knows the workspace the window shows and the group of partner windows it belongs to. A new window takes the workspace of the window in front when they share a profile, and otherwise its profile's first workspace.
+- Switching moves the group's window for the other workspace to where the current one is, shows it, and hides the current one. The first switch to a workspace opens its window with a new tab, once the profile has loaded.
+- A hidden window that something else shows, such as a link from another app, becomes the one its group shows.
+- Each window saves its workspace, its group, and whether it is hidden, in Chromium's session file and in Cmd+Shift+T's record of a closed window. A restart brings the group back with the same window in front. Cmd+Shift+T on any window of a closed group brings back the rest. If a group's shown window does not come back, one of its hidden windows shows.
+- Closing the shown window closes its group, except when quitting. When the group's windows were the profile's last, the session keeps all of them for the next launch.
+- Ctrl+1 to 9 and Cmd+Option+← / → are window commands beside the task commands.
+- The command bar's open-tab rows already come from every window of the current profile, hidden ones included, and picking one shows its window. Its "Go to …" and "New workspace" rows come with T61, which adds command rows.
 
 ## Design
 

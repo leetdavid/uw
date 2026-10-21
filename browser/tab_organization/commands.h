@@ -7,7 +7,7 @@
 namespace uw {
 
 // Commands of the menu bar and keys that act on the window's selected tab,
-// its task, or automatic organization. The numbers follow
+// its task, its workspace, or automatic organization. The numbers follow
 // TabOrganizationController::Command, whose commands also run as window
 // commands, on the selected tabs.
 enum WindowCommand {
@@ -24,7 +24,11 @@ enum WindowCommand {
   kShowOrganizerActivity,
   kShowOrganizationSettings,
   kShowThemePicker,
-  kLastWindowCommand = kShowThemePicker,
+  kGoToWorkspace1,
+  kGoToWorkspace9 = kGoToWorkspace1 + 8,
+  kNextWorkspace,
+  kPreviousWorkspace,
+  kLastWindowCommand = kPreviousWorkspace,
 };
 
 bool IsWindowCommand(int command);

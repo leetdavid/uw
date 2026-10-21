@@ -1,31 +1,41 @@
 diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
-index 3b46ea761345ceea74fd9c32bd0b259a63b5c90c..0f862309ccfb1115b31d62eaaeac189653614fbd 100644
+index 3b46ea761345ceea74fd9c32bd0b259a63b5c90c..81d29ef39f1f1c241df446b48d45681ac49474d0 100644
 --- a/chrome/browser/prefs/BUILD.gn
 +++ b/chrome/browser/prefs/BUILD.gn
-@@ -206,6 +206,8 @@ source_set("impl") {
+@@ -206,6 +206,9 @@ source_set("impl") {
      "//services/preferences/tracked",
      "//services/preferences/tracked:features",
      "//ui/webui:buildflags",
 +    "//uw/browser/pins:prefs",
 +    "//uw/browser/tab_organization:ai_connection",
++    "//uw/browser/workspaces:prefs",
    ]
  
    if (enable_print_preview) {
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
-index 6ccdf1e52f7fd305c36b0f109586b19d6080004b..01a22493a267482cf4d56da7a81df44788d22e7f 100644
+index 6ccdf1e52f7fd305c36b0f109586b19d6080004b..69c7d3e6e11d48a74dc7cabeac80574cc39404e6 100644
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -560,6 +560,9 @@
+@@ -560,6 +560,10 @@
  #include "chrome/browser/ui/side_search/side_search_prefs.h"
  #endif
  
 +#include "uw/browser/pins/pin_prefs.h"
 +#include "uw/browser/tab_organization/ai_connection.h"
++#include "uw/browser/workspaces/workspace_prefs.h"
 +
  #if BUILDFLAG(ENABLE_SESSION_SERVICE)
  #include "chrome/browser/sessions/session_data_service.h"
  #include "chrome/browser/sessions/session_service_log.h"
-@@ -1777,6 +1780,8 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+@@ -1744,6 +1748,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+   registry->RegisterBooleanPref(
+       policy::policy_prefs::kLocalNetworkAccessPermissionsPolicyDefaultEnabled,
+       false);
++  uw::RegisterWorkspaceLocalStatePrefs(registry);
+ 
+   // This is intentionally last.
+   RegisterLocalStatePrefsForMigration(registry);
+@@ -1777,6 +1782,8 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
    contextual_search::ContextualSearchService::RegisterProfilePrefs(registry);
    contextual_tasks::RegisterProfilePrefs(registry);
    registry->RegisterIntegerPref(prefs::kContextualTasksNextPanelOpenCount, 0);

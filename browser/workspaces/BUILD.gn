@@ -1,0 +1,68 @@
+# Workspaces and the windows that show them. See docs/plans/workspaces.md.
+source_set("workspaces") {
+  sources = [
+    "workspace_list.cc",
+    "workspace_list.h",
+    "workspace_window.cc",
+    "workspace_window.h",
+  ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/profiles:profile_util",
+    "//components/sessions",
+    "//ui/base/unowned_user_data",
+  ]
+  deps = [
+    ":prefs",
+    "//chrome/browser/lifetime",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/browser_window:create_browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/common",
+    "//components/prefs",
+    "//ui/base",
+    "//url",
+  ]
+}
+
+# Kept apart, so registering the pref pulls in no browser code.
+source_set("prefs") {
+  sources = [
+    "workspace_prefs.cc",
+    "workspace_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "workspaces_browsertest.mm" ]
+  deps = [
+    ":workspaces",
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser:global_keyboard_shortcuts_mac",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_test_util",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/test:test_support",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/events:test_support",
+    "//ui/gfx/geometry",
+    "//url",
+    "//uw/browser/tab_organization",
+    "//uw/browser/ui/views/tab_organization",
+  ]
+}

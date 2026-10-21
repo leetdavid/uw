@@ -1,0 +1,101 @@
+diff --git a/chrome/browser/sessions/BUILD.gn b/chrome/browser/sessions/BUILD.gn
+index c8d07e45c8bfa88e2e63bab68f14ffe3f02ad456..fbeef2e0873119888726fc625e3bdebbbfb8cffb 100644
+--- a/chrome/browser/sessions/BUILD.gn
++++ b/chrome/browser/sessions/BUILD.gn
+@@ -149,6 +149,7 @@ source_set("impl") {
+       "//components/media_device_salt",
+       "//components/pref_registry",
+       "//components/tab_groups",
++      "//uw/browser/workspaces",
+     ]
+ 
+     if (is_mac) {
+diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
+index 31cc627e9a6f978367e994a44e39ff94d80908d4..9387ccb39605c48c200a54b25e57532e358c5d2f 100644
+--- a/chrome/browser/sessions/session_restore.cc
++++ b/chrome/browser/sessions/session_restore.cc
+@@ -113,6 +113,7 @@
+ #include "extensions/browser/extension_registry.h"
+ #include "extensions/common/extension_set.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
++#include "uw/browser/workspaces/workspace_window.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/constants/ash_features.h"
+@@ -1332,6 +1333,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     base::TimeTicks now = base::TimeTicks::Now();
+     BrowserWindowInterface* browser_window =
+         CreateBrowserWindow(std::move(params));
++    // uw: the window rejoins its workspace and the windows it switches with.
++    uw::WorkspaceWindow::Restore(browser_window, extra_data);
+     if (auto* manager =
+             InitialWebUIWindowMetricsManager::From(browser_window)) {
+       manager->SetWindowCreationInfo(
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index d80d6550e73ccd088505e8dd00350cf5002caea9..cfd35897356140cb1fc3731681b19e276c0712b0 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -61,6 +61,7 @@
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/window_open_disposition.h"
++#include "uw/browser/workspaces/workspace_window.h"
+ 
+ using content::NavigationController;
+ using content::SessionStorageNamespace;
+@@ -189,6 +190,10 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
+     }
+   }
+ 
++  // uw: Cmd+Shift+T brings the window back in its workspace, with the
++  // windows it switches with.
++  uw::WorkspaceWindow::AddRestoreData(&browser_.get(), data);
++
+   return data;
+ }
+ 
+@@ -523,6 +528,7 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+ 
+   Browser* browser = CreateBrowserWindow(std::move(*create_params))
+                          ->GetBrowserForMigrationOnly();
++  uw::WorkspaceWindow::Restore(browser, extra_data);
+ 
+   return browser->GetFeatures().live_tab_context();
+ }
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index f9b1d3de0545b1426169859660f555f825e02468..589a2299266779a44f19f67f2542c91e8572ba15 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -356,6 +356,7 @@
+ #include "ui/views/widget/widget.h"
+ #include "ui/views/window/dialog_delegate.h"
+ #include "ui/views/window/hit_test_utils.h"
++#include "uw/browser/workspaces/workspace_window.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/constants/ash_switches.h"
+@@ -1586,6 +1587,12 @@ void BrowserView::Show() {
+     return;
+   }
+ 
++  // uw: a window behind another workspace's stays hidden while it is
++  // restored, and otherwise swaps places with the one in front.
++  if (!uw::WorkspaceWindow::WillShow(browser())) {
++    return;
++  }
++
+   if (auto* manager = InitialWebUIManager::From(browser())) {
+     if (manager->RequestDeferShow(base::BindOnce(
+             &BrowserView::Show, weak_ptr_factory_.GetWeakPtr()))) {
+@@ -1691,6 +1698,11 @@ void BrowserView::Activate() {
+     return;
+   }
+ 
++  // uw: as in Show().
++  if (!uw::WorkspaceWindow::WillShow(browser())) {
++    return;
++  }
++
+   if (auto* manager = InitialWebUIManager::From(browser())) {
+     if (manager->RequestDeferShow(base::BindOnce(
+             &BrowserView::Activate, weak_ptr_factory_.GetWeakPtr()))) {

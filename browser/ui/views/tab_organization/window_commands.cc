@@ -25,6 +25,8 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
+#include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -35,6 +37,27 @@ std::optional<tab_groups::TabGroupId> SelectedTask(
     BrowserWindowInterface* window) {
   tabs::TabInterface* tab = window->GetTabStripModel()->GetActiveTab();
   return tab ? tab->GetGroup() : std::nullopt;
+}
+
+// The workspace a workspace command switches `window` to, or null when there
+// is none or `window` already shows it.
+const WorkspaceList::Workspace* WorkspaceFor(BrowserWindowInterface* window,
+                                             int command) {
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window);
+  if (!shown) {
+    return nullptr;
+  }
+  const WorkspaceList& list = WorkspaceList::Get();
+  int index = command - kGoToWorkspace1;
+  if (command == kNextWorkspace || command == kPreviousWorkspace) {
+    index =
+        list.IndexOf(shown->workspace()) + (command == kNextWorkspace ? 1 : -1);
+  }
+  if (index < 0 || index >= static_cast<int>(list.workspaces().size()) ||
+      list.workspaces()[index].id == shown->workspace()) {
+    return nullptr;
+  }
+  return &list.workspaces()[index];
 }
 
 }  // namespace
@@ -51,6 +74,9 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
   if (command >= kGoToTask1 && command <= kGoToTask9) {
     return static_cast<size_t>(command - kGoToTask1) <
            controller->tree().Tasks().size();
+  }
+  if (command >= kGoToWorkspace1 && command <= kPreviousWorkspace) {
+    return WorkspaceFor(window, command) != nullptr;
   }
   const AutomaticOrganizer* organizer = AutomaticOrganizer::From(window);
   const PrefService* prefs = window->GetProfile()->GetPrefs();
@@ -94,6 +120,10 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
   }
   if (command >= kGoToTask1 && command <= kGoToTask9) {
     controller->SelectTask(controller->tree().Tasks()[command - kGoToTask1]);
+    return;
+  }
+  if (command >= kGoToWorkspace1 && command <= kPreviousWorkspace) {
+    WorkspaceWindow::From(window)->Switch(WorkspaceFor(window, command)->id);
     return;
   }
   PrefService* prefs = window->GetProfile()->GetPrefs();
