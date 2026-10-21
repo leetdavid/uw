@@ -148,7 +148,7 @@ The public list at models.dev of what each provider's models can do: whether a m
 A language-model request for a task name. It is sent only when the placement answer calls for a name: for a new task, for a task with the provisional name that a tab starts, and for a task that has outgrown the name uw gave it. After a call that failed or gave no usable name, it is sent again for the next tab that changes and stays in that task.
 
 **Name check**:
-The question in a placement request that asks whether a tab is the same piece of work as the tabs that make up its task. A tab that is, and yet fits no task name, shows that its task has outgrown its name. It is asked only about a generated name.
+The question in a placement request that asks whether a tab is the same piece of work as the other tabs of its task. A tab leaves its task only when the answer is that it is not. A tab that is, and yet fits no task name, shows that its task has outgrown a generated name.
 
 **Generated name**:
 A task name uw gave. uw may replace it, and remembers it across a restart. A name the user typed is not generated and is never replaced, until the user hands it back with the name lock or asks for a new one with "Name Task".

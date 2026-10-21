@@ -55,7 +55,9 @@ class TabOrganizationController;
 // once no request about a tab of that branch is out. Tabs that sit under
 // each other and agree move together: into a task, out of a task they no
 // longer fit, or into a new task, through the controller as one undoable
-// action. A tab that still fits its task stays behind. A new task starts
+// action. A tab leaves a task only when the model finds it a different piece
+// of work from the other tabs there. A tab that still fits its task stays
+// behind. A new task starts
 // under the name every new task has, so its tabs move at once, and the
 // language model is asked for its name afterwards. The same answers say when
 // another task needs a name: a task without one that the branch starts, or a
@@ -260,8 +262,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::vector<std::string> MemberTitles(const Page& page) const;
   // The titles of the tabs under `top`.
   std::vector<std::string> TitlesUnder(const PageId& top) const;
-  // The name check for a tab in a task that uw named and that holds other
-  // tabs, when there is a language model to give a new name.
+  // The name check for a tab in a task that holds other tabs.
   std::optional<NameCheck> NameCheckFor(const Page& page) const;
   // Names the task the branch stays in: with `name` when the answer carried
   // one, else by asking the language model. With neither, the branch is

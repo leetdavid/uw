@@ -1,5 +1,5 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..a97c6f5e1e0725facf94673ade4e861f109befef 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..f7a4fdb94396ab0e2cb3a4433f9ec51aad1f03b2 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
 @@ -3904,6 +3904,103 @@
@@ -46,7 +46,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..a97c6f5e1e0725facf94673ade4e861f
 +        Models and keys moved to their own page
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_SCOPE" desc="Explains what automatic organization sends to the models.">
-+        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models picked on the AI page. For a tab in a task that uw named, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too.
++        uw sends each tab branch's title, URL, source-tab relationship, current task names, and a short readable-text excerpt to the models picked on the AI page. For a tab in a task, the decision model also gets the titles of the other tabs in that task. To name a task that already holds tabs, the language model gets their titles too.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_THRESHOLD_MOVE" desc="Label of the slider that sets how sure a model must be before a tab moves into a task or out of one.">
 +        Move a tab

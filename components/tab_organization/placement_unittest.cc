@@ -169,31 +169,73 @@ TEST(PlacementTest, ATaskThatHasOutgrownItsNameKeepsTheBranch) {
   EXPECT_EQ(PlaceIn("task-1", Answer("task-1", 0.95, 0.0, 0.99)).action,
             Action::kLeave);
 
-  // Short of the threshold, it is the branch that has left the task.
+  // Short of the threshold, the task keeps its name. The branch is still the
+  // same piece of work, so it stays, and the new task is only suggested.
   placement = PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, 0.89));
-  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.action, Action::kSuggest);
   EXPECT_EQ(placement.target, kNewTaskOption);
 
-  // What the model calls a one-off says nothing about the task. It leaves
-  // for the Scratchpad.
+  // What the model calls a one-off renames nothing.
   placement = PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1, 0.99));
-  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.action, Action::kSuggest);
   EXPECT_EQ(placement.target, kScratchpadOption);
   // Anything else can rename the task, even short of starting one itself.
   EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.74, 0.99)).action,
             Action::kName);
 
-  // Another task the branch belongs to comes first.
+  // Another task the branch belongs to comes first, and renames nothing.
   placement = PlaceIn("task-1", Answer("task-2", 0.95, 0.0, 0.99));
-  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.action, Action::kSuggest);
   EXPECT_EQ(placement.target, "task-2");
-  EXPECT_EQ(PlaceIn("task-1", Answer("task-2", 0.5, 0.0, 0.99)).action,
-            Action::kSuggest);
+
+  // A name the user typed is never replaced.
+  placement = Place(Answer(kNewTaskOption, 0.95, 0.9, 0.95),
+                    {"task-1", /*in_unnamed_task=*/false, /*typed_name=*/true},
+                    kNeeded);
+  EXPECT_EQ(placement.action, Action::kSuggest);
+  EXPECT_EQ(placement.target, kNewTaskOption);
 
   // The Scratchpad has no name to outgrow.
   EXPECT_EQ(
       PlaceIn(std::string(), Answer(kNewTaskOption, 0.95, 0.9, 0.99)).action,
       Action::kApply);
+}
+
+TEST(PlacementTest, ABranchLeavesItsTaskOnlyAsAnotherPieceOfWork) {
+  // Sure that the branch belongs elsewhere, the model must also find it a
+  // different piece of work from the other tabs of its task.
+  Placement placement = PlaceIn("task-1", Answer("task-2", 0.95, 0.0, 0.05));
+  EXPECT_EQ(placement.action, Action::kApply);
+  EXPECT_EQ(placement.target, "task-2");
+  placement = PlaceIn("task-1", Answer("task-2", 0.95, 0.0, 0.2));
+  EXPECT_EQ(placement.action, Action::kSuggest);
+  EXPECT_EQ(placement.target, "task-2");
+  EXPECT_DOUBLE_EQ(placement.confidence, 0.8);
+  EXPECT_EQ(placement.needed, kNeeded.confidence);
+
+  // The same holds for a new task and for the Scratchpad.
+  EXPECT_EQ(PlaceIn("task-1", Answer(kNewTaskOption, 0.95, 0.9, 0.2)).action,
+            Action::kSuggest);
+  EXPECT_EQ(PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1, 0.2)).action,
+            Action::kSuggest);
+  EXPECT_EQ(
+      PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1, 0.05)).action,
+      Action::kApply);
+
+  // A task with no other tabs has no name check, so nothing holds the
+  // branch.
+  EXPECT_EQ(PlaceIn("task-1", Answer(kScratchpadOption, 0.95, 0.1)).action,
+            Action::kApply);
+
+  // A branch in a task without a name joins a named task the same way.
+  EXPECT_EQ(Place(Answer("task-2", 0.95, 0.0, 0.2),
+                  {std::string(), /*in_unnamed_task=*/true}, kNeeded)
+                .action,
+            Action::kSuggest);
+
+  // The Scratchpad holds nothing.
+  EXPECT_EQ(PlaceIn(std::string(), Answer("task-2", 0.95, 0.0, 0.99)).action,
+            Action::kApply);
 }
 
 TEST(PlacementTest, EachThresholdDecidesOneKindOfAnswer) {
@@ -209,7 +251,14 @@ TEST(PlacementTest, EachThresholdDecidesOneKindOfAnswer) {
 
   const ClassificationAnswer outgrown = Answer(kNewTaskOption, 0.99, 0.6, 0.6);
   EXPECT_EQ(Place(outgrown, {"task-1"}, {0.50, 0.50, 0.65}).action,
+            Action::kSuggest);
+  // The move threshold also says how sure the name check must be that the
+  // branch is another piece of work.
+  const ClassificationAnswer other = Answer(kNewTaskOption, 0.99, 0.6, 0.45);
+  EXPECT_EQ(Place(other, {"task-1"}, {0.55, 0.50, 0.65}).action,
             Action::kApply);
+  EXPECT_EQ(Place(other, {"task-1"}, {0.60, 0.50, 0.65}).action,
+            Action::kSuggest);
   // The other two thresholds have no say in a new name.
   const Placement placement = Place(outgrown, {"task-1"}, {0.95, 0.95, 0.60});
   EXPECT_EQ(placement.action, Action::kName);
@@ -412,18 +461,37 @@ TEST(PlacementTest, AnAnswerShortOfTheThresholdMovesNothingByItself) {
   EXPECT_EQ(placements[1].placement.target, "task-2");
 }
 
-TEST(PlacementTest, TheTopTabOfAGroupDecidesWhetherItsTaskOutgrewItsName) {
+TEST(PlacementTest, TheNameCheckHoldsATabInItsTaskUnlessItGoesAlong) {
+  // The search is the same piece of work as the other tabs of its task, so
+  // it stays, and the task has outgrown its name. The result under it is
+  // another piece of work and leaves with the tab under it.
   std::vector<BranchPlacement> placements =
       PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8, 0.95)}},
-                   {Id("result"), {Answer(kNewTaskOption, 0.99, 0.9, 0.1)}}});
-  ASSERT_EQ(placements.size(), 1u);
-  EXPECT_EQ(placements[0].pages, Ids({"search", "result", "steps", "other"}));
+                   {Id("result"), {Answer(kNewTaskOption, 0.99, 0.9, 0.05)}}});
+  ASSERT_EQ(placements.size(), 2u);
+  EXPECT_EQ(placements[0].pages, Ids({"search"}));
   EXPECT_EQ(placements[0].placement.action, Action::kName);
+  EXPECT_EQ(placements[1].pages, Ids({"result", "steps"}));
+  EXPECT_EQ(placements[1].placement.action, Action::kApply);
+  EXPECT_EQ(placements[1].placement.target, kNewTaskOption);
 
-  // A tab below it that looks like the task's work does not hold the group
-  // back: the tabs it was compared with may be the very ones that leave.
+  // A tab held in its task that would go elsewhere stays behind when the
+  // page above it leaves.
   placements =
-      PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8, 0.1)}},
+      PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8, 0.05)}},
+                   {Id("result"), {Answer("task-2", 0.99, 0.0, 0.95)}}});
+  ASSERT_EQ(placements.size(), 2u);
+  EXPECT_EQ(placements[0].pages, Ids({"search", "other"}));
+  EXPECT_EQ(placements[0].staying, Ids({"result"}));
+  EXPECT_EQ(placements[0].placement.action, Action::kApply);
+  EXPECT_EQ(placements[1].pages, Ids({"result"}));
+  EXPECT_EQ(placements[1].placement.action, Action::kSuggest);
+
+  // A tab below a leaving page that agrees with it goes along, whatever the
+  // name check says about it: the tabs it was compared with may be the very
+  // ones that leave.
+  placements =
+      PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8, 0.05)}},
                    {Id("result"), {Answer(kNewTaskOption, 0.99, 0.9, 0.95)}}});
   ASSERT_EQ(placements.size(), 1u);
   EXPECT_EQ(placements[0].placement.action, Action::kApply);

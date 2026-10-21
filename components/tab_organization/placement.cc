@@ -34,6 +34,18 @@ bool HubInATask(const ClassificationAnswer& answer, const Position& position) {
   return IsHub(answer) && (!position.task.empty() || position.in_unnamed_task);
 }
 
+// A branch leaves the task it is in only when the model also finds it a
+// different piece of work from the other tabs there. A task without other
+// tabs has no name check, and nothing holds the branch. Out of a task without
+// a name, only a named task can take it.
+bool SameWorkHolds(const ClassificationAnswer& answer,
+                   const Position& position,
+                   const Thresholds& needed) {
+  const bool leaves =
+      !position.task.empty() || (position.in_unnamed_task && !Outside(answer));
+  return leaves && 1.0 - answer.same_work < needed.confidence;
+}
+
 Lean LeanOf(const TabAnswer& tab,
             const Position& position,
             const Thresholds& needed) {
@@ -96,9 +108,12 @@ double AsThreshold(double value) {
                     kMaxThreshold);
 }
 
-Placement Place(const ClassificationAnswer& answer,
-                const Position& position,
-                const Thresholds& needed) {
+namespace {
+
+// What uw does with `answer` before the name check can hold the branch.
+Placement PlaceByName(const ClassificationAnswer& answer,
+                      const Position& position,
+                      const Thresholds& needed) {
   using Action = Placement::Action;
   if (HubInATask(answer, position)) {
     return {Action::kLeave, position.task, answer.confidence,
@@ -125,11 +140,10 @@ Placement Place(const ClassificationAnswer& answer,
                            needed.new_task}
                : placement;
   }
-  // A branch that fits no task name has left its task, unless it is the same
-  // piece of work as the other tabs there: then the task has outgrown its
-  // name. What the model calls a one-off says nothing about the task, so it
-  // leaves either way.
-  if (!position.task.empty() && starts_task &&
+  // A branch that fits no task name and is the same piece of work as the
+  // other tabs of its task shows that the task has outgrown its name, if uw
+  // gave it. What the model calls a one-off renames nothing.
+  if (!position.task.empty() && !position.typed_name && starts_task &&
       answer.same_work >= needed.new_name) {
     return {Action::kName, answer.choice, answer.same_work, needed.new_name};
   }
@@ -150,6 +164,21 @@ Placement Place(const ClassificationAnswer& answer,
   }
   if (starts_task) {
     return {Action::kSuggest, kNewTaskOption, new_task, needed.new_task};
+  }
+  return placement;
+}
+
+}  // namespace
+
+Placement Place(const ClassificationAnswer& answer,
+                const Position& position,
+                const Thresholds& needed) {
+  Placement placement = PlaceByName(answer, position, needed);
+  if (placement.action == Placement::Action::kApply &&
+      SameWorkHolds(answer, position, needed)) {
+    placement.action = Placement::Action::kSuggest;
+    placement.confidence = 1.0 - answer.same_work;
+    placement.needed = needed.confidence;
   }
   return placement;
 }
@@ -183,7 +212,10 @@ std::vector<BranchPlacement> PlaceBranch(
     if (below_a_group) {
       placements[*above->second.group].staying.push_back(id);
     }
-    if (lean.kind == Lean::Kind::kLeaves) {
+    // A tab that the name check holds in its task stays, unless it goes
+    // along with the page above it.
+    if (lean.kind == Lean::Kind::kLeaves &&
+        !SameWorkHolds(*tab->second.answer, position, needed)) {
       seen[id] = {lean, placements.size()};
       groups.push_back(placements.size());
       placements.push_back({id, {id}, {}, {}});

@@ -1273,7 +1273,8 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 
 // A tab that no longer matches the name of its task has either left the task
 // or shows that the task has outgrown the name. The decision model says
-// which, and only a name uw gave is replaced.
+// which, and only a name uw gave is replaced. A tab leaves only as a
+// different piece of work from the task's other tabs, under any name.
 IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
                        ATaskThatOutgrowsItsNameIsRenamed) {
   UseDecisionModel(ProviderFormat::kSystemOne);
@@ -1324,34 +1325,47 @@ IN_PROC_BROWSER_TEST_F(OrganizerLogBrowserTest,
   EXPECT_NE(requests[4].body.find("\"Compare Lisbon hotels\""),
             std::string::npos);
 
-  // A name the user typed is theirs. The model is not asked about it, and a
-  // tab that fits no task leaves as it did before.
+  // A name the user typed is theirs and is never replaced. The model is still
+  // asked whether the tab is the same piece of work as the task's other tabs,
+  // and one that is stays in the task.
   tabs()->ChangeTabGroupVisuals(
       *task,
       tab_groups::TabGroupVisualData(
           u"Lisbon",
           tabs()->group_model()->GetTabGroup(*task)->visual_data()->color()));
   Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.99));
-  Answer("/v1/chat/completions", ChatAnswer("Read about Sintra"));
   Browse(second, "sintra");
-  ASSERT_TRUE(SettleAfter(7));
+  ASSERT_TRUE(SettleAfter(6));
   requests = Requests();
-  ASSERT_EQ(requests.size(), 7u);
-  EXPECT_EQ(requests[5].body.find("same piece of work"), std::string::npos);
+  ASSERT_EQ(requests.size(), 6u);
+  EXPECT_NE(requests[5].body.find(
+                "The tab sits in a group with these tabs:\\n- baixa"),
+            std::string::npos);
+  EXPECT_EQ(TitleOf(*task), u"Lisbon");
+  EXPECT_EQ(second->GetGroup(), task);
+  EXPECT_EQ(bar()->card()->headline(), u"Suggested a new task");
+
+  // A different piece of work leaves.
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.9, 0.05));
+  Answer("/v1/chat/completions", ChatAnswer("Read about Sintra"));
+  Browse(second, "pena");
+  ASSERT_TRUE(SettleAfter(8));
   EXPECT_EQ(TitleOf(*task), u"Lisbon");
   ASSERT_TRUE(second->GetGroup());
   EXPECT_NE(second->GetGroup(), task);
   EXPECT_EQ(TitleOf(*second->GetGroup()), u"Read about Sintra");
 
-  EXPECT_THAT(Results("placement"),
-              testing::ElementsAre("new_task", "name", "left", "new_task"));
+  EXPECT_THAT(
+      Results("placement"),
+      testing::ElementsAre("new_task", "name", "left", "unsure", "new_task"));
   EXPECT_THAT(Results("name"), testing::ElementsAre("named", "named", "named"));
   const std::vector<base::DictValue> lines = LogLines();
-  ASSERT_EQ(lines.size(), 7u);
+  ASSERT_EQ(lines.size(), 8u);
   EXPECT_EQ(lines[2].FindDouble("new_name"), 0.93);
   EXPECT_EQ(lines[2].FindDouble("needed"), 0.90);
   EXPECT_EQ(lines[4].FindDouble("new_name"), 0.89);
-  EXPECT_EQ(lines[5].FindDouble("new_name"), 0.0);
+  EXPECT_EQ(lines[5].FindDouble("new_name"), 0.99);
+  EXPECT_EQ(lines[6].FindDouble("new_name"), 0.05);
 }
 
 // A lock on a task's row marks a name the user typed. Nothing else has one:
@@ -1384,9 +1398,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(NameLockOf(*task)->GetVisible());
 }
 
-// uw leaves a locked name alone and does not ask the model about it. A click
-// on the lock hands the name back: the lock goes, the name stays, and uw
-// renames the task once it has outgrown that name.
+// uw never replaces a locked name. A click on the lock hands the name back:
+// the lock goes, the name stays, and uw renames the task once it has outgrown
+// that name.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AClickOnTheLockHandsTheNameBack) {
   UseDecisionModel(ProviderFormat::kSystemOne);
@@ -1405,7 +1419,6 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Answer("/v1/systemone", SystemOneAnswer(task->ToString(), 0.99));
   tabs::TabInterface* second = OpenLinkFrom(first, "chiado");
   ASSERT_TRUE(SettleAfter(3));
-  EXPECT_EQ(Requests()[2].body.find("same piece of work"), std::string::npos);
   EXPECT_EQ(TitleOf(*task), u"Lisbon");
 
   views::test::ButtonTestApi(NameLockOf(*task)).NotifyDefaultMouseClick();
@@ -1468,7 +1481,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(controller()->HasGeneratedName(named->ToString()));
   EXPECT_FALSE(controller()->HasGeneratedName(mine->ToString()));
 
-  // So the model is asked about the restored name, and not about the user's.
+  // So the restored name can be replaced, and the user's cannot. Both new
+  // tabs are compared with the tabs of their task, and the user's keeps a tab
+  // that is the same piece of work under the name they typed.
   tabs::TabInterface* restored = nullptr;
   tabs::TabInterface* own = nullptr;
   for (int i = 0; i < tabs()->count(); ++i) {
@@ -1480,8 +1495,9 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   UseDecisionModel(ProviderFormat::kSystemOne);
   UseLanguageModel();
   Answer("/v1/systemone", SystemOneAnswer(named->ToString(), 0.95, 0.0, 0.1));
-  OpenLinkFrom(restored, "alfama");
-  OpenLinkFrom(own, "minutes");
+  AnswerAbout("minutes", SystemOneAnswer("none", 0.97, 0.9, 0.95));
+  tabs::TabInterface* alfama = OpenLinkFrom(restored, "alfama");
+  tabs::TabInterface* minutes = OpenLinkFrom(own, "minutes");
   const auto request_about = [&](const std::string& title) {
     for (const ModelRequest& request : Requests()) {
       if (request.body.find("Title: " + title) != std::string::npos) {
@@ -1498,13 +1514,18 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_NE(
       request_about("alfama").find("The tab sits in a group with these tabs:"),
       std::string::npos);
-  EXPECT_EQ(request_about("minutes").find("same piece of work"),
+  EXPECT_NE(request_about("minutes").find(
+                "The tab sits in a group with these tabs:\\n- notes"),
             std::string::npos);
+  ASSERT_TRUE(SettleAfter(Requests().size()));
+  EXPECT_EQ(alfama->GetGroup(), named);
+  EXPECT_EQ(minutes->GetGroup(), mine);
+  EXPECT_EQ(TitleOf(*mine), u"Mine");
 }
 
 // A tab opened from another tab starts in that tab's task, under it. When it
 // turns out to be a piece of work of its own, it leaves for a task of its
-// own, and the name check does not hold it back.
+// own, since the name check calls it another piece of work.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        AChildTabBreaksOutOfItsParentsTask) {
   UseDecisionModel(ProviderFormat::kSystemOne);
@@ -1522,7 +1543,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   ASSERT_EQ(sibling->GetGroup(), task);
   ASSERT_EQ(controller()->DepthFor(sibling), 1);
 
-  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8, 0.3));
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.97, 0.8, 0.05));
   Answer("/v1/chat/completions", ChatAnswer("Compare laptops"));
   tabs::TabInterface* child = OpenLinkFrom(parent, "laptops");
   ASSERT_EQ(child->GetGroup(), task);

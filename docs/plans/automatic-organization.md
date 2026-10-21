@@ -44,7 +44,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - uw waits 30 seconds for an answer, in a test and while browsing, so a test that passes means the model is fast enough to use.
 - A switch at the top of the settings page turns automatic organization off and on. Off sends nothing and keeps both connections. On saves and tests the connections like "Save and validate", and stays off when a test fails. Agreed on 2026-10-12.
 - "Load available models" lists a connection's models with `GET <base>/models`. When the endpoint has no such list, the user types the model ID.
-- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). A terminal tab sends its shell's folder instead of an excerpt, with the home folder written as `~`. For a tab in a task that uw named, a decision model's request also lists the titles of up to 20 of the tabs that make up that task, for the [name check](#name-check). A naming call for a task that already holds tabs lists them too. Agreed on 2026-10-19 as T121, to be built only if a replay of the log shows more right joins: every request lists the titles of up to 20 tabs of each task, so the model judges a task by its tabs as well as its name. The settings page's list of what is sent changes with it.
+- A decision request contains the tab title, URL, source-tab relationship, the names of the user's named tasks, and a short readable-page-text excerpt. See [ADR 0001](../adr/0001-classification-requests-include-page-excerpts.md). A terminal tab sends its shell's folder instead of an excerpt, with the home folder written as `~`. For a tab in a task with other tabs, a decision model's request also lists the titles of up to 20 of them, for the [name check](#name-check). Until T121 this was only for a task that uw named. A naming call for a task that already holds tabs lists them too. Listing the tabs of every task in each request was agreed on 2026-10-19 and dropped on 2026-10-21, after a replay of the log showed no gain. See [Judging a task by its tabs](#judging-a-task-by-its-tabs).
 - Pinned tabs are outside the tab tree. The organizer sends nothing about a pinned tab and never moves one. Pinning a tab drops the request that was out for it. A tab opened from a pinned tab is a regular tab. Agreed on 2026-10-12.
 - The source-tab relationship is sent only for a tab that a link opened and that has followed links since. A blank new tab, and a tab the user took elsewhere by typing an address, searching, or picking a bookmark, has no source tab.
 - A request asks two questions about placement. See [Placement rules](#placement-rules). Agreed on 2026-10-12.
@@ -92,15 +92,16 @@ Agreed on 2026-10-12. `components/tab_organization/placement` holds them. The th
 | It belongs to no task (confidence threshold or more), does not clearly start one, and sits in a named task | Moves it to the Scratchpad. |
 | The same, and it already sits in the Scratchpad | Suggests a new task when the model leans that way. Otherwise nothing. |
 | Any of the above, short of its threshold | Suggests it on the activity card. |
+| Any move out of a task, while the [name check](#name-check) calls the branch a different piece of work short of the move threshold | Suggests it on the activity card. |
 | It belongs to the task it is in | Nothing. |
-| It belongs to no task, is not a one-off by the model's own answer, and the [name check](#name-check) reaches the rename threshold | Leaves it there and asks the language model for a new name for its task. |
+| It belongs to no task, is not a one-off by the model's own answer, sits in a task uw named, and the [name check](#name-check) reaches the rename threshold | Leaves it there and asks the language model for a new name for its task. |
 | It belongs to no named task, starts a task of its own (both thresholds), and sits in a task without a name | Leaves it there and asks the language model to name that task. |
 | The same, short of either threshold | Nothing. |
 
 - A [hub](#hub-pages) outside every task is a one-off whatever its other scores are: it starts no task and gives none a name.
 - A hub in a task stays there. See [Hub pages](#hub-pages).
 - Joining another task comes before the name check.
-- Agreed on 2026-10-19 as T121, to be built only if a replay of the log shows a gain: a tab in a task leaves it, for another task, a new task, or the Scratchpad, only when the model also says it is a different piece of work from the task's other tabs, at the move threshold. Not fitting the task's name is no longer enough. The [name check](#name-check) question is asked for every task with other tabs, including names the user typed. Only a generated name is ever replaced. In the log the "uw" task lost doop.design twice, and a tab the model scored `0.98` the same work as its task moved to another one.
+- A tab in a task leaves it, for another task, a new task, or the Scratchpad, only when the [name check](#name-check) also calls it a different piece of work from the task's other tabs, at the move threshold. Not fitting the task's name is not enough. A task with no other tabs has no name check, and nothing holds the tab. Agreed on 2026-10-19 as T121 and confirmed on 2026-10-21 by a [replay of the log](#judging-a-task-by-its-tabs). In the log the "uw" task lost doop.design twice, and a tab the model scored `0.98` the same work as its task moved to another one.
 - A tab opened from another tab starts in that tab's task. It leaves on its own, like any other tab, when the page above it stays.
 - The table reads one answer. [Branch moves](#branch-moves) says how the answers about the tabs of a branch combine.
 
@@ -116,7 +117,7 @@ Agreed on 2026-10-13. `PlaceBranch` in `components/tab_organization/placement` h
 - A [child tab](../CONTEXT.md#language) the user nested by hand, with "New child tab" or "Nest under previous tab", goes wherever its parent goes and never leaves on its own. It is not asked about. The hold survives a restart and ends when the user moves the tab or its parent closes. This is an exception to the [manual placement rule](../product.md#automatic-tab-organization). Agreed on 2026-10-15.
 - A tab without an answer, or with one short of the move threshold, goes with the page above it.
 - Tabs that leave together and fit no task start a task when any one of them reaches the "Start a task" threshold. Otherwise they go to the Scratchpad. The same holds in the Scratchpad: a one-off page there goes into the task that a tab under it starts.
-- The top tab of the tabs that leave together decides whether their task has outgrown its name instead.
+- A tab that the [name check](#name-check) holds in its task stays behind, and decides on its own whether the task has outgrown its name. A tab under a leaving page that agrees with it goes along, whatever the name check says about it, because the tabs it was compared with may be the very ones that leave.
 - A [hub](#hub-pages) is filed on its own answer alone. It never goes with the page above it, and the tabs under it leave without it. Its score cannot make the tabs around it a task.
 - A tab that uw filed stays where it is until it shows something else. uw does not ask about it again before then.
 - The same answers give the same moves, and carrying them out twice changes nothing. `PlacementTest.TheSameAnswersGiveTheSameMovesAndASecondPassMovesNothing` checks it.
@@ -157,7 +158,7 @@ The user sets each one on the settings page, between `0.50` and `0.95`. Half is 
 
 | Threshold | Default | What must reach it |
 | --- | --- | --- |
-| Move a tab | `0.70` | The model's confidence in the task a branch belongs to, or that it belongs to none. |
+| Move a tab | `0.70` | The model's confidence in the task a branch belongs to, or that it belongs to none. For a branch in a task with other tabs, also the probability from the [name check](#name-check) that it is a different piece of work. |
 | Start a task | `0.55` | The probability that a branch outside every task starts one. |
 | Rename a task | `0.70` | The probability, from the [name check](#name-check), that a task has outgrown its name. |
 
@@ -182,10 +183,11 @@ Measured on the 153 placement requests the organizer log recorded on 2026-10-12,
 
 Agreed on 2026-10-12, with a new question since 2026-10-13. A tab that no longer matches the name of its task has either left the task, or shows that the task has outgrown its name. The decision model says which, in the same request as the placement.
 
-- It is asked only about a tab in a task that uw named and that holds other tabs, with a decision model and a language model set. The chat format has no name check, so without a decision model a named task keeps its name.
+- It is asked about a tab in any task that holds other tabs, with a decision model set. Until T121 it was asked only in a task that uw named, and only with a language model set too. The chat format has no name check, so without a decision model a named task keeps its name and a tab leaves as the first question says.
 - The question lists the titles of up to 20 tabs that make up the task and asks whether this tab is part of the same piece of work as those tabs. The answers are `same` and `different`. The question does not mention the task's name. Whether the tab fits the name is the first question's business.
 - The list leaves out tabs that are being asked about at that moment, and tabs the model has put outside the task. A tab nobody asked about counts as part of the task.
-- `same` at the rename threshold or more, for a tab that fits no task, keeps the tab in the task and asks the language model for a name. A one-off by the model's own answer leaves for the Scratchpad whatever the name check says. The other two thresholds have no say in a rename.
+- `different` at the move threshold or more lets the tab leave its task. Short of it the tab stays, and the move is suggested.
+- `same` at the rename threshold or more, for a tab that fits no task in a task uw named, keeps the tab in the task and asks the language model for a name. A name the user typed is never replaced. A one-off by the model's own answer renames nothing. The other two thresholds have no say in a rename.
 - A tab that fits its task by name renames nothing.
 
 Until 2026-10-13 the question named the task and offered `keep` and `rename`. In real use it reached `0.70` four times, each time for an unrelated tab in a small task.
@@ -205,6 +207,17 @@ Measured on 2026-10-13. The organizer log held 18 placement requests with a name
 - One real tab that did belong scored `0.24` to `0.31` on `same`. The model kept it by name, so uw would not have read that answer.
 - No real request shows a task that outgrew its name. The right-hand column is made up, so read it as a first look.
 - Weak spot: a tab that sat unfiled in a task before a restart counts as part of that task, and a tab opened from it is compared with it.
+
+### Judging a task by its tabs
+
+Measured on 2026-10-21 for T121. The organizer log held 1,141 distinct placement requests from 2026-10-12 to 2026-10-21. They went to the live Jev API in today's layout, again in today's layout, and in two T121 layouts.
+
+- The log does not say which tabs each task held, so the replay rebuilt that from the log. The rebuilt lists held 83% of the tabs in the lists uw itself had sent.
+- The same layout sent twice changed what uw would do for 24 tabs. Differences that small are noise.
+- The name check alone, asked of every task with other tabs, held back 8 of the 72 tabs that would have left a task. Three plainly belonged: a sign-in error page and a localhost page while the user set up a connector, and an IP-check page in a task about a VPN. One plainly did not. Four could go either way. No join changed. Most tabs that left, such as unrelated searches, scored `different` at `0.90` or more.
+- Listing up to 20 titles per task in the first question changed 49 moves. Judged by their titles, 12 got better and 16 got worse. A task's stray tabs misled the model: a video site's home page joined a health task through one video in it, and an issue left its task because that task still held two unrelated tabs.
+- Tabs restored after a restart never appear in the log, so the replay could not test the case that led to T121, doop.design leaving the "uw" task.
+- So T121 is the name check alone. The user chose that on 2026-10-21.
 
 ### Why two questions
 
@@ -250,7 +263,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 3. Settings page: decision model, language model, pause, and validation that gates enablement.
 4. Branch moves and the same-work name check.
 5. T120: ask less, hubs stay, and Keep here.
-6. T121: judge a task by its tabs, after a replay of the log.
+6. T121: a tab leaves its task only as a different piece of work from the task's other tabs.
 
 ## Acceptance checks
 
@@ -277,11 +290,11 @@ Each stage is a ticket on the [board](roadmap.md#board).
 21. A task named `New task` gets a name when the model finds that a tab in it starts a piece of work and the language model returns a valid name. A one-off page sends no naming call. After a naming call that fails or returns an unusable name, the next tab that changes and stays in the task asks again, even a one-off: `AutomaticOrganizerBrowserTest.ANameThatFailedIsAskedForAgain` checks it. A tab in a task without a name does not start a second task.
 22. With `--uw-organizer-log`, a placement request and a naming request each leave one line with the request, the answer, the time taken, and what uw did. A placement line says where the branch was and where it went. No API key is in the file. `OrganizerLogBrowserTest.*` checks it.
 
-23. A tab that fits no task and would start a second one instead renames its task when the name check reaches the rename threshold. Short of it, the tab leaves as before. A tab that fits its task by name renames nothing. A name the user typed is never asked about and never replaced. An answer to a name check the request did not carry changes nothing. `OrganizerLogBrowserTest.ATaskThatOutgrowsItsNameIsRenamed` checks it.
+23. A tab that fits no task and would start a second one instead renames its task when the name check reaches the rename threshold, if uw gave the name. A tab that fits its task by name renames nothing. A name the user typed is never replaced. An answer to a name check the request did not carry changes nothing. `OrganizerLogBrowserTest.ATaskThatOutgrowsItsNameIsRenamed` checks it.
 24. A tab opened from another tab leaves its parent's task for a task of its own while its parent stays, and Undo puts it back under its parent. `AutomaticOrganizerBrowserTest.AChildTabBreaksOutOfItsParentsTask` checks it.
-25. After a restart with the session restored, a task uw named is still asked about in the name check, and a task the user named is not. `AutomaticOrganizerBrowserTest.ANameUwGaveIsRememberedAfterARestart` checks it across a real restart.
+25. After a restart with the session restored, a task uw named can still be renamed, and a task the user named cannot. `AutomaticOrganizerBrowserTest.ANameUwGaveIsRememberedAfterARestart` checks it across a real restart.
 26. A run with `--use-mock-keychain` does not see a key saved in the Keychain, and saving or removing a key in that run leaves the saved one as it was. `AutomaticOrganizerBrowserTest.AMockKeychainRunLeavesTheUsersKeysAlone` checks it.
-27. A task with a name the user typed shows the name lock. A task uw named, a task called `New task`, and every task while automatic organization is off show none. A click on the lock hides it and keeps the name; the next placement request carries the name check, and the task can be renamed. `AutomaticOrganizerBrowserTest.OnlyANameTheUserTypedIsLocked` and `AClickOnTheLockHandsTheNameBack` check it.
+27. A task with a name the user typed shows the name lock. A task uw named, a task called `New task`, and every task while automatic organization is off show none. A click on the lock hides it and keeps the name, and the task can be renamed. `AutomaticOrganizerBrowserTest.OnlyANameTheUserTypedIsLocked` and `AClickOnTheLockHandsTheNameBack` check it.
 
 28. A page that fits no task leaves with the tabs under it that fit none either, into one new task with one naming call, when any of them starts a task. A tab of the branch that nobody asked about is asked about first. One Undo puts them all back. `OrganizerLogBrowserTest.ABranchThatFitsNoTaskLeavesTogether` checks it.
 29. A tab under a leaving page stays in its task, where the page was, when its own answer says it fits there. A tab under it without a sure answer goes along. `AutomaticOrganizerBrowserTest.ATabThatStillFitsItsTaskStaysBehind` checks it.
@@ -295,7 +308,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 37. A tab in the Scratchpad whose title changes while its address stays sends nothing. A new title at a new address sends a request. `AutomaticOrganizerBrowserTest.AScratchpadTabIsAskedAgainForANewTitleAtANewAddress` checks it.
 38. A hub opened in a task stays there when the model puts it outside every task. When its title and address change, it is asked again. `AutomaticOrganizerBrowserTest.AHubStaysInItsTask` and `PlacementTest.AHubInATaskStaysThere` check it.
 39. Keep here puts an anchor at the end of the tab's row, after a collapsed branch's count, and a click on it lets the tab go. A kept tab sends no request when it changes and stays when the page above it leaves. Keep here again, or moving it by hand to another task, lets it go; collapsing its branch does not. The hold survives a restart. `AutomaticOrganizerBrowserTest.AKeptTabStaysWhereTheUserLeftIt`, `AKeptTabIsKeptAfterARestart`, and `TabOrganizationControllerBrowserTest.AKeptTabsRowEndsInAnAnchor` check it.
-40. With T121, a tab that fits no task name but that the model calls the same work as its task's tabs stays in the task, and each request lists up to 20 titles per task.
+40. A tab in a task, under any name, that the model puts in another task, a new task, or the Scratchpad leaves only when the name check calls it a different piece of work at the move threshold. Short of it, the move is suggested. A tab under a leaving page that agrees with it goes along. `PlacementTest.ABranchLeavesItsTaskOnlyAsAnotherPieceOfWork`, `PlacementTest.TheNameCheckHoldsATabInItsTaskUnlessItGoesAlong`, and `OrganizerLogBrowserTest.ATaskThatOutgrowsItsNameIsRenamed` check it.
 
 ## Later stages
 
@@ -307,6 +320,6 @@ Each stage is a ticket on the [board](roadmap.md#board).
 - A browser test for a name that arrives after another move, where the card stays quiet.
 - Telling a hub with a language model alone.
 - Leaving tabs that sat unfiled in a task before a restart out of the name check.
-- Offering a task named `New task` as an answer once requests list the tabs of each task (T121).
+- Listing the tabs of every task in each request, and then offering a task named `New task` as an answer. A replay on 2026-10-21 showed no gain: see [Judging a task by its tabs](#judging-a-task-by-its-tabs).
 
 Update the roadmap with measured accuracy, confidence calibration, and latency before expanding scope.

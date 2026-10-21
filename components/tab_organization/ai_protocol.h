@@ -75,9 +75,10 @@ struct ClassificationAnswer {
 };
 
 // The name check: the question whether a branch is the same piece of work as
-// the other tabs of its task. A branch that is, and yet fits no task name,
-// shows that its task has outgrown the name. `other_titles` are the titles of
-// those tabs; only the first kMaxNamingTitles are sent.
+// the other tabs of its task. A branch that is stays there. One that is, and
+// yet fits no task name, shows that its task has outgrown the name.
+// `other_titles` are the titles of those tabs; only the first kMaxNamingTitles
+// are sent.
 struct NameCheck {
   std::vector<std::string> other_titles;
 };

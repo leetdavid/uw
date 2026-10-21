@@ -615,8 +615,7 @@ std::vector<std::string> AutomaticOrganizer::TitlesUnder(
 
 std::optional<NameCheck> AutomaticOrganizer::NameCheckFor(
     const Page& page) const {
-  if (!Generated(page.task) ||
-      !IsComplete(ReadAiConnectionConfig(profile()->GetPrefs()))) {
+  if (page.task.empty()) {
     return std::nullopt;
   }
   std::vector<std::string> titles = MemberTitles(page);
@@ -813,7 +812,8 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
   }
   const bool named = Named(task);
   return PlaceBranch(tree, top, tabs,
-                     {named ? task : std::string(), !task.empty() && !named},
+                     {named ? task : std::string(), !task.empty() && !named,
+                      named && !Generated(task)},
                      ReadThresholds(profile()->GetPrefs()));
 }
 

@@ -67,9 +67,10 @@ constexpr char kNewTaskDescription[] =
 constexpr char kScratchpadDescription[] =
     "The tab is a one-off: a quick lookup, a sign-in or verification page, a "
     "home page, a feed, or a dashboard.";
-// Asked about a branch in a task that uw named. It settles whether a branch
-// that no longer matches the name has left the task, or the task has outgrown
-// the name: the branch then is the same piece of work as the task's tabs.
+// Asked about a branch in a task with other tabs. The branch leaves the task
+// only as a different piece of work from those tabs. One that is the same
+// piece of work, and yet fits no task name, shows that the task has outgrown
+// a name uw gave it.
 constexpr char kNameQuestion[] = "name";
 constexpr char kSameWorkOption[] = "same";
 constexpr char kOtherWorkOption[] = "different";

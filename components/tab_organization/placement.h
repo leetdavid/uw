@@ -16,7 +16,9 @@ namespace uw {
 
 // How sure the model must be before uw acts on its answer without asking.
 struct Thresholds {
-  // Of the task a branch belongs to, or that it belongs to none.
+  // Of the task a branch belongs to, or that it belongs to none. A branch in
+  // a task with other tabs must also reach it on the name check's answer
+  // that it is a different piece of work from those tabs.
   double confidence;
   // The probability that a branch outside every task starts one of its own.
   // Below it, the branch is a one-off for the Scratchpad.
@@ -43,6 +45,9 @@ struct Position {
   // task, so its answer cannot say the branch does not fit there. A branch
   // that starts a task gives this one its name.
   bool in_unnamed_task = false;
+  // True when the user typed the name of the task it is in. uw never
+  // replaces such a name.
+  bool typed_name = false;
 };
 
 // What uw does with one placement answer.
@@ -73,7 +78,9 @@ bool IsHub(const ClassificationAnswer& answer);
 
 // Decides what to do with `answer` for a branch at `position`. A hub outside
 // every task is a one-off whatever else the model says: it starts no task
-// and gives none a name. A hub in a task stays there.
+// and gives none a name. A hub in a task stays there. A branch in a task
+// leaves it only when the name check finds it a different piece of work from
+// the other tabs there; short of that, the move is only suggested.
 Placement Place(const ClassificationAnswer& answer,
                 const Position& position,
                 const Thresholds& needed);
@@ -107,14 +114,14 @@ struct BranchPlacement {
 // tabs. Tabs that sit under each other and whose answers put them in the same
 // place go together: `top` of each group decides where, and whether its task
 // has outgrown its name, while any tab of the group can make it the start of
-// a task. A tab that fits where it is, or that is `placed`, stays behind. A
-// tab without a usable answer goes with the page above it. A hub is never
-// made into a task: it stays in the task it is in, or is filed on its own
-// answer alone, for a task it fits or for the Scratchpad, and the tabs under
-// it leave without it. `tabs` holds
-// what is known about each tab; a tab missing from it was not asked about. The
-// result lists every tab that has an answer, alone or in its group, in tree
-// order.
+// a task. A tab that fits where it is, or that is `placed`, stays behind. So
+// does a tab that the name check holds in its task, unless it agrees with the
+// page above it. A tab without a usable answer goes with the page above it. A
+// hub is never made into a task: it stays in the task it is in, or is filed on
+// its own answer alone, for a task it fits or for the Scratchpad, and the tabs
+// under it leave without it. `tabs` holds what is known about each tab; a tab
+// missing from it was not asked about. The result lists every tab that has an
+// answer, alone or in its group, in tree order.
 std::vector<BranchPlacement> PlaceBranch(
     const PageTree& tree,
     const PageId& top,
