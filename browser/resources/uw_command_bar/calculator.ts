@@ -82,6 +82,10 @@ export interface Calculation {
   why: string;
   // The exchange rates the answer used, and their date.
   note: string;
+  // A long answer, a date or a date with a time, is drawn smaller.
+  size?: 'date'|'datetime';
+  // The answer moves with the clock, so the page works it out each minute.
+  live?: boolean;
 }
 
 // The day's rates: how much of each currency one euro buys.
@@ -287,6 +291,18 @@ interface Reading {
   replace: Map<MathNode, MathNode>;
 }
 
+function emptyReading(): Reading {
+  return {
+    ink: [],
+    words: [],
+    operators: 0,
+    units: 0,
+    constants: 0,
+    amounts: [],
+    replace: new Map(),
+  };
+}
+
 export class Calculator {
   private readonly math_: MathJs;
   private readonly locale_: string|undefined;
@@ -326,15 +342,7 @@ export class Calculator {
     if (!parsed) {
       return null;
     }
-    const reading: Reading = {
-      ink: [],
-      words: [],
-      operators: 0,
-      units: 0,
-      constants: 0,
-      amounts: [],
-      replace: new Map(),
-    };
+    const reading = emptyReading();
     let target: MathNode|null = null;
     try {
       target = this.read_(parsed.node, reading);
@@ -385,6 +393,35 @@ export class Calculator {
       ...answer,
       answer: spaced(answer.answer),
     };
+  }
+
+  // What a unit measures, as in "a mass" for kg, or "" for a word that is not
+  // a unit.
+  kindOf(word: string): string {
+    const code = word.toUpperCase();
+    if (code.length === 3 && this.isCurrency_(code)) {
+      return KINDS['EUR_STUFF'] ?? '';
+    }
+    const name = this.unitName_(word);
+    return name ? this.kindOfUnit_(this.math_.unit(name)) : '';
+  }
+
+  // A length of time, such as 66 days, in `target`, a unit that kindOf knows.
+  // A target that is not a time says why it does not fit.
+  convertTime(amount: number, unit: string, target: string):
+      Pick<Calculation, 'answer'|'answerName'|'copy'>|string {
+    let value: MathUnit;
+    try {
+      value = this.math_.unit(`${amount} ${unit}`).to(this.unitName_(target));
+    } catch {
+      return `Cannot convert a length of time to ${this.kindOf(target)}`;
+    }
+    const answer = this.answer_(
+        value, {reading: emptyReading(), converted: true, bare: false});
+    if (!answer) {
+      return 'This length of time cannot be shown';
+    }
+    return {...answer, answer: spaced(answer.answer)};
   }
 
   // Parses the text, setting aside an unfinished end until what is left
@@ -537,22 +574,14 @@ export class Calculator {
         reading.replace.set(node, new math.SymbolNode(canonical));
       }
     };
-    if (name === 'min') {
-      unit(name, 'minute');
-      return;
-    }
     const code = name.toUpperCase();
     if (code.length === 3 && this.isCurrency_(code)) {
       unit(code, code);
       return;
     }
-    if (this.isUnit_(name)) {
-      unit(name, name);
-      return;
-    }
-    // Spelled-out names ignore case; symbols keep it.
-    if (name.length > 2 && this.isUnit_(name.toLowerCase())) {
-      unit(name, name.toLowerCase());
+    const canonical = this.unitName_(name);
+    if (canonical) {
+      unit(name, canonical);
       return;
     }
     if (CONSTANTS.has(name)) {
@@ -586,6 +615,31 @@ export class Calculator {
 
   private isUnit_(name: string): boolean {
     return name !== 'min' && this.math_.Unit.isValuelessUnit(name);
+  }
+
+  // The mathjs name of a unit word: min is minutes, and spelled-out names
+  // ignore case while symbols keep it. "" when the word is not a unit.
+  private unitName_(word: string): string {
+    if (word === 'min') {
+      return 'minute';
+    }
+    if (this.isUnit_(word)) {
+      return word;
+    }
+    return word.length > 2 && this.isUnit_(word.toLowerCase()) ?
+        word.toLowerCase() :
+        '';
+  }
+
+  private kindOfUnit_(unit: MathUnit): string {
+    for (const [base, name] of Object.entries(KINDS)) {
+      const known = this.math_.Unit.BASE_UNITS[base]?.dimensions;
+      if (known &&
+          known.every((power, index) => power === unit.dimensions[index])) {
+        return name;
+      }
+    }
+    return this.unitWords_(unit, /*plural=*/ true);
   }
 
   private isCurrency_(code: string): boolean {
@@ -953,17 +1007,7 @@ export class Calculator {
       if (typeof value === 'number') {
         return 'a number';
       }
-      if (!math.isUnit(value)) {
-        return '';
-      }
-      const dimensions = (value as MathUnit).dimensions;
-      for (const [base, name] of Object.entries(KINDS)) {
-        const known = math.Unit.BASE_UNITS[base]?.dimensions;
-        if (known && known.every((power, index) => power === dimensions[index])) {
-          return name;
-        }
-      }
-      return this.unitWords_(value as MathUnit, /*plural=*/ true);
+      return math.isUnit(value) ? this.kindOfUnit_(value as MathUnit) : '';
     };
     const visit = (part: MathNode): boolean => {
       const [left, right] = part.args ?? [];

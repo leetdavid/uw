@@ -21,7 +21,7 @@
     "verify": "node scripts/chromium.ts verify",
     "window-tests": "node scripts/chromium.ts window-tests",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.ts",
+    "test": "node --harmony-temporal --test --test-isolation=none tests/*.test.ts",
     "check": "pnpm run typecheck && pnpm test"
   },
   "devDependencies": {

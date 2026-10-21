@@ -20,6 +20,7 @@ build_webui("build") {
   ts_files = [
     "calculator.ts",
     "command_bar.ts",
+    "time.ts",
   ]
 
   ts_deps = [

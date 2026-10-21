@@ -5,17 +5,21 @@
 
 #import <AppKit/AppKit.h>
 
+#include <algorithm>
 #include <atomic>
 #include <optional>
 #include <string>
 #include <string_view>
 
+#include "base/apple/scoped_cftyperef.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
+#include "base/strings/sys_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/test_future.h"
@@ -496,12 +500,68 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AWordThatIsNotAUnitHasNoAnswer) {
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
   Press(ui::VKEY_T, NSEventModifierFlagCommand);
   Type("1/2 cup flour");
-  EXPECT_EQ("1 ÷ 2 cup flour|“flour” is not a unit|No answer", Card());
+  EXPECT_EQ("", Card());
+  Type("covid-19");
+  EXPECT_EQ("", Card());
+  Type("10 kg + 5 m");
+  EXPECT_EQ("10 kg + 5 m|Cannot add a mass to a length|No answer", Card());
   EXPECT_EQ(false, content::EvalJs(bar()->page(), "document.querySelector("
                                                   "'#calc').classList.contains("
                                                   "'selected')"));
-  Type("covid-19");
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TimeMathLeavesMathAlone) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("2026-12-25");
+  EXPECT_TRUE(base::StartsWith(Card(), "Dec 25, 2026|Friday, Dec 25, 2026|"))
+      << Card();
+  EXPECT_EQ("date", content::EvalJs(bar()->page(),
+                                    "document.querySelector('#answer')"
+                                    ".className"));
+  Type("3/4");
+  EXPECT_EQ("3 ÷ 4|0.75|Result", Card());
+  Type("now in Narnia");
   EXPECT_EQ("", Card());
+  Type("feb 30");
+  EXPECT_EQ("Feb 30|Feb 30 is not a date|No answer", Card());
+}
+
+// The pill under a time names the Mac's zone, which the page asks the browser
+// for.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ATimeIsReadInTheMacsZone) {
+  base::apple::ScopedCFTypeRef<CFTimeZoneRef> zone(CFTimeZoneCopySystem());
+  std::string name = base::SysCFStringRefToUTF8(CFTimeZoneGetName(zone.get()));
+  name = name.substr(name.rfind('/') + 1);
+  std::replace(name.begin(), name.end(), '_', ' ');
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  ASSERT_TRUE(Eventually([&] {
+    Type("3pm");
+    return content::EvalJs(bar()->page(),
+                           "document.querySelector('#sumName').textContent")
+               .ExtractString() == name;
+  }));
+}
+
+// The page's clock is moved to half a second before a minute starts, so the
+// card for `now +` shows the next minute without retyping.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ACardBuiltOnNowKeepsTime) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  ASSERT_TRUE(content::ExecJs(bar()->page(), R"(
+      const start = performance.now();
+      const minute = Math.ceil(Date.now() / 60000) * 60000 - 500;
+      Date.now = () => minute + (performance.now() - start);
+  )"));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("now +");
+  const std::string first = Card();
+  ASSERT_FALSE(first.empty());
+  EXPECT_TRUE(Eventually([&] { return Card() != first; }, base::Seconds(3)))
+      << first;
+  EXPECT_EQ(true, content::EvalJs(bar()->page(), "document.querySelector("
+                                                 "'#calc').classList.contains("
+                                                 "'selected')"));
 }
 
 // Serves the European Central Bank's daily file with two rates, from before
@@ -612,7 +672,9 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
   PressInField("Backspace");
   for (auto [text, name] :
        {std::pair{"20 kg * 10 m/s/s / 5W", "command-bar-calculator"},
-        std::pair{"1/2 cup flour", "command-bar-no-answer"}}) {
+        std::pair{"10 kg + 5 m", "command-bar-no-answer"},
+        std::pair{"now + 100 minutes to UTC", "command-bar-time"},
+        std::pair{"dec 25", "command-bar-date"}}) {
     Type(text);
     Wait(base::Milliseconds(300));
     SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(

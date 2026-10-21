@@ -8,6 +8,7 @@ import {InputMethod, PageCallbackRouter, PageHandlerFactory, PageHandlerRemote} 
 
 import {Calculator} from './calculator.js';
 import type {Calculation, Ink, MathJsLibrary} from './calculator.js';
+import {TimeMath} from './time.js';
 import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
 
 // mathjs, which command_bar.html loads first.
@@ -45,7 +46,10 @@ const NO_ROW = 255;
 const PLACEHOLDER = field.placeholder;
 
 const calculator = new Calculator(math);
+const timeMath = new TimeMath(calculator);
 const calculatorHandler = CalculatorHandler.getRemote();
+// Works a card built on the clock out again when the minute changes.
+let ticker = 0;
 
 let queryId = 0;
 // What the user typed. The field can also hold a completion after it.
@@ -161,10 +165,16 @@ function draw(element: HTMLElement, ink: Ink[]) {
   }));
 }
 
-// Works out the typed text at once, before Chromium's rows arrive, and
-// selects the answer when there is one.
-function calculate() {
-  calculation = shell || !typed ? null : calculator.calculate(typed);
+// Time math first, and math for text with nothing about time in it.
+function workOut(): Calculation|null {
+  if (shell || !typed) {
+    return null;
+  }
+  const timed = timeMath.calculate(typed);
+  return timed === undefined ? calculator.calculate(typed) : timed;
+}
+
+function drawCard() {
   card.hidden = !calculation;
   note.hidden = !calculation?.note;
   if (calculation) {
@@ -178,10 +188,34 @@ function calculate() {
       draw(answer, calculation.answer);
       answerName.textContent = calculation.answerName;
     }
+    answer.className = calculation.why ? '' : calculation.size ?? '';
     arrowIcon.setAttribute(
         'href', calculation.why ? '#no-answer' : '#arrow-right');
     note.textContent = calculation.note;
   }
+}
+
+// A card built on the clock is worked out again when the minute changes, and
+// the selected row stays selected.
+function keepTime() {
+  clearTimeout(ticker);
+  if (!calculation?.live) {
+    return;
+  }
+  ticker = setTimeout(() => {
+    calculation = workOut();
+    drawCard();
+    select(selected === -1 && !answered() ? 0 : selected);
+    keepTime();
+  }, 60_000 - Date.now() % 60_000);
+}
+
+// Works out the typed text at once, before Chromium's rows arrive, and
+// selects the answer when there is one.
+function calculate() {
+  calculation = workOut();
+  drawCard();
+  keepTime();
   select(answered() ? -1 : 0);
 }
 
@@ -195,6 +229,11 @@ async function refreshCurrencies() {
   const {rates, currency} = await calculatorHandler.getCurrencies();
   calculator.setCurrencies(
       rates ? {date: rates.date, perEuro: rates.perEuro} : null, currency);
+}
+
+async function refreshClock() {
+  const {timeZone, twentyFourHour} = await calculatorHandler.getClock();
+  timeMath.setClock(timeZone, twentyFourHour);
 }
 
 // The field's text without a completion still selected after the caret.
@@ -414,6 +453,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', () => {
   setTimeout(() => field.focus());
   refreshCurrencies();
+  refreshClock();
 });
 window.addEventListener('blur', () => field.blur());
 card.addEventListener('mousemove', () => {
@@ -424,6 +464,7 @@ card.addEventListener('mousemove', () => {
 card.addEventListener('click', copyAnswer);
 
 refreshCurrencies();
+refreshClock();
 if (document.hasFocus()) {
   field.focus();
 }

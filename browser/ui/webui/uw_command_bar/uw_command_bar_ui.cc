@@ -3,10 +3,14 @@
 
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
+#include <CoreFoundation/CoreFoundation.h>
+
 #include <memory>
 #include <utility>
 
+#include "base/apple/scoped_cftyperef.h"
 #include "base/memory/raw_ptr.h"
+#include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/supports_user_data.h"
 #include "chrome/browser/profiles/profile.h"
@@ -33,6 +37,26 @@ const void* const kActionsKey = &kActionsKey;
 struct ActionsData : base::SupportsUserData::Data {
   raw_ptr<CommandBarActions> actions;
 };
+
+// The system's zone is read again each time, so a change of zone shows.
+std::string MacTimeZone() {
+  CFTimeZoneResetSystem();
+  base::apple::ScopedCFTypeRef<CFTimeZoneRef> zone(CFTimeZoneCopySystem());
+  return base::SysCFStringRefToUTF8(CFTimeZoneGetName(zone.get()));
+}
+
+// The Mac's short time format follows its 24-hour switch: an H or a k in it
+// is a 24-hour hour.
+bool MacUsesTwentyFourHours() {
+  base::apple::ScopedCFTypeRef<CFLocaleRef> locale(CFLocaleCopyCurrent());
+  base::apple::ScopedCFTypeRef<CFDateFormatterRef> formatter(
+      CFDateFormatterCreate(kCFAllocatorDefault, locale.get(),
+                            kCFDateFormatterNoStyle,
+                            kCFDateFormatterShortStyle));
+  const std::string format =
+      base::SysCFStringRefToUTF8(CFDateFormatterGetFormat(formatter.get()));
+  return format.find_first_of("Hk") != std::string::npos;
+}
 
 }  // namespace
 
@@ -98,6 +122,10 @@ void UwCommandBarUI::GetCurrencies(GetCurrenciesCallback callback) {
   }
   std::move(callback).Run(rates->Saved(), currency);
   rates->Refresh();
+}
+
+void UwCommandBarUI::GetClock(GetClockCallback callback) {
+  std::move(callback).Run(MacTimeZone(), MacUsesTwentyFourHours());
 }
 
 void UwCommandBarUI::CopyAnswer(const std::string& text) {

@@ -91,6 +91,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
 
   // mojom::CalculatorHandler:
   void GetCurrencies(GetCurrenciesCallback callback) override;
+  void GetClock(GetClockCallback callback) override;
   void CopyAnswer(const std::string& text) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
