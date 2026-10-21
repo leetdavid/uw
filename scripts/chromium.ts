@@ -642,7 +642,7 @@ const TEST_SUITES = {
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "UwTerminalBrowserTest.*",
     "UwTerminalMenuBrowserTest.*",
     "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "AgentLoopBrowserTest.*",
-    "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
+    "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarRatesBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
     "UwProvidersBrowserTest.*", "ConnectorsBrowserTest.*", "PinsBrowserTest.*",
   ],
 } as const;
