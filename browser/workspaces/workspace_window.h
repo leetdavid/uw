@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "base/callback_list.h"
+#include "base/files/file_path.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/sessions/core/session_id.h"
@@ -18,15 +20,19 @@
 class BrowserWindowInterface;
 class Profile;
 
+namespace tabs {
+class TabInterface;
+}
+
 namespace uw {
 
 // Owned by EmbedderBrowserWindowFeatures for each normal window that is not
-// private. Says which workspace the window shows, and groups it with its
-// partners: a window for each other workspace the user switched to from it,
-// in the same place, of which one shows at a time. Switching shows the
-// partner and hides this window, per ADR 0009. The workspace, the group, and
-// whether the window is hidden are saved with the session, so a restart or
-// Cmd+Shift+T brings the whole group back.
+// private, from before the window's views are built. Says which workspace the
+// window shows, and groups it with its partners: a window for each other
+// workspace the user switched to from it, in the same place, of which one shows
+// at a time. Switching shows the partner and hides this window, per ADR 0009.
+// The workspace, the group, and whether the window is hidden are saved with the
+// session, so a restart or Cmd+Shift+T brings the whole group back.
 class WorkspaceWindow {
  public:
   DECLARE_USER_DATA(WorkspaceWindow);
@@ -41,15 +47,45 @@ class WorkspaceWindow {
 
   static WorkspaceWindow* From(BrowserWindowInterface* window);
 
+  // Called once the window is built and its session tracks it.
+  void Start();
+  // Tells `changed` when a restore gives the window another workspace.
+  base::CallbackListSubscription ObserveChanges(base::RepeatingClosure changed);
+
   BrowserWindowInterface* window() { return window_; }
   const std::string& workspace() const { return workspace_; }
   bool hidden() const { return hidden_; }
   // The other windows of this window's group.
   std::vector<WorkspaceWindow*> Partners() const;
 
-  // Shows workspace `id` where this window is. Its partner for `id` opens on
-  // the first switch, once the profile has loaded.
-  void Switch(std::string_view id);
+  using WindowCallback = base::OnceCallback<void(BrowserWindowInterface*)>;
+
+  // Shows workspace `id` where this window is, then gives `shown` the window
+  // that shows it. Its partner for `id` opens on the first switch, once the
+  // profile has loaded.
+  void Switch(std::string_view id, WindowCallback shown = {});
+  // Gives `found` this group's window for workspace `id`, opened hidden if
+  // there is none yet.
+  void WithPartner(std::string_view id, WindowCallback found);
+
+  // Adds a workspace on `profile`, or on a new profile named `new_profile`
+  // when `profile` is empty, and switches `window` to it.
+  static void Create(BrowserWindowInterface* window,
+                     std::string name,
+                     std::string icon,
+                     const base::FilePath& profile,
+                     const std::u16string& new_profile,
+                     WindowCallback shown);
+  // Removes workspace `id` and closes its windows, each after it switches
+  // to the workspace before it. Cmd+Shift+T does not bring them back. With
+  // `with_profile`, the profile goes too, once its windows are gone.
+  static void Delete(std::string_view id, bool with_profile);
+  // The tabs, besides pins, that deleting workspace `id` closes.
+  static int CountTabs(std::string_view id);
+  // Moves `tab` to the window for workspace `id` in its window's group.
+  // Within a profile the page moves with its state. Across profiles its address
+  // opens there and the tab closes here.
+  static void MoveTab(tabs::TabInterface* tab, std::string_view id);
 
   // A window that session restore or Cmd+Shift+T brings back rejoins its
   // workspace and group. Cmd+Shift+T brings back the rest of the group too.
@@ -70,9 +106,13 @@ class WorkspaceWindow {
   // Puts this window where the group's shown window is, shows it, and hides
   // that one.
   void Reveal();
-  void OpenPartner(const std::string& id, Profile* profile);
+  void OpenPartner(const std::string& id,
+                   WindowCallback found,
+                   Profile* profile);
   void SaveSession();
   void OnClosed(BrowserWindowInterface* window);
+  // Drops this closed window from Cmd+Shift+T.
+  void ForgetClosed(BrowserWindowInterface* window);
   void RestorePartners();
   // Shows a window of each group no window shows, as when a group's shown
   // window did not come back with the session.
@@ -82,7 +122,11 @@ class WorkspaceWindow {
   std::string workspace_;
   std::string group_;
   bool hidden_ = false;
+  // Set when the window closes for a deleted workspace, which Cmd+Shift+T
+  // does not bring back.
+  bool forget_ = false;
   base::CallbackListSubscription close_subscription_;
+  base::RepeatingClosureList changes_;
   ui::ScopedUnownedUserData<WorkspaceWindow> user_data_;
   base::WeakPtrFactory<WorkspaceWindow> weak_factory_{this};
 };

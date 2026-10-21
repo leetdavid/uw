@@ -10,6 +10,8 @@ source_set("ai_providers") {
     "model_lister.h",
     "models.cc",
     "models.h",
+    "provider_sync.cc",
+    "provider_sync.h",
     "remote_model_client.cc",
     "remote_model_client.h",
   ]
@@ -29,6 +31,7 @@ source_set("ai_providers") {
   ]
   deps = [
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
     "//components/os_crypt/common:switches",
     "//components/prefs",
     "//content/public/browser",

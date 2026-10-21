@@ -30,7 +30,8 @@ enum class VerticalTabStripCollapseState;
 
 namespace views {
 class BubbleDialogDelegate;
-class MdTextButton;
+class Button;
+class ImageButton;
 class MenuRunner;
 }  // namespace views
 
@@ -41,7 +42,8 @@ class NewButton;
 class ThemePicker;
 
 // Sits at the foot of the tab sidebar. Holds the Organize button with its
-// card, and the new button at the right end. Above them, a card names the
+// card at the left end, the new button at the right end, and the workspace
+// switcher between them. Above them, a card names the
 // task after each automatic move, with an Undo button, and says when a
 // request fails. With "Show organizer activity" on, the card also shows each
 // request and what every answer was. It never takes focus by itself. The
@@ -72,6 +74,10 @@ class OrganizeBar : public views::FlexLayoutView,
   bool card_visible() const;
   const ActivityCard* card() const { return card_; }
   NewButton* new_button() { return new_button_; }
+  views::Button* organize_button();
+  // Puts `middle`, such as the workspace switcher, between Organize and the
+  // new button. The narrow sidebar hides it.
+  void SetMiddle(std::unique_ptr<views::View> middle);
   // The Organize card while it is open.
   views::Widget* organize_card() { return card_widget_.get(); }
   void ShowMenu();
@@ -105,7 +111,7 @@ class OrganizeBar : public views::FlexLayoutView,
 
   const raw_ptr<BrowserWindowInterface> window_;
   raw_ptr<ActivityCard> card_ = nullptr;
-  raw_ptr<views::MdTextButton> button_ = nullptr;
+  raw_ptr<views::ImageButton> button_ = nullptr;
   raw_ptr<views::FlexLayoutView> row_ = nullptr;
   raw_ptr<views::View> spacer_ = nullptr;
   raw_ptr<NewButton> new_button_ = nullptr;

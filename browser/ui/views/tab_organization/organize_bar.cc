@@ -21,9 +21,13 @@
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
-#include "ui/views/controls/button/md_text_button.h"
+#include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/background.h"
+#include "ui/views/controls/button/image_button.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/layout/flex_layout.h"
@@ -31,10 +35,10 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
-#include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 
@@ -51,6 +55,11 @@ constexpr base::TimeDelta kSuggestionDuration = base::Seconds(15);
 // Longer than a request can take, so the card cannot outlive its request.
 constexpr base::TimeDelta kAskingDuration = kProviderTimeout + base::Seconds(5);
 constexpr int kRowSpacing = 4;
+// Organize is a pill with the tree icon alone, as tall as the new button.
+constexpr int kOrganizeWidth = 32;
+constexpr int kOrganizeHeight = 28;
+constexpr int kOrganizeIconSize = 15;
+constexpr int kFootGap = 6;
 
 }  // namespace
 
@@ -77,11 +86,25 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
   row_->SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
   row_->SetProperty(views::kMarginsKey,
                     gfx::Insets::TLBR(kRowSpacing, 0, 0, 0));
-  button_ = row_->AddChildView(std::make_unique<views::MdTextButton>(
-      base::BindRepeating(&OrganizeBar::ShowMenu, base::Unretained(this)),
-      l10n_util::GetStringUTF16(IDS_UW_ORGANIZE)));
-  StyleAsPill(button_);
+  button_ = row_->AddChildView(std::make_unique<views::ImageButton>(
+      base::BindRepeating(&OrganizeBar::ShowMenu, base::Unretained(this))));
+  button_->SetPreferredSize(gfx::Size(kOrganizeWidth, kOrganizeHeight));
+  button_->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+  button_->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+  button_->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(kListTreeIcon,
+                                     kColorTabForegroundInactiveFrameActive,
+                                     kOrganizeIconSize));
+  button_->SetBackground(views::CreateRoundedRectBackground(
+      kColorNewTabButtonCRBackgroundFrameActive, kOrganizeHeight / 2));
+  views::InstallPillHighlightPathGenerator(button_);
+  const std::u16string organize = l10n_util::GetStringUTF16(IDS_UW_ORGANIZE);
+  button_->SetTooltipText(organize);
+  button_->GetViewAccessibility().SetName(organize);
   spacer_ = row_->AddChildView(std::make_unique<views::View>());
+  spacer_->SetUseDefaultFillLayout(true);
+  spacer_->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kFootGap));
   spacer_->SetProperty(
       views::kFlexBehaviorKey,
       views::FlexSpecification(views::LayoutOrientation::kHorizontal,
@@ -113,6 +136,16 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
 
 OrganizeBar::~OrganizeBar() {
   card_widget_.reset();
+}
+
+views::Button* OrganizeBar::organize_button() {
+  return button_;
+}
+
+void OrganizeBar::SetMiddle(std::unique_ptr<views::View> middle) {
+  if (middle) {
+    spacer_->AddChildView(std::move(middle));
+  }
 }
 
 bool OrganizeBar::card_visible() const {

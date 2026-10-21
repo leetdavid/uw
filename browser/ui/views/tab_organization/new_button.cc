@@ -27,6 +27,8 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
+#include "uw/browser/workspaces/workspace_commands.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -61,6 +63,9 @@ NewItemsMenu::NewItemsMenu(BrowserWindowInterface* window)
   AddItemWithStringId(kNewTerminalCommand, IDS_UW_NEW_TERMINAL);
   AddSeparator(ui::NORMAL_SEPARATOR);
   AddItemWithStringId(IDC_NEW_SPLIT_TAB, IDS_TAB_CXMENU_NEW_SPLIT_WITH_CURRENT);
+  if (WorkspaceWindow::From(window)) {
+    AddItemWithStringId(kNewWorkspaceCommand, IDS_UW_NEW_WORKSPACE);
+  }
 }
 
 NewItemsMenu::~NewItemsMenu() = default;

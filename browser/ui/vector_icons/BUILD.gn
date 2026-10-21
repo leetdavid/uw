@@ -1,0 +1,26 @@
+# uw's own line icons, drawn as in the designs, for what Chromium has no
+# icon for.
+import("//components/vector_icons/vector_icons.gni")
+
+aggregate_vector_icons("uw_vector_icons") {
+  icon_directory = "."
+
+  sources = [
+    "chevrons_up_down.icon",
+    "list_tree.icon",
+    "palette.icon",
+    "smile.icon",
+    "user.icon",
+  ]
+}
+
+source_set("vector_icons") {
+  sources = get_target_outputs(":uw_vector_icons")
+
+  deps = [
+    ":uw_vector_icons",
+    "//base",
+    "//skia",
+    "//ui/gfx",
+  ]
+}

@@ -1,0 +1,19 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+// vector_icons.cc.template is used to generate vector_icons.cc. Edit the former
+// rather than the latter.
+
+#include "uw/browser/ui/vector_icons/vector_icons.h"
+
+#include "components/vector_icons/cc_macros.h"
+#include "ui/gfx/vector_icon_types.h"
+
+#define DECLARE_VECTOR_COMMAND(x) using gfx::x;
+DECLARE_VECTOR_COMMANDS
+
+namespace uw {
+
+TEMPLATE_PLACEHOLDER
+
+}  // namespace uw

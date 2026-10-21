@@ -1,0 +1,25 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+// vector_icons.h.template is used to generate vector_icons.h. Edit the former
+// rather than the latter.
+
+#ifndef UW_BROWSER_UI_VECTOR_ICONS_VECTOR_ICONS_H_
+#define UW_BROWSER_UI_VECTOR_ICONS_VECTOR_ICONS_H_
+
+namespace gfx {
+struct VectorIcon;
+}
+
+namespace uw {
+
+#define VECTOR_ICON_TEMPLATE_H(icon_name) \
+extern const gfx::VectorIcon icon_name;
+
+TEMPLATE_PLACEHOLDER
+
+#undef VECTOR_ICON_TEMPLATE_H
+
+}  // namespace uw
+
+#endif  // UW_BROWSER_UI_VECTOR_ICONS_VECTOR_ICONS_H_

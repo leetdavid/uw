@@ -23,8 +23,8 @@ class MenuRunner;
 namespace uw {
 
 // What the new button's caret lists, and a right-click on the narrow
-// sidebar's "+": New tab, New task, New chat, New terminal, and New split
-// view, each with its key.
+// sidebar's "+": New tab, New task, New chat, New terminal, New split view,
+// and New workspace, each with its key.
 class NewItemsMenu : public ui::SimpleMenuModel,
                      public ui::SimpleMenuModel::Delegate {
  public:

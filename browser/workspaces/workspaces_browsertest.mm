@@ -10,6 +10,7 @@
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/global_keyboard_shortcuts_mac.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -24,6 +25,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -38,6 +40,7 @@
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/ai_providers/providers.h"
 
 namespace uw {
 namespace {
@@ -250,6 +253,53 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   browser()->GetWindow()->Show();
   EXPECT_EQ(WaitForShown(browser(), personal), browser());
   EXPECT_FALSE(partner->GetWindow()->IsVisible());
+}
+
+// The command bar's open-tab rows come from these: every window of the
+// profile, hidden ones too, and no other profile's.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       OpenTabsComeFromEveryWorkspaceOfTheProfile) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  Profile& other = profiles::testing::CreateProfileSync(
+      manager, manager->GenerateNextProfileDirectoryPath());
+  const std::string reading = AddWorkspace("Reading", profile());
+  const std::string work = AddWorkspace("Work", &other);
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(partner);
+  Load(partner, GURL(kArticle));
+  WorkspaceWindow::From(partner)->Switch(work);
+  BrowserWindowInterface* apart = WaitForShown(browser(), work);
+  ASSERT_TRUE(apart);
+  Load(apart, GURL(kNotes));
+
+  std::vector<GURL> found;
+  for (const TabMatcher::TabWrapper& tab :
+       TabMatcherDesktop(nullptr, profile())
+           .GetOpenTabs(nullptr, /*exclude_active_tab=*/false)) {
+    found.push_back(tab.url);
+  }
+  EXPECT_TRUE(std::ranges::contains(found, GURL(kArticle)));
+  EXPECT_FALSE(std::ranges::contains(found, GURL(kNotes)));
+}
+
+// A provider saved in one profile is in every profile, and each keeps its own
+// model choices.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       ProvidersAreSharedByEveryProfile) {
+  PrefService* prefs = profile()->GetPrefs();
+  const std::string id =
+      AddProvider(*prefs, PresetProvider(ProviderPreset::kOllama));
+  ProfileManager* manager = g_browser_process->profile_manager();
+  Profile& other = profiles::testing::CreateProfileSync(
+      manager, manager->GenerateNextProfileDirectoryPath());
+  EXPECT_TRUE(FindProvider(*other.GetPrefs(), id));
+
+  SetChoice(*other.GetPrefs(), ModelSlot::kLanguage, id, "llama3");
+  EXPECT_FALSE(ReadChoice(*prefs, ModelSlot::kLanguage));
+
+  RemoveProvider(*other.GetPrefs(), id);
+  EXPECT_FALSE(FindProvider(*prefs, id));
 }
 
 // As when the command bar's row for an open tab is picked.

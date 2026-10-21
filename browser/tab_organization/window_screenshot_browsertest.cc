@@ -49,6 +49,7 @@
 #include "uw/browser/ui/views/tab_organization/task_card.h"
 #include "uw/browser/ui/views/tab_organization/task_name_field.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
+#include "uw/browser/workspaces/workspace_commands.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -254,10 +255,11 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
             tasks);
 
   NewItemsMenu menu(browser());
-  ASSERT_EQ(menu.GetItemCount(), 6u);
+  ASSERT_EQ(menu.GetItemCount(), 7u);
   EXPECT_EQ(menu.GetCommandIdAt(0), IDC_NEW_TAB);
   EXPECT_EQ(menu.GetCommandIdAt(1), IDC_CREATE_NEW_TAB_GROUP);
   EXPECT_EQ(menu.GetCommandIdAt(5), IDC_NEW_SPLIT_TAB);
+  EXPECT_EQ(menu.GetCommandIdAt(6), kNewWorkspaceCommand);
   ui::Accelerator key;
   ASSERT_TRUE(menu.GetAcceleratorForCommandId(IDC_CREATE_NEW_TAB_GROUP, &key));
   EXPECT_EQ(key, ui::Accelerator(ui::VKEY_N,

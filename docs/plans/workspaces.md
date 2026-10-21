@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, started on 2026-10-21: switching, the keys, and closing and restoring are built.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -53,6 +53,11 @@ Chosen by uw for T130 on 2026-10-21.
 - Closing the shown window closes its group, except when quitting. When the group's windows were the profile's last, the session keeps all of them for the next launch.
 - Ctrl+1 to 9 and Cmd+Option+← / → are window commands beside the task commands.
 - The command bar's open-tab rows already come from every window of the current profile, hidden ones included, and picking one shows its window. Its "Go to …" and "New workspace" rows come with T61, which adds command rows.
+- The switcher, the name row, the workspace cards, and Move to Workspace are in `browser/ui/views/workspaces`. Chromium's sidebar puts the switcher in the middle of the Organize row and the name row between the pins and the tabs. Organize's tree icon, and the smile, palette, person, and up-and-down icons, are uw's own, in `browser/ui/vector_icons`.
+- Deleting a workspace switches each window that shows it to the workspace before it, then closes its windows and drops them from Cmd+Shift+T. With Delete Profile Too, the profile goes once those windows have closed. One workspace always stays.
+- Every profile shares the providers, through local state, as the [AI providers plan](ai-providers.md) says.
+- Chromium's profile button, its row in the app menu, Cmd+Shift+M, the Profiles menu in the menu bar, and the profiles in the Dock menu are gone. Launching never shows the profile picker, unless a policy forces it.
+- Built differently from the design: a workspace's tooltip writes its key as the menus do, "⌃2", not "Ctrl+2". The new button's menu and the profile list are Chromium's menus, so their rows have no icons, and a profile's emoji sit where a key would. The new workspace and delete cards use Chromium's dialog title and buttons in the shape of a uw card. The new profile step's button reads "Done", and Delete Profile Too sits at the card's left. Change Icon, which the design does not draw, opens a card with the emoji, the name, and the suggestions. A new workspace starts on the profile's theme until T131 gives each workspace its own.
 
 ## Design
 

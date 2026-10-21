@@ -644,7 +644,7 @@ const TEST_SUITES = {
     "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "AgentLoopBrowserTest.*",
     "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarRatesBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
     "UwProvidersBrowserTest.*", "ConnectorsBrowserTest.*", "PinsBrowserTest.*",
-    "WorkspacesBrowserTest.*",
+    "WorkspacesBrowserTest.*", "WorkspaceViewsBrowserTest.*",
   ],
 } as const;
 

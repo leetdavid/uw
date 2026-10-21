@@ -1,6 +1,7 @@
 # Workspaces and the windows that show them. See docs/plans/workspaces.md.
 source_set("workspaces") {
   sources = [
+    "workspace_commands.h",
     "workspace_list.cc",
     "workspace_list.h",
     "workspace_window.cc",
@@ -45,6 +46,7 @@ source_set("browser_tests") {
     ":workspaces",
     "//base",
     "//chrome/browser",
+    "//chrome/browser/autocomplete",
     "//chrome/browser:global_keyboard_shortcuts_mac",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile",
@@ -54,6 +56,7 @@ source_set("browser_tests") {
     "//chrome/browser/ui/navigator",
     "//chrome/test:test_support",
     "//components/tabs:public",
+    "//components/prefs",
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
@@ -64,5 +67,6 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/tab_organization",
     "//uw/browser/ui/views/tab_organization",
+    "//uw/components/ai_providers",
   ]
 }

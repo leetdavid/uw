@@ -24,7 +24,6 @@
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/mac/coordinate_conversion.h"
-#include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
@@ -325,10 +324,7 @@ IN_PROC_BROWSER_TEST_F(SidebarMenusBrowserTest,
   OrganizeBar* bar =
       FindIn<OrganizeBar>(view(), [](OrganizeBar*) { return true; });
   ASSERT_TRUE(bar);
-  views::MdTextButton* pill =
-      FindIn<views::MdTextButton>(bar, [](views::MdTextButton* button) {
-        return button->GetText() == u"Organize";
-      });
+  views::Button* pill = bar->organize_button();
   ASSERT_TRUE(pill);
 
   Click(pill, NSEventTypeLeftMouseDown, NSEventTypeLeftMouseUp);

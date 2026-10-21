@@ -98,6 +98,7 @@ source_set("browser_tests") {
     "//chrome/browser/ui/views/tabs/common:impl",
     "//chrome/browser/ui/views/tabs/tab",
     "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/workspaces",
     "//uw/components/ai_providers",
   ]
 }

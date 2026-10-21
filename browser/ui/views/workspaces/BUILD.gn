@@ -1,0 +1,88 @@
+# The workspace switcher at the sidebar's foot, the name row under the pins,
+# the workspace cards, and Move to Workspace in a tab's menu. See
+# docs/plans/workspaces.md.
+source_set("workspaces") {
+  sources = [
+    "card_bubble.cc",
+    "card_bubble.h",
+    "icon_picker.cc",
+    "icon_picker.h",
+    "move_to_workspace_menu.cc",
+    "move_to_workspace_menu.h",
+    "workspace_cards.cc",
+    "workspace_cards.h",
+    "workspace_name_row.cc",
+    "workspace_name_row.h",
+    "workspace_switcher.cc",
+    "workspace_switcher.h",
+    "workspace_text.cc",
+    "workspace_text.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/base/unowned_user_data",
+    "//ui/menus",
+    "//ui/views",
+  ]
+  deps = [
+    "//base:i18n",
+    "//cc/paint",
+    "//chrome:strings",
+    "//chrome/app/vector_icons",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/profiles:profile_util",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/strings",
+    "//components/tabs:public",
+    "//components/vector_icons",
+    "//third_party/icu",
+    "//ui/base",
+    "//ui/base/emoji",
+    "//ui/color",
+    "//ui/compositor",
+    "//ui/gfx",
+    "//uw/browser/tab_organization",
+    "//uw/browser/ui/look",
+    "//uw/browser/ui/vector_icons",
+    "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/ui/views/theme_picker",
+    "//uw/browser/workspaces",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "workspace_views_browsertest.cc" ]
+  deps = [
+    ":workspaces",
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/profiles:profile_test_util",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/test:test_support",
+    "//components/sessions",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/events",
+    "//ui/menus",
+    "//ui/views",
+    "//ui/views:test_support",
+    "//url",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/ui/views/theme_picker",
+    "//uw/browser/workspaces",
+  ]
+}

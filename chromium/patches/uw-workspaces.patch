@@ -1,3 +1,27 @@
+diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
+index 51af775d30ce385bde20b47f84fbc43009cc1dd0..330f802d31b19a06c6d2cb83a424a4f3b6b55526 100644
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -1963,16 +1963,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+   NSMenu* mainMenu = [NSApp mainMenu];
+   NSMenuItem* profileMenu = [mainMenu itemWithTag:kMacProfileMainMenuId];
+ 
+-  if (!profiles::IsMultipleProfilesEnabled()) {
+-    [mainMenu removeItem:profileMenu];
+-    return;
+-  }
+-
+-  // The controller will unhide the menu if necessary.
+-  [profileMenu setHidden:YES];
+-
+-  _profileMenuController =
+-      [[ProfileMenuController alloc] initWithMainMenuItem:profileMenu];
++  // uw: workspaces, at the foot of the sidebar, take the place of the
++  // Profiles menu and the Dock menu's profiles.
++  [mainMenu removeItem:profileMenu];
+ }
+ 
+ - (void)initShareMenu {
 diff --git a/chrome/browser/sessions/BUILD.gn b/chrome/browser/sessions/BUILD.gn
 index c8d07e45c8bfa88e2e63bab68f14ffe3f02ad456..fbeef2e0873119888726fc625e3bdebbbfb8cffb 100644
 --- a/chrome/browser/sessions/BUILD.gn
@@ -62,6 +86,39 @@ index d80d6550e73ccd088505e8dd00350cf5002caea9..cfd35897356140cb1fc3731681b19e27
  
    return browser->GetFeatures().live_tab_context();
  }
+diff --git a/chrome/browser/ui/profiles/profile_picker.cc b/chrome/browser/ui/profiles/profile_picker.cc
+index d809ca0aa5505d62482d7ba285de503bd34d189a..895e0e385e48b927a80582ccf6681fd186b6971e 100644
+--- a/chrome/browser/ui/profiles/profile_picker.cc
++++ b/chrome/browser/ui/profiles/profile_picker.cc
+@@ -11,7 +11,6 @@
+ #include "base/containers/flat_set.h"
+ #include "base/feature_list.h"
+ #include "base/logging.h"
+-#include "base/metrics/histogram_functions.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/profiles/profile_manager.h"
+ #include "chrome/browser/profiles/profiles_state.h"
+@@ -192,18 +191,8 @@ StartupProfileMode ProfilePicker::GetStartupMode() {
+     }
+   }
+ 
+-  size_t number_of_profiles = profile_manager->GetNumberOfProfiles();
+-  // Need to consider 0 profiles as this is what happens in some browser-tests.
+-  if (number_of_profiles <= 1) {
+-    return StartupProfileMode::kBrowserWindow;
+-  }
+-
+-  bool pref_enabled = g_browser_process->local_state()->GetBoolean(
+-      prefs::kBrowserShowProfilePickerOnStartup);
+-  base::UmaHistogramBoolean("ProfilePicker.AskOnStartup", pref_enabled);
+-  if (pref_enabled) {
+-    return StartupProfileMode::kProfilePicker;
+-  }
++  // uw: every workspace shows in each window's sidebar, so launching opens
++  // windows and never the profile picker.
+   return StartupProfileMode::kBrowserWindow;
+ }
+ 
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
 index f9b1d3de0545b1426169859660f555f825e02468..589a2299266779a44f19f67f2542c91e8572ba15 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
@@ -99,3 +156,126 @@ index f9b1d3de0545b1426169859660f555f825e02468..589a2299266779a44f19f67f2542c91e
    if (auto* manager = InitialWebUIManager::From(browser())) {
      if (manager->RequestDeferShow(base::BindOnce(
              &BrowserView::Activate, weak_ptr_factory_.GetWeakPtr()))) {
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
+index 11077328391e522a34d3f8a0e8ad781e3f06b3e9..f26a29a4b1de0065eef8f3807d51eece03dc0897 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
+@@ -207,6 +207,18 @@ TabStripView::TabStripView(TabCollectionNode* collection_node)
+ 
+ TabStripView::~TabStripView() = default;
+ 
++void TabStripView::SetUwRow(std::unique_ptr<views::View> row) {
++  if (views::View* old = uw_row_) {
++    uw_row_ = nullptr;
++    std::unique_ptr<views::View> removed = RemoveChildViewT(old);
++  }
++  if (row) {
++    uw_row_ = AddChildViewAt(std::move(row),
++                             GetIndexOf(pinned_tabs_scroll_view_).value() + 1);
++  }
++  InvalidateLayout();
++}
++
+ void TabStripView::AddedToWidget() {
+   views::Widget* const widget = GetWidget();
+   paint_as_active_subscription_ = widget->RegisterPaintAsActiveChangedCallback(
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.h b/chrome/browser/ui/views/tabs/common/tab_strip_view.h
+index bca3e9acc58f9ba2530b29d23750b12f5c9f7f37..30f9e441833a9593173d1201e0f13fb4f8179181 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.h
+@@ -5,6 +5,8 @@
+ #ifndef CHROME_BROWSER_UI_VIEWS_TABS_COMMON_TAB_STRIP_VIEW_H_
+ #define CHROME_BROWSER_UI_VIEWS_TABS_COMMON_TAB_STRIP_VIEW_H_
+ 
++#include <memory>
++
+ #include "base/memory/raw_ptr.h"
+ #include "base/scoped_observation.h"
+ #include "components/tabs/public/tab_interface.h"
+@@ -37,6 +39,10 @@ class TabStripView final : public views::View,
+ 
+   views::Separator* GetTabsSeparator() const { return tabs_separator_; }
+ 
++  // uw: a row between the pinned and the other tabs in the wide sidebar, such
++  // as the name of the window's workspace. Null removes it.
++  void SetUwRow(std::unique_ptr<views::View> row);
++
+   PinnedTabContainerView* GetPinnedTabsContainer() const;
+   UnpinnedTabContainerView* GetUnpinnedTabsContainer() const;
+ 
+@@ -131,6 +137,7 @@ class TabStripView final : public views::View,
+   raw_ptr<views::ScrollView> pinned_tabs_scroll_view_ = nullptr;
+   raw_ptr<PinnedTabContainerView> pinned_tabs_container_view_ = nullptr;
+   raw_ptr<views::Separator> tabs_separator_ = nullptr;
++  raw_ptr<views::View> uw_row_ = nullptr;
+   raw_ptr<views::ScrollView> unpinned_tabs_scroll_view_ = nullptr;
+   raw_ptr<UnpinnedTabContainerView> unpinned_tabs_container_view_ = nullptr;
+   bool is_collapsed_ = false;
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+index db53e40e591295311569835fae59eb340ad776a4..13d9d6fa159b21f0241673e2081c65d5dc4c74ba 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+@@ -125,6 +125,10 @@ views::ProposedLayout TabStripViewLayout::CalculateHorizontalLayout(
+ 
+   // The tabs separator isn't visible for the horizontal orientation.
+   layouts.child_layouts.emplace_back(tabs_separator, false, gfx::Rect());
++  if (tab_strip_view->uw_row_) {
++    layouts.child_layouts.emplace_back(tab_strip_view->uw_row_.get(), false,
++                                       gfx::Rect());
++  }
+ 
+   // Place the unpinned container.
+   int unpinned_width = unpinned_preferred_width;
+@@ -185,6 +189,11 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+   const bool should_show_separator = pinned_preferred_height != 0 &&
+                                      unpinned_preferred_height != 0 &&
+                                      is_collapsed;
++  // uw: the row under the pins, in the wide sidebar.
++  views::View* uw_row = tab_strip_view->uw_row_.get();
++  const bool show_uw_row = uw_row && uw_row->GetVisible() && !is_collapsed;
++  const int uw_row_height =
++      show_uw_row ? uw_row->GetPreferredSize().height() : 0;
+ 
+   // If the height is bounded, calculate the available space for laying out the
+   // pinned and unpinned containers.
+@@ -198,6 +207,7 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+       remaining_height -=
+           tabs_separator->GetPreferredSize().height() + region_vertical_padding;
+     }
++    remaining_height -= uw_row_height;
+     // Clamp the remaining height to 0 if we have less space.
+     remaining_height = std::max(remaining_height, 0);
+   }
+@@ -231,6 +241,15 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+     }
+   }
+ 
++  if (uw_row) {
++    const gfx::Rect uw_row_bounds(
++        region_horizontal_padding, y,
++        size_bounds.width().value() - 2 * region_horizontal_padding,
++        uw_row_height);
++    layouts.child_layouts.emplace_back(uw_row, show_uw_row, uw_row_bounds);
++    y += uw_row_height;
++  }
++
+   // Place the tabs separator if visible.
+   gfx::Rect separator_bounds;
+   if (should_show_separator) {
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..63dc69aeb315b259e3b82feaaebc58e088c74cb8 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -577,9 +577,9 @@ void ToolbarView::Init() {
+ 
+   if (!features::IsWebUIAvatarButtonEnabled()) {
+     avatar_ = AddChildView(std::make_unique<AvatarToolbarButton>(browser_));
+-    bool show_avatar_toolbar_button =
+-        AvatarToolbarButtonInterface::CanShowForProfile(browser_->GetProfile());
+-    avatar_->SetVisible(show_avatar_toolbar_button);
++    // uw: workspaces, at the foot of the sidebar, take the place of the
++    // profile button.
++    avatar_->SetVisible(false);
+   }
+ 
+   // Only manage the overflow button when there are at least some views

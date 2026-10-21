@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb8449e02ca1e 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..9a0bf7a0c0c89488665a7d7953778e283cb61b9a 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,113 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,145 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -123,10 +123,42 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
 +      <message name="IDS_UW_EDIT_HOME_URL_MAC" desc="In Title Case: Item in a pinned tab's menu. Opens a card to type the pin's home URL.">Edit Home URL…</message>
 +      <message name="IDS_UW_HOME_URL_TITLE" desc="Title of the card that edits a pinned tab's home URL. SITE is the site of its home URL.">Home URL for <ph name="SITE">$1<ex>linear.app</ex></ph></message>
 +      <message name="IDS_UW_HOME_URL_HINT" desc="Note under the home URL field of a pinned tab's card.">Saving loads this address in the pin.</message>
++      <message name="IDS_UW_WORKSPACES" desc="Accessible name of the row of workspace icons at the foot of the tab sidebar. A workspace is a named area of browsing, such as work or personal, that the user switches between.">Workspaces</message>
++      <message name="IDS_UW_NEW_WORKSPACE" desc="In Title Case: Item in the File menu and in the menu of the sidebar's new button, and the title of the card it opens. Makes a workspace, a named area of browsing such as work or personal.">New Workspace</message>
++      <message name="IDS_UW_WORKSPACE_NAME" desc="Accessible name of the field that names a workspace.">Workspace name</message>
++      <message name="IDS_UW_WORKSPACE_ICON" desc="Accessible name of the square that shows a workspace's emoji. Typing or picking an emoji there changes it.">Icon</message>
++      <message name="IDS_UW_MORE_EMOJI" desc="Link under the suggested emoji of a workspace. Opens the macOS emoji picker.">More…</message>
++      <message name="IDS_UW_WORKSPACE_PROFILE" desc="Label over the profile a new workspace uses. A profile holds sign-ins, history, extensions, and pins.">Profile</message>
++      <message name="IDS_UW_WORKSPACE_SHARES" desc="Note under the profile of a new workspace. Names the workspaces that already use the profile.">Shares sign-ins, history, extensions, and pins with <ph name="WORKSPACES">$1<ex>Personal and Reading</ex></ph>.</message>
++      <message name="IDS_UW_NEW_PROFILE" desc="In Title Case: Last item of the list of profiles on the new workspace card. Asks for the name of a new profile.">New Profile…</message>
++      <message name="IDS_UW_NEW_PROFILE_NAME" desc="Label over the field that names a new profile on the new workspace card.">New profile name</message>
++      <message name="IDS_UW_NEW_PROFILE_HINT" desc="Note under the field that names a new profile.">Starts with no sign-ins, history, extensions, or pins. It uses the same AI providers as your other profiles.</message>
++      <message name="IDS_UW_CREATE" desc="Button of the new workspace card that makes the workspace.">Create</message>
++      <message name="IDS_UW_RENAME_WORKSPACE" desc="In Title Case: Item in a workspace's menu. Turns the workspace's name into a field.">Rename Workspace</message>
++      <message name="IDS_UW_CHANGE_WORKSPACE_ICON" desc="In Title Case: Item in a workspace's menu. Shows emoji to pick the workspace's icon from.">Change Icon</message>
++      <message name="IDS_UW_DELETE_WORKSPACE_MENU" desc="In Title Case: Item in a workspace's menu. Asks before deleting the workspace.">Delete Workspace…</message>
++      <message name="IDS_UW_DELETE_WORKSPACE" desc="Button that deletes a workspace and closes its tabs.">Delete Workspace</message>
++      <message name="IDS_UW_DELETE_WORKSPACE_TITLE" desc="Title of the card that asks before deleting a workspace.">Delete “<ph name="WORKSPACE">$1<ex>Side project</ex></ph>”?</message>
++      <message name="IDS_UW_DELETE_WORKSPACE_TABS" desc="First sentence of the card that asks before deleting a workspace: how many of its tabs close. [ICU Syntax]">
++        {COUNT, plural,
++          =0 {No tabs close.}
++          =1 {Its tab closes.}
++          other {Its # tabs close.}}
++      </message>
++      <message name="IDS_UW_DELETE_WORKSPACE_KEEPS" desc="Second sentence of the card that asks before deleting a workspace whose profile other workspaces still use. [ICU Syntax]">
++        {COUNT, plural,
++          =1 {The profile <ph name="PROFILE">{PROFILE}<ex>Personal</ex></ph> keeps its sign-ins and history, since <ph name="OTHERS">{OTHERS}<ex>Reading</ex></ph> still uses it.}
++          other {The profile <ph name="PROFILE">{PROFILE}<ex>Personal</ex></ph> keeps its sign-ins and history, since <ph name="OTHERS">{OTHERS}<ex>Personal and Reading</ex></ph> still use it.}}
++      </message>
++      <message name="IDS_UW_DELETE_LAST_WORKSPACE" desc="Second sentence of the card that asks before deleting a profile's last workspace.">It is the last workspace on the profile <ph name="PROFILE">$1<ex>Work</ex></ph>. Also delete the profile and its sign-ins, history, and pins?</message>
++      <message name="IDS_UW_DELETE_PROFILE_TOO" desc="Button that deletes a workspace and its profile, with the profile's sign-ins, history, and pins.">Delete Profile Too</message>
++      <message name="IDS_UW_KEEP_PROFILE" desc="Default button that deletes a profile's last workspace and keeps the profile.">Keep Profile</message>
++      <message name="IDS_UW_MOVE_TO_WORKSPACE" desc="In Title Case: Item in a tab's menu that opens a list of workspaces to move the tab to.">Move to Workspace</message>
++      <message name="IDS_UW_REOPENS_IN_ANOTHER_PROFILE" desc="Heading over the workspaces of other profiles in the Move to Workspace list. Their tab reopens there from its address.">Reopens in another profile</message>
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1778,7 +1885,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1778,7 +1917,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen closed window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
@@ -135,7 +167,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
            Reopen closed split view
-@@ -1831,7 +1938,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1831,7 +1970,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen Closed Window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="In Title Case: The text label of the Reopen Closed Group menu item">
@@ -144,7 +176,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -11140,7 +11247,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+@@ -11140,7 +11279,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
        <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
@@ -153,7 +185,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
        </message>
        <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
          <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
-@@ -12077,9 +12184,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12077,9 +12216,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add tabs to reading list}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -164,7 +196,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12099,7 +12204,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12099,7 +12236,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move tab into split view
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -173,7 +205,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove from group
-@@ -12193,9 +12298,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12193,9 +12330,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add Tabs to Reading List}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -184,7 +216,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12215,7 +12318,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12215,7 +12350,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move Tab into Split View
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -193,7 +225,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove From Group
-@@ -12720,7 +12823,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12720,7 +12855,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
  
        <!-- Tab Group Editor Bubble -->
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
@@ -202,7 +234,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
            {MEMBER_COUNT, plural,
-@@ -12730,22 +12833,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12730,22 +12865,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
        </message>
        <if expr="not use_titlecase">
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
@@ -230,7 +262,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent activity
-@@ -12754,16 +12857,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12754,16 +12889,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -250,7 +282,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open group in new window
-@@ -12781,28 +12884,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12781,28 +12916,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -285,7 +317,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent Activity
-@@ -12811,16 +12914,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12811,16 +12946,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage Sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="In Title Case: The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -305,7 +337,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="In Title Case: The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open Group in New Window
-@@ -12838,7 +12941,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12838,7 +12973,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send Feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="In Title Case: The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -314,7 +346,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
          </message>
        </if>
  
-@@ -16925,10 +17028,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16925,10 +17060,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
        </message>
        <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
@@ -327,7 +359,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
        </message>
        <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
-@@ -16949,10 +17052,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16949,10 +17084,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          </message>
        </if>
        <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
@@ -340,7 +372,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
        </message>
        <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
          Collapsed
-@@ -16997,16 +17100,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16997,16 +17132,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Tab moved to end of tabstrip
        </message>
        <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
@@ -361,7 +393,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..f3f91fa58e9ce129ebded1663b8cb844
        </message>
        <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
            Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
-@@ -19308,7 +19411,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -19308,7 +19443,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Select any text or image to ask Gemini
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">
@@ -422,13 +454,14 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..77ea44a1df6f6a92c46c4d003f89ff28
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..06b1845d1407fffff4ded9ef462cbfe7c7d4238d 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..2c97f7a25ed9735c54e6ab3be2cfc5c60663c959 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,12 @@ source_set("internal") {
+@@ -58,6 +58,13 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
++      "//uw/browser/ai_providers",
 +      "//uw/browser/connectors",
 +      "//uw/browser/pins",
 +      "//uw/browser/tab_organization",
@@ -439,16 +472,17 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..06b1845d1407fffff4ded9ef462cbfe7
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..e1629047be522b0b37384a99c4244890efcb7408 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..7e1c36c387a8808184ff334f9aa038898c896465 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -4,8 +4,16 @@
+@@ -4,8 +4,17 @@
  
  #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
  
 +#include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "uw/browser/ai_providers/provider_sync.h"
 +#include "uw/browser/connectors/connectors.h"
 +#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/tab_organization/automatic_organizer.h"
@@ -459,7 +493,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..e1629047be522b0b37384a99c4244890
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +29,36 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +30,40 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -471,19 +505,23 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..e1629047be522b0b37384a99c4244890
 +        browser, tab_organization_.get());
 +    command_bar_ = std::make_unique<uw::CommandBar>(browser);
 +    pin_sync_ = std::make_unique<uw::PinSync>(browser);
++    if (!browser->GetProfile()->IsOffTheRecord()) {
++      workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
++    }
 +    // Connectors serve every window and profile. The first window starts
 +    // them.
 +    uw::Connectors::Get().Start();
++    // So do the providers every profile shares.
++    uw::ProviderSync::Start();
 +  }
  }
  
  void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
      BrowserWindowInterface* browser) {
 -  // Embedder implementation goes here.
-+  // Made once the session tracks the window, which saves its workspace.
-+  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
-+      !browser->GetProfile()->IsOffTheRecord()) {
-+    workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
++  // Once the session tracks the window, it can save the window's workspace.
++  if (workspace_window_) {
++    workspace_window_->Start();
 +  }
  }
  
@@ -578,10 +616,10 @@ index f8d51fa..9ae6552 100644
      // "already split" case is handled in Browser::OpenURLFromTab().
      if (params->disposition == WindowOpenDisposition::NEW_SPLIT_VIEW &&
 diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
-index 9354e0d5497b85db204ebae5d6adcd41973ea01a..36a641aa9becc31c9e4ed2662c5a4b8ee50b8a4f 100644
+index 9354e0d5497b85db204ebae5d6adcd41973ea01a..f3b526cc11c8dd433fc17a65c59f0ef65fd120dd 100644
 --- a/chrome/browser/ui/views/tabs/common/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
-@@ -77,6 +77,10 @@ source_set("impl") {
+@@ -77,6 +77,11 @@ source_set("impl") {
    ]
  
    deps = [
@@ -589,6 +627,7 @@ index 9354e0d5497b85db204ebae5d6adcd41973ea01a..36a641aa9becc31c9e4ed2662c5a4b8e
 +    "//uw/browser/pins",
 +    "//uw/browser/ui/views/pins",
 +    "//uw/browser/ui/views/tab_organization",
++    "//uw/browser/ui/views/workspaces",
      "//chrome/browser:primitives",
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
@@ -627,7 +666,7 @@ index cdc7c0f..a260033 100644
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
-index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..7fa552fe1cf62e2c69a6a72e720273273afb3292 100644
+index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..2543bacc96f51de5888dfc06c41253fed4696d5a 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 @@ -32,6 +32,7 @@
@@ -638,17 +677,18 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..7fa552fe1cf62e2c69a6a72e72027327
  #include "chrome/browser/ui/views/tabs/common/tab_group_view.h"
  #include "chrome/browser/ui/views/tabs/common/tab_view.h"
  #include "chrome/browser/ui/views/tabs/groups/tab_group_accessibility.h"
-@@ -44,6 +45,9 @@
+@@ -44,6 +45,10 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/view_utils.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/pins/pin_menu.h"
 +#include "uw/browser/ui/views/tab_organization/task_card.h"
++#include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "chrome/browser/ash/boca/on_task/on_task_locked_controller.h"
-@@ -452,6 +456,14 @@ void TabStripCollectionController::ShowTabContextMenu(
+@@ -452,6 +457,15 @@ void TabStripCollectionController::ShowTabContextMenu(
        browser_view_->browser()->GetFeatures().tab_menu_model_delegate(), model_,
        tab_index.value());
  
@@ -659,11 +699,12 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..7fa552fe1cf62e2c69a6a72e72027327
 +  } else if (tab->IsPinned()) {
 +    uw::AddPinCommands(model.get(), collection_node->view());
 +  }
++  uw::AddMoveToWorkspace(model.get(), tab);
 +
    CHECK(browser_view_->tab_strip_view());
    expand_on_hover_lock_ = browser_view_->tab_strip_view()->GetExpandOnHoverLock(
        ExpandOnHoverLockType::kKeepCurrentState);
-@@ -475,6 +487,13 @@ void TabStripCollectionController::ShowGroupEditorBubble(
+@@ -475,6 +489,13 @@ void TabStripCollectionController::ShowGroupEditorBubble(
      const TabCollectionNode* group_node) {
    auto* group_header_view =
        views::AsViewClass<TabGroupView>(group_node->view())->group_header();
@@ -677,7 +718,7 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..7fa552fe1cf62e2c69a6a72e72027327
    group_header_view->ShowContextMenuForViewImpl(
        group_header_view, gfx::Point(), ui::mojom::MenuSourceType::kNone);
  }
-@@ -484,6 +503,15 @@ TabStripCollectionController::ShowGroupEditorBubble(
+@@ -484,6 +505,15 @@ TabStripCollectionController::ShowGroupEditorBubble(
      const tab_groups::TabGroupId& group_id,
      views::View* anchor_view,
      bool stop_context_menu_propagation) {
@@ -694,47 +735,53 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..7fa552fe1cf62e2c69a6a72e72027327
        browser_view_->browser(), group_id,
        /*anchor_view=*/anchor_view, /*anchor_rect=*/std::nullopt,
 diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
-index 88df244c596b07dbd0f5049ae59824bc80e47698..3b837ed3da0f6e0bd4c9c8d21dfe1c4af58b931a 100644
+index 88df244c596b07dbd0f5049ae59824bc80e47698..098be0d20e8dbc329f76d82664e3b21ae23e1bc0 100644
 --- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/tab/BUILD.gn
-@@ -49,6 +49,9 @@ source_set("impl") {
+@@ -49,6 +49,10 @@ source_set("impl") {
    ]
  
    deps = [
 +    "//uw/browser/tab_organization",
 +    "//uw/browser/ui/views/pins",
 +    "//uw/browser/ui/views/tab_organization",
++    "//uw/browser/ui/views/workspaces",
      ":tab",
      "//chrome/app/vector_icons",
      "//chrome/browser:browser_process",
 diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-index a06ae504557fd293fc7a8fe01d368539f379dc23..3a8e65b7acbb4524c08f7361ec68e75b43eebbf8 100644
+index a06ae504557fd293fc7a8fe01d368539f379dc23..b3dd6cbace3fc32158bd968b7e3094c485e8c7e4 100644
 --- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
 +++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
-@@ -8,6 +8,9 @@
+@@ -8,6 +8,10 @@
  #include "extensions/buildflags/buildflags.h"
  #include "ui/gfx/geometry/rect.h"
  #include "ui/views/controls/menu/menu_runner.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/pins/pin_menu.h"
 +#include "uw/browser/ui/views/tab_organization/window_commands.h"
++#include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
  
  #if BUILDFLAG(ENABLE_EXTENSIONS)
  #include "chrome/browser/extensions/context_menu_matcher.h"
-@@ -52,6 +55,9 @@ void TabContextMenuController::CloseMenu() {
+@@ -52,6 +56,10 @@ void TabContextMenuController::CloseMenu() {
  }
  
  bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
 +  if (uw::TabOrganizationController::IsCommand(command_id) ||
-+      uw::IsPinCommand(command_id))
++      uw::IsPinCommand(command_id) ||
++      uw::IsMoveToWorkspaceCommand(command_id))
 +    return false;
  #if BUILDFLAG(ENABLE_EXTENSIONS)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -65,6 +71,17 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
+@@ -65,6 +73,20 @@ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
  }
  
  bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
++  if (uw::IsMoveToWorkspaceCommand(command_id)) {
++    return true;
++  }
 +  if (uw::IsPinCommand(command_id)) {
 +    return uw::CanExecutePinCommand(tab_handle_.Get());
 +  }
@@ -749,12 +796,13 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..3a8e65b7acbb4524c08f7361ec68e75b
  #if BUILDFLAG(ENABLE_EXTENSIONS)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -93,11 +110,27 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
+@@ -93,11 +115,28 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
  }
  
  bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
 +  if (uw::TabOrganizationController::IsCommand(command_id) ||
-+      uw::IsPinCommand(command_id))
++      uw::IsPinCommand(command_id) ||
++      uw::IsMoveToWorkspaceCommand(command_id))
 +    return false;
    return delegate_->IsContextMenuCommandAlerted(
        static_cast<TabStripModel::ContextMenuCommand>(command_id));
@@ -777,7 +825,7 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..3a8e65b7acbb4524c08f7361ec68e75b
  #if BUILDFLAG(ENABLE_EXTENSIONS)
    if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
      if (tab_menu_model_ && tab_menu_model_->extension_items()) {
-@@ -114,6 +147,13 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+@@ -114,6 +153,13 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
    }
  #endif
    if (auto* tab = tab_handle_.Get()) {
@@ -791,11 +839,12 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..3a8e65b7acbb4524c08f7361ec68e75b
      delegate_->ExecuteContextMenuCommand(
          tab, static_cast<TabStripModel::ContextMenuCommand>(command_id),
          event_flags);
-@@ -123,5 +163,13 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+@@ -123,5 +169,14 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
  bool TabContextMenuController::GetAcceleratorForCommandId(
      int command_id,
      ui::Accelerator* accelerator) const {
-+  if (uw::IsPinCommand(command_id)) {
++  if (uw::IsPinCommand(command_id) ||
++      uw::IsMoveToWorkspaceCommand(command_id)) {
 +    return false;
 +  }
 +  if (uw::TabOrganizationController::IsCommand(command_id)) {
@@ -979,29 +1028,35 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
  
      if (size_bounds.width().is_bounded()) {
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index ab919030ae2fbd70240f192e1a7060776530523a..e2d9914d520e779b47adc2e8266af12595025d09 100644
+index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c87562da3 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-@@ -67,6 +67,7 @@
+@@ -67,6 +67,9 @@
  #include "ui/views/controls/focus_ring.h"
  #include "ui/views/controls/resize_area.h"
  #include "ui/views/controls/separator.h"
 +#include "uw/browser/ui/views/tab_organization/organize_bar.h"
++#include "uw/browser/ui/views/workspaces/workspace_name_row.h"
++#include "uw/browser/ui/views/workspaces/workspace_switcher.h"
  #include "ui/views/focus/focus_manager.h"
  #include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/layout/flex_layout.h"
-@@ -156,6 +157,10 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+@@ -156,6 +159,14 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
                LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
            region_horizontal_padding, 0, region_horizontal_padding));
  
-+  // Right-clicking empty space in the sidebar shows uw's sidebar menu.
-+  set_context_menu_controller(
-+      AddChildView(std::make_unique<uw::OrganizeBar>(browser_view->browser())));
++  // Right-clicking empty space in the sidebar shows uw's sidebar menu. The
++  // workspace switcher sits in the middle of its row.
++  auto* organize_bar = AddChildView(
++      std::make_unique<uw::OrganizeBar>(browser_view->browser()));
++  organize_bar->SetMiddle(
++      uw::WorkspaceSwitcher::Make(browser_view->browser()));
++  set_context_menu_controller(organize_bar);
 +
    gemini_button_ = AddChildView(std::make_unique<views::View>());
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
-@@ -279,14 +284,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
+@@ -279,14 +290,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
      return false;
    }
  
@@ -1022,11 +1077,21 @@ index ab919030ae2fbd70240f192e1a7060776530523a..e2d9914d520e779b47adc2e8266af125
      gfx::Point point_in_child = point;
      views::View::ConvertPointToTarget(this, bottom_button_container_,
                                        &point_in_child);
+@@ -722,6 +737,9 @@ void VerticalTabStripRegionView::ClickEventHandler::OnMouseEvent(
+ }
+ 
+ void VerticalTabStripRegionView::OnTabStripViewSet() {
++  // uw: the workspace's name, under the pins.
++  tab_strip_view()->SetUwRow(
++      uw::WorkspaceNameRow::Make(browser_view()->browser()));
+   tab_strip_view()->SetProperty(
+       views::kFlexBehaviorKey,
+       views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57ff291d60 100644
+index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..4d681d69ba233511818a32e07aa7e6298b7462b8 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -143,6 +143,13 @@
+@@ -143,6 +143,15 @@
  #include "ui/base/ui_base_features.h"
  #include "ui/base/window_open_disposition.h"
  #include "ui/events/keycodes/keyboard_codes.h"
@@ -1037,10 +1102,12 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
 +#include "uw/browser/terminal/terminal_tab.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
 +#include "uw/browser/ui/views/tab_organization/window_commands.h"
++#include "uw/browser/ui/views/workspaces/workspace_switcher.h"
++#include "uw/browser/workspaces/workspace_commands.h"
  
  #if !BUILDFLAG(IS_ANDROID)
  #include "chrome/browser/devtools/devtools_policy_dialog.h"
-@@ -659,6 +666,11 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -659,6 +668,11 @@ void BrowserCommandController::HandleCommandWithDisposition(
      base::TimeTicks time_stamp) {
    DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
  
@@ -1052,7 +1119,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
    // The order of commands in this switch statement must match the function
    // declaration order in browser.h!
    switch (id) {
-@@ -742,7 +754,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -742,7 +756,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -1063,7 +1130,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -750,6 +764,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -750,6 +766,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
        break;
      }
      case IDC_CLOSE_TAB:
@@ -1074,7 +1141,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
        base::RecordAction(base::UserMetricsAction("CloseTabByKey"));
        CloseTab(browser_);
        break;
-@@ -1397,7 +1415,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1397,7 +1417,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
                                      TabGroupShortcut::kCloseTabGroup);
        break;
      case IDC_CREATE_NEW_TAB_GROUP:
@@ -1085,7 +1152,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kCreateNewTabGroup);
        break;
-@@ -1406,6 +1426,15 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1406,6 +1428,20 @@ void BrowserCommandController::HandleCommandWithDisposition(
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kAddNewTabToGroup);
        break;
@@ -1095,13 +1162,18 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
 +    case uw::kNewChatCommand:
 +      uw::OpenChatTab(browser_);
 +      break;
++    case uw::kNewWorkspaceCommand:
++      if (auto* switcher = uw::WorkspaceSwitcher::From(browser_)) {
++        switcher->ShowNewWorkspaceCard();
++      }
++      break;
 +    case uw::kShellCommandBarCommand:
 +      uw::CommandBar::OpenForShellCommand(browser_);
 +      break;
      case IDC_GROUP_UNGROUPED_TABS:
        GroupAllUngroupedTabs(browser_);
        base::RecordAction(
-@@ -1731,6 +1760,15 @@ void BrowserCommandController::InitCommandState() {
+@@ -1731,6 +1767,17 @@ void BrowserCommandController::InitCommandState() {
    command_updater_->UpdateCommandEnabled(IDC_GROUP_UNGROUPED_TABS, true);
    command_updater_->UpdateCommandEnabled(IDC_ADD_NEW_TAB_RECENT_GROUP, true);
    command_updater_->UpdateCommandEnabled(IDC_UNFOCUS_TAB_GROUP, true);
@@ -1113,12 +1185,14 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..3f1f2f95c73c4cbb327213bb11186d57
 +  }
 +  command_updater_->UpdateCommandEnabled(uw::kNewTerminalCommand, true);
 +  command_updater_->UpdateCommandEnabled(uw::kNewChatCommand, true);
++  command_updater_->UpdateCommandEnabled(uw::kNewWorkspaceCommand,
++                                         !profile()->IsOffTheRecord());
 +  command_updater_->UpdateCommandEnabled(uw::kShellCommandBarCommand, true);
  
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
-index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..725fe4aaec865692889b5ebfdef8d3b6249bbf31 100644
+index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..f66f636ed2ac53e78307f7e180421712bb49f9cb 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
 @@ -24,6 +24,8 @@
@@ -1142,7 +1216,15 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..725fe4aaec865692889b5ebfdef8d3b6
        {false, true,  true,  false, kVK_PageDown,          IDC_MOVE_TAB_NEXT},
        {false, true,  true,  false, kVK_PageUp,            IDC_MOVE_TAB_PREVIOUS},
  
-@@ -158,13 +161,26 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+@@ -143,7 +146,6 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+       {true,  false, false, false, kVK_ANSI_9,            IDC_SELECT_LAST_TAB},
+       {true,  false, false, false, kVK_ANSI_Keypad9,      IDC_SELECT_LAST_TAB},
+ 
+-      {true,  true,  false, false, kVK_ANSI_M,            IDC_SHOW_AVATAR_MENU},
+       {true,  false, false, true,  kVK_ANSI_L,            IDC_SHOW_DOWNLOADS},
+       {true,  true,  false, false, kVK_ANSI_C,            IDC_DEV_TOOLS_INSPECT},
+       {true,  false, false, true,  kVK_ANSI_C,            IDC_DEV_TOOLS_INSPECT},
+@@ -158,13 +160,26 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
      keys.push_back(
          {true, false, true, false, kVK_ANSI_C, IDC_ADD_NEW_TAB_TO_GROUP});
      keys.push_back(
@@ -1170,7 +1252,7 @@ index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..725fe4aaec865692889b5ebfdef8d3b6
      if (base::FeatureList::IsEnabled(features::kUIDebugTools)) {
        keys.push_back(
            {false, true, true, true, kVK_ANSI_T, IDC_DEBUG_TOGGLE_TABLET_MODE});
-@@ -209,6 +225,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
+@@ -209,6 +224,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
      return NoCommand();
  
    int cmdNum = MenuCommandForKeyEvent(event);
@@ -1426,10 +1508,35 @@ index a66de0ebb69849292242b5efb637e807345a5cf0..bd5eef180ea4aea103786fe8a1f7ebe0
  
    SchedulePaint();
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
-index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..1b003b2191a7b5e805f401bde0eeee41e5a5ef1c 100644
+index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..498dd9ffa52de59e8582927087b724a747db2ced 100644
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
 +++ b/chrome/browser/ui/toolbar/app_menu_model.cc
-@@ -2319,18 +2319,7 @@ void AppMenuModel::Build() {
+@@ -2255,22 +2255,8 @@ void AppMenuModel::Build() {
+ 
+   AddSeparator(ui::NORMAL_SEPARATOR);
+ 
+-#if !BUILDFLAG(IS_CHROMEOS)
+-  sub_menus_.push_back(std::make_unique<ProfileSubMenuModel>(
+-      this, browser()->GetProfile(),
+-      BrowserWindow::FromBrowser(browser())->GetColorProvider()));
+-  auto* const profile_submenu_model =
+-      static_cast<ProfileSubMenuModel*>(sub_menus_.back().get());
+-  AddSubMenu(kProfileMenuPlaceholder, profile_submenu_model->profile_name(),
+-             profile_submenu_model);
+-  SetIconForCommandId(kProfileMenuPlaceholder,
+-                      profile_submenu_model->avatar_image_model());
+-  SetElementIdentifierAt(GetIndexOfCommandId(kProfileMenuPlaceholder).value(),
+-                         kProfileMenuItem);
+-  SetAccessibleNameAt(GetIndexOfCommandId(kProfileMenuPlaceholder).value(),
+-                      profile_submenu_model->accessible_name());
+-  AddSeparator(ui::SPACING_SEPARATOR);
+-#endif
++  // uw: no profile row. Workspaces, at the foot of the sidebar, take its
++  // place.
+ 
+   if (!browser_->GetProfile()->IsGuestSession()) {
+     sub_menus_.push_back(
+@@ -2319,18 +2305,7 @@ void AppMenuModel::Build() {
          kBookmarksMenuItem);
    }
  

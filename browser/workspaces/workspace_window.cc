@@ -7,14 +7,19 @@
 #include <set>
 #include <utility>
 
+#include "base/barrier_closure.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/uuid.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/lifetime/browser_shutdown.h"
+#include "chrome/browser/profiles/delete_profile_helper.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_avatar_icon_util.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/profiles/profile_metrics.h"
 #include "chrome/browser/sessions/session_restore.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
@@ -24,9 +29,14 @@
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
+#include "chrome/browser/ui/tabs/tab_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/webui_url_constants.h"
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/core/tab_restore_types.h"
+#include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
@@ -40,6 +50,13 @@ std::string Find(const std::map<std::string, std::string>& data,
                  const char* key) {
   const auto it = data.find(key);
   return it == data.end() ? std::string() : it->second;
+}
+
+void DeleteProfile(const base::FilePath& profile) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  manager->GetDeleteProfileHelper().MaybeScheduleProfileForDeletion(
+      manager->user_data_dir().Append(profile), base::DoNothing(),
+      ProfileMetrics::DELETE_PROFILE_USER_MANAGER);
 }
 
 bool IsRestoring(Profile* profile) {
@@ -67,9 +84,17 @@ WorkspaceWindow::WorkspaceWindow(BrowserWindowInterface* window)
   workspace_ = in_front && front->GetProfile() == window->GetProfile()
                    ? in_front->workspace_
                    : WorkspaceList::Get().FirstFor(window->GetProfile()).id;
-  close_subscription_ = window->RegisterBrowserDidClose(
+}
+
+void WorkspaceWindow::Start() {
+  close_subscription_ = window_->RegisterBrowserDidClose(
       base::BindRepeating(&WorkspaceWindow::OnClosed, base::Unretained(this)));
   SaveSession();
+}
+
+base::CallbackListSubscription WorkspaceWindow::ObserveChanges(
+    base::RepeatingClosure changed) {
+  return changes_.Add(std::move(changed));
 }
 
 WorkspaceWindow::~WorkspaceWindow() = default;
@@ -91,23 +116,41 @@ std::vector<WorkspaceWindow*> WorkspaceWindow::Partners() const {
   return partners;
 }
 
-void WorkspaceWindow::Switch(std::string_view id) {
-  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
-  if (!workspace || hidden_ || id == workspace_) {
+void WorkspaceWindow::Switch(std::string_view id, WindowCallback shown) {
+  if (hidden_ || !WorkspaceList::Get().Find(id)) {
+    return;
+  }
+  WithPartner(id, base::BindOnce(
+                      [](WindowCallback shown, BrowserWindowInterface* window) {
+                        From(window)->Reveal();
+                        if (shown) {
+                          std::move(shown).Run(window);
+                        }
+                      },
+                      std::move(shown)));
+}
+
+void WorkspaceWindow::WithPartner(std::string_view id, WindowCallback found) {
+  if (id == workspace_) {
+    std::move(found).Run(window_);
     return;
   }
   for (WorkspaceWindow* partner : Partners()) {
     if (partner->workspace_ == id) {
-      partner->Reveal();
+      std::move(found).Run(partner->window_);
       return;
     }
+  }
+  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
+  if (!workspace) {
+    return;
   }
   ProfileManager* manager = g_browser_process->profile_manager();
   manager->LoadProfileByPath(
       manager->user_data_dir().Append(workspace->profile),
       /*incognito=*/false,
       base::BindOnce(&WorkspaceWindow::OpenPartner, weak_factory_.GetWeakPtr(),
-                     workspace->id));
+                     workspace->id, std::move(found)));
 }
 
 // static
@@ -128,6 +171,7 @@ void WorkspaceWindow::Restore(
   }
   self->hidden_ = Find(extra_data, kHiddenKey) == "true";
   self->SaveSession();
+  self->changes_.Notify();
   // A group shows one window. A window revealed before this one came back
   // goes behind it again.
   if (!self->hidden_) {
@@ -211,14 +255,16 @@ void WorkspaceWindow::Reveal() {
   }
 }
 
-void WorkspaceWindow::OpenPartner(const std::string& id, Profile* profile) {
-  if (!profile || hidden_ || window_->IsDeleteScheduled()) {
+void WorkspaceWindow::OpenPartner(const std::string& id,
+                                  WindowCallback found,
+                                  Profile* profile) {
+  if (!profile || window_->IsDeleteScheduled()) {
     return;
   }
   // A second switch may have opened it while the profile loaded.
   for (WorkspaceWindow* partner : Partners()) {
     if (partner->workspace_ == id) {
-      partner->Reveal();
+      std::move(found).Run(partner->window_);
       return;
     }
   }
@@ -232,11 +278,148 @@ void WorkspaceWindow::OpenPartner(const std::string& id, Profile* profile) {
   partner->workspace_ = id;
   partner->group_ = group_;
   partner->hidden_ = true;
+  partner->SaveSession();
+  partner->changes_.Notify();
   NavigateParams new_tab(opened, GURL(chrome::kChromeUINewTabURL),
                          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
   new_tab.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   Navigate(&new_tab);
-  partner->Reveal();
+  std::move(found).Run(opened);
+}
+
+// static
+void WorkspaceWindow::Create(BrowserWindowInterface* window,
+                             std::string name,
+                             std::string icon,
+                             const base::FilePath& profile,
+                             const std::u16string& new_profile,
+                             WindowCallback shown) {
+  WorkspaceWindow* self = From(window);
+  if (!self) {
+    return;
+  }
+  auto add = base::BindOnce(
+      [](base::WeakPtr<WorkspaceWindow> self, std::string name,
+         std::string icon, WindowCallback shown, Profile* profile) {
+        if (!self || !profile) {
+          return;
+        }
+        const std::string id = WorkspaceList::Get().Add(
+            std::move(name), std::move(icon), profile->GetBaseName());
+        self->Switch(id, std::move(shown));
+      },
+      self->weak_factory_.GetWeakPtr(), std::move(name), std::move(icon),
+      std::move(shown));
+  ProfileManager* manager = g_browser_process->profile_manager();
+  if (!profile.empty()) {
+    manager->LoadProfileByPath(manager->user_data_dir().Append(profile),
+                               /*incognito=*/false, std::move(add));
+    return;
+  }
+  ProfileManager::CreateMultiProfileAsync(new_profile,
+                                          profiles::GetPlaceholderAvatarIndex(),
+                                          /*is_hidden=*/false, std::move(add));
+}
+
+// static
+void WorkspaceWindow::Delete(std::string_view id, bool with_profile) {
+  WorkspaceList& list = WorkspaceList::Get();
+  const int index = list.IndexOf(id);
+  if (index < 0 || list.workspaces().size() < 2) {
+    return;
+  }
+  const std::string deleted(id);
+  const base::FilePath profile = list.workspaces()[index].profile;
+  const std::string before = list.workspaces()[index > 0 ? index - 1 : 1].id;
+  list.Remove(deleted);
+
+  std::vector<WorkspaceWindow*> shown;
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    WorkspaceWindow* self = From(window);
+    if (!self || self->workspace_ != deleted || window->IsDeleteScheduled()) {
+      continue;
+    }
+    self->forget_ = true;
+    if (self->hidden_) {
+      window->GetWindow()->Close();
+    } else {
+      shown.push_back(self);
+    }
+  }
+  // The profile goes once every window that showed the workspace has
+  // switched away, so no window of another workspace closes with it.
+  base::OnceClosure after = base::DoNothing();
+  if (with_profile) {
+    after = base::BindOnce(&DeleteProfile, profile);
+  }
+  const base::RepeatingClosure switched =
+      base::BarrierClosure(shown.size(), std::move(after));
+  for (WorkspaceWindow* self : shown) {
+    self->Switch(before, base::BindOnce(
+                             [](base::WeakPtr<WorkspaceWindow> self,
+                                base::RepeatingClosure switched,
+                                BrowserWindowInterface*) {
+                               if (self) {
+                                 self->window_->GetWindow()->Close();
+                               }
+                               switched.Run();
+                             },
+                             self->weak_factory_.GetWeakPtr(), switched));
+  }
+}
+
+// static
+int WorkspaceWindow::CountTabs(std::string_view id) {
+  int tabs = 0;
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    const WorkspaceWindow* self = From(window);
+    if (self && self->workspace_ == id) {
+      const TabStripModel* strip = window->GetTabStripModel();
+      tabs += strip->count() - strip->IndexOfFirstNonPinnedTab();
+    }
+  }
+  return tabs;
+}
+
+// static
+void WorkspaceWindow::MoveTab(tabs::TabInterface* tab, std::string_view id) {
+  WorkspaceWindow* self = From(tab->GetBrowserWindowInterface());
+  if (!self || tab->IsPinned() || id == self->workspace_) {
+    return;
+  }
+  self->WithPartner(
+      id,
+      base::BindOnce(
+          [](base::WeakPtr<tabs::TabInterface> tab,
+             BrowserWindowInterface* to) {
+            if (!tab) {
+              return;
+            }
+            BrowserWindowInterface* from = tab->GetBrowserWindowInterface();
+            TabStripModel* source = from->GetTabStripModel();
+            // The window keeps a tab, so it stays open.
+            if (source->count() == 1) {
+              NavigateParams new_tab(from, GURL(chrome::kChromeUINewTabURL),
+                                     ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+              new_tab.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+              Navigate(&new_tab);
+            }
+            const int index = source->GetIndexOfTab(tab.get());
+            TabStripModel* target = to->GetTabStripModel();
+            if (to->GetProfile() == from->GetProfile()) {
+              target->InsertDetachedTabAt(
+                  target->count(), source->DetachTabAtForInsertion(index),
+                  AddTabTypes::ADD_ACTIVE);
+              return;
+            }
+            NavigateParams params(to, tab->GetContents()->GetLastCommittedURL(),
+                                  ui::PAGE_TRANSITION_LINK);
+            params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+            Navigate(&params);
+            source->CloseWebContentsAt(index,
+                                       TabCloseTypes::CLOSE_USER_GESTURE);
+          },
+          tab->GetWeakPtr()));
 }
 
 void WorkspaceWindow::SaveSession() {
@@ -255,11 +438,34 @@ void WorkspaceWindow::SaveSession() {
 // Closing the window that shows closes its whole group. Quitting leaves the
 // group to the session, which brings it back at launch.
 void WorkspaceWindow::OnClosed(BrowserWindowInterface* window) {
+  if (forget_) {
+    ForgetClosed(window);
+    return;
+  }
   if (hidden_ || browser_shutdown::IsTryingToQuit()) {
     return;
   }
   for (WorkspaceWindow* partner : Partners()) {
     partner->window_->GetWindow()->Close();
+  }
+}
+
+void WorkspaceWindow::ForgetClosed(BrowserWindowInterface* window) {
+  sessions::TabRestoreService* service =
+      TabRestoreServiceFactory::GetForProfileIfExisting(window->GetProfile());
+  if (!service) {
+    return;
+  }
+  std::vector<SessionID> entries;
+  for (const auto& entry : service->entries()) {
+    if (entry->type == sessions::tab_restore::Type::WINDOW &&
+        Find(entry->extra_data, kWorkspaceKey) == workspace_ &&
+        Find(entry->extra_data, kGroupKey) == group_) {
+      entries.push_back(entry->id);
+    }
+  }
+  for (SessionID id : entries) {
+    service->RemoveEntryById(id);
   }
 }
 
