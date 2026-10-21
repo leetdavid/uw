@@ -1,6 +1,6 @@
 # Connectors and the AI page
 
-Status: scope agreed on 2026-10-21 for v2.1. The design, T134, is drawn and waits for the user's sign-off. On the user's word to "finish all of them", T135 to T142 were built the same day to that design, and are in review; [Built](#built) lists where they differ from it.
+Status: done. Scope agreed, and T134 to T142 built and signed off, on 2026-10-21 for v2.1. [Built](#built) lists where the build differs from the design.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The pages, menus, and skill changes reuse what T72, T77, and T107 built. The hard parts:
 
@@ -61,7 +61,7 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 
 ## Design
 
-The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, drawn on 2026-10-21 for T134, and the `uw-ai-providers` guide has their rules. They are proposals until the user signs off.
+The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, drawn on 2026-10-21 for T134, and the `uw-ai-providers` guide has their rules. The user signed them off on 2026-10-21.
 
 - "AI page: connectors (Fluid)": `uw://ai/connectors` with the section list and a connector in each common state.
 - "AI page: a connector open (Fluid)": its tools with Reads only, Always allowed, and a switch each.
