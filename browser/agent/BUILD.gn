@@ -9,6 +9,8 @@ source_set("agent") {
     "agent_tools.h",
     "chat_suggestions.cc",
     "chat_suggestions.h",
+    "command_check.cc",
+    "command_check.h",
   ]
   public_deps = [
     ":chats",
@@ -25,7 +27,6 @@ source_set("agent") {
   ]
   deps = [
     "//chrome/browser/actor",
-    "//uw/browser/connectors",
     "//chrome/browser/history",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
@@ -39,6 +40,7 @@ source_set("agent") {
     "//net",
     "//services/network/public/cpp",
     "//ui/base",
+    "//uw/browser/connectors",
     "//uw/browser/terminal",
   ]
 }
@@ -127,6 +129,7 @@ source_set("browser_tests") {
     "agent_engine_browsertest.cc",
     "agent_loop_browsertest.cc",
     "agent_tools_browsertest.cc",
+    "command_check_browsertest.cc",
   ]
   deps = [
     ":agent",
@@ -151,6 +154,8 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//ui/gfx/geometry",
     "//url",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",
     "//uw/components/ai_providers",

@@ -15,6 +15,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/types/expected.h"
@@ -25,9 +26,12 @@
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/command_check.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/connectors/connector_tools.h"
+
+class Profile;
 
 namespace network {
 class SharedURLLoaderFactory;
@@ -35,10 +39,11 @@ class SharedURLLoaderFactory;
 
 namespace uw {
 
-// How much a chat asks before it acts. Ask first asks before every click and
-// typing, Auto before each change, and Full auto never. Until the command
-// check, every mode asks before each command and set of keys. See
-// docs/plans/agent-chats.md.
+// How much a chat asks before it acts. Ask first asks before every click,
+// typing, command, and set of keys. Auto asks before each change on a site and
+// each command the command check finds potentially dangerous. Full auto never
+// asks, except before a command that may read a sensitive file, which every
+// mode asks about. See docs/plans/agent-chats.md.
 enum class ApprovalMode { kAskFirst, kAuto, kFullAuto };
 
 // The model a chat talks to, and its key, which may be empty.
@@ -160,6 +165,16 @@ class AgentLoop {
                          base::DictValue args,
                          base::expected<mcp::Content, std::string> answer);
   void CallTool(ModelTurn turn, size_t index, base::DictValue args);
+  // Asks the command check about a terminal step that `approval` describes,
+  // and runs it or asks the user, as its answer says.
+  void CheckStep(ModelTurn turn,
+                 size_t index,
+                 base::DictValue args,
+                 AgentTools::Approval approval);
+  void OnCheck(std::optional<CommandCheckAnswer> answer);
+  // Drops a check under way, after Stop or a steer, and leaves its step to
+  // RunCall.
+  void EndCheck();
   void OnApproval(ModelTurn turn,
                   size_t index,
                   base::DictValue args,
@@ -178,6 +193,7 @@ class AgentLoop {
   void Finish(Step step);
 
   AgentTools tools_;
+  const raw_ptr<Profile> profile_;
   AgentModel model_;
   const OnStep on_step_;
   const scoped_refptr<network::SharedURLLoaderFactory> loader_;
@@ -205,6 +221,16 @@ class AgentLoop {
   // under way.
   std::optional<ApprovalAnswer> site_refused_;
   std::unique_ptr<RemoteModelClient> client_;
+  // The command check under way, and the step it is about.
+  struct Check {
+    ModelTurn turn;
+    size_t index = 0;
+    base::DictValue args;
+    AgentTools::Approval approval;
+    bool file_only = false;
+    std::unique_ptr<RemoteModelClient> client;
+  };
+  std::unique_ptr<Check> check_;
   int turns_ = 0;
   bool working_ = false;
   // A model request is under way.

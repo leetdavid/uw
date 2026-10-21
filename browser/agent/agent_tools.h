@@ -81,9 +81,13 @@ class AgentTools {
     std::string connector;
     std::string tool;
     std::string arguments;
+    // A terminal step that may read a sensitive file, and the file, when the
+    // command check named it.
+    bool sensitive = false;
+    std::string file;
   };
-  // Whether `tool` works in a terminal tab. Until the command check, every
-  // terminal step asks in every mode.
+  // Whether `tool` works in a terminal tab. Outside Ask first, the command
+  // check decides whether a terminal step asks.
   static bool IsTerminalTool(std::string_view tool);
   // What a call to `tool` with `args` needs approved: clicking a button
   // that submits a form, pressing Enter in a form's field, typing a password

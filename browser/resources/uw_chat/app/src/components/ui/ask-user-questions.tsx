@@ -1304,7 +1304,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
               : "px-4 sm:px-5 pt-3.5 sm:pt-4 pb-2 text-[length:var(--fs-caption,12px)] leading-[var(--lh-caption,16px)]"
           )}
         >
-          <span>
+          <span className="min-w-0 flex-1">
             {label ?? (
               <>
                 Question {safeIndex + 1} of {total}

@@ -1,10 +1,13 @@
-# How uw's agent reads a page and talks to its model. See docs/plans/agent-chats.md.
+# How uw's agent reads a page and talks to its model. See
+# docs/plans/agent-chats.md.
 source_set("agent") {
   sources = [
     "agent_context.cc",
     "agent_context.h",
     "agent_protocol.cc",
     "agent_protocol.h",
+    "command_check.cc",
+    "command_check.h",
     "page_text.cc",
     "page_text.h",
     "skills.cc",
@@ -12,7 +15,10 @@ source_set("agent") {
     "suggestions.cc",
     "suggestions.h",
   ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//uw/components/tab_organization",
+  ]
   deps = [
     "//components/optimization_guide/proto:optimization_guide_proto",
     "//uw/components/ai_providers",
@@ -24,6 +30,7 @@ source_set("unit_tests") {
   sources = [
     "agent_context_unittest.cc",
     "agent_protocol_unittest.cc",
+    "command_check_unittest.cc",
     "page_text_unittest.cc",
     "skills_unittest.cc",
     "suggestions_unittest.cc",

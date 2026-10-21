@@ -82,6 +82,12 @@ class AgentContext {
   // with `error`. A model refuses a request with an unanswered call.
   void CloseOpenCalls(std::string_view error);
 
+  // What the command check sees of the chat: the user's messages and the
+  // agent's tool calls before the latest call `call_id`, oldest first, as lines
+  // such as `User: ...` and `Agent: run {"command":"ls"}`. Never a tool's
+  // answer or an image.
+  std::vector<std::string> UserAndActions(std::string_view call_id) const;
+
   // The request for `model`. Shortens the oldest long results until it fits
   // in `max_length` characters, not counting images, or nothing is left to
   // shorten.

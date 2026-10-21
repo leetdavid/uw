@@ -22,6 +22,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "uw/browser/agent/command_check.h"
 #include "uw/browser/connectors/connectors.h"
 
 namespace uw {
@@ -84,11 +85,10 @@ AgentLoop::AgentLoop(tabs::TabInterface& chat,
                      std::unique_ptr<AgentContext> context,
                      base::RepeatingClosure on_change)
     : tools_(chat),
+      profile_(chat.GetBrowserWindowInterface()->GetProfile()),
       model_(std::move(model)),
       on_step_(std::move(on_step)),
-      loader_(chat.GetBrowserWindowInterface()
-                  ->GetProfile()
-                  ->GetDefaultStoragePartition()
+      loader_(profile_->GetDefaultStoragePartition()
                   ->GetURLLoaderFactoryForBrowserProcess()),
       context_(context ? std::move(context) : std::make_unique<AgentContext>()),
       on_change_(std::move(on_change)) {}
@@ -147,6 +147,7 @@ void AgentLoop::Stop() {
   }
   stopping_ = true;
   tools_.EndWait();
+  EndCheck();
 }
 
 void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
@@ -165,6 +166,7 @@ void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
   steer_ = Message{std::string(text), std::move(images)};
   // A command left running is the agent's to look at with the message.
   tools_.EndWait();
+  EndCheck();
 }
 
 void AgentLoop::AskModel() {
@@ -312,12 +314,17 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
                        std::move(turn), index, std::move(asked)));
     return;
   }
-  // Until the command check, a command asks even in Full auto.
-  if (approve_ && (mode_ != ApprovalMode::kFullAuto ||
-                   AgentTools::IsTerminalTool(call.name))) {
+  // Full auto still asks the command check about each terminal step.
+  const bool terminal = AgentTools::IsTerminalTool(call.name);
+  if (approve_ && (mode_ != ApprovalMode::kFullAuto || terminal)) {
     if (std::optional<AgentTools::Approval> approval = tools_.ApprovalFor(
             call.name, *args,
             /*every_step=*/mode_ == ApprovalMode::kAskFirst)) {
+      if (terminal && mode_ != ApprovalMode::kAskFirst) {
+        CheckStep(std::move(turn), index, std::move(*args),
+                  std::move(*approval));
+        return;
+      }
       approve_.Run(
           std::move(*approval),
           base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
@@ -326,6 +333,64 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     }
   }
   CallTool(std::move(turn), index, std::move(*args));
+}
+
+void AgentLoop::CheckStep(ModelTurn turn,
+                          size_t index,
+                          base::DictValue args,
+                          AgentTools::Approval approval) {
+  CommandCheckInput input;
+  input.chat = context_->UserAndActions(turn.calls[index].id);
+  input.step.tab = approval.tab;
+  input.step.folder = approval.folder;
+  input.step.command = approval.command;
+  input.step.text = approval.text;
+  input.step.keys = approval.keys;
+  input.file_only = mode_ == ApprovalMode::kFullAuto;
+  check_ = std::make_unique<Check>();
+  check_->turn = std::move(turn);
+  check_->index = index;
+  check_->args = std::move(args);
+  check_->approval = std::move(approval);
+  check_->file_only = input.file_only;
+  check_->client = SendCommandCheck(
+      *profile_, model_.connection, model_.api_key, input,
+      base::BindOnce(&AgentLoop::OnCheck, weak_factory_.GetWeakPtr()));
+  if (!check_->client) {
+    OnCheck(std::nullopt);
+  }
+}
+
+void AgentLoop::OnCheck(std::optional<CommandCheckAnswer> answer) {
+  std::unique_ptr<Check> check = std::move(check_);
+  if (check->client) {
+    // The client that answered may still be on the stack.
+    base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(check->client));
+  }
+  const CommandCheckVerdict verdict =
+      JudgeTerminalStep(answer, check->file_only, model_.connection.model);
+  if (!verdict.ask) {
+    CallTool(std::move(check->turn), check->index, std::move(check->args));
+    return;
+  }
+  AgentTools::Approval approval = std::move(check->approval);
+  approval.reason = verdict.reason;
+  approval.sensitive = verdict.sensitive;
+  approval.file = verdict.file;
+  approve_.Run(
+      std::move(approval),
+      base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
+                     std::move(check->turn), check->index,
+                     std::move(check->args)));
+}
+
+void AgentLoop::EndCheck() {
+  if (!check_) {
+    return;
+  }
+  std::unique_ptr<Check> check = std::move(check_);
+  RunCall(std::move(check->turn), check->index);
 }
 
 void AgentLoop::SetApprover(Approve approve) {

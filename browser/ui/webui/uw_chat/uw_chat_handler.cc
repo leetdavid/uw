@@ -1281,7 +1281,8 @@ void UwChatHandler::AskApproval(
       approval.screen, approval.connector, approval.tool, approval.arguments,
       /*can_always_allow=*/
       !Profile::FromBrowserContext(contents_->GetBrowserContext())
-          ->IsOffTheRecord()));
+           ->IsOffTheRecord(),
+      approval.sensitive, approval.file));
   UpdateIndex();
 }
 

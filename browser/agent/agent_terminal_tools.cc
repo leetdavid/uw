@@ -191,9 +191,10 @@ std::optional<AgentTools::Approval> AgentTools::TerminalApprovalFor(
     return std::nullopt;
   }
   Approval approval;
-  approval.reason = every_step ? "Ask first is on."
-                               : "For now, every command waits for your "
-                                 "approval.";
+  // Outside Ask first, the command check gives the reason.
+  if (every_step) {
+    approval.reason = "Ask first is on.";
+  }
   std::string error;
   if (tool == "run") {
     const std::string* command = args.FindString("command");

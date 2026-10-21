@@ -19,6 +19,7 @@ import {
   Blocks,
   ImageIcon,
   Info,
+  KeyRound,
   Link2,
   Plus,
   Shield,
@@ -181,9 +182,9 @@ const MODE_NOTES: Record<ApprovalMode, string> = {
   [ApprovalMode.kAskFirst]:
     "Every click, typing, and command waits for your approval",
   [ApprovalMode.kAuto]:
-    "Changes on a site and every command wait for your approval",
+    "Changes on a site and risky commands wait for your approval",
   [ApprovalMode.kFullAuto]:
-    "Full auto: the agent acts without asking, except to run a command",
+    "Full auto: the agent acts without asking, except to read a sensitive file",
 };
 
 // How long the agent has worked on the current request, as the chat's
@@ -812,9 +813,11 @@ function SkillProposalCard({ proposal }: { proposal: SkillProposal }) {
 // The card goes once answered: an approved command may run for minutes.
 function ApprovalCard({
   approval,
+  fullAuto,
   onAnswered,
 }: {
   approval: Approval;
+  fullAuto: boolean;
   onAnswered: () => void;
 }) {
   const answer = (given: AskUserAnswer | undefined) => {
@@ -871,6 +874,12 @@ function ApprovalCard({
             <span className="flex items-center gap-1.5">
               <TerminalIcon aria-hidden className="size-3.5" />
               Terminal · Tab {approval.tab} · {approval.folder}
+              {approval.sensitive && fullAuto && (
+                <span className="full-auto ml-auto flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 font-medium text-warning">
+                  <Shield aria-hidden className="size-3" />
+                  Full auto
+                </span>
+              )}
             </span>
           ) : (
             `${approval.site} · Tab ${approval.tab}`
@@ -882,9 +891,11 @@ function ApprovalCard({
             title: connector
               ? `Run ${approval.tool} in ${approval.connector}?`
               : terminal
-                ? approval.command
-                  ? "Run this command?"
-                  : "Send keys to the running program?"
+                ? approval.sensitive
+                  ? `Let the agent read ${approval.file || "a sensitive file"}?`
+                  : approval.command
+                    ? "Run this command?"
+                    : "Send keys to the running program?"
                 : `${approval.action}?`,
             detail: connector ? (
               <ConnectorApproval approval={approval} />
@@ -1038,7 +1049,11 @@ function TerminalApproval({ approval }: { approval: Approval }) {
         </>
       )}
       <p className="approval-reason flex gap-1.5 text-[13px] leading-[1.45] text-muted-foreground">
-        <Shield aria-hidden className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        {approval.sensitive ? (
+          <KeyRound aria-hidden className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        ) : (
+          <Shield aria-hidden className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        )}
         <span>
           <b className="font-semibold text-foreground">{first}</b>
           {rest.length > 0 && ` ${rest.join(" ")}`}
@@ -1835,6 +1850,7 @@ function Chat() {
           {approval && (
             <ApprovalCard
               approval={approval}
+              fullAuto={mode === ApprovalMode.kFullAuto}
               onAnswered={() => setApproval(null)}
             />
           )}

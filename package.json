@@ -20,6 +20,7 @@
     "smoke": "node scripts/chromium.ts smoke",
     "verify": "node scripts/chromium.ts verify",
     "window-tests": "node scripts/chromium.ts window-tests",
+    "command-check": "node scripts/command-check.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --harmony-temporal --test --test-isolation=none tests/*.test.ts",
     "check": "pnpm run typecheck && pnpm test"

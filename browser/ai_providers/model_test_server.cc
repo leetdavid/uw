@@ -93,6 +93,27 @@ std::string ChatAnswer(const std::string& escaped_content) {
          escaped_content + R"("}}]})";
 }
 
+std::string CheckDecisionsAnswer(double safe,
+                                 const std::string& danger,
+                                 double none,
+                                 const std::string& file) {
+  const auto answer = [](const std::string& name, const std::string& choice,
+                         const std::string& first, double probability,
+                         const std::string& second) {
+    return R"({"type":"choice","name":")" + name + R"(","choice":")" + choice +
+           R"(","probabilities":[{"value":")" + first + R"(","probability":)" +
+           base::NumberToString(probability) + R"(},{"value":")" + second +
+           R"(","probability":)" + base::NumberToString(1.0 - probability) +
+           "}]}";
+  };
+  return R"({"answers":[)" +
+         answer("danger", danger, "safe", safe,
+                danger == "safe" ? "deletes" : danger) +
+         "," +
+         answer("file", file, "none", none, file == "none" ? "other" : file) +
+         "]}";
+}
+
 ModelTestServer::ModelTestServer(net::test_server::EmbeddedTestServer* server) {
   server->RegisterRequestHandler(
       base::BindRepeating(&ModelTestServer::Serve, base::Unretained(this)));

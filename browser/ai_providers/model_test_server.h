@@ -48,6 +48,14 @@ std::string SystemOneAnswer(const std::string& choice,
                             double hub = 0.0);
 // `escaped_content` is the assistant message, already escaped for JSON.
 std::string ChatAnswer(const std::string& escaped_content);
+// A decision model's answer to the command check, in the Decisions API's
+// shape: how likely the step is safe and the danger it chose, and how likely
+// it reads no sensitive file and the option it chose, such as "w2" for the
+// step's second word.
+std::string CheckDecisionsAnswer(double safe,
+                                 const std::string& danger,
+                                 double none,
+                                 const std::string& file = "none");
 
 // Plays every model provider under /v1/ on an embedded test server. Create it
 // before the server starts and keep it alive while the server runs.

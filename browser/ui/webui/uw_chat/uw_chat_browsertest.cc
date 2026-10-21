@@ -58,6 +58,7 @@
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/catalog_store.h"
+#include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -1984,7 +1985,21 @@ class UwChatTerminalBrowserTest : public UwChatBrowserTest {
         ScriptedModel::Call("run", base::DictValue().Set("command", command))));
   }
 
+  // A decision model at the test server is the command check, and answers
+  // `answer`.
+  void UseCheck(const std::string& answer) {
+    PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Check";
+    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    provider.format = ProviderFormat::kOpenAiDecisions;
+    SetChoice(prefs, ModelSlot::kDecision, AddProvider(prefs, provider),
+              "check-model");
+    checks_.Answer("/v1/decisions", answer);
+  }
+
   base::ScopedTempDir zdotdir_;
+  ModelTestServer checks_{embedded_test_server()};
 };
 
 // A command waits on a card of its own. Once approved, it runs in a terminal
@@ -1992,20 +2007,22 @@ class UwChatTerminalBrowserTest : public UwChatBrowserTest {
 IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
                        ACommandWaitsOnItsCardAndItsOutputShows) {
   UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(0.05, "deletes", 0.99));
   model_.Script(
       {RunCall("echo hi-$((40+2))"), ScriptedModel::Answer("It said hi.")});
   content::WebContents* chat = OpenChat();
   EXPECT_EQ(content::EvalJs(chat,
                             "document.getElementById('approval-note')"
                             "    .textContent"),
-            "Changes on a site and every command wait for your approval");
+            "Changes on a site and risky commands wait for your approval");
   ASSERT_TRUE(content::ExecJs(chat, SendScript("Say hi in a terminal")));
 
   const std::string card = Approval(chat);
   EXPECT_THAT(card, ::testing::HasSubstr("Terminal · Tab 1 · ~"));
   EXPECT_THAT(card, ::testing::HasSubstr("Run this command?"));
   EXPECT_THAT(card, ::testing::HasSubstr(
-                        "For now, every command waits for your approval."));
+                        "Deletes or overwrites files or data. What it removes "
+                        "may not come back."));
   EXPECT_EQ(content::EvalJs(chat,
                             "document.querySelector('.approval-command')"
                             "    .textContent"),
@@ -2035,6 +2052,7 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
 IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
                        APasswordPromptWaitsForTheUser) {
   UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(0.05, "system", 0.99));
   model_.Script(
       {RunCall("bash -c 'stty -echo; printf Password:; read p; stty echo; "
                "echo thanks-$((40+2))'"),
@@ -2081,6 +2099,52 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
           .ExtractString();
   EXPECT_THAT(output, ::testing::HasSubstr("thanks-42"));
   EXPECT_THAT(output, ::testing::Not(::testing::HasSubstr("hunter2")));
+}
+
+// In Full auto, a command that may read a sensitive file still waits on a
+// card that names the file. One the check finds safe runs without one.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       ASensitiveFileWaitsEvenInFullAuto) {
+  UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(1.0, "safe", 0.99));
+  checks_.AnswerAbout("/v1/decisions", "grep STRIPE .env.local",
+                      CheckDecisionsAnswer(1.0, "safe", 0.05, "w3"));
+  model_.Script({RunCall("echo ok-$((40+2))"),
+                 RunCall("grep STRIPE .env.local"),
+                 ScriptedModel::Answer("I left the key alone.")});
+  content::WebContents* chat = OpenChat();
+  PickMode(chat, "Full auto");
+  EXPECT_EQ(
+      Until(chat, "document.getElementById('approval-note')?.textContent"),
+      "Full auto: the agent acts without asking, except to read a "
+      "sensitive file");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Which Stripe key is it?")));
+
+  const std::string card = Approval(chat);
+  EXPECT_THAT(card, ::testing::HasSubstr("Let the agent read .env.local?"));
+  EXPECT_THAT(card, ::testing::HasSubstr(
+                        "A sensitive file. It can hold passwords and keys, "
+                        "and what the command prints goes to test-agent."));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('#approval .full-auto')"
+                            "    ?.textContent"),
+            "Full auto");
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('.approval-command')"
+                            "    .textContent"),
+            "% grep STRIPE .env.local");
+  const std::vector<std::string> before = Steps(chat);
+  ASSERT_EQ(before.size(), 1u);
+  EXPECT_THAT(before[0],
+              ::testing::StartsWith("Ran echo ok-$((40+2)) in tab 1"));
+  SaveWindowScreenshot(browser(), "chat-sensitive-file");
+
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Not this one")),
+            "I left the key alone.");
+  const std::vector<std::string> steps = Steps(chat);
+  ASSERT_EQ(steps.size(), 2u);
+  EXPECT_THAT(steps[1],
+              ::testing::StartsWith("Didn't run grep STRIPE .env.local"));
 }
 
 // The chat tab's row shows what the chat page's list shows: a spinner while

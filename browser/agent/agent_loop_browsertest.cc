@@ -25,6 +25,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -35,6 +36,9 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/model_test_server.h"
+#include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/ai_providers/providers.h"
@@ -737,34 +741,214 @@ IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
   EXPECT_THAT(ScreenOf(mine), Not(HasSubstr("agent-")));
 }
 
-// Until the command check, every command asks, even in Full auto. A declined
-// command does not run, and no terminal tab opens for it.
+// A decision model at the test server is the command check. An approver
+// answers each step that asks, and keeps what it asked.
+class AgentCheckBrowserTest : public AgentTerminalBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    AgentTerminalBrowserTest::SetUpOnMainThread();
+    PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Check";
+    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    provider.format = ProviderFormat::kOpenAiDecisions;
+    provider.id = AddProvider(prefs, provider);
+    provider.key_account = KeyAccountFor(provider.id);
+    ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, "check-key"));
+    UpdateProvider(prefs, provider);
+    SetChoice(prefs, ModelSlot::kDecision, provider.id, "check-model");
+    agent_->SetApprover(base::BindLambdaForTesting(
+        [this](AgentTools::Approval approval,
+               base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
+          asked_.push_back(std::move(approval));
+          std::move(answer).Run(answer_);
+        }));
+  }
+
+  // The body of each command check so far.
+  std::vector<std::string> Checks() {
+    std::vector<std::string> bodies;
+    for (const ModelRequest& request : checks_.Requests()) {
+      if (request.path == "/v1/decisions") {
+        bodies.push_back(request.body);
+      }
+    }
+    return bodies;
+  }
+
+  ScopedMemoryKeychain keychain_;
+  ModelTestServer checks_{embedded_test_server()};
+  std::vector<AgentTools::Approval> asked_;
+  AgentLoop::ApprovalAnswer answer_;
+};
+
+// The check sees what the user asked and what the agent did, never a page's
+// text or a command's output. Safe steps run without asking.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, TheCheckSeesNoPageOrOutput) {
+  checks_.Answer("/v1/decisions", CheckDecisionsAnswer(0.95, "safe", 0.99));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/form"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(
+           Run(base::DictValue().Set("command", "echo out-$((6*7))"))),
+       ScriptedModel::Calls(Run(base::DictValue().Set("command", "pwd"))),
+       ScriptedModel::Answer("Done.")});
+
+  EXPECT_EQ(Ask("Note the tour page in a terminal").kind, Kind::kAnswer);
+
+  EXPECT_TRUE(asked_.empty());
+  ASSERT_EQ(steps_.size(), 5u);
+  EXPECT_EQ(*steps_[2].result.FindString("output"), "out-42");
+  EXPECT_THAT(model_.Requests().back(), HasSubstr("Your name"));
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 2u);
+  EXPECT_THAT(checks[1], HasSubstr("Note the tour page in a terminal"));
+  EXPECT_THAT(checks[1], HasSubstr("echo out-$((6*7))"));
+  EXPECT_THAT(checks[1], HasSubstr(R"(\npwd")"));
+  for (const std::string& check : checks) {
+    EXPECT_THAT(check, Not(HasSubstr("Your name")));
+    EXPECT_THAT(check, Not(HasSubstr("Book a tour")));
+    EXPECT_THAT(check, Not(HasSubstr("out-42")));
+  }
+}
+
+// No answer, or an unsure one, asks. A declined command does not run.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, AnUnsureOrMissingAnswerAsks) {
+  checks_.Fail("/v1/decisions", net::HTTP_INTERNAL_SERVER_ERROR, "{}");
+  model_.Script({ScriptedModel::Calls(
+                     Run(base::DictValue().Set("command", "echo first"))),
+                 ScriptedModel::Answer("I left it.")});
+  EXPECT_EQ(Ask("Say first").kind, Kind::kAnswer);
+
+  checks_.Answer("/v1/decisions", CheckDecisionsAnswer(0.6, "safe", 0.99));
+  model_.Script({ScriptedModel::Calls(
+                     Run(base::DictValue().Set("command", "echo second"))),
+                 ScriptedModel::Answer("I left it.")});
+  EXPECT_EQ(Ask("Say second").kind, Kind::kAnswer);
+
+  ASSERT_EQ(asked_.size(), 2u);
+  EXPECT_EQ(asked_[0].command, "echo first");
+  EXPECT_EQ(asked_[0].reason, "The command check didn't answer.");
+  EXPECT_EQ(asked_[1].command, "echo second");
+  EXPECT_EQ(asked_[1].reason, "The command check wasn't sure it's safe.");
+  EXPECT_FALSE(asked_[1].sensitive);
+  EXPECT_THAT(*steps_[0].result.FindString("error"),
+              HasSubstr("did not approve"));
+  EXPECT_TRUE(agent_->tools().OpenTabs().empty());
+}
+
+// Auto asks before a dangerous command, with the danger the check found, and
+// runs it once the user approves.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, ADangerousCommandAsksFirst) {
+  checks_.Answer("/v1/decisions", CheckDecisionsAnswer(0.05, "deletes", 0.99));
+  answer_.choice = AgentLoop::ApprovalAnswer::Choice::kApprove;
+  model_.Script({ScriptedModel::Calls(Run(
+                     base::DictValue().Set("command", "echo gone-$((40+2))"))),
+                 ScriptedModel::Answer("Gone.")});
+
+  EXPECT_EQ(Ask("Clear the old builds").kind, Kind::kAnswer);
+
+  ASSERT_EQ(asked_.size(), 1u);
+  EXPECT_EQ(asked_[0].tab, 1);
+  EXPECT_EQ(asked_[0].folder, "~");
+  EXPECT_EQ(asked_[0].command, "echo gone-$((40+2))");
+  EXPECT_EQ(asked_[0].reason,
+            "Deletes or overwrites files or data. What it removes may not come "
+            "back.");
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "gone-42");
+}
+
+// Full auto asks the check only about sensitive files: a dangerous command
+// runs, and one that may read a .env file asks, naming it.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest,
+                       FullAutoAsksOnlyBeforeASensitiveFile) {
+  agent_->SetMode(ApprovalMode::kFullAuto);
+  checks_.Answer("/v1/decisions", CheckDecisionsAnswer(0.05, "deletes", 0.99));
+  checks_.AnswerAbout("/v1/decisions", "cat .env",
+                      CheckDecisionsAnswer(1.0, "safe", 0.1, "w2"));
+  answer_.note = "Not my secrets";
+  model_.Script(
+      {ScriptedModel::Calls(
+           Run(base::DictValue().Set("command", "echo cleaned"))),
+       ScriptedModel::Calls(Run(base::DictValue().Set("command", "cat .env"))),
+       ScriptedModel::Answer("I left it.")});
+
+  EXPECT_EQ(Ask("Clean up, then show the env file").kind, Kind::kAnswer);
+
+  ASSERT_EQ(asked_.size(), 1u);
+  EXPECT_TRUE(asked_[0].sensitive);
+  EXPECT_EQ(asked_[0].file, ".env");
+  EXPECT_EQ(asked_[0].command, "cat .env");
+  EXPECT_EQ(asked_[0].reason,
+            "A sensitive file. It can hold passwords and keys, and what the "
+            "command prints goes to test-agent.");
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "cleaned");
+  EXPECT_EQ(*steps_[1].result.FindString("user_said"), "Not my secrets");
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 2u);
+  for (const std::string& check : checks) {
+    EXPECT_THAT(check, Not(HasSubstr(R"("name":"danger")")));
+    EXPECT_THAT(check, HasSubstr(R"("name":"file")"));
+  }
+}
+
+// Ask first asks before every command, without the check.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, AskFirstAsksWithoutTheCheck) {
+  agent_->SetMode(ApprovalMode::kAskFirst);
+  model_.Script(
+      {ScriptedModel::Calls(Run(base::DictValue().Set("command", "echo hi"))),
+       ScriptedModel::Answer("I left it.")});
+
+  EXPECT_EQ(Ask("Say hi").kind, Kind::kAnswer);
+
+  ASSERT_EQ(asked_.size(), 1u);
+  EXPECT_EQ(asked_[0].reason, "Ask first is on.");
+  EXPECT_TRUE(Checks().empty());
+}
+
+// Stop drops a check under way, and its command never runs.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, StopDropsACheckUnderWay) {
+  checks_.Hold("/v1/decisions");
+  model_.Script({ScriptedModel::Calls(
+      Run(base::DictValue().Set("command", "echo never")))});
+  steps_.clear();
+  agent_->Send("Say never");
+  ASSERT_TRUE(base::test::RunUntil([&] { return !Checks().empty(); }));
+
+  agent_->Stop();
+  ASSERT_TRUE(base::test::RunUntil([&] { return !agent_->working(); }));
+
+  ASSERT_EQ(steps_.size(), 1u);
+  EXPECT_EQ(steps_[0].kind, Kind::kStoppedByUser);
+  EXPECT_TRUE(asked_.empty());
+  EXPECT_TRUE(agent_->tools().OpenTabs().empty());
+}
+
+// Without a decision or language model, the chat's own model checks.
 IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
-                       EveryCommandAsksEvenInFullAuto) {
+                       WithoutADecisionModelTheChatsModelChecks) {
   std::vector<AgentTools::Approval> asked;
   agent_->SetApprover(base::BindLambdaForTesting(
       [&](AgentTools::Approval approval,
           base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
         asked.push_back(approval);
-        AgentLoop::ApprovalAnswer no;
-        no.choice = AgentLoop::ApprovalAnswer::Choice::kDecline;
-        no.note = "Not in my home folder";
-        std::move(answer).Run(std::move(no));
+        std::move(answer).Run(AgentLoop::ApprovalAnswer());
       }));
-  agent_->SetMode(ApprovalMode::kFullAuto);
-  model_.Script({ScriptedModel::Calls(Run(
-                     base::DictValue().Set("command", "rm -rf old-builds"))),
-                 ScriptedModel::Answer("I left them.")});
+  model_.Script(
+      {ScriptedModel::Calls(Run(base::DictValue().Set("command", "echo hi"))),
+       ScriptedModel::Answer(
+           R"({"danger": "safe", "confidence": 0.95, "reason": "", )"
+           R"("file": "none", "file_confidence": 0.99})"),
+       ScriptedModel::Answer("It said hi.")});
 
-  EXPECT_EQ(Ask("Clear the old builds").kind, Kind::kAnswer);
+  EXPECT_EQ(Ask("Say hi in a terminal").kind, Kind::kAnswer);
 
-  ASSERT_EQ(asked.size(), 1u);
-  EXPECT_EQ(asked[0].tab, 1);
-  EXPECT_EQ(asked[0].folder, "~");
-  EXPECT_EQ(asked[0].command, "rm -rf old-builds");
-  EXPECT_EQ(asked[0].reason, "For now, every command waits for your approval.");
-  EXPECT_EQ(*steps_[0].result.FindString("user_said"), "Not in my home folder");
-  EXPECT_TRUE(agent_->tools().OpenTabs().empty());
+  EXPECT_TRUE(asked.empty());
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "hi");
+  ASSERT_EQ(model_.Requests().size(), 3u);
+  EXPECT_THAT(model_.Requests()[1], HasSubstr("You check a step"));
 }
 
 }  // namespace

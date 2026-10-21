@@ -144,6 +144,10 @@ struct Approval {
   string tool;
   string arguments;
   bool can_always_allow;
+  // A terminal step that may read a sensitive file, and the file, when the
+  // command check named it.
+  bool sensitive;
+  string file;
 };
 
 enum ApprovalChoice {
