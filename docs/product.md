@@ -231,7 +231,9 @@ Agreed on 2026-10-22: runs happen out of sight, whether or not a window is open.
 
 Agreed on 2026-10-22: a scheduled chat stays one conversation. Each [run](CONTEXT.md#language) is a subagent that starts fresh with the request, the last few results, and the [tracked values](CONTEXT.md#language). It adds one message to the chat, with its steps folded under it. A run with nothing new is one quiet line, such as `9:00 · No change · $129`. Each run saves its tracked values, with the time, on this Mac. A reply in the chat goes to the main agent, which sees every result and the tracked values. [ADR 0013](adr/0013-each-run-of-a-scheduled-chat-is-a-subagent.md) records why.
 
-Agreed on 2026-10-22: a run uses its scheduled chat's [approval mode](CONTEXT.md#language), shown on the schedule card, which turns amber for Full auto. One run of a scheduled chat goes at a time. A run waiting for approval waits until the user answers or stops it; the times due meanwhile are skipped, and the chat then says "Skipped 3 runs while this waited for you." After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
+Agreed on 2026-10-22: a run uses its scheduled chat's [approval mode](CONTEXT.md#language), shown on the schedule card, which turns amber for Full auto. One run of a scheduled chat goes at a time. A run waiting for approval waits until the user answers or stops it; the times due meanwhile are skipped, and the chat then says "Skipped 3 runs while this waited for you."
+
+Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go at once, and there is no spending cap. A run uses its chat's model and effort. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 
 Other proposed behavior:
 
