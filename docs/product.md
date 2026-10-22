@@ -220,6 +220,8 @@ Agreed use cases: track a price on a page, look for news on a topic, and send a 
 
 Agreed on 2026-10-22: there are three ways to set one up, and all use the same schedule card. On a chat, "Run this chat again". On a page, "Watch this page", which also asks what to watch for; the command bar has the same command. In words in a chat, such as "check this every morning at 9": the agent fills in the card and the user saves it. The agent never saves a schedule on its own.
 
+Agreed on 2026-10-22, with the "Watch this page" frames on the canvas: an eye beside the star in the address bar both starts a watch and shows one, outline until the page is watched and filled after. Its card offers fixed "Watch for" chips, Price drops with an optional "Only below" price, Back in stock, New items, and Anything worth knowing, or the user's own words; the pick becomes the chat's request. A watched page matches by its address without the part after # and common tracking parameters such as `utm_` and `ref`. The tab's sidebar row shows nothing extra.
+
 Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
 
 Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of two ways.
