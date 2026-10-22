@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, started on 2026-10-22.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
