@@ -114,21 +114,20 @@ void SaveWidgetScreenshot(views::Widget* widget, const std::string& name) {
   Save([&] { return CaptureSettled(widget); }, name);
 }
 
+SkBitmap CaptureNativeWindow(Browser* browser) {
+  views::Widget* widget =
+      BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
+  base::test::TestFuture<gfx::Image> grabbed;
+  ui::GrabWindowSnapshot(widget->GetNativeWindow(),
+                         gfx::Rect(widget->GetWindowBoundsInScreen().size()),
+                         grabbed.GetCallback());
+  const gfx::Image image = grabbed.Take();
+  EXPECT_FALSE(image.IsEmpty());
+  return image.IsEmpty() ? SkBitmap() : image.AsBitmap();
+}
+
 void SaveNativeWindowScreenshot(Browser* browser, const std::string& name) {
-  Save(
-      [&] {
-        views::Widget* widget =
-            BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
-        base::test::TestFuture<gfx::Image> grabbed;
-        ui::GrabWindowSnapshot(
-            widget->GetNativeWindow(),
-            gfx::Rect(widget->GetWindowBoundsInScreen().size()),
-            grabbed.GetCallback());
-        const gfx::Image image = grabbed.Take();
-        EXPECT_FALSE(image.IsEmpty());
-        return image.IsEmpty() ? SkBitmap() : image.AsBitmap();
-      },
-      name);
+  Save([&] { return CaptureNativeWindow(browser); }, name);
 }
 
 }  // namespace uw

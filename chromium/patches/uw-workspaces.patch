@@ -144,7 +144,7 @@ index d809ca0aa5505d62482d7ba285de503bd34d189a..895e0e385e48b927a80582ccf6681fd1
  }
  
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index f9b1d3de0545b1426169859660f555f825e02468..589a2299266779a44f19f67f2542c91e8572ba15 100644
+index f9b1d3de0545b1426169859660f555f825e02468..8469ec0cd989d42a027a84c7be0eacfb6fd1bdbe 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -356,6 +356,7 @@
@@ -168,7 +168,19 @@ index f9b1d3de0545b1426169859660f555f825e02468..589a2299266779a44f19f67f2542c91e
    if (auto* manager = InitialWebUIManager::From(browser())) {
      if (manager->RequestDeferShow(base::BindOnce(
              &BrowserView::Show, weak_ptr_factory_.GetWeakPtr()))) {
-@@ -1691,6 +1698,11 @@ void BrowserView::Activate() {
+@@ -1646,6 +1653,11 @@ void BrowserView::Show() {
+ }
+ 
+ void BrowserView::ShowInactive() {
++  // uw: as in Show().
++  if (!uw::WorkspaceWindow::WillShow(browser())) {
++    return;
++  }
++
+   if (!browser_widget_->IsVisible()) {
+     browser_widget_->ShowInactive();
+   }
+@@ -1691,6 +1703,11 @@ void BrowserView::Activate() {
      return;
    }
  

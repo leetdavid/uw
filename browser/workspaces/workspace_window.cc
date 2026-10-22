@@ -109,6 +109,10 @@ WorkspaceWindow::WorkspaceWindow(BrowserWindowInterface* window)
 void WorkspaceWindow::Start() {
   close_subscription_ = window_->RegisterBrowserDidClose(
       base::BindRepeating(&WorkspaceWindow::OnClosed, base::Unretained(this)));
+  if (views::Widget* widget = views::Widget::GetWidgetForNativeWindow(
+          window_->GetWindow()->GetNativeWindow())) {
+    widget_observation_.Observe(widget);
+  }
   SaveSession();
 }
 
@@ -262,6 +266,30 @@ bool WorkspaceWindow::WillShow(BrowserWindowInterface* window) {
     self->Reveal();
   }
   return false;
+}
+
+void WorkspaceWindow::OnWidgetVisibilityChanged(views::Widget* widget,
+                                                bool visible) {
+  if (visible && hidden_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&WorkspaceWindow::OnShownElsewhere,
+                                  weak_factory_.GetWeakPtr()));
+  }
+}
+
+void WorkspaceWindow::OnWidgetDestroying(views::Widget* widget) {
+  widget_observation_.Reset();
+}
+
+void WorkspaceWindow::OnShownElsewhere() {
+  if (!hidden_ || !window_->GetWindow()->IsVisible()) {
+    return;
+  }
+  WillShow(window_);
+  // A window being restored goes behind its partner again.
+  if (hidden_) {
+    window_->GetWindow()->Hide();
+  }
 }
 
 void WorkspaceWindow::Reveal() {

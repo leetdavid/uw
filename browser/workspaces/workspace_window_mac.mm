@@ -13,8 +13,15 @@ namespace uw {
 
 void WorkspaceWindow::SetHidden(bool hidden) {
   hidden_ = hidden;
-  window_->GetWindow()->GetNativeWindow().GetNativeNSWindow().contentView
-      .hidden = hidden;
+  NSWindow* window =
+      window_->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  window.contentView.hidden = hidden;
+  window.excludedFromWindowsMenu = hidden;
+  if (hidden) {
+    window.collectionBehavior |= NSWindowCollectionBehaviorIgnoresCycle;
+  } else {
+    window.collectionBehavior &= ~NSWindowCollectionBehaviorIgnoresCycle;
+  }
 }
 
 }  // namespace uw

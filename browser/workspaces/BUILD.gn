@@ -14,6 +14,7 @@ source_set("workspaces") {
     "//chrome/browser/profiles:profile_util",
     "//components/sessions",
     "//ui/base/unowned_user_data",
+    "//ui/views",
   ]
   deps = [
     ":prefs",
@@ -63,12 +64,14 @@ source_set("browser_tests") {
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
+    "//skia",
     "//testing/gtest",
     "//ui/base",
     "//ui/events:test_support",
     "//ui/gfx/geometry",
     "//url",
     "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/views/tab_organization",
     "//uw/components/ai_providers",
   ]

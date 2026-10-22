@@ -14,8 +14,11 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "components/sessions/core/session_id.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "ui/views/widget/widget.h"
+#include "ui/views/widget/widget_observer.h"
 
 class BrowserWindowInterface;
 class Profile;
@@ -33,7 +36,7 @@ namespace uw {
 // at a time. Switching shows the partner and hides this window, per ADR 0009.
 // The workspace, the group, and whether the window is hidden are saved with the
 // session, so a restart or Cmd+Shift+T brings the whole group back.
-class WorkspaceWindow {
+class WorkspaceWindow : public views::WidgetObserver {
  public:
   DECLARE_USER_DATA(WorkspaceWindow);
   static constexpr char kWorkspaceKey[] = "uw.workspace";
@@ -43,7 +46,7 @@ class WorkspaceWindow {
   explicit WorkspaceWindow(BrowserWindowInterface* window);
   WorkspaceWindow(const WorkspaceWindow&) = delete;
   WorkspaceWindow& operator=(const WorkspaceWindow&) = delete;
-  ~WorkspaceWindow();
+  ~WorkspaceWindow() override;
 
   static WorkspaceWindow* From(BrowserWindowInterface* window);
   // Whether `window` is a workspace window kept hidden behind its partner.
@@ -108,14 +111,21 @@ class WorkspaceWindow {
   // place of the one its group shows, and it shows itself.
   static bool WillShow(BrowserWindowInterface* window);
 
+  // views::WidgetObserver:
+  void OnWidgetVisibilityChanged(views::Widget* widget, bool visible) override;
+  void OnWidgetDestroying(views::Widget* widget) override;
+
  private:
   // Puts this window where the group's shown window is, shows it, and hides
   // that one.
   void Reveal();
   // Hides the window's pages with it, so they neither load nor draw while it
   // is behind its partner. macOS counts a page in a window that is only
-  // ordered out as visible.
+  // ordered out as visible. The Window menu and Cmd+` leave it out too.
   void SetHidden(bool hidden);
+  // Asked once something past BrowserView, such as macOS's Window menu,
+  // showed the window while it is hidden.
+  void OnShownElsewhere();
   void OpenPartner(const std::string& id,
                    WindowCallback found,
                    Profile* profile);
@@ -134,6 +144,8 @@ class WorkspaceWindow {
   // does not bring back.
   bool forget_ = false;
   base::CallbackListSubscription close_subscription_;
+  base::ScopedObservation<views::Widget, views::WidgetObserver>
+      widget_observation_{this};
   base::RepeatingClosureList changes_;
   ui::ScopedUnownedUserData<WorkspaceWindow> user_data_;
   base::WeakPtrFactory<WorkspaceWindow> weak_factory_{this};

@@ -9,7 +9,10 @@
 
 #include "base/files/file_path.h"
 #include "base/run_loop.h"
+#include "base/strings/sys_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/browser_process.h"
@@ -34,6 +37,8 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
@@ -42,6 +47,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
@@ -55,6 +61,8 @@ constexpr char kNotes[] = "chrome://version/?notes";
 constexpr char kArticle[] = "chrome://version/?article";
 constexpr char kLater[] = "chrome://version/?later";
 constexpr char kAside[] = "chrome://version/?aside";
+constexpr char kGreen[] =
+    "data:text/html,<body style='background:rgb(40,160,90)'>";
 constexpr char kOtherProfile[] = "Other";
 constexpr NSEventModifierFlags kOptionCmd =
     NSEventModifierFlagOption | NSEventModifierFlagCommand;
@@ -70,12 +78,57 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
                       profile->GetBaseName());
   }
 
+  static NSWindow* NSWindowOf(BrowserWindowInterface* window) {
+    return window->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  }
+
+  // Whether macOS's Window menu and Cmd+` offer `window`.
+  static bool InWindowMenu(BrowserWindowInterface* window) {
+    return !NSWindowOf(window).excludedFromWindowsMenu;
+  }
+  static bool InCycle(BrowserWindowInterface* window) {
+    return !(NSWindowOf(window).collectionBehavior &
+             NSWindowCollectionBehaviorIgnoresCycle);
+  }
+
+  // Whether the Window menu has a row for `window`.
+  static bool Listed(BrowserWindowInterface* window) {
+    for (NSMenuItem* item in NSApp.windowsMenu.itemArray) {
+      if (item.target == NSWindowOf(window)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // The Window menu's rows, for a failure message.
+  static std::string WindowMenu() {
+    std::string rows;
+    for (NSMenuItem* item in NSApp.windowsMenu.itemArray) {
+      rows += base::SysNSStringToUTF8(item.title) + " -> " +
+              base::SysNSStringToUTF8(NSStringFromClass([item.target class])) +
+              "\n";
+    }
+    return rows;
+  }
+
+  static bool IsGreen(SkColor color) {
+    return SkColorGetG(color) > SkColorGetR(color) + 60 &&
+           SkColorGetG(color) > SkColorGetB(color) + 30;
+  }
+
+  static void Wait(base::TimeDelta time) {
+    base::RunLoop loop;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, loop.QuitClosure(), time);
+    loop.Run();
+  }
+
   // Hands a key to `window` the way macOS hands it a shortcut.
   static void Press(BrowserWindowInterface* window,
                     ui::KeyboardCode key,
                     NSEventModifierFlags modifiers) {
-    NSWindow* ns_window =
-        window->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+    NSWindow* ns_window = NSWindowOf(window);
     [ns_window
         performKeyEquivalent:cocoa_test_event_utils::SynthesizeKeyEvent(
                                  ns_window, /*keyDown=*/true, key, modifiers)];
@@ -157,6 +210,33 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_TRUE(base::test::RunUntil([&] { return Windows().size() == 1u; }));
     SetBrowser(elsewhere);
     return elsewhere;
+  }
+
+  // Loads `page` in browser() and switches it to a new workspace, so it hides
+  // behind the partner this returns.
+  BrowserWindowInterface* SwitchAway(const GURL& page) {
+    Load(browser(), page);
+    const std::string reading = AddWorkspace("Reading", profile());
+    WorkspaceWindow::From(browser())->Switch(reading);
+    BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+    CHECK(partner);
+    return partner;
+  }
+
+  // Checks that `window`, shown by something besides its group, took
+  // `partner`'s place and shows its page.
+  static void ExpectShownInsteadOf(BrowserWindowInterface* window,
+                                   BrowserWindowInterface* partner) {
+    EXPECT_EQ(WaitForShown(window, WorkspaceWindow::From(window)->workspace()),
+              window);
+    EXPECT_TRUE(base::test::RunUntil(
+        [&] { return !partner->GetWindow()->IsVisible(); }));
+    EXPECT_TRUE(WorkspaceWindow::From(partner)->hidden());
+    EXPECT_FALSE(NSWindowOf(window).contentView.hidden);
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return PageOf(window)->GetVisibility() == content::Visibility::VISIBLE;
+    }));
+    EXPECT_FALSE(PageOf(window)->GetController().NeedsReload());
   }
 
   // Whether a tab of `window` shows `url`.
@@ -402,6 +482,39 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   EXPECT_EQ(PageOf(browser())->GetVisibleURL(), GURL(kNotes));
 }
 
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       TheWindowMenuAndCmdBacktickOfferOnlyTheShownWindow) {
+  const std::string personal = WorkspaceWindow::From(browser())->workspace();
+  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
+  EXPECT_FALSE(InWindowMenu(browser()));
+  EXPECT_FALSE(InCycle(browser()));
+  EXPECT_TRUE(InWindowMenu(partner));
+  EXPECT_TRUE(InCycle(partner));
+
+  WorkspaceWindow::From(partner)->Switch(personal);
+  EXPECT_EQ(WaitForShown(partner, personal), browser());
+  EXPECT_TRUE(InWindowMenu(browser()));
+  EXPECT_TRUE(InCycle(browser()));
+  EXPECT_FALSE(InWindowMenu(partner));
+  EXPECT_FALSE(InCycle(partner));
+}
+
+// As an extension's windows.create({focused: false}) does.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       AHiddenWindowShownInactiveTakesItsGroupsPlace) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
+  browser()->GetWindow()->ShowInactive();
+  ExpectShownInsteadOf(browser(), partner);
+}
+
+// macOS's Window menu, the Dock, and Cmd+` show a window past BrowserView.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       AHiddenWindowMacOSShowsTakesItsGroupsPlace) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
+  [NSWindowOf(browser()) makeKeyAndOrderFront:nil];
+  ExpectShownInsteadOf(browser(), partner);
+}
+
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, PrivateWindowsHaveNoWorkspace) {
   AddWorkspace("Reading", profile());
   Browser* incognito = CreateIncognitoBrowser();
@@ -536,6 +649,8 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                                     WorkspaceWindow::From(behind)));
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
+  EXPECT_FALSE(InWindowMenu(behind));
+  EXPECT_FALSE(InCycle(behind));
 
   // The shown window's background tab loads, as Chromium loads restored
   // tabs. The hidden window's tabs wait until it shows.
@@ -561,6 +676,38 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   tabs->ActivateTabAt(tabs->GetIndexOfWebContents(later));
   EXPECT_TRUE(
       base::test::RunUntil([&] { return Committed(later) == GURL(kLater); }));
+}
+
+// Run with pnpm run window-tests: only a real window is in macOS's Window
+// menu.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       MANUAL_TheWindowMenuLeavesOutTheHiddenWindow) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
+  [NSApp.windowsMenu update];
+  EXPECT_TRUE(Listed(partner)) << WindowMenu();
+  EXPECT_FALSE(Listed(browser())) << WindowMenu();
+
+  // Window > Bring All to Front leaves it behind.
+  [NSApp arrangeInFront:nil];
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(browser()->GetWindow()->IsVisible());
+  EXPECT_TRUE(partner->GetWindow()->IsVisible());
+}
+
+// Run with pnpm run window-tests: only a real window draws its page.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       MANUAL_AHiddenWindowMacOSShowsDrawsItsPage) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kGreen));
+  [NSWindowOf(browser()) makeKeyAndOrderFront:nil];
+  ExpectShownInsteadOf(browser(), partner);
+  SkColor middle = SK_ColorWHITE;
+  for (int tries = 0; tries < 30 && !IsGreen(middle); ++tries) {
+    Wait(base::Milliseconds(100));
+    const SkBitmap pixels = CaptureNativeWindow(browser());
+    middle = pixels.getColor(pixels.width() / 2, pixels.height() / 2);
+  }
+  EXPECT_TRUE(IsGreen(middle)) << std::hex << middle;
+  SaveNativeWindowScreenshot(browser(), "workspace-shown-by-macos");
 }
 
 }  // namespace
