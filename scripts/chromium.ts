@@ -635,6 +635,7 @@ const TEST_SUITES = {
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
     "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*", "CatalogTest.*",
     "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*",
+    "ScheduleTest.*", "ChatSchedulerTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",

@@ -6,10 +6,14 @@ source_set("agent") {
     "agent_context.h",
     "agent_protocol.cc",
     "agent_protocol.h",
+    "chat_scheduler.cc",
+    "chat_scheduler.h",
     "command_check.cc",
     "command_check.h",
     "page_text.cc",
     "page_text.h",
+    "schedule.cc",
+    "schedule.h",
     "skills.cc",
     "skills.h",
     "suggestions.cc",
@@ -21,6 +25,7 @@ source_set("agent") {
   ]
   deps = [
     "//components/optimization_guide/proto:optimization_guide_proto",
+    "//third_party/icu",
     "//uw/components/ai_providers",
   ]
 }
@@ -30,14 +35,17 @@ source_set("unit_tests") {
   sources = [
     "agent_context_unittest.cc",
     "agent_protocol_unittest.cc",
+    "chat_scheduler_unittest.cc",
     "command_check_unittest.cc",
     "page_text_unittest.cc",
+    "schedule_unittest.cc",
     "skills_unittest.cc",
     "suggestions_unittest.cc",
   ]
   deps = [
     ":agent",
     "//base",
+    "//base/test:test_support",
     "//components/optimization_guide/proto:optimization_guide_proto",
     "//testing/gmock",
     "//testing/gtest",
