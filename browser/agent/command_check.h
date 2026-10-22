@@ -52,7 +52,7 @@ class CommandCheck {
  private:
   CommandCheck(Profile& profile, const CommandCheckInput& input, Done done);
 
-  void OnCatalog(const ModelCatalog* catalog);
+  void SendLanguageCheck(const ModelCatalog* catalog);
   void SendToLanguageModel(const AiConnectionConfig& model,
                            const std::string& body,
                            base::TimeDelta timeout);

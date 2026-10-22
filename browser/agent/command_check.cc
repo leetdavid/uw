@@ -78,8 +78,8 @@ std::unique_ptr<CommandCheck> CommandCheck::Send(
   check->language_ = std::move(language);
   check->key_ = std::move(*key);
   check->body_ = std::move(*body);
-  CatalogStore::For(&profile)->Get(base::BindOnce(
-      &CommandCheck::OnCatalog, check->weak_factory_.GetWeakPtr()));
+  // A check never waits for the catalog: without one it asks as before.
+  check->SendLanguageCheck(CatalogStore::For(&profile)->Current());
   return check;
 }
 
@@ -93,7 +93,7 @@ CommandCheck::CommandCheck(Profile& profile,
 
 CommandCheck::~CommandCheck() = default;
 
-void CommandCheck::OnCatalog(const ModelCatalog* catalog) {
+void CommandCheck::SendLanguageCheck(const ModelCatalog* catalog) {
   Provider provider;
   provider.preset = language_.preset;
   provider.address = language_.endpoint;

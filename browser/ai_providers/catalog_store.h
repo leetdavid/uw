@@ -46,6 +46,10 @@ class CatalogStore : public base::SupportsUserData::Data {
   // the first download failed.
   void Get(CatalogCallback done);
 
+  // The catalog as uw has it now, or null, without waiting for a read or a
+  // download. Starts one for the next time.
+  const ModelCatalog* Current();
+
   // Runs `done` with the format `model` goes over at `provider`, to keep
   // with a pick: its maker's when the provider leaves it to each model,
   // nothing otherwise.

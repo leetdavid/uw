@@ -995,14 +995,24 @@ class AgentLanguageCheckBrowserTest : public AgentTerminalBrowserTest {
     ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, "check-key"));
     UpdateProvider(prefs, provider);
     SetChoice(prefs, ModelSlot::kLanguage, provider.id, "check-model");
-    // The catalog says the model can switch its thinking off.
-    checks_.Answer(
-        "/v1/catalog.json",
-        base::StrCat({R"({"checker": {"api": ")", provider.address,
-                      R"(", "models": {"check-model": {"reasoning_options":)"
-                      R"( [{"type": "toggle"}]}}}})"}));
     CatalogStore::SetSourceForTesting(
         embedded_test_server()->GetURL("/v1/catalog.json"));
+    if (catalog_loads_) {
+      // The catalog says the model can switch its thinking off, and the chat
+      // page has read it by the time the agent works.
+      checks_.Answer(
+          "/v1/catalog.json",
+          base::StrCat({R"({"checker": {"api": ")", provider.address,
+                        R"(", "models": {"check-model": {"reasoning_options":)"
+                        R"( [{"type": "toggle"}]}}}})"}));
+      base::RunLoop loaded;
+      CatalogStore::For(browser()->GetProfile())
+          ->Get(base::BindLambdaForTesting(
+              [&](const ModelCatalog*) { loaded.Quit(); }));
+      loaded.Run();
+    } else {
+      checks_.Hold("/v1/catalog.json");
+    }
     checks_.Answer(kCheckPath,
                    ChatAnswer(R"({\"danger\": \"safe\", \"confidence\": )"
                               R"(0.95, \"reason\": \"\", \"file\": )"
@@ -1029,9 +1039,17 @@ class AgentLanguageCheckBrowserTest : public AgentTerminalBrowserTest {
     return bodies;
   }
 
+  bool catalog_loads_ = true;
   ScopedMemoryKeychain keychain_;
   ModelTestServer checks_{embedded_test_server()};
   std::vector<AgentTools::Approval> asked_;
+};
+
+// The catalog's download never ends.
+class AgentLanguageCheckWithoutCatalogBrowserTest
+    : public AgentLanguageCheckBrowserTest {
+ public:
+  AgentLanguageCheckWithoutCatalogBrowserTest() { catalog_loads_ = false; }
 };
 
 IN_PROC_BROWSER_TEST_F(AgentLanguageCheckBrowserTest,
@@ -1060,6 +1078,18 @@ IN_PROC_BROWSER_TEST_F(AgentLanguageCheckBrowserTest,
   ASSERT_EQ(checks.size(), 2u);
   EXPECT_THAT(checks[0], HasSubstr(R"("thinking":{)"));
   EXPECT_THAT(checks[1], Not(HasSubstr(R"("thinking":{)")));
+}
+
+// A check never waits for the catalog: before uw has one, it asks as before.
+IN_PROC_BROWSER_TEST_F(AgentLanguageCheckWithoutCatalogBrowserTest,
+                       ACheckDoesNotWaitForTheCatalog) {
+  EXPECT_EQ(Ask("Say hi in a terminal").kind, Kind::kAnswer);
+
+  EXPECT_TRUE(asked_.empty());
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "hi");
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 1u);
+  EXPECT_THAT(checks[0], Not(HasSubstr(R"("thinking":{)")));
 }
 
 IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,

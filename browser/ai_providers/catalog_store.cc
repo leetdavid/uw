@@ -9,6 +9,7 @@
 #include "base/files/file.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
 #include "base/task/thread_pool.h"
@@ -115,6 +116,11 @@ void CatalogStore::Get(CatalogCallback done) {
     Answer();
   }
   Download();
+}
+
+const ModelCatalog* CatalogStore::Current() {
+  Get(base::DoNothing());
+  return catalog_ ? &*catalog_ : nullptr;
 }
 
 void CatalogStore::FormatOf(const Provider& provider,
