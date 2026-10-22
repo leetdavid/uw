@@ -635,7 +635,7 @@ const TEST_SUITES = {
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
     "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*", "CatalogTest.*",
     "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*",
-    "ScheduleTest.*", "ChatSchedulerTest.*", "RunReportTest.*",
+    "ScheduleTest.*", "ChatSchedulerTest.*", "RunReportTest.*", "ScheduledChatTest.*",
     "CommandCheckTest.*", "ProviderAddressTest.*", "ShellHostPromptTest.*", "ThemeTest.*", "ThemePrefsTest.*",
   ],
   browser_tests: [
@@ -643,7 +643,7 @@ const TEST_SUITES = {
     "UwOrganizationPageBrowserTest.*", "MenuKeysBrowserTest.*", "UwShortcutsPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "UwTerminalBrowserTest.*",
     "UwTerminalMenuBrowserTest.*",
-    "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "RunWindowBrowserTest.*", "ChatRunBrowserTest.*", "AgentLoopBrowserTest.*",
+    "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "RunWindowBrowserTest.*", "ChatRunBrowserTest.*", "ScheduledChatsBrowserTest.*", "AgentLoopBrowserTest.*",
     "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarRatesBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
     "UwProvidersBrowserTest.*", "ConnectorsBrowserTest.*", "PinsBrowserTest.*",
     "WorkspacesBrowserTest.*", "WorkspaceViewsBrowserTest.*",

@@ -80,6 +80,11 @@ base::DictValue ReportToolSchema() {
                Parameter("string",
                          "One or two short sentences for the user about what "
                          "this run found."))
+          .Set("sign_in",
+               Parameter("string",
+                         "The site, such as fully.com, when it wants the user "
+                         "to sign in before you can do the request. Leave out "
+                         "otherwise."))
           .Set(
               "values",
               base::DictValue()
@@ -127,6 +132,10 @@ base::expected<RunReport, std::string> ParseReport(
     base::TruncateUTF8ToByteSize(report.message, kMaxMessageLength,
                                  &report.message);
   }
+  if (const std::string* sign_in = args.FindString("sign_in")) {
+    report.sign_in =
+        std::string(base::TrimWhitespaceASCII(*sign_in, base::TRIM_ALL));
+  }
   if (const base::ListValue* values = args.FindList("values")) {
     for (const base::Value& value : *values) {
       if (report.values.size() == kMaxValues) {
@@ -140,6 +149,19 @@ base::expected<RunReport, std::string> ParseReport(
     }
   }
   return report;
+}
+
+base::DictValue TrackedValueToValue(const TrackedValue& tracked) {
+  base::DictValue value =
+      base::DictValue().Set("name", tracked.name).Set("unit", tracked.unit);
+  if (const double* number = std::get_if<double>(&tracked.value)) {
+    value.Set("number", *number);
+  } else if (const bool* yes = std::get_if<bool>(&tracked.value)) {
+    value.Set("yes", *yes);
+  } else {
+    value.Set("text", std::get<std::string>(tracked.value));
+  }
+  return value;
 }
 
 std::string DescribeValue(const TrackedValue& value) {

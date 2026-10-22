@@ -478,14 +478,15 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..b5a4f6b6178d8659ca14cc7a72759983b61d3639 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..82f30006a6562a638b85b89498ebb49ad3eec644 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,15 @@ source_set("internal") {
+@@ -58,6 +58,16 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
 +      "//uw/browser/agent:run_window_mark",
++      "//uw/browser/agent:scheduled_chats",
 +      "//uw/browser/ai_providers",
 +      "//uw/browser/connectors",
 +      "//uw/browser/pins",
@@ -498,10 +499,10 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..b5a4f6b6178d8659ca14cc7a72759983
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..889a2bd6d5ab897b60ebe1d49138c198355a8b0d 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8e4c920fc450950c51bb8d07894859b672fce7df 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -4,8 +4,19 @@
+@@ -4,8 +4,20 @@
  
  #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
  
@@ -509,6 +510,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..889a2bd6d5ab897b60ebe1d49138c198
  #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
 +#include "uw/browser/agent/run_window_mark.h"
++#include "uw/browser/agent/scheduled_chats.h"
 +#include "uw/browser/ai_providers/provider_sync.h"
 +#include "uw/browser/connectors/connectors.h"
 +#include "uw/browser/pins/pin_sync.h"
@@ -521,7 +523,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..889a2bd6d5ab897b60ebe1d49138c198
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +32,46 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +33,49 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -538,6 +540,9 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..889a2bd6d5ab897b60ebe1d49138c198
 +      if (!browser->GetProfile()->IsOffTheRecord()) {
 +        workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
 +      }
++      // A profile's scheduled chats start with its first window and keep
++      // running after its last one closes.
++      uw::ScheduledChats::For(browser->GetProfile());
 +    }
 +    // Connectors serve every window and profile. The first window starts
 +    // them.

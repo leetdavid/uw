@@ -60,6 +60,14 @@ TEST(RunReportTest, ValuesAreOptional) {
   EXPECT_TRUE(report->values.empty());
 }
 
+TEST(RunReportTest, ReadsASiteThatWantsASignIn) {
+  const base::expected<RunReport, std::string> report = ParseReport(
+      Args(R"({"found": false, "message": "fully.com asks me to sign in.",
+               "sign_in": " fully.com "})"));
+  ASSERT_TRUE(report.has_value());
+  EXPECT_EQ(report->sign_in, "fully.com");
+}
+
 TEST(RunReportTest, TellsTheModelWhatIsMissingOrWrong) {
   EXPECT_EQ(ParseReport(Args(R"({"message": "Hi"})")).error(),
             "report needs found, true or false.");

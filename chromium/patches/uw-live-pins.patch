@@ -1,21 +1,23 @@
 diff --git a/chrome/browser/profiles/keep_alive/profile_keep_alive_types.cc b/chrome/browser/profiles/keep_alive/profile_keep_alive_types.cc
-index 210e73b316090c7a064689092c19f33b4b2b602e..05daf96ad6803b41132f98caf512916f97db430d 100644
+index 210e73b316090c7a064689092c19f33b4b2b602e..fcb9656dd3c57769c0b21a1f976b1dafc9bc0fa5 100644
 --- a/chrome/browser/profiles/keep_alive/profile_keep_alive_types.cc
 +++ b/chrome/browser/profiles/keep_alive/profile_keep_alive_types.cc
-@@ -93,6 +93,8 @@ std::ostream& operator<<(std::ostream& out,
+@@ -93,6 +93,10 @@ std::ostream& operator<<(std::ostream& out,
        return out << "kFetchKeepAlive";
      case ProfileKeepAliveOrigin::kOmniboxEverywhere:
        return out << "kOmniboxEverywhere";
 +    case ProfileKeepAliveOrigin::kUwPinnedPage:
 +      return out << "kUwPinnedPage";
++    case ProfileKeepAliveOrigin::kUwScheduledChats:
++      return out << "kUwScheduledChats";
    }
    NOTREACHED();
  }
 diff --git a/chrome/browser/profiles/keep_alive/profile_keep_alive_types.h b/chrome/browser/profiles/keep_alive/profile_keep_alive_types.h
-index 5582ae1d0febd9ad2d9ecc9d62c64390b89fb992..ee32d8a96d7c3dd0fd32744c17792ad98c4fe2be 100644
+index 5582ae1d0febd9ad2d9ecc9d62c64390b89fb992..f739184700bb5e3a5125e1579e7eac8ec4ec235d 100644
 --- a/chrome/browser/profiles/keep_alive/profile_keep_alive_types.h
 +++ b/chrome/browser/profiles/keep_alive/profile_keep_alive_types.h
-@@ -190,7 +190,10 @@ enum class ProfileKeepAliveOrigin {
+@@ -190,7 +190,14 @@ enum class ProfileKeepAliveOrigin {
    // alive.
    kOmniboxEverywhere = 46,
  
@@ -23,7 +25,11 @@ index 5582ae1d0febd9ad2d9ecc9d62c64390b89fb992..ee32d8a96d7c3dd0fd32744c17792ad9
 +  // uw: a pin's live page while no window holds it.
 +  kUwPinnedPage = 47,
 +
-+  kMaxValue = kUwPinnedPage,
++  // uw: a profile with scheduled chats, which run while uw is open even
++  // with no window.
++  kUwScheduledChats = 48,
++
++  kMaxValue = kUwScheduledChats,
  };
  // LINT.ThenChange(/tools/metrics/histograms/metadata/profile/enums.xml)
  
@@ -51,14 +57,15 @@ index e5cd22968a6d8569e1853a1926f0c187adc56fba..0c184a5c14016260ede3155eb5bf0c94
        [this]() -> BrowserWindowInterface::ClosingStatus {
      // If `force_skip_warning_user_` is true, then we should immediately
 diff --git a/tools/metrics/histograms/metadata/profile/enums.xml b/tools/metrics/histograms/metadata/profile/enums.xml
-index 0277245142ca88ca7322c7d9df684f39d21de6b3..24cb395ef60d5fd859583b18e95003fbe1fb370f 100644
+index 0277245142ca88ca7322c7d9df684f39d21de6b3..f58a358987e3cea6dc340405fb408ac2d0a98ad3 100644
 --- a/tools/metrics/histograms/metadata/profile/enums.xml
 +++ b/tools/metrics/histograms/metadata/profile/enums.xml
-@@ -427,6 +427,7 @@ chromium-metrics-reviews@google.com.
+@@ -427,6 +427,8 @@ chromium-metrics-reviews@google.com.
    <int value="44" label="kWebAppDatabaseCorruptionRecovery"/>
    <int value="45" label="kFetchKeepAlive"/>
    <int value="46" label="kOmniboxEverywhere"/>
 +  <int value="47" label="kUwPinnedPage"/>
++  <int value="48" label="kUwScheduledChats"/>
  </enum>
  
  <!-- LINT.IfChange(ProfileLockStatus) -->

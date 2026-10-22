@@ -40,6 +40,9 @@ struct RunReport {
   bool found = false;
   std::string message;
   std::vector<TrackedValue> values;
+  // The site that wanted the user to sign in before the run could do its
+  // work, such as "fully.com". Empty when none did.
+  std::string sign_in;
 
   bool operator==(const RunReport&) const = default;
 };
@@ -56,6 +59,10 @@ base::DictValue ReportToolSchema();
 // The report in the arguments of a report call, or what is wrong with them,
 // to tell the model.
 base::expected<RunReport, std::string> ParseReport(const base::DictValue& args);
+
+// A value as the report tool takes it: its name, its unit, and one of
+// number, yes, or text.
+base::DictValue TrackedValueToValue(const TrackedValue& value);
 
 // A value as a person reads it, such as "price 549 USD".
 std::string DescribeValue(const TrackedValue& value);

@@ -115,6 +115,31 @@ source_set("chat_run") {
   deps = [ ":run_window" ]
 }
 
+# A profile's scheduled chats: their schedules, and the runs that fire.
+source_set("scheduled_chats") {
+  sources = [
+    "scheduled_chats.cc",
+    "scheduled_chats.h",
+  ]
+  public_deps = [
+    ":agent",
+    ":chat_run",
+    ":chats",
+    "//base",
+    "//mojo/public/cpp/bindings",
+    "//services/device/public/mojom",
+    "//uw/components/agent",
+  ]
+  deps = [
+    ":chat_notification",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles/keep_alive",
+    "//content/public/browser",
+    "//uw/browser/ai_providers",
+    "//uw/components/ai_providers",
+  ]
+}
+
 # What the browser's commands need to open a chat.
 source_set("chat_tab") {
   sources = [
@@ -177,10 +202,13 @@ source_set("browser_tests") {
     "chat_run_browsertest.cc",
     "command_check_browsertest.cc",
     "run_window_browsertest.cc",
+    "scheduled_chats_browsertest.cc",
   ]
   deps = [
     ":agent",
     ":chat_run",
+    ":chats",
+    ":scheduled_chats",
     ":run_window",
     ":run_window_mark",
     ":test_support",
@@ -209,6 +237,7 @@ source_set("browser_tests") {
     "//testing/gmock",
     "//testing/gtest",
     "//ui/base",
+    "//ui/message_center/public/cpp",
     "//ui/gfx/geometry",
     "//url",
     "//uw/browser/ai_providers",

@@ -16,6 +16,8 @@ source_set("agent") {
     "run_report.h",
     "schedule.cc",
     "schedule.h",
+    "scheduled_chat.cc",
+    "scheduled_chat.h",
     "skills.cc",
     "skills.h",
     "suggestions.cc",
@@ -43,6 +45,7 @@ source_set("unit_tests") {
     "page_text_unittest.cc",
     "run_report_unittest.cc",
     "schedule_unittest.cc",
+    "scheduled_chat_unittest.cc",
     "skills_unittest.cc",
     "suggestions_unittest.cc",
   ]
