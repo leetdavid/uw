@@ -118,12 +118,14 @@ How the chat is built:
 
 ## Context
 
-The model sees as little as it needs, and a `recall` tool brings back the rest.
+The model sees what the chat has gathered, and a `recall` tool brings back what has shrunk. Each request repeats the one before it and adds to its end, so a provider can serve most of it from its cache, at a small part of the price.
 
 - While the agent works on a request, each tab's latest reading stays in full. An older reading of the same tab shrinks to one line naming the step, the page, and its length.
-- When the model answers, every bulky tool result from that request shrinks the same way. The user's messages, the answers, and the one-line steps stay.
-- `recall` returns an earlier step's result in full, by step number, also after a restart. A recalled page is a past copy: its element numbers cannot be clicked, so the agent reads the tab again to act.
-- A request to the model stays under about 200,000 characters. Above that, the oldest readings shrink first.
+- Tool results and images stay in full after the model answers. Agreed on 2026-10-22: shrinking them at each answer made the agent recall pages at full price that the cache would have served.
+- A request to the model stays under 400,000 characters, with each image counted as 6,000. Above that, the oldest results and images shrink in one go until the request is half that size, so the requests after it only add to it. Results since the user's latest message shrink last, and only as far as the limit needs.
+- `recall` returns an earlier step's result in full, by step number, also after a restart. A recalled page is a past copy: its element numbers cannot be clicked, so the agent reads the tab again to act. A recall that would take the results since the user's latest message past half the limit is refused, with the reason.
+- What a provider kept, such as Anthropic's thinking, goes back only for steps after the user's latest message and after uw last changed the chat: shrank a message, or changed the instructions or tools. Anthropic refuses thinking whose earlier conversation changed.
+- An Anthropic request marks the instructions and tools for an hour in Anthropic's cache. The agent's requests also ask for the rest to be cached for 5 minutes.
 - When the model refuses a request, the chat shows the model's own error text.
 
 ## Stages
