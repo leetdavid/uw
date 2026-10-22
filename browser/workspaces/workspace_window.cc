@@ -47,6 +47,13 @@
 namespace uw {
 namespace {
 
+base::RepeatingCallbackList<void(BrowserWindowInterface*)>& Reveals() {
+  static base::NoDestructor<
+      base::RepeatingCallbackList<void(BrowserWindowInterface*)>>
+      reveals;
+  return *reveals;
+}
+
 std::string Find(const std::map<std::string, std::string>& data,
                  const char* key) {
   const auto it = data.find(key);
@@ -292,6 +299,12 @@ void WorkspaceWindow::OnShownElsewhere() {
   }
 }
 
+// static
+base::CallbackListSubscription WorkspaceWindow::ObserveReveals(
+    base::RepeatingCallback<void(BrowserWindowInterface*)> shown) {
+  return Reveals().Add(std::move(shown));
+}
+
 void WorkspaceWindow::Reveal() {
   WorkspaceWindow* shown = nullptr;
   for (WorkspaceWindow* partner : Partners()) {
@@ -314,6 +327,7 @@ void WorkspaceWindow::Reveal() {
     shown->SaveSession();
     shown->window_->GetWindow()->Hide();
   }
+  Reveals().Notify(window_);
 }
 
 void WorkspaceWindow::OpenPartner(const std::string& id,

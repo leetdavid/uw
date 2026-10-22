@@ -57,6 +57,10 @@ class WorkspaceWindow : public views::WidgetObserver {
   void Start();
   // Tells `changed` when a restore gives the window another workspace.
   base::CallbackListSubscription ObserveChanges(base::RepeatingClosure changed);
+  // Tells `shown` each time a hidden window becomes the one its group shows,
+  // once its partner is hidden.
+  static base::CallbackListSubscription ObserveReveals(
+      base::RepeatingCallback<void(BrowserWindowInterface*)> shown);
 
   BrowserWindowInterface* window() { return window_; }
   const std::string& workspace() const { return workspace_; }
