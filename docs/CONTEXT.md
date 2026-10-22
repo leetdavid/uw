@@ -224,6 +224,10 @@ _Avoid_: Integration, plugin, tool server.
 A service on uw's own short list of connectors that uw has tested: its web address is the service's own, and uw signed in to it and listed its tools with a real account.
 _Avoid_: Verified, official, featured.
 
+**Plugin**:
+A package a service publishes that adds its connector, its skills, or both to uw in one step.
+_Avoid_: App, extension, integration.
+
 **Approval**:
 The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program. For a connector, it lets one tool call run, or every call of that tool for the rest of the chat or for good.
 
