@@ -235,6 +235,10 @@ _Avoid_: Classifier, guard, safety check.
 A file that holds secrets, such as a `.env` file, a key or certificate, a password store, or the credentials of a tool such as ssh, AWS, or gcloud. The agent reads one only through a command the user approved, in every approval mode.
 _Avoid_: Secret file, private file.
 
+**Password prompt**:
+A program in a terminal tab waiting for the user to type a password or passphrase, such as `sudo`, `ssh`, or `sudo` on another machine through `ssh`. uw hands it to the user, and the agent never types there.
+_Avoid_: Secret prompt, credential prompt.
+
 **Steer**:
 To send a chat a message while its agent works. The agent reads it after its current step, before it asks the model again. A queued message instead waits until the agent has answered.
 _Avoid_: interrupt, inject.
