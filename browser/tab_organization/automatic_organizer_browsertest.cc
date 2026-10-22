@@ -1829,6 +1829,83 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(controller()->IsKept(Id(notes)));
 }
 
+// A child the user nested by hand goes wherever its parent goes, and is not
+// asked about when it shows something else. A child opened from a link still
+// is, and can leave on its own.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AChildNestedByHandGoesWithItsParent) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
+  controller()->Execute(TabOrganizationController::kNewChildTab, {Id(page)});
+  tabs::TabInterface* child = tabs()->GetActiveTab();
+  ASSERT_TRUE(controller()->IsHeld(Id(child)));
+  ASSERT_EQ(child->GetGroup(), task);
+
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  Answer("/v1/systemone", SystemOneAnswer("none", 0.99));
+  Browse(child, "weather");
+  Browse(page, "radar");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_FALSE(child->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(child), controller()->DepthFor(page) + 1);
+  EXPECT_FALSE(RequestAbout("radar").empty());
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_TRUE(controller()->IsHeld(Id(child)));
+
+  AnswerAbout("beach", SystemOneAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* linked = OpenLinkFrom(page, "beach");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_EQ(Requests().size(), 2u);
+  EXPECT_EQ(linked->GetGroup(), task);
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_FALSE(child->GetGroup());
+
+  controller()->Execute(TabOrganizationController::kOutdent, {Id(child)});
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(controller()->IsHeld(Id(child)));
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       PRE_AHeldChildIsHeldAfterARestartUntilItsParentCloses) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  Browse(InitialTab(), "notes");
+  tabs::TabInterface* ideas = NewTab();
+  Browse(ideas, "ideas");
+  controller()->Execute(TabOrganizationController::kNest, {Id(ideas)});
+  ASSERT_TRUE(controller()->IsHeld(Id(ideas)));
+  ASSERT_EQ(controller()->DepthFor(ideas), 1);
+  // Lets the session take the tabs' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AHeldChildIsHeldAfterARestartUntilItsParentCloses) {
+  const auto find = [&](const std::string& path) -> tabs::TabInterface* {
+    for (int i = 0; i < tabs()->count(); ++i) {
+      tabs::TabInterface* tab = tabs()->GetTabAtIndex(i);
+      if (tab->GetContents()->GetLastCommittedURL().path() == path ||
+          tab->GetContents()->GetVisibleURL().path() == path) {
+        return tab;
+      }
+    }
+    return nullptr;
+  };
+  tabs::TabInterface* notes = find("/page/notes");
+  tabs::TabInterface* ideas = find("/page/ideas");
+  ASSERT_TRUE(notes);
+  ASSERT_TRUE(ideas);
+  EXPECT_TRUE(controller()->IsHeld(Id(ideas)));
+  EXPECT_EQ(controller()->DepthFor(ideas), 1);
+
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(notes),
+                             TabCloseTypes::CLOSE_NONE);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(controller()->IsHeld(Id(ideas)));
+  EXPECT_EQ(controller()->DepthFor(ideas), 0);
+}
+
 // A pinned tab is not in the tab tree, so the organizer leaves it alone.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        APinnedTabIsNeverAskedAbout) {

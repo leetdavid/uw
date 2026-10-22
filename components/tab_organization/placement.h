@@ -93,6 +93,10 @@ struct TabAnswer {
   // True for a tab that stays where it is whatever was answered: the user
   // placed it by hand, or uw has already acted on its answer.
   bool placed = false;
+  // True for a child the user nested by hand. It goes wherever the page above
+  // it goes, even when it is `placed`. uw does not ask about it, so it has no
+  // answer.
+  bool held = false;
 };
 
 // What uw does with some of the tabs of one branch.

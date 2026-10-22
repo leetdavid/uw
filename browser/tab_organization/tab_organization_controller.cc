@@ -225,6 +225,9 @@ void TabOrganizationController::RestoreTab(
   if (state->FindBool("kept").value_or(false)) {
     self->kept_[PageId(*id)] = TaskOf(tab);
   }
+  if (state->FindBool("held").value_or(false) && parent && !parent->empty()) {
+    self->held_[PageId(*id)] = PageId(*parent);
+  }
   const std::string* task_name = state->FindString("task_name");
   if (task_name && tab->GetGroup()) {
     self->generated_names_.try_emplace(TaskOf(tab),
@@ -447,6 +450,7 @@ bool TabOrganizationController::Nest(const PageId& id) {
     undo_.pop_back();
     return false;
   }
+  held_[id] = tree_.Find(id)->parent;
   Apply();
   NotifyManualMove({id});
   return true;
@@ -455,6 +459,7 @@ bool TabOrganizationController::Nest(const PageId& id) {
 void TabOrganizationController::OpenChild(const PageId& id) {
   if (const std::optional<PageId> page = OpenBlankTab(id)) {
     tree_.OpenUnder(*page, id);
+    held_[*page] = id;
     RevealSelected();
     ScheduleApply();
     ScheduleUpdate();
@@ -635,6 +640,12 @@ void TabOrganizationController::ToggleKept(const std::vector<PageId>& ids) {
     }
   }
   ScheduleUpdate();
+}
+
+bool TabOrganizationController::IsHeld(const PageId& id) const {
+  const auto held = held_.find(id);
+  const Page* page = tree_.Find(id);
+  return held != held_.end() && page && page->parent == held->second;
 }
 
 void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
@@ -1188,6 +1199,11 @@ void TabOrganizationController::Update() {
   // A kept tab the user moved to another task or to the Scratchpad is let go.
   std::erase_if(kept_,
                 [this](const auto& entry) { return !IsKept(entry.first); });
+  // A held tab the user moved, or whose parent closed, is let go. A restored
+  // one waits until it is linked to its parent.
+  std::erase_if(held_, [this](const auto& entry) {
+    return !IsHeld(entry.first) && !restored_parents_.contains(entry.first);
+  });
   std::map<PageId, std::string> states;
   for (const auto& [handle, id] : ids_) {
     const Page* page = tree_.Find(id);
@@ -1204,6 +1220,9 @@ void TabOrganizationController::Update() {
     }
     if (IsKept(id)) {
       state.Set("kept", true);
+    }
+    if (IsHeld(id)) {
+      state.Set("held", true);
     }
     if (HasGeneratedName(page->task)) {
       state.Set("task_name", generated_names_[page->task]);

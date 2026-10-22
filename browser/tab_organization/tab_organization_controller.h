@@ -161,6 +161,11 @@ class TabOrganizationController : public TabStripModelObserver,
   bool KeepsTabs(const std::vector<PageId>& ids) const;
   // Keeps the tabs of `ids`, or lets them go when all are kept.
   void ToggleKept(const std::vector<PageId>& ids);
+  // A held tab is a child the user nested by hand, with "New child tab" or
+  // "Nest under previous tab". The organizer does not ask about it, and it
+  // goes wherever its parent goes, until the user moves it or its parent
+  // closes.
+  bool IsHeld(const PageId& id) const;
 
   // Selects the tab used last in `task`, or in the Scratchpad when `task` is
   // empty. Returns false when it holds no tab.
@@ -290,6 +295,9 @@ class TabOrganizationController : public TabStripModelObserver,
   std::set<PageId> collapsed_;
   // Kept tabs, each with the task it was kept in. Saved with the session.
   std::map<PageId, std::string> kept_;
+  // Held tabs, each with the parent it was nested under. Saved with the
+  // session.
+  std::map<PageId, PageId> held_;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;

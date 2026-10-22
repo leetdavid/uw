@@ -344,9 +344,9 @@ void AutomaticOrganizer::Scan() {
     activity.url = url;
     activity.folder = folder;
     activity.title = title;
-    if (controller_->IsKept(page.id)) {
-      // A kept tab is never asked about. A request already out for it is
-      // dropped, and its branch need not wait for it.
+    if (controller_->IsKept(page.id) || controller_->IsHeld(page.id)) {
+      // A kept or held tab is never asked about. A request already out for it
+      // is dropped, and its branch need not wait for it.
       if (first_sight || activity.asking ||
           activity.requested < activity.revision) {
         CancelRequestsFor(page.id);
@@ -796,7 +796,9 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
     }
     TabAnswer& tab = tabs[id];
     tab.placed = kept_tab || activity->second.placed;
-    if (activity == pages_.end()) {
+    // A kept tab stays where the user left it, even when it is held.
+    tab.held = !kept_tab && controller_->IsHeld(id);
+    if (activity == pages_.end() || tab.held) {
       continue;
     }
     const auto kept = kept_.find(id);

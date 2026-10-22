@@ -427,6 +427,27 @@ TEST(PlacementTest, ATabThatFitsItsTaskStaysBehind) {
   EXPECT_EQ(placements[1].placement.action, Action::kLeave);
 }
 
+TEST(PlacementTest, AChildNestedByHandGoesWithThePageAboveIt) {
+  std::vector<BranchPlacement> placements =
+      PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8)}},
+                   {Id("result"), {Answer("task-1", 0.4)}},
+                   {Id("other"),
+                    {std::nullopt, /*placed=*/true,
+                     /*held=*/true}}});
+  ASSERT_EQ(placements.size(), 2u);
+  EXPECT_EQ(placements[0].pages, Ids({"search", "other"}));
+  EXPECT_EQ(placements[0].staying, Ids({"result"}));
+
+  // Under a page that stays, it stays too.
+  placements = PlaceSearch({{Id("search"), {Answer("task-1", 0.95)}},
+                            {Id("other"),
+                             {std::nullopt, /*placed=*/true,
+                              /*held=*/true}}});
+  ASSERT_EQ(placements.size(), 1u);
+  EXPECT_EQ(placements[0].pages, Ids({"search"}));
+  EXPECT_EQ(placements[0].placement.action, Action::kLeave);
+}
+
 TEST(PlacementTest, ATabThatBelongsElsewhereLeavesOnItsOwn) {
   std::vector<BranchPlacement> placements =
       PlaceSearch({{Id("search"), {Answer(kNewTaskOption, 0.99, 0.8)}},

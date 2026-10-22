@@ -49,6 +49,9 @@ bool SameWorkHolds(const ClassificationAnswer& answer,
 Lean LeanOf(const TabAnswer& tab,
             const Position& position,
             const Thresholds& needed) {
+  if (tab.held) {
+    return {};
+  }
   if (tab.placed) {
     return {Lean::Kind::kStays};
   }
