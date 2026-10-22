@@ -86,7 +86,7 @@ Added on 2026-10-20 for T124: "Agent terminal: a command waits for you (Fluid)" 
 - A terminal tab card shows the screen's last lines in mono, the tab's title, and Running, Waits for your approval, or Ran 1 min ago.
 - The notes under the composer become "Every click, typing, and command waits for your approval", "Changes on a site and risky commands wait for your approval", and "Full auto: the agent acts without asking, except to read a sensitive file".
 
-Added on 2026-10-22 for scheduled chats: "Watch this page: the card" and "Watch this page: every state" draw the eye beside the star in the address bar, the schedule card with "Watch for", the card of a watched page, and the card from a chat with its Trigger row. The user signed them off the same day; their rules are in the canvas guide `uw-scheduled-chats`. The chart in a watched page's card waits for the charts question. "Chat rows, schedule, and rules" now matches them.
+Added on 2026-10-22 for scheduled chats: "Watch this page: the card" and "Watch this page: every state" draw the eye beside the star in the address bar, the schedule card with "Watch for", the card of a watched page, and the card from a chat with its Trigger row. The user signed them off the same day; their rules are in the canvas guide `uw-scheduled-chats`. "Chat rows, schedule, and rules" now matches them.
 
 How the chat is built:
 

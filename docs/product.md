@@ -249,6 +249,8 @@ Agreed on 2026-10-22: the schedule card has a Model row, with the chat's model a
 
 Agreed on 2026-10-22: the model judges whether something happened; uw does no page comparison of its own. A run ends by calling a `report` tool with whether it found what the user asked to hear about, a message, and its tracked values, such as `price: 99 USD`. uw acts only on that: it notifies per the chat's setting, saves the values, and writes the run's line. A run that ends without a report counts as "Didn't finish", never as no change. For runs, these settings replace the notification a chat sends when it answers.
 
+Agreed charts, on 2026-10-22: a tracked value that is a number gets a line chart, and a yes or no value a strip of colored spans; text values are not charted. The watched page's card shows the last 14 days. The schedule strip's "Chart" button opens a larger chart above the conversation, with 7 days, 30 days, and All; a point shows its run's line, and a click scrolls to that run. Notifications and the Chats list stay text. The first run names each value and its unit, and later runs reuse them. Values are kept until the chat is deleted; removing the schedule keeps them.
+
 Agreed management, on 2026-10-22:
 
 - A scheduled chat's page shows a strip under its title, such as `Every day at 9:00 · Next: tomorrow 9:00 · Last: No change, $129`, with Edit, which opens the schedule card, Pause, and Mute. A running trigger shows there with Stop.
