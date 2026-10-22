@@ -36,6 +36,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Agent engine spike](research/agent-engine-spike.md): uw drives Chromium's agent engine without Gemini's panel, and what it cannot do yet.
 - [ADR 0006: the chat page is React with Fluid Functionalism](adr/0006-the-chat-page-is-react-with-fluid-functionalism.md): why one WebUI page is a React bundle built beside Chromium's own WebUI tooling.
 - [ADR 0012: a command check judges the agent's terminal commands](adr/0012-a-command-check-judges-the-agents-terminal-commands.md): why a separate model call, which never sees page text, decides which of the agent's commands ask.
+- [ADR 0013: each run of a scheduled chat is a subagent](adr/0013-each-run-of-a-scheduled-chat-is-a-subagent.md): why runs start fresh and add one message to one conversation.
 
 ### AI providers
 

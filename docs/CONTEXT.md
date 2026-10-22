@@ -173,6 +173,14 @@ A global suspension of automatic tab placement and task proposals. Manual organi
 A chat uw runs again on a schedule, such as every morning at 9, to carry out the same request, such as checking a price or looking for news. It need not be about one page.
 _Avoid_: Page watch, watch, routine.
 
+**Run**:
+One time a scheduled chat carries out its request, out of sight, shown as one message in the chat. Underneath, a run is a subagent; say "subagent" only for that mechanism.
+_Avoid_: Check, job, execution.
+
+**Tracked value**:
+A value a run records each time, such as a price or whether something is in stock, kept so uw can show how it changed over time.
+_Avoid_: Metric, data point.
+
 **Watched page**:
 A page that a scheduled chat checks. The page shows that it is watched, and watching a page is how the user starts a scheduled chat from it.
 _Avoid_: Page watch, tracked page.
