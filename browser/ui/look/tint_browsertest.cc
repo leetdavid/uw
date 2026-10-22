@@ -7,9 +7,11 @@
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include "base/environment.h"
 #include "base/numerics/safe_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -29,6 +31,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -263,6 +266,38 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackInDarkMode) {
                       ".getPropertyValue('--background').trim()"),
       "#0a0a0a");
   SaveWindowScreenshot(browser(), "chat-dark");
+}
+
+// uw's other pages are on the same blacks in dark mode: the providers page
+// and the terminal on the page black, and the command bar's card one step up.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, UwPagesAreBlackInDarkMode) {
+  // The terminal's shell reads none of the user's startup files.
+  base::Environment::Create()->SetVar("ZDOTDIR", "/var/empty");
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  const auto open = [&](const std::string& url) {
+    EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(url)));
+    return browser()->tab_strip_model()->GetActiveWebContents();
+  };
+  const auto style = [](content::WebContents* page,
+                        const std::string& property) {
+    return content::EvalJs(page,
+                           "getComputedStyle(document.documentElement)"
+                           ".getPropertyValue('" +
+                               property + "').trim()")
+        .ExtractString();
+  };
+
+  EXPECT_EQ(style(open("chrome://ai/"), "--background"), "#0a0a0a");
+  SaveWindowScreenshot(browser(), "providers-dark");
+
+  EXPECT_EQ(content::EvalJs(open("chrome://terminal/"),
+                            "getComputedStyle(document.body).backgroundColor"),
+            "rgb(10, 10, 10)");
+  SaveWindowScreenshot(browser(), "terminal-dark");
+
+  EXPECT_EQ(style(open("chrome://uw-command-bar.top-chrome/"), "--card"),
+            "#171717");
+  SaveWindowScreenshot(browser(), "command-bar-dark");
 }
 
 // Two colors run from the first, at the top leading corner, to the second, at
