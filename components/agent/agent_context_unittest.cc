@@ -31,6 +31,10 @@ base::DictValue Reading(std::string_view text) {
       .Set("text", text);
 }
 
+base::DictValue ReadingAt(std::string_view url, std::string_view text) {
+  return Reading(text).Set("url", url);
+}
+
 int Count(const std::string& body, std::string_view text) {
   int count = 0;
   for (size_t at = body.find(text); at != std::string::npos;
@@ -87,6 +91,27 @@ TEST_F(AgentContextTest, ARereadTabSendsOnlyItsLatestReading) {
             "characters, shortened. Call recall with step 1 to see it again.");
   EXPECT_EQ(*ToolContents()[2].FindString("text"), "Tours start at one");
   EXPECT_EQ(ToolContents()[2].FindInt("step"), 3);
+}
+
+// A reading of another page the tab showed is still true of that page, but a
+// jump within a page is the same page.
+TEST_F(AgentContextTest, AReadingOfAnotherPageInTheTabStays) {
+  constexpr char kCity[] = "https://en.wikipedia.org/wiki/Reykjav%C3%ADk";
+  context_.AddUser("Compare Iceland and its capital");
+  context_.AddResult(
+      "call_1", "read", Tab(1),
+      ReadingAt("https://en.wikipedia.org/wiki/Iceland", "394,324 people"));
+  context_.AddResult("call_2", "read", Tab(1),
+                     ReadingAt(kCity, "140,000 people"));
+  context_.AddResult(
+      "call_3", "read", Tab(1),
+      ReadingAt(base::StrCat({kCity, "#History"}), "Founded in 874"));
+
+  const std::string body = Request();
+
+  EXPECT_THAT(body, HasSubstr("394,324 people"));
+  EXPECT_THAT(body, Not(HasSubstr("140,000 people")));
+  EXPECT_THAT(body, HasSubstr("Founded in 874"));
 }
 
 // A provider's cache serves what a request repeats of the one before it, so
@@ -225,6 +250,23 @@ TEST_F(AgentContextTest, ASavedContextComesBackTheSame) {
   EXPECT_FALSE(AgentContext::FromValue(context_.ToValue().Set(
       "results",
       base::ListValue().Append(base::DictValue().Set("tool", "read")))));
+}
+
+// What a provider kept is bound to the instructions it saw, and a restored
+// chat gets this version's.
+TEST_F(AgentContextTest, ARestoredChatKeepsNothingAProviderKept) {
+  context_.AddUser("Book a tour");
+  context_.AddAssistant({"Booked.", {}, R"({"items":["sealed-1"]})"});
+  ASSERT_THAT(Request(), HasSubstr("sealed-1"));
+
+  std::unique_ptr<AgentContext> restored =
+      AgentContext::FromValue(context_.ToValue());
+
+  ASSERT_TRUE(restored);
+  const std::optional<std::string> body = restored->Request("agent", 400000);
+  ASSERT_TRUE(body);
+  EXPECT_THAT(*body, Not(HasSubstr("sealed-1")));
+  EXPECT_THAT(*body, HasSubstr("Booked."));
 }
 
 TEST_F(AgentContextTest, AQuitAnswersTheCallsItCutShort) {

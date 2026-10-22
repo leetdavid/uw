@@ -29,7 +29,8 @@ class AgentContext {
   AgentContext& operator=(const AgentContext&) = delete;
   ~AgentContext();
 
-  // A context saved by ToValue(), or null when `saved` is not one.
+  // A context saved by ToValue(), without what providers kept, or null when
+  // `saved` is not one.
   static std::unique_ptr<AgentContext> FromValue(const base::DictValue& saved);
   base::DictValue ToValue() const;
 
@@ -42,7 +43,8 @@ class AgentContext {
   void ShowImages(const std::vector<int>& numbers);
   void AddAssistant(const ModelTurn& turn);
   // Records what a tool answered to the call `call_id` and returns its step
-  // number. A reading of a tab shortens the older readings of that tab.
+  // number. A reading of a tab shortens the older readings of the same page in
+  // that tab.
   int AddResult(std::string_view call_id,
                 std::string_view tool,
                 const base::DictValue& args,

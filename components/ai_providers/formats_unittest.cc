@@ -161,22 +161,33 @@ TEST(FormatsTest, KeptPartsGoOnlyBackToWhereTheyCameFrom) {
   EXPECT_FALSE((*chat.FindList("messages"))[2].GetDict().Find(kKeptPartsKey));
 }
 
-TEST(FormatsTest, KeptPartsStayInTheTurnThatMadeThem) {
-  // Once the user writes again, earlier turns may have been shortened, so
-  // what they kept stays behind.
-  std::string chat =
-      Chat(static_cast<int>(ProviderFormat::kAnthropicMessages), kThinking);
-  chat.insert(chat.find("\n  ],\n  \"tools\""),
-              R"(, {"role": "user", "content": "Thanks"})");
-  const base::DictValue request =
-      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, chat, kAddress));
-  EXPECT_EQ(*(*request.FindList("messages"))[1]
+// Once the user writes again, what earlier turns kept still goes back, so
+// the conversation before the next turn is the one the provider saw.
+TEST(FormatsTest, KeptPartsGoBackFromEarlierTurns) {
+  const auto later = [](std::string chat) {
+    chat.insert(chat.find("\n  ],\n  \"tools\""),
+                R"(, {"role": "user", "content": "Thanks"})");
+    return chat;
+  };
+  const base::DictValue anthropic = Parsed(
+      RequestIn(ProviderFormat::kAnthropicMessages,
+                later(Chat(static_cast<int>(ProviderFormat::kAnthropicMessages),
+                           kThinking)),
+                kAddress));
+  EXPECT_EQ(*(*anthropic.FindList("messages"))[1]
                  .GetDict()
                  .FindList("content")
                  ->front()
                  .GetDict()
                  .FindString("type"),
-            "tool_use");
+            "thinking");
+  const base::DictValue responses = Parsed(
+      RequestIn(ProviderFormat::kOpenAiResponses,
+                later(Chat(static_cast<int>(ProviderFormat::kOpenAiResponses),
+                           kReasoning)),
+                kAddress));
+  EXPECT_EQ(*(*responses.FindList("input"))[1].GetDict().FindString("type"),
+            "reasoning");
 }
 
 TEST(FormatsTest, AnAnthropicAnswerReadsAsChatCompletions) {
@@ -312,9 +323,8 @@ TEST(FormatsTest, AnthropicCachesAOneOffRequestsInstructionsOnly) {
      "cache_control": {"type": "ephemeral", "ttl": "1h"}}])"));
 }
 
-// An image in a user message goes as each format's own image part. A message
-// that shows recalled images is not a new turn, so what the model kept still
-// goes back, and chat completions does not see uw's mark on it.
+// An image in a user message goes as each format's own image part, and chat
+// completions does not see uw's mark on a message that shows recalled images.
 TEST(FormatsTest, AnImageGoesInEachFormatsOwnParts) {
   constexpr char kImages[] = R"({
     "model": "a-model",

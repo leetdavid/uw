@@ -27,6 +27,13 @@ base::DictValue TextPart(std::string_view text) {
   return base::DictValue().Set("type", "text").Set("text", text);
 }
 
+// A page's address without the part after #, which only moves within it.
+std::string_view PageOf(const base::DictValue& reading) {
+  const std::string* url = reading.FindString("url");
+  return url ? std::string_view(*url).substr(0, url->find('#'))
+             : std::string_view();
+}
+
 base::DictValue ImagePart(std::string_view url) {
   return base::DictValue()
       .Set("type", "image_url")
@@ -106,6 +113,9 @@ std::unique_ptr<AgentContext> AgentContext::FromValue(
            image->FindBool("shortened").value_or(false)});
     }
   }
+  // What a provider kept is bound to the instructions it saw, and these may
+  // be a newer version's.
+  context->DropKeptAfter(0);
   if (const base::DictValue* connectors = saved.FindDict("connectors")) {
     const auto read = [&](std::string_view key, std::set<std::string>& names) {
       if (const base::ListValue* list = connectors->FindList(key)) {
@@ -218,7 +228,7 @@ int AgentContext::AddResult(std::string_view call_id,
   if (tool == "read" && tab && !result.contains("error")) {
     for (Result& older : results_) {
       if (older.tool == "read" && older.args.FindInt("tab") == tab &&
-          !older.shortened) {
+          !older.shortened && PageOf(older.result) == PageOf(result)) {
         Shorten(older);
       }
     }

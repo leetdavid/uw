@@ -26,22 +26,6 @@ std::string_view StringOr(const base::DictValue& dict,
   return value ? std::string_view(*value) : fallback;
 }
 
-// The index of the user's latest message. What a provider kept goes back
-// only after it: earlier turns may have been shortened since, and a provider
-// that checks its thinking against the conversation refuses an edited one.
-size_t CurrentTurnStart(const base::ListValue& messages) {
-  size_t start = 0;
-  for (size_t i = 0; i < messages.size(); ++i) {
-    const base::DictValue* message = messages[i].GetIfDict();
-    if (message && message->FindString("role") &&
-        *message->FindString("role") == "user" &&
-        !message->FindBool(kShownKey).value_or(false)) {
-      start = i;
-    }
-  }
-  return start;
-}
-
 // The parts of a user message: its text, or the list it has when it carries
 // images, as chat completions writes them.
 base::ListValue UserParts(const base::DictValue& message) {
@@ -166,9 +150,8 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
         base::DictValue().Set("role", role).Set("content", std::move(blocks)));
   };
   const base::ListValue& all = messages ? *messages : empty;
-  const size_t turn = CurrentTurnStart(all);
-  for (size_t i = 0; i < all.size(); ++i) {
-    const base::DictValue* message = all[i].GetIfDict();
+  for (const base::Value& value : all) {
+    const base::DictValue* message = value.GetIfDict();
     if (!message) {
       continue;
     }
@@ -205,9 +188,8 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
       add("user", std::move(blocks));
     } else if (role == "assistant") {
       if (const base::ListValue* kept =
-              i > turn ? KeptParts(*message, ProviderFormat::kAnthropicMessages,
-                                   address, StringOr(chat, "model"))
-                       : nullptr) {
+              KeptParts(*message, ProviderFormat::kAnthropicMessages, address,
+                        StringOr(chat, "model"))) {
         blocks = kept->Clone();
       }
       if (!text.empty()) {
@@ -293,9 +275,8 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
   const base::ListValue* messages = chat.FindList("messages");
   base::ListValue input;
   const base::ListValue& all = messages ? *messages : empty;
-  const size_t turn = CurrentTurnStart(all);
-  for (size_t i = 0; i < all.size(); ++i) {
-    const base::DictValue* message = all[i].GetIfDict();
+  for (const base::Value& value : all) {
+    const base::DictValue* message = value.GetIfDict();
     if (!message) {
       continue;
     }
@@ -325,9 +306,8 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
                        .Set("content", std::move(content)));
     } else if (role == "assistant") {
       if (const base::ListValue* kept =
-              i > turn ? KeptParts(*message, ProviderFormat::kOpenAiResponses,
-                                   address, StringOr(chat, "model"))
-                       : nullptr) {
+              KeptParts(*message, ProviderFormat::kOpenAiResponses, address,
+                        StringOr(chat, "model"))) {
         for (const base::Value& item : *kept) {
           input.Append(item.Clone());
         }
