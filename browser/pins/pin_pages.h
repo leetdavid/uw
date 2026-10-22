@@ -11,10 +11,12 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/supports_user_data.h"
 #include "chrome/browser/profiles/profile_manager_observer.h"
 #include "chrome/browser/profiles/profile_observer.h"
+#include "ui/gfx/image/image_skia.h"
 
 class Profile;
 class ProfileManager;
@@ -28,7 +30,9 @@ namespace uw {
 
 // The live pages of one profile's pins while no window holds them, as after
 // the window that showed one closed. They stay alive, and keep the profile
-// alive, until a window takes them, the profile goes, or uw quits.
+// alive, until a window takes them, the profile goes, or uw quits. Also keeps
+// a picture of each pin's page as it last left a window, for the hazed view
+// the other windows show.
 class PinPages : public base::SupportsUserData::Data,
                  public ProfileObserver,
                  public ProfileManagerObserver {
@@ -46,6 +50,14 @@ class PinPages : public base::SupportsUserData::Data,
   std::unique_ptr<content::WebContents> Take(std::string_view id);
   bool Holds(std::string_view id) const;
 
+  void SetPicture(std::string id, gfx::ImageSkia picture);
+  // Pin `id`'s picture, empty if there is none yet.
+  gfx::ImageSkia PictureOf(std::string_view id) const;
+  base::CallbackListSubscription ObservePictures(
+      base::RepeatingClosure changed);
+
+  base::WeakPtr<PinPages> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
+
   // ProfileObserver:
   void OnProfileWillBeDestroyed(Profile* profile) override;
   // ProfileManagerObserver:
@@ -58,11 +70,14 @@ class PinPages : public base::SupportsUserData::Data,
   const raw_ptr<Profile> profile_;
   std::map<std::string, std::unique_ptr<content::WebContents>, std::less<>>
       pages_;
+  std::map<std::string, gfx::ImageSkia, std::less<>> pictures_;
+  base::RepeatingClosureList picture_observers_;
   std::unique_ptr<ScopedProfileKeepAlive> keep_alive_;
   base::CallbackListSubscription terminating_;
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
   base::ScopedObservation<ProfileManager, ProfileManagerObserver>
       manager_observation_{this};
+  base::WeakPtrFactory<PinPages> weak_factory_{this};
 };
 
 }  // namespace uw

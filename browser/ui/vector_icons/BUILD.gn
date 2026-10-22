@@ -8,6 +8,7 @@ aggregate_vector_icons("uw_vector_icons") {
   sources = [
     "chevrons_up_down.icon",
     "list_tree.icon",
+    "log_in.icon",
     "palette.icon",
     "smile.icon",
     "user.icon",

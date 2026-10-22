@@ -69,18 +69,29 @@ index 31cc627e9a6f978367e994a44e39ff94d80908d4..92b2f4c500e6e9f4935c83ed1ada7f53
              InitialWebUIWindowMetricsManager::From(browser_window)) {
        manager->SetWindowCreationInfo(
 diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
-index d80d6550e73ccd088505e8dd00350cf5002caea9..508c8424a4f93eb5a5347e8cb777afd53a606b26 100644
+index d80d6550e73ccd088505e8dd00350cf5002caea9..c75c3284001ae32d1c965c3d9f839e5ca7deccf2 100644
 --- a/chrome/browser/ui/browser_live_tab_context.cc
 +++ b/chrome/browser/ui/browser_live_tab_context.cc
-@@ -61,6 +61,7 @@
+@@ -61,6 +61,8 @@
  #include "content/public/browser/web_contents.h"
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/window_open_disposition.h"
++#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/workspaces/workspace_window.h"
  
  using content::NavigationController;
  using content::SessionStorageNamespace;
-@@ -189,6 +190,10 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
+@@ -164,6 +166,9 @@ std::map<std::string, std::string> BrowserLiveTabContext::GetExtraDataForTab(
+ 
+   glic::PopulateGlicExtraData(tab_strip_model_->GetTabAtIndex(index),
+                               &extra_data);
++  // uw: a pin comes back as the same pin.
++  uw::PinSync::AddRestoreData(tab_strip_model_->GetTabAtIndex(index),
++                              extra_data);
+ 
+   return extra_data;
+ }
+@@ -189,6 +194,10 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
      }
    }
  
@@ -91,7 +102,7 @@ index d80d6550e73ccd088505e8dd00350cf5002caea9..508c8424a4f93eb5a5347e8cb777afd5
    return data;
  }
  
-@@ -402,6 +407,10 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
+@@ -402,6 +411,10 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
  
    CHECK(web_contents);
  
@@ -102,7 +113,7 @@ index d80d6550e73ccd088505e8dd00350cf5002caea9..508c8424a4f93eb5a5347e8cb777afd5
    if (performance_manager::policies::CanScheduleLoadForRestoredTabs()) {
      performance_manager::policies::ScheduleLoadForRestoredTabs({web_contents});
    } else {
-@@ -523,6 +532,7 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+@@ -523,6 +536,7 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
  
    Browser* browser = CreateBrowserWindow(std::move(*create_params))
                           ->GetBrowserForMigrationOnly();

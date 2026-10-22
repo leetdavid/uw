@@ -1,8 +1,11 @@
-# A pin's right-click menu rows and its Edit Home URL card.
+# A pin's right-click menu rows, its Edit Home URL card, and the hazed view
+# over a pin whose live page is in another window.
 source_set("pins") {
   sources = [
     "home_url_card.cc",
     "home_url_card.h",
+    "inactive_pin_overlay.cc",
+    "inactive_pin_overlay.h",
     "pin_menu.cc",
     "pin_menu.h",
   ]
@@ -12,14 +15,22 @@ source_set("pins") {
     "//ui/views",
   ]
   deps = [
+    "//cc/paint",
     "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//components/strings",
     "//components/url_formatter",
     "//ui/base",
+    "//ui/color",
+    "//ui/compositor",
+    "//ui/gfx",
     "//ui/menus",
     "//url",
     "//uw/browser/pins",
     "//uw/browser/ui/look",
+    "//uw/browser/ui/vector_icons",
   ]
 }

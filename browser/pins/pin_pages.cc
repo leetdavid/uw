@@ -73,6 +73,21 @@ bool PinPages::Holds(std::string_view id) const {
   return pages_.contains(id);
 }
 
+void PinPages::SetPicture(std::string id, gfx::ImageSkia picture) {
+  pictures_[std::move(id)] = std::move(picture);
+  picture_observers_.Notify();
+}
+
+gfx::ImageSkia PinPages::PictureOf(std::string_view id) const {
+  const auto it = pictures_.find(id);
+  return it == pictures_.end() ? gfx::ImageSkia() : it->second;
+}
+
+base::CallbackListSubscription PinPages::ObservePictures(
+    base::RepeatingClosure changed) {
+  return picture_observers_.Add(std::move(changed));
+}
+
 void PinPages::OnProfileWillBeDestroyed(Profile* profile) {
   DropAll();
   profile_observation_.Reset();

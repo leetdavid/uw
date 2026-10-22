@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "base/functional/bind.h"
 #include "base/functional/function_ref.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
@@ -16,6 +17,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
@@ -29,15 +32,20 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/pins/home_url_card.h"
+#include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 #include "uw/browser/ui/views/pins/pin_menu.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
@@ -57,6 +65,12 @@ constexpr char kTypeIntoNotes[] =
     "document.getElementById('f').value = 'half-typed'";
 constexpr char kNotesState[] =
     "document.getElementById('f').value + ' ' + token";
+constexpr char kMoreNotes[] = "data:text/html,<title>More notes</title>";
+// A page that asks before it is left.
+constexpr char kDraft[] =
+    "data:text/html,<title>Draft</title><input id=f><script>token="
+    "Math.random();onbeforeunload=e=>{e.preventDefault();e.returnValue=''}"
+    "</script>";
 
 class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -106,6 +120,74 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
 
   static int TicksOf(content::WebContents* page) {
     return content::EvalJs(page, "ticks").ExtractInt();
+  }
+
+  // Waits until the first pin of `window` has the hazed view over it.
+  static views::View* WaitForHaze(Browser* window) {
+    views::View* haze = nullptr;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      haze = InactivePinOverlay::From(window)->GetShownView();
+      return haze != nullptr;
+    }));
+    return haze;
+  }
+
+  static void Click(views::View* view, const gfx::Point& at) {
+    view->OnMousePressed(ui::MouseEvent(
+        ui::EventType::kMousePressed, at, at, ui::EventTimeForNow(),
+        ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON));
+    view->OnMouseReleased(ui::MouseEvent(
+        ui::EventType::kMouseReleased, at, at, ui::EventTimeForNow(),
+        ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON));
+  }
+
+  // How many windows have a pin page with a renderer.
+  static int LiveCopies() {
+    int live = 0;
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      TabStripModel* tabs = window->GetTabStripModel();
+      for (int i = 0; i < tabs->IndexOfFirstNonPinnedTab(); ++i) {
+        live += HasRenderer(tabs->GetWebContentsAt(i));
+      }
+    }
+    return live;
+  }
+
+  // Whether a restored page has started to load.
+  static bool Started(content::WebContents* page) {
+    return page->GetController().GetPendingEntry() ||
+           !page->GetPrimaryMainFrame()->GetLastCommittedURL().is_empty();
+  }
+
+  // Moves the live page of the first pin from `from`, where it is selected,
+  // to `to`, and returns it.
+  content::WebContents* MovePage(Browser* from, Browser* to) {
+    content::WebContents* page = PinPageOf(from);
+    to->tab_strip_model()->ActivateTabAt(0);
+    EXPECT_TRUE(Holds(to, page));
+    return page;
+  }
+
+  // The window's colors in the pill and in the haze beside it.
+  struct HazeColors {
+    SkColor pill;
+    SkColor haze;
+  };
+  static HazeColors ColorsOf(Browser* window, views::View* haze) {
+    const SkBitmap bitmap = CaptureWindow(window);
+    views::View* pill = haze->children().back();
+    const gfx::Rect pill_bounds =
+        pill->ConvertRectToWidget(pill->GetLocalBounds());
+    const gfx::Rect haze_bounds =
+        haze->ConvertRectToWidget(haze->GetLocalBounds());
+    const float scale = static_cast<float>(bitmap.width()) /
+                        haze->GetWidget()->GetRootView()->width();
+    const auto at = [&](int x, int y) {
+      return bitmap.getColor(x * scale, y * scale);
+    };
+    // Inside the pill, just past its round end, and in the haze above it.
+    return {at(pill_bounds.x() + 24 + 8, pill_bounds.CenterPoint().y()),
+            at(haze_bounds.x() + 40, haze_bounds.y() + 40)};
   }
 
   static void Navigate(tabs::TabInterface* tab, const GURL& url) {
@@ -477,6 +559,274 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
   UnpinAfterARestart([](TabStripModel* tabs) {
     tabs->ExecuteContextMenuCommand(0, TabStripModel::CommandTogglePinned);
   });
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TheWindowThePageLeftShowsItHazed) {
+  Profile* profile = browser()->GetProfile();
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  MovePage(browser(), second);
+
+  views::View* haze = WaitForHaze(browser());
+  ASSERT_TRUE(haze);
+  EXPECT_FALSE(InactivePinOverlay::From(second)->GetShownView());
+  // The pill is the card's white, and the haze over the picture is not.
+  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+      ThemeService::BrowserColorScheme::kLight);
+  base::RunLoop().RunUntilIdle();
+  HazeColors light = ColorsOf(browser(), haze);
+  EXPECT_EQ(light.pill, SK_ColorWHITE);
+  EXPECT_NE(light.haze, SK_ColorWHITE);
+  EXPECT_FALSE(color_utils::IsDark(light.haze));
+  SaveWindowScreenshot(browser(), "pin-haze-light");
+
+  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+      ThemeService::BrowserColorScheme::kDark);
+  base::RunLoop().RunUntilIdle();
+  HazeColors dark = ColorsOf(browser(), haze);
+  // The pill takes the dark card's color, and the haze darkens the picture.
+  EXPECT_TRUE(color_utils::IsDark(dark.pill));
+  EXPECT_LT(color_utils::GetRelativeLuminance(dark.haze),
+            color_utils::GetRelativeLuminance(light.haze));
+  SaveWindowScreenshot(browser(), "pin-haze-dark");
+
+  // A click anywhere on it brings the page back.
+  Click(haze, gfx::Point(40, 40));
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_FALSE(InactivePinOverlay::From(browser())->GetShownView());
+  EXPECT_TRUE(WaitForHaze(second));
+  EXPECT_EQ(StateOf(page), state);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_APlaceholderStaysUnloadedAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  Pin(browser(), GURL(kMail));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kMail)}));
+  // The first window keeps its placeholder selected.
+  MovePage(browser(), second);
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       APlaceholderStaysUnloadedAfterARestart) {
+  std::vector<BrowserWindowInterface*> windows;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    windows = GetAllBrowserWindowInterfaces();
+    return windows.size() == 2u && AllShow(windows, {GURL(kMail)});
+  }));
+  content::WebContents* live = nullptr;
+  content::WebContents* placeholder = nullptr;
+  for (BrowserWindowInterface* window : windows) {
+    tabs::TabInterface* tab = window->GetTabStripModel()->GetTabAtIndex(0);
+    (PinSync::IsPlaceholder(tab) ? placeholder : live) = tab->GetContents();
+  }
+  ASSERT_TRUE(live && placeholder);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Started(live); }));
+  // The selected placeholder of a shown window never loads a second copy.
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(tabs::TabInterface::GetFromContents(placeholder)->IsActivated());
+  EXPECT_FALSE(Started(placeholder));
+  EXPECT_FALSE(HasRenderer(placeholder));
+  ASSERT_EQ(store()->pins().size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ThePageFollowsAWorkspaceSwitch) {
+  Profile* profile = browser()->GetProfile();
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal = list.workspaces()[0].id;
+  const std::string reading = list.Add(
+      "Reading", std::string(list.UnusedIcon()), profile->GetBaseName());
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  Browser* partner = nullptr;
+  WorkspaceWindow::From(browser())->Switch(
+      reading, base::BindOnce(
+                   [](Browser** partner, BrowserWindowInterface* shown) {
+                     *partner = shown->GetBrowserForMigrationOnly();
+                   },
+                   &partner));
+  ASSERT_TRUE(base::test::RunUntil([&] { return partner != nullptr; }));
+  ASSERT_TRUE(ShowsPins(partner, {GURL(kNotes)}));
+  // Selecting the pin in the shown window takes the page from the hidden one.
+  MovePage(browser(), partner);
+
+  // Switching back, the page follows into the window that shows.
+  WorkspaceWindow::From(partner)->Switch(personal);
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_EQ(StateOf(page), state);
+  EXPECT_EQ(LiveCopies(), 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ReloadInAPlaceholderBringsThePage) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  MovePage(browser(), second);
+  const std::string state = StateOf(page);
+
+  chrome::ExecuteCommand(browser(), IDC_RELOAD);
+
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_TRUE(content::WaitForLoadStop(page));
+  // The live page reloaded: the same page, loaded again.
+  EXPECT_NE(StateOf(page), state);
+  EXPECT_EQ(LiveCopies(), 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, BackInAPlaceholderGoesBackInThePage) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::NavigateToURL(page, GURL(kMoreNotes)));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kMoreNotes)}));
+  MovePage(browser(), second);
+
+  chrome::ExecuteCommand(browser(), IDC_BACK);
+
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return page->GetLastCommittedURL() == GURL(kNotes); }));
+  EXPECT_EQ(LiveCopies(), 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, PlaceholdersFollowThePagesHistory) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+
+  ASSERT_TRUE(content::NavigateToURL(page, GURL(kMoreNotes)));
+
+  EXPECT_TRUE(ShowsPins(second, {GURL(kMoreNotes)}));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return PinPageOf(second)->GetTitle() == u"More notes"; }));
+  EXPECT_EQ(PinPageOf(second)->GetController().GetEntryCount(), 2);
+  EXPECT_FALSE(HasRenderer(PinPageOf(second)));
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       UnpinningWhenNoWindowHoldsThePageOpensItHere) {
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  content::WebContents* page = Pin(second, GURL(kNotes))->GetContents();
+  ASSERT_TRUE(ShowsPins(browser(), {GURL(kNotes)}));
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  CloseBrowserSynchronously(second);
+
+  browser()->tab_strip_model()->SetTabPinned(0, /*pinned=*/false);
+
+  TabStripModel* tabs = browser()->tab_strip_model();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs->GetIndexOfWebContents(page) != TabStripModel::kNoTab;
+  }));
+  EXPECT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
+  EXPECT_EQ(StateOf(page), state);
+  EXPECT_TRUE(store()->pins().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       APageThatAsksBeforeLeavingLetsItsWindowClose) {
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  content::WebContents* page = Pin(second, GURL(kDraft))->GetContents();
+  ASSERT_TRUE(ShowsPins(browser(), {GURL(kDraft)}));
+  // Gives the page the user activation it needs to ask.
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  base::WeakPtr<content::WebContents> alive = page->GetWeakPtr();
+
+  CloseBrowserSynchronously(second);
+
+  ASSERT_TRUE(alive);
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  ASSERT_TRUE(Holds(browser(), page));
+  // Quitting still asks, as Chromium does, so the test lets it go.
+  EXPECT_TRUE(content::ExecJs(page, "onbeforeunload = null"));
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TwoQuickSelectionsLeaveOneLivePage) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  Browser* third = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  ASSERT_TRUE(ShowsPins(third, {GURL(kNotes)}));
+
+  second->tab_strip_model()->ActivateTabAt(0);
+  third->tab_strip_model()->ActivateTabAt(0);
+
+  ASSERT_TRUE(Holds(third, page));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(PinPageOf(third), page);
+  EXPECT_EQ(LiveCopies(), 1);
+  EXPECT_EQ(StateOf(page), state);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       CmdShiftTBringsTheWindowBackWithItsPage) {
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  content::WebContents* page = Pin(second, GURL(kNotes))->GetContents();
+  ASSERT_TRUE(ShowsPins(browser(), {GURL(kNotes)}));
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  CloseBrowserSynchronously(second);
+
+  chrome::RestoreTab(browser());
+
+  Browser* back = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      if (window != browser()) {
+        back = window->GetBrowserForMigrationOnly();
+      }
+    }
+    return back && back->tab_strip_model()->count() > 0 &&
+           PinPageOf(back) == page;
+  }));
+  EXPECT_EQ(StateOf(page), state);
+  // It comes back as the same pin, not a new one.
+  EXPECT_EQ(store()->pins().size(), 1u);
+  EXPECT_EQ(PinnedUrls(browser()), std::vector<GURL>{GURL(kNotes)});
+}
+
+// Needs a real window: run it with `pnpm run window-tests`.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, MANUAL_TheHazedViewShowsInARealWindow) {
+  Profile* profile = browser()->GetProfile();
+  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+      ThemeService::BrowserColorScheme::kLight);
+  Pin(browser(), GURL(kNotes));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  MovePage(browser(), second);
+  views::View* haze = WaitForHaze(browser());
+  ASSERT_TRUE(haze);
+  // macOS draws a window behind another only once it comes to the front.
+  browser()->GetWindow()->Activate();
+
+  views::View* pill = haze->children().back();
+  SkColor in_pill = SK_ColorTRANSPARENT;
+  SkColor in_haze = SK_ColorTRANSPARENT;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const SkBitmap bitmap = CaptureNativeWindow(browser());
+    const gfx::Rect pill_bounds =
+        pill->ConvertRectToWidget(pill->GetLocalBounds());
+    const gfx::Rect haze_bounds =
+        haze->ConvertRectToWidget(haze->GetLocalBounds());
+    const float scale = static_cast<float>(bitmap.width()) /
+                        haze->GetWidget()->GetWindowBoundsInScreen().width();
+    in_pill = bitmap.getColor((pill_bounds.x() + 24 + 8) * scale,
+                              pill_bounds.CenterPoint().y() * scale);
+    in_haze = bitmap.getColor((haze_bounds.x() + 40) * scale,
+                              (haze_bounds.y() + 40) * scale);
+    return in_haze != SK_ColorWHITE;
+  }));
+  EXPECT_EQ(in_pill, SK_ColorWHITE);
+  EXPECT_FALSE(color_utils::IsDark(in_haze));
+  SaveNativeWindowScreenshot(browser(), "pin-haze-real-window");
 }
 
 }  // namespace

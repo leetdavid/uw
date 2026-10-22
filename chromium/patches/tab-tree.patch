@@ -415,7 +415,7 @@ index 2e7510e..54b0c39 100644
        ":browser_actions",
        ":browser_select_file_dialog_controller",
 diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
-index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f6288a7d6de3cbd42271c54de3986b53c8dd9e02 100644
+index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1ca0b7e05 100644
 --- a/chrome/browser/ui/browser_tabrestore.cc
 +++ b/chrome/browser/ui/browser_tabrestore.cc
 @@ -3,6 +3,9 @@
@@ -440,7 +440,7 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f6288a7d6de3cbd42271c54de3986b53
    if (initially_hidden) {
      raw_web_contents->WasHidden();
    } else {
-@@ -285,15 +291,21 @@ WebContents* AddRestoredTab(
+@@ -285,15 +291,20 @@ WebContents* AddRestoredTab(
      const std::map<std::string, std::string>& extra_data,
      bool from_session_restore,
      std::optional<bool> is_active_browser) {
@@ -461,26 +461,26 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f6288a7d6de3cbd42271c54de3986b53
 +      AddRestoredTabImpl(std::move(web_contents), browser, tab_index, group,
 +                         select, pin, from_session_restore, is_active_browser);
 +  uw::TabOrganizationController::RestoreTab(browser, restored, extra_data);
-+  uw::PinSync::RestoreTab(restored, extra_data);
-+  return restored;
++  return uw::PinSync::RestoreTab(browser, restored, extra_data);
  }
  
  WebContents* ReplaceRestoredTab(
-@@ -319,6 +331,9 @@ WebContents* ReplaceRestoredTab(
+@@ -319,6 +330,10 @@ WebContents* ReplaceRestoredTab(
        insertion_index + 1, std::move(web_contents),
        AddTabTypes::ADD_ACTIVE | AddTabTypes::ADD_INHERIT_OPENER,
        tab_strip->GetTabGroupForTab(insertion_index));
-+  uw::PinSync::RestoreTab(raw_web_contents, extra_data);
++  raw_web_contents =
++      uw::PinSync::RestoreTab(browser, raw_web_contents, extra_data);
 +  uw::TabOrganizationController::RestoreTab(browser, raw_web_contents,
 +                                            extra_data);
  
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..2c97f7a25ed9735c54e6ab3be2cfc5c60663c959 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..25d1e73537a346126e21a5de7d7aba75c7d34859 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,13 @@ source_set("internal") {
+@@ -58,6 +58,14 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
@@ -490,15 +490,16 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..2c97f7a25ed9735c54e6ab3be2cfc5c6
 +      "//uw/browser/tab_organization",
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/views/page_colors",
++      "//uw/browser/ui/views/pins",
 +      "//uw/browser/workspaces",
        "//chrome/browser:global_features",
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..7e1c36c387a8808184ff334f9aa038898c896465 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..13aefe0499b3a49c1d83ca3fa717dc11b854e22c 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -4,8 +4,17 @@
+@@ -4,8 +4,18 @@
  
  #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
  
@@ -510,13 +511,14 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..7e1c36c387a8808184ff334f9aa03889
 +#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/tab_organization/automatic_organizer.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
 +#include "uw/browser/ui/views/page_colors/page_colors.h"
 +#include "uw/browser/workspaces/workspace_window.h"
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +30,40 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +31,42 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -554,18 +556,20 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..7e1c36c387a8808184ff334f9aa03889
 +  if (browser_view->browser()->GetType() ==
 +      BrowserWindowInterface::TYPE_NORMAL) {
 +    page_colors_ = std::make_unique<uw::PageColors>(browser_view);
++    inactive_pins_ = std::make_unique<uw::InactivePinOverlay>(browser_view);
 +  }
  }
  
  void EmbedderBrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
 -  // Embedder implementation goes here.
 +  page_colors_.reset();
++  inactive_pins_.reset();
  }
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..234a03aaf40aa5d4398f3904aa8e3637b126c56d 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..7901db12cd3c0a3435c28984d4fc9159d0a26437 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,17 @@
+@@ -7,6 +7,18 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
@@ -574,6 +578,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..234a03aaf40aa5d4398f3904aa8e3637
 +namespace uw {
 +class AutomaticOrganizer;
 +class CommandBar;
++class InactivePinOverlay;
 +class PageColors;
 +class PinSync;
 +class TabOrganizationController;
@@ -583,7 +588,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..234a03aaf40aa5d4398f3904aa8e3637
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +55,12 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +56,13 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
@@ -591,6 +596,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..234a03aaf40aa5d4398f3904aa8e3637
 +  std::unique_ptr<uw::AutomaticOrganizer> automatic_organizer_;
 +  std::unique_ptr<uw::CommandBar> command_bar_;
 +  std::unique_ptr<uw::PageColors> page_colors_;
++  std::unique_ptr<uw::InactivePinOverlay> inactive_pins_;
 +  std::unique_ptr<uw::PinSync> pin_sync_;
 +  std::unique_ptr<uw::WorkspaceWindow> workspace_window_;
  };
