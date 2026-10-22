@@ -241,7 +241,9 @@ Agreed on 2026-10-22: a scheduled chat stays one conversation. Each [run](CONTEX
 
 Agreed on 2026-10-22: a run uses its scheduled chat's [approval mode](CONTEXT.md#language), shown on the schedule card, which turns amber for Full auto. One run of a scheduled chat goes at a time. A run waiting for approval waits until the user answers or stops it; the times due meanwhile are skipped, and the chat then says "Skipped 3 runs while this waited for you."
 
-Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go at once, and there is no spending cap. A run uses its chat's model and effort.
+Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go at once, and there is no spending cap.
+
+Agreed on 2026-10-22: the schedule card has a Model row, with the chat's model and effort chips, for the model runs use, such as a cheaper one like DeepSeek's `deepseek-flash`. It starts on the model last picked on a schedule card. Replies in the chat use the chat's own model. Only models the model catalog lists with tool calls can run, since a run ends with `report`.
 
 Agreed on 2026-10-22: the model judges whether something happened; uw does no page comparison of its own. A run ends by calling a `report` tool with whether it found what the user asked to hear about, a message, and its tracked values, such as `price: 99 USD`. uw acts only on that: it notifies per the chat's setting, saves the values, and writes the run's line. A run that ends without a report counts as "Didn't finish", never as no change. For runs, these settings replace the notification a chat sends when it answers.
 
