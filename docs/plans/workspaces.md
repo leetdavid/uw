@@ -54,7 +54,7 @@ Chosen by uw for T133 on 2026-10-22, and built the same day.
 - Each placeholder saves `uw.pin_placeholder` in the session file beside `uw.pin`. A restart, or Cmd+Shift+T, brings it back as a placeholder before it loads, and so does a copy whose live page another window already holds, such as the second copy in a session saved before T133. Cmd+Shift+T keeps both keys, so a window it brings back has its pins, not new ones.
 - Unpinning a placeholder closes it, and the live page stays a regular tab where it is, or opens in its place when no window has it.
 - The `HandleBeforeClose` hook and the profile's new keep-alive reason are in the `uw-live-pins` patch. Restoring placeholders is in `tab-tree`, and keeping the keys through Cmd+Shift+T in `uw-workspaces`.
-- Built differently from the design: the picture is of the page, so a light page stays light under the dark haze. In dark mode the pill takes the dark card's field color, `#171717` on uw's black. "Open here" is not yet in Chromium's string files, so it is not translated.
+- Built differently from the design: the picture is of the page, so a light page stays light under the dark haze. In dark mode the pill takes the dark card's field color, `#171717` on uw's black.
 
 ## How workspace windows work
 

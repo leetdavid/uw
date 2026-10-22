@@ -15,7 +15,9 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
+#include "chrome/grit/generated_resources.h"
 #include "components/tabs/public/tab_interface.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -116,7 +118,8 @@ class OpenHerePill : public views::View {
         ->set_cross_axis_alignment(
             views::BoxLayout::CrossAxisAlignment::kCenter);
     icon_ = AddChildView(std::make_unique<views::ImageView>());
-    label_ = AddChildView(std::make_unique<views::Label>(u"Open here"));
+    label_ = AddChildView(std::make_unique<views::Label>(
+        l10n_util::GetStringUTF16(IDS_UW_OPEN_HERE)));
     const gfx::FontList base;
     label_->SetFontList(base.DeriveWithSizeDelta(13 - base.GetFontSize())
                             .DeriveWithWeight(gfx::Font::Weight::MEDIUM));
