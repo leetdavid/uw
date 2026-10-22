@@ -19,7 +19,9 @@ namespace uw {
 
 // What the model sees of a chat. Every tool result is kept in full, but the
 // model gets one short line for the results it no longer needs, and the
-// recall tool brings any of them back. See docs/plans/agent-chats.md#context.
+// recall tool brings any of them back. Each request only adds to the one
+// before it, except where a result shrinks, so a provider's cache serves the
+// rest. See docs/plans/agent-chats.md#context.
 class AgentContext {
  public:
   AgentContext();
@@ -45,11 +47,13 @@ class AgentContext {
                 std::string_view tool,
                 const base::DictValue& args,
                 const base::DictValue& result);
-  // What the recall tool answers to `args`.
+  // The step or image `args` names, as the recall tool finds it.
   base::DictValue Recall(const base::DictValue& args) const;
-  // Shortens every long result and every image, for when the model has
-  // answered.
-  void ShortenAll();
+  // What the recall tool answers to `args`: Recall(), unless it would take
+  // the results since the user's latest message past half of `max_length`,
+  // which Request() would shrink again.
+  base::DictValue RecallWithin(const base::DictValue& args,
+                               size_t max_length) const;
   // Lists `skills`, one per line, in the instructions every request starts
   // with. Empty for none.
   void SetSkills(std::string_view skills);
@@ -58,7 +62,7 @@ class AgentContext {
   void SetConnectors(std::string_view connectors);
   // Tools every request offers beside uw's own: the connector tool and the
   // tools of each connector the model loaded.
-  void SetExtraTools(base::ListValue tools) { extra_tools_ = std::move(tools); }
+  void SetExtraTools(base::ListValue tools);
   // A connector the model loaded, whose tools it keeps for the rest of the
   // chat.
   void LoadConnector(std::string_view name);
@@ -88,10 +92,15 @@ class AgentContext {
   // answer or an image.
   std::vector<std::string> UserAndActions(std::string_view call_id) const;
 
-  // The request for `model`. Shortens the oldest long results until it fits
-  // in `max_length` characters, not counting images, or nothing is left to
-  // shorten.
+  // The request for `model`. Above `max_length` characters, each image
+  // counted as kImageLength, it shrinks the oldest results and images until
+  // the request is half that long, those since the user's latest message last
+  // and only as far as `max_length`.
   std::optional<std::string> Request(std::string_view model, size_t max_length);
+
+  // What an image counts for in a request's length: about as many tokens as
+  // a screenshot costs.
+  static constexpr size_t kImageLength = 6000;
 
  private:
   struct Result {
@@ -116,8 +125,19 @@ class AgentContext {
   static bool CanShorten(const Result& result);
   // The instructions, with the skills and connectors.
   void UpdateInstructions();
+  std::optional<std::string> Body(std::string_view model) const;
+  size_t Length(const std::string& body) const;
+  // Where the user's latest message sits in `messages_`.
+  size_t ReplyStart() const;
+  // Shortens the oldest long result or image before `end`, or returns false
+  // when there is none.
+  bool ShortenOldestBefore(size_t end);
   void Shorten(Result& result);
   void Shorten(Image& image);
+  // Drops what the provider kept with the turns after `message`: a provider
+  // that checks it against the conversation before it refuses it once that
+  // has changed.
+  void DropKeptAfter(size_t message);
   const Image* FindImage(int number) const;
 
   base::ListValue messages_;

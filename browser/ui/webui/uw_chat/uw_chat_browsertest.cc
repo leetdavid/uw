@@ -649,15 +649,14 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatComesBackAfterARestart) {
   EXPECT_EQ(Lines(chat, ".answer"),
             std::vector<std::string>{"The tour form asks for your name."});
 
-  // The model still knows the chat, with the page it read shortened.
+  // The model still knows the chat, with the page it read.
   UseAgentModel();
   model_.Script({ScriptedModel::Answer("Only your name.")});
   EXPECT_EQ(Ask(chat, "Anything else?"), "Only your name.");
   ASSERT_EQ(model_.Requests().size(), 1u);
   EXPECT_THAT(model_.Requests()[0],
               ::testing::HasSubstr("What does the tour form ask?"));
-  EXPECT_THAT(model_.Requests()[0],
-              ::testing::HasSubstr("Call recall with step 2"));
+  EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr("Your name"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PRE_AStoppedChatGoesOnWithContinue) {

@@ -262,17 +262,36 @@ base::DictValue AgentContext::Recall(const base::DictValue& args) const {
   return recalled;
 }
 
-void AgentContext::ShortenAll() {
-  for (Result& result : results_) {
-    if (!result.shortened && CanShorten(result)) {
-      Shorten(result);
+base::DictValue AgentContext::RecallWithin(const base::DictValue& args,
+                                           size_t max_length) const {
+  base::DictValue recalled = Recall(args);
+  if (recalled.contains("error")) {
+    return recalled;
+  }
+  const size_t reply = ReplyStart();
+  size_t held = 0;
+  for (const Result& result : results_) {
+    if (result.message >= reply && !result.shortened) {
+      held += Json(result.result).size();
     }
   }
-  for (Image& image : images_) {
-    if (!image.shortened) {
-      Shorten(image);
+  for (const Image& image : images_) {
+    if (image.message >= reply && !image.shortened) {
+      held += kImageLength;
     }
   }
+  const std::optional<int> image = recalled.FindInt("image");
+  if (held + (image ? kImageLength : Json(recalled).size()) <= max_length / 2) {
+    return recalled;
+  }
+  return base::DictValue().Set(
+      "error",
+      base::StrCat({image ? "Image " : "Step ",
+                    base::NumberToString(
+                        image ? *image : recalled.FindInt("step").value_or(0)),
+                    " is not brought back: with what this reply already "
+                    "holds, the request would be too long. Work from what is "
+                    "in view."}));
 }
 
 void AgentContext::SetSkills(std::string_view skills) {
@@ -295,7 +314,17 @@ void AgentContext::UpdateInstructions() {
     base::StrAppend(&content, {"\n\n", connectors_});
   }
   instructions.Set("content", std::move(content));
-  messages_[0] = base::Value(std::move(instructions));
+  if (messages_[0].GetDict() != instructions) {
+    messages_[0] = base::Value(std::move(instructions));
+    DropKeptAfter(0);
+  }
+}
+
+void AgentContext::SetExtraTools(base::ListValue tools) {
+  if (tools != extra_tools_) {
+    extra_tools_ = std::move(tools);
+    DropKeptAfter(0);
+  }
 }
 
 void AgentContext::LoadConnector(std::string_view name) {
@@ -421,29 +450,72 @@ void AgentContext::CloseOpenCalls(std::string_view error) {
 
 std::optional<std::string> AgentContext::Request(std::string_view model,
                                                  size_t max_length) {
-  // Images are sent as they are; only text counts against the limit.
-  size_t pictures = 0;
+  std::optional<std::string> body = Body(model);
+  if (!body || Length(*body) <= max_length) {
+    return body;
+  }
+  // A shrunk result changes an earlier message, and the provider's cache
+  // serves nothing after it. Shrinking well below the limit at once lets the
+  // requests after this one only add to it.
+  const size_t reply = ReplyStart();
+  while (body && Length(*body) > max_length / 2 && ShortenOldestBefore(reply)) {
+    body = Body(model);
+  }
+  while (body && Length(*body) > max_length &&
+         ShortenOldestBefore(messages_.size())) {
+    body = Body(model);
+  }
+  return body;
+}
+
+std::optional<std::string> AgentContext::Body(std::string_view model) const {
+  base::ListValue tools = AgentToolSchemas();
+  for (const base::Value& tool : extra_tools_) {
+    tools.Append(tool.Clone());
+  }
+  return BuildAgentRequestBody(model, messages_, tools);
+}
+
+size_t AgentContext::Length(const std::string& body) const {
+  size_t length = body.size();
   for (const Image& image : images_) {
-    pictures += image.shortened ? 0 : image.url.size();
+    if (!image.shortened) {
+      length = length - image.url.size() + kImageLength;
+    }
   }
-  for (;;) {
-    base::ListValue tools = AgentToolSchemas();
-    for (const base::Value& tool : extra_tools_) {
-      tools.Append(tool.Clone());
+  return length;
+}
+
+size_t AgentContext::ReplyStart() const {
+  size_t start = 0;
+  for (size_t i = 0; i < messages_.size(); ++i) {
+    const base::DictValue& message = messages_[i].GetDict();
+    const std::string* role = message.FindString("role");
+    if (role && *role == "user" &&
+        !message.FindBool(kShownKey).value_or(false)) {
+      start = i;
     }
-    std::optional<std::string> body =
-        BuildAgentRequestBody(model, messages_, tools);
-    if (!body || body->size() <= max_length + pictures) {
-      return body;
-    }
-    auto oldest = std::ranges::find_if(results_, [](const Result& result) {
-      return !result.shortened && CanShorten(result);
-    });
-    if (oldest == results_.end()) {
-      return body;
-    }
-    Shorten(*oldest);
   }
+  return start;
+}
+
+bool AgentContext::ShortenOldestBefore(size_t end) {
+  const auto result = std::ranges::find_if(results_, [end](const Result& r) {
+    return r.message < end && !r.shortened && CanShorten(r);
+  });
+  const auto image = std::ranges::find_if(images_, [end](const Image& i) {
+    return i.message < end && !i.shortened;
+  });
+  if (image != images_.end() &&
+      (result == results_.end() || image->message < result->message)) {
+    Shorten(*image);
+    return true;
+  }
+  if (result != results_.end()) {
+    Shorten(*result);
+    return true;
+  }
+  return false;
 }
 
 // static
@@ -485,6 +557,7 @@ void AgentContext::Shorten(Result& result) {
                           .Set("step", result.step)
                           .Set("shortened", std::move(line))));
   result.shortened = true;
+  DropKeptAfter(result.message);
 }
 
 void AgentContext::Shorten(Image& image) {
@@ -496,6 +569,13 @@ void AgentContext::Shorten(Image& image) {
          " to see it again.]"})));
   }
   image.shortened = true;
+  DropKeptAfter(image.message);
+}
+
+void AgentContext::DropKeptAfter(size_t message) {
+  for (size_t i = message + 1; i < messages_.size(); ++i) {
+    messages_[i].GetDict().Remove(kKeptPartsKey);
+  }
 }
 
 const AgentContext::Image* AgentContext::FindImage(int number) const {

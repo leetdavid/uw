@@ -181,7 +181,7 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, FillsAFormAndSaysItIsDone) {
 }
 
 IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
-                       AFollowUpStartsWithoutPageTextAndCanRecallIt) {
+                       AFollowUpKeepsThePageTextAndCanRecallIt) {
   model_.Script(
       {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
            "open", base::DictValue().Set("url", Url("/form"))))),
@@ -204,8 +204,8 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
   const std::vector<std::string> requests = model_.Requests();
   ASSERT_EQ(requests.size(), 5u);
   EXPECT_THAT(requests[2], HasSubstr("Your name"));
-  EXPECT_THAT(requests[3], Not(HasSubstr("Your name")));
-  EXPECT_THAT(requests[3], HasSubstr("Call recall with step 2"));
+  EXPECT_THAT(requests[3], HasSubstr("Your name"));
+  EXPECT_THAT(requests[3], Not(HasSubstr("Call recall with step 2")));
   EXPECT_THAT(requests[4], HasSubstr("Your name"));
 }
 

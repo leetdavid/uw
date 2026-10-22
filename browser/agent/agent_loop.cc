@@ -32,8 +32,8 @@ namespace {
 constexpr int kMaxTurns = 40;
 // A large model can think for a while before it answers.
 constexpr base::TimeDelta kModelTimeout = base::Minutes(2);
-// Long enough for several full readings, short enough for most models.
-constexpr size_t kMaxRequestLength = 200000;
+// Long enough for a dozen full readings, short enough for most models.
+constexpr size_t kMaxRequestLength = 400000;
 
 // A file of a skill larger than this is not read.
 constexpr size_t kMaxSkillFile = 256 * 1024;
@@ -263,7 +263,7 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     return;
   }
   if (call.name == "recall") {
-    base::DictValue recalled = context_->Recall(*args);
+    base::DictValue recalled = context_->RecallWithin(*args, kMaxRequestLength);
     if (const std::optional<int> image = recalled.FindInt("image")) {
       recalled_images_.push_back(*image);
     }
@@ -665,7 +665,6 @@ void AgentLoop::Finish(Step step) {
   steer_.reset();
   recalled_images_.clear();
   tool_images_.clear();
-  context_->ShortenAll();
   working_ = false;
   on_step_.Run(step);
 }
