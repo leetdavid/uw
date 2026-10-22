@@ -224,6 +224,8 @@ Agreed on 2026-10-22, with the "Watch this page" frames on the canvas: an eye be
 
 Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
 
+Agreed failures, on 2026-10-22: a failed run is one line in the chat, such as `9:00 · Didn't finish · fully.com didn't load`, and the Chats list shows the warning icon until a run succeeds. The first failure after a success notifies with the reason; later ones stay quiet until a run succeeds again. "Sign in required" notifies once and the strip shows it with Sign in, which opens the site in the user's window; the next run tries again. A schedule never pauses itself. Mute silences failures too.
+
 Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of two ways.
 
 | Mode | Behavior |
