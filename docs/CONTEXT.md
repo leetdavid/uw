@@ -170,12 +170,16 @@ An organization mode in which the user accepts or rejects task proposals while r
 A global suspension of automatic tab placement and task proposals. Manual organization and explicitly requested reorganization remain available.
 
 **Scheduled chat**:
-A chat uw runs again on a schedule, such as every morning at 9, to carry out the same request, such as checking a price or looking for news. It need not be about one page.
+A chat uw runs again on its own, on a schedule such as every morning at 9 or on a trigger, to carry out the same request, such as checking a price or looking for news. It need not be about one page.
 _Avoid_: Page watch, watch, routine.
 
 **Run**:
 One time a scheduled chat carries out its request, out of sight, shown as one message in the chat. Underneath, a run is a subagent; say "subagent" only for that mechanism.
 _Avoid_: Check, job, execution.
+
+**Trigger**:
+A command left running out of sight that wakes its chat once when it ends, or once for each line it prints. In a scheduled chat each wake starts a run.
+_Avoid_: Monitor, watcher, hook.
 
 **Tracked value**:
 A value a run records each time, such as a price or whether something is in stock, kept so uw can show how it changed over time.
