@@ -62,6 +62,7 @@
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/components/agent/agent_context.h"
+#include "uw/components/agent/schedule_tool.h"
 
 namespace uw {
 namespace {
@@ -890,6 +891,8 @@ bool UwChatHandler::Start() {
       base::BindRepeating(&UwChatHandler::Save, base::Unretained(this)));
   agent_->SetSkillSaver(base::BindRepeating(&UwChatHandler::AskToSaveSkill,
                                             base::Unretained(this)));
+  agent_->SetScheduleCard(base::BindRepeating(&UwChatHandler::OpenScheduleCard,
+                                              base::Unretained(this)));
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
@@ -1450,6 +1453,10 @@ void UwChatHandler::UpdateIndex() {
 }
 
 void UwChatHandler::NewSchedule(NewScheduleCallback callback) {
+  std::move(callback).Run(StateOf(NewCard()));
+}
+
+ScheduledChat UwChatHandler::NewCard() const {
   ScheduledChat chat;
   for (const base::Value& entry : log_) {
     const base::DictValue* line = entry.GetIfDict();
@@ -1471,7 +1478,22 @@ void UwChatHandler::NewSchedule(NewScheduleCallback callback) {
     chat.effort = model->effort;
   }
   chat.approval_mode = std::string(NameOf(mode_));
-  std::move(callback).Run(StateOf(chat));
+  return chat;
+}
+
+base::DictValue UwChatHandler::OpenScheduleCard(const base::DictValue& args) {
+  const ScheduledChats* chats = schedules_observation_.GetSource();
+  const ScheduledChat* saved = chats ? chats->Find(id_) : nullptr;
+  base::expected<ScheduledChat, std::string> card =
+      FillScheduleCard(args, saved ? *saved : NewCard(), base::Time::Now());
+  if (!card.has_value()) {
+    return base::DictValue().Set("error", std::move(card.error()));
+  }
+  page_->OnScheduleCard(StateOf(*card));
+  return base::DictValue().Set(
+      "result",
+      "The schedule card is open, filled in. Nothing is scheduled until the "
+      "user saves it.");
 }
 
 void UwChatHandler::SaveSchedule(mojom::ChatSchedulePtr schedule) {

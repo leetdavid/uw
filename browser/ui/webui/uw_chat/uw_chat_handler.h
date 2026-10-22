@@ -122,6 +122,12 @@ class UwChatHandler : public mojom::ChatHandler,
   void BringWaitingTab();
   // The schedule card's state for `chat`, which runs on `schedule`.
   mojom::ScheduleStatePtr StateOf(const ScheduledChat& chat) const;
+  // What a new schedule card starts with. See NewSchedule.
+  ScheduledChat NewCard() const;
+  // The agent's schedule call: opens the schedule card filled in, over the
+  // chat's schedule if it has one, and tells the model that nothing is saved
+  // until the user saves it.
+  base::DictValue OpenScheduleCard(const base::DictValue& args);
   // Gives the agent what the chat's scheduled runs reported, from their
   // lines.
   void UpdateScheduledRuns();

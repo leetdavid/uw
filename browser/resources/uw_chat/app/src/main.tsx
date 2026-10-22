@@ -357,6 +357,12 @@ function describe(step: Step): ReactNode {
           Used the <b>{args.name}</b> skill
         </>
       );
+    case "schedule":
+      return (
+        <>
+          Filled in the <b>schedule card</b>
+        </>
+      );
     case "save_skill":
       return (
         <>
@@ -415,6 +421,7 @@ const TOOL_ICONS: Record<string, IconName> = {
   recall: "rotate-ccw",
   skill: "lightbulb",
   save_skill: "check",
+  schedule: "clock",
   connector: "link",
   prompt: "message-circle",
 };
@@ -1505,6 +1512,9 @@ function Chat() {
       chatPage.onSchedule.addListener((state: ScheduleState | null) =>
         setSchedule(state),
       ),
+      chatPage.onScheduleCard.addListener((state: ScheduleState) =>
+        setCard(state),
+      ),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
       chatPage.onAsk.addListener((text: string) => setAsked(text)),
       chatPage.onTabs.addListener(
@@ -1970,6 +1980,8 @@ function Chat() {
         )}
         {card && providers && (
           <ScheduleCard
+            // The agent can fill in the card while it is open.
+            key={JSON.stringify(card.schedule)}
             state={card}
             editing={Boolean(schedule)}
             providers={providers}

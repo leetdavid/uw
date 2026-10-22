@@ -138,6 +138,12 @@ class AgentLoop {
   using Report =
       base::RepeatingCallback<base::DictValue(const base::DictValue& args)>;
   void SetReport(Report report);
+  // A chat's agent fills in the schedule card with the schedule tool. Once
+  // this is set, the model is offered it, and `fill` opens the card for each
+  // call and answers it.
+  using FillScheduleCard =
+      base::RepeatingCallback<base::DictValue(const base::DictValue& args)>;
+  void SetScheduleCard(FillScheduleCard fill);
   // The user's answer to a step that needs approval. A decline may carry a
   // note for the model.
   struct ApprovalAnswer {
@@ -229,6 +235,7 @@ class AgentLoop {
   std::vector<std::pair<std::string, std::vector<std::string>>> tool_images_;
   SaveSkill save_skill_;
   Report report_;
+  FillScheduleCard schedule_card_;
   Approve approve_;
   ApprovalMode mode_ = ApprovalMode::kAuto;
   // The user's no to the engine's question about a site, during the step

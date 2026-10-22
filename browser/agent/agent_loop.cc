@@ -25,6 +25,7 @@
 #include "uw/browser/agent/command_check.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/components/agent/run_report.h"
+#include "uw/components/agent/schedule_tool.h"
 
 namespace uw {
 namespace {
@@ -98,6 +99,11 @@ AgentLoop::~AgentLoop() = default;
 
 void AgentLoop::SetReport(Report report) {
   report_ = std::move(report);
+  UpdateConnectorTools();
+}
+
+void AgentLoop::SetScheduleCard(FillScheduleCard fill) {
+  schedule_card_ = std::move(fill);
   UpdateConnectorTools();
 }
 
@@ -286,6 +292,11 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
   }
   if (call.name == kReportTool && report_) {
     base::DictValue answer = report_.Run(*args);
+    OnTool(std::move(turn), index, std::move(*args), std::move(answer));
+    return;
+  }
+  if (call.name == kScheduleTool && schedule_card_) {
+    base::DictValue answer = schedule_card_.Run(*args);
     OnTool(std::move(turn), index, std::move(*args), std::move(answer));
     return;
   }
@@ -523,6 +534,9 @@ void AgentLoop::UpdateConnectorTools() {
   base::ListValue tools;
   if (report_) {
     tools.Append(ReportToolSchema());
+  }
+  if (schedule_card_) {
+    tools.Append(ScheduleToolSchema());
   }
   if (!connectors_.empty()) {
     tools.Append(LoadConnectorToolSchema());

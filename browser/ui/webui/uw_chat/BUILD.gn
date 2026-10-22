@@ -97,6 +97,7 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:scheduled_chats",
     "//uw/browser/agent:skill_folders",
     "//uw/browser/agent:test_support",
     "//uw/browser/connectors",
@@ -107,6 +108,7 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
     "//uw/browser/ui/views/tab_organization",
+    "//uw/components/agent",
     "//uw/components/ai_providers",
   ]
 }

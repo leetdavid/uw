@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -56,6 +57,7 @@
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/catalog_store.h"
@@ -68,6 +70,7 @@
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
+#include "uw/components/agent/schedule.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -2272,6 +2275,60 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   ASSERT_TRUE(saved);
   const base::ListValue& log = *saved->FindList("log");
   EXPECT_EQ(*log.back().GetDict().FindString("kind"), "run");
+}
+
+// Asked in words to check something on a schedule, the agent fills in the
+// schedule card. Nothing is scheduled until the user saves it.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentFillsInTheScheduleCard) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "schedule", base::DictValue()
+                           .Set("request", "Check the Jarvis desk price")
+                           .Set("repeat", "weekly")
+                           .Set("weekday", "monday")
+                           .Set("time", "08:30")))),
+       ScriptedModel::Answer("Save the card to start.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Check the Jarvis desk price every Monday at 8:30"),
+            "Save the card to start.");
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat, "!!document.querySelector('#schedule-card')")
+        .ExtractBool();
+  }));
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-request').value"),
+            "Check the Jarvis desk price");
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-weekday').value"),
+            "1");
+  EXPECT_EQ(
+      content::EvalJs(chat, "document.querySelector('#schedule-time').value"),
+      "08:30");
+  EXPECT_TRUE(
+      std::ranges::contains(Steps(chat), "Filled in the schedule card"));
+  SaveWindowScreenshot(browser(), "schedule-card-filled-in");
+
+  ScheduledChats* chats = ScheduledChats::For(browser()->GetProfile());
+  ASSERT_TRUE(chats);
+  const std::string id =
+      content::EvalJs(chat, "document.body.dataset.chatId").ExtractString();
+  EXPECT_FALSE(chats->Find(id));
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("report", base::DictValue()
+                                             .Set("found", false)
+                                             .Set("message", "Still $549.")))),
+       ScriptedModel::Answer("Reported.")});
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('#schedule-save').click()"));
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats->Find(id) != nullptr; }));
+  const Schedule& schedule = chats->Find(id)->schedule;
+  EXPECT_EQ(schedule.repeat, Schedule::Repeat::kWeekly);
+  EXPECT_EQ(schedule.weekday, 1);
+  EXPECT_EQ(schedule.hour, 8);
+  EXPECT_EQ(schedule.minute, 30);
 }
 
 }  // namespace

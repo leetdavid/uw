@@ -365,6 +365,9 @@ interface ChatPage {
   // The chat's schedule and how it stands, after OnOpened and after every
   // change. Nothing when it has none.
   OnSchedule(ScheduleState? state);
+  // The agent filled in the schedule card. The page opens it with `state`,
+  // and nothing is saved until the user saves it.
+  OnScheduleCard(ScheduleState state);
 };
 
 // The watch card, under the eye in the address bar: the page of the tab it
