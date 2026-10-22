@@ -130,4 +130,8 @@ void SaveNativeWindowScreenshot(Browser* browser, const std::string& name) {
   Save([&] { return CaptureNativeWindow(browser); }, name);
 }
 
+void SaveBitmap(const SkBitmap& pixels, const std::string& name) {
+  Save([&] { return pixels; }, name);
+}
+
 }  // namespace uw

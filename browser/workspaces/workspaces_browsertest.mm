@@ -4,11 +4,14 @@
 #import <AppKit/AppKit.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "base/files/file_path.h"
 #include "base/run_loop.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
@@ -29,6 +32,8 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
 #include "components/prefs/pref_service.h"
@@ -46,6 +51,7 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -65,6 +71,8 @@ constexpr char kLater[] = "chrome://version/?later";
 constexpr char kAside[] = "chrome://version/?aside";
 constexpr char kGreen[] =
     "data:text/html,<body style='background:rgb(40,160,90)'>";
+constexpr char kBlue[] =
+    "data:text/html,<body style='background:rgb(40,90,200)'>";
 constexpr char kOtherProfile[] = "Other";
 constexpr NSEventModifierFlags kOptionCmd =
     NSEventModifierFlagOption | NSEventModifierFlagCommand;
@@ -108,6 +116,29 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
   static bool IsGreen(SkColor color) {
     return SkColorGetG(color) > SkColorGetR(color) + 60 &&
            SkColorGetG(color) > SkColorGetB(color) + 30;
+  }
+
+  // Whether `color` is kGreen, kBlue, or a fade between them.
+  static bool IsPageColor(SkColor color) {
+    const float toward_blue = (160.0f - SkColorGetG(color)) / 70.0f;
+    const float blue = 90.0f + 110.0f * toward_blue;
+    return std::abs(static_cast<int>(SkColorGetR(color)) - 40) < 30 &&
+           toward_blue > -0.2f && toward_blue < 1.2f &&
+           std::abs(SkColorGetB(color) - blue) < 30;
+  }
+
+  // Where `window`'s page is, in the window.
+  static gfx::Rect PageArea(BrowserWindowInterface* window) {
+    views::View* page =
+        BrowserView::GetBrowserViewForBrowser(window)->multi_contents_view();
+    return page->ConvertRectToWidget(page->GetLocalBounds());
+  }
+
+  // The middle of `area` and points 24px in from its corners.
+  static std::vector<gfx::Point> InsetCorners(gfx::Rect area) {
+    area.Inset(24);
+    return {area.CenterPoint(), area.origin(), area.top_right(),
+            area.bottom_left(), area.bottom_right()};
   }
 
   static void Wait(base::TimeDelta time) {
@@ -690,6 +721,117 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   }
   EXPECT_TRUE(IsGreen(middle)) << std::hex << middle;
   SaveNativeWindowScreenshot(browser(), "workspace-shown-by-macos");
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       ASwitchDrawsUnderTheWindowThenComesUpWithoutAnimating) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
+  const std::string work = WorkspaceWindow::From(browser())->workspace();
+  ASSERT_TRUE(WorkspaceWindow::From(partner)->Switch(work));
+  // browser() is in, under the window that shows, drawing its page unseen.
+  EXPECT_TRUE(WorkspaceWindow::From(partner)->switching());
+  EXPECT_TRUE(browser()->GetWindow()->IsVisible());
+  EXPECT_TRUE(WorkspaceWindow::From(browser())->hidden());
+  EXPECT_FALSE(NSWindowOf(browser()).contentView.hidden);
+  EXPECT_TRUE(partner->GetWindow()->IsVisible());
+  EXPECT_FALSE(WorkspaceWindow::From(partner)->hidden());
+  EXPECT_EQ(NSWindowOf(browser()).animationBehavior,
+            NSWindowAnimationBehaviorNone);
+  EXPECT_EQ(NSWindowOf(partner).animationBehavior,
+            NSWindowAnimationBehaviorNone);
+  // A second switch waits for this one.
+  EXPECT_FALSE(WorkspaceWindow::From(partner)->Switch(work));
+
+  EXPECT_EQ(WaitForShown(partner, work), browser());
+  EXPECT_FALSE(WorkspaceWindow::From(partner)->switching());
+  EXPECT_FALSE(partner->GetWindow()->IsVisible());
+  EXPECT_TRUE(WorkspaceWindow::From(partner)->hidden());
+  EXPECT_EQ(NSWindowOf(browser()).animationBehavior,
+            NSWindowAnimationBehaviorDocumentWindow);
+  EXPECT_EQ(NSWindowOf(partner).animationBehavior,
+            NSWindowAnimationBehaviorDocumentWindow);
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, ANewWindowStillAnimates) {
+  chrome::ExecuteCommand(browser(), IDC_NEW_WINDOW);
+  ASSERT_TRUE(base::test::RunUntil([&] { return Windows().size() == 2u; }));
+  for (BrowserWindowInterface* window : Windows()) {
+    EXPECT_EQ(NSWindowOf(window).animationBehavior,
+              NSWindowAnimationBehaviorDocumentWindow);
+  }
+}
+
+// Run with pnpm run window-tests: switching each way, the window in front
+// always shows one of the two pages, or the fade between them, and never a
+// blank page. While both windows are on screen, the one coming waits under
+// the one going, and neither plays macOS's animation. Capturing the screen
+// itself, which would show that animation, needs a permission the VM has not
+// granted, so each window is captured on its own.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       MANUAL_ASwitchNeverShowsABlankOrAnimatingWindow) {
+  BrowserWindowInterface* partner = SwitchAway(GURL(kBlue));
+  Load(partner, GURL(kGreen));
+  const std::string work = WorkspaceWindow::From(browser())->workspace();
+  const std::string reading = WorkspaceWindow::From(partner)->workspace();
+  Wait(base::Milliseconds(500));
+
+  BrowserWindowInterface* from = partner;
+  int frames = 0;
+  for (const std::string& to : {work, reading, work}) {
+    BrowserWindowInterface* coming = from == partner ? browser() : partner;
+    RunWindowCommand(from, to == work ? kPreviousWorkspace : kNextWorkspace);
+    const base::TimeTicks give_up = base::TimeTicks::Now() + base::Seconds(5);
+    base::TimeTicks gone;
+    while (base::TimeTicks::Now() < give_up &&
+           (gone.is_null() ||
+            base::TimeTicks::Now() < gone + base::Milliseconds(400))) {
+      NSWindow* going = NSWindowOf(from);
+      NSWindow* arriving = NSWindowOf(coming);
+      if (going.visible && arriving.visible) {
+        EXPECT_GT(arriving.orderedIndex, going.orderedIndex);
+        EXPECT_EQ(going.animationBehavior, NSWindowAnimationBehaviorNone);
+        EXPECT_EQ(arriving.animationBehavior, NSWindowAnimationBehaviorNone);
+      }
+      BrowserWindowInterface* front =
+          going.visible && (!arriving.visible ||
+                            going.orderedIndex < arriving.orderedIndex)
+              ? from
+              : coming;
+      const bool going_shown = going.visible;
+      const bool arriving_shown = arriving.visible;
+      const SkBitmap pixels =
+          CaptureNativeWindow(front->GetBrowserForMigrationOnly());
+      // A capture lands a little later, so one that spans the moment the
+      // windows trade places pictures the wrong one.
+      const bool settled =
+          going.visible == going_shown && arriving.visible == arriving_shown;
+      const double scale = pixels.width() / NSWidth(NSWindowOf(front).frame);
+      const std::vector<gfx::Point> points =
+          settled ? InsetCorners(PageArea(front)) : std::vector<gfx::Point>();
+      for (const gfx::Point& point : points) {
+        const SkColor color =
+            pixels.getColor(static_cast<int>(point.x() * scale),
+                            static_cast<int>(point.y() * scale));
+        EXPECT_TRUE(IsPageColor(color))
+            << "frame " << frames << " at " << point.ToString() << ": "
+            << std::hex << color;
+      }
+      if (frames < 12) {
+        SaveBitmap(pixels, "switch-" + base::NumberToString(frames));
+      }
+      ++frames;
+      if (gone.is_null() && !going.visible) {
+        gone = base::TimeTicks::Now();
+      }
+    }
+    EXPECT_FALSE(gone.is_null());
+    from = WaitForShown(from, to);
+    ASSERT_EQ(from, coming);
+    EXPECT_EQ(NSWindowOf(browser()).animationBehavior,
+              NSWindowAnimationBehaviorDocumentWindow);
+    EXPECT_EQ(NSWindowOf(partner).animationBehavior,
+              NSWindowAnimationBehaviorDocumentWindow);
+  }
 }
 
 }  // namespace

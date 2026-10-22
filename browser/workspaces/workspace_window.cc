@@ -12,6 +12,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
 #include "base/uuid.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/lifetime/browser_shutdown.h"
@@ -36,16 +37,23 @@
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/core/tab_restore_types.h"
 #include "components/tabs/public/tab_interface.h"
+#include "components/viz/common/frame_timing_details.h"
 #include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/compositor/compositor.h"
 #include "url/gurl.h"
 #include "uw/browser/workspaces/workspace_list.h"
 
 namespace uw {
 namespace {
+
+// How long a window revealed under its partner waits to draw before it comes
+// to the front anyway.
+constexpr base::TimeDelta kRevealWait = base::Milliseconds(200);
 
 base::RepeatingCallbackList<void(BrowserWindowInterface*)>& Reveals() {
   static base::NoDestructor<
@@ -153,18 +161,30 @@ std::vector<WorkspaceWindow*> WorkspaceWindow::Partners() const {
   return partners;
 }
 
-void WorkspaceWindow::Switch(std::string_view id, WindowCallback shown) {
-  if (hidden_ || !WorkspaceList::Get().Find(id)) {
-    return;
+bool WorkspaceWindow::Switch(std::string_view id, WindowCallback shown) {
+  if (hidden_ || switching() || !WorkspaceList::Get().Find(id)) {
+    return false;
   }
   WithPartner(id, base::BindOnce(
                       [](WindowCallback shown, BrowserWindowInterface* window) {
-                        From(window)->Reveal();
-                        if (shown) {
-                          std::move(shown).Run(window);
-                        }
+                        From(window)->Reveal(
+                            shown ? base::BindOnce(std::move(shown), window)
+                                  : base::OnceClosure());
                       },
                       std::move(shown)));
+  return true;
+}
+
+bool WorkspaceWindow::switching() const {
+  if (revealing_) {
+    return true;
+  }
+  for (const WorkspaceWindow* partner : Partners()) {
+    if (partner->revealing_) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void WorkspaceWindow::Slide(std::string_view id) {
@@ -290,7 +310,8 @@ bool WorkspaceWindow::WillShow(BrowserWindowInterface* window) {
 
 void WorkspaceWindow::OnWidgetVisibilityChanged(views::Widget* widget,
                                                 bool visible) {
-  if (visible && hidden_) {
+  // A reveal orders the window in under its partner itself.
+  if (visible && hidden_ && !revealing_) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&WorkspaceWindow::OnShownElsewhere,
                                   weak_factory_.GetWeakPtr()));
@@ -302,7 +323,7 @@ void WorkspaceWindow::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void WorkspaceWindow::OnShownElsewhere() {
-  if (!hidden_ || !window_->GetWindow()->IsVisible()) {
+  if (!hidden_ || revealing_ || !window_->GetWindow()->IsVisible()) {
     return;
   }
   WillShow(window_);
@@ -318,29 +339,119 @@ base::CallbackListSubscription WorkspaceWindow::ObserveReveals(
   return Reveals().Add(std::move(shown));
 }
 
-void WorkspaceWindow::Reveal() {
+void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
+  if (revealed) {
+    revealed_.push_back(std::move(revealed));
+  }
+  if (revealing_) {
+    return;
+  }
   WorkspaceWindow* shown = nullptr;
   for (WorkspaceWindow* partner : Partners()) {
     if (!partner->hidden_) {
       shown = partner;
     }
   }
+  // With nothing to swap with, or once something else has put the window on
+  // screen, it comes to the front at once.
+  if (!shown || window_->GetWindow()->IsVisible()) {
+    Present(shown ? shown->weak_factory_.GetWeakPtr() : nullptr);
+    return;
+  }
+  // Otherwise it goes in just under its partner, where it draws unseen, and
+  // comes to the front once it has drawn. Neither window plays macOS's open
+  // or close animation.
+  revealing_ = true;
+  ++reveals_;
+  SetAnimates(false);
+  shown->SetAnimates(false);
+  window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
+  SetContentsHidden(false);
+  OrderBelow(shown);
+  LoadActiveTab();
+  const auto present = base::BindRepeating(
+      [](base::WeakPtr<WorkspaceWindow> self,
+         base::WeakPtr<WorkspaceWindow> shown, int reveal) {
+        if (self && self->revealing_ && self->reveals_ == reveal) {
+          self->Present(shown);
+        }
+      },
+      weak_factory_.GetWeakPtr(), shown->weak_factory_.GetWeakPtr(),
+      reveals_);
+  // The page draws first, then the window shows a frame with it.
+  const auto drawn = base::BindRepeating(
+      [](base::WeakPtr<WorkspaceWindow> self, base::RepeatingClosure present,
+         int reveal) {
+        if (!self || !self->revealing_ || self->reveals_ != reveal) {
+          return;
+        }
+        views::Widget* widget = self->GetWidget();
+        ui::Compositor* compositor =
+            widget ? widget->GetCompositor() : nullptr;
+        if (!compositor) {
+          present.Run();
+          return;
+        }
+        compositor->RequestSuccessfulPresentationTimeForNextFrame(
+            base::BindOnce([](base::RepeatingClosure present,
+                              const viz::FrameTimingDetails&) {
+              present.Run();
+            }, present));
+      },
+      weak_factory_.GetWeakPtr(), present, reveals_);
+  content::WebContents* page =
+      window_->GetTabStripModel()->GetActiveWebContents();
+  if (page && page->GetPrimaryMainFrame()->IsRenderFrameLive()) {
+    page->GetPrimaryMainFrame()->InsertVisualStateCallback(base::BindOnce(
+        [](base::RepeatingClosure drawn, bool) { drawn.Run(); }, drawn));
+  } else {
+    drawn.Run();
+  }
+  reveal_timer_.Start(FROM_HERE, kRevealWait, present);
+}
+
+void WorkspaceWindow::Present(base::WeakPtr<WorkspaceWindow> shown) {
+  revealing_ = false;
+  reveal_timer_.Stop();
   SetHidden(false);
   SaveSession();
-  if (shown) {
+  if (shown && shown.get() != this) {
     window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
   }
   window_->GetWindow()->Show();
+  LoadActiveTab();
+  if (shown && shown.get() != this && !shown->hidden_) {
+    shown->SetAnimates(false);
+    shown->SetHidden(true);
+    shown->SaveSession();
+    shown->window_->GetWindow()->Hide();
+    shown->SetAnimates(true);
+  }
+  SetAnimates(true);
+  Reveals().Notify(window_);
+  std::vector<base::OnceClosure> revealed;
+  revealed.swap(revealed_);
+  for (base::OnceClosure& done : revealed) {
+    std::move(done).Run();
+  }
+}
+
+void WorkspaceWindow::LoadActiveTab() {
   if (content::WebContents* active =
           window_->GetTabStripModel()->GetActiveWebContents()) {
     active->GetController().LoadIfNecessary();
   }
-  if (shown) {
-    shown->SetHidden(true);
-    shown->SaveSession();
-    shown->window_->GetWindow()->Hide();
+}
+
+views::Widget* WorkspaceWindow::GetWidget() {
+  return views::Widget::GetWidgetForNativeWindow(
+      window_->GetWindow()->GetNativeWindow());
+}
+
+void WorkspaceWindow::SetAnimates(bool animates) {
+  if (views::Widget* widget = GetWidget()) {
+    widget->SetVisibilityChangedAnimationsEnabled(animates);
   }
-  Reveals().Notify(window_);
 }
 
 void WorkspaceWindow::OpenPartner(const std::string& id,

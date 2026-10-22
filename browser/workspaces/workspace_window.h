@@ -15,6 +15,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/timer/timer.h"
 #include "components/sessions/core/session_id.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/views/widget/widget.h"
@@ -73,7 +74,10 @@ class WorkspaceWindow : public views::WidgetObserver {
   // Shows workspace `id` where this window is, then gives `shown` the window
   // that shows it. Its partner for `id` opens on the first switch, once the
   // profile has loaded.
-  void Switch(std::string_view id, WindowCallback shown = {});
+  // False when it cannot switch now, as while the group is mid-switch.
+  bool Switch(std::string_view id, WindowCallback shown = {});
+  // Whether a window of this group is on its way to the front.
+  bool switching() const;
   // Switches to workspace `id` as a key or a click asks: with the sidebar's
   // slide when the window has one, and at once otherwise.
   void Slide(std::string_view id);
@@ -126,12 +130,24 @@ class WorkspaceWindow : public views::WidgetObserver {
 
  private:
   // Puts this window where the group's shown window is, shows it, and hides
-  // that one.
-  void Reveal();
+  // that one. It goes in just under the shown window first and comes to the
+  // front once it has drawn, or after 200ms, so the swap never shows it still
+  // drawing. Neither window plays macOS's open or close animation. `revealed`
+  // runs once it is in front.
+  void Reveal(base::OnceClosure revealed = {});
+  // Brings this window to the front and hides `shown`.
+  void Present(base::WeakPtr<WorkspaceWindow> shown);
+  void LoadActiveTab();
+  views::Widget* GetWidget();
+  // Whether macOS animates the window as it is ordered in or out.
+  void SetAnimates(bool animates);
   // Hides the window's pages with it, so they neither load nor draw while it
   // is behind its partner. macOS counts a page in a window that is only
   // ordered out as visible.
   void SetHidden(bool hidden);
+  void SetContentsHidden(bool hidden);
+  // Orders the window in just under `above`, where it draws unseen.
+  void OrderBelow(WorkspaceWindow* above);
   // Asked once something past BrowserView, such as macOS's Window menu,
   // showed the window while it is hidden.
   void OnShownElsewhere();
@@ -149,6 +165,12 @@ class WorkspaceWindow : public views::WidgetObserver {
   std::string workspace_;
   std::string group_;
   bool hidden_ = false;
+  // Set while the window waits under its partner to draw.
+  bool revealing_ = false;
+  // Counts reveals, so a late frame of an older one is left.
+  int reveals_ = 0;
+  base::OneShotTimer reveal_timer_;
+  std::vector<base::OnceClosure> revealed_;
   // Set when the window closes for a deleted workspace, which Cmd+Shift+T
   // does not bring back.
   bool forget_ = false;

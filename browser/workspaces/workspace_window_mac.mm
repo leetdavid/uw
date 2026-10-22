@@ -10,11 +10,26 @@
 #include "ui/gfx/native_ui_types.h"
 
 namespace uw {
+namespace {
+
+NSWindow* NSWindowOf(BrowserWindowInterface* window) {
+  return window->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+}
+
+}  // namespace
 
 void WorkspaceWindow::SetHidden(bool hidden) {
   hidden_ = hidden;
-  window_->GetWindow()->GetNativeWindow().GetNativeNSWindow().contentView
-      .hidden = hidden;
+  SetContentsHidden(hidden);
+}
+
+void WorkspaceWindow::SetContentsHidden(bool hidden) {
+  NSWindowOf(window_).contentView.hidden = hidden;
+}
+
+void WorkspaceWindow::OrderBelow(WorkspaceWindow* above) {
+  [NSWindowOf(window_) orderWindow:NSWindowBelow
+                        relativeTo:NSWindowOf(above->window_).windowNumber];
 }
 
 }  // namespace uw

@@ -264,8 +264,8 @@ void WorkspaceSwipe::SlideTo(const std::string& id) {
   const WorkspaceList& list = WorkspaceList::Get();
   const int from = shown ? list.IndexOf(shown->workspace()) : -1;
   const int to = list.IndexOf(id);
-  if (!shown || shown->hidden() || sliding() || !region_ || from < 0 ||
-      to < 0 || from == to) {
+  if (!shown || shown->hidden() || shown->switching() || sliding() ||
+      !region_ || from < 0 || to < 0 || from == to) {
     return;
   }
   const int direction = to > from ? 1 : -1;
@@ -466,7 +466,8 @@ bool WorkspaceSwipe::SidebarCanSlide() const {
 
 bool WorkspaceSwipe::CanSwipe() const {
   const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
-  return shown && !shown->hidden() && !sliding() && SidebarCanSlide();
+  return shown && !shown->hidden() && !shown->switching() && !sliding() &&
+         SidebarCanSlide();
 }
 
 std::string WorkspaceSwipe::NeighborToward(int direction) const {
@@ -721,17 +722,31 @@ void WorkspaceSwipe::ArriveIfReady() {
 void WorkspaceSwipe::SwitchTo(gfx::ImageSkia page,
                               int direction,
                               BrowserWindowInterface* partner) {
-  give_up_.Stop();
   base::WeakPtr<WorkspaceSwipe> other;
   if (WorkspaceSwipe* swipe = From(partner); swipe && swipe != this) {
     swipe->CoverPage(page, direction);
     other = swipe->weak_factory_.GetWeakPtr();
   }
-  const std::string target = target_;
-  Reset();
-  WorkspaceWindow::From(window_)->Switch(target);
-  if (other) {
-    other->UncoverPage();
+  // The other window draws under this one, with the cover, before it comes
+  // to the front; until then this window keeps the slide where it landed.
+  const bool switching = WorkspaceWindow::From(window_)->Switch(
+      target_, base::BindOnce(
+                   [](base::WeakPtr<WorkspaceSwipe> self,
+                      base::WeakPtr<WorkspaceSwipe> other,
+                      BrowserWindowInterface* shown) {
+                     if (other) {
+                       other->UncoverPage();
+                     }
+                     if (self) {
+                       self->Reset();
+                     }
+                   },
+                   weak_factory_.GetWeakPtr(), other));
+  if (!switching) {
+    if (other) {
+      other->OnUncovered();
+    }
+    Reset();
   }
 }
 

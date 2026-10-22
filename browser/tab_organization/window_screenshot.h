@@ -35,6 +35,9 @@ SkBitmap CaptureNativeWindow(Browser* browser);
 // Saves CaptureNativeWindow() the same way.
 void SaveNativeWindowScreenshot(Browser* browser, const std::string& name);
 
+// Saves `pixels` the same way.
+void SaveBitmap(const SkBitmap& pixels, const std::string& name);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_TAB_ORGANIZATION_WINDOW_SCREENSHOT_H_

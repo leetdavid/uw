@@ -27,7 +27,9 @@ source_set("workspaces") {
     "//chrome/browser/ui/navigator",
     "//chrome/common",
     "//components/prefs",
+    "//components/viz/common",
     "//ui/base",
+    "//ui/compositor",
     "//ui/gfx",
     "//url",
   ]
