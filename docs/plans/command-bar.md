@@ -47,6 +47,8 @@ Agreed on 2026-10-15, after [Raycast's ranking](https://www.raycast.com/changelo
 
 - Return runs the selected row's first action. Cmd+K opens its [result menu](../CONTEXT.md#language): a tab can be switched to, closed, moved to a task, or have its link copied.
 - "Ask uw …" does what Cmd+Return does.
+- ↑ and ↓ put the selected row's text in the field, as Chromium's address bar does: a page's address, or a search's words. The caret goes to the end, so the text can be edited before Return. Going back to the first row brings back what was typed. Agreed on 2026-10-22 at the user's request.
+- Text uw puts in the field, from a row or an address completion, is muted after what was typed. With `pu` typed and the row for `pulse.bilby.ai` selected, `pu` is in full ink and `lse.bilby.ai` is muted. Once edited, all of the text is typed text. Agreed on 2026-10-22.
 
 ### Sending the text to a chat or a terminal
 
@@ -64,6 +66,7 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 - A `>` at the start of the field marks a shell command, and Return runs it as Option+Return does. Cmd+Shift+P puts it there. Typing `>` in an empty field does the same, and Backspace in an empty field removes it.
 - Ctrl+Return keeps Chromium's meaning: it adds `www.` and `.com` to the typed word and opens it.
 - An address is completed inline after the caret, as in Chromium's address bar, and Return opens the completed address. Chromium completes an address with a path once it was typed twice, and a bare host once. Added on 2026-10-16.
+- The completion is drawn after the caret but is not in the field, so the caret shows where typing goes. Typing its next letters keeps the rest. Tab, →, and End turn it into typed text. Backspace deletes the last typed letter and the completion goes with it, and so does moving the caret. Changed on 2026-10-22 at the user's request: before, the completion was selected text, as in Chromium, so no caret showed and Backspace removed only the completion.
 
 ### Models
 
@@ -142,6 +145,7 @@ These examples are typed in Hong Kong at 6:24 PM on Tuesday, Oct 20, 2026:
 - `browser/resources/uw_command_bar/` and `browser/ui/webui/uw_command_bar/` hold the page and its Mojo link, as the terminal's do. It shows in a top-chrome WebUI panel, the kind Chromium uses for its tab search popup.
 - While the switch is on, each window keeps its command bar page loaded and shows it in a `WebUIBubbleDialogView` over the page card, from `browser/ui/views/command_bar/`. Chromium's `WebUIContentsPreloadManager` keeps one page for all of Chromium and picks which, and tab search's bubble drops its page 30 seconds after closing, so neither keeps it ready. Keys pressed before the page can take them are held by the browser and passed to the page in order once the page says its field has focus. Until the page's first frame is on screen, the browser refuses its keys, so a refused key stays held and is tried again a frame later. After one second the browser stops holding.
 - Open tabs, history, bookmarks, past searches, and site search shortcuts come from Chromium's suggestion engine, asked for instant results only with `AutocompleteInput::set_omit_asynchronous_matches`, the mode Chromium uses for pasted text. The spike used the new tab page's searchbox handler (`chrome/browser/ui/webui/searchbox/`), which loads a picked page inside the panel. T98 subclasses it as `UwCommandBarHandler`: it opens a picked row in a new tab, runs an open-tab row's switch action, names each row's kind for the page, and asks for instant results only through a hook `uw-command-bar.patch` adds to Chromium's `SearchboxHandler`. The panel's `OpenURLFromTab` hands the page to the window, which opens it where `chrome::NewTab` would put a blank tab. The command bar adds uw's commands, tasks, fallbacks, math, currency, and translation beside them.
+- A text field cannot color part of its text, so the field's own text is invisible and a layer under it draws the typed text and the muted rest, scrolled with the field. The completion is drawn only in that layer. The arrow keys fill the field through the fill text Chromium's searchbox uses, `KeywordModeManager.formatMatchFillIntoEdit`.
 - Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
 - What uw learns from picks, aliases, and the default currency are profile prefs. Recorded keys are the same in every profile. A history deletion clears what uw learned.
@@ -163,13 +167,14 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 5. T81: Cmd+Return sends the text to a new chat, with the selected tab handed to the agent.
 6. T66: math, units, currency, and the default currency setting.
 7. T143: time and time zones. Added on 2026-10-21.
-8. T112: translation. Split from T66 on 2026-10-17.
-9. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
-10. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
-11. T62: Cmd+L and the address click open it.
-12. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
-13. T64: Cmd+Shift+A opens it narrowed to tabs.
-14. T65: aliases, and recording a key from the result menu into T122's key list.
+8. T156: the arrow keys put a row's text in the field, and filled text is muted. Added on 2026-10-22.
+9. T112: translation. Split from T66 on 2026-10-17.
+10. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
+11. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
+12. T62: Cmd+L and the address click open it.
+13. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
+14. T64: Cmd+Shift+A opens it narrowed to tabs.
+15. T65: aliases, and recording a key from the result menu into T122's key list.
 
 ## Acceptance checks
 
@@ -189,6 +194,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 14. An alias runs its command. A key recorded from the result menu shows in the Keyboard shortcuts section and runs its command after a restart.
 15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, `1/2 cup to tsp` shows 25 tsp, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 16. With the clock at 6:24 PM on Tuesday, Oct 20, 2026, in Hong Kong: `now + 100 minutes to UTC` shows 12:04 PM, `3pm London` shows 10:00 PM, `dec 25 - today` shows 66 days, `next friday` shows Friday, Oct 30, 2026, `1760000000 to date` shows Oct 9, 2025, 4:53:20 PM with Thursday, and `now to unix` shows 1792491840. `2026-12-25` shows a date, and `3/4` shows 0.75. `now`, `friday`, and `now in Narnia` show no card, and `feb 30` says it is not a date. With the Mac's 24-hour setting on, `3pm` shows 15:00. A card built on `now` shows the next minute without retyping.
+17. With a page visited by its address, typing the start of the address shows the rest muted after the caret. Backspace deletes a typed letter and the rest goes; → takes it. ↓ to another page's row puts its address in the field with the caret at the end, what was typed in full ink and the rest muted, and a long address shows its end. Backspace edits it, and all of it turns to full ink. ↑ back to the first row shows what was typed and its completion.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 

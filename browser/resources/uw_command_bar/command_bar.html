@@ -92,17 +92,40 @@
         width: 20px;
       }
 
-      #field {
-        background: transparent;
-        border: none;
-        color: inherit;
+      #line {
         flex: 1;
-        font: inherit;
         font-size: 18px;
         letter-spacing: -0.005em;
         min-width: 0;
+        position: relative;
+      }
+
+      #field,
+      #ink {
+        font: inherit;
+        letter-spacing: inherit;
+      }
+
+      #field {
+        background: transparent;
+        border: none;
+        caret-color: var(--text);
+        color: transparent;
         outline: none;
         padding: 0;
+        position: relative;
+        width: 100%;
+      }
+
+      #ink {
+        inset: 0;
+        overflow: hidden;
+        position: absolute;
+        white-space: pre;
+      }
+
+      #ink .filled {
+        color: var(--muted);
       }
 
       #field::placeholder {
@@ -134,7 +157,7 @@
         width: 26px;
       }
 
-      #chip.shell + #field {
+      #chip.shell + #line {
         font: 17px ui-monospace, 'SF Mono', Menlo, monospace;
       }
 
@@ -400,8 +423,11 @@
     <div id="query">
       <svg><use href="#search"/></svg>
       <span id="chip" hidden></span>
-      <input id="field" spellcheck="false" autocomplete="off"
-          placeholder="Search tabs, tasks, commands, or the web">
+      <div id="line">
+        <div id="ink" aria-hidden="true"></div>
+        <input id="field" spellcheck="false" autocomplete="off"
+            placeholder="Search tabs, tasks, commands, or the web">
+      </div>
       <kbd>esc</kbd>
     </div>
     <div id="calc" role="option" hidden>

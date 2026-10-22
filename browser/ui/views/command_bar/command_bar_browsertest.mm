@@ -123,6 +123,19 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
         .ExtractString();
   }
 
+  // The field's text as drawn: what was typed, a bar, then what uw filled in,
+  // which is muted.
+  std::string Ink() {
+    return content::EvalJs(bar()->page(), R"(
+        (ink => {
+          const filled = ink.querySelector('.filled').textContent;
+          return ink.textContent.slice(0, -filled.length || undefined) + '|' +
+              filled;
+        })(document.querySelector('#ink'))
+    )")
+        .ExtractString();
+  }
+
   // Visits `url` twice as if its address were typed: Chromium completes an
   // address with a path once it was typed twice.
   void VisitTyped(const GURL& url) {
@@ -760,13 +773,164 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TabTurnsTheCompletionIntoText) {
       [&] {
         Type(start);
         Wait(base::Milliseconds(100));
-        return FieldAndSelection() ==
-               whole + "|" + base::NumberToString(start.size()) + "-" + size;
+        return Ink() == start + "|e2.html";
       },
       base::Seconds(5)))
-      << FieldAndSelection();
+      << Ink();
   PressInField("Tab");
   EXPECT_EQ(whole + "|" + size + "-" + size, FieldAndSelection());
+  EXPECT_EQ(whole + "|", Ink());
+}
+
+// The completion is muted after the caret and is not in the field, so typing
+// and Backspace work on what was typed.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
+                       TheCompletionIsMutedAfterTheCaret) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  VisitTyped(page);
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  const std::string start =
+      base::StrCat({page.host(), ":", page.port(), "/titl"});
+  const std::string caret = base::NumberToString(start.size());
+  const auto completed = [&] {
+    return Eventually(
+        [&] {
+          // Typed again from empty, so the caret is at the end.
+          Type("");
+          Type(start);
+          Wait(base::Milliseconds(100));
+          return Ink() == start + "|e2.html";
+        },
+        base::Seconds(5));
+  };
+  ASSERT_TRUE(completed()) << Ink();
+  EXPECT_EQ(start + "|" + caret + "-" + caret, FieldAndSelection());
+
+  // Typing the completion's next letter keeps the rest before the rows come.
+  Type(start + "e");
+  EXPECT_EQ(start + "e|2.html", Ink());
+
+  // Backspace deletes a typed letter, and the completion goes with it.
+  ASSERT_TRUE(content::ExecJs(bar()->page(), content::JsReplace(R"(
+      const field = document.querySelector('#field');
+      field.value = $1;
+      field.dispatchEvent(
+          new InputEvent('input', {inputType: 'deleteContentBackward'}));
+  )",
+                                                                start)));
+  EXPECT_EQ(start + "|", Ink());
+  Wait(base::Milliseconds(300));
+  EXPECT_EQ(start + "|", Ink());
+
+  // Moving the caret drops the completion.
+  ASSERT_TRUE(completed()) << Ink();
+  ASSERT_TRUE(content::ExecJs(
+      bar()->page(),
+      "document.querySelector('#field').setSelectionRange(0, 0)"));
+  EXPECT_TRUE(Eventually([&] { return Ink() == start + "|"; })) << Ink();
+
+  // → takes it.
+  ASSERT_TRUE(completed()) << Ink();
+  PressInField("ArrowRight");
+  const std::string whole = start + "e2.html";
+  const std::string size = base::NumberToString(whole.size());
+  EXPECT_EQ(whole + "|" + size + "-" + size, FieldAndSelection());
+  EXPECT_EQ(whole + "|", Ink());
+}
+
+// The arrow keys put a row's address in the field, muted until it is edited.
+// Going back to the first row brings back what was typed.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
+                       TheArrowKeysPutARowsAddressInTheField) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  VisitTyped(page);
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  // The page's title, "Title Of Awesomeness", finds it.
+  ASSERT_TRUE(Eventually(
+      [&] {
+        Type("awesomeness");
+        Wait(base::Milliseconds(100));
+        return Kinds().find("Search,") == 0 && Rows() > 1;
+      },
+      base::Seconds(5)))
+      << "The rows are: " << Kinds();
+  const std::string address =
+      base::StrCat({page.host(), ":", page.port(), "/title2.html"});
+  const std::string size = base::NumberToString(address.size());
+
+  PressInField("ArrowDown");
+  EXPECT_EQ(address + "|" + size + "-" + size, FieldAndSelection());
+  EXPECT_EQ("|" + address, Ink());
+
+  PressInField("ArrowUp");
+  EXPECT_EQ("awesomeness|11-11", FieldAndSelection());
+  EXPECT_EQ("awesomeness|", Ink());
+
+  PressInField("ArrowDown");
+  Type(address + "?q");
+  EXPECT_EQ(address + "?q|", Ink());
+}
+
+// The look of a completion and of a long address put in the field: run in the
+// VM with UW_SCREENSHOT_DIR set.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_ARowsAddressInTheField) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  VisitTyped(page);
+  VisitTyped(embedded_test_server()->GetURL(
+      "/title2.html?from=the-command-bar&to=a-field-too-narrow-for-it"));
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  views::Widget* panel = views::Widget::GetTopLevelWidgetForNativeView(
+      bar()->page()->GetNativeView());
+
+  const std::string start =
+      base::StrCat({page.host(), ":", page.port(), "/ti"});
+  ASSERT_TRUE(Eventually(
+      [&] {
+        Type(start);
+        Wait(base::Milliseconds(100));
+        return Ink().size() > start.size() + 1 && Rows() > 1;
+      },
+      base::Seconds(5)))
+      << Ink();
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(panel, "command-bar-completion");
+  // The caret shows only in a focused field.
+  EXPECT_EQ("field",
+            content::EvalJs(bar()->page(), "document.hasFocus() && "
+                                           "document.activeElement.id"));
+
+  for (int row = 1; row < Rows() && Field().find("narrow") == std::string::npos;
+       ++row) {
+    PressInField("ArrowDown");
+  }
+  ASSERT_NE(std::string::npos, Field().find("narrow")) << Field();
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(panel, "command-bar-long-address");
+
+  // The field's own text, drawn red, lies over its ink.
+  ASSERT_TRUE(content::ExecJs(
+      bar()->page(),
+      "document.querySelector('#field').style.color = 'rgb(255 0 0 / 0.6)'"));
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(panel, "command-bar-field-over-ink");
+
+  // The field scrolled to the caret at the end, and its ink with it.
+  const std::string scrolled =
+      content::EvalJs(bar()->page(),
+                      "`${document.querySelector('#field').scrollLeft}|"
+                      "${document.querySelector('#ink').scrollLeft}`")
+          .ExtractString();
+  const std::string field_scroll = scrolled.substr(0, scrolled.find('|'));
+  EXPECT_NE("0", field_scroll);
+  EXPECT_EQ(field_scroll + "|" + field_scroll, scrolled);
 }
 
 // Return opens the completed address, even when pressed before the rows for
@@ -787,7 +951,7 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ReturnOpensTheCompletedAddress) {
       [&] {
         Type(start);
         Wait(base::Milliseconds(100));
-        return FieldAndSelection().starts_with(start + "e2.html|");
+        return Ink() == start + "|e2.html";
       },
       base::Seconds(5)));
   Type(start);

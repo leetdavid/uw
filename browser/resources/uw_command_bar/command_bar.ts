@@ -15,6 +15,7 @@ import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
 declare const math: MathJsLibrary;
 
 const field = document.querySelector<HTMLInputElement>('#field')!;
+const ink = document.querySelector<HTMLElement>('#ink')!;
 const chip = document.querySelector<HTMLElement>('#chip')!;
 const results = document.querySelector<HTMLUListElement>('#results')!;
 const keys = document.querySelector<HTMLElement>('#keys')!;
@@ -52,8 +53,11 @@ const calculatorHandler = CalculatorHandler.getRemote();
 let ticker = 0;
 
 let queryId = 0;
-// What the user typed. The field can also hold a completion after it.
+// What the user typed. The arrow keys can put a row's text in the field.
 let typed = '';
+// The rest of the address being typed, drawn after the caret but not in the
+// field, so the caret stays where the typing goes.
+let completion = '';
 // Each shown row, and the line Chromium knows it by.
 let rows: Array<{match: AutocompleteMatch, line: number}> = [];
 // The typed text the shown rows are for.
@@ -236,12 +240,45 @@ async function refreshClock() {
   timeMath.setClock(timeZone, twentyFourHour);
 }
 
-// The field's text without a completion still selected after the caret.
-function typedText(): string {
-  const completing = field.selectionStart !== field.selectionEnd &&
-      field.selectionEnd === field.value.length;
-  return completing ? field.value.slice(0, field.selectionStart ?? 0) :
-                      field.value;
+// The field's own text is invisible: #ink draws it. What was typed is in full
+// ink, and a completion after it, or the rest of a row's text, is muted.
+function paint() {
+  const value = field.value;
+  const own =
+      value.slice(0, typed.length).toLowerCase() === typed.toLowerCase() ?
+      typed.length :
+      0;
+  ink.replaceChildren(
+      value.slice(0, own), text('filled', value.slice(own) + completion));
+  ink.scrollLeft = field.scrollLeft;
+}
+
+// The arrow keys put the selected row's text in the field, as the address bar
+// does: a page's address or a search's words, with the caret at the end to
+// edit it. The first row and the calculator's card bring back what was typed.
+function fill() {
+  const row = rows[selected];
+  const first = row?.line === 0 && row.match.allowedToBeDefaultMatch;
+  setField(
+      row && !first ?
+          keywords.formatMatchFillIntoEdit(row.match, row.line, typed) :
+          typed);
+  completion = row && first ? row.match.inlineAutocompletion : '';
+  paint();
+}
+
+// Tab, → and End turn the completion into typed text.
+function accept() {
+  setField(typed + completion);
+  query(/*preventInlineAutocomplete=*/ true);
+}
+
+// Sets the field's text with the caret at its end, scrolled into view, which
+// the field does by itself only for typing.
+function setField(value: string) {
+  field.value = value;
+  field.setSelectionRange(value.length, value.length);
+  field.scrollLeft = field.scrollWidth;
 }
 
 function show(result: AutocompleteResult) {
@@ -272,12 +309,11 @@ function show(result: AutocompleteResult) {
   // Complete the typed text with the first row, as the address bar does,
   // while the caret is at the end of what was typed. A sum is not completed.
   const first = rows[0]?.match;
-  if (!answered() && first?.allowedToBeDefaultMatch &&
-      first.inlineAutocompletion && field.value === typed &&
-      field.selectionStart === typed.length) {
-    field.value = typed + first.inlineAutocompletion;
-    field.setSelectionRange(typed.length, field.value.length);
-  }
+  completion = !answered() && first?.allowedToBeDefaultMatch &&
+          field.value === typed && field.selectionStart === typed.length ?
+      first.inlineAutocompletion :
+      '';
+  paint();
 
   if (pendingReturn) {
     pendingReturn = false;
@@ -307,8 +343,18 @@ function showRows(on: boolean) {
 }
 
 function query(preventInlineAutocomplete: boolean) {
+  const completed = typed + completion;
+  const grew = field.value.length > typed.length;
   typed = field.value;
   calculate();
+  // Typing the completion's next letters keeps the rest of it until the rows
+  // for the new text arrive.
+  completion = !preventInlineAutocomplete && grew && !answered() &&
+          completed.slice(0, typed.length).toLowerCase() ===
+              typed.toLowerCase() ?
+      completed.slice(typed.length) :
+      '';
+  paint();
   if (shell) {
     return;
   }
@@ -327,7 +373,7 @@ function query(preventInlineAutocomplete: boolean) {
 // Hands the typed text to uw: Cmd asks it in a new chat, Option runs it in a
 // new terminal. The browser takes the text from the query.
 function sendText(key: {metaKey?: boolean, altKey?: boolean}) {
-  const words = typedText().trim();
+  const words = field.value.trim();
   if (!words) {
     return;
   }
@@ -359,6 +405,8 @@ function setShell(on: boolean) {
 function clear() {
   field.value = '';
   typed = '';
+  completion = '';
+  paint();
   pendingReturn = false;
   calculate();
   keywords.exit();
@@ -373,6 +421,7 @@ field.addEventListener('input', event => {
   if (!shell && field.value === '>' && !keywords.isInKeywordMode) {
     field.value = '';
     typed = '';
+    paint();
     setShell(true);
     return;
   }
@@ -395,13 +444,18 @@ field.addEventListener('keydown', event => {
     if (count > 0) {
       const step = event.key === 'ArrowDown' ? 1 : -1;
       select((selected - top + step + count) % count + top);
+      fill();
     }
+  } else if (
+      (event.key === 'ArrowRight' || event.key === 'End') &&
+      !event.shiftKey && completion) {
+    event.preventDefault();
+    accept();
   } else if (event.key === 'Tab' && !event.shiftKey) {
     // Tab turns a completion into typed text, or starts a site search.
     event.preventDefault();
-    if (typedText() !== field.value) {
-      field.setSelectionRange(field.value.length, field.value.length);
-      query(/*preventInlineAutocomplete=*/ true);
+    if (completion) {
+      accept();
     } else {
       keywords.acceptTab(rows[selected]?.match ?? null, selected);
     }
@@ -456,6 +510,17 @@ window.addEventListener('focus', () => {
   refreshClock();
 });
 window.addEventListener('blur', () => field.blur());
+// Moving the caret off the end of what was typed drops the completion.
+field.addEventListener('selectionchange', () => {
+  if (completion &&
+      (field.selectionStart !== typed.length ||
+       field.selectionEnd !== typed.length)) {
+    query(/*preventInlineAutocomplete=*/ true);
+  }
+});
+field.addEventListener('scroll', () => {
+  ink.scrollLeft = field.scrollLeft;
+});
 card.addEventListener('mousemove', () => {
   if (answered() && selected !== -1) {
     select(-1);
