@@ -1,8 +1,8 @@
-# The uw://chat page, one chat with uw's agent, and uw://ai, the AI
-# page. Both pages are one React app in app/, built from Fluid
-# Functionalism's parts. app/bundle.ts checks its types,
-# bundles it with Chromium's node, and puts the page's files in one folder;
-# the bundle carries the page's mojo bindings.
+# The uw://chat page, one chat with uw's agent, uw://ai, the AI page, and
+# the watch card under the eye in the address bar. All three are one React
+# app in app/, built from Fluid Functionalism's parts. app/bundle.ts checks
+# its types, bundles it with Chromium's node, and puts the pages' files in
+# one folder; the bundle carries the pages' mojo bindings.
 import("//third_party/node/node.gni")
 import("//tools/grit/grit_rule.gni")
 import("//ui/webui/resources/tools/generate_grd.gni")
@@ -13,10 +13,12 @@ app_dir = "$target_gen_dir/app"
 app_files = [
   "chat.html",
   "providers.html",
+  "watch_card.html",
   "favicon.svg",
   "plug.svg",
   "chat.js",
   "providers.js",
+  "watch_card.js",
   "chat.css",
   "icons/openai.svg",
   "icons/anthropic.svg",
@@ -33,6 +35,7 @@ node("app") {
     "app/bundle.ts",
     "chat.html",
     "providers.html",
+    "watch_card.html",
     "favicon.svg",
     "plug.svg",
   ]

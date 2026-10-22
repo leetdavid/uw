@@ -9,10 +9,10 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9d5baffde 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..bccb9ed5bfb2b4bb6501eb5ec433956a652d80fc 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,146 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,149 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -99,6 +99,9 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
 +      <message name="IDS_UW_ORGANIZE_SETTINGS" desc="In Title Case: Organize menu item that opens the tab organization settings page.">Settings…</message>
 +      <message name="IDS_UW_THEME_MENU" desc="Menu item that opens the theme picker, which sets the colors, grain, and light or dark mode of the browser window. It is in the View menu and in the menu of empty space in the tab sidebar.">Theme…</message>
 +      <message name="IDS_UW_THEME_PICKER" desc="Name of uw's theme picker in the task manager. The theme picker is a panel beside the tab sidebar that sets the window's colors.">Theme picker</message>
++      <message name="IDS_UW_WATCH_THIS_PAGE" desc="Tooltip of the eye in the address bar on a page that is not watched. A click opens a card that sets up a scheduled chat, which checks the page and tells the user when something they asked about happens. Also the card's name in the task manager.">Watch this page</message>
++      <message name="IDS_UW_WATCHING_THIS_PAGE" desc="Tooltip of the filled eye in the address bar on a page that a scheduled chat checks, when the user described what to watch for in their own words.">Watching this page</message>
++      <message name="IDS_UW_WATCHING_FOR" desc="Tooltip of the filled eye in the address bar on a page that a scheduled chat checks for what the user picked on the watch card.">Watching for <ph name="WHAT">$1<ex>price drops below $500</ex></ph></message>
 +      <message name="IDS_UW_THEME_MODE_AUTO" desc="Theme picker choice that follows the system's light or dark appearance.">Auto</message>
 +      <message name="IDS_UW_THEME_MODE_LIGHT" desc="Theme picker choice for light mode.">Light</message>
 +      <message name="IDS_UW_THEME_MODE_DARK" desc="Theme picker choice for dark mode.">Dark</message>
@@ -159,7 +162,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1778,7 +1918,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1778,7 +1921,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen closed window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
@@ -168,7 +171,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="The text label of the Reopen Closed Split menu item">
            Reopen closed split view
-@@ -1831,7 +1971,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1831,7 +1974,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen Closed Window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="In Title Case: The text label of the Reopen Closed Group menu item">
@@ -177,7 +180,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -11140,7 +11280,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+@@ -11140,7 +11283,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
        <message name="IDS_TAB_GROUPS_UNNAMED_GROUP_TOOLTIP" desc="Static tooltip to display on hover over unnamed tab group.">
@@ -186,7 +189,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        </message>
        <message name="IDS_TAB_GROUPS_NAMED_GROUP_TOOLTIP" desc="Dynamic tooltip to display on hover over named tab group.">
          <ph name="GROUP_NAME">$1<ex>New Group</ex></ph> - <ph name="GROUP_CONTENT_STRING">$2<ex>"New Tab" and one other</ex></ph>
-@@ -12077,9 +12217,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12077,9 +12220,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add tabs to reading list}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -197,7 +200,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12099,7 +12237,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12099,7 +12240,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move tab into split view
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -206,7 +209,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove from group
-@@ -12193,9 +12331,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12193,9 +12334,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            other {Add Tabs to Reading List}}
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_GROUP" desc="In Title Case: The label of the tab context menu submenu for adding one or more tabs to either a new group or an existing tab group. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
@@ -217,7 +220,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_CXMENU_ADD_TAB_TO_NEW_GROUP" desc="In Title Case: The label of the tab context menu item for creating a new tab group and adding one or more tabs to it. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
            {NUM_TABS, plural,
-@@ -12215,7 +12351,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12215,7 +12354,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Move Tab into Split View
          </message>
          <message name="IDS_TAB_CXMENU_SUBMENU_NEW_GROUP" desc="In Title Case: The label of the tab context menu sub-menu item for adding one more tabs to a new group.">
@@ -226,7 +229,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_CXMENU_REMOVE_TAB_FROM_GROUP" desc="In Title Case: The label of the tab context menu item for removing one or more tabs from the groups that contain them.">
            Remove From Group
-@@ -12720,7 +12856,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12720,7 +12859,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
  
        <!-- Tab Group Editor Bubble -->
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
@@ -235,7 +238,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
            {MEMBER_COUNT, plural,
-@@ -12730,22 +12866,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12730,22 +12869,22 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
        </message>
        <if expr="not use_titlecase">
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
@@ -263,7 +266,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent activity
-@@ -12754,16 +12890,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12754,16 +12893,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -283,7 +286,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open group in new window
-@@ -12781,28 +12917,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12781,28 +12920,28 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -318,7 +321,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_RECENT_ACTIVITY" desc="The label of the tab group header context menu item for open recent activity for the current group.">
            Recent Activity
-@@ -12811,16 +12947,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12811,16 +12950,16 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Manage Sharing
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_CLOSE_GROUP" desc="In Title Case: The label of the tab group header context menu item for closing all tabs in the current group.">
@@ -338,7 +341,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
          <message name="IDS_TAB_GROUP_HEADER_CXMENU_OPEN_GROUP_IN_NEW_WINDOW" desc="In Title Case: The label of the saved tab group button context menu item for opening the entire group in a new window.">
            Open Group in New Window
-@@ -12838,7 +12974,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
+@@ -12838,7 +12977,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google
            Send Feedback
          </message>
          <message name="IDS_TAB_GROUP_HEADER_BUBBLE_TITLE_PLACEHOLDER" desc="In Title Case: The placeholder text to display within the input field of the tab group editor bubble for naming a tab group.">
@@ -347,7 +350,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
          </message>
        </if>
  
-@@ -16925,10 +17061,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16925,10 +17064,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Bottom view
        </message>
        <message name="IDS_TAB_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Accessibility label text for a tab, when it is in a group that has not been named by the user. Example: 'Google Search - Part of unnamed group'">
@@ -360,7 +363,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        </message>
        <message name="IDS_TAB_AX_LABEL_PINNED_FORMAT" is_accessibility_with_no_ui="true" desc="Accessibility label text, when a tab is pinned. Example: 'Google Search - Pinned'">
          <ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pinned
-@@ -16949,10 +17085,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16949,10 +17088,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
          </message>
        </if>
        <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
@@ -373,7 +376,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        </message>
        <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
          Collapsed
-@@ -16997,16 +17133,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -16997,16 +17136,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Tab moved to end of tabstrip
        </message>
        <message name="IDS_TAB_AX_ANNOUNCE_TAB_ADDED_TO_UNNAMED_GROUP" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the user inputs a hotkey for moving the currently-selected tab and it results in the tab being added to a tab group with no title">
@@ -394,7 +397,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..c22020efd914a8e92eb55188a1ce55c9
        </message>
        <message name="IDS_PAGE_LOADING_AX_TITLE_FORMAT" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the back/forward button is focused and has been pressed. If the title of the page can be obtained, it will be included. Example: 'Loading Google News'.">
            Loading <ph name="WINDOW_TITLE">$1<ex>Google News</ex></ph>
-@@ -19308,7 +19444,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -19308,7 +19447,7 @@ Please help our engineers fix this problem. Tell us what happened right before y
          Select any text or image to ask Gemini
        </message>
        <message name="IDS_TAB_GROUP_HEADER_CXMENU_ASK_GEMINI" translateable="false" desc="The label of the tab group context menu item to ask Gemini about the tab group.">
@@ -478,10 +481,10 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..82f30006a6562a638b85b89498ebb49ad3eec644 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..2d398abf14cd37736cb72e69ea2c11dda7c2949b 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,16 @@ source_set("internal") {
+@@ -58,6 +58,17 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
@@ -494,15 +497,16 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..82f30006a6562a638b85b89498ebb49a
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/views/page_colors",
 +      "//uw/browser/ui/views/pins",
++      "//uw/browser/ui/views/watch_card",
 +      "//uw/browser/workspaces",
        "//chrome/browser:global_features",
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8e4c920fc450950c51bb8d07894859b672fce7df 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8162618523ed6161ebcc50ceea47e6f0081155f0 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -4,8 +4,20 @@
+@@ -4,8 +4,21 @@
  
  #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
  
@@ -519,11 +523,12 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8e4c920fc450950c51bb8d07894859b6
 +#include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
 +#include "uw/browser/ui/views/page_colors/page_colors.h"
++#include "uw/browser/ui/views/watch_card/watch_card.h"
 +#include "uw/browser/workspaces/workspace_window.h"
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +33,49 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +34,52 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -539,6 +544,8 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8e4c920fc450950c51bb8d07894859b6
 +      pin_sync_ = std::make_unique<uw::PinSync>(browser);
 +      if (!browser->GetProfile()->IsOffTheRecord()) {
 +        workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
++        // The eye in the address bar, and the watch card under it.
++        watch_card_ = std::make_unique<uw::WatchCard>(browser);
 +      }
 +      // A profile's scheduled chats start with its first window and keep
 +      // running after its last one closes.
@@ -576,12 +583,13 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8e4c920fc450950c51bb8d07894859b6
 -  // Embedder implementation goes here.
 +  page_colors_.reset();
 +  inactive_pins_.reset();
++  watch_card_.reset();
  }
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..7901db12cd3c0a3435c28984d4fc9159d0a26437 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..29088b6d4f197e157969c0ed53130aa07d504404 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,18 @@
+@@ -7,6 +7,19 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
@@ -594,13 +602,14 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..7901db12cd3c0a3435c28984d4fc9159
 +class PageColors;
 +class PinSync;
 +class TabOrganizationController;
++class WatchCard;
 +class WorkspaceWindow;
 +}
 +
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +56,13 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +57,14 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
@@ -611,6 +620,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..7901db12cd3c0a3435c28984d4fc9159
 +  std::unique_ptr<uw::InactivePinOverlay> inactive_pins_;
 +  std::unique_ptr<uw::PinSync> pin_sync_;
 +  std::unique_ptr<uw::WorkspaceWindow> workspace_window_;
++  std::unique_ptr<uw::WatchCard> watch_card_;
  };
  
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_

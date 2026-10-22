@@ -1,0 +1,67 @@
+# The eye in the address bar and the watch card under it. The card's page is
+# a page of the uw://chat app, in //uw/browser/ui/webui/uw_chat.
+source_set("watch_card") {
+  sources = [
+    "watch_card.cc",
+    "watch_card.h",
+  ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//ui/base/unowned_user_data",
+    "//uw/browser/agent:scheduled_chats",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/webui/top_chrome",
+    "//components/tabs:public",
+    "//components/vector_icons",
+    "//content/public/browser",
+    "//ui/actions",
+    "//ui/base",
+    "//ui/color",
+    "//ui/views",
+    "//url",
+    "//uw/browser/ui/vector_icons",
+    "//uw/browser/ui/webui/uw_chat",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "watch_card_browsertest.cc" ]
+  deps = [
+    ":watch_card",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/notifications:test_support",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/actions",
+    "//ui/views",
+    "//url",
+    "//uw/browser/agent",
+    "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:scheduled_chats",
+    "//uw/browser/agent:test_support",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/webui/uw_chat",
+    "//uw/components/agent",
+    "//uw/components/ai_providers",
+  ]
+}

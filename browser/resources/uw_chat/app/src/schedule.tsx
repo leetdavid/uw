@@ -61,7 +61,7 @@ function shortTime(ms: number): string {
 }
 
 // A time as the strip says it: "today 9:02", "tomorrow 9:00", or "Oct 9".
-function whenText(ms: number): string {
+export function whenText(ms: number): string {
   const date = new Date(ms);
   const day = new Date(date).setHours(0, 0, 0, 0);
   const today = new Date().setHours(0, 0, 0, 0);
@@ -491,28 +491,25 @@ function localDateTime(ms: number): string {
   return date.toISOString().slice(0, 16);
 }
 
-// "Run this chat again": the card that makes or changes a chat's schedule.
-// Nothing is saved until the user presses Save schedule.
-export function ScheduleCard({
-  state,
-  editing,
+// The schedule card's rows, from Repeat to Approvals. The watch card shares
+// them.
+export function ScheduleRows({
+  draft,
+  zoneName,
   providers,
   lists,
   onOpenModels,
-  onClose,
+  onChange: set,
 }: {
-  state: ScheduleState;
-  // The chat has a schedule already.
-  editing: boolean;
+  draft: ChatSchedule;
+  // The Mac's time zone, as a person reads it.
+  zoneName: string;
   providers: Provider[];
   lists: Record<string, ModelList | undefined>;
   onOpenModels: () => void;
-  onClose: () => void;
+  onChange: (change: Partial<ChatSchedule>) => void;
 }) {
-  const [draft, setDraft] = useState<ChatSchedule>(state.schedule);
   const [changingZone, setChangingZone] = useState(false);
-  const set = (change: Partial<ChatSchedule>) =>
-    setDraft((before) => ({ ...before, ...change }));
   const repeatIndex = REPEATS.findIndex(
     (each) =>
       each.repeat === draft.repeat &&
@@ -531,32 +528,8 @@ export function ScheduleCard({
     typeof Intl.supportedValuesOf === "function"
       ? Intl.supportedValuesOf("timeZone")
       : [];
-  const save = () => {
-    if (!draft.request.trim()) {
-      return;
-    }
-    chatHandler.saveSchedule(draft);
-    onClose();
-  };
   return (
-    <div
-      id="schedule-card"
-      role="dialog"
-      aria-label="Run this chat again"
-      className="absolute top-12 right-7 z-20 flex w-96 flex-col gap-2.5 rounded-[14px] bg-background p-4 shadow-[0_0_0_1px_rgba(30,27,46,.08),0_18px_48px_rgba(30,27,46,.22)]"
-    >
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-        <Clock aria-hidden className="size-[17px] text-info" />
-        Run this chat again
-      </h2>
-      <textarea
-        id="schedule-request"
-        aria-label="What each run is asked"
-        className="min-h-14 resize-none rounded-[9px] bg-accent px-2.5 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        value={draft.request}
-        onChange={(event) => set({ request: event.target.value })}
-      />
-      <div className="my-1 h-px bg-border" />
+    <>
       <Row label="Repeat">
         <select
           id="schedule-repeat"
@@ -628,7 +601,7 @@ export function ScheduleCard({
               value={draft.timeZone}
               onChange={(event) => set({ timeZone: event.target.value })}
             >
-              <option value="">Your time zone, {state.zoneName}</option>
+              <option value="">Your time zone, {zoneName}</option>
               {zones.map((zone) => (
                 <option key={zone} value={zone}>
                   {zone.replaceAll("_", " ")}
@@ -639,7 +612,7 @@ export function ScheduleCard({
             <>
               {draft.timeZone
                 ? `${draft.timeZone.split("/").at(-1)!.replaceAll("_", " ")} time.`
-                : `Your time zone, ${state.zoneName}.`}{" "}
+                : `Your time zone, ${zoneName}.`}{" "}
               <button
                 type="button"
                 id="schedule-change-zone"
@@ -649,77 +622,136 @@ export function ScheduleCard({
                 Change
               </button>
             </>
-          )}
-        </p>
-      )}
-      <Row label="Tell me">
-        <div className="flex flex-1 rounded-[9px] bg-accent p-[3px]" role="radiogroup">
-          {[
-            { label: "Change alerts", regular: false },
-            { label: "Regular updates", regular: true },
-          ].map((each) => (
-            <button
-              key={each.label}
-              type="button"
-              role="radio"
-              aria-checked={draft.regularUpdates === each.regular}
-              className={cn(
-                "h-[26px] flex-1 rounded-[7px] text-xs font-medium text-muted-foreground",
-                draft.regularUpdates === each.regular &&
-                  "bg-background text-foreground shadow-[0_1px_3px_rgba(30,27,46,.14)]",
-              )}
-              onClick={() => set({ regularUpdates: each.regular })}
-            >
-              {each.label}
-            </button>
-          ))}
-        </div>
-      </Row>
-      {!draft.regularUpdates && (
-        <div className="-mt-0.5 pl-[86px] text-[12.5px] text-muted-foreground">
-          <Switch
-            id="schedule-even-when"
-            label="Even when nothing changes"
-            size="compact"
-            className="w-full"
-            checked={draft.evenWhenNothingChanges}
-            onToggle={() =>
-              set({ evenWhenNothingChanges: !draft.evenWhenNothingChanges })
+            )}
+          </p>
+        )}
+        <Row label="Tell me">
+          <div className="flex flex-1 rounded-[9px] bg-accent p-[3px]" role="radiogroup">
+            {[
+              { label: "Change alerts", regular: false },
+              { label: "Regular updates", regular: true },
+            ].map((each) => (
+              <button
+                key={each.label}
+                type="button"
+                role="radio"
+                aria-checked={draft.regularUpdates === each.regular}
+                className={cn(
+                  "h-[26px] flex-1 rounded-[7px] text-xs font-medium text-muted-foreground",
+                  draft.regularUpdates === each.regular &&
+                    "bg-background text-foreground shadow-[0_1px_3px_rgba(30,27,46,.14)]",
+                )}
+                onClick={() => set({ regularUpdates: each.regular })}
+              >
+                {each.label}
+              </button>
+            ))}
+          </div>
+        </Row>
+        {!draft.regularUpdates && (
+          <div className="-mt-0.5 pl-[86px] text-[12.5px] text-muted-foreground">
+            <Switch
+              id="schedule-even-when"
+              label="Even when nothing changes"
+              size="compact"
+              className="w-full"
+              checked={draft.evenWhenNothingChanges}
+              onToggle={() =>
+                set({ evenWhenNothingChanges: !draft.evenWhenNothingChanges })
+              }
+            />
+          </div>
+        )}
+        <Row label="Model">
+          <ModelChip
+            choice={model.model ? model : null}
+            providers={providers}
+            lists={lists}
+            needsTools
+            className="h-8 min-w-0 flex-1"
+            onOpen={onOpenModels}
+            onPick={(provider, name) =>
+              set({ model: { providerId: provider.id, model: name, effort: "" } })
             }
           />
-        </div>
-      )}
-      <Row label="Model">
-        <ModelChip
-          choice={model.model ? model : null}
-          providers={providers}
-          lists={lists}
-          needsTools
-          className="h-8 min-w-0 flex-1"
-          onOpen={onOpenModels}
-          onPick={(provider, name) =>
-            set({ model: { providerId: provider.id, model: name, effort: "" } })
-          }
-        />
-        <EffortChip
-          efforts={chosenModel?.efforts ?? []}
-          effort={model.effort}
-          model={model.model}
-          preset={chosen?.preset}
-          className="h-8"
-          onPick={(effort) => set({ model: { ...model, effort } })}
-        />
-      </Row>
-      <p className="-mt-1 pl-[86px] text-xs text-muted-foreground">
-        For runs. Replies use the chat's model.
-      </p>
-      <Row label="Approvals">
-        <ModeChip
-          mode={draft.mode}
-          className="h-8"
-          onPick={(mode) => set({ mode })}
-        />
-      </Row>
+          <EffortChip
+            efforts={chosenModel?.efforts ?? []}
+            effort={model.effort}
+            model={model.model}
+            preset={chosen?.preset}
+            className="h-8"
+            onPick={(effort) => set({ model: { ...model, effort } })}
+          />
+        </Row>
+        <p className="-mt-1 pl-[86px] text-xs text-muted-foreground">
+          For runs. Replies use the chat's model.
+        </p>
+        <Row label="Approvals">
+          <ModeChip
+            mode={draft.mode}
+            className="h-8"
+            onPick={(mode) => set({ mode })}
+          />
+        </Row>
+    </>
+  );
+}
+
+// "Run this chat again": the card that makes or changes a chat's schedule.
+// Nothing is saved until the user presses Save schedule.
+export function ScheduleCard({
+  state,
+  editing,
+  providers,
+  lists,
+  onOpenModels,
+  onClose,
+}: {
+  state: ScheduleState;
+  // The chat has a schedule already.
+  editing: boolean;
+  providers: Provider[];
+  lists: Record<string, ModelList | undefined>;
+  onOpenModels: () => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<ChatSchedule>(state.schedule);
+  const set = (change: Partial<ChatSchedule>) =>
+    setDraft((before) => ({ ...before, ...change }));
+  const save = () => {
+    if (!draft.request.trim()) {
+      return;
+    }
+    chatHandler.saveSchedule(draft);
+    onClose();
+  };
+  return (
+    <div
+      id="schedule-card"
+      role="dialog"
+      aria-label="Run this chat again"
+      className="absolute top-12 right-7 z-20 flex w-96 flex-col gap-2.5 rounded-[14px] bg-background p-4 shadow-[0_0_0_1px_rgba(30,27,46,.08),0_18px_48px_rgba(30,27,46,.22)]"
+    >
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+        <Clock aria-hidden className="size-[17px] text-info" />
+        Run this chat again
+      </h2>
+      <textarea
+        id="schedule-request"
+        aria-label="What each run is asked"
+        className="min-h-14 resize-none rounded-[9px] bg-accent px-2.5 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        value={draft.request}
+        onChange={(event) => set({ request: event.target.value })}
+      />
+      <div className="my-1 h-px bg-border" />
+      <ScheduleRows
+        draft={draft}
+        zoneName={state.zoneName}
+        providers={providers}
+        lists={lists}
+        onOpenModels={onOpenModels}
+        onChange={set}
+      />
       <div className="mt-1.5 flex items-center gap-2">
         {editing && (
           <Button

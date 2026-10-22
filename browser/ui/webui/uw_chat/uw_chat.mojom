@@ -366,3 +366,48 @@ interface ChatPage {
   // change. Nothing when it has none.
   OnSchedule(ScheduleState? state);
 };
+
+// The watch card, under the eye in the address bar: the page of the tab it
+// opened for, and the scheduled chat that watches it, if one does. See
+// docs/product.md, "Scheduled chats".
+struct WatchCardState {
+  string title;
+  // The site, such as "fully.com".
+  string host;
+  // The page's icon as a data: URL, or empty.
+  string favicon;
+  // The chat that watches the page, or empty when none does.
+  string chat_id;
+  // What the card's chip asked for, such as "Price drops below $500", or
+  // empty for the user's own words.
+  string watch_for;
+  // The watch's schedule and how it stands, or a new card's settings.
+  ScheduleState state;
+};
+
+// Links the watch card's page to its handler.
+interface WatchCardHandlerFactory {
+  CreateWatchCardHandler(pending_remote<WatchCardPage> page,
+                         pending_receiver<WatchCardHandler> handler);
+};
+
+// Browser side. Only the watch card's page can reach it.
+interface WatchCardHandler {
+  // The page has drawn and can be shown.
+  ShowUI();
+  // Watches the page on `schedule`, which asks `schedule.request`, or saves
+  // the watch's changed schedule. Then closes the card.
+  Watch(ChatSchedule schedule, string watch_for);
+  // Removes the watch's schedule and closes the card. Its chat stays.
+  StopWatching();
+  // Shows the watch's chat and closes the card.
+  OpenChat();
+  Close();
+};
+
+// The watch card's page.
+interface WatchCardPage {
+  // What the card shows: once it connects, and again whenever the watch
+  // changes.
+  OnCard(WatchCardState card);
+};

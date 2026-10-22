@@ -1,0 +1,54 @@
+diff --git a/chrome/browser/ui/page_action/action_ids.h b/chrome/browser/ui/page_action/action_ids.h
+index 54418596f3ab17429b6746cff5e215e9784c3cac..94f7b78832f03d1291f79363d8c2a8e050b7effd 100644
+--- a/chrome/browser/ui/page_action/action_ids.h
++++ b/chrome/browser/ui/page_action/action_ids.h
+@@ -11,6 +11,12 @@
+ 
+ namespace page_actions {
+ 
++// uw's eye, which watches the page; see uw's docs/product.md, "Scheduled
++// chats". Its id sits far from Chromium's, which count up from zero, and from
++// the ids actions::ActionIdMap makes as it runs, which count down from the
++// largest ActionId.
++inline constexpr actions::ActionId kActionUwWatchPage = 1 << 30;
++
+ // All ActionIds associated with a page action.
+ // For now, the order of the page actions will be based on their position in
+ // the array.
+@@ -56,6 +62,7 @@ inline constexpr auto kActionIds = std::to_array<actions::ActionId>({
+     kActionShowPaymentsChurnedUsersBubble,
+     kActionFakePageActionForDebug,
+     kActionWalletReminderNotice,
++    kActionUwWatchPage,
+ 
+     // Add any new page actions before this line to ensure that the bookmark
+     // star is always the right-most page action.
+diff --git a/chrome/browser/ui/page_action/page_action_properties_provider.cc b/chrome/browser/ui/page_action/page_action_properties_provider.cc
+index 910ffa4b8755424e0985489e95880595388dca23..0dc5f0af388d30516ced53a5295be80bed5880eb 100644
+--- a/chrome/browser/ui/page_action/page_action_properties_provider.cc
++++ b/chrome/browser/ui/page_action/page_action_properties_provider.cc
+@@ -7,6 +7,7 @@
+ #include "base/containers/fixed_flat_map.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
++#include "chrome/browser/ui/page_action/action_ids.h"
+ #include "chrome/browser/ui/page_action/page_action_controller.h"
+ #include "chrome/browser/ui/page_action/page_action_icon_type.h"
+ #include "ui/actions/action_id.h"
+@@ -347,6 +348,16 @@ constexpr auto kPageActionProperties = base::MakeFixedFlatMap<
+             .element_identifier = kPageActionWalletReminderNoticeElementId,
+         },
+     },
++    {
++        page_actions::kActionUwWatchPage,
++        {
++            .histogram_name = "UwWatchPage",
++            .is_ephemeral = false,
++            // A new PageActionIconType rebuilds most of Chromium, so uw's eye
++            // is counted as the debug page action, which uw never shows.
++            .type = PageActionIconType::kFakePageActionForDebug,
++        },
++    },
+ });
+ // LINT.ThenChange(//components/browser_apis/ui_controllers/toolbar/toolbar_ui_api_data_model.mojom:PageActionId,//chrome/browser/ui/page_action/action_ids.h:kActionIds)
+ 

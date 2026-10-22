@@ -71,6 +71,7 @@ source_set("tab_organization") {
     "//uw/browser/ui/vector_icons",
     "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/theme_picker",
+    "//uw/browser/ui/views/watch_card",
     "//uw/browser/workspaces",
   ]
 }

@@ -29,7 +29,9 @@ enum WindowCommand {
   kNextWorkspace,
   kPreviousWorkspace,
   kShowShortcutSettings,
-  kLastWindowCommand = kShowShortcutSettings,
+  // Opens the watch card under the eye in the address bar.
+  kWatchThisPage,
+  kLastWindowCommand = kWatchThisPage,
 };
 
 bool IsWindowCommand(int command);

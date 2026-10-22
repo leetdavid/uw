@@ -9,14 +9,21 @@ mojom("mojo_bindings") {
 
 source_set("uw_chat") {
   sources = [
+    "schedule_card.cc",
+    "schedule_card.h",
     "uw_chat_handler.cc",
     "uw_chat_handler.h",
     "uw_chat_ui.cc",
     "uw_chat_ui.h",
+    "uw_watch_card_handler.cc",
+    "uw_watch_card_handler.h",
+    "uw_watch_card_ui.cc",
+    "uw_watch_card_ui.h",
   ]
   public_deps = [
     ":mojo_bindings",
     "//base",
+    "//chrome/browser/ui/webui/top_chrome",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",
     "//ui/webui",
@@ -36,8 +43,10 @@ source_set("uw_chat") {
     "//components/prefs",
     "//components/split_tabs",
     "//components/tabs:public",
+    "//components/url_formatter",
     "//components/viz/common",
     "//content/public/common",
+    "//net",
     "//ui/base",
     "//ui/gfx",
     "//ui/gfx/codec",

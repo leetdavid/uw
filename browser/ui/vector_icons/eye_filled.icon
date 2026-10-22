@@ -1,0 +1,25 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+// The outline of vector_icons::kVisibilityIcon, filled, with its pupil cut
+// out: the eye of a watched page.
+CANVAS_DIMENSIONS, 24,
+MOVE_TO, 5.89f, 17.21f,
+R_ARC_TO, 12.92f, 12.92f, 0, 0, 1, -4.36f, -4.75f,
+R_ARC_TO, 2.12f, 2.12f, 0, 0, 1, -0.19f, -0.46f,
+R_ARC_TO, 2.04f, 2.04f, 0, 0, 1, -0.06f, -0.49f,
+R_CUBIC_TO, 0, -0.17f, 0.02f, -0.33f, 0.06f, -0.49f,
+R_CUBIC_TO, 0.04f, -0.16f, 0.11f, -0.31f, 0.19f, -0.46f,
+ARC_TO, 12.92f, 12.92f, 0, 0, 1, 5.89f, 5.8f,
+CUBIC_TO, 7.73f, 4.6f, 9.77f, 4, 12, 4,
+R_CUBIC_TO, 2.23f, 0, 4.27f, 0.6f, 6.11f, 1.8f,
+R_ARC_TO, 12.92f, 12.92f, 0, 0, 1, 4.36f, 4.75f,
+R_CUBIC_TO, 0.08f, 0.15f, 0.14f, 0.31f, 0.19f, 0.46f,
+R_CUBIC_TO, 0.04f, 0.16f, 0.06f, 0.32f, 0.06f, 0.49f,
+R_CUBIC_TO, 0, 0.17f, -0.02f, 0.33f, -0.06f, 0.49f,
+R_ARC_TO, 2.12f, 2.12f, 0, 0, 1, -0.19f, 0.46f,
+R_ARC_TO, 12.92f, 12.92f, 0, 0, 1, -4.36f, 4.75f,
+CUBIC_TO, 16.27f, 18.4f, 14.23f, 19, 12, 19,
+R_CUBIC_TO, -2.23f, 0, -4.27f, -0.6f, -6.11f, -1.8f,
+CLOSE,
+CIRCLE, 12, 11.5f, 2.75f
