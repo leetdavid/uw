@@ -1,0 +1,7 @@
+# uw signs in with its own apps, kept out of the repo
+
+On 2026-10-22 the user wanted GitHub, Slack, Gmail, and Google Calendar to connect in one click, as they do in Grok Bot. None of their MCP servers lets an app register itself, so each needs an app registered with the service in advance. We chose apps the user registers once for uw: a GitHub OAuth app, a Slack internal app, and a Google OAuth client marked Internal to their Workspace org. Their client IDs and secrets come in at build time from outside the repository, as Chromium's own Google keys do, because the repository is public.
+
+Considered options: a form where each user pastes the client ID of an app they registered themselves (rejected: every user repeats the developer-console work, which is the opposite of one click); apps published for everyone (rejected for now: Slack's Marketplace review, Google's verification, and Gmail's yearly paid security assessment, while [uw is built for its owner first](../product.md#audience)); reusing the client IDs that Claude's and OpenAI's plugins carry (rejected: the sign-in screen would name another company's app).
+
+Consequences: the apps work only for the user's own accounts and org until they are published, and a personal Gmail account would sign in again every 7 days under Google's testing mode. A build made without the keys has no one-click sign-in for these four services. Opening uw to everyone means registering the apps again and passing each service's review, without changing uw's code.

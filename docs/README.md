@@ -42,6 +42,9 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 
 - [AI providers plan](plans/ai-providers.md): providers saved once, the `uw://providers` page, and a model and effort picker in each chat.
 - [Connectors plan](plans/connectors.md): MCP servers as connectors that give the agent tools, skills the user starts with `/`, and the `uw://ai` page.
+- [Connect dialog plan](plans/connect-dialog.md): find a service, click Add, and sign in; recommended connectors, plugins with skills, and uw's own sign-in apps.
+- [ADR 0014: uw signs in with its own apps, kept out of the repo](adr/0014-uw-signs-in-with-its-own-apps-kept-out-of-the-repo.md): why GitHub, Slack, and Google use apps registered for the user's org, with keys passed in at build time.
+- [ADR 0015: uw reads Claude's and OpenAI's plugin formats](adr/0015-uw-reads-claudes-and-openais-plugin-formats.md): why plugins come from those two directories and which parts uw takes.
 - [ADR 0007: uw speaks three wire formats to language models](adr/0007-uw-speaks-three-wire-formats-to-language-models.md): chat completions, Anthropic Messages, and OpenAI Responses.
 - [ADR 0008: uw reads what a model can do from models.dev](adr/0008-uw-reads-what-a-model-can-do-from-models-dev.md): tool calls and effort levels come from a public catalog, not from testing each model.
 

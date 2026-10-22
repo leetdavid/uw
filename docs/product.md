@@ -189,7 +189,7 @@ Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent b
 - A chat is a regular tab. The agent's tabs are its child tabs, open in the background, and never take the selection or focus.
 - The agent asks for [approval](CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](CONTEXT.md#language), Auto. Ask first also asks before every click and typing; Full auto never asks.
 - Agreed on 2026-10-20: the agent can run commands on this Mac in a [terminal tab](CONTEXT.md#language) under its chat. In Auto, a [command check](CONTEXT.md#language) asks only before potentially dangerous commands, as Claude Code's auto mode does, and every mode asks before a command reads a [sensitive file](CONTEXT.md#language).
-- Agreed on 2026-10-21: [connectors](CONTEXT.md#language) give the agent tools from MCP servers, and the user can start a [skill](CONTEXT.md#language) by typing `/` and its name. See the [connectors plan](plans/connectors.md).
+- Agreed on 2026-10-21: [connectors](CONTEXT.md#language) give the agent tools from MCP servers, and the user can start a [skill](CONTEXT.md#language) by typing `/` and its name. See the [connectors plan](plans/connectors.md). Agreed on 2026-10-22: a connect dialog finds a service and adds its connector and skills with one click and a sign-in. See the [connect dialog plan](plans/connect-dialog.md).
 - [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
 
 Example use cases:

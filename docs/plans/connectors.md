@@ -30,13 +30,13 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 
 - **Kinds.** A local connector is a program uw starts and talks to over its input and output. A remote one is a web address uw talks to over Streamable HTTP. The older HTTP+SSE transport is not supported.
 - **Versions.** uw speaks MCP 2026-07-28 and 2025-11-25. It first calls `server/discover`; when the server does not know it, uw falls back to `initialize` with 2025-11-25 and keeps the session. It remembers which one worked.
-- **Adding.** uw keeps its own list. Add connector takes the JSON every server's README gives: `{"mcpServers": {"name": {"command", "args", "env"}}}` for a local one, or `{"type": "http", "url", "headers"}` for a remote one. uw does not read other agents' lists. A connector can be removed.
+- **Adding.** uw keeps its own list. Add connector takes the JSON every server's README gives: `{"mcpServers": {"name": {"command", "args", "env"}}}` for a local one, or `{"type": "http", "url", "headers"}` for a remote one. uw does not read other agents' lists. A connector can be removed. Agreed on 2026-10-22: the [connect dialog](connect-dialog.md) adds search, recommended connectors, and plugins, and keeps this paste box behind "Add by address or JSON".
 - **One list for every profile**, like providers, sign-ins included. Two accounts of one service are two connectors with two names.
 - **Keys.** Values in `env` and `headers` go to Keychain and show masked.
 - **Sign-in.** A remote connector that asks for OAuth shows "Sign in". uw opens the server's sign-in page in a tab and catches the return address itself. It follows MCP's authorization rules: it finds the sign-in server from the connector's address, registers itself automatically (Dynamic Client Registration), keeps the client ID by the sign-in server's issuer, and uses PKCE. Tokens go to Keychain and refresh on their own; Sign out deletes them. A server that only takes Client ID Metadata Documents shows "This connector's sign-in needs a registration uw doesn't support yet."
 - **Addresses.** A remote connector's address is `https`, or `http` on this Mac or a private network, by the [providers rule](ai-providers.md#agreed-scope).
 - **Starting.** Every connector that is on starts when uw starts. Adding, editing, or turning one on starts or restarts it at once. One process, or one remote connection, per connector serves every chat. It stops when uw quits or the connector is turned off.
-- **Environment.** A local connector starts through the user's login shell, `$SHELL -l -c 'exec <command> <args>'`, so it finds the programs the terminal finds. The pasted `env` goes on top.
+- **Environment.** A local connector starts through the user's login shell, `$SHELL -l -c 'exec <command> <args>'`, so it finds the programs the terminal finds. The pasted `env` goes on top. On 2026-10-22 this missed Node set up in `.zshrc`; the [connect dialog plan](connect-dialog.md#fixes) replaces this rule.
 - **Failures.** A crash restarts the connector once; after that it shows as failed. A failed connector's row shows its last error line and Open in terminal, which opens a terminal tab running its exact command and environment. Each connector's error output is kept in a log in the user data folder.
 - **Tool list.** uw keeps each connector's tools and prompts on disk, so the agent's instructions can list them before the connector starts. They refresh each time it starts and when the server says they changed.
 
@@ -55,7 +55,7 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 
 - Resources, elicitation, and sampling. uw does not announce support for them.
 - Client ID Metadata Documents, which need an address uw means to keep.
-- A user's own OAuth client ID.
+- A user's own OAuth client ID. uw's own apps for services that need one are in the [connect dialog plan](connect-dialog.md#uws-own-sign-in-apps).
 - "Allow for this chat" on page steps or terminal commands.
 - Stopping an idle local connector.
 
