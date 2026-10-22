@@ -29,6 +29,8 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/performance_manager/public/graph/page_node.h"
+#include "components/performance_manager/public/performance_manager.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
@@ -153,10 +155,11 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(content::NavigateToURL(PageOf(window), url));
   }
 
-  static void AddBackgroundTab(BrowserWindowInterface* window,
-                               const GURL& url) {
+  // Opens `url` in a new tab in front, where it loads as a shown page does. A
+  // background tab's page loads late on a busy Mac.
+  static void AddTab(BrowserWindowInterface* window, const GURL& url) {
     NavigateParams params(window, url, ui::PAGE_TRANSITION_LINK);
-    params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
     ASSERT_TRUE(
         content::WaitForLoadStop(params.navigated_or_inserted_contents));
@@ -181,6 +184,15 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
   static bool Started(content::WebContents* contents) {
     return contents->GetController().GetPendingEntry() ||
            !Committed(contents).is_empty();
+  }
+
+  // Whether Chromium's loader of restored tabs took a restored tab to load
+  // in the background. It gives the tab's page its address straight away.
+  static bool Queued(content::WebContents* contents) {
+    return !performance_manager::PerformanceManager::
+                GetPrimaryPageNodeForWebContents(contents)
+                    ->GetMainFrameUrl()
+                    .is_empty();
   }
 
   static std::vector<BrowserWindowInterface*> Windows() {
@@ -587,13 +599,13 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   SessionStartupPref::SetStartupPref(
       profile(), SessionStartupPref(SessionStartupPref::LAST));
   const std::string reading = AddWorkspace("Reading", profile());
-  Load(browser(), GURL(kNotes));
-  AddBackgroundTab(browser(), GURL(kLater));
+  Load(browser(), GURL(kLater));
+  AddTab(browser(), GURL(kNotes));
   WorkspaceWindow::From(browser())->Switch(reading);
   BrowserWindowInterface* partner = WaitForShown(browser(), reading);
   ASSERT_TRUE(partner);
-  Load(partner, GURL(kArticle));
-  AddBackgroundTab(partner, GURL(kAside));
+  Load(partner, GURL(kAside));
+  AddTab(partner, GURL(kArticle));
   // Lets the session take the windows' data before the browser quits.
   base::RunLoop().RunUntilIdle();
 }
@@ -624,17 +636,15 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
 
-  // The shown window's background tab loads, as Chromium loads restored
-  // tabs. The hidden window's tabs wait until it shows.
+  // Chromium's loader of restored tabs takes the shown window's background
+  // tab. The hidden window's tabs wait until it shows.
   content::WebContents* aside = TabOf(shown, GURL(kAside));
-  ASSERT_TRUE(aside);
-  ASSERT_TRUE(
-      base::test::RunUntil([&] { return Committed(aside) == GURL(kAside); }));
   content::WebContents* notes = TabOf(behind, GURL(kNotes));
   content::WebContents* later = TabOf(behind, GURL(kLater));
-  ASSERT_TRUE(notes && later);
-  EXPECT_FALSE(Started(notes));
-  EXPECT_FALSE(Started(later));
+  ASSERT_TRUE(aside && notes && later);
+  EXPECT_TRUE(Queued(aside));
+  EXPECT_FALSE(Started(notes) || Queued(notes));
+  EXPECT_FALSE(Started(later) || Queued(later));
 
   // Switching back shows the restored window, with no third one, and loads
   // its tab. Its other tab loads once selected.
@@ -643,7 +653,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   EXPECT_EQ(Windows().size(), 2u);
   EXPECT_TRUE(
       base::test::RunUntil([&] { return Committed(notes) == GURL(kNotes); }));
-  EXPECT_FALSE(Started(later));
+  EXPECT_FALSE(Started(later) || Queued(later));
   TabStripModel* tabs = behind->GetTabStripModel();
   tabs->ActivateTabAt(tabs->GetIndexOfWebContents(later));
   EXPECT_TRUE(
