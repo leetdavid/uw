@@ -505,6 +505,37 @@ function StepLine({ step, last }: { step: Step; last: boolean }) {
   );
 }
 
+// A command a step waits for: how long it has run, as the step will say it.
+type Running = { tab: number; command: string; since: number };
+
+function ranFor(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  return seconds >= 60 ? `${Math.floor(seconds / 60)} min` : `${seconds} s`;
+}
+
+// The step that waits for a command, while it runs, as Fluid's active step.
+function RunningStep({ running }: { running: Running }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <ThinkingStep
+      className="step running"
+      icon="terminal"
+      status="active"
+      isLast
+      label={
+        <StepText>
+          Running <Command>{running.command}</Command> in tab {running.tab} ·{" "}
+          {ranFor(now - running.since)}
+        </StepText>
+      }
+    />
+  );
+}
+
 // A command's output under its step: its first and last lines when long.
 function outputPreview(output: string): string {
   const lines = output.split("\n");
@@ -1308,6 +1339,8 @@ function Chat() {
     tab: number;
     program: string;
   } | null>(null);
+  // The command a step waits for in the agent's terminal tab.
+  const [running, setRunning] = useState<Running | null>(null);
   const [lines, setLines] = useState<Step[]>([]);
   // The model the chat runs on, the providers it can pick from, and each
   // provider's models once listed.
@@ -1391,6 +1424,9 @@ function Chat() {
       chatPage.onConnectorsChanged.addListener(() => loadConnectors()),
       chatPage.onPassword.addListener((tab: number, program: string) =>
         setPassword(tab ? { tab, program } : null),
+      ),
+      chatPage.onRunning.addListener((tab: number, command: string) =>
+        setRunning(tab ? { tab, command, since: Date.now() } : null),
       ),
       chatPage.onStep.addListener((step: Step) => {
         setApproval(null);
@@ -1626,6 +1662,9 @@ function Chat() {
   const lastGroup = groups.findLastIndex(
     (run) => run[0]!.kind !== StepKind.kModel,
   );
+  // A running command shows as the newest step, in the steps before it.
+  const live = working ? running : null;
+  const liveAfterSteps = Boolean(live && groups.length && isStep(groups.at(-1)![0]!));
   const title = lines.find((line) => line.kind === StepKind.kUser)?.text;
   const stopped =
     !working &&
@@ -1808,8 +1847,18 @@ function Chat() {
               <ThinkingSteps key={index} className="w-full">
                 <ThinkingStepsContent>
                   {run.map((step, at) => (
-                    <StepLine key={at} step={step} last={at === run.length - 1} />
+                    <StepLine
+                      key={at}
+                      step={step}
+                      last={
+                        at === run.length - 1 &&
+                        !(liveAfterSteps && index === groups.length - 1)
+                      }
+                    />
                   ))}
+                  {liveAfterSteps && index === groups.length - 1 && (
+                    <RunningStep running={live!} />
+                  )}
                 </ThinkingStepsContent>
               </ThinkingSteps>
             ) : (
@@ -1823,6 +1872,13 @@ function Chat() {
                 />
               </Fragment>
             ),
+          )}
+          {live && !liveAfterSteps && (
+            <ThinkingSteps className="w-full">
+              <ThinkingStepsContent>
+                <RunningStep running={live} />
+              </ThinkingStepsContent>
+            </ThinkingSteps>
           )}
           {proposal && <SkillProposalCard proposal={proposal} />}
           {password && (
@@ -1854,7 +1910,7 @@ function Chat() {
               onAnswered={() => setApproval(null)}
             />
           )}
-          {working && !proposal && !approval && !password && (
+          {working && !live && !proposal && !approval && !password && (
             <ThinkingIndicator id="working" />
           )}
           <div ref={end} />

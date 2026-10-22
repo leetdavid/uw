@@ -113,6 +113,13 @@ class AgentTools {
   void SetOnPassword(OnPassword on_password) {
     on_password_ = std::move(on_password);
   }
+  // Tells the chat that `command` runs in tab `number`, from when it is typed
+  // until its wait ends, or with 0, that no wait runs any more.
+  using OnRunning =
+      base::RepeatingCallback<void(int number, const std::string& command)>;
+  void SetOnRunning(OnRunning on_running) {
+    on_running_ = std::move(on_running);
+  }
   // Ends a wait for a command or keys at once. The command keeps running in
   // its tab, and the step answers with what the tab shows so far.
   void EndWait();
@@ -221,6 +228,7 @@ class AgentTools {
   int acting_tab_ = 0;
   ConfirmSite confirm_site_;
   OnPassword on_password_;
+  OnRunning on_running_;
   std::unique_ptr<TerminalWait> wait_;
   base::OneShotTimer check_;
   base::WeakPtrFactory<AgentTools> weak_factory_{this};

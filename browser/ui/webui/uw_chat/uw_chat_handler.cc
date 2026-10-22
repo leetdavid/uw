@@ -832,6 +832,10 @@ bool UwChatHandler::Start() {
   }
   agent_->tools().SetOnPassword(
       base::BindRepeating(&UwChatHandler::OnPassword, base::Unretained(this)));
+  agent_->tools().SetOnRunning(base::BindRepeating(
+      [](mojo::Remote<mojom::ChatPage>* page, int number,
+         const std::string& command) { (*page)->OnRunning(number, command); },
+      base::Unretained(&page_)));
   if (TabOrganizationController* tree =
           TabOrganizationController::From(tab->GetBrowserWindowInterface())) {
     for (const auto& [number, page] : saved_tabs_) {

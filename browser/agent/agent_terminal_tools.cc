@@ -565,25 +565,29 @@ void AgentTools::Send() {
   TerminalShell* shell = ShellOf(wait_->tab);
   wait_->starting = false;
   // The command's output starts on the line it is typed on.
-  shell->Read(std::numeric_limits<int>::max(),
-              base::BindOnce(
-                  [](base::WeakPtr<AgentTools> self, const std::string& text,
-                     int cursor_line) {
-                    if (!self || !self->wait_) {
-                      return;
-                    }
-                    TerminalShell* shell = self->ShellOf(self->wait_->tab);
-                    if (!shell) {
-                      self->FinishWait(Error(base::StrCat(
-                          {TabName(self->wait_->tab), " is closed."})));
-                      return;
-                    }
-                    self->wait_->from_line = cursor_line;
-                    shell->Write(self->wait_->bytes);
-                    self->wait_->since = base::TimeTicks::Now();
-                    self->CheckShell();
-                  },
-                  weak_factory_.GetWeakPtr()));
+  shell->Read(
+      std::numeric_limits<int>::max(),
+      base::BindOnce(
+          [](base::WeakPtr<AgentTools> self, const std::string& text,
+             int cursor_line) {
+            if (!self || !self->wait_) {
+              return;
+            }
+            TerminalShell* shell = self->ShellOf(self->wait_->tab);
+            if (!shell) {
+              self->FinishWait(Error(
+                  base::StrCat({TabName(self->wait_->tab), " is closed."})));
+              return;
+            }
+            self->wait_->from_line = cursor_line;
+            shell->Write(self->wait_->bytes);
+            self->wait_->since = base::TimeTicks::Now();
+            if (!self->wait_->keys && self->on_running_) {
+              self->on_running_.Run(self->wait_->tab, self->wait_->command);
+            }
+            self->CheckShell();
+          },
+          weak_factory_.GetWeakPtr()));
 }
 
 void AgentTools::Collect(bool ended) {
@@ -632,6 +636,9 @@ void AgentTools::FinishWait(base::DictValue result) {
   std::unique_ptr<TerminalWait> wait = std::move(wait_);
   if (!wait->password_since.is_null() && on_password_) {
     on_password_.Run(0, std::string());
+  }
+  if (!wait->keys && !wait->starting && on_running_) {
+    on_running_.Run(0, std::string());
   }
   std::move(wait->done).Run(std::move(result));
 }

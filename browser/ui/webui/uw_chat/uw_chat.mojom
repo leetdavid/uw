@@ -246,6 +246,9 @@ interface ChatPage {
   // `program` in the agent's terminal tab `tab` waits for a password, which
   // only the user types there; or with 0, nothing waits any more.
   OnPassword(int32 tab, string program);
+  // `command` runs in the agent's terminal tab `tab` while its step waits
+  // for it; or with 0, no step waits for a command any more.
+  OnRunning(int32 tab, string command);
   // A connector changed: added, removed, turned on or off, or started.
   OnConnectorsChanged();
 };

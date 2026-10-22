@@ -2046,6 +2046,34 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
   SaveWindowScreenshot(browser(), "chat-command-ran");
 }
 
+// A command shows as its step while it runs, with how long it has run, in
+// place of the thinking line, and the step it ends as takes its place.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       ARunningCommandShowsAsItsStep) {
+  UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(0.95, "safe", 0.99));
+  model_.Script(
+      {RunCall("sleep 3 && echo slept"), ScriptedModel::Answer("It slept.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Sleep a bit")));
+
+  EXPECT_THAT(
+      Until(chat, "document.querySelector('.step.running')?.textContent")
+          .ExtractString(),
+      ::testing::StartsWith("Running sleep 3 && echo slept in tab 1 · "));
+  EXPECT_EQ(content::EvalJs(chat, "!document.getElementById('working')"), true);
+  SaveWindowScreenshot(browser(), "chat-command-running");
+
+  EXPECT_EQ(Until(chat, "document.querySelector('.answer')?.textContent"),
+            "It slept.");
+  EXPECT_EQ(content::EvalJs(chat, "!document.querySelector('.step.running')"),
+            true);
+  const std::vector<std::string> steps = Steps(chat);
+  ASSERT_EQ(steps.size(), 1u);
+  EXPECT_THAT(steps[0],
+              ::testing::StartsWith("Ran sleep 3 && echo slept in tab 1"));
+}
+
 // A password prompt hands the tab to the user: the chat says so, waits, and
 // goes on once they have typed it.
 IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
