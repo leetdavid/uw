@@ -70,6 +70,36 @@ source_set("chats") {
   deps = [ "//chrome/browser/profiles:profile" ]
 }
 
+# Whether a browser window is the run window. Chromium's own files ask, so
+# this depends on nothing but //base.
+source_set("run_window_mark") {
+  sources = [
+    "run_window_mark.cc",
+    "run_window_mark.h",
+  ]
+  deps = [ "//base" ]
+}
+
+# The window scheduled runs open their tabs in, never shown.
+source_set("run_window") {
+  sources = [
+    "run_window.cc",
+    "run_window.h",
+  ]
+  deps = [
+    ":run_window_mark",
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//ui/base",
+    "//url",
+  ]
+}
+
 # What the browser's commands need to open a chat.
 source_set("chat_tab") {
   sources = [
@@ -130,21 +160,30 @@ source_set("browser_tests") {
     "agent_loop_browsertest.cc",
     "agent_tools_browsertest.cc",
     "command_check_browsertest.cc",
+    "run_window_browsertest.cc",
   ]
   deps = [
     ":agent",
+    ":run_window",
+    ":run_window_mark",
     ":test_support",
     "//base",
     "//base/test:test_support",
+    "//chrome/browser",
     "//chrome/browser/actor",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles/keep_alive",
+    "//chrome/browser/sessions",
     "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
     "//chrome/common",
     "//chrome/test:test_support",
     "//components/actor/core",
+    "//components/keep_alive_registry",
     "//components/prefs",
     "//components/safe_browsing/core/common:safe_browsing_prefs",
+    "//components/sessions",
     "//components/tabs:public",
     "//content/public/browser",
     "//content/test:test_support",
@@ -152,6 +191,7 @@ source_set("browser_tests") {
     "//net:test_support",
     "//testing/gmock",
     "//testing/gtest",
+    "//ui/base",
     "//ui/gfx/geometry",
     "//url",
     "//uw/browser/ai_providers",
