@@ -141,7 +141,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // A collapsed branch hides the tabs under its top page. Collapsing is not
   // an organization action, so undo leaves it alone.
   bool IsCollapsed(const PageId& id) const { return collapsed_.contains(id); }
-  // True when a collapsed branch hides `id`. Horizontal tabs hide nothing.
+  // True when a collapsed branch hides `id` below its top page.
   bool IsHidden(const PageId& id) const;
   bool IsHidden(const tabs::TabInterface* tab) const override;
   // True when ToggleBranches would collapse the branches of `ids`, false
@@ -242,10 +242,6 @@ class TabOrganizationController : public TabStripModelObserver,
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
   // Roots of `ids` with tabs under them.
   std::vector<PageId> Parents(const std::vector<PageId>& ids) const;
-  bool Vertical() const;
-  // True when a collapsed branch holds `id` below its top page, also while
-  // horizontal tabs show it.
-  bool InCollapsedBranch(const PageId& id) const;
   // Expands every collapsed branch that holds the selected tab below its top
   // page.
   void RevealSelected();

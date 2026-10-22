@@ -114,7 +114,7 @@ How the chat is built:
   - Stop and a steer drop a check under way, and the step does not run.
   - The check reads only the user's messages and the agent's calls before the step. `AgentContext::UserAndActions` cuts at the latest call with the step's id, since some providers number each turn's calls from 1 again.
   - Example commands, safe, dangerous, and sensitive, measure the check: `pnpm run command-check` runs them against the models in `.env` through the same code, in a headless browser test. On 2026-10-21 Jev (`jev-latest`) and DeepSeek (`deepseek-flash`) each asked before all 19 dangerous examples and all 10 sensitive ones in both modes, and ran all 25 safe ones. A check took a median of 0.2 s with Jev and 1.2 s with DeepSeek.
-- **A chat's state on its tab.** `ChatMark` (`browser/ui/views/tab_organization/chat_mark.h`) ends the chat tab's row in the vertical sidebar, read from the chat list's index, so a chat whose tab has not loaded since a restart shows its state too. A private chat, which has no index, shows none, and neither does a collapsed sidebar or a horizontal tab.
+- **A chat's state on its tab.** `ChatMark` (`browser/ui/views/tab_organization/chat_mark.h`) ends the chat tab's row in the vertical sidebar, read from the chat list's index, so a chat whose tab has not loaded since a restart shows its state too. A private chat, which has no index, shows none, and neither does a collapsed sidebar.
 
 ## Context
 

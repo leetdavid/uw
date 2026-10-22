@@ -112,7 +112,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef51
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..128fe4417c57e589884440d3007dcff3e79241e6 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..7f2f9c91c289326a5e84aa74805c7d5cdd728b8b 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -158,7 +158,14 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..128fe4417c57e589884440d3007dcff3
                Item(IDS_REOPEN_CLOSED_TABS_MAC)
                    .command_id(IDC_RESTORE_TAB)
                    .remove_if(is_pwa),
-@@ -328,6 +343,9 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -321,13 +336,13 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+                    .command_id(IDC_SHOW_AI_MODE_OMNIBOX_BUTTON),
+               Item(IDS_CONTEXT_MENU_SHOW_SEARCH_TOOLS)
+                   .command_id(IDC_SHOW_SEARCH_TOOLS),
+-              Item(IDS_SWITCH_TO_VERTICAL_TAB)
+-                  .command_id(IDC_TOGGLE_VERTICAL_TABS)
+-                  .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
+               Item(IDS_VERTICAL_TABS_VIEW_MENU_TOGGLE_COLLAPSE)
                    .command_id(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE)
                    .key_equivalent(@"L", NSEventModifierFlagCommand)
                    .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
@@ -168,7 +175,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..128fe4417c57e589884440d3007dcff3
                Item(IDS_CUSTOMIZE_TOUCH_BAR)
                    .tag(IDC_CUSTOMIZE_TOUCH_BAR)
                    .action(@selector(toggleTouchBarCustomizationPalette:))
-@@ -562,12 +580,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -562,12 +577,6 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                    .command_id(IDC_PIN_TARGET_TAB)
                    .is_alternate()
                    .key_equivalent(@"", NSEventModifierFlagOption),
@@ -181,7 +188,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..128fe4417c57e589884440d3007dcff3
                Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
                    .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
                Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
-@@ -583,12 +595,91 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +592,91 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -273,7 +280,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..128fe4417c57e589884440d3007dcff3
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +735,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +732,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,

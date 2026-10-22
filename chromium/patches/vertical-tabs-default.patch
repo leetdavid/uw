@@ -37,3 +37,38 @@ diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest
  TEST_F(VerticalTabStripStateControllerTest, Initial) {
    EXPECT_FALSE(controller()->ShouldDisplayVerticalTabs());
    EXPECT_FALSE(controller()->IsCollapsed());
+diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+index 41b80c71f317ac260bbebec024aca8e7f25face5..477be0f1473f51c1339dc128f383de8118f31dc8 100644
+--- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
++++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
+@@ -162,17 +162,6 @@ export function getHtml(this: SettingsAppearancePageElement) {
+ 
+ 
+     ${this.showVerticalTabsEnabled_ ? html`
+-      <div class="cr-row">
+-        <div class="flex cr-padded-text" aria-hidden="true">
+-          $i18n{tabStripPosition}
+-        </div>
+-        <settings-dropdown-menu id="tabStripPosition"
+-            label="$i18n{tabStripPosition}"
+-            pref-key="vertical_tabs.enabled"
+-            .menuOptions="${this.tabStripOptions_}"
+-            @settings-control-change="${this.onTabStripPositionSettingsControlChange_}">
+-        </settings-dropdown-menu>
+-      </div>
+       <div class="list-frame indented-toggles"
+           ?hidden="${!this.verticalTabsEnabledPref_?.value}">
+         ${this.showVerticalTabsExpandOnHoverSetting_() ? html`
+diff --git a/chrome/browser/ui/tabs/features.cc b/chrome/browser/ui/tabs/features.cc
+index 9f151cf8e346533f5528b7d60e9c8f04d93b2988..6f0eb4cec07de8144d4e4cfd02101978effc2d32 100644
+--- a/chrome/browser/ui/tabs/features.cc
++++ b/chrome/browser/ui/tabs/features.cc
+@@ -33,7 +33,7 @@ BASE_FEATURE_PARAM(bool,
+                    kVerticalTabsToggleInTabContextMenu,
+                    &kVerticalTabsLaunch,
+                    "toggle_in_tab_context_menu",
+-                   true);
++                   false);
+ 
+ BASE_FEATURE(kVerticalTabsPreviewBadge, base::FEATURE_DISABLED_BY_DEFAULT);
+ 

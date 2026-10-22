@@ -15,7 +15,7 @@ The task menu and the Organize menu become uw cards in the [Arc-style look](arc-
 
 ### Task menu
 
-- The ⋮ button on a task's row and a right-click on the row open the same card, under the row. This is in the sidebar only; horizontal tabs keep Chromium's group editor.
+- The ⋮ button on a task's row and a right-click on the row open the same card, under the row.
 - Rows, from the top:
   1. Rename Task, and Name Task while a language model is set.
   2. The task's color as a row of small dots, the current one ringed in the primary color.
@@ -79,7 +79,7 @@ Chosen by uw for T116 on 2026-10-17, and for T114 and T115 on 2026-10-18.
 - The color dots use the colors of the task's folder on its row, so a dot always matches its folder.
 - Rows, chips, and dots always take focus, so the arrow keys reach them with Full Keyboard Access off, as macOS ships. Chromium's buttons on macOS take focus only with it on. Return runs the focused one, where Chromium's buttons on macOS take only Space.
 - The name field never shrinks below one character. The row's layout hides a child it gives no width, and hiding the field would take the keyboard from it while a new task's row grows in.
-- Rename Task in the menu bar raises Chromium's own "open the task editor" event, so the sidebar renames on the row and horizontal tabs open Chromium's editor.
+- Rename Task in the menu bar raises Chromium's own "open the task editor" event, and the sidebar renames on the row.
 - `browser/tab_organization/sidebar_menus_browsertest.mm` checks both cards and the name field with real clicks and keys. Run it with `pnpm run window-tests --gtest_filter='SidebarMenusBrowserTest.MANUAL_*'`.
 
 ## Stages
@@ -98,7 +98,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 3. Name Task closes the card, the row spins, and the name arrives with no window open. A failed request shows in the activity card with Try Again. A name typed while the model works is kept.
 4. The Organize card shows the right status line in each of the six states, and the countdown follows the time. Each chip pauses for its time, and Resume ends the pause.
 5. Undo Move names the move it undoes, and is grayed with "Nothing to undo" when there is none.
-6. With horizontal tabs, a task still opens Chromium's group editor.
+6. Removed on 2026-10-22: tabs are always vertical.
 7. Headless screenshots of both cards and of a row being renamed match the frames in light and dark mode.
 8. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 

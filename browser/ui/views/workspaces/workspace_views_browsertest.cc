@@ -25,6 +25,7 @@
 #include "chrome/browser/ui/profiles/profile_picker.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/profiles/avatar_toolbar_button.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
@@ -38,6 +39,7 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
@@ -48,8 +50,10 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/workspaces/icon_picker.h"
 #include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
@@ -294,6 +298,35 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
       NewItemsMenu(incognito).GetIndexOfCommandId(kNewWorkspaceCommand));
   EXPECT_FALSE(SwitcherOf(incognito));
   EXPECT_FALSE(WorkspaceNameRow::From(incognito));
+  EXPECT_FALSE(chrome::IsCommandEnabled(CreateBrowserForPopup(profile()),
+                                        kNewWorkspaceCommand));
+}
+
+// The narrow sidebar keeps only the new button in its foot. New Workspace and
+// the keys still work there.
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       NewWorkspaceAndTheKeysWorkInTheNarrowSidebar) {
+  const std::string work = AddWorkspace("Work", profile());
+  Settle();
+  tabs::VerticalTabStripStateController* state =
+      tabs::VerticalTabStripStateController::From(browser());
+  state->RequestCollapse(true);
+  ASSERT_TRUE(base::test::RunUntil([&] { return state->IsCollapsed(); }));
+
+  chrome::ExecuteCommand(browser(), kNewWorkspaceCommand);
+  views::Widget* card = SwitcherOf(browser())->card();
+  ASSERT_TRUE(card);
+  EXPECT_TRUE(card->IsVisible());
+  const gfx::Rect window =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetBoundsInScreen();
+  EXPECT_TRUE(window.Contains(card->GetWindowBoundsInScreen()))
+      << card->GetWindowBoundsInScreen().ToString() << " in "
+      << window.ToString();
+  SaveWidgetScreenshot(card, "new-workspace-card-narrow");
+  card->CloseNow();
+
+  RunWindowCommand(browser(), kGoToWorkspace1 + 1);
+  EXPECT_TRUE(WaitForShown(browser(), work));
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,

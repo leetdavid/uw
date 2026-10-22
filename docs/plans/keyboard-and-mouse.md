@@ -29,7 +29,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Keep here | Ctrl+Cmd+K | new. Makes a [kept tab](../CONTEXT.md#language), or lets it go. See [Automatic organization](automatic-organization.md#agreed-scope). |
 | Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | new. Selects the tab last used in that task. |
 | Go to the Scratchpad | Ctrl+Cmd+0 | new |
-| Rename task | Ctrl+Cmd+R | new. Turns the name on the task's row into a field. With horizontal tabs, opens Chromium's task editor. |
+| Rename task | Ctrl+Cmd+R | new. Turns the name on the task's row into a field. |
 | Close task, next task, previous task | Ctrl+Cmd+W, X, Z | Chromium's, unchanged |
 | Confirm the organizer's suggestion | Ctrl+Cmd+Return | button on the activity card |
 | Undo tab organization | Option+Cmd+Z | exists |
@@ -68,7 +68,7 @@ Agreed on 2026-10-15, at the user's request.
 - "New tab below" opens below the right-clicked tab's branch, at its level. Today it opens below the selected tab's branch.
 - With several tabs selected, it opens one child, under the tab that was right-clicked.
 - The child is in its parent's task, or in the Scratchpad. Selecting it expands a collapsed parent. Organization undo does not remove it.
-- It is off for pinned tabs. In horizontal tabs it opens right after its parent and keeps the parent link.
+- It is off for pinned tabs.
 - Terminal and chat tabs can have children like any tab.
 - A child made this way, or with "Nest under previous tab", stays with its parent. See [Branch moves](automatic-organization.md#branch-moves).
 - Once the command bar lands, the command opens it instead of a blank tab, per the [command bar plan](command-bar.md#opening-it).
@@ -82,8 +82,7 @@ Agreed on 2026-10-15. A tab's right-click menu groups moves together, tree comma
 3. Nest under previous tab, Move up one level, Collapse branch, and Undo tab organization.
 4. Reload, Duplicate, Pin, and Mute site.
 5. Chromium's Read later and Send to your devices.
-6. Switch to horizontal tabs.
-7. Close tab, Close branch, Close other tabs, and Close tabs below.
+6. Close tab, Close branch, Close other tabs, and Close tabs below.
 
 Chromium's "Add tab to new group" and "Remove from group" are left out: see [Product](../product.md#automatic-tab-organization).
 
@@ -110,7 +109,7 @@ Agreed on 2026-10-15.
   - Closing a collapsed parent moves its children up one level, where they show again.
   - A link opened in the background from a collapsed branch stays hidden, and the count goes up.
   - The collapse survives a restart. The organizer and undo never change it.
-- Horizontal tabs show every tab, and the command is off there. A branch keeps its collapse for the sidebar, unless a tab in it is selected.
+- Selecting a hidden tab expands its branch.
 - Drags and the chevron count as [manual adjustments](../CONTEXT.md#language), like the menu commands.
 
 ### Mouse actions
@@ -124,7 +123,7 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 | Double-click empty space below the tabs | Does what the foot's "+" does. The space still drags the window, but a double-click there no longer zooms it, as in Arc. |
 | Middle-click a task's folder row | Closes the task and its tabs, like Close task. |
 
-- The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar and in horizontal tabs.
+- The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar.
 - The task row's "+" opens the command bar since it landed. Agreed on 2026-10-21.
 - Elsewhere in the window, a double-click on space that drags the window still does what macOS's "Double-click a window's title bar" setting says. A double-click below the tabs did too until T58.
 - The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
@@ -205,5 +204,4 @@ Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites w
 ## Open questions
 
 - Whether window manager apps on the user's Mac already take Ctrl+Cmd with the arrows. Check by hand before T53 ships.
-- What sideways drags do in horizontal tabs. Proposal: they are off there. Collapse was settled with T57: see [Branches with the mouse](#branches-with-the-mouse).
 - Where Ctrl+\` returns to when the tab selected before the terminal has closed. Proposal: the tab above the terminal.

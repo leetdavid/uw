@@ -24,9 +24,7 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
-#include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
@@ -163,7 +161,7 @@ bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
     const std::optional<tab_groups::TabGroupId> task = self->MoveToNewTask(
         {*page}, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     // The user made the task, so it opens ready for its name.
-    if (task && self->Vertical()) {
+    if (task) {
       self->RenameOnItsRow(task->ToString());
     }
   }
@@ -327,7 +325,7 @@ bool TabOrganizationController::CanExecute(
     case kCloseBranch:
       return !Parents(ids).empty();
     case kToggleBranch:
-      return Vertical() && !Parents(ids).empty();
+      return !Parents(ids).empty();
     default:
       return false;
   }
@@ -588,10 +586,6 @@ void TabOrganizationController::PlaceInTask(
 }
 
 bool TabOrganizationController::IsHidden(const PageId& id) const {
-  return Vertical() && InCollapsedBranch(id);
-}
-
-bool TabOrganizationController::InCollapsedBranch(const PageId& id) const {
   const Page* page = tree_.Find(id);
   for (const Page* up = page ? tree_.Find(page->parent) : nullptr; up;
        up = tree_.Find(up->parent)) {
@@ -645,7 +639,7 @@ void TabOrganizationController::ToggleKept(const std::vector<PageId>& ids) {
 
 void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
   const std::vector<PageId> parents = Parents(ids);
-  if (parents.empty() || !Vertical()) {
+  if (parents.empty()) {
     return;
   }
   if (!CollapsesBranches(ids)) {
@@ -655,7 +649,7 @@ void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
   } else {
     collapsed_.insert(parents.begin(), parents.end());
     const std::optional<PageId> selected = IdFor(tabs_->GetActiveTab());
-    if (selected && InCollapsedBranch(*selected)) {
+    if (selected && IsHidden(*selected)) {
       PageId top;
       for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
            up = tree_.Find(up->parent)) {
@@ -944,14 +938,9 @@ std::vector<PageId> TabOrganizationController::Parents(
   return parents;
 }
 
-bool TabOrganizationController::Vertical() const {
-  return window_->GetProfile()->GetPrefs()->GetBoolean(
-      prefs::kVerticalTabsEnabled);
-}
-
 void TabOrganizationController::RevealSelected() {
   const std::optional<PageId> selected = IdFor(tabs_->GetActiveTab());
-  if (!selected || !InCollapsedBranch(*selected)) {
+  if (!selected || !IsHidden(*selected)) {
     return;
   }
   for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
@@ -1144,9 +1133,7 @@ void TabOrganizationController::ScheduleApply() {
 
 void TabOrganizationController::ApplyWhenIdle() {
   apply_pending_ = false;
-  // Horizontal tab drags do not report their start and end here, so the
-  // strip is only put back in tree order on its own in vertical mode.
-  if (dragging_ || !Vertical()) {
+  if (dragging_) {
     return;
   }
   Apply();

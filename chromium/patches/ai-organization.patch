@@ -14,7 +14,7 @@ index 3b46ea761345ceea74fd9c32bd0b259a63b5c90c..898df460c4807874f34315f424996d6f
  
    if (enable_print_preview) {
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
-index 6ccdf1e52f7fd305c36b0f109586b19d6080004b..a9e6b8e201fca57952941acb703226a4f60612aa 100644
+index 6ccdf1e52f7fd305c36b0f109586b19d6080004b..aa8d3aafcb34618632e8dcb0838160987b8d2e84 100644
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
 @@ -560,6 +560,11 @@
@@ -47,3 +47,12 @@ index 6ccdf1e52f7fd305c36b0f109586b19d6080004b..a9e6b8e201fca57952941acb703226a4
    registry->RegisterBooleanPref(prefs::kCtrlTabMru, false);
    cross_device::RegisterProfilePrefs(registry);
    enterprise::RegisterIdentifiersProfilePrefs(registry);
+@@ -2687,6 +2696,8 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
+ #if !BUILDFLAG(IS_ANDROID)
+   // Added 07/2026.
+   tabs::MigrateEverythingMenuPinnedToTabstripPref(profile_prefs);
++  // uw: tabs are always vertical, so a horizontal choice saved before goes.
++  profile_prefs->ClearPref(prefs::kVerticalTabsEnabled);
+ #endif
+ 
+   // Added 07/2026.

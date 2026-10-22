@@ -26,7 +26,7 @@ Agreed: build for the project owner's daily browsing first. A broader target aud
 
 Agreed: the first version targets macOS desktop. Chrome-like everyday browsing with vertical tabs is enough to start daily use. Other planned features can follow.
 
-Agreed: keep uw branding minimal and use native vertical tabs by default. Preserve the user's explicit choice to use horizontal tabs.
+Agreed: keep uw branding minimal and use native vertical tabs. Changed on 2026-10-22, when the user asked to "disable horizontal tabs": tabs are always vertical. No menu or setting switches to horizontal tabs, and a profile that chose them before opens with vertical tabs.
 
 Agreed on 2026-10-14, for now: the logo is the two-ink double u in [Logo](logo.md). It is the app icon on macOS. Logos inside the browser are still Chromium's.
 

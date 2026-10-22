@@ -15,14 +15,12 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
-#include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_group.h"
@@ -33,7 +31,6 @@
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
-#include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -359,26 +356,6 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdRRenamesTheTaskOnItsRow) {
   Press(ui::VKEY_R, kCtrlCmd);
   ASSERT_TRUE(base::test::RunUntil([&] { return field->editing(); }));
   EXPECT_EQ(field->GetText(), u"Plan");
-}
-
-// Horizontal tabs have no name field on a row, so the key opens Chromium's
-// task editor, which has one.
-IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
-                       CtrlCmdROpensTheTaskEditorWithHorizontalTabs) {
-  browser()->GetProfile()->GetPrefs()->SetBoolean(::prefs::kVerticalTabsEnabled,
-                                                  false);
-  base::RunLoop().RunUntilIdle();
-  tabs::TabInterface* tab = tabs()->GetTabAtIndex(0);
-  ASSERT_TRUE(controller()->MoveToNewTask({Id(tab)}, u"Plan"));
-  base::RunLoop().RunUntilIdle();
-
-  Press(ui::VKEY_R, kCtrlCmd);
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
-        kTabGroupEditorBubbleId,
-        views::ElementTrackerViews::GetContextForView(
-            BrowserView::GetBrowserViewForBrowser(browser())));
-  }));
 }
 
 // Space goes into the name, though on the row it opens or collapses the task.

@@ -100,7 +100,7 @@ pnpm run launch
 
 `launch` starts a new `uw.app` instance and returns without waiting for it to close. uw gets the environment the Finder would give it, not your terminal's, so a shell in a uw terminal tab does not think it runs inside the terminal you launched from. It also records every organizer request and answer in `~/Library/Application Support/uw-dev/organizer-log.jsonl`; `pnpm run launch:nolog` starts uw without that record. See [Try uw](docs/try-uw.md). It uses `~/Library/Application Support/uw-dev` to keep development settings and extensions separate. For tab restoration, choose "Continue where you left off" at `chrome://settings/onStartup`. Quit this build before rebuilding it. When uw is already running, `launch` asks whether to quit it and start it again. An answer that starts with `y`, such as `y` or `yes`, does that; any other answer leaves uw running and starts nothing, because a second launch would only open a window of the running copy, not the new build. `pnpm run launch -y` quits it and starts it again without asking. `pnpm run kill` quits every running copy of this build.
 
-Launching `uw.app` normally uses `~/Library/Application Support/uw`. Profiles without an explicit tab-orientation preference start with vertical tabs. The upstream tab context menu can switch back to horizontal tabs, and that choice persists.
+Launching `uw.app` normally uses `~/Library/Application Support/uw`. Tabs are always vertical. A profile that chose horizontal tabs before opens with vertical tabs, and no menu or setting offers horizontal tabs.
 
 For current manual test scenarios and known limits, see [Try the current build](docs/try-uw.md).
 
@@ -261,7 +261,7 @@ Pending native verification:
 1. Launch with a fresh profile and no feature flags. Check native vertical tabs, the app menu and About name, tab creation, closing, grouping, dragging, and window resizing.
 2. Run the [native tab-tree acceptance checks](docs/plans/native-tab-tree.md#acceptance-checks), including Scratchpad, branch extraction, close promotion, undo, and session restoration.
 3. Run the [automatic organization acceptance checks](docs/plans/automatic-organization.md#acceptance-checks) with a configured provider, including classification, generated naming, manual holds, pause, and undo feedback.
-4. Switch to horizontal tabs, restart, and confirm the choice persists. Check required extensions separately.
+4. Check that no menu or setting offers horizontal tabs. Check required extensions separately.
 
 Headless smoke testing does not establish that the native browser interface works.
 

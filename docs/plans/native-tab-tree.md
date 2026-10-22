@@ -73,7 +73,7 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 7. One undo reverses a move or task creation as a whole. Tabs opened since stay open.
 8. Collapse, rename, color, and drag of a task behave exactly as they do in stock Chromium.
 9. After a quit, a crash, and the last window closing, the tree comes back whole: depth, order, collapse, task names, and who named each task. Each case is also checked after Chromium has rewritten its session file.
-10. Switching to horizontal tabs and back keeps tasks and parent links.
+10. Tabs are always vertical: a horizontal choice saved before goes at the next launch. `TabOrganizationControllerBrowserTest.TabsComeBackVerticalAfterAHorizontalChoice` checks it.
 11. Option+Cmd+Z undoes one organization action per press. `UndoShortcutBrowserTest.OptionCmdZUndoesOneOrganizationActionPerPress` checks it.
 12. A launch after a quit restores the last session without a prompt. After a crash, the "Restore pages?" prompt shows an unticked "Always restore after a crash" box. Once it is ticked, the next crash restores without the prompt.
 

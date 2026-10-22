@@ -131,8 +131,8 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
     case kGoToScratchpad:
       controller->SelectTask(std::string());
       break;
-    // The sidebar renames on the task's row. Horizontal tabs open Chromium's
-    // task editor, which has the name field.
+    // The sidebar answers Chromium's request for the task editor by renaming
+    // on the task's row.
     case kRenameTask:
       window->GetTabStripModel()->OpenTabGroupEditor(*SelectedTask(window));
       break;

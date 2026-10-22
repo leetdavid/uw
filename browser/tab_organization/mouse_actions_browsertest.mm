@@ -27,10 +27,7 @@
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
-#include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_close_button.h"
-#include "chrome/browser/ui/views/tabs/tab_group_header.h"
-#include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_group.h"
@@ -114,11 +111,6 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
 
   void Settle() { base::RunLoop().RunUntilIdle(); }
 
-  void SetVertical(bool on) {
-    prefs()->SetBoolean(::prefs::kVerticalTabsEnabled, on);
-    Settle();
-  }
-
   tabs::TabInterface* OpenLinkFrom(tabs::TabInterface* source) {
     NavigateParams params(browser(), GURL("about:blank"),
                           ui::PAGE_TRANSITION_LINK);
@@ -175,7 +167,7 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
     return found;
   }
 
-  // The close button on the row of `tab`, in either orientation.
+  // The close button on the row of `tab`.
   views::Button* CloseButtonOf(tabs::TabInterface* tab) {
     for (TabView* row : Shown<TabView>()) {
       if (row->GetTabInterface() == tab) {
@@ -186,24 +178,14 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
         }
       }
     }
-    for (Tab* row : Shown<Tab>()) {
-      if (row->tab_handle().Get() == tab) {
-        return row->close_button();
-      }
-    }
     return nullptr;
   }
 
-  // The row of `task`, in either orientation.
+  // The row of `task`.
   views::View* RowOf(const tab_groups::TabGroupId& task) {
     for (TaskNameField* field : AllOf<TaskNameField>()) {
       if (field->group() == task && field->parent()->IsDrawn()) {
         return field->parent();
-      }
-    }
-    for (TabGroupHeader* row : Shown<TabGroupHeader>()) {
-      if (row->group() == task) {
-        return row;
       }
     }
     return nullptr;
@@ -397,18 +379,6 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
-                       OptionClickClosesTheBranchInHorizontalTabs) {
-  SetVertical(false);
-  const Tree tree = OpenTree();
-  views::Button* close = CloseButtonOf(tree.a);
-  ASSERT_TRUE(views::IsViewClass<TabCloseButton>(close));
-  ASSERT_TRUE(Shown<TabView>().empty());
-  OptionClick(close);
-  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 1; }));
-  EXPECT_EQ(tabs()->GetTabAtIndex(0), tree.d.get());
-}
-
-IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
                        MiddleClickOnATaskRowClosesTheTask) {
   const Tree tree = OpenTree();
   const tab_groups::TabGroupId task = TaskOf({tree.a});
@@ -428,18 +398,6 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
            !tabs()->group_model()->ContainsTabGroup(task);
   }));
   EXPECT_FALSE(tabs()->GetTabAtIndex(0)->GetGroup());
-}
-
-IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
-                       MiddleClickClosesTheTaskInHorizontalTabs) {
-  SetVertical(false);
-  const Tree tree = OpenTree();
-  const tab_groups::TabGroupId task = TaskOf({tree.a});
-  views::View* row = RowOf(task);
-  ASSERT_TRUE(views::IsViewClass<TabGroupHeader>(row));
-  MiddleClick(row);
-  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 1; }));
-  EXPECT_EQ(tabs()->GetTabAtIndex(0), tree.d.get());
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,

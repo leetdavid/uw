@@ -69,7 +69,7 @@ Agreed on 2026-10-12:
 3. Collapse, rename, recolor, and drag of a task still work from the folder row.
 4. With either default tint, text on the tint and on the card has at least a 4.5:1 contrast ratio.
 5. With any picked tint, text on it has at least a 4.5:1 contrast ratio. `TintTest.*` covers light, dark, and mid-tone colors. `TintBrowserTest.*` covers a picked color in a window. `ThemePickerBrowserTest.*` picks a suggested theme, moves and adds dots, and sets intensity, grain, and the mode from the picker.
-6. Horizontal tabs keep Chromium's layout. Their frame takes the tint as a plain color, like any Chromium theme color.
+6. Windows without a sidebar, such as pop-ups, keep Chromium's layout. Their frame takes the tint as a plain color, like any Chromium theme color.
 7. `pnpm run check` and `pnpm run verify` pass.
 
 ## Open questions

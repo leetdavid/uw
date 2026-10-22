@@ -212,21 +212,10 @@ index bca3e9acc58f9ba2530b29d23750b12f5c9f7f37..30f9e441833a9593173d1201e0f13fb4
    raw_ptr<UnpinnedTabContainerView> unpinned_tabs_container_view_ = nullptr;
    bool is_collapsed_ = false;
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
-index db53e40e591295311569835fae59eb340ad776a4..13d9d6fa159b21f0241673e2081c65d5dc4c74ba 100644
+index db53e40e591295311569835fae59eb340ad776a4..74d041e6dcee97f0af055c532e6a22a3dc7fb70a 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
-@@ -125,6 +125,10 @@ views::ProposedLayout TabStripViewLayout::CalculateHorizontalLayout(
- 
-   // The tabs separator isn't visible for the horizontal orientation.
-   layouts.child_layouts.emplace_back(tabs_separator, false, gfx::Rect());
-+  if (tab_strip_view->uw_row_) {
-+    layouts.child_layouts.emplace_back(tab_strip_view->uw_row_.get(), false,
-+                                       gfx::Rect());
-+  }
- 
-   // Place the unpinned container.
-   int unpinned_width = unpinned_preferred_width;
-@@ -185,6 +189,11 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+@@ -185,6 +185,11 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
    const bool should_show_separator = pinned_preferred_height != 0 &&
                                       unpinned_preferred_height != 0 &&
                                       is_collapsed;
@@ -238,7 +227,7 @@ index db53e40e591295311569835fae59eb340ad776a4..13d9d6fa159b21f0241673e2081c65d5
  
    // If the height is bounded, calculate the available space for laying out the
    // pinned and unpinned containers.
-@@ -198,6 +207,7 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+@@ -198,6 +203,7 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
        remaining_height -=
            tabs_separator->GetPreferredSize().height() + region_vertical_padding;
      }
@@ -246,7 +235,7 @@ index db53e40e591295311569835fae59eb340ad776a4..13d9d6fa159b21f0241673e2081c65d5
      // Clamp the remaining height to 0 if we have less space.
      remaining_height = std::max(remaining_height, 0);
    }
-@@ -231,6 +241,15 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+@@ -231,6 +237,15 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
      }
    }
  

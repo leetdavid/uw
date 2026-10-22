@@ -38,6 +38,7 @@
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
@@ -661,22 +662,27 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->tree().Tasks().size(), 2u);
 }
 
-// Switching tab orientation rebuilds the sidebar views. The window-owned
-// tree must not depend on them.
+// Tabs are always vertical. A horizontal choice saved before uw turned
+// horizontal tabs off goes at the next launch, and no menu offers it again.
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       OrientationTogglePreservesTree) {
-  tabs::TabInterface* page = InitialTab();
-  tabs::TabInterface* child = OpenLinkFrom(page);
-  ASSERT_TRUE(controller()->MoveToNewTask({Id(page)}, u"Keep"));
-  const PageTree before = controller()->tree();
+                       PRE_TabsComeBackVerticalAfterAHorizontalChoice) {
+  browser()->GetProfile()->GetPrefs()->SetBoolean(::prefs::kVerticalTabsEnabled,
+                                                  false);
+}
 
-  PrefService* prefs = browser()->GetProfile()->GetPrefs();
-  prefs->SetBoolean(::prefs::kVerticalTabsEnabled, false);
-  base::RunLoop().RunUntilIdle();
-  prefs->SetBoolean(::prefs::kVerticalTabsEnabled, true);
-  base::RunLoop().RunUntilIdle();
-  EXPECT_EQ(controller()->tree(), before);
-  EXPECT_EQ(controller()->DepthFor(child), 1);
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TabsComeBackVerticalAfterAHorizontalChoice) {
+  EXPECT_FALSE(browser()->GetProfile()->GetPrefs()->HasPrefPath(
+      ::prefs::kVerticalTabsEnabled));
+  EXPECT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())
+                  ->ShouldDrawVerticalTabStrip());
+  EXPECT_FALSE(chrome::IsCommandEnabled(browser(), IDC_TOGGLE_VERTICAL_TABS));
+  TabMenuModel tab_menu(
+      nullptr, browser()->GetFeatures().tab_menu_model_delegate(), tabs(), 0);
+  EXPECT_FALSE(
+      tab_menu.GetIndexOfCommandId(TabStripModel::CommandToggleVertical));
+  ToolsMenuModel more_tools(nullptr, browser());
+  EXPECT_FALSE(more_tools.GetIndexOfCommandId(IDC_TOGGLE_VERTICAL_TABS));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
@@ -1056,30 +1062,6 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 
   EXPECT_FALSE(controller()->IsCollapsed(Id(parent)));
   EXPECT_FALSE(controller()->IsHidden(Id(tabs()->GetActiveTab())));
-}
-
-IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       HorizontalTabsCollapseNothing) {
-  const auto vertical = [&](bool on) {
-    browser()->GetProfile()->GetPrefs()->SetBoolean(
-        ::prefs::kVerticalTabsEnabled, on);
-    base::RunLoop().RunUntilIdle();
-  };
-  tabs::TabInterface* page = InitialTab();
-  tabs::TabInterface* child = OpenLinkFrom(page);
-  Collapse(page);
-  vertical(false);
-  EXPECT_FALSE(controller()->IsHidden(Id(child)));
-  EXPECT_FALSE(controller()->CanExecute(
-      TabOrganizationController::kToggleBranch, {Id(page)}));
-  vertical(true);
-  EXPECT_TRUE(controller()->IsHidden(Id(child)));
-
-  // Selecting a tab that the sidebar would hide expands its branch.
-  vertical(false);
-  chrome::SelectNextTab(browser());
-  EXPECT_EQ(tabs()->GetActiveTab(), child);
-  EXPECT_FALSE(controller()->IsCollapsed(Id(page)));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

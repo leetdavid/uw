@@ -1088,7 +1088,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c
        views::kFlexBehaviorKey,
        views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..4d681d69ba233511818a32e07aa7e6298b7462b8 100644
+index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5e13d4957 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -143,6 +143,15 @@
@@ -1173,7 +1173,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..4d681d69ba233511818a32e07aa7e629
      case IDC_GROUP_UNGROUPED_TABS:
        GroupAllUngroupedTabs(browser_);
        base::RecordAction(
-@@ -1731,6 +1767,17 @@ void BrowserCommandController::InitCommandState() {
+@@ -1731,6 +1767,19 @@ void BrowserCommandController::InitCommandState() {
    command_updater_->UpdateCommandEnabled(IDC_GROUP_UNGROUPED_TABS, true);
    command_updater_->UpdateCommandEnabled(IDC_ADD_NEW_TAB_RECENT_GROUP, true);
    command_updater_->UpdateCommandEnabled(IDC_UNFOCUS_TAB_GROUP, true);
@@ -1185,12 +1185,24 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..4d681d69ba233511818a32e07aa7e629
 +  }
 +  command_updater_->UpdateCommandEnabled(uw::kNewTerminalCommand, true);
 +  command_updater_->UpdateCommandEnabled(uw::kNewChatCommand, true);
-+  command_updater_->UpdateCommandEnabled(uw::kNewWorkspaceCommand,
-+                                         !profile()->IsOffTheRecord());
++  command_updater_->UpdateCommandEnabled(
++      uw::kNewWorkspaceCommand,
++      !profile()->IsOffTheRecord() &&
++          browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL);
 +  command_updater_->UpdateCommandEnabled(uw::kShellCommandBarCommand, true);
  
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
+@@ -1749,7 +1798,8 @@ void BrowserCommandController::InitCommandState() {
+   UpdateTabRestoreCommandState();
+   command_updater_->UpdateCommandEnabled(IDC_EXIT, true);
+   command_updater_->UpdateCommandEnabled(IDC_NAME_WINDOW, true);
+-  command_updater_->UpdateCommandEnabled(IDC_TOGGLE_VERTICAL_TABS, true);
++  // uw: tabs are always vertical.
++  command_updater_->UpdateCommandEnabled(IDC_TOGGLE_VERTICAL_TABS, false);
+   command_updater_->UpdateCommandEnabled(IDC_VERTICAL_TABS_SEND_FEEDBACK, true);
+   command_updater_->UpdateCommandEnabled(
+       IDC_TOGGLE_VERTICAL_TABS_EXPAND_ON_HOVER, true);
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
 index 1bbe4c5fab65668acadce3f60c0e6d181f83036e..f66f636ed2ac53e78307f7e180421712bb49f9cb 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
@@ -1508,10 +1520,45 @@ index a66de0ebb69849292242b5efb637e807345a5cf0..bd5eef180ea4aea103786fe8a1f7ebe0
  
    SchedulePaint();
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
-index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..498dd9ffa52de59e8582927087b724a747db2ced 100644
+index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..fd1cf76e5de357896d9fd71c4a763896ba4fc950 100644
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
 +++ b/chrome/browser/ui/toolbar/app_menu_model.cc
-@@ -2255,22 +2255,8 @@ void AppMenuModel::Build() {
+@@ -1193,34 +1193,6 @@ void ToolsMenuModel::Build(BrowserWindowInterface* browser) {
+       this, IDC_NAME_WINDOW, IDS_NAME_WINDOW,
+       features::IsRoundedIconsEnabled() ? kWebAssetIcon : kNameWindowOldIcon);
+ 
+-  if (auto* controller = tabs::VerticalTabStripStateController::From(browser)) {
+-    if (controller->ShouldDisplayVerticalTabs()) {
+-      AddItemWithStringIdAndVectorIcon(
+-          this, IDC_TOGGLE_VERTICAL_TABS, IDS_SWITCH_TO_HORIZONTAL_TAB,
+-          features::IsRoundedIconsEnabled() ? kToolbarIcon : kToolbarOldIcon);
+-    } else {
+-      AddItemWithStringIdAndVectorIcon(
+-          this, IDC_TOGGLE_VERTICAL_TABS, IDS_SWITCH_TO_VERTICAL_TAB,
+-          base::i18n::IsRTL() ? features::IsRoundedIconsEnabled()
+-                                    ? kDockToLeftIcon
+-                                    : kDockToRightOldIcon
+-          : features::IsRoundedIconsEnabled() ? kDockToRightIcon
+-                                              : kDockToLeftOldIcon);
+-      const bool use_preview_badge =
+-          base::FeatureList::IsEnabled(tabs::kVerticalTabsPreviewBadge);
+-      const ui::NewBadgeType badge_type = use_preview_badge
+-                                              ? ui::NewBadgeType::kPreview
+-                                              : ui::NewBadgeType::kNew;
+-      const user_education::DisplayNewBadge show_badge =
+-          UserEducationService::MaybeShowNewBadge(
+-              browser->GetProfile(), use_preview_badge
+-                                         ? tabs::kVerticalTabsPreviewBadge
+-                                         : tabs::kVerticalTabsNewBadge);
+-      SetIsNewFeatureAt(GetIndexOfCommandId(IDC_TOGGLE_VERTICAL_TABS).value(),
+-                        show_badge, badge_type);
+-    }
+-  }
+-
+   if (CustomizeChromePageHandler::IsSupported(
+           NtpCustomBackgroundServiceFactory::GetForProfile(
+               browser->GetProfile()),
+@@ -2255,22 +2227,8 @@ void AppMenuModel::Build() {
  
    AddSeparator(ui::NORMAL_SEPARATOR);
  
@@ -1536,7 +1583,7 @@ index 7c3624d660c56d7b37aca31d6e01f2ef3d503189..498dd9ffa52de59e8582927087b724a7
  
    if (!browser_->GetProfile()->IsGuestSession()) {
      sub_menus_.push_back(
-@@ -2319,18 +2305,7 @@ void AppMenuModel::Build() {
+@@ -2319,18 +2277,7 @@ void AppMenuModel::Build() {
          kBookmarksMenuItem);
    }
  
@@ -1791,64 +1838,6 @@ index 23b60722456be4692fc5bd5a7d9e25e1b4d22cff..c242839a90c572b92a2599b1f144012b
    const SessionStartupPref session_startup_pref =
        SessionStartupPref::GetStartupPref(browser->GetProfile());
  
-diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
-index 668a2d050fed37b99098fa58687b732d80bb0164..d42005eb2f78aaa798c3ace57c93a9a52ab0824c 100644
---- a/chrome/browser/ui/views/tabs/tab.cc
-+++ b/chrome/browser/ui/views/tabs/tab.cc
-@@ -89,6 +89,7 @@
- #include "ui/views/view_utils.h"
- #include "ui/views/widget/tooltip_manager.h"
- #include "ui/views/widget/widget.h"
-+#include "uw/browser/ui/views/tab_organization/mouse_actions.h"
- 
- #if BUILDFLAG(IS_WIN)
- #include "ui/views/win/pen_event_handler_util.h"
-@@ -1496,6 +1497,11 @@ void Tab::MaybeUpdateHoverStatus(const ui::MouseEvent& event) {
- }
- 
- void Tab::CloseButtonPressed(const ui::Event& event) {
-+  // uw: Option-click closes the tab's branch.
-+  if (uw::CloseBranchOnOptionClick(this, tab_handle().Get(), event)) {
-+    return;
-+  }
-+
-   if (IsActive()) {
-     base::RecordAction(UserMetricsAction("CloseTab_Active"));
-   } else {
-diff --git a/chrome/browser/ui/views/tabs/tab_group_header.cc b/chrome/browser/ui/views/tabs/tab_group_header.cc
-index 2bc58b05b5ee16364e3f45dd167f968e3f83b26d..22e05d5686cdbf3e62994c08ae485994bab00455 100644
---- a/chrome/browser/ui/views/tabs/tab_group_header.cc
-+++ b/chrome/browser/ui/views/tabs/tab_group_header.cc
-@@ -64,6 +64,7 @@
- #include "ui/views/layout/flex_layout_types.h"
- #include "ui/views/view.h"
- #include "ui/views/view_class_properties.h"
-+#include "uw/browser/ui/views/tab_organization/mouse_actions.h"
- 
- #if BUILDFLAG(IS_MAC)
- #include "base/i18n/break_iterator.h"
-@@ -311,7 +312,8 @@ bool TabGroupHeader::OnMousePressed(const ui::MouseEvent& event) {
-     return true;
-   }
- 
--  return false;
-+  // uw: a middle-click closes the task when it is let go.
-+  return uw::TakesMiddleClick(this, event);
- }
- 
- bool TabGroupHeader::OnMouseDragged(const ui::MouseEvent& event) {
-@@ -321,6 +323,11 @@ bool TabGroupHeader::OnMouseDragged(const ui::MouseEvent& event) {
- }
- 
- void TabGroupHeader::OnMouseReleased(const ui::MouseEvent& event) {
-+  // uw: a middle-click closes the task.
-+  if (uw::CloseTaskOnMiddleClick(this, group().value(), event)) {
-+    return;
-+  }
-+
-   if (!dragging()) {
-     bool open_editor_bubble =
-         event.IsRightMouseButton() && !editor_bubble_tracker_.is_open();
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h
 index e8ec955ea42e6a7f5124579007b7ce23228bd310..f61460e21cd7e24c873724af5eda489f26647644 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h
