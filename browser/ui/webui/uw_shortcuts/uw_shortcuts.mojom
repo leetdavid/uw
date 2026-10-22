@@ -1,0 +1,29 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+module uw.mojom;
+
+// One command of the menu bar. See uw::MenuKey.
+struct MenuKey {
+  string menu;
+  string title;
+  // Empty for Chromium's commands, whose keys cannot be changed.
+  string name;
+  // Written as Chromium's key recorder writes a key, such as "Command+Ctrl+K".
+  // Empty for no key.
+  string key;
+  string default_key;
+  string taken_by;
+};
+
+// The Keyboard shortcuts section of chrome://settings. Every call answers
+// with all the commands, since one change can take a key from another.
+interface ShortcutsHandler {
+  GetMenuKeys() => (array<MenuKey> keys);
+  // Refused, changing nothing, for a key without Command.
+  SetMenuKey(string name, string key) => (array<MenuKey> keys);
+  ResetMenuKey(string name) => (array<MenuKey> keys);
+  // Gives a key back to the Chromium command it belongs to.
+  GiveBackMenuKey(string key) => (array<MenuKey> keys);
+  ResetMenuKeys() => (array<MenuKey> keys);
+};

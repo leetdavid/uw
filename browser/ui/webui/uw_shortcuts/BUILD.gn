@@ -1,0 +1,49 @@
+# Mojo backend of the Keyboard shortcuts section of chrome://settings. The
+# keys are the app's, in local state, not a profile's.
+import("//mojo/public/tools/bindings/mojom.gni")
+
+assert(is_mac)
+
+mojom("mojo_bindings") {
+  sources = [ "uw_shortcuts.mojom" ]
+  webui_module_path = "/"
+}
+
+source_set("uw_shortcuts") {
+  sources = [
+    "uw_shortcuts_handler.cc",
+    "uw_shortcuts_handler.h",
+  ]
+  public_deps = [
+    ":mojo_bindings",
+    "//mojo/public/cpp/bindings",
+  ]
+  deps = [
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//components/prefs",
+    "//content/public/browser",
+    "//ui/base",
+    "//uw/browser/shortcuts",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "uw_shortcuts_page_browsertest.cc" ]
+  deps = [
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//url",
+    "//uw/browser/shortcuts",
+    "//uw/browser/tab_organization:test_support",
+  ]
+}

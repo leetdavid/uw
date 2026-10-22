@@ -1,0 +1,53 @@
+# The keys of uw's commands of the menu bar, which the user can change for the
+# whole app. See ADR 0011.
+
+assert(is_mac)
+
+source_set("prefs") {
+  sources = [
+    "menu_keys.cc",
+    "menu_keys.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("shortcuts") {
+  sources = [ "menu_keys_mac.mm" ]
+  public_deps = [ ":prefs" ]
+  deps = [
+    "//base",
+    "//chrome:strings",
+    "//chrome/app:command_ids",
+    "//components/prefs",
+    "//ui/base",
+    "//uw/browser/agent:chat_tab",
+    "//uw/browser/tab_organization",
+    "//uw/browser/terminal",
+    "//uw/browser/workspaces",
+  ]
+  frameworks = [ "AppKit.framework" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "menu_keys_browsertest.mm" ]
+  deps = [
+    ":shortcuts",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/app:command_ids",
+    "//chrome/browser",
+    "//chrome/browser:global_keyboard_shortcuts_mac",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/events:test_support",
+    "//url",
+    "//uw/browser/tab_organization",
+  ]
+}

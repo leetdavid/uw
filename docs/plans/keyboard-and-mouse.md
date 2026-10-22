@@ -54,7 +54,7 @@ Agreed on 2026-10-19 as T122. uw keeps its own list of keys, so the same code ca
 - A key must include Cmd, so it works while a terminal tab has focus. On Windows that would be Ctrl.
 - A key already in use moves to the new command, whether a uw or a Chromium command had it. The row that lost it reads "No key" and shows the old key.
 - Each row has Reset, back to uw's default, and can have no key. Reset gives the default key back even when another row has it then, and that row loses it. The section has Reset all, which asks nothing first.
-- The menus are listed in menu bar order. A submenu's commands are rows of their own.
+- The menus are listed in menu bar order, from the uw menu to Help. A submenu's commands are rows of their own. The Services menu and the pages the History, Bookmarks, and Window menus list are left out.
 - Keys read as the recorder writes them, such as "Command + Ctrl + K". It cannot record Return, Tab, \`, or brackets, so only Reset brings back a default that uses one, such as Ctrl+Cmd+Return.
 - The keys are the same in every profile and workspace.
 - Settings search finds a command by name. Help → Keyboard Shortcuts… opens the section, and so will the command bar.
@@ -198,7 +198,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 11. A tab's right-click menu lists its items in the order of [Tab menu](#tab-menu), with no "Add tab to new group" or "Remove from group".
 12. A click on the foot's "+" does what Cmd+T does, "▾" lists its five items with their keys, and the tab list has no "+". A collapsed sidebar shows a lone "+" whose right-click opens the same menu.
 13. Ctrl+Cmd+N opens a new task, Shift+Ctrl+Cmd+N moves the selected branch to a new task, and Ctrl+Cmd+P does nothing.
-14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults.
+14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults. `MenuKeysBrowserTest` and `UwShortcutsPageBrowserTest` check this.
 15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tasks menu.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.

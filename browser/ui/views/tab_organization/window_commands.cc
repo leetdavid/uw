@@ -32,6 +32,7 @@ namespace uw {
 namespace {
 
 constexpr char kSettingsSubPage[] = "uwOrganization";
+constexpr char kShortcutsSubPage[] = "shortcuts";
 
 std::optional<tab_groups::TabGroupId> SelectedTask(
     BrowserWindowInterface* window) {
@@ -164,6 +165,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kShowThemePicker:
       ThemePicker::Open(window);
+      break;
+    case kShowShortcutSettings:
+      chrome::ShowSettingsSubPage(window, kShortcutsSubPage);
       break;
   }
 }

@@ -28,7 +28,8 @@ enum WindowCommand {
   kGoToWorkspace9 = kGoToWorkspace1 + 8,
   kNextWorkspace,
   kPreviousWorkspace,
-  kLastWindowCommand = kPreviousWorkspace,
+  kShowShortcutSettings,
+  kLastWindowCommand = kShowShortcutSettings,
 };
 
 bool IsWindowCommand(int command);

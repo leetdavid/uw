@@ -4,6 +4,7 @@ group("browser_tests") {
     "agent:browser_tests",
     "connectors:browser_tests",
     "pins:browser_tests",
+    "shortcuts:browser_tests",
     "workspaces:browser_tests",
     "tab_organization:browser_tests",
     "ui:browser_tests",
@@ -14,6 +15,7 @@ group("browser_tests") {
     "ui/views/workspaces:browser_tests",
     "ui/webui/uw_chat:browser_tests",
     "ui/webui/uw_organization:browser_tests",
+    "ui/webui/uw_shortcuts:browser_tests",
     "ui/webui/uw_providers:browser_tests",
     "ui/webui/uw_terminal:browser_tests",
   ]

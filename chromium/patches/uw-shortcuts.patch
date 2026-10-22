@@ -1,0 +1,459 @@
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -4000,6 +4000,42 @@
+       <message name="IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK" desc="Label of the switch that makes a middle-click on a task's row close the task and its tabs. A task is a group of tabs.">
+         Middle-click a task's row to close the task
+       </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_TITLE" desc="Title of the settings section that lists every command of the menu bar with its keyboard shortcut.">
++        Keyboard shortcuts
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_INTRO" desc="Line under the title of the Keyboard shortcuts settings section. Chromium is the browser uw is built on.">
++        Every command in the menu bar, by menu. Click the pencil on one of uw's keys and press a new one; it must include Command. Chromium's keys show here but can't be changed yet.
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_RESET_ALL" desc="Button that gives every command of the menu bar its default keyboard shortcut back.">
++        Reset all
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_RESET" desc="Button on a command's row that gives the command its default keyboard shortcut back.">
++        Reset
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_RESET_LABEL" desc="Accessible label of the Reset button on a command's row.">
++        Reset the key of <ph name="COMMAND">$1<ex>Keep Here</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_NO_KEY" desc="Shown in place of a keyboard shortcut for a command that has none.">
++        No key
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_INCLUDE_COMMAND" desc="Error under the shortcut field when the pressed keys do not include the Command key.">
++        Include Command
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_CHROMIUM_KEY" desc="Tooltip on a keyboard shortcut of one of Chromium's own commands. Chromium is the browser uw is built on.">
++        Chromium's keys can't be changed yet
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_WENT_TO" desc="Note under a command that lost its keyboard shortcut to another command.">
++        <ph name="KEY">$1<ex>Command + G</ex></ph> went to <ph name="COMMAND">$2<ex>Move to New Task</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_INPUT_LABEL" desc="Accessible label of the field that holds a command's keyboard shortcut.">
++        Key of <ph name="COMMAND">$1<ex>Keep Here</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_EDIT_LABEL" desc="Accessible label of the button that starts recording a new keyboard shortcut for a command.">
++        Change the key of <ph name="COMMAND">$1<ex>Keep Here</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_SHORTCUTS_CLEAR_LABEL" desc="Accessible label of the button that removes a command's keyboard shortcut.">
++        Remove the key of <ph name="COMMAND">$1<ex>Keep Here</ex></ph>
++      </message>
+     </if>
+     <if expr="not is_chromeos">
+       <message name="IDS_SETTINGS_SYSTEM_HARDWARE_ACCELERATION_LABEL" desc="Label for the checkbox that forces Chrome to render via graphics acceleration (GPU) when available.">
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -324,6 +324,7 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_PAUSE_INDEFINITE_MAC" desc="In Title Case: Pauses automatic organization until the user resumes it.">Pause Organization Indefinitely</message>
+       <message name="IDS_UW_PAUSE_RESUME_MAC" desc="In Title Case: Resumes automatic organization.">Resume Automatic Organization</message>
+       <message name="IDS_UW_ORGANIZATION_SETTINGS_MAC" desc="In Title Case: Opens the tab organization settings page.">Tab Organization Settings…</message>
++      <message name="IDS_UW_KEYBOARD_SHORTCUTS_MAC" desc="In Title Case: Opens the settings section that lists every command of the menu bar with its keyboard shortcut.">Keyboard Shortcuts…</message>
+       <message name="IDS_UW_NEST_BRANCH_MAC" desc="In Title Case: Makes the selected tab a child of the tab above it.">Nest Under Previous Tab</message>
+       <message name="IDS_UW_OUTDENT_BRANCH_MAC" desc="In Title Case: Moves the selected tab up one nesting level.">Move Up One Level</message>
+       <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -886,6 +886,7 @@ source_set("core") {
+   deps = [
+     "//uw/browser/tab_organization",
+     "//uw/browser/ui:ui",
++    "//uw/browser/shortcuts",
+     ":active_use_util",
+     ":after_startup_task_utils",
+     ":bad_message",
+diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
+--- a/chrome/browser/chrome_browser_main_mac.mm
++++ b/chrome/browser/chrome_browser_main_mac.mm
+@@ -49,6 +49,7 @@
+ #include "ui/base/resource/resource_handle.h"
+ #include "ui/native_theme/native_theme_mac.h"
+ #include "ui/views/cocoa/native_widget_mac_ns_window_host.h"
++#include "uw/browser/shortcuts/menu_keys.h"
+ 
+ // ChromeBrowserMainPartsMac ---------------------------------------------------
+ 
+@@ -164,6 +165,7 @@ int ChromeBrowserMainPartsMac::PreCreateThreads() {
+                         /*is_pwa=*/false,
+                         /*is_rtl=*/base::i18n::IsRTL());
+   [app_controller mainMenuCreated];
++  uw::ApplyMenuKeys(*g_browser_process->local_state());
+ 
+   return content::RESULT_CODE_NORMAL_EXIT;
+ }
+diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
+--- a/chrome/browser/global_keyboard_shortcuts_mac.mm
++++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
+@@ -24,6 +24,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/events/event_constants.h"
+ #include "ui/events/keycodes/keyboard_code_conversion_mac.h"
++#include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/commands.h"
+ #include "uw/browser/ui/views/command_bar/command_bar.h"
+ 
+@@ -234,6 +235,10 @@ CommandForKeyEventResult CommandForKeyEvent(NSEvent* event) {
+   // Scan through keycodes and see if it corresponds to one of the non-menu
+   // shortcuts.
+   for (NSMenuItem* menu_item : GetMenuItemsNotPresentInMainMenu()) {
++    // uw: a command whose key the user changed keeps no other key.
++    if (uw::MenuKeyChanged(menu_item.tag, nullptr)) {
++      continue;
++    }
+     if ([menu_item cr_firesForKeyEquivalentEvent:event])
+       return ShortcutCommand(menu_item.tag);
+   }
+@@ -277,6 +282,11 @@ bool EventUsesPerformKeyEquivalent(NSEvent* event) {
+ 
+ bool GetDefaultMacAcceleratorForCommandId(int command_id,
+                                           ui::Accelerator* accelerator) {
++  // uw: the key the user gave the command, or took from it.
++  if (uw::MenuKeyChanged(command_id, accelerator)) {
++    return accelerator->key_code() != ui::VKEY_UNKNOWN;
++  }
++
+   // See if it corresponds to one of the non-menu shortcuts.
+   for (const auto& shortcut : GetShortcutsNotPresentInMainMenu()) {
+     if (shortcut.chrome_command == command_id) {
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -562,6 +562,7 @@
+ 
+ #include "uw/browser/ai_providers/provider_sync.h"
+ #include "uw/browser/pins/pin_prefs.h"
++#include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/ai_connection.h"
+ #include "uw/browser/workspaces/workspace_prefs.h"
+ 
+@@ -1751,6 +1752,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+       false);
+   uw::RegisterSharedProviderPrefs(registry);
+   uw::RegisterWorkspaceLocalStatePrefs(registry);
++  uw::RegisterMenuKeysPrefs(registry);
+ 
+   // This is intentionally last.
+   RegisterLocalStatePrefsForMigration(registry);
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -208,6 +208,7 @@ source_set("impl") {
+     "//ui/webui:buildflags",
+     "//uw/browser/ai_providers",
+     "//uw/browser/pins:prefs",
++    "//uw/browser/shortcuts:prefs",
+     "//uw/browser/tab_organization:ai_connection",
+     "//uw/browser/workspaces:prefs",
+   ]
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -688,6 +688,8 @@ NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
+ 
+   // clang-format off
+   std::vector<Item> items = {};
++  items.push_back(Item(IDS_UW_KEYBOARD_SHORTCUTS_MAC)
++                      .command_id(uw::kShowShortcutSettings));
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   items.push_back(Item(IDS_FEEDBACK_MAC).command_id(IDC_FEEDBACK));
+   bool is_profile_loaded =
+diff --git a/chrome/browser/resources/settings/route.ts b/chrome/browser/resources/settings/route.ts
+--- a/chrome/browser/resources/settings/route.ts
++++ b/chrome/browser/resources/settings/route.ts
+@@ -312,6 +312,11 @@ function createRoutes(): SettingsRoutes {
+         '/uwOrganization', 'uwOrganization',
+         loadTimeData.getString('uwOrganizationPageTitle'));
+   }
++  if (visibility.uwShortcuts !== false) {
++    r.UW_SHORTCUTS = r.BASIC.createSection(
++        '/shortcuts', 'uwShortcuts',
++        loadTimeData.getString('uwShortcutsPageTitle'));
++  }
+   // </if>
+ 
+   return r as unknown as SettingsRoutes;
+diff --git a/chrome/browser/resources/settings/router.ts b/chrome/browser/resources/settings/router.ts
+--- a/chrome/browser/resources/settings/router.ts
++++ b/chrome/browser/resources/settings/router.ts
+@@ -119,6 +119,7 @@ export interface SettingsRoutes {
+   SYNC_ADVANCED: Route;
+   SYSTEM: Route;
+   UW_ORGANIZATION: Route;
++  UW_SHORTCUTS: Route;
+   TRAVEL: Route;
+   TRIGGERED_RESET_DIALOG: Route;
+   ACCOUNT: Route;
+diff --git a/chrome/browser/resources/settings/page_visibility.ts b/chrome/browser/resources/settings/page_visibility.ts
+--- a/chrome/browser/resources/settings/page_visibility.ts
++++ b/chrome/browser/resources/settings/page_visibility.ts
+@@ -24,6 +24,7 @@ export interface PageVisibility {
+   safetyHub?: boolean;
+   system?: boolean;
+   uwOrganization?: boolean;
++  uwShortcuts?: boolean;
+   yourSavedInfo?: boolean;
+ }
+ 
+@@ -66,6 +67,7 @@ function createPageVisibility(): PageVisibility|undefined {
+     safetyHub: false,
+     system: false,
+     uwOrganization: false,
++    uwShortcuts: false,
+     yourSavedInfo: false,
+   };
+   // </if>
+diff --git a/chrome/browser/resources/settings/settings_main/settings_main.html b/chrome/browser/resources/settings/settings_main/settings_main.html
+--- a/chrome/browser/resources/settings/settings_main/settings_main.html
++++ b/chrome/browser/resources/settings/settings_main/settings_main.html
+@@ -203,6 +203,14 @@
+       </template>
+     </div>
+   </template>
++  <template is="dom-if" if="[[showPage_(pageVisibility_.uwShortcuts)]]">
++    <div slot="view" id="uwShortcuts">
++      <template is="dom-if" if="[[renderPlugin_(
++          routes_.UW_SHORTCUTS, lastRoute_, inSearchMode_)]]">
++        <settings-uw-shortcuts-page></settings-uw-shortcuts-page>
++      </template>
++    </div>
++  </template>
+ </if>
+ 
+   <template is="dom-if" if="[[showPage_(pageVisibility_.reset)]]">
+diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
+@@ -154,6 +154,13 @@
+           $i18n{uwOrganizationPageTitle}
+           <cr-ripple></cr-ripple>
+         </a>
++        <a role="menuitem" id="uwShortcuts" href="/shortcuts"
++            class="cr-nav-menu-item"
++            hidden="[[!pageVisibility_.uwShortcuts]]">
++          <cr-icon icon="settings:keyboard"></cr-icon>
++          $i18n{uwShortcutsPageTitle}
++          <cr-ripple></cr-ripple>
++        </a>
+         <a role="menuitem" id="uwProvidersLink" class="cr-nav-menu-item"
+             href="chrome://ai/providers" target="_blank"
+             hidden="[[!pageVisibility_.uwOrganization]]">
+diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.ts b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+--- a/chrome/browser/resources/settings/settings_menu/settings_menu.ts
++++ b/chrome/browser/resources/settings/settings_menu/settings_menu.ts
+@@ -59,6 +59,7 @@ const pathToActionMap: Map<string, string> = new Map([
+   ['/accessibility', 'SettingsMenu_AccessibilityClicked'],
+   ['/system', 'SettingsMenu_SystemClicked'],
+   ['/uwOrganization', 'SettingsMenu_UwOrganizationClicked'],
++  ['/shortcuts', 'SettingsMenu_UwShortcutsClicked'],
+   ['/reset', 'SettingsMenu_ResetClicked'],
+   ['/help', 'SettingsMenu_AboutClicked'],
+ ]);
+diff --git a/chrome/browser/resources/settings/lazy_load.ts b/chrome/browser/resources/settings/lazy_load.ts
+--- a/chrome/browser/resources/settings/lazy_load.ts
++++ b/chrome/browser/resources/settings/lazy_load.ts
+@@ -117,6 +117,7 @@ import './reset_page/reset_page.js';
+ // <if expr="not is_chromeos">
+ import './system_page/system_page.js';
+ import '/uw/uw_organization/uw_organization_page.js';
++import '/uw/uw_organization/uw_shortcuts_page.js';
+ 
+ // </if>
+ 
+diff --git a/chrome/browser/resources/settings/ensure_lazy_loaded.ts b/chrome/browser/resources/settings/ensure_lazy_loaded.ts
+--- a/chrome/browser/resources/settings/ensure_lazy_loaded.ts
++++ b/chrome/browser/resources/settings/ensure_lazy_loaded.ts
+@@ -30,6 +30,7 @@ export function ensureLazyLoaded(): Promise<void> {
+                             // <if expr="not is_chromeos">
+                             'settings-system-page',
+                             'settings-uw-organization-page',
++                            'settings-uw-shortcuts-page',
+                             // </if>
+                             // <if expr="not is_chromeos and not is_macosx">
+                             'settings-edit-dictionary-page',
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -222,6 +222,7 @@
+ #include "chrome/browser/ui/webui/batch_upload_promo/batch_upload_promo_handler.h"
+ #if !BUILDFLAG(IS_CHROMEOS)
+ #include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
++#include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts_handler.h"
+ #endif
+ 
+ namespace settings {
+@@ -788,6 +789,12 @@ void SettingsUI::BindInterface(
+   organization_handler_ = std::make_unique<uw::UwOrganizationHandler>(
+       Profile::FromWebUI(web_ui()), std::move(receiver));
+ }
++
++void SettingsUI::BindInterface(
++    mojo::PendingReceiver<uw::mojom::ShortcutsHandler> receiver) {
++  shortcuts_handler_ =
++      std::make_unique<uw::UwShortcutsHandler>(std::move(receiver));
++}
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+ void SettingsUI::BindInterface(
+diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
+--- a/chrome/browser/ui/webui/settings/BUILD.gn
++++ b/chrome/browser/ui/webui/settings/BUILD.gn
+@@ -125,6 +125,7 @@ source_set("settings") {
+   if (!is_chromeos) {
+     public_deps += [
+       "//uw/browser/ui/webui/uw_organization:uw_organization_handler",
++      "//uw/browser/ui/webui/uw_shortcuts",
+     ]
+   }
+ 
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -157,6 +157,7 @@
+ 
+ #if !BUILDFLAG(IS_CHROMEOS)
+ #include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
++#include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts_handler.h"
+ #endif
+ 
+ #if BUILDFLAG(IS_LINUX)
+@@ -4568,6 +4569,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
+   AddImportDataStrings(html_source);
+   AddSystemStrings(html_source);
+   uw::UwOrganizationHandler::AddLoadTimeData(html_source);
++  uw::UwShortcutsHandler::AddLoadTimeData(html_source);
+ #endif
+ 
+   policy_indicator::AddLocalizedStrings(html_source);
+diff --git a/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.ts b/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.ts
+--- a/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.ts
++++ b/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.ts
+@@ -57,6 +57,7 @@ export class CrShortcutInputElement extends CrShortcutInputElementBase {
+       clearButtonAriaLabel: {type: String},
+       inputDisabled: {type: Boolean},
+       allowCtrlAltShortcuts: {type: Boolean},
++      commandRequired: {type: Boolean},
+       error_: {type: Number},
+ 
+       readonly_: {
+@@ -72,6 +73,8 @@ export class CrShortcutInputElement extends CrShortcutInputElementBase {
+   accessor clearButtonAriaLabel: string = '';
+   accessor inputDisabled: boolean = false;
+   accessor allowCtrlAltShortcuts = false;
++  // uw: whether a shortcut must include Command, as uw's keys must.
++  accessor commandRequired = false;
+   protected accessor readonly_: boolean = true;
+   private capturing_: boolean = false;
+   private accessor error_: ShortcutError = ShortcutError.NO_ERROR;
+@@ -220,7 +223,7 @@ export class CrShortcutInputElement extends CrShortcutInputElementBase {
+       return;
+     }
+     // </if>
+-    if (!hasValidModifiers(e)) {
++    if (!hasValidModifiers(e) || (this.commandRequired && !e.metaKey)) {
+       this.pendingShortcut_ = '';
+       this.error_ = ShortcutError.INCLUDE_START_MODIFIER;
+       return;
+diff --git a/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.css b/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.css
+--- a/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.css
++++ b/ui/webui/resources/cr_components/cr_shortcut_input/cr_shortcut_input.css
+@@ -12,7 +12,7 @@
+ 
+  #main {
+   position: relative;
+-  width: 200px;
++  width: var(--cr-shortcut-input-width, 200px);
+ }
+ 
+ #input {
+diff --git a/chrome/browser/resources/settings/icons.html.ts b/chrome/browser/resources/settings/icons.html.ts
+--- a/chrome/browser/resources/settings/icons.html.ts
++++ b/chrome/browser/resources/settings/icons.html.ts
+@@ -113,6 +113,8 @@ NOTE: Chrome OS icons go in ./chromeos/os_icons.html.
+ <cr-iconset name="settings" size="24">
+   <svg>
+     <defs>
++      <!-- uw: the keyboard icon of chrome://extensions -->
++      <g id="keyboard"><path d="M4.2 18c-.497 0-.919-.176-1.27-.527a1.747 1.747 0 0 1-.532-1.274V7.801c0-.496.18-.918.532-1.274A1.729 1.729 0 0 1 4.2 6h15.6c.497 0 .919.176 1.27.527.352.356.532.778.532 1.274v8.398c0 .496-.18.918-.532 1.274A1.729 1.729 0 0 1 19.8 18Zm0-1.8h15.6V7.8H4.2Zm5.1-.598h5.391a.874.874 0 0 0 .645-.258.861.861 0 0 0 .266-.637.875.875 0 0 0-.262-.645.854.854 0 0 0-.64-.261H9.308a.874.874 0 0 0-.645.258.855.855 0 0 0-.266.636.86.86 0 0 0 .262.64.857.857 0 0 0 .64.267Zm-5.1.597V7.801Zm3.34-6.258a.866.866 0 0 0 .26-.636.872.872 0 0 0-.257-.64.855.855 0 0 0-.637-.267.887.887 0 0 0-.644.258.858.858 0 0 0-.262.637c0 .254.086.469.258.645a.852.852 0 0 0 .637.261.887.887 0 0 0 .644-.258Zm2.546 0a.855.855 0 0 0 .266-.636.872.872 0 0 0-.258-.64.861.861 0 0 0-.637-.267.887.887 0 0 0-.645.258.858.858 0 0 0-.261.637c0 .254.086.469.258.645a.852.852 0 0 0 .636.261.872.872 0 0 0 .64-.258Zm2.55 0a.852.852 0 0 0 .262-.636.884.884 0 0 0-.253-.64.864.864 0 0 0-.641-.267.878.878 0 0 0-.64.258.858.858 0 0 0-.262.637.9.9 0 0 0 .253.645.86.86 0 0 0 .641.261.878.878 0 0 0 .64-.258Zm2.552 0a.852.852 0 0 0 .261-.636.872.872 0 0 0-.258-.64.855.855 0 0 0-.636-.267.872.872 0 0 0-.64.258.861.861 0 0 0-.267.637c0 .254.086.469.258.645a.858.858 0 0 0 .637.261.887.887 0 0 0 .645-.258Zm2.55 0A.852.852 0 0 0 18 9.305a.872.872 0 0 0-.258-.64.855.855 0 0 0-.637-.267.887.887 0 0 0-.906.895c0 .254.086.469.258.645a.852.852 0 0 0 .637.261.887.887 0 0 0 .644-.258ZM7.54 12.344a.873.873 0 0 0 .262-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.637-.261.887.887 0 0 0-.644.258.852.852 0 0 0-.262.636c0 .254.086.47.258.64a.855.855 0 0 0 .637.267.887.887 0 0 0 .644-.258Zm2.547 0a.861.861 0 0 0 .266-.637.887.887 0 0 0-.258-.645.858.858 0 0 0-.637-.261.887.887 0 0 0-.645.258.852.852 0 0 0-.261.636c0 .254.086.47.258.64a.855.855 0 0 0 .636.267.872.872 0 0 0 .64-.258Zm2.55 0a.858.858 0 0 0 .262-.637.9.9 0 0 0-.253-.645.86.86 0 0 0-.641-.261.878.878 0 0 0-.64.258.852.852 0 0 0-.262.636c0 .254.085.47.253.64a.864.864 0 0 0 .641.267.878.878 0 0 0 .64-.258Zm2.552 0a.858.858 0 0 0 .261-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.636-.261.872.872 0 0 0-.64.258.855.855 0 0 0-.267.636c0 .254.086.47.258.64a.861.861 0 0 0 .637.267.887.887 0 0 0 .645-.258Zm2.55 0a.858.858 0 0 0 .262-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.637-.261.887.887 0 0 0-.906.894c0 .254.086.47.258.64a.855.855 0 0 0 .637.267.887.887 0 0 0 .644-.258Zm0 0"></path></g>
+       <!-- Domain verification GM3 icon -->
+       <g id="domain-verification">
+         <path d="M4.2 19.2c-.497 0-.919-.177-1.27-.528a1.747 1.747 0 0 1-.532-1.274V6.594c0-.496.18-.918.532-1.27a1.74 1.74 0 0 1 1.27-.523h15.6c.497 0 .919.176 1.27.527.352.356.532.777.532 1.274v10.804c0 .496-.18.918-.532 1.27a1.74 1.74 0 0 1-1.27.523Zm0-1.802h15.6v-9H4.2Zm6.75-3.546 3.6-3.602a.87.87 0 0 1 .637-.273.87.87 0 0 1 .637.273c.184.184.278.39.278.625a.862.862 0 0 1-.278.625l-4.25 4.25a.864.864 0 0 1-.636.273.87.87 0 0 1-.637-.273l-2.125-2.125a.816.816 0 0 1-.262-.637.914.914 0 0 1 .285-.636.88.88 0 0 1 .637-.278c.242 0 .457.094.64.278ZM4.2 17.398V6.602Zm0 0"></path>
+@@ -351,6 +353,8 @@ NOTE: Chrome OS icons go in ./chromeos/os_icons.html.
+ <cr-iconset name="settings" size="24">
+   <svg>
+     <defs>
++      <!-- uw: the keyboard icon of chrome://extensions -->
++      <g id="keyboard"><path d="M4.2 18c-.497 0-.919-.176-1.27-.527a1.747 1.747 0 0 1-.532-1.274V7.801c0-.496.18-.918.532-1.274A1.729 1.729 0 0 1 4.2 6h15.6c.497 0 .919.176 1.27.527.352.356.532.778.532 1.274v8.398c0 .496-.18.918-.532 1.274A1.729 1.729 0 0 1 19.8 18Zm0-1.8h15.6V7.8H4.2Zm5.1-.598h5.391a.874.874 0 0 0 .645-.258.861.861 0 0 0 .266-.637.875.875 0 0 0-.262-.645.854.854 0 0 0-.64-.261H9.308a.874.874 0 0 0-.645.258.855.855 0 0 0-.266.636.86.86 0 0 0 .262.64.857.857 0 0 0 .64.267Zm-5.1.597V7.801Zm3.34-6.258a.866.866 0 0 0 .26-.636.872.872 0 0 0-.257-.64.855.855 0 0 0-.637-.267.887.887 0 0 0-.644.258.858.858 0 0 0-.262.637c0 .254.086.469.258.645a.852.852 0 0 0 .637.261.887.887 0 0 0 .644-.258Zm2.546 0a.855.855 0 0 0 .266-.636.872.872 0 0 0-.258-.64.861.861 0 0 0-.637-.267.887.887 0 0 0-.645.258.858.858 0 0 0-.261.637c0 .254.086.469.258.645a.852.852 0 0 0 .636.261.872.872 0 0 0 .64-.258Zm2.55 0a.852.852 0 0 0 .262-.636.884.884 0 0 0-.253-.64.864.864 0 0 0-.641-.267.878.878 0 0 0-.64.258.858.858 0 0 0-.262.637.9.9 0 0 0 .253.645.86.86 0 0 0 .641.261.878.878 0 0 0 .64-.258Zm2.552 0a.852.852 0 0 0 .261-.636.872.872 0 0 0-.258-.64.855.855 0 0 0-.636-.267.872.872 0 0 0-.64.258.861.861 0 0 0-.267.637c0 .254.086.469.258.645a.858.858 0 0 0 .637.261.887.887 0 0 0 .645-.258Zm2.55 0A.852.852 0 0 0 18 9.305a.872.872 0 0 0-.258-.64.855.855 0 0 0-.637-.267.887.887 0 0 0-.906.895c0 .254.086.469.258.645a.852.852 0 0 0 .637.261.887.887 0 0 0 .644-.258ZM7.54 12.344a.873.873 0 0 0 .262-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.637-.261.887.887 0 0 0-.644.258.852.852 0 0 0-.262.636c0 .254.086.47.258.64a.855.855 0 0 0 .637.267.887.887 0 0 0 .644-.258Zm2.547 0a.861.861 0 0 0 .266-.637.887.887 0 0 0-.258-.645.858.858 0 0 0-.637-.261.887.887 0 0 0-.645.258.852.852 0 0 0-.261.636c0 .254.086.47.258.64a.855.855 0 0 0 .636.267.872.872 0 0 0 .64-.258Zm2.55 0a.858.858 0 0 0 .262-.637.9.9 0 0 0-.253-.645.86.86 0 0 0-.641-.261.878.878 0 0 0-.64.258.852.852 0 0 0-.262.636c0 .254.085.47.253.64a.864.864 0 0 0 .641.267.878.878 0 0 0 .64-.258Zm2.552 0a.858.858 0 0 0 .261-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.636-.261.872.872 0 0 0-.64.258.855.855 0 0 0-.267.636c0 .254.086.47.258.64a.861.861 0 0 0 .637.267.887.887 0 0 0 .645-.258Zm2.55 0a.858.858 0 0 0 .262-.637.887.887 0 0 0-.258-.645.852.852 0 0 0-.637-.261.887.887 0 0 0-.906.894c0 .254.086.47.258.64a.855.855 0 0 0 .637.267.887.887 0 0 0 .644-.258Zm0 0"></path></g>
+       <!-- Domain verification GM3 icon -->
+       <g id="domain-verification" viewBox="0 -960 960 960">
+         <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm0-80h640v-400H160v400Zm278-58L296-440l58-58 84 84 168-168 58 58-226 226Zm-278 58v-480 480Z"></path>
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.h b/chrome/browser/ui/webui/settings/settings_ui.h
+--- a/chrome/browser/ui/webui/settings/settings_ui.h
++++ b/chrome/browser/ui/webui/settings/settings_ui.h
+@@ -25,6 +25,7 @@
+ #include "ui/webui/resources/cr_components/signin/signin.mojom.h"
+ #include "ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom.h"
+ #include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
++#include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts.mojom.h"
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ #include "ui/webui/resources/js/batch_upload_promo/batch_upload_promo.mojom.h"
+ 
+@@ -41,6 +42,7 @@ class ThemeColorPickerHandler;
+ class SigninUtilsHandler;
+ namespace uw {
+ class UwOrganizationHandler;
++class UwShortcutsHandler;
+ }  // namespace uw
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ class BatchUploadPromoHandler;
+@@ -103,6 +105,9 @@ class SettingsUI
+   // Binds the uw organization section backend.
+   void BindInterface(
+       mojo::PendingReceiver<uw::mojom::OrganizationHandler> pending_receiver);
++  // Binds the Keyboard shortcuts section backend.
++  void BindInterface(
++      mojo::PendingReceiver<uw::mojom::ShortcutsHandler> pending_receiver);
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+@@ -157,6 +162,7 @@ class SettingsUI
+       signin_handler_factory_receiver_{this};
+ 
+   std::unique_ptr<uw::UwOrganizationHandler> organization_handler_;
++  std::unique_ptr<uw::UwShortcutsHandler> shortcuts_handler_;
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+   // batch_upload_promo::mojom::PageHandlerFactory:
+diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+--- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
++++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+@@ -227,6 +227,7 @@
+ #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
+ #include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
+ #include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
++#include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts.mojom.h"
+ #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
+ #include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
+ #include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
+@@ -705,6 +706,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+       .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
+       .Add<signin::mojom::SigninPageHandlerFactory>()
+       .Add<uw::mojom::OrganizationHandler>()
++      .Add<uw::mojom::ShortcutsHandler>()
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+       .Add<batch_upload_promo::mojom::PageHandlerFactory>()
+       .Add<customize_color_scheme_mode::mojom::
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -1335,6 +1335,7 @@ static_library("ui") {
+       "//uw/browser/tab_organization",
+       "//uw/browser/ui/webui/uw_chat",
+       "//uw/browser/ui/webui/uw_organization:mojo_bindings",
++      "//uw/browser/ui/webui/uw_shortcuts:mojo_bindings",
+       "//uw/browser/ui/webui/uw_providers",
+       "//uw/browser/ui/webui/uw_terminal",
+       "//uw/browser/ui/views/command_bar",

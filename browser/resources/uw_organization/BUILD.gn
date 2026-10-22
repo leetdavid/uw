@@ -1,4 +1,5 @@
-# WebUI resources for the uw organization section of chrome://settings.
+# WebUI resources for uw's sections of chrome://settings: Tab organization
+# and Keyboard shortcuts.
 # Built as its own target and mapped into the settings build via
 # ts_path_mappings, mirroring how settings_shared is consumed.
 import("//ui/webui/resources/tools/build_webui.gni")
@@ -17,6 +18,8 @@ build_webui("build") {
     "uw_organization_browser_proxy.ts",
     "uw_organization_page.html.ts",
     "uw_organization_page.ts",
+    "uw_shortcuts_page.html.ts",
+    "uw_shortcuts_page.ts",
   ]
 
   ts_composite = true
@@ -26,15 +29,19 @@ build_webui("build") {
   ]
   ts_deps = [
     "//third_party/lit/v3_0:build_ts",
+    "//ui/webui/resources/cr_components/cr_shortcut_input:build_ts",
     "//ui/webui/resources/cr_elements:build_ts",
     "//ui/webui/resources/js:build_ts",
     "//ui/webui/resources/mojo:build_ts",
   ]
 
-  mojo_files_deps =
-      [ "//uw/browser/ui/webui/uw_organization:mojo_bindings_ts__generator" ]
+  mojo_files_deps = [
+    "//uw/browser/ui/webui/uw_organization:mojo_bindings_ts__generator",
+    "//uw/browser/ui/webui/uw_shortcuts:mojo_bindings_ts__generator",
+  ]
   mojo_files = [
     "$root_gen_dir/uw/browser/ui/webui/uw_organization/uw_organization.mojom-webui.ts",
+    "$root_gen_dir/uw/browser/ui/webui/uw_shortcuts/uw_shortcuts.mojom-webui.ts",
   ]
 
   webui_context_type = "trusted"
