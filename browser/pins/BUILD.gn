@@ -59,5 +59,6 @@ source_set("browser_tests") {
     "//ui/views",
     "//url",
     "//uw/browser/ui/views/pins",
+    "//uw/browser/workspaces",
   ]
 }

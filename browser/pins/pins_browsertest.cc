@@ -1,9 +1,12 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
+#include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
+#include "base/functional/function_ref.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -17,6 +20,7 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -35,6 +39,8 @@
 #include "uw/browser/pins/pin_sync.h"
 #include "uw/browser/ui/views/pins/home_url_card.h"
 #include "uw/browser/ui/views/pins/pin_menu.h"
+#include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -88,6 +94,70 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
       }
     }
     return nullptr;
+  }
+
+  static bool AllShow(const std::vector<BrowserWindowInterface*>& windows,
+                      const std::vector<GURL>& urls) {
+    return std::ranges::all_of(windows, [&](BrowserWindowInterface* window) {
+      return PinnedUrls(window->GetBrowserForMigrationOnly()) == urls;
+    });
+  }
+
+  // Pins kMail in a second window too, and switches the first window to a
+  // second workspace on the profile, so a hidden window has a copy as well.
+  // The next start restores all three windows with their copies.
+  void PinInThreeWindowsBeforeARestart() {
+    Profile* profile = browser()->GetProfile();
+    SessionStartupPref::SetStartupPref(
+        profile, SessionStartupPref(SessionStartupPref::LAST));
+    WorkspaceList& list = WorkspaceList::Get();
+    const std::string reading = list.Add(
+        "Reading", std::string(list.UnusedIcon()), profile->GetBaseName());
+    Pin(browser(), GURL(kMail));
+    CreateBrowser(profile);
+    WorkspaceWindow::From(browser())->Switch(reading);
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      return GetAllBrowserWindowInterfaces().size() == 3u &&
+             AllShow(GetAllBrowserWindowInterfaces(), {GURL(kMail)});
+    }));
+    // Lets the session take the tabs' data before the browser quits.
+    base::RunLoop().RunUntilIdle();
+  }
+
+  // Unpins the restored kMail in a window that shows, with `unpin`. The page
+  // stays there as a regular tab, and every other window loses its copy and
+  // gains nothing.
+  void UnpinAfterARestart(base::FunctionRef<void(TabStripModel*)> unpin) {
+    std::vector<BrowserWindowInterface*> windows;
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      windows = GetAllBrowserWindowInterfaces();
+      return windows.size() == 3u && AllShow(windows, {GURL(kMail)});
+    }));
+    base::RunLoop().RunUntilIdle();
+    BrowserWindowInterface* shown = nullptr;
+    std::map<BrowserWindowInterface*, int> before;
+    for (BrowserWindowInterface* window : windows) {
+      before[window] = window->GetTabStripModel()->count();
+      if (!WorkspaceWindow::IsHidden(window)) {
+        shown = window;
+      }
+    }
+    ASSERT_TRUE(shown);
+    TabStripModel* tabs = shown->GetTabStripModel();
+    content::WebContents* page = tabs->GetWebContentsAt(0);
+
+    unpin(tabs);
+    for (int i = 0; i < 5; ++i) {
+      base::RunLoop().RunUntilIdle();
+    }
+
+    EXPECT_TRUE(store()->pins().empty());
+    EXPECT_TRUE(AllShow(windows, {}));
+    for (BrowserWindowInterface* window : windows) {
+      EXPECT_EQ(window->GetTabStripModel()->count(),
+                window == shown ? before[window] : before[window] - 1);
+    }
+    EXPECT_NE(tabs->GetIndexOfWebContents(page), TabStripModel::kNoTab);
   }
 
   views::View* TileOf(const tabs::TabInterface* tab) {
@@ -263,6 +333,29 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, PinsComeBackOnceAfterARestart) {
   EXPECT_EQ(PinnedUrls(browser()), std::vector<GURL>{GURL(kIssue)});
   ASSERT_EQ(store()->pins().size(), 1u);
   EXPECT_EQ(store()->pins()[0].home, GURL(kIssues));
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_UnpinningFromTheTabStripAfterARestartAddsNoCopies) {
+  PinInThreeWindowsBeforeARestart();
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       UnpinningFromTheTabStripAfterARestartAddsNoCopies) {
+  UnpinAfterARestart(
+      [](TabStripModel* tabs) { tabs->SetTabPinned(0, /*pinned=*/false); });
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_UnpinningFromTheMenuAfterARestartAddsNoCopies) {
+  PinInThreeWindowsBeforeARestart();
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       UnpinningFromTheMenuAfterARestartAddsNoCopies) {
+  UnpinAfterARestart([](TabStripModel* tabs) {
+    tabs->ExecuteContextMenuCommand(0, TabStripModel::CommandTogglePinned);
+  });
 }
 
 }  // namespace

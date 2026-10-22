@@ -32,7 +32,8 @@ namespace uw {
 namespace {
 
 // The pin a tab shows. It stays with the page when the tab moves to another
-// window. `restored` is set for a mark read back from the session.
+// window. `restored` is set for a mark read back from the session, until the
+// window next applies the store.
 class PinMark : public content::WebContentsUserData<PinMark> {
  public:
   ~PinMark() override = default;
@@ -300,6 +301,15 @@ void PinSync::Apply() {
     Navigate(&params);
     if (params.navigated_or_inserted_contents) {
       Mark(params.navigated_or_inserted_contents, pins[index].id);
+    }
+  }
+
+  // From now on a restored pin that leaves the store was unpinned elsewhere,
+  // so its copy here goes instead of coming back as a new pin.
+  for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
+    content::WebContents* page = tabs_->GetWebContentsAt(i);
+    if (const PinMark* mark = MarkOf(page); mark && mark->restored()) {
+      Mark(page, mark->id());
     }
   }
   SaveSession();
