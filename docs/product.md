@@ -206,7 +206,7 @@ Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). T
 
 Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need not be about one page. Watching a page starts one from that page, which becomes a [watched page](CONTEXT.md#language).
 
-Agreed schedules, on 2026-10-22: every hour or every 2, 3, 4, 6, or 12 hours; every day, or weekdays, at a time; every week on a day at a time; and once at a date and time, after which the chat keeps no schedule. Hourly is the shortest. The time zone is the Mac's, shown and changeable, and 9:00 stays 9:00 across a daylight-saving change. No custom cron syntax. To watch more closely than hourly, use a trigger.
+Agreed schedules, on 2026-10-22: every hour or every 2, 3, 4, 6, or 12 hours; every day, or weekdays, at a time; every week on a day at a time; and once at a date and time, after which the chat keeps no schedule. Hourly is the shortest. A schedule follows the Mac's current time zone, shown as a quiet line under Repeat with Change, since most people never change it; one picked with Change stays fixed. 9:00 stays 9:00 across a daylight-saving change. No custom cron syntax. To watch more closely than hourly, use a trigger.
 
 Agreed on 2026-10-22, after Claude Code's background commands and Monitor tool: a [trigger](CONTEXT.md#language) is a command left running out of sight that wakes its chat once when it ends, or once for each line it prints. Lines that come close together are one wake. A trigger that prints too much is stopped, and the chat says so. Triggers do not expire.
 
