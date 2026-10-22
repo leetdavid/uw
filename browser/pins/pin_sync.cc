@@ -11,10 +11,12 @@
 #include "base/containers/adapters.h"
 #include "base/functional/bind.h"
 #include "base/task/sequenced_task_runner.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
@@ -27,27 +29,38 @@
 #include "content/public/common/referrer.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "uw/browser/pins/pin_pages.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
 
-// The pin a tab shows. It stays with the page when the tab moves to another
+// The pin a tab shows. It stays with the page when the page moves to another
 // window. `restored` is set for a mark read back from the session, until the
-// window next applies the store.
+// window next applies the store, and `placeholder` for a page that only keeps
+// the history of the pin's live page, which is elsewhere.
 class PinMark : public content::WebContentsUserData<PinMark> {
  public:
   ~PinMark() override = default;
 
   const std::string& id() const { return id_; }
   bool restored() const { return restored_; }
+  bool placeholder() const { return placeholder_; }
 
  private:
   friend WebContentsUserData;
-  PinMark(content::WebContents* page, std::string id, bool restored)
-      : WebContentsUserData(*page), id_(std::move(id)), restored_(restored) {}
+  PinMark(content::WebContents* page,
+          std::string id,
+          bool restored,
+          bool placeholder)
+      : WebContentsUserData(*page),
+        id_(std::move(id)),
+        restored_(restored),
+        placeholder_(placeholder) {}
 
   const std::string id_;
   const bool restored_;
+  const bool placeholder_;
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 };
 
@@ -57,9 +70,12 @@ const PinMark* MarkOf(content::WebContents* page) {
   return page ? PinMark::FromWebContents(page) : nullptr;
 }
 
-void Mark(content::WebContents* page, std::string id, bool restored = false) {
+void Mark(content::WebContents* page,
+          std::string id,
+          bool restored = false,
+          bool placeholder = false) {
   page->RemoveUserData(PinMark::UserDataKey());
-  PinMark::CreateForWebContents(page, std::move(id), restored);
+  PinMark::CreateForWebContents(page, std::move(id), restored, placeholder);
 }
 
 void Unmark(content::WebContents* page) {
@@ -76,9 +92,33 @@ PinStore* StoreFor(content::WebContents* page) {
 }
 
 void Load(const tabs::TabInterface* tab, const GURL& url) {
-  tab->GetContents()->GetController().LoadURL(
-      url, content::Referrer(), ui::PAGE_TRANSITION_AUTO_BOOKMARK,
-      std::string());
+  tab->GetContents()->GetController().LoadURL(url, content::Referrer(),
+                                              ui::PAGE_TRANSITION_AUTO_BOOKMARK,
+                                              std::string());
+}
+
+// A page with `page`'s history and no renderer, to stand in for it. It stays
+// unloaded when shown, as a discarded tab does.
+std::unique_ptr<content::WebContents> MakePlaceholder(
+    content::WebContents* page,
+    const std::string& id) {
+  content::WebContents::CreateParams params(page->GetBrowserContext());
+  params.initially_hidden = true;
+  params.desired_renderer_state =
+      content::WebContents::CreateParams::kNoRendererProcess;
+  std::unique_ptr<content::WebContents> placeholder =
+      content::WebContents::Create(params);
+  placeholder->GetController().CopyStateFrom(&page->GetController(),
+                                             /*needs_reload=*/false);
+  Mark(placeholder.get(), id, /*restored=*/false, /*placeholder=*/true);
+  return placeholder;
+}
+
+// Makes a placeholder the live page, loading it from its history.
+void Wake(content::WebContents* page, std::string id) {
+  Mark(page, std::move(id));
+  page->GetController().SetNeedsReload();
+  page->GetController().LoadIfNecessary();
 }
 
 }  // namespace
@@ -112,9 +152,8 @@ PinSync* PinSync::From(BrowserWindowInterface* window) {
 }
 
 // static
-void PinSync::RestoreTab(
-    content::WebContents* page,
-    const std::map<std::string, std::string>& extra_data) {
+void PinSync::RestoreTab(content::WebContents* page,
+                         const std::map<std::string, std::string>& extra_data) {
   const auto saved = extra_data.find(kSessionKey);
   if (page && saved != extra_data.end() && !saved->second.empty()) {
     Mark(page, saved->second, /*restored=*/true);
@@ -140,6 +179,20 @@ bool PinSync::KeepsActiveTab(BrowserWindowInterface* window) {
 // static
 bool PinSync::CanClose(const tabs::TabInterface* tab) {
   return !PinFor(tab);
+}
+
+// static
+void PinSync::WillCloseWindow(BrowserWindowInterface* window) {
+  PinSync* sync = From(window);
+  if (sync && sync->store_ && !browser_shutdown::IsTryingToQuit()) {
+    sync->HoldLivePages();
+  }
+}
+
+// static
+bool PinSync::IsPlaceholder(const tabs::TabInterface* tab) {
+  const PinMark* mark = tab ? MarkOf(tab->GetContents()) : nullptr;
+  return mark && mark->placeholder() && PinFor(tab);
 }
 
 // static
@@ -173,12 +226,18 @@ void PinSync::OnTabStripModelChanged(TabStripModel* model,
   if (applying_) {
     return;
   }
+  if (selection.active_tab_changed() &&
+      selection.reason != TabStripModelObserver::CHANGE_REASON_REPLACED) {
+    if (const PinMark* mark = MarkOf(selection.new_contents);
+        mark && mark->placeholder()) {
+      ScheduleBring(mark->id());
+    }
+  }
   switch (change.type()) {
     case TabStripModelChange::kInserted:
-      if (std::ranges::any_of(change.GetInsert()->contents,
-                              [](const auto& added) {
-                                return added.tab->IsPinned();
-                              })) {
+      if (std::ranges::any_of(
+              change.GetInsert()->contents,
+              [](const auto& added) { return added.tab->IsPinned(); })) {
         ScheduleApply();
       }
       break;
@@ -194,9 +253,13 @@ void PinSync::OnTabStripModelChanged(TabStripModel* model,
       }
       break;
     case TabStripModelChange::kReplaced: {
+      // Chromium discarded the tab: the page that replaces it shows the same
+      // pin.
       const TabStripModelChange::Replace* replace = change.GetReplace();
-      if (const PinMark* mark = MarkOf(replace->old_contents)) {
-        Mark(replace->new_contents, mark->id());
+      const PinMark* mark = MarkOf(replace->old_contents);
+      if (mark && !MarkOf(replace->new_contents)) {
+        Mark(replace->new_contents, mark->id(), /*restored=*/false,
+             mark->placeholder());
       }
       break;
     }
@@ -213,8 +276,18 @@ void PinSync::OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) {
   if (tab->IsPinned()) {
     Mark(page, store_->Insert(index, CurrentUrl(page)));
   } else if (const PinMark* mark = MarkOf(page)) {
-    store_->Remove(mark->id());
-    Unmark(page);
+    const std::string id = mark->id();
+    if (mark->placeholder()) {
+      // The live page stays a regular tab where it is. When no window holds
+      // it, it opens here.
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&PinSync::UnpinPlaceholder, weak_factory_.GetWeakPtr(),
+                         tab->GetWeakPtr(), id, LivePageIsElsewhere(id)));
+    } else {
+      Unmark(page);
+    }
+    store_->Remove(id);
   }
   SaveSession();
 }
@@ -228,14 +301,27 @@ void PinSync::ScheduleApply() {
       FROM_HERE, base::BindOnce(&PinSync::Apply, weak_factory_.GetWeakPtr()));
 }
 
+void PinSync::ScheduleBring(const std::string& id) {
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&PinSync::Bring, weak_factory_.GetWeakPtr(), id));
+}
+
 void PinSync::Apply() {
   apply_pending_ = false;
   if (tabs_->closing_all() || tabs_->empty()) {
     return;
   }
   base::AutoReset<bool> applying(&applying_, true);
+  PinPages* pages = PinPages::For(window_->GetProfile());
 
-  // Keep one copy of each pin: a restored one first, then the selected one.
+  // Keep one copy of each pin: the live page first, then a restored one, then
+  // the selected one.
+  const auto rank = [&](int i) {
+    const PinMark* mark = MarkOf(tabs_->GetWebContentsAt(i));
+    return (mark->placeholder() ? 0 : 4) + (mark->restored() ? 2 : 0) +
+           (i == tabs_->active_index() ? 1 : 0);
+  };
   std::map<std::string, int> keep;
   for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
     const PinMark* mark = MarkOf(tabs_->GetWebContentsAt(i));
@@ -243,27 +329,33 @@ void PinSync::Apply() {
       continue;
     }
     const auto [kept, added] = keep.try_emplace(mark->id(), i);
-    const PinMark* other = MarkOf(tabs_->GetWebContentsAt(kept->second));
-    if (!added && !other->restored() &&
-        (mark->restored() || i == tabs_->active_index())) {
+    if (!added && rank(i) > rank(kept->second)) {
       kept->second = i;
     }
   }
+  // A copy of a pin another window unpinned goes, unless it is the live page,
+  // which stays as a regular tab. A restored pin the store has lost is
+  // adopted below.
+  const auto unpinned = [&](const PinMark* mark) {
+    return !store_->Find(mark->id()) && !mark->restored();
+  };
   std::vector<int> closing;
   for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
     const PinMark* mark = MarkOf(tabs_->GetWebContentsAt(i));
-    if (!mark) {
-      continue;
-    }
-    // A copy of a pin another window unpinned goes. A restored pin the
-    // store has lost is adopted below.
-    const bool unpinned = !store_->Find(mark->id()) && !mark->restored();
-    if (keep[mark->id()] != i || unpinned) {
+    if (mark &&
+        (keep[mark->id()] != i || (unpinned(mark) && mark->placeholder()))) {
       closing.push_back(i);
     }
   }
   for (int index : base::Reversed(closing)) {
     tabs_->CloseWebContentsAt(index, TabCloseTypes::CLOSE_NONE);
+  }
+  for (int i = tabs_->IndexOfFirstNonPinnedTab() - 1; i >= 0; --i) {
+    content::WebContents* page = tabs_->GetWebContentsAt(i);
+    if (const PinMark* mark = MarkOf(page); mark && unpinned(mark)) {
+      Unmark(page);
+      tabs_->SetTabPinned(i, false);
+    }
   }
 
   // Adopt pinned tabs the store does not know: restored ones, and ones pinned
@@ -278,10 +370,11 @@ void PinSync::Apply() {
 
   const std::vector<PinStore::Pin> pins = store_->pins();
   for (int index = 0; index < static_cast<int>(pins.size()); ++index) {
+    const std::string& id = pins[index].id;
     int at = -1;
     for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
       const PinMark* mark = MarkOf(tabs_->GetWebContentsAt(i));
-      if (mark && mark->id() == pins[index].id) {
+      if (mark && mark->id() == id) {
         at = i;
         break;
       }
@@ -293,6 +386,18 @@ void PinSync::Apply() {
       tabs_->MoveWebContentsAt(at, index, /*select_after_move=*/false);
       continue;
     }
+    // A live page no window holds comes here as it was. While another window
+    // holds it, this window gets a placeholder.
+    if (std::unique_ptr<content::WebContents> page = pages->Take(id)) {
+      tabs_->InsertWebContentsAt(index, std::move(page),
+                                 AddTabTypes::ADD_PINNED);
+      continue;
+    }
+    if (content::WebContents* live = FindLivePage(id)) {
+      tabs_->InsertWebContentsAt(index, MakePlaceholder(live, id),
+                                 AddTabTypes::ADD_PINNED);
+      continue;
+    }
     NavigateParams params(window_, pins[index].home,
                           ui::PAGE_TRANSITION_AUTO_BOOKMARK);
     params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
@@ -300,7 +405,24 @@ void PinSync::Apply() {
     params.tabstrip_add_types = AddTabTypes::ADD_PINNED;
     Navigate(&params);
     if (params.navigated_or_inserted_contents) {
-      Mark(params.navigated_or_inserted_contents, pins[index].id);
+      Mark(params.navigated_or_inserted_contents, id);
+    }
+  }
+
+  // One live page per pin: a kept page is the pin as it was, and takes the
+  // place of a copy here, and a copy here gives way to a page another window
+  // holds.
+  for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
+    content::WebContents* page = tabs_->GetWebContentsAt(i);
+    const PinMark* mark = MarkOf(page);
+    if (!mark || mark->placeholder()) {
+      continue;
+    }
+    const std::string id = mark->id();
+    if (std::unique_ptr<content::WebContents> kept = pages->Take(id)) {
+      tabs_->DiscardWebContents(page, std::move(kept));
+    } else if (LivePageIsElsewhere(id)) {
+      tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
     }
   }
 
@@ -309,8 +431,124 @@ void PinSync::Apply() {
   for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
     content::WebContents* page = tabs_->GetWebContentsAt(i);
     if (const PinMark* mark = MarkOf(page); mark && mark->restored()) {
-      Mark(page, mark->id());
+      Mark(page, mark->id(), /*restored=*/false, mark->placeholder());
     }
+  }
+  SaveSession();
+}
+
+void PinSync::Bring(const std::string& id) {
+  const int at = tabs_->active_index();
+  content::WebContents* here = at >= 0 && at < tabs_->IndexOfFirstNonPinnedTab()
+                                   ? tabs_->GetWebContentsAt(at)
+                                   : nullptr;
+  const PinMark* mark = MarkOf(here);
+  if (!mark || !mark->placeholder() || mark->id() != id ||
+      tabs_->closing_all() || WorkspaceWindow::IsHidden(window_)) {
+    return;
+  }
+  std::unique_ptr<content::WebContents> page = TakeLivePage(id);
+  base::AutoReset<bool> applying(&applying_, true);
+  if (page) {
+    tabs_->DiscardWebContents(here, std::move(page));
+  } else {
+    Wake(here, id);
+  }
+  SaveSession();
+}
+
+void PinSync::UnpinPlaceholder(base::WeakPtr<tabs::TabInterface> tab,
+                               const std::string& id,
+                               bool elsewhere) {
+  const int index =
+      tab ? tabs_->GetIndexOfTab(tab.get()) : TabStripModel::kNoTab;
+  if (index == TabStripModel::kNoTab) {
+    return;
+  }
+  content::WebContents* here = tab->GetContents();
+  base::AutoReset<bool> applying(&applying_, true);
+  if (elsewhere) {
+    tabs_->CloseWebContentsAt(index, TabCloseTypes::CLOSE_NONE);
+    return;
+  }
+  if (std::unique_ptr<content::WebContents> page =
+          PinPages::For(window_->GetProfile())->Take(id)) {
+    Unmark(page.get());
+    tabs_->DiscardWebContents(here, std::move(page));
+  } else {
+    Unmark(here);
+    here->GetController().SetNeedsReload();
+    here->GetController().LoadIfNecessary();
+  }
+  SaveSession();
+}
+
+std::unique_ptr<content::WebContents> PinSync::TakeLivePage(
+    const std::string& id) {
+  if (std::unique_ptr<content::WebContents> page =
+          PinPages::For(window_->GetProfile())->Take(id)) {
+    return page;
+  }
+  for (PinSync* sync : Others()) {
+    const int at = sync->IndexOfLivePage(id);
+    if (at < 0 || sync->tabs_->closing_all()) {
+      continue;
+    }
+    content::WebContents* page = sync->tabs_->GetWebContentsAt(at);
+    base::AutoReset<bool> applying(&sync->applying_, true);
+    std::unique_ptr<content::WebContents> taken =
+        sync->tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
+    sync->SaveSession();
+    return taken;
+  }
+  return nullptr;
+}
+
+std::vector<PinSync*> PinSync::Others() const {
+  std::vector<PinSync*> others;
+  for (BrowserWindowInterface* other : GetAllBrowserWindowInterfaces()) {
+    PinSync* sync = From(other);
+    if (sync && sync != this && sync->store_ == store_) {
+      others.push_back(sync);
+    }
+  }
+  return others;
+}
+
+int PinSync::IndexOfLivePage(std::string_view id) const {
+  for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
+    const PinMark* mark = MarkOf(tabs_->GetWebContentsAt(i));
+    if (mark && mark->id() == id && !mark->placeholder()) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+content::WebContents* PinSync::FindLivePage(std::string_view id) const {
+  for (PinSync* sync : Others()) {
+    if (const int at = sync->IndexOfLivePage(id); at >= 0) {
+      return sync->tabs_->GetWebContentsAt(at);
+    }
+  }
+  return nullptr;
+}
+
+bool PinSync::LivePageIsElsewhere(std::string_view id) const {
+  return PinPages::For(window_->GetProfile())->Holds(id) || FindLivePage(id);
+}
+
+void PinSync::HoldLivePages() {
+  PinPages* pages = PinPages::For(window_->GetProfile());
+  base::AutoReset<bool> applying(&applying_, true);
+  for (int i = 0; i < tabs_->IndexOfFirstNonPinnedTab(); ++i) {
+    content::WebContents* page = tabs_->GetWebContentsAt(i);
+    const PinMark* mark = MarkOf(page);
+    if (!mark || mark->placeholder() || !store_->Find(mark->id())) {
+      continue;
+    }
+    const std::string id = mark->id();
+    pages->Hold(id, tabs_->DiscardWebContents(page, MakePlaceholder(page, id)));
   }
   SaveSession();
 }

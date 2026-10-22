@@ -5,7 +5,10 @@
 #define UW_BROWSER_PINS_PIN_SYNC_H_
 
 #include <map>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
@@ -32,7 +35,9 @@ namespace uw {
 // Owned by EmbedderBrowserWindowFeatures. Keeps a window's pinned tabs the
 // same as its profile's PinStore: a tab pinned, unpinned, or moved among the
 // pins here changes the store, and a change to the store from another window
-// is applied here. Each window loads its own page for a pin.
+// is applied here. Each pin has one live page in the profile. The other
+// windows' tabs for it hold a placeholder with the page's history and no
+// renderer, and selecting one moves the live page into it.
 class PinSync : public TabStripModelObserver {
  public:
   DECLARE_USER_DATA(PinSync);
@@ -56,6 +61,12 @@ class PinSync : public TabStripModelObserver {
   // Whether a click or a menu row may close `tab`. Pins are only unpinned.
   static bool CanClose(const tabs::TabInterface* tab);
 
+  // Moves the live pages of `window`'s pins out of it before it closes, so
+  // they outlive it, unless uw is quitting. See PinPages.
+  static void WillCloseWindow(BrowserWindowInterface* window);
+  // Whether `tab` holds a placeholder for a pin whose live page is elsewhere.
+  static bool IsPlaceholder(const tabs::TabInterface* tab);
+
   // Loads the pin's home URL in `tab`.
   static void ResetToHome(const tabs::TabInterface* tab);
   // Makes the page `tab` shows its pin's home URL, without loading anything.
@@ -64,13 +75,34 @@ class PinSync : public TabStripModelObserver {
   static void SetHome(const tabs::TabInterface* tab, const GURL& home);
 
   // TabStripModelObserver:
-  void OnTabStripModelChanged(TabStripModel* model,
-                              const TabStripModelChange& change,
-                              const TabStripSelectionChange& selection) override;
+  void OnTabStripModelChanged(
+      TabStripModel* model,
+      const TabStripModelChange& change,
+      const TabStripSelectionChange& selection) override;
   void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
 
  private:
   void ScheduleApply();
+  void ScheduleBring(const std::string& id);
+  // Moves pin `id`'s live page into this window's selected tab for it.
+  void Bring(const std::string& id);
+  // Takes pin `id`'s live page from the window that holds it, leaving a
+  // placeholder there, or from PinPages.
+  std::unique_ptr<content::WebContents> TakeLivePage(const std::string& id);
+  // Finishes unpinning a placeholder: it closes while another window holds
+  // the live page. Otherwise the live page takes its place, or it loads.
+  void UnpinPlaceholder(base::WeakPtr<tabs::TabInterface> tab,
+                        const std::string& id,
+                        bool elsewhere);
+  // The other windows' PinSyncs of this profile.
+  std::vector<PinSync*> Others() const;
+  // This window's tab holding pin `id`'s live page, or -1.
+  int IndexOfLivePage(std::string_view id) const;
+  // Pin `id`'s live page in another window of this profile, or null.
+  content::WebContents* FindLivePage(std::string_view id) const;
+  // Whether another window or PinPages holds pin `id`'s live page.
+  bool LivePageIsElsewhere(std::string_view id) const;
+  void HoldLivePages();
   // Adopts pinned tabs the store does not know, closes copies of pins it no
   // longer has, and adds and orders the rest to match it.
   void Apply();

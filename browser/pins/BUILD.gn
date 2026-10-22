@@ -1,6 +1,8 @@
 # Pins shared by every window of a profile. See docs/plans/workspaces.md.
 source_set("pins") {
   sources = [
+    "pin_pages.cc",
+    "pin_pages.h",
     "pin_store.cc",
     "pin_store.h",
     "pin_sync.cc",
@@ -15,7 +17,11 @@ source_set("pins") {
   ]
   deps = [
     ":prefs",
+    "//chrome/browser/lifetime",
+    "//chrome/browser/lifetime:termination_notification",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/profiles/keep_alive",
     "//chrome/browser/sessions",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
@@ -24,6 +30,7 @@ source_set("pins") {
     "//content/public/browser",
     "//content/public/common",
     "//ui/base",
+    "//uw/browser/workspaces",
   ]
 }
 

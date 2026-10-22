@@ -36,10 +36,20 @@ Chosen by uw for T129 on 2026-10-21.
 
 - A profile's pins, each an id and a home URL, are the profile pref `uw.pins`. `PinStore` in `browser/pins` holds them.
 - Each normal window has a `PinSync`. It marks every pinned tab with its pin's id, and the mark stays with the page if the tab moves to another window. Pinning, unpinning, or moving a pin in a window changes the store. A change to the store reaches every window on a later task.
-- A window adds a missing pin as a background tab at its home URL. It closes a copy of a pin that was unpinned elsewhere, keeps one copy of each pin (a restored one first), and adopts pinned tabs the store does not know, such as tabs pinned before uw kept pins.
+- A window adds a missing pin as a background tab at its home URL when no window has the pin's live page; see [How the live pin page works](#how-the-live-pin-page-works). It closes a copy of a pin that was unpinned elsewhere, keeps one copy of each pin (a restored one first), and adopts pinned tabs the store does not know, such as tabs pinned before uw kept pins. A copy counts as restored only until its window first applies the store, so a pin unpinned later never comes back as a new one.
 - Each pinned tab saves its pin's id in Chromium's session file under `uw.pin`, so a restart brings it back on the page it was on, with no second copy.
 - Cmd-W, a middle-click on the tile, and the tab menu never close a pin. The menu's three rows and the Edit Home URL card are in `browser/ui/views/pins`.
 - Built differently from the design: Reset to Home does not show "Double-click" at its end, since Chromium's menus show only keys there. The card uses Chromium's dialog title and buttons in the shape of a uw card.
+
+## How the live pin page works
+
+Chosen by uw for T133 on 2026-10-22. The prototype is built; the hazed view and the rest wait for the build stage.
+
+- Each pin has one live page in its profile. Every other window's tab for the pin holds a placeholder: a page with the live page's history and no renderer, as Chromium's discarded tabs have.
+- Selecting a placeholder moves the live page into that tab and leaves a placeholder where it was. The pages swap inside the two windows' own tabs with `TabStripModel::DiscardWebContents`, the call Chromium's tab discarding uses, so no sidebar gains or loses a tile.
+- Before a closing window asks its pages whether it may close, its live pin pages move to `PinPages` in `browser/pins`. It keeps them, and their profile, alive until a window takes one. A window that opens takes them at once. When uw quits, the session keeps the page in its window instead.
+- Unpinning a placeholder closes it, and the live page stays a regular tab where it is, or opens in its place when no window has it.
+- Chromium's `HandleBeforeClose` hook and the profile's new keep-alive reason are in the `uw-live-pins` patch.
 
 ## How workspace windows work
 

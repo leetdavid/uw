@@ -48,6 +48,15 @@ namespace {
 constexpr char kMail[] = "chrome://version/?mail";
 constexpr char kIssues[] = "chrome://version/?issues";
 constexpr char kIssue[] = "chrome://version/?issue-412";
+// A page that remembers a half-typed field, a number drawn when it loaded,
+// and a counter that keeps going.
+constexpr char kNotes[] =
+    "data:text/html,<title>Notes</title><input id=f><script>token="
+    "Math.random();ticks=0;setInterval(()=>ticks++,10)</script>";
+constexpr char kTypeIntoNotes[] =
+    "document.getElementById('f').value = 'half-typed'";
+constexpr char kNotesState[] =
+    "document.getElementById('f').value + ' ' + token";
 
 class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -77,6 +86,27 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   PinStore* store() { return PinStore::For(browser()->GetProfile()); }
+
+  static content::WebContents* PinPageOf(Browser* window) {
+    return window->tab_strip_model()->GetWebContentsAt(0);
+  }
+
+  // Waits until the first pin of `window` is `page`.
+  static bool Holds(Browser* window, content::WebContents* page) {
+    return base::test::RunUntil([&] { return PinPageOf(window) == page; });
+  }
+
+  static bool HasRenderer(content::WebContents* page) {
+    return page->GetPrimaryMainFrame()->IsRenderFrameLive();
+  }
+
+  static std::string StateOf(content::WebContents* page) {
+    return content::EvalJs(page, kNotesState).ExtractString();
+  }
+
+  static int TicksOf(content::WebContents* page) {
+    return content::EvalJs(page, "ticks").ExtractInt();
+  }
 
   static void Navigate(tabs::TabInterface* tab, const GURL& url) {
     ASSERT_TRUE(content::NavigateToURL(tab->GetContents(), url));
@@ -124,9 +154,9 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
     base::RunLoop().RunUntilIdle();
   }
 
-  // Unpins the restored kMail in a window that shows, with `unpin`. The page
-  // stays there as a regular tab, and every other window loses its copy and
-  // gains nothing.
+  // Unpins the restored kMail in a window that shows, with `unpin`. The live
+  // page stays a regular tab in the window that holds it, every other window
+  // loses its copy, and no window gains a tab.
   void UnpinAfterARestart(base::FunctionRef<void(TabStripModel*)> unpin) {
     std::vector<BrowserWindowInterface*> windows;
     ASSERT_TRUE(base::test::RunUntil([&] {
@@ -143,21 +173,21 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
       }
     }
     ASSERT_TRUE(shown);
-    TabStripModel* tabs = shown->GetTabStripModel();
-    content::WebContents* page = tabs->GetWebContentsAt(0);
 
-    unpin(tabs);
+    unpin(shown->GetTabStripModel());
     for (int i = 0; i < 5; ++i) {
       base::RunLoop().RunUntilIdle();
     }
 
     EXPECT_TRUE(store()->pins().empty());
     EXPECT_TRUE(AllShow(windows, {}));
+    int keeping = 0;
     for (BrowserWindowInterface* window : windows) {
-      EXPECT_EQ(window->GetTabStripModel()->count(),
-                window == shown ? before[window] : before[window] - 1);
+      const int count = window->GetTabStripModel()->count();
+      EXPECT_TRUE(count == before[window] || count == before[window] - 1);
+      keeping += count == before[window];
     }
-    EXPECT_NE(tabs->GetIndexOfWebContents(page), TabStripModel::kNoTab);
+    EXPECT_EQ(keeping, 1);
   }
 
   views::View* TileOf(const tabs::TabInterface* tab) {
@@ -184,17 +214,108 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowGetsThePins) {
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, UnpinningRemovesItEverywhere) {
   Browser* second = CreateBrowser(browser()->GetProfile());
-  Pin(browser(), GURL(kMail));
+  content::WebContents* page = Pin(browser(), GURL(kMail))->GetContents();
   ASSERT_TRUE(ShowsPins(second, {GURL(kMail)}));
-  const int tabs_before = second->tab_strip_model()->count();
+  const int tabs_before = browser()->tab_strip_model()->count();
+  const int second_before = second->tab_strip_model()->count();
 
+  // Unpinned in a window that only has a placeholder: the live page stays a
+  // regular tab in the window that holds it.
   second->tab_strip_model()->SetTabPinned(0, false);
 
   EXPECT_TRUE(ShowsPins(browser(), {}));
   EXPECT_TRUE(ShowsPins(second, {}));
-  // The page stays open as a regular tab in the window that unpinned it.
-  EXPECT_EQ(second->tab_strip_model()->count(), tabs_before);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return second->tab_strip_model()->count() == second_before - 1; }));
+  EXPECT_EQ(browser()->tab_strip_model()->count(), tabs_before);
+  EXPECT_NE(browser()->tab_strip_model()->GetIndexOfWebContents(page),
+            TabStripModel::kNoTab);
   EXPECT_TRUE(store()->pins().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, UnpinningTheLivePageKeepsItThere) {
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  content::WebContents* page = Pin(browser(), GURL(kMail))->GetContents();
+  ASSERT_TRUE(ShowsPins(second, {GURL(kMail)}));
+  const int tabs_before = browser()->tab_strip_model()->count();
+  const int second_before = second->tab_strip_model()->count();
+
+  browser()->tab_strip_model()->SetTabPinned(0, false);
+
+  EXPECT_TRUE(ShowsPins(second, {}));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return second->tab_strip_model()->count() == second_before - 1; }));
+  EXPECT_EQ(browser()->tab_strip_model()->count(), tabs_before);
+  EXPECT_NE(browser()->tab_strip_model()->GetIndexOfWebContents(page),
+            TabStripModel::kNoTab);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, SelectingAPinMovesItsLivePageThere) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  // The other window has a placeholder with the page's history and no
+  // renderer.
+  content::WebContents* placeholder = PinPageOf(second);
+  EXPECT_NE(placeholder, page);
+  EXPECT_FALSE(HasRenderer(placeholder));
+  EXPECT_TRUE(
+      PinSync::IsPlaceholder(second->tab_strip_model()->GetTabAtIndex(0)));
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  const int ticks = TicksOf(page);
+
+  second->tab_strip_model()->ActivateTabAt(0);
+
+  ASSERT_TRUE(Holds(second, page));
+  EXPECT_EQ(StateOf(page), state);
+  EXPECT_GE(TicksOf(page), ticks);
+  content::WebContents* left = PinPageOf(browser());
+  EXPECT_NE(left, page);
+  EXPECT_FALSE(HasRenderer(left));
+  EXPECT_EQ(left->GetVisibleURL(), GURL(kNotes));
+
+  // Selecting it in the first window brings it back.
+  browser()->tab_strip_model()->ActivateTabAt(1);
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_EQ(StateOf(page), state);
+  EXPECT_FALSE(HasRenderer(PinPageOf(second)));
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ThePageOutlivesTheWindowThatShowedIt) {
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  content::WebContents* page = Pin(second, GURL(kNotes))->GetContents();
+  ASSERT_TRUE(ShowsPins(browser(), {GURL(kNotes)}));
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  const int ticks = TicksOf(page);
+  base::WeakPtr<content::WebContents> alive = page->GetWeakPtr();
+
+  CloseBrowserSynchronously(second);
+
+  ASSERT_TRUE(alive);
+  EXPECT_FALSE(HasRenderer(PinPageOf(browser())));
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_EQ(StateOf(page), state);
+  EXPECT_GE(TicksOf(page), ticks);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowAfterTheLastOneGetsThePage) {
+  Profile* profile = browser()->GetProfile();
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  base::WeakPtr<content::WebContents> alive = page->GetWeakPtr();
+
+  CloseBrowserSynchronously(browser());
+
+  ASSERT_TRUE(alive);
+  Browser* next = CreateBrowser(profile);
+  SetBrowser(next);
+  ASSERT_TRUE(Holds(next, page));
+  EXPECT_EQ(StateOf(page), state);
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, MovingAPinMovesItEverywhere) {
