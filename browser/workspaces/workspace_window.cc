@@ -59,6 +59,25 @@ void DeleteProfile(const base::FilePath& profile) {
       ProfileMetrics::DELETE_PROFILE_USER_MANAGER);
 }
 
+// Drops every closed window of `workspace` from Cmd+Shift+T.
+void ForgetClosedWindows(Profile* profile, std::string_view workspace) {
+  sessions::TabRestoreService* service =
+      TabRestoreServiceFactory::GetForProfileIfExisting(profile);
+  if (!service) {
+    return;
+  }
+  std::vector<SessionID> entries;
+  for (const auto& entry : service->entries()) {
+    if (entry->type == sessions::tab_restore::Type::WINDOW &&
+        Find(entry->extra_data, WorkspaceWindow::kWorkspaceKey) == workspace) {
+      entries.push_back(entry->id);
+    }
+  }
+  for (SessionID id : entries) {
+    service->RemoveEntryById(id);
+  }
+}
+
 bool IsRestoring(Profile* profile) {
   if (SessionRestore::IsRestoring(profile)) {
     return true;
@@ -165,11 +184,14 @@ void WorkspaceWindow::Restore(
       WorkspaceList::Get().Find(Find(extra_data, kWorkspaceKey));
   if (workspace && workspace->profile == window->GetProfile()->GetBaseName()) {
     self->workspace_ = workspace->id;
+    if (std::string group = Find(extra_data, kGroupKey); !group.empty()) {
+      self->group_ = std::move(group);
+    }
+    self->hidden_ = Find(extra_data, kHiddenKey) == "true";
+  } else {
+    // The window of a deleted workspace comes back on its own.
+    self->workspace_ = WorkspaceList::Get().FirstFor(window->GetProfile()).id;
   }
-  if (std::string group = Find(extra_data, kGroupKey); !group.empty()) {
-    self->group_ = std::move(group);
-  }
-  self->hidden_ = Find(extra_data, kHiddenKey) == "true";
   self->SaveSession();
   self->changes_.Notify();
   // A group shows one window. A window revealed before this one came back
@@ -332,6 +354,10 @@ void WorkspaceWindow::Delete(std::string_view id, bool with_profile) {
   const base::FilePath profile = list.workspaces()[index].profile;
   const std::string before = list.workspaces()[index > 0 ? index - 1 : 1].id;
   list.Remove(deleted);
+  for (Profile* loaded :
+       g_browser_process->profile_manager()->GetLoadedProfiles()) {
+    ForgetClosedWindows(loaded, deleted);
+  }
 
   std::vector<WorkspaceWindow*> shown;
   for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
@@ -439,7 +465,7 @@ void WorkspaceWindow::SaveSession() {
 // group to the session, which brings it back at launch.
 void WorkspaceWindow::OnClosed(BrowserWindowInterface* window) {
   if (forget_) {
-    ForgetClosed(window);
+    ForgetClosedWindows(window->GetProfile(), workspace_);
     return;
   }
   if (hidden_ || browser_shutdown::IsTryingToQuit()) {
@@ -447,25 +473,6 @@ void WorkspaceWindow::OnClosed(BrowserWindowInterface* window) {
   }
   for (WorkspaceWindow* partner : Partners()) {
     partner->window_->GetWindow()->Close();
-  }
-}
-
-void WorkspaceWindow::ForgetClosed(BrowserWindowInterface* window) {
-  sessions::TabRestoreService* service =
-      TabRestoreServiceFactory::GetForProfileIfExisting(window->GetProfile());
-  if (!service) {
-    return;
-  }
-  std::vector<SessionID> entries;
-  for (const auto& entry : service->entries()) {
-    if (entry->type == sessions::tab_restore::Type::WINDOW &&
-        Find(entry->extra_data, kWorkspaceKey) == workspace_ &&
-        Find(entry->extra_data, kGroupKey) == group_) {
-      entries.push_back(entry->id);
-    }
-  }
-  for (SessionID id : entries) {
-    service->RemoveEntryById(id);
   }
 }
 

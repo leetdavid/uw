@@ -107,6 +107,22 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
     return GetAllBrowserWindowInterfaces();
   }
 
+  // Closes a group whose window for `reading`, on kArticle, shows in front of
+  // the first window, on kNotes. Another window keeps the browser open, does
+  // Cmd+Shift+T, and becomes browser().
+  Browser* CloseGroup(const std::string& reading) {
+    Load(browser(), GURL(kNotes));
+    Browser* elsewhere = CreateBrowser(profile());
+    WorkspaceWindow::From(browser())->Switch(reading);
+    BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+    CHECK(partner);
+    Load(partner, GURL(kArticle));
+    chrome::CloseWindow(partner->GetBrowserForMigrationOnly());
+    EXPECT_TRUE(base::test::RunUntil([&] { return Windows().size() == 1u; }));
+    SetBrowser(elsewhere);
+    return elsewhere;
+  }
+
   // Whether a tab of `window` shows `url`.
   static bool HasTab(BrowserWindowInterface* window, const GURL& url) {
     TabStripModel* tabs = window->GetTabStripModel();
@@ -362,19 +378,9 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                        ClosingAWindowClosesItsWorkspacesUntilCmdShiftT) {
   const std::string personal = WorkspaceWindow::From(browser())->workspace();
   const std::string reading = AddWorkspace("Reading", profile());
-  Load(browser(), GURL(kNotes));
-  // Another window keeps the browser open and does Cmd+Shift+T.
-  Browser* elsewhere = CreateBrowser(profile());
-  WorkspaceWindow::From(browser())->Switch(reading);
-  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
-  ASSERT_TRUE(partner);
-  Load(partner, GURL(kArticle));
-
-  const BrowserWindowInterface* closed_personal = browser();
-  chrome::CloseWindow(partner->GetBrowserForMigrationOnly());
-  ASSERT_TRUE(base::test::RunUntil([&] { return Windows().size() == 1u; }));
+  Browser* elsewhere = CloseGroup(reading);
+  ASSERT_EQ(Windows().size(), 1u);
   EXPECT_EQ(Windows()[0], elsewhere);
-  EXPECT_FALSE(std::ranges::contains(Windows(), closed_personal));
 
   chrome::RestoreTab(elsewhere);
   BrowserWindowInterface* shown = nullptr;
@@ -397,7 +403,59 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                                     WorkspaceWindow::From(behind)));
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
-  SetBrowser(elsewhere);
+}
+
+// Including a window of it that closed before it went.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       CmdShiftTDoesNotBringBackADeletedWorkspace) {
+  const std::string personal = WorkspaceWindow::From(browser())->workspace();
+  const std::string reading = AddWorkspace("Reading", profile());
+  CloseGroup(reading);
+  WorkspaceWindow::Delete(reading, /*with_profile=*/false);
+
+  chrome::RestoreTab(browser());
+  BrowserWindowInterface* restored = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (BrowserWindowInterface* window : Windows()) {
+      if (window != browser() && window->GetWindow()->IsVisible()) {
+        restored = window;
+      }
+    }
+    return restored != nullptr;
+  }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Windows().size(), 2u);
+  EXPECT_EQ(WorkspaceWindow::From(restored)->workspace(), personal);
+  EXPECT_TRUE(HasTab(restored, GURL(kNotes)));
+}
+
+// As when the workspace went while its profile was not loaded.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       AWindowOfAGoneWorkspaceComesBackOnItsOwn) {
+  const std::string personal = WorkspaceWindow::From(browser())->workspace();
+  const std::string reading = AddWorkspace("Reading", profile());
+  CloseGroup(reading);
+  list().Remove(reading);
+
+  chrome::RestoreTab(browser());
+  BrowserWindowInterface* article = nullptr;
+  BrowserWindowInterface* notes = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    article = notes = nullptr;
+    for (BrowserWindowInterface* window : Windows()) {
+      if (window->GetWindow()->IsVisible() && HasTab(window, GURL(kArticle))) {
+        article = window;
+      } else if (window->GetWindow()->IsVisible() &&
+                 HasTab(window, GURL(kNotes))) {
+        notes = window;
+      }
+    }
+    return article && notes;
+  }));
+  const WorkspaceWindow* alone = WorkspaceWindow::From(article);
+  EXPECT_FALSE(alone->hidden());
+  EXPECT_EQ(alone->workspace(), personal);
+  EXPECT_TRUE(alone->Partners().empty());
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,

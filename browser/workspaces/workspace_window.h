@@ -77,8 +77,9 @@ class WorkspaceWindow {
                      const std::u16string& new_profile,
                      WindowCallback shown);
   // Removes workspace `id` and closes its windows, each after it switches
-  // to the workspace before it. Cmd+Shift+T does not bring them back. With
-  // `with_profile`, the profile goes too, once its windows are gone.
+  // to the workspace before it. Cmd+Shift+T does not bring them back, nor
+  // the workspace's windows that closed before. With `with_profile`, the
+  // profile goes too, once its windows are gone.
   static void Delete(std::string_view id, bool with_profile);
   // The tabs, besides pins, that deleting workspace `id` closes.
   static int CountTabs(std::string_view id);
@@ -89,6 +90,8 @@ class WorkspaceWindow {
 
   // A window that session restore or Cmd+Shift+T brings back rejoins its
   // workspace and group. Cmd+Shift+T brings back the rest of the group too.
+  // A window whose workspace is gone shows on its own, in its profile's first
+  // workspace.
   static void Restore(BrowserWindowInterface* window,
                       const std::map<std::string, std::string>& extra_data);
   // What Cmd+Shift+T needs to bring `window` back with its group.
@@ -111,8 +114,6 @@ class WorkspaceWindow {
                    Profile* profile);
   void SaveSession();
   void OnClosed(BrowserWindowInterface* window);
-  // Drops this closed window from Cmd+Shift+T.
-  void ForgetClosed(BrowserWindowInterface* window);
   void RestorePartners();
   // Shows a window of each group no window shows, as when a group's shown
   // window did not come back with the session.
