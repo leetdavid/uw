@@ -24,6 +24,7 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/agent/command_check.h"
 #include "uw/browser/connectors/connectors.h"
+#include "uw/components/agent/run_report.h"
 
 namespace uw {
 namespace {
@@ -94,6 +95,11 @@ AgentLoop::AgentLoop(tabs::TabInterface& chat,
       on_change_(std::move(on_change)) {}
 
 AgentLoop::~AgentLoop() = default;
+
+void AgentLoop::SetReport(Report report) {
+  report_ = std::move(report);
+  UpdateConnectorTools();
+}
 
 void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
   skills_ = started_skills_;
@@ -193,7 +199,9 @@ void AgentLoop::AskModel() {
   const std::optional<std::string> body =
       context_->Request(model_.connection.model, kMaxRequestLength);
   if (!body || model_.connection.endpoint.empty()) {
-    Finish(Failed("No agent model is set."));
+    Step failed = Failed("No agent model is set.");
+    failed.model_unreachable = true;
+    Finish(std::move(failed));
     return;
   }
   client_ = RemoteModelClient::ForLanguageModel(
@@ -215,7 +223,9 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
         !message.empty()) {
       base::StrAppend(&text, {": ", message});
     }
-    Finish(Failed(std::move(text)));
+    Step failed = Failed(std::move(text));
+    failed.model_unreachable = true;
+    Finish(std::move(failed));
     return;
   }
   std::optional<ModelTurn> turn = ParseAgentResponse(outcome.body);
@@ -272,6 +282,11 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
   }
   if (call.name == "skill") {
     LoadSkill(std::move(turn), index, std::move(*args));
+    return;
+  }
+  if (call.name == kReportTool && report_) {
+    base::DictValue answer = report_.Run(*args);
+    OnTool(std::move(turn), index, std::move(*args), std::move(answer));
     return;
   }
   if (call.name == kLoadConnectorTool) {
@@ -506,6 +521,9 @@ void AgentLoop::SetConnectors(std::vector<ConnectorTools> connectors) {
 void AgentLoop::UpdateConnectorTools() {
   connector_tools_.clear();
   base::ListValue tools;
+  if (report_) {
+    tools.Append(ReportToolSchema());
+  }
   if (!connectors_.empty()) {
     tools.Append(LoadConnectorToolSchema());
   }

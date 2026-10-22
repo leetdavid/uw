@@ -69,6 +69,9 @@ class AgentLoop {
     base::DictValue result;
     // The model's answer, or what went wrong.
     std::string text;
+    // A failure to reach the model: no model is set, or its request failed,
+    // as when the provider is down, rejects the key, or the Mac is offline.
+    bool model_unreachable = false;
   };
   using OnStep = base::RepeatingCallback<void(const Step&)>;
 
@@ -125,6 +128,12 @@ class AgentLoop {
   void SetSkillSaver(SaveSkill save_skill) {
     save_skill_ = std::move(save_skill);
   }
+
+  // A run of a scheduled chat ends with the report tool. Once this is set,
+  // the model is offered it, and `report` answers each call.
+  using Report =
+      base::RepeatingCallback<base::DictValue(const base::DictValue& args)>;
+  void SetReport(Report report);
   // The user's answer to a step that needs approval. A decline may carry a
   // note for the model.
   struct ApprovalAnswer {
@@ -215,6 +224,7 @@ class AgentLoop {
   // the model before it is asked again.
   std::vector<std::pair<std::string, std::vector<std::string>>> tool_images_;
   SaveSkill save_skill_;
+  Report report_;
   Approve approve_;
   ApprovalMode mode_ = ApprovalMode::kAuto;
   // The user's no to the engine's question about a site, during the step

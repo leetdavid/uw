@@ -12,6 +12,8 @@ source_set("agent") {
     "command_check.h",
     "page_text.cc",
     "page_text.h",
+    "run_report.cc",
+    "run_report.h",
     "schedule.cc",
     "schedule.h",
     "skills.cc",
@@ -24,6 +26,7 @@ source_set("agent") {
     "//uw/components/tab_organization",
   ]
   deps = [
+    "//base:i18n",
     "//components/optimization_guide/proto:optimization_guide_proto",
     "//third_party/icu",
     "//uw/components/ai_providers",
@@ -38,6 +41,7 @@ source_set("unit_tests") {
     "chat_scheduler_unittest.cc",
     "command_check_unittest.cc",
     "page_text_unittest.cc",
+    "run_report_unittest.cc",
     "schedule_unittest.cc",
     "skills_unittest.cc",
     "suggestions_unittest.cc",

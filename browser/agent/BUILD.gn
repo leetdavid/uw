@@ -100,6 +100,21 @@ source_set("run_window") {
   ]
 }
 
+# One run of a scheduled chat, a subagent in the run window.
+source_set("chat_run") {
+  sources = [
+    "chat_run.cc",
+    "chat_run.h",
+  ]
+  public_deps = [
+    ":agent",
+    "//base",
+    "//components/tabs:public",
+    "//uw/components/agent",
+  ]
+  deps = [ ":run_window" ]
+}
+
 # What the browser's commands need to open a chat.
 source_set("chat_tab") {
   sources = [
@@ -159,11 +174,13 @@ source_set("browser_tests") {
     "agent_engine_browsertest.cc",
     "agent_loop_browsertest.cc",
     "agent_tools_browsertest.cc",
+    "chat_run_browsertest.cc",
     "command_check_browsertest.cc",
     "run_window_browsertest.cc",
   ]
   deps = [
     ":agent",
+    ":chat_run",
     ":run_window",
     ":run_window_mark",
     ":test_support",
