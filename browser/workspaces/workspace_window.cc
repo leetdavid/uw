@@ -34,6 +34,7 @@
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/webui_url_constants.h"
+#include "components/favicon/content/content_favicon_driver.h"
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/core/tab_restore_types.h"
 #include "components/tabs/public/tab_interface.h"
@@ -147,6 +148,14 @@ WorkspaceWindow* WorkspaceWindow::From(BrowserWindowInterface* window) {
 bool WorkspaceWindow::IsHidden(BrowserWindowInterface* window) {
   const WorkspaceWindow* self = From(window);
   return self && self->hidden_;
+}
+
+// static
+void WorkspaceWindow::ShowSavedIcon(content::WebContents* page) {
+  if (favicon::ContentFaviconDriver* icons =
+          favicon::ContentFaviconDriver::FromWebContents(page)) {
+    icons->FetchFavicon(icons->GetActiveURL(), /*is_same_document=*/false);
+  }
 }
 
 std::vector<WorkspaceWindow*> WorkspaceWindow::Partners() const {

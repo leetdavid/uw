@@ -24,6 +24,10 @@
 class BrowserWindowInterface;
 class Profile;
 
+namespace content {
+class WebContents;
+}
+
 namespace tabs {
 class TabInterface;
 }
@@ -53,6 +57,9 @@ class WorkspaceWindow : public views::WidgetObserver {
   // Whether `window` is a workspace window kept hidden behind its partner.
   // Its restored tabs load once it shows.
   static bool IsHidden(BrowserWindowInterface* window);
+  // Shows the saved icon of `page`, a restored tab of a hidden window, until
+  // it loads, as Chromium does for the restored tabs it loads later.
+  static void ShowSavedIcon(content::WebContents* page);
 
   // Called once the window is built and its session tracks it.
   void Start();

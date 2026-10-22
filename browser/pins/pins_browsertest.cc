@@ -28,10 +28,12 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "components/favicon/content/content_favicon_driver.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/events/base_event_utils.h"
@@ -157,6 +159,13 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
   static bool Started(content::WebContents* page) {
     return page->GetController().GetPendingEntry() ||
            !page->GetPrimaryMainFrame()->GetLastCommittedURL().is_empty();
+  }
+
+  // Whether `page`'s tile shows the page's own icon, not the default one.
+  static bool ShowsIcon(content::WebContents* page) {
+    favicon::FaviconDriver* icons =
+        favicon::ContentFaviconDriver::FromWebContents(page);
+    return icons && icons->FaviconIsValid() && !icons->GetFavicon().IsEmpty();
   }
 
   // Moves the live page of the first pin from `from`, where it is selected,
@@ -621,19 +630,78 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
     return windows.size() == 2u && AllShow(windows, {GURL(kMail)});
   }));
   content::WebContents* live = nullptr;
-  content::WebContents* placeholder = nullptr;
+  // The tab, since its placeholder is remade when the live page changes.
+  tabs::TabInterface* placeholder = nullptr;
   for (BrowserWindowInterface* window : windows) {
     tabs::TabInterface* tab = window->GetTabStripModel()->GetTabAtIndex(0);
-    (PinSync::IsPlaceholder(tab) ? placeholder : live) = tab->GetContents();
+    if (PinSync::IsPlaceholder(tab)) {
+      placeholder = tab;
+    } else {
+      live = tab->GetContents();
+    }
   }
   ASSERT_TRUE(live && placeholder);
   EXPECT_TRUE(base::test::RunUntil([&] { return Started(live); }));
   // The selected placeholder of a shown window never loads a second copy.
   base::RunLoop().RunUntilIdle();
-  EXPECT_TRUE(tabs::TabInterface::GetFromContents(placeholder)->IsActivated());
-  EXPECT_FALSE(Started(placeholder));
-  EXPECT_FALSE(HasRenderer(placeholder));
+  EXPECT_TRUE(placeholder->IsActivated());
+  EXPECT_TRUE(PinSync::IsPlaceholder(placeholder));
+  EXPECT_FALSE(Started(placeholder->GetContents()));
+  EXPECT_FALSE(HasRenderer(placeholder->GetContents()));
   ASSERT_EQ(store()->pins().size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_IconsShowBeforeAHiddenWorkspaceLoads) {
+  Profile* profile = browser()->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(embedded_test_server()->Start());
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string reading = list.Add(
+      "Reading", std::string(list.UnusedIcon()), profile->GetBaseName());
+  content::WebContents* page =
+      Pin(browser(),
+          embedded_test_server()->GetURL("/favicon/page_with_favicon.html"))
+          ->GetContents();
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsIcon(page); }));
+  // The live page stays in the window that goes behind.
+  Browser* partner = nullptr;
+  WorkspaceWindow::From(browser())->Switch(
+      reading, base::BindOnce(
+                   [](Browser** partner, BrowserWindowInterface* shown) {
+                     *partner = shown->GetBrowserForMigrationOnly();
+                   },
+                   &partner));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return partner && partner->tab_strip_model()->IndexOfFirstNonPinnedTab();
+  }));
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, IconsShowBeforeAHiddenWorkspaceLoads) {
+  BrowserWindowInterface* hidden = nullptr;
+  BrowserWindowInterface* shown = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    hidden = shown = nullptr;
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      if (window->GetTabStripModel()->IndexOfFirstNonPinnedTab() == 1) {
+        (WorkspaceWindow::IsHidden(window) ? hidden : shown) = window;
+      }
+    }
+    return hidden && shown;
+  }));
+  content::WebContents* live = hidden->GetTabStripModel()->GetWebContentsAt(0);
+  ASSERT_FALSE(
+      PinSync::IsPlaceholder(hidden->GetTabStripModel()->GetTabAtIndex(0)));
+
+  // The hidden window's page shows its saved icon without loading, and the
+  // shown window's placeholder takes the icon from it.
+  EXPECT_TRUE(base::test::RunUntil([&] { return ShowsIcon(live); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return ShowsIcon(shown->GetTabStripModel()->GetWebContentsAt(0));
+  }));
+  EXPECT_FALSE(Started(live));
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ThePageFollowsAWorkspaceSwitch) {
