@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, started on 2026-10-22 after its design was approved.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -28,7 +28,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 ### Shared pins
 
 - The [pinned-tab behavior](../product.md#pinned-tabs) agreed in Product. A pin belongs to a profile and shows in every window and workspace of it.
-- Until T133, each window loads its own page for a pin.
+- Until T133, each window loads its own page for a pin. With T133, one live page per pin moves between windows, as [Pinned tabs](../product.md#pinned-tabs) says.
 
 ## How pins are kept
 
@@ -68,6 +68,7 @@ On the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Workspac
 - "New workspace: the card": name, emoji, and profile.
 - "Workspaces: every state": the foot with five or more workspaces and in dark mode, the new button's menu, the Organize icon, the workspace menu, renaming, the profile list, a new profile, both delete questions, and Move to Workspace.
 - "Pins: every state": the pin menu, Edit Home URL, one set of pins in two windows, and in two workspaces of one profile.
+- "Pins: the live page in another window", drawn for T133 and approved on 2026-10-22: the hazed picture with "Open here" in light and dark mode, and notes on a click, a workspace switch, unpinning, and closing a window.
 
 The rules are in the `uw-workspaces` guide. The name row, the dots from five workspaces on, and starting a new workspace on an unused suggested theme are uw's proposals.
 

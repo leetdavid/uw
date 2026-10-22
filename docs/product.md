@@ -270,7 +270,7 @@ Agreed: show pinned tabs as compact icons at the top of the sidebar, inspired by
 
 Agreed: each pin represents one continuing live page session shared across windows. Selecting it in another window continues its current navigation and in-progress page state, including an unfinished form or comment. Ordinary navigation does not replace the saved home URL.
 
-Agreed: only one window displays a pinned page session at a time. Selecting the pin in another window transfers the live page there. The previous window retains a hazed, inactive pinned view rather than a second live copy. Selecting that inactive view transfers the live page back.
+Agreed: only one window displays a pinned page session at a time. Selecting the pin in another window transfers the live page there. The previous window retains a hazed, inactive pinned view rather than a second live copy: a blurred, dimmed picture of the page as it left, with "Open here" in the middle. A click anywhere on it transfers the live page back. Switching workspace carries the live page along when the window that comes into view has the pin selected, since a hidden window displays nothing. The picture and the workspace rule were agreed on 2026-10-22; see the frame "Pins: the live page in another window" in the [workspaces plan](plans/workspaces.md#design).
 
 Agreed: pins are shared across all windows in one browser profile and separate between profiles. Since 2026-10-21 that includes every [workspace](#workspaces) on the profile.
 
@@ -282,7 +282,7 @@ Agreed: "Replace home URL with current" changes the saved home URL without navig
 
 Agreed: a pin's site is the saved home URL's scheme and registrable domain. Same-site navigation stays in the pinned page session. A link that would leave the site opens in a temporary Peek preview. Closing the preview leaves the pinned page unchanged; promoting the preview creates a regular tab in Scratchpad.
 
-Agreed: unpinning removes the icon and inactive pinned views across the profile. The live page remains open as a regular tab in the window currently displaying it.
+Agreed: unpinning removes the icon and inactive pinned views across the profile. The live page remains open as a regular tab in the window currently displaying it. When no window holds it, it opens as a regular tab in the window the pin was unpinned from (agreed 2026-10-22).
 
 Agreed: closing the window that displays a pinned page detaches its live session from that window without discarding it. Selecting the pin in another open window restores the same page state there.
 
