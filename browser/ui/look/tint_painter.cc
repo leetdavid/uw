@@ -180,10 +180,15 @@ void PaintPageCardEdge(gfx::Canvas* canvas,
       view->GetWidget()->IsFullscreen()) {
     return;
   }
-  gfx::RectF edge = views::View::ConvertRectToTarget(
-      toolbar, view, gfx::RectF(toolbar->GetLocalBounds()));
-  edge.Union(views::View::ConvertRectToTarget(
-      page, view, gfx::RectF(page->GetLocalBounds())));
+  // Where the card is laid out, leaving out any transform on the toolbar or
+  // the page themselves, such as the page's nudge as a workspace switch fades
+  // in. A view drawn mid-nudge keeps its drawing after the nudge ends.
+  const auto laid_out = [view](const views::View* part) {
+    return views::View::ConvertRectToTarget(part->parent(), view,
+                                            gfx::RectF(part->bounds()));
+  };
+  gfx::RectF edge = laid_out(toolbar);
+  edge.Union(laid_out(page));
   edge.Outset(0.5f);
   cc::PaintFlags flags;
   flags.setAntiAlias(true);

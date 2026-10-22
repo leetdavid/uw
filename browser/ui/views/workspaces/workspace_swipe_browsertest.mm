@@ -5,11 +5,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "base/apple/owned_objc.h"
 #include "base/run_loop.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
 #include "base/time/time.h"
 #include "chrome/browser/browser_process.h"
@@ -27,6 +29,8 @@
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/base_window.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
@@ -35,9 +39,11 @@
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/window/non_client_view.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
@@ -134,6 +140,46 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
     now_ += kSlowStep;
     return ui::ScrollEvent(ui::EventType::kScroll, gfx::PointF(point),
                            gfx::PointF(point), now_, 0, x, y, x, y, 2, phase);
+  }
+
+  // Where the left edge of `window`'s page card is, in the window.
+  static int CardLeft(BrowserWindowInterface* window) {
+    views::View* page =
+        BrowserView::GetBrowserViewForBrowser(window)->multi_contents_view();
+    return page->ConvertRectToWidget(page->GetLocalBounds()).x();
+  }
+
+  // Checks that `pixels`, a picture of `window`, shows only the tint in the
+  // sidebar's strip that ends 11px left of the page card, below the tabs.
+  static void ExpectNoEdgeLeftOfTheCard(BrowserWindowInterface* window,
+                                        const SkBitmap& pixels) {
+    const float scale = static_cast<float>(pixels.width()) /
+                        BrowserView::GetBrowserViewForBrowser(window)
+                            ->GetWidget()
+                            ->GetRootView()
+                            ->width();
+    const int card = CardLeft(window);
+    const int height = static_cast<int>(pixels.height() / scale);
+    const auto at = [&](int x, int y) {
+      return pixels.getColor(static_cast<int>(x * scale),
+                             static_cast<int>(y * scale));
+    };
+    // Low in the sidebar, under its tabs and over its foot.
+    for (int y : {height * 6 / 10, height * 7 / 10, height * 8 / 10}) {
+      const SkColor tint = at(card - 30, y);
+      for (int x : {card - 13, card - 12, card - 11}) {
+        const SkColor color = at(x, y);
+        const int difference =
+            std::abs(static_cast<int>(SkColorGetR(color)) -
+                     static_cast<int>(SkColorGetR(tint))) +
+            std::abs(static_cast<int>(SkColorGetG(color)) -
+                     static_cast<int>(SkColorGetG(tint))) +
+            std::abs(static_cast<int>(SkColorGetB(color)) -
+                     static_cast<int>(SkColorGetB(tint)));
+        EXPECT_LT(difference, 24) << "at " << x << "," << y << ": "
+                                  << std::hex << color << " beside " << tint;
+      }
+    }
   }
 
   // Sends a trackpad scroll at `point` in `window`, to whatever is there.
@@ -459,6 +505,51 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, MANUAL_ASwipeInARealWindow) {
   shown = WaitForShown(browser(), reading);
   SaveNativeWindowScreenshot(shown->GetBrowserForMigrationOnly(),
                              "swipe-real-landed");
+
+  // Back the other way, whose page comes in from the left: nothing of the
+  // card's edge stays over the sidebar.
+  // The card has an edge in dark mode.
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  RunWindowCommand(shown, kPreviousWorkspace);
+  WaitForShown(browser(), work_);
+  base::RunLoop settle;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, settle.QuitClosure(), base::Milliseconds(500));
+  settle.Run();
+  ExpectNoEdgeLeftOfTheCard(browser(), CaptureNativeWindow(browser()));
+  SaveNativeWindowScreenshot(browser(), "swipe-real-back");
+}
+
+
+// Whatever draws the card's edge while the page is still nudged draws it where
+// the card is laid out, so no outline stays over the sidebar after the fade.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       NoEdgeIsLeftOverTheSidebarAfterThePageFades) {
+  // The card has an edge in dark mode.
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  gfx::ScopedAnimationDurationScaleMode slow(10);
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  RunWindowCommand(browser(), kNextWorkspace);
+  BrowserWindowInterface* shown = WaitForShown(browser(), reading);
+  // Back to the workspace before, whose page comes in from 12px to the left.
+  RunWindowCommand(shown, kPreviousWorkspace);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return ShownOf(browser()) == browser() && SwipeOf(browser())->has_cover();
+  }));
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  view->GetWidget()->non_client_view()->frame_view()->SchedulePaint();
+  view->tab_strip_view()->SchedulePaint();
+  base::RunLoop loop;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, loop.QuitClosure(), base::Milliseconds(200));
+  loop.Run();
+  ASSERT_TRUE(SwipeOf(browser())->has_cover());
+  WaitForShown(browser(), work_);
+
+  ExpectNoEdgeLeftOfTheCard(browser(), CaptureWindow(browser()));
+  SaveWindowScreenshot(browser(), "swipe-edge-after-fade");
 }
 
 }  // namespace
