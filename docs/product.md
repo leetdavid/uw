@@ -204,7 +204,9 @@ The [agent chats plan](plans/agent-chats.md) has the full scope, releases, and s
 
 Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). The watch rules below carry over to every scheduled chat. A step that needs approval waits and sends a notification.
 
-Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need not be about one page. Watching a page starts one from that page, which becomes a [watched page](CONTEXT.md#language). Support daily, weekly, and specific-time schedules with an explicit timezone.
+Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need not be about one page. Watching a page starts one from that page, which becomes a [watched page](CONTEXT.md#language).
+
+Agreed schedules, on 2026-10-22: every hour or every 2, 3, 4, 6, or 12 hours; every day, or weekdays, at a time; every week on a day at a time; and once at a date and time, after which the chat keeps no schedule. Hourly is the shortest. The time zone is the Mac's, shown and changeable, and 9:00 stays 9:00 across a daylight-saving change. No custom cron syntax. Open: letting a chat watch something more closely than hourly while the user waits on it.
 
 Agreed use cases: track a price on a page, look for news on a topic, and send a regular update.
 
