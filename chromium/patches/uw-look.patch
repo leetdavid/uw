@@ -388,7 +388,7 @@ index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c8
    // The sync icon that is displayed in the tab group header of saved groups in
    // the tabstrip.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4cdafdd34 100644
+index 75f02715c7af13fa992eb95586cfbd860286bef6..ad68d492c5603c85dcf75708ac68b0ff1665e1dc 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -47,6 +47,7 @@
@@ -399,18 +399,84 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
  
  #if BUILDFLAG(IS_MAC)
  #include "chrome/browser/ui/fullscreen_util_mac.h"
-@@ -761,6 +762,10 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -613,15 +614,9 @@ int BrowserViewTabbedLayoutImpl::GetCollapsedVerticalTabStripRelativeTop()
+   const int exclusion_height =
+       base::ClampCeil(params.leading_exclusion.ContentWithPadding().height());
+ 
+-  // Try to align with toolbar. But if it's not visible, then don't.
+-  if (!delegate().IsToolbarVisible()) {
+-    return exclusion_height;
+-  }
+-
+-  // Gets where the bottom of the toolbar will be laid out.
+-  const int provisional_toolbar_height =
+-      GetBoundsWithExclusion(params, views().toolbar).height();
+-  return std::max(exclusion_height, provisional_toolbar_height);
++  // uw: the page card starts below the caption buttons too, level with the
++  // tabstrip, so the tint shows behind the buttons.
++  return exclusion_height;
+ }
+ 
+ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumSize(
+@@ -705,18 +700,12 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   gfx::Rect unclipped_contents_region = params.visual_client_area;
+ 
+   // Lay out vertical tab strip if visible.
+-  int collapsed_vertical_tab_strip_adjustment = 0;
+   const VerticalTabStripAnimation& vertical_tab_strip_animation =
+       layout_data_->vertical_tab_strip_animation;
+   gfx::Rect vertical_tab_strip_bounds;
+   if (IsParentedTo(views().vertical_tab_strip_region_view,
+                    views().browser_view)) {
+     if (layout_data_->tab_strip_type == TabStripType::kVertical) {
+-      if (vertical_tab_strip_animation.top_offset > 0) {
+-        collapsed_vertical_tab_strip_adjustment =
+-            horizontal_layout.vertical_tab_strip_width;
+-      }
+-
+       const int vertical_tab_strip_hover_width =
+           std::max(0, tabs::kVerticalTabStripDefaultUncollapsedWidth -
+                           horizontal_layout.vertical_tab_strip_width) *
+@@ -761,6 +750,17 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        const int inset_amount = horizontal_layout.vertical_tab_strip_width -
                                 GetVerticalTabStripContentOverlap();
        params.InsetHorizontal(inset_amount, /*leading=*/true);
 +      if (!is_fullscreen(layout_data_->window_state)) {
-+        params.Inset(uw::kPageCardMargins);
-+        unclipped_contents_region.Inset(uw::kPageCardMargins);
++        // A tabstrip collapsed below the caption buttons takes the card down
++        // with it, clear of the buttons.
++        gfx::Insets margins = uw::kPageCardMargins;
++        if (vertical_tab_strip_animation.top_offset > margins.top()) {
++          margins.set_top(vertical_tab_strip_animation.top_offset);
++          params.leading_exclusion = BrowserLayoutExclusionArea();
++        }
++        params.Inset(margins);
++        unclipped_contents_region.Inset(margins);
 +      }
  
        // Let the vertical tab strip animate out over the content.
        if (vertical_tab_strip_animation.current_motion) {
-@@ -1150,8 +1155,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -884,20 +884,6 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     top_container_layout.bounds =
+         GetTopContainerBoundsInParent(top_container_local_bounds, params);
+     params.SetTop(top_container_layout.bounds.bottom());
+-
+-    // Possibly bump the leading margin of the top container out to cover the
+-    // caption buttons, leaving all of the child views in the same absolute
+-    // position.
+-    if (collapsed_vertical_tab_strip_adjustment > 0) {
+-      top_container_layout.bounds.Outset(
+-          gfx::Outsets::TLBR(0, collapsed_vertical_tab_strip_adjustment, 0, 0));
+-      for (auto& [child, child_layout] : top_container_layout.children) {
+-        if (!child_layout.bounds.IsEmpty()) {
+-          child_layout.bounds.Offset(collapsed_vertical_tab_strip_adjustment,
+-                                     0);
+-        }
+-      }
+-    }
+   }
+ 
+   // Lay out the main area background.
+@@ -1150,8 +1136,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      }
    }
  
@@ -424,7 +490,20 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..b912d96f1880ffed62b4febea728b5e4
      gfx::RoundedCornersF content_corners;
      if (layout_data_->tab_strip_type == TabStripType::kVertical &&
          !is_fullscreen(layout_data_->window_state) &&
-@@ -1613,11 +1621,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1194,6 +1183,12 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       caption_button_width =
+           base::ClampCeil(browser_params.leading_exclusion.content.width()) -
+           tabstrip_bounds->x();
++      // uw: none when the tabstrip starts below the caption buttons.
++      if (tabstrip_bounds->y() >=
++          base::ClampCeil(
++              browser_params.leading_exclusion.ContentWithPadding().height())) {
++        caption_button_width = 0;
++      }
+     }
+ 
+     views().vertical_tab_strip_region_view->SetToolbarHeightForLayout(
+@@ -1613,11 +1608,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      case TabStripType::kVertical: {
        // Curve trailing corner when it becomes the top trailing corner of the
        // browser.

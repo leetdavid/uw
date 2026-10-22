@@ -28,6 +28,10 @@ void SaveWindowScreenshot(Browser* browser, const std::string& name);
 // Saves `widget`, such as an open menu, the same way.
 void SaveWidgetScreenshot(views::Widget* widget, const std::string& name);
 
+// Saves the window of `browser` as macOS shows it, with the close, minimize,
+// and zoom buttons. Only a real window has them.
+void SaveNativeWindowScreenshot(Browser* browser, const std::string& name);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_TAB_ORGANIZATION_WINDOW_SCREENSHOT_H_

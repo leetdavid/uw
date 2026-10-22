@@ -119,6 +119,7 @@ source_set("test_support") {
     "//ui/compositor",
     "//ui/gfx",
     "//ui/gfx/codec",
+    "//ui/snapshot",
     "//ui/views",
     "//url",
   ]

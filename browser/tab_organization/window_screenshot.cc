@@ -26,7 +26,9 @@
 #include "ui/compositor/layer.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/image/image.h"
 #include "ui/gfx/skia_util.h"
+#include "ui/snapshot/snapshot.h"
 #include "ui/views/widget/widget.h"
 
 namespace uw {
@@ -110,6 +112,23 @@ void SaveWindowScreenshot(Browser* browser, const std::string& name) {
 
 void SaveWidgetScreenshot(views::Widget* widget, const std::string& name) {
   Save([&] { return CaptureSettled(widget); }, name);
+}
+
+void SaveNativeWindowScreenshot(Browser* browser, const std::string& name) {
+  Save(
+      [&] {
+        views::Widget* widget =
+            BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
+        base::test::TestFuture<gfx::Image> grabbed;
+        ui::GrabWindowSnapshot(
+            widget->GetNativeWindow(),
+            gfx::Rect(widget->GetWindowBoundsInScreen().size()),
+            grabbed.GetCallback());
+        const gfx::Image image = grabbed.Take();
+        EXPECT_FALSE(image.IsEmpty());
+        return image.IsEmpty() ? SkBitmap() : image.AsBitmap();
+      },
+      name);
 }
 
 }  // namespace uw

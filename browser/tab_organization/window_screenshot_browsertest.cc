@@ -16,13 +16,18 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/top_container_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/prefs/pref_service.h"
 #include "components/tab_groups/tab_group_color.h"
 #include "components/tab_groups/tab_group_id.h"
@@ -31,9 +36,13 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/test/button_test_api.h"
@@ -211,6 +220,36 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
         ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                        ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
   }
+
+  // Collapses the sidebar and checks the page card: it starts level with the
+  // narrow sidebar, below the window's close, minimize, and zoom buttons, and
+  // its toolbar and page share a left edge. Nothing in the toolbar's color
+  // covers the buttons, so the tint runs behind them.
+  void CheckTheNarrowSidebar(const std::string& screenshot) {
+    tabs::VerticalTabStripStateController* state =
+        tabs::VerticalTabStripStateController::From(browser());
+    state->RequestCollapse(true);
+    ASSERT_TRUE(base::test::RunUntil([&] { return state->IsCollapsed(); }));
+    const SkBitmap pixels = CaptureWindow(browser());
+    BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+    const gfx::Rect rail =
+        view->vertical_tab_strip_region_view_for_testing()->bounds();
+    const gfx::Rect toolbar = views::View::ConvertRectToTarget(
+        view->toolbar()->parent(), view, view->toolbar()->bounds());
+    const gfx::Rect page = views::View::ConvertRectToTarget(
+        view->multi_contents_view()->parent(), view,
+        view->multi_contents_view()->bounds());
+    EXPECT_EQ(toolbar.x(), page.x());
+    EXPECT_EQ(toolbar.y(), rail.y());
+    EXPECT_EQ(view->top_container()->x(), page.x());
+
+    const float scale = static_cast<float>(pixels.width()) / view->width();
+    const SkColor above_card =
+        pixels.getColor(static_cast<int>((toolbar.x() + 40) * scale),
+                        static_cast<int>((toolbar.y() - 3) * scale));
+    EXPECT_NE(above_card, view->GetColorProvider()->GetColor(kColorToolbar));
+    SaveWindowScreenshot(browser(), screenshot);
+  }
 };
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, Sidebar) {
@@ -223,6 +262,21 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, SidebarInDarkMode) {
       ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   StageSidebar();
   SaveWindowScreenshot(browser(), "sidebar-dark");
+}
+
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       TheNarrowSidebarLeavesTheWindowButtonsOnTheTint) {
+  StageSidebar();
+  CheckTheNarrowSidebar("sidebar-collapsed");
+}
+
+// Run with pnpm run window-tests. macOS draws the buttons only in a real
+// window.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       MANUAL_TheNarrowSidebarInARealWindow) {
+  StageSidebar();
+  CheckTheNarrowSidebar("sidebar-collapsed-real-window");
+  SaveNativeWindowScreenshot(browser(), "sidebar-collapsed-native");
 }
 
 // The new button at the right end of the foot replaces Chromium's "+" under
