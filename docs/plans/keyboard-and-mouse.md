@@ -57,7 +57,7 @@ Agreed on 2026-10-19 as T122. uw keeps its own list of keys, so the same code ca
 - The keys are the same in every profile and workspace.
 - Settings search finds a command by name. Help → Keyboard Shortcuts… opens the section, and so will the command bar.
 - A key recorded from the [command bar](command-bar.md#aliases-and-recorded-keys) lands in the same list.
-- The section waits for a design.
+- The design is drawn on the canvas page "Keyboard and mouse", in the frames "Keyboard shortcuts: settings" and "Keyboard shortcuts: every state". It waits for the user's sign-off.
 
 ### New child tab
 
