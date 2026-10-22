@@ -124,7 +124,7 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
     return;
   }
   if (command >= kGoToWorkspace1 && command <= kPreviousWorkspace) {
-    WorkspaceWindow::From(window)->Switch(WorkspaceFor(window, command)->id);
+    WorkspaceWindow::From(window)->Slide(WorkspaceFor(window, command)->id);
     return;
   }
   PrefService* prefs = window->GetProfile()->GetPrefs();

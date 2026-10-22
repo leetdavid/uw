@@ -74,6 +74,11 @@ class WorkspaceWindow : public views::WidgetObserver {
   // that shows it. Its partner for `id` opens on the first switch, once the
   // profile has loaded.
   void Switch(std::string_view id, WindowCallback shown = {});
+  // Switches to workspace `id` as a key or a click asks: with the sidebar's
+  // slide when the window has one, and at once otherwise.
+  void Slide(std::string_view id);
+  // The sidebar's slide, which ends in Switch. Null takes it away.
+  void SetSlide(base::RepeatingCallback<void(const std::string&)> slide);
   // Gives `found` this group's window for workspace `id`, opened hidden if
   // there is none yet.
   void WithPartner(std::string_view id, WindowCallback found);
@@ -151,6 +156,7 @@ class WorkspaceWindow : public views::WidgetObserver {
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       widget_observation_{this};
   base::RepeatingClosureList changes_;
+  base::RepeatingCallback<void(const std::string&)> slide_;
   ui::ScopedUnownedUserData<WorkspaceWindow> user_data_;
   base::WeakPtrFactory<WorkspaceWindow> weak_factory_{this};
 };

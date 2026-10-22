@@ -3,6 +3,7 @@
 
 #include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 
+#include <tuple>
 #include <utility>
 
 #include "base/auto_reset.h"
@@ -69,7 +70,73 @@ const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   return shown ? WorkspaceList::Get().Find(shown->workspace()) : nullptr;
 }
 
+// Lays `row` out as the name row: the emoji, then the name, which takes the
+// rest.
+std::pair<views::Label*, views::Label*> AddLabels(views::View* row) {
+  auto* layout = row->SetLayoutManager(std::make_unique<views::FlexLayout>());
+  layout->SetOrientation(views::LayoutOrientation::kHorizontal);
+  layout->SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
+  layout->SetInteriorMargin(gfx::Insets::VH(0, kInset));
+  row->SetPreferredSize(gfx::Size(0, kHeight));
+
+  const gfx::FontList base;
+  auto* icon = row->AddChildView(std::make_unique<views::Label>());
+  icon->SetFontList(base.DeriveWithSizeDelta(kIconSize - base.GetFontSize()));
+  icon->SetElideBehavior(gfx::NO_ELIDE);
+  icon->SetBackgroundColor(SK_ColorTRANSPARENT);
+  icon->SetSubpixelRenderingEnabled(false);
+  icon->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 0, kGap));
+
+  auto* name = row->AddChildView(std::make_unique<views::Label>());
+  name->SetFontList(base.DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
+  name->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  name->SetElideBehavior(gfx::ELIDE_TAIL);
+  name->SetBackgroundColor(SK_ColorTRANSPARENT);
+  name->SetSubpixelRenderingEnabled(false);
+  name->SetProperty(
+      views::kFlexBehaviorKey,
+      views::FlexSpecification(views::LayoutOrientation::kHorizontal,
+                               views::MinimumFlexSizeRule::kScaleToZero,
+                               views::MaximumFlexSizeRule::kUnbounded));
+  return {icon, name};
+}
+
+void ColorName(views::Label* name, const ui::ColorProvider* colors) {
+  name->SetEnabledColor(SkColorSetA(
+      colors->GetColor(kColorTabForegroundInactiveFrameActive), kNameAlpha));
+}
+
+// A name row that only shows a workspace.
+class NameRowLook : public views::View {
+  METADATA_HEADER(NameRowLook, views::View)
+
+ public:
+  explicit NameRowLook(const WorkspaceList::Workspace& workspace) {
+    auto [icon, name] = AddLabels(this);
+    icon->SetText(base::UTF8ToUTF16(workspace.icon));
+    name->SetText(base::UTF8ToUTF16(workspace.name));
+    name_ = name;
+  }
+
+  // views::View:
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    ColorName(name_, GetColorProvider());
+  }
+
+ private:
+  raw_ptr<views::Label> name_ = nullptr;
+};
+
+BEGIN_METADATA(NameRowLook)
+END_METADATA
+
 }  // namespace
+
+std::unique_ptr<views::View> MakeNameRowLook(std::string_view id) {
+  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
+  return workspace ? std::make_unique<NameRowLook>(*workspace) : nullptr;
+}
 
 DEFINE_USER_DATA(WorkspaceNameRow);
 
@@ -88,38 +155,13 @@ WorkspaceNameRow* WorkspaceNameRow::From(BrowserWindowInterface* window) {
 
 WorkspaceNameRow::WorkspaceNameRow(BrowserWindowInterface* window)
     : window_(window), user_data_(window->GetUnownedUserDataHost(), *this) {
-  auto* layout = SetLayoutManager(std::make_unique<views::FlexLayout>());
-  layout->SetOrientation(views::LayoutOrientation::kHorizontal);
-  layout->SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
-  layout->SetInteriorMargin(gfx::Insets::VH(0, kInset));
-  SetPreferredSize(gfx::Size(0, kHeight));
-
-  const gfx::FontList base;
-  icon_ = AddChildView(std::make_unique<views::Label>());
-  icon_->SetFontList(base.DeriveWithSizeDelta(kIconSize - base.GetFontSize()));
-  icon_->SetElideBehavior(gfx::NO_ELIDE);
-  icon_->SetBackgroundColor(SK_ColorTRANSPARENT);
-  icon_->SetSubpixelRenderingEnabled(false);
-  icon_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 0, kGap));
-
-  const gfx::FontList bold = base.DeriveWithWeight(gfx::Font::Weight::SEMIBOLD);
-  name_ = AddChildView(std::make_unique<views::Label>());
-  name_->SetFontList(bold);
-  name_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  name_->SetElideBehavior(gfx::ELIDE_TAIL);
-  name_->SetBackgroundColor(SK_ColorTRANSPARENT);
-  name_->SetSubpixelRenderingEnabled(false);
-  name_->SetProperty(
-      views::kFlexBehaviorKey,
-      views::FlexSpecification(views::LayoutOrientation::kHorizontal,
-                               views::MinimumFlexSizeRule::kScaleToZero,
-                               views::MaximumFlexSizeRule::kUnbounded));
+  std::tie(icon_, name_) = AddLabels(this);
 
   field_ = AddChildView(std::make_unique<RenameField>(base::BindRepeating(
       &WorkspaceNameRow::EndRename, base::Unretained(this), true)));
   field_->SetController(this);
   field_->SetVisible(false);
-  field_->SetFontList(bold);
+  field_->SetFontList(name_->font_list());
   field_->SetTextColorId(kColorMenuCardText);
   field_->SetBackgroundColor(kColorMenuCardBackground);
   field_->SetBorder(views::CreatePaddedBorder(
@@ -174,9 +216,7 @@ bool WorkspaceNameRow::OnMousePressed(const ui::MouseEvent& event) {
 
 void WorkspaceNameRow::OnThemeChanged() {
   views::View::OnThemeChanged();
-  name_->SetEnabledColor(SkColorSetA(
-      GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive),
-      kNameAlpha));
+  ColorName(name_, GetColorProvider());
 }
 
 bool WorkspaceNameRow::HandleKeyEvent(views::Textfield* sender,

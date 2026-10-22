@@ -14,12 +14,14 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/font_list.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -34,6 +36,7 @@
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/workspaces/card_bubble.h"
 #include "uw/browser/ui/views/workspaces/workspace_cards.h"
+#include "uw/browser/ui/views/workspaces/workspace_swipe.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
@@ -102,6 +105,14 @@ class WorkspaceIcon : public views::Button {
     SchedulePaint();
   }
 
+  // While the sidebar slides, the switcher draws the current fill instead.
+  void SetFillMoved(bool moved) {
+    if (fill_moved_ != moved) {
+      fill_moved_ = moved;
+      SchedulePaint();
+    }
+  }
+
   // views::Button:
   void PaintButtonContents(gfx::Canvas* canvas) override {
     const ui::ColorProvider* colors = GetColorProvider();
@@ -117,8 +128,10 @@ class WorkspaceIcon : public views::Button {
     const SkColor fill =
         colors->GetColor(kColorNewTabButtonCRBackgroundFrameActive);
     if (current_) {
-      flags.setColor(fill);
-      canvas->DrawRoundRect(bounds, kRadius, flags);
+      if (!fill_moved_) {
+        flags.setColor(fill);
+        canvas->DrawRoundRect(bounds, kRadius, flags);
+      }
     } else if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
       flags.setColor(SkColorSetA(
           fill, static_cast<SkAlpha>(SkColorGetA(fill) * kHoverFill)));
@@ -167,6 +180,7 @@ class WorkspaceIcon : public views::Button {
   const bool current_;
   const bool dot_;
   bool ringed_ = false;
+  bool fill_moved_ = false;
 };
 
 BEGIN_METADATA(WorkspaceIcon)
@@ -206,7 +220,64 @@ WorkspaceSwitcher::WorkspaceSwitcher(BrowserWindowInterface* window)
 }
 
 WorkspaceSwitcher::~WorkspaceSwitcher() {
+  swipe_.reset();
   card_.reset();
+}
+
+void WorkspaceSwitcher::SetSlide(const std::string& to, float amount) {
+  slide_to_ = to;
+  slide_amount_ = amount;
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+  if (auto* current = views::AsViewClass<WorkspaceIcon>(
+          shown ? IconFor(shown->workspace()) : nullptr)) {
+    current->SetFillMoved(!to.empty() && IconFor(to));
+  }
+  SchedulePaint();
+}
+
+void WorkspaceSwitcher::AddedToWidget() {
+  // The sidebar that holds the switcher is the one that swipes.
+  swipe_.reset();
+  BrowserView* browser_view = nullptr;
+  VerticalTabStripRegionView* region = nullptr;
+  for (views::View* view = parent(); view; view = view->parent()) {
+    if (!region) {
+      region = views::AsViewClass<VerticalTabStripRegionView>(view);
+    }
+    browser_view = views::AsViewClass<BrowserView>(view);
+    if (browser_view) {
+      break;
+    }
+  }
+  if (region && browser_view) {
+    swipe_ = std::make_unique<WorkspaceSwipe>(window_, browser_view, region);
+  }
+}
+
+void WorkspaceSwitcher::OnPaint(gfx::Canvas* canvas) {
+  views::View::OnPaint(canvas);
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+  views::View* from = shown ? IconFor(shown->workspace()) : nullptr;
+  views::View* to = slide_to_.empty() ? nullptr : IconFor(slide_to_);
+  if (!from || !to) {
+    return;
+  }
+  // The current fill glides toward the other workspace's icon, under the
+  // icons, which draw on their own layers.
+  const gfx::RectF a(from->bounds());
+  const gfx::RectF b(to->bounds());
+  const auto between = [this](float start, float end) {
+    return gfx::Tween::FloatValueBetween(slide_amount_, start, end);
+  };
+  cc::PaintFlags flags;
+  flags.setAntiAlias(true);
+  flags.setColor(
+      GetColorProvider()->GetColor(kColorNewTabButtonCRBackgroundFrameActive));
+  canvas->DrawRoundRect(
+      gfx::RectF(between(a.x(), b.x()), between(a.y(), b.y()),
+                 between(a.width(), b.width()),
+                 between(a.height(), b.height())),
+      kRadius, flags);
 }
 
 void WorkspaceSwitcher::ShowNewWorkspaceCard() {
@@ -267,7 +338,7 @@ void WorkspaceSwitcher::Rebuild() {
         base::BindRepeating(
             [](BrowserWindowInterface* window, const std::string& id) {
               if (WorkspaceWindow* shown = WorkspaceWindow::From(window)) {
-                shown->Switch(id);
+                shown->Slide(id);
               }
             },
             window_, workspace.id),

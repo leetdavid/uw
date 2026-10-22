@@ -5,6 +5,7 @@
 #define UW_BROWSER_UI_VIEWS_WORKSPACES_WORKSPACE_NAME_ROW_H_
 
 #include <memory>
+#include <string_view>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
@@ -69,6 +70,10 @@ class WorkspaceNameRow : public views::View, public views::TextfieldController {
   base::CallbackListSubscription window_subscription_;
   ui::ScopedUnownedUserData<WorkspaceNameRow> user_data_;
 };
+
+// Workspace `id`'s emoji and name as the name row shows them, with no
+// renaming. The sidebar's slide shows it for a window with no picture yet.
+std::unique_ptr<views::View> MakeNameRowLook(std::string_view id);
 
 }  // namespace uw
 

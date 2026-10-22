@@ -27,6 +27,14 @@ void PaintTint(gfx::Canvas* canvas,
                SkColor color,
                const PrefService& prefs);
 
+// While the sidebar of `window` slides to another workspace, its tint fades
+// toward the one `color` and `prefs` give, by `amount` from 0 to 1. Zero
+// ends it. `prefs` must last as long as the blend.
+void SetTintBlend(const views::View* window,
+                  SkColor color,
+                  const PrefService* prefs,
+                  float amount);
+
 // Draws the edge of the page card, which holds `toolbar` and `page`: a 1px
 // line just outside it, where it crosses `view`. Draws nothing in fullscreen
 // or when the edge color is transparent.

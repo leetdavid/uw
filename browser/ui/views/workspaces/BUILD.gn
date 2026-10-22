@@ -1,6 +1,6 @@
 # The workspace switcher at the sidebar's foot, the name row under the pins,
-# the workspace cards, and Move to Workspace in a tab's menu. See
-# docs/plans/workspaces.md.
+# the slide between workspaces, the workspace cards, and Move to Workspace in a
+# tab's menu. See docs/plans/workspaces.md.
 source_set("workspaces") {
   sources = [
     "card_bubble.cc",
@@ -13,11 +13,15 @@ source_set("workspaces") {
     "workspace_cards.h",
     "workspace_name_row.cc",
     "workspace_name_row.h",
+    "workspace_swipe.cc",
+    "workspace_swipe.h",
+    "workspace_swipe_mac.mm",
     "workspace_switcher.cc",
     "workspace_switcher.h",
     "workspace_text.cc",
     "workspace_text.h",
   ]
+  frameworks = [ "AppKit.framework" ]
   public_deps = [
     "//base",
     "//ui/base/unowned_user_data",
@@ -38,11 +42,14 @@ source_set("workspaces") {
     "//components/strings",
     "//components/tabs:public",
     "//components/vector_icons",
+    "//components/viz/common",
+    "//skia",
     "//third_party/icu",
     "//ui/base",
     "//ui/base/emoji",
     "//ui/color",
     "//ui/compositor",
+    "//ui/events",
     "//ui/gfx",
     "//uw/browser/tab_organization",
     "//uw/browser/ui/look",
@@ -56,7 +63,11 @@ source_set("workspaces") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "workspace_views_browsertest.cc" ]
+  sources = [
+    "workspace_swipe_browsertest.mm",
+    "workspace_views_browsertest.cc",
+  ]
+  frameworks = [ "AppKit.framework" ]
   deps = [
     ":workspaces",
     "//base",
@@ -75,7 +86,10 @@ source_set("browser_tests") {
     "//content/test:test_support",
     "//testing/gtest",
     "//ui/base",
+    "//ui/compositor",
     "//ui/events",
+    "//ui/events:test_support",
+    "//ui/gfx",
     "//ui/menus",
     "//ui/views",
     "//ui/views:test_support",

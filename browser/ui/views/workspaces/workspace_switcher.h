@@ -27,6 +27,7 @@ class Widget;
 namespace uw {
 
 class CardBubble;
+class WorkspaceSwipe;
 
 // The workspaces in the middle of the sidebar's foot: an icon for each, the
 // one this window shows on the tint's fill. A click switches to it and a
@@ -58,6 +59,11 @@ class WorkspaceSwitcher : public views::View,
   // Asks before deleting workspace `id`, over the page.
   void ShowDeleteCard(const std::string& id);
 
+  // While the sidebar slides toward workspace `to`, the current icon's fill
+  // glides toward its icon by `amount`, from 0 to 1. An empty `to` puts it
+  // back.
+  void SetSlide(const std::string& to, float amount);
+
   views::Button* IconFor(std::string_view id);
   // The card or menu that is open, if any.
   views::Widget* card() { return card_.get(); }
@@ -65,6 +71,10 @@ class WorkspaceSwitcher : public views::View,
   base::WeakPtr<WorkspaceSwitcher> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }
+
+  // views::View:
+  void AddedToWidget() override;
+  void OnPaint(gfx::Canvas* canvas) override;
 
   // views::ContextMenuController:
   void ShowContextMenuForViewImpl(
@@ -84,6 +94,9 @@ class WorkspaceSwitcher : public views::View,
   std::string ringed_;
   std::unique_ptr<views::Widget> card_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
+  std::unique_ptr<WorkspaceSwipe> swipe_;
+  std::string slide_to_;
+  float slide_amount_ = 0;
   base::CallbackListSubscription list_subscription_;
   base::CallbackListSubscription window_subscription_;
   ui::ScopedUnownedUserData<WorkspaceSwitcher> user_data_;

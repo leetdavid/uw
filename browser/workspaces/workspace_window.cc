@@ -167,6 +167,19 @@ void WorkspaceWindow::Switch(std::string_view id, WindowCallback shown) {
                       std::move(shown)));
 }
 
+void WorkspaceWindow::Slide(std::string_view id) {
+  if (slide_) {
+    slide_.Run(std::string(id));
+    return;
+  }
+  Switch(id);
+}
+
+void WorkspaceWindow::SetSlide(
+    base::RepeatingCallback<void(const std::string&)> slide) {
+  slide_ = std::move(slide);
+}
+
 void WorkspaceWindow::WithPartner(std::string_view id, WindowCallback found) {
   if (id == workspace_) {
     std::move(found).Run(window_);

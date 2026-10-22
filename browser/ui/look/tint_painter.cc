@@ -6,9 +6,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <numbers>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
@@ -85,13 +87,22 @@ void PaintGrain(gfx::Canvas* canvas,
   canvas->DrawRect(view->GetLocalBounds(), flags);
 }
 
-}  // namespace
+struct Blend {
+  SkColor color;
+  raw_ptr<const PrefService> prefs;
+  float amount;
+};
 
-void PaintTint(gfx::Canvas* canvas,
-               const views::View* view,
-               const views::View* window,
-               SkColor color,
-               const PrefService& prefs) {
+std::map<const views::View*, Blend>& Blends() {
+  static base::NoDestructor<std::map<const views::View*, Blend>> blends;
+  return *blends;
+}
+
+void PaintSheet(gfx::Canvas* canvas,
+                const views::View* view,
+                const views::View* window,
+                SkColor color,
+                const PrefService& prefs) {
   const Tint tint = TintFrom(color);
   const double across = std::sin(kAngle);
   const double down = -std::cos(kAngle);
@@ -129,6 +140,35 @@ void PaintTint(gfx::Canvas* canvas,
     PaintWindowButtonDots(canvas, view, kDarkTextOnTint);
   }
 #endif
+}
+
+}  // namespace
+
+void PaintTint(gfx::Canvas* canvas,
+               const views::View* view,
+               const views::View* window,
+               SkColor color,
+               const PrefService& prefs) {
+  PaintSheet(canvas, view, window, color, prefs);
+  const auto blend = Blends().find(window);
+  if (blend == Blends().end()) {
+    return;
+  }
+  canvas->SaveLayerAlpha(
+      static_cast<uint8_t>(std::lround(blend->second.amount * 255)));
+  PaintSheet(canvas, view, window, blend->second.color, *blend->second.prefs);
+  canvas->Restore();
+}
+
+void SetTintBlend(const views::View* window,
+                  SkColor color,
+                  const PrefService* prefs,
+                  float amount) {
+  if (!prefs || amount <= 0) {
+    Blends().erase(window);
+    return;
+  }
+  Blends()[window] = {color, prefs, std::min(amount, 1.0f)};
 }
 
 void PaintPageCardEdge(gfx::Canvas* canvas,
