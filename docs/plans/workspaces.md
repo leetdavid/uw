@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, started on 2026-10-22 after its design was approved.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -43,13 +43,18 @@ Chosen by uw for T129 on 2026-10-21.
 
 ## How the live pin page works
 
-Chosen by uw for T133 on 2026-10-22. The prototype is built; the hazed view and the rest wait for the build stage.
+Chosen by uw for T133 on 2026-10-22, and built the same day.
 
-- Each pin has one live page in its profile. Every other window's tab for the pin holds a placeholder: a page with the live page's history and no renderer, as Chromium's discarded tabs have.
-- Selecting a placeholder moves the live page into that tab and leaves a placeholder where it was. The pages swap inside the two windows' own tabs with `TabStripModel::DiscardWebContents`, the call Chromium's tab discarding uses, so no sidebar gains or loses a tile.
-- Before a closing window asks its pages whether it may close, its live pin pages move to `PinPages` in `browser/pins`. It keeps them, and their profile, alive until a window takes one. A window that opens takes them at once. When uw quits, the session keeps the page in its window instead.
+- Each pin has one live page in its profile. Every other window's tab for the pin holds a placeholder: a page with the live page's history and no renderer, as Chromium's discarded tabs have. Its tile shows the live page's title and icon, refreshed a moment after the live page changes them or navigates.
+- Selecting a placeholder moves the live page into that tab and leaves a placeholder where it was. The pages swap inside the two windows' own tabs with `TabStripModel::DiscardWebContents`, the call Chromium's tab discarding uses, so no sidebar gains or loses a tile. Two quick selections move it twice and leave one live page.
+- Over a selected placeholder, `InactivePinOverlay` in `browser/ui/views/pins` draws the design's hazed view: a picture of the page taken as it last left a window on screen, blurred and dimmed, with "Open here" in the middle. A click anywhere on it brings the live page.
+- A navigation that starts in a placeholder, such as Reload or Back, stops there, brings the live page over, and runs in it, so no second copy loads.
+- Showing a hidden workspace window brings in the live page of its selected pin when the page sits in the window that just went behind it, or in no window. `WorkspaceWindow::ObserveReveals` says when.
+- Before a closing window asks its pages whether it may close, its live pin pages move to `PinPages` in `browser/pins`. It keeps them, and their profile, alive until a window takes one, the profile is deleted, or uw quits. A new window takes them at once, and so does a window Cmd+Shift+T brings back. When uw quits, the session keeps the page in its window instead, so a page that asks before it is left still asks then.
+- Each placeholder saves `uw.pin_placeholder` in the session file beside `uw.pin`. A restart, or Cmd+Shift+T, brings it back as a placeholder before it loads, and so does a copy whose live page another window already holds, such as the second copy in a session saved before T133. Cmd+Shift+T keeps both keys, so a window it brings back has its pins, not new ones.
 - Unpinning a placeholder closes it, and the live page stays a regular tab where it is, or opens in its place when no window has it.
-- Chromium's `HandleBeforeClose` hook and the profile's new keep-alive reason are in the `uw-live-pins` patch.
+- The `HandleBeforeClose` hook and the profile's new keep-alive reason are in the `uw-live-pins` patch. Restoring placeholders is in `tab-tree`, and keeping the keys through Cmd+Shift+T in `uw-workspaces`.
+- Built differently from the design: the picture is of the page, so a light page stays light under the dark haze. In dark mode the pill takes the dark card's field color, `#171717` on uw's black. "Open here" is not yet in Chromium's string files, so it is not translated.
 
 ## How workspace windows work
 
