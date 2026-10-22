@@ -38,12 +38,13 @@
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/color/color_provider.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
-#include "ui/color/color_provider.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/image_button.h"
+#include "ui/views/controls/image_view.h"
 #include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_utils.h"
@@ -248,6 +249,16 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
         pixels.getColor(static_cast<int>((toolbar.x() + 40) * scale),
                         static_cast<int>((toolbar.y() - 3) * scale));
     EXPECT_NE(above_card, view->GetColorProvider()->GetColor(kColorToolbar));
+
+    // The task's row shows its folder and no sliver of its name.
+    TabGroupHeaderView* row = RowOf(Task());
+    ASSERT_TRUE(row);
+    for (views::View* child : row->children()) {
+      if (child->GetVisible() && !child->bounds().IsEmpty()) {
+        EXPECT_TRUE(views::IsViewClass<views::ImageView>(child))
+            << child->GetClassName() << " " << child->bounds().ToString();
+      }
+    }
     SaveWindowScreenshot(browser(), screenshot);
   }
 };

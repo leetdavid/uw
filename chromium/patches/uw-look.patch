@@ -161,7 +161,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
  
  SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
-index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790c521753b 100644
+index cfaf18f54f721f3f4bf0eb438454e3e41f963728..9030dcf61443b283bda756d3f8646c84a4bc0b8a 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_header_view.cc
 @@ -9,6 +9,7 @@
@@ -190,7 +190,21 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
  
  views::ScrollView* GetScrollView(views::View* view) {
    views::View* ancestor = view;
-@@ -169,6 +174,28 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -124,6 +129,13 @@ class TabGroupHeaderLabel : public views::Label {
+     SetElideBehavior(gfx::FADE_TAIL);
+     SetAutoColorReadabilityEnabled(false);
+   }
++
++  // uw: a name with no room for two letters, as in the collapsed sidebar,
++  // goes rather than showing a sliver of its first one.
++  gfx::Size GetMinimumSize() const override {
++    return gfx::Size(font_list().GetExpectedTextWidth(2),
++                     views::Label::GetMinimumSize().height());
++  }
+ };
+ 
+ BEGIN_METADATA(TabGroupHeaderLabel)
+@@ -169,6 +181,28 @@ TabGroupHeaderView::TabGroupHeaderView(
        editor_bubble_tracker_.RegisterOnBubbleClosed(base::BindRepeating(
            &TabGroupHeaderView::OnBubbleClosed, base::Unretained(this)));
  
@@ -219,7 +233,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
    SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
    SetInteriorMargin(gfx::Insets::VH(0, kGroupHeaderHorizontalInset));
    SetDefault(views::kFlexBehaviorKey,
-@@ -199,7 +226,7 @@ TabGroupHeaderView::TabGroupHeaderView(
+@@ -199,7 +233,7 @@ TabGroupHeaderView::TabGroupHeaderView(
          views::kFlexBehaviorKey,
          views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
                                   views::MaximumFlexSizeRule::kPreferred));
@@ -228,7 +242,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
    }
  
    sync_icon_->SetProperty(views::kMarginsKey,
-@@ -265,6 +292,12 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
+@@ -265,6 +299,12 @@ gfx::Size TabGroupHeaderView::CalculatePreferredSize(
  }
  
  bool TabGroupHeaderView::OnKeyPressed(const ui::KeyEvent& event) {
@@ -241,7 +255,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
    if ((event.key_code() == ui::VKEY_SPACE ||
         event.key_code() == ui::VKEY_RETURN) &&
        !delegate_->IsGroupFocused()) {
-@@ -327,6 +360,11 @@ bool TabGroupHeaderView::OnMouseDragged(const ui::MouseEvent& event) {
+@@ -327,6 +367,11 @@ bool TabGroupHeaderView::OnMouseDragged(const ui::MouseEvent& event) {
  void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
    delegate_->CancelHeaderDrag();
  
@@ -253,7 +267,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
    bool open_editor_bubble =
        event.IsRightMouseButton() && !editor_bubble_tracker_.is_open();
    bool toggle_collapse =
-@@ -338,6 +376,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -338,6 +383,13 @@ void TabGroupHeaderView::OnMouseReleased(const ui::MouseEvent& event) {
      views::ElementTrackerViews::GetInstance()->NotifyViewActivated(
          kTabGroupHeaderElementId, this);
    }
@@ -267,7 +281,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
  }
  
  void TabGroupHeaderView::OnGestureEvent(ui::GestureEvent* event) {
-@@ -388,9 +433,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
+@@ -388,9 +440,13 @@ void TabGroupHeaderView::OnMouseEntered(const ui::MouseEvent& event) {
      delegate_->HideHoverCard(TabSlotController::HoverCardUpdateType::kHover);
    }
    UpdateEditorBubbleButtonVisibility();
@@ -281,7 +295,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
  #if BUILDFLAG(IS_LINUX)
    // Bypasses the synchronous IsMouseHovered() check which can be stale on Linux
    // Wayland/X11 due to asynchronous cursor updates during mouse exit events.
-@@ -527,18 +576,26 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -527,18 +583,26 @@ void TabGroupHeaderView::OnDataChanged(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
      SkColor foreground_color = GetForegroundColor();
@@ -310,7 +324,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
      }
      if (tab_group_visual_data_.is_collapsed() && needs_attention_) {
        attention_indicator_->SetVisible(true);
-@@ -557,16 +614,12 @@ void TabGroupHeaderView::OnDataChanged(
+@@ -557,16 +621,12 @@ void TabGroupHeaderView::OnDataChanged(
  
      // Update collapse icon.
      if (collapse_icon_) {
@@ -331,7 +345,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
      }
  
      // Update background.
-@@ -627,6 +680,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
+@@ -627,6 +687,15 @@ void TabGroupHeaderView::UpdateAttentionState(bool needs_attention) {
    UpdateAccessibleName();
  }
  
@@ -347,7 +361,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
  void TabGroupHeaderView::UpdateAccessibleName() {
    if (features::IsTabGroupHoverCardsEnabled()) {
      GetViewAccessibility().SetName(tab_groups::GetHoverCardAccessibilityText(
-@@ -673,6 +735,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
+@@ -673,6 +742,10 @@ void TabGroupHeaderView::UpdateAccessibleName() {
  
  SkColor TabGroupHeaderView::GetForegroundColor() const {
    if (GetColorProvider()) {
@@ -358,7 +372,7 @@ index cfaf18f54f721f3f4bf0eb438454e3e41f963728..d2e93c93f2606410780bb380a7b37790
      SkColor background_color = GetColorProvider()->GetColor(
          GetTabGroupTabStripColorId(tab_group_visual_data_.color(),
                                     GetWidget()->ShouldPaintAsActive()));
-@@ -716,6 +782,9 @@ void TabGroupHeaderView::SetEditorBubbleButtonVisibilityOnHover(
+@@ -716,6 +789,9 @@ void TabGroupHeaderView::SetEditorBubbleButtonVisibilityOnHover(
    editor_bubble_button_->SetVisible(delegate_->IsGroupFocused() ||
                                      editor_bubble_tracker_.is_open() ||
                                      is_hovered);
