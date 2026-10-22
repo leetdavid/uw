@@ -6,7 +6,9 @@ source_set("workspaces") {
     "workspace_list.h",
     "workspace_window.cc",
     "workspace_window.h",
+    "workspace_window_mac.mm",
   ]
+  frameworks = [ "AppKit.framework" ]
   public_deps = [
     "//base",
     "//chrome/browser/profiles:profile_util",
@@ -25,6 +27,7 @@ source_set("workspaces") {
     "//chrome/common",
     "//components/prefs",
     "//ui/base",
+    "//ui/gfx",
     "//url",
   ]
 }

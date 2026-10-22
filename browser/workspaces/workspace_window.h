@@ -46,6 +46,9 @@ class WorkspaceWindow {
   ~WorkspaceWindow();
 
   static WorkspaceWindow* From(BrowserWindowInterface* window);
+  // Whether `window` is a workspace window kept hidden behind its partner.
+  // Its restored tabs load once it shows.
+  static bool IsHidden(BrowserWindowInterface* window);
 
   // Called once the window is built and its session tracks it.
   void Start();
@@ -109,6 +112,10 @@ class WorkspaceWindow {
   // Puts this window where the group's shown window is, shows it, and hides
   // that one.
   void Reveal();
+  // Hides the window's pages with it, so they neither load nor draw while it
+  // is behind its partner. macOS counts a page in a window that is only
+  // ordered out as visible.
+  void SetHidden(bool hidden);
   void OpenPartner(const std::string& id,
                    WindowCallback found,
                    Profile* profile);

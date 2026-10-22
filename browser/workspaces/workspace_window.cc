@@ -36,6 +36,7 @@
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/core/tab_restore_types.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
@@ -123,6 +124,12 @@ WorkspaceWindow* WorkspaceWindow::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;
 }
 
+// static
+bool WorkspaceWindow::IsHidden(BrowserWindowInterface* window) {
+  const WorkspaceWindow* self = From(window);
+  return self && self->hidden_;
+}
+
 std::vector<WorkspaceWindow*> WorkspaceWindow::Partners() const {
   std::vector<WorkspaceWindow*> partners;
   for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
@@ -187,7 +194,7 @@ void WorkspaceWindow::Restore(
     if (std::string group = Find(extra_data, kGroupKey); !group.empty()) {
       self->group_ = std::move(group);
     }
-    self->hidden_ = Find(extra_data, kHiddenKey) == "true";
+    self->SetHidden(Find(extra_data, kHiddenKey) == "true");
   } else {
     // The window of a deleted workspace comes back on its own.
     self->workspace_ = WorkspaceList::Get().FirstFor(window->GetProfile()).id;
@@ -199,7 +206,7 @@ void WorkspaceWindow::Restore(
   if (!self->hidden_) {
     for (WorkspaceWindow* partner : self->Partners()) {
       if (!partner->hidden_) {
-        partner->hidden_ = true;
+        partner->SetHidden(true);
         partner->SaveSession();
         partner->window_->GetWindow()->Hide();
       }
@@ -264,14 +271,18 @@ void WorkspaceWindow::Reveal() {
       shown = partner;
     }
   }
-  hidden_ = false;
+  SetHidden(false);
   SaveSession();
   if (shown) {
     window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
   }
   window_->GetWindow()->Show();
+  if (content::WebContents* active =
+          window_->GetTabStripModel()->GetActiveWebContents()) {
+    active->GetController().LoadIfNecessary();
+  }
   if (shown) {
-    shown->hidden_ = true;
+    shown->SetHidden(true);
     shown->SaveSession();
     shown->window_->GetWindow()->Hide();
   }
@@ -299,7 +310,7 @@ void WorkspaceWindow::OpenPartner(const std::string& id,
   }
   partner->workspace_ = id;
   partner->group_ = group_;
-  partner->hidden_ = true;
+  partner->SetHidden(true);
   partner->SaveSession();
   partner->changes_.Notify();
   NavigateParams new_tab(opened, GURL(chrome::kChromeUINewTabURL),

@@ -35,7 +35,7 @@ index c8d07e45c8bfa88e2e63bab68f14ffe3f02ad456..fbeef2e0873119888726fc625e3bdebb
  
      if (is_mac) {
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index 31cc627e9a6f978367e994a44e39ff94d80908d4..9387ccb39605c48c200a54b25e57532e358c5d2f 100644
+index 31cc627e9a6f978367e994a44e39ff94d80908d4..92b2f4c500e6e9f4935c83ed1ada7f53cb82f80a 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
 @@ -113,6 +113,7 @@
@@ -46,7 +46,20 @@ index 31cc627e9a6f978367e994a44e39ff94d80908d4..9387ccb39605c48c200a54b25e57532e
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/constants/ash_features.h"
-@@ -1332,6 +1333,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1132,7 +1133,11 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     RestoredTab restored_tab(web_contents, is_selected_tab,
+                              tab.extension_app_id.empty(), tab.pinned,
+                              new_group, tab.split_id);
+-    restored_tabs.push_back(restored_tab);
++    // uw: a hidden workspace window loads its tabs once it shows, not in the
++    // background.
++    if (!uw::WorkspaceWindow::IsHidden(browser)) {
++      restored_tabs.push_back(restored_tab);
++    }
+ 
+     if (tab.split_id) {
+       // add tab to tabs_by_split_id.
+@@ -1332,6 +1337,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
      base::TimeTicks now = base::TimeTicks::Now();
      BrowserWindowInterface* browser_window =
          CreateBrowserWindow(std::move(params));
@@ -56,7 +69,7 @@ index 31cc627e9a6f978367e994a44e39ff94d80908d4..9387ccb39605c48c200a54b25e57532e
              InitialWebUIWindowMetricsManager::From(browser_window)) {
        manager->SetWindowCreationInfo(
 diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
-index d80d6550e73ccd088505e8dd00350cf5002caea9..cfd35897356140cb1fc3731681b19e276c0712b0 100644
+index d80d6550e73ccd088505e8dd00350cf5002caea9..508c8424a4f93eb5a5347e8cb777afd53a606b26 100644
 --- a/chrome/browser/ui/browser_live_tab_context.cc
 +++ b/chrome/browser/ui/browser_live_tab_context.cc
 @@ -61,6 +61,7 @@
@@ -78,7 +91,18 @@ index d80d6550e73ccd088505e8dd00350cf5002caea9..cfd35897356140cb1fc3731681b19e27
    return data;
  }
  
-@@ -523,6 +528,7 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+@@ -402,6 +407,10 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
+ 
+   CHECK(web_contents);
+ 
++  // uw: a hidden workspace window loads its tabs once it shows.
++  if (uw::WorkspaceWindow::IsHidden(browser)) {
++    return sessions::ContentLiveTab::GetOrCreateForWebContents(web_contents);
++  }
+   if (performance_manager::policies::CanScheduleLoadForRestoredTabs()) {
+     performance_manager::policies::ScheduleLoadForRestoredTabs({web_contents});
+   } else {
+@@ -523,6 +532,7 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
  
    Browser* browser = CreateBrowserWindow(std::move(*create_params))
                           ->GetBrowserForMigrationOnly();

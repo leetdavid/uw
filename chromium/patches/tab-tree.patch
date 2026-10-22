@@ -415,19 +415,42 @@ index 2e7510e..54b0c39 100644
        ":browser_actions",
        ":browser_select_file_dialog_controller",
 diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
-index c8e946c19e0bfdc5d932532a7413ce5ce861283b..77ea44a1df6f6a92c46c4d003f89ff282419f96a 100644
+index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f6288a7d6de3cbd42271c54de3986b53c8dd9e02 100644
 --- a/chrome/browser/ui/browser_tabrestore.cc
 +++ b/chrome/browser/ui/browser_tabrestore.cc
-@@ -3,6 +3,8 @@
+@@ -3,6 +3,9 @@
  // found in the LICENSE file.
  
  #include "chrome/browser/ui/browser_tabrestore.h"
 +#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/workspaces/workspace_window.h"
  
  #include <map>
  #include <memory>
-@@ -291,9 +293,12 @@ WebContents* AddRestoredTab(
+@@ -220,7 +223,10 @@ WebContents* AddRestoredTabImpl(std::unique_ptr<WebContents> web_contents,
+   }
+   raw_web_contents->Resize(gfx::Rect(size));
+ 
+-  const bool initially_hidden = !select || browser->GetWindow()->IsMinimized();
++  // uw: a hidden workspace window loads its tabs once it shows.
++  const bool initially_hidden = !select ||
++                                browser->GetWindow()->IsMinimized() ||
++                                uw::WorkspaceWindow::IsHidden(browser);
+   if (initially_hidden) {
+     raw_web_contents->WasHidden();
+   } else {
+@@ -285,15 +291,21 @@ WebContents* AddRestoredTab(
+     const std::map<std::string, std::string>& extra_data,
+     bool from_session_restore,
+     std::optional<bool> is_active_browser) {
+-  const bool initially_hidden = !select || browser->GetWindow()->IsMinimized();
++  // uw: a hidden workspace window loads its tabs once it shows.
++  const bool initially_hidden = !select ||
++                                browser->GetWindow()->IsMinimized() ||
++                                uw::WorkspaceWindow::IsHidden(browser);
+   std::unique_ptr<WebContents> web_contents = CreateRestoredTab(
+       browser, navigations, selected_navigation, extension_app_id,
        last_active_time_ticks, last_active_time, session_storage_namespace,
        user_agent_override, extra_data, initially_hidden, from_session_restore);
  
@@ -443,7 +466,7 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..77ea44a1df6f6a92c46c4d003f89ff28
  }
  
  WebContents* ReplaceRestoredTab(
-@@ -319,6 +324,9 @@ WebContents* ReplaceRestoredTab(
+@@ -319,6 +331,9 @@ WebContents* ReplaceRestoredTab(
        insertion_index + 1, std::move(web_contents),
        AddTabTypes::ADD_ACTIVE | AddTabTypes::ADD_INHERIT_OPENER,
        tab_strip->GetTabGroupForTab(insertion_index));

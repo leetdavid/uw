@@ -28,11 +28,15 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/base_window.h"
+#include "ui/base/page_transition_types.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/rect.h"
@@ -49,6 +53,8 @@ namespace {
 constexpr char kForm[] = "data:text/html,<input id=field>";
 constexpr char kNotes[] = "chrome://version/?notes";
 constexpr char kArticle[] = "chrome://version/?article";
+constexpr char kLater[] = "chrome://version/?later";
+constexpr char kAside[] = "chrome://version/?aside";
 constexpr char kOtherProfile[] = "Other";
 constexpr NSEventModifierFlags kOptionCmd =
     NSEventModifierFlagOption | NSEventModifierFlagCommand;
@@ -101,6 +107,36 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
 
   static void Load(BrowserWindowInterface* window, const GURL& url) {
     ASSERT_TRUE(content::NavigateToURL(PageOf(window), url));
+  }
+
+  static void AddBackgroundTab(BrowserWindowInterface* window,
+                               const GURL& url) {
+    NavigateParams params(window, url, ui::PAGE_TRANSITION_LINK);
+    params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+    Navigate(&params);
+    ASSERT_TRUE(
+        content::WaitForLoadStop(params.navigated_or_inserted_contents));
+  }
+
+  static content::WebContents* TabOf(BrowserWindowInterface* window,
+                                     const GURL& url) {
+    TabStripModel* tabs = window->GetTabStripModel();
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetVisibleURL() == url) {
+        return tabs->GetWebContentsAt(i);
+      }
+    }
+    return nullptr;
+  }
+
+  static GURL Committed(content::WebContents* contents) {
+    return contents->GetPrimaryMainFrame()->GetLastCommittedURL();
+  }
+
+  // Whether a restored tab has started to load its page.
+  static bool Started(content::WebContents* contents) {
+    return contents->GetController().GetPendingEntry() ||
+           !Committed(contents).is_empty();
   }
 
   static std::vector<BrowserWindowInterface*> Windows() {
@@ -403,6 +439,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                                     WorkspaceWindow::From(behind)));
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
+  EXPECT_FALSE(Started(PageOf(behind)));
 }
 
 // Including a window of it that closed before it went.
@@ -464,10 +501,12 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
       profile(), SessionStartupPref(SessionStartupPref::LAST));
   const std::string reading = AddWorkspace("Reading", profile());
   Load(browser(), GURL(kNotes));
+  AddBackgroundTab(browser(), GURL(kLater));
   WorkspaceWindow::From(browser())->Switch(reading);
   BrowserWindowInterface* partner = WaitForShown(browser(), reading);
   ASSERT_TRUE(partner);
   Load(partner, GURL(kArticle));
+  AddBackgroundTab(partner, GURL(kAside));
   // Lets the session take the windows' data before the browser quits.
   base::RunLoop().RunUntilIdle();
 }
@@ -498,10 +537,30 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
 
-  // Switching back shows the restored window, with no third one.
+  // The shown window's background tab loads, as Chromium loads restored
+  // tabs. The hidden window's tabs wait until it shows.
+  content::WebContents* aside = TabOf(shown, GURL(kAside));
+  ASSERT_TRUE(aside);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return Committed(aside) == GURL(kAside); }));
+  content::WebContents* notes = TabOf(behind, GURL(kNotes));
+  content::WebContents* later = TabOf(behind, GURL(kLater));
+  ASSERT_TRUE(notes && later);
+  EXPECT_FALSE(Started(notes));
+  EXPECT_FALSE(Started(later));
+
+  // Switching back shows the restored window, with no third one, and loads
+  // its tab. Its other tab loads once selected.
   WorkspaceWindow::From(shown)->Switch(personal);
   EXPECT_EQ(WaitForShown(shown, personal), behind);
   EXPECT_EQ(Windows().size(), 2u);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return Committed(notes) == GURL(kNotes); }));
+  EXPECT_FALSE(Started(later));
+  TabStripModel* tabs = behind->GetTabStripModel();
+  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(later));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return Committed(later) == GURL(kLater); }));
 }
 
 }  // namespace
