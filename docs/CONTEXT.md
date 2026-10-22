@@ -170,18 +170,24 @@ An organization mode in which the user accepts or rejects task proposals while r
 A global suspension of automatic tab placement and task proposals. Manual organization and explicitly requested reorganization remain available.
 
 **Scheduled chat**:
-A chat uw starts again on a schedule, such as every morning at 9, to check pages or carry out a request. Watching a page for changes is one use.
-_Avoid_: Page watch, routine.
+A chat uw runs again on a schedule, such as every morning at 9, to carry out the same request, such as checking a price or looking for news. It need not be about one page.
+_Avoid_: Page watch, watch, routine.
+
+**Watched page**:
+A page that a scheduled chat checks. The page shows that it is watched, and watching a page is how the user starts a scheduled chat from it.
+_Avoid_: Page watch, tracked page.
 
 **Catch-up run**:
 A single run of a scheduled chat after uw becomes available following missed scheduled runs.
 _Avoid_: Catch-up check.
 
-**Condition-based alert**:
-A notification that a scheduled chat found a result matching the user's condition.
+**Change alert**:
+A notification that a run of a scheduled chat found what the user asked to hear about, such as a lower price or a new story.
+_Avoid_: Condition-based alert.
 
-**Scheduled summary**:
-A report from one or more scheduled chats, delivered on a chosen schedule.
+**Regular update**:
+A notification after every run of a scheduled chat, saying what the run found.
+_Avoid_: Scheduled summary, digest.
 
 **Chat**:
 A conversation with uw's built-in agent, which may browse for the user to answer or carry out a request. Its page is a regular tab, and the tabs the agent opens are child tabs beneath it.

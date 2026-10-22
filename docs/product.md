@@ -204,24 +204,24 @@ The [agent chats plan](plans/agent-chats.md) has the full scope, releases, and s
 
 Agreed on 2026-10-14: a page watch is a [scheduled chat](CONTEXT.md#language). The watch rules below carry over to every scheduled chat. A step that needs approval waits and sends a notification.
 
-Let users choose a page, describe what to watch, and set a schedule. Support daily, weekly, and specific-time schedules with an explicit timezone.
+Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need not be about one page. Watching a page starts one from that page, which becomes a [watched page](CONTEXT.md#language). Support daily, weekly, and specific-time schedules with an explicit timezone.
 
-Agreed use case: check sites for updates, such as price changes.
+Agreed use cases: track a price on a page, look for news on a topic, and send a regular update.
 
 Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
 
-Agreed reporting: let users choose a mode per watch.
+Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of two ways.
 
 | Mode | Behavior |
 | --- | --- |
-| Condition-based alerts, default | Notify when the user's condition matches. |
-| Scheduled summaries | Report watched-page updates on a chosen schedule. Summaries can cover multiple watched pages. |
+| [Change alerts](CONTEXT.md#language), default | Notify when a run finds what the user asked to hear about. A run that finds nothing new stays in the chat's history, unless "Tell me even when nothing changes" is on; then it sends a short "No change" with the time it checked. |
+| [Regular updates](CONTEXT.md#language) | Notify after every run with what it found. |
 
-Agreed delivery: keep results and history in uw. Send native macOS notifications for matching alerts and scheduled summaries. Let users mute notifications per watch while checks and history continue.
+A summary that combines several scheduled chats comes later.
 
-In alert mode, successful checks with no matching result stay in watch history without interrupting the user.
+Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue.
 
-Agreed availability: watches continue while the uw app is running, even with all windows closed. Quitting uw stops checks. After checks are missed because uw was quit or the Mac was asleep or off, run one catch-up check when uw can next run. Show the actual check time.
+Agreed availability: scheduled chats run while the uw app is running, even with all windows closed. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 
 Other proposed behavior:
 
