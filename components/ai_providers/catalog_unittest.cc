@@ -201,6 +201,21 @@ TEST(CatalogTest, TheCatalogSaysWhichModelsSeeImages) {
                   .sees_images);
 }
 
+TEST(CatalogTest, TheCatalogSaysWhichModelsCanStopThinking) {
+  const std::optional<ModelCatalog> catalog =
+      ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  EXPECT_TRUE(catalog->For(Preset(ProviderPreset::kOpenRouter), "x/switch-only")
+                  .toggles_thinking);
+  EXPECT_FALSE(
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-5").toggles_thinking);
+  const std::optional<ModelCatalog> saved =
+      ModelCatalog::FromSaved(catalog->ToSaved());
+  ASSERT_TRUE(saved);
+  EXPECT_TRUE(saved->For(Custom("https://api.deepseek.com"), "deepseek-v4-pro")
+                  .toggles_thinking);
+}
+
 TEST(CatalogTest, TheSavedCopyReadsBackTheSame) {
   const std::optional<ModelCatalog> catalog =
       ModelCatalog::FromModelsDev(kApiJson);

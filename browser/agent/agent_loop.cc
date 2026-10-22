@@ -368,7 +368,7 @@ void AgentLoop::CheckStep(ModelTurn turn,
   check_->args = std::move(args);
   check_->approval = std::move(approval);
   check_->file_only = input.file_only;
-  check_->client = SendCommandCheck(
+  check_->client = CommandCheck::Send(
       *profile_, model_.connection, model_.api_key, input,
       base::BindOnce(&AgentLoop::OnCheck, weak_factory_.GetWeakPtr()));
   if (!check_->client) {

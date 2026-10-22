@@ -63,10 +63,18 @@ class ShellHost {
     bool at_prompt = false;
     // A line is read without being shown, as a password prompt reads one.
     bool password = false;
+    // A program other than the shell has the terminal and reads keys one at
+    // a time, as `ssh -t` does for a whole session. A password prompt on the
+    // other machine then shows only in the program's text.
+    bool program_reads_keys = false;
     // The program that has the terminal. Empty while the shell has it.
     std::string program;
   };
   Activity CurrentActivity() const;
+
+  // Whether `line`, where the cursor waits, asks for a password or a
+  // passphrase, as `[sudo] password for admin:` does.
+  static bool IsPasswordPrompt(std::string_view line);
 
   // The folder the shell is in. Empty when it cannot be read.
   base::FilePath Folder() const;

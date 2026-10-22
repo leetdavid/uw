@@ -22,6 +22,8 @@ struct ModelAbilities {
   // The effort levels the model takes, named as its provider names them.
   // Empty when it takes none.
   std::vector<std::string> efforts;
+  // Whether its thinking can be switched off, as the catalog's toggle says.
+  bool toggles_thinking = false;
 };
 
 // The levels of a model the catalog does not know, over chat completions.

@@ -29,6 +29,7 @@
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/environment_internal.h"
 #include "base/process/kill.h"
+#include "base/strings/string_util.h"
 
 namespace uw {
 namespace {
@@ -257,10 +258,25 @@ ShellHost::Activity ShellHost::CurrentActivity() const {
   // with echo off.
   const bool lines = settings.c_lflag & ICANON;
   const bool echo = settings.c_lflag & ECHO;
-  activity.at_prompt = tcgetpgrp(terminal_.get()) == shell_.Pid() && !lines;
+  const pid_t foreground = tcgetpgrp(terminal_.get());
+  activity.at_prompt = foreground == shell_.Pid() && !lines;
   activity.password = lines && !echo;
+  activity.program_reads_keys =
+      foreground > 0 && foreground != shell_.Pid() && !lines;
   activity.program = RunningCommand().value_or(std::string());
   return activity;
+}
+
+// static
+bool ShellHost::IsPasswordPrompt(std::string_view line) {
+  const std::string_view asked =
+      base::TrimWhitespaceASCII(line, base::TRIM_TRAILING);
+  if (!asked.ends_with(':')) {
+    return false;
+  }
+  const std::string lower = base::ToLowerASCII(asked);
+  return lower.find("password") != std::string::npos ||
+         lower.find("passphrase") != std::string::npos;
 }
 
 base::FilePath ShellHost::Folder() const {

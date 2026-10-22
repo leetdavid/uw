@@ -71,6 +71,12 @@ class ModelTestServer {
   void AnswerAbout(const std::string& path,
                    const std::string& text,
                    std::string body);
+  // Serves `body` at `path` with an error status to a request whose own body
+  // holds `text`. Comes before Answer().
+  void FailAbout(const std::string& path,
+                 const std::string& text,
+                 int status,
+                 std::string body);
   // Serves `body` at `path` with an error status.
   void Fail(const std::string& path, int status, std::string body);
   // Never answers `path`, like a model that takes its time.

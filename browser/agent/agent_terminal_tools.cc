@@ -48,6 +48,8 @@ constexpr base::TimeDelta kQuickCommand = base::Milliseconds(500);
 constexpr base::TimeDelta kStartLimit = base::Minutes(1);
 // How long keys wait for a program to answer them.
 constexpr base::TimeDelta kKeysLimit = base::Seconds(5);
+// What Ctrl-C sends.
+constexpr char kCtrlC[] = "\x03";
 // Long output keeps this many lines of its start and of its end.
 constexpr size_t kHeadLines = 50;
 constexpr size_t kTailLines = 150;
@@ -162,7 +164,7 @@ std::string PasswordError(int number) {
   return base::StrCat(
       {"A program in tab ", base::NumberToString(number),
        " waits for a password. Only the user types passwords; uw asked them "
-       "to type it in that tab."});
+       "to type it in that tab. To cancel it, send Ctrl-C alone with keys."});
 }
 
 std::string BusyError(int number, const ShellHost::Activity& activity) {
@@ -495,7 +497,8 @@ void AgentTools::OnActivity(ShellHost::Activity activity) {
                 "first."));
       return;
     }
-    if (activity.password) {
+    // Ctrl-C alone cancels a password prompt; nothing else reaches one.
+    if (activity.password && !(wait.keys && wait.bytes == kCtrlC)) {
       FinishWait(Error(PasswordError(wait.tab)));
       return;
     }

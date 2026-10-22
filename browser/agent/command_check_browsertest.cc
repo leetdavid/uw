@@ -101,7 +101,7 @@ IN_PROC_BROWSER_TEST_F(CommandCheckBrowserTest, MANUAL_JudgesTheExamples) {
       std::optional<CommandCheckAnswer> answer;
       base::RunLoop loop;
       const base::TimeTicks start = base::TimeTicks::Now();
-      std::unique_ptr<RemoteModelClient> client = SendCommandCheck(
+      std::unique_ptr<CommandCheck> client = CommandCheck::Send(
           *browser()->GetProfile(), chat, var("UW_CHECK_KEY"), input,
           base::BindLambdaForTesting(
               [&](std::optional<CommandCheckAnswer> got) {

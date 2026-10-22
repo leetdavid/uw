@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -56,6 +57,10 @@ class UwTerminalHandler : public mojom::TerminalHandler,
   base::TimeTicks last_output() const override;
 
  private:
+  // Adds a password prompt that shows only in its text.
+  void OnActivity(base::OnceCallback<void(ShellHost::Activity)> done,
+                  ShellHost::Activity activity);
+
   const raw_ptr<content::WebContents> contents_;
   mojo::Remote<mojom::TerminalPage> page_;
   mojo::Receiver<mojom::TerminalHandler> receiver_;
@@ -63,6 +68,7 @@ class UwTerminalHandler : public mojom::TerminalHandler,
   // The page draws the shell's output and has not said it is done.
   bool drawing_ = false;
   base::TimeTicks last_output_;
+  base::WeakPtrFactory<UwTerminalHandler> weak_factory_{this};
 };
 
 }  // namespace uw

@@ -22,11 +22,11 @@
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
+#include "uw/browser/agent/command_check.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
-#include "uw/components/agent/command_check.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/connectors/connector_tools.h"
@@ -238,7 +238,7 @@ class AgentLoop {
     base::DictValue args;
     AgentTools::Approval approval;
     bool file_only = false;
-    std::unique_ptr<RemoteModelClient> client;
+    std::unique_ptr<CommandCheck> client;
   };
   std::unique_ptr<Check> check_;
   int turns_ = 0;

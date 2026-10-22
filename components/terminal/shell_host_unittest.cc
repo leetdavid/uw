@@ -208,7 +208,7 @@ TEST_F(ShellHostTest, TellsThePromptACommandAndAPasswordPromptApart) {
   Type(*shell, "sleep 300\n");
   EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
     return !activity.at_prompt && !activity.password &&
-           activity.program == "sleep";
+           !activity.program_reads_keys && activity.program == "sleep";
   }));
   Type(*shell, "\x03");
   EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
@@ -216,7 +216,8 @@ TEST_F(ShellHostTest, TellsThePromptACommandAndAPasswordPromptApart) {
   // zsh's own read, so no other program has the terminal.
   Type(*shell, "read -s secret\n");
   EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
-    return !activity.at_prompt && activity.password;
+    return !activity.at_prompt && activity.password &&
+           !activity.program_reads_keys;
   }));
   Type(*shell, "hunter2\n");
   EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
@@ -224,10 +225,25 @@ TEST_F(ShellHostTest, TellsThePromptACommandAndAPasswordPromptApart) {
   Type(*shell, "vi\n");
   EXPECT_TRUE(WaitForActivity(*shell, [](const ShellHost::Activity& activity) {
     return !activity.at_prompt && !activity.password &&
-           !activity.program.empty();
+           activity.program_reads_keys && !activity.program.empty();
   }));
   Type(*shell, "\x1b:q!\n");
   EXPECT_TRUE(WaitForActivity(*shell, at_prompt));
+}
+
+// A program that reads keys one at a time, as ssh -t does, hides a prompt on
+// the other machine, so its text tells.
+TEST(ShellHostPromptTest, APasswordPromptReadsAsOne) {
+  EXPECT_TRUE(ShellHost::IsPasswordPrompt("[sudo] password for admin: "));
+  EXPECT_TRUE(ShellHost::IsPasswordPrompt("(admin@vm) Password:"));
+  EXPECT_TRUE(ShellHost::IsPasswordPrompt(
+      "Enter passphrase for key '/Users/a/.ssh/id_ed25519': "));
+  EXPECT_TRUE(
+      ShellHost::IsPasswordPrompt("Password for 'https://a@github.com':"));
+  EXPECT_FALSE(ShellHost::IsPasswordPrompt("admin@vm ~ % "));
+  EXPECT_FALSE(ShellHost::IsPasswordPrompt("Verification code: "));
+  EXPECT_FALSE(ShellHost::IsPasswordPrompt("Your password was changed."));
+  EXPECT_FALSE(ShellHost::IsPasswordPrompt(""));
 }
 
 TEST_F(ShellHostTest, CtrlCInterruptsARunningCommand) {

@@ -56,14 +56,17 @@ std::string Trimmed(const GURL& address) {
   return spec;
 }
 
-// One model of api.json as uw keeps it. Only named effort levels count.
+// One model of api.json as uw keeps it. Only named effort levels and the
+// thinking toggle count.
 base::DictValue Abilities(const base::DictValue& model) {
   base::ListValue efforts;
+  bool toggle = false;
   if (const base::ListValue* options = model.FindList("reasoning_options")) {
     for (const base::Value& option : *options) {
       const base::DictValue* dict = option.GetIfDict();
       const std::string* type = dict ? dict->FindString("type") : nullptr;
       const base::ListValue* values = dict ? dict->FindList("values") : nullptr;
+      toggle |= type && *type == "toggle";
       if (type && *type == "effort" && values) {
         for (const base::Value& value : *values) {
           if (value.is_string()) {
@@ -79,7 +82,8 @@ base::DictValue Abilities(const base::DictValue& model) {
       .Set("tools", model.FindBool("tool_call").value_or(true))
       .Set("images",
            !inputs || std::ranges::contains(*inputs, base::Value("image")))
-      .Set("efforts", std::move(efforts));
+      .Set("efforts", std::move(efforts))
+      .Set("toggle", toggle);
 }
 
 }  // namespace
@@ -190,6 +194,7 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
   ModelAbilities abilities;
   abilities.calls_tools = known->FindBool("tools").value_or(true);
   abilities.sees_images = known->FindBool("images").value_or(true);
+  abilities.toggles_thinking = known->FindBool("toggle").value_or(false);
   if (const base::ListValue* efforts = known->FindList("efforts")) {
     for (const base::Value& effort : *efforts) {
       if (effort.is_string()) {

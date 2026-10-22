@@ -296,6 +296,49 @@ TEST(FormatsTest, AnEffortTakesEachFormatsOwnField) {
       "low");
 }
 
+// A model that takes effort "none" gets it; one with a thinking toggle gets
+// its provider's switch; Anthropic thinks only when asked.
+TEST(FormatsTest, ThinkingTurnsOffInEachProvidersOwnField) {
+  constexpr char kAsk[] =
+      R"({"model": "m", "messages": [{"role": "user", "content": "Go"}]})";
+  ModelAbilities none;
+  none.efforts = {"none", "low", "high"};
+  ModelAbilities toggle;
+  toggle.efforts = {"low", "high", "max"};
+  toggle.toggles_thinking = true;
+  ModelAbilities neither;
+  neither.efforts = {"low", "medium", "high"};
+
+  EXPECT_EQ(*Parsed(WithoutThinking(kAsk, ProviderPreset::kOpenAi,
+                                    ProviderFormat::kOpenAiResponses, none))
+                 .FindString("reasoning_effort"),
+            "none");
+  EXPECT_EQ(*Parsed(WithoutThinking(kAsk, ProviderPreset::kOpenRouter,
+                                    ProviderFormat::kChatCompletions, none))
+                 .FindStringByDottedPath("reasoning.effort"),
+            "none");
+  EXPECT_EQ(*Parsed(WithoutThinking(kAsk, ProviderPreset::kCustom,
+                                    ProviderFormat::kChatCompletions, toggle))
+                 .FindStringByDottedPath("thinking.type"),
+            "disabled");
+  EXPECT_EQ(Parsed(WithoutThinking(kAsk, ProviderPreset::kVercelAiGateway,
+                                   ProviderFormat::kChatCompletions, toggle))
+                .FindBoolByDottedPath("reasoning.enabled"),
+            false);
+  EXPECT_EQ(*Parsed(WithoutThinking(kAsk, ProviderPreset::kOllama,
+                                    ProviderFormat::kChatCompletions, toggle))
+                 .FindString("reasoning_effort"),
+            "none");
+  EXPECT_EQ(WithoutThinking(kAsk, ProviderPreset::kAnthropic,
+                            ProviderFormat::kAnthropicMessages, neither),
+            kAsk);
+
+  EXPECT_FALSE(WithoutThinking(kAsk, ProviderPreset::kCustom,
+                               ProviderFormat::kChatCompletions, neither));
+  EXPECT_FALSE(WithoutThinking(kAsk, ProviderPreset::kOpenAi,
+                               ProviderFormat::kOpenAiResponses, toggle));
+}
+
 TEST(FormatsTest, ALimitCarriesOver) {
   constexpr char kNaming[] = R"({"model": "m", "max_tokens": 4096,
     "messages": [{"role": "user", "content": "Name it"}]})";

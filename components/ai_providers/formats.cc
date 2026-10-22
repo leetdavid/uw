@@ -3,6 +3,7 @@
 
 #include "uw/components/ai_providers/formats.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -485,6 +486,34 @@ std::string WithEffort(std::string_view chat_body,
     chat->Set("reasoning_effort", effort);
   }
   return Write(*chat).value_or(std::string(chat_body));
+}
+
+std::optional<std::string> WithoutThinking(std::string_view chat_body,
+                                           ProviderPreset preset,
+                                           ProviderFormat format,
+                                           const ModelAbilities& abilities) {
+  if (format == ProviderFormat::kAnthropicMessages) {
+    return std::string(chat_body);
+  }
+  if (std::ranges::contains(abilities.efforts, "none")) {
+    return WithEffort(chat_body, preset, "none");
+  }
+  std::optional<base::DictValue> chat =
+      base::JSONReader::ReadDict(chat_body, base::JSON_PARSE_RFC);
+  if (!abilities.toggles_thinking || !chat) {
+    return std::nullopt;
+  }
+  if (preset == ProviderPreset::kOpenRouter ||
+      preset == ProviderPreset::kVercelAiGateway) {
+    chat->Set("reasoning", base::DictValue().Set("enabled", false));
+  } else if (preset == ProviderPreset::kOllama) {
+    chat->Set("reasoning_effort", "none");
+  } else if (format == ProviderFormat::kChatCompletions) {
+    chat->Set("thinking", base::DictValue().Set("type", "disabled"));
+  } else {
+    return std::nullopt;
+  }
+  return Write(*chat);
 }
 
 std::optional<std::string> RequestIn(ProviderFormat format,

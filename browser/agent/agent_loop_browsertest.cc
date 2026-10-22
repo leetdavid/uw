@@ -15,6 +15,7 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
@@ -37,6 +38,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/terminal/terminal_shell.h"
@@ -648,8 +650,9 @@ IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
 }
 
 // A program that asks for a password after the agent went on takes no keys
-// from the agent.
-IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest, KeysNeverGoToAPasswordPrompt) {
+// from the agent but Ctrl-C alone, which cancels it.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       OnlyCtrlCReachesAPasswordPrompt) {
   const base::DictValue left =
       CallTool("run", base::DictValue()
                           .Set("command", "sleep 0.5 && read -rs secret")
@@ -669,6 +672,53 @@ IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest, KeysNeverGoToAPasswordPrompt) {
 
   EXPECT_THAT(*keyed.FindString("error"), HasSubstr("waits for a password"));
   EXPECT_TRUE(ActivityOf(terminal).password);
+
+  const base::DictValue cancelled =
+      CallTool("keys", base::DictValue().Set("tab", 1).Set(
+                           "keys", base::ListValue().Append("Ctrl-C")));
+  EXPECT_FALSE(cancelled.FindString("error")) << cancelled.DebugString();
+  EXPECT_TRUE(WaitFor(terminal, [](const ShellHost::Activity& activity) {
+    return activity.at_prompt && !activity.password;
+  }));
+}
+
+// A program that reads keys one at a time, as ssh -t does for a whole
+// session, hides a password prompt on the other machine. Its text shows it,
+// so the agent types nothing there but Ctrl-C.
+IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
+                       APasswordPromptIsReadFromItsText) {
+  const base::DictValue left = CallTool(
+      "run", base::DictValue()
+                 .Set("command",
+                      "sleep 0.5 && sh -c 'stty raw -echo; printf \"[sudo] "
+                      "password for admin: \"; head -c 1 >/dev/null; stty "
+                      "sane'")
+                 .Set("wait", 0));
+  ASSERT_EQ(left.FindBool("running"), true) << left.DebugString();
+  content::WebContents* terminal =
+      agent_->tools().OpenTabs().at(1)->GetContents();
+  ASSERT_TRUE(WaitFor(terminal, [](const ShellHost::Activity& activity) {
+    return activity.password && activity.program_reads_keys;
+  }));
+
+  const base::DictValue keyed =
+      CallTool("keys", base::DictValue()
+                           .Set("tab", 1)
+                           .Set("text", "guess")
+                           .Set("keys", base::ListValue().Append("Enter")));
+  EXPECT_THAT(*keyed.FindString("error"), HasSubstr("waits for a password"));
+  const base::DictValue screen =
+      CallTool("screen", base::DictValue().Set("tab", 1));
+  EXPECT_EQ(screen.FindBool("password"), true) << screen.DebugString();
+
+  const base::DictValue cancelled =
+      CallTool("keys", base::DictValue().Set("tab", 1).Set(
+                           "keys", base::ListValue().Append("Ctrl-C")));
+  EXPECT_FALSE(cancelled.FindString("error")) << cancelled.DebugString();
+  EXPECT_TRUE(WaitFor(terminal, [](const ShellHost::Activity& activity) {
+    return activity.at_prompt && !activity.password;
+  }));
+  EXPECT_THAT(ScreenOf(terminal), Not(HasSubstr("guess")));
 }
 
 // Stop ends the wait at once; the command keeps running in its tab.
@@ -927,6 +977,91 @@ IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, StopDropsACheckUnderWay) {
 }
 
 // Without a decision or language model, the chat's own model checks.
+// The language model checks commands, with thinking off where the catalog
+// says how. It answers under /v1/check, apart from the agent's model.
+class AgentLanguageCheckBrowserTest : public AgentTerminalBrowserTest {
+ protected:
+  static constexpr char kCheckPath[] = "/v1/check/chat/completions";
+
+  void SetUpOnMainThread() override {
+    AgentTerminalBrowserTest::SetUpOnMainThread();
+    PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Check";
+    provider.address = embedded_test_server()->GetURL("/v1/check").spec();
+    provider.format = ProviderFormat::kChatCompletions;
+    provider.id = AddProvider(prefs, provider);
+    provider.key_account = KeyAccountFor(provider.id);
+    ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, "check-key"));
+    UpdateProvider(prefs, provider);
+    SetChoice(prefs, ModelSlot::kLanguage, provider.id, "check-model");
+    // The catalog says the model can switch its thinking off.
+    checks_.Answer(
+        "/v1/catalog.json",
+        base::StrCat({R"({"checker": {"api": ")", provider.address,
+                      R"(", "models": {"check-model": {"reasoning_options":)"
+                      R"( [{"type": "toggle"}]}}}})"}));
+    CatalogStore::SetSourceForTesting(
+        embedded_test_server()->GetURL("/v1/catalog.json"));
+    checks_.Answer(kCheckPath,
+                   ChatAnswer(R"({\"danger\": \"safe\", \"confidence\": )"
+                              R"(0.95, \"reason\": \"\", \"file\": )"
+                              R"(\"none\", \"file_confidence\": 0.99})"));
+    agent_->SetApprover(base::BindLambdaForTesting(
+        [this](AgentTools::Approval approval,
+               base::OnceCallback<void(AgentLoop::ApprovalAnswer)> answer) {
+          asked_.push_back(std::move(approval));
+          std::move(answer).Run(AgentLoop::ApprovalAnswer());
+        }));
+    model_.Script(
+        {ScriptedModel::Calls(Run(base::DictValue().Set("command", "echo hi"))),
+         ScriptedModel::Answer("It said hi.")});
+  }
+
+  // The body of each command check so far.
+  std::vector<std::string> Checks() {
+    std::vector<std::string> bodies;
+    for (const ModelRequest& request : checks_.Requests()) {
+      if (request.path == kCheckPath) {
+        bodies.push_back(request.body);
+      }
+    }
+    return bodies;
+  }
+
+  ScopedMemoryKeychain keychain_;
+  ModelTestServer checks_{embedded_test_server()};
+  std::vector<AgentTools::Approval> asked_;
+};
+
+IN_PROC_BROWSER_TEST_F(AgentLanguageCheckBrowserTest,
+                       TheCheckAsksWithThinkingOff) {
+  EXPECT_EQ(Ask("Say hi in a terminal").kind, Kind::kAnswer);
+
+  EXPECT_TRUE(asked_.empty());
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "hi");
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 1u);
+  EXPECT_THAT(checks[0], HasSubstr(R"("thinking":{"type":"disabled"})"));
+}
+
+// A provider that rejects the switch is asked again without it, and the
+// command runs without asking.
+IN_PROC_BROWSER_TEST_F(AgentLanguageCheckBrowserTest,
+                       AProviderThatRejectsTheSwitchIsAskedAgain) {
+  checks_.FailAbout(kCheckPath, R"("thinking":{)", net::HTTP_BAD_REQUEST,
+                    R"({"error": {"message": "Unknown field: thinking"}})");
+
+  EXPECT_EQ(Ask("Say hi in a terminal").kind, Kind::kAnswer);
+
+  EXPECT_TRUE(asked_.empty());
+  EXPECT_EQ(*steps_[0].result.FindString("output"), "hi");
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 2u);
+  EXPECT_THAT(checks[0], HasSubstr(R"("thinking":{)"));
+  EXPECT_THAT(checks[1], Not(HasSubstr(R"("thinking":{)")));
+}
+
 IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
                        WithoutADecisionModelTheChatsModelChecks) {
   std::vector<AgentTools::Approval> asked;

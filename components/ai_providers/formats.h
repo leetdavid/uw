@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 
+#include "uw/components/ai_providers/catalog.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -35,6 +36,19 @@ std::string_view LanguageModelPath(ProviderFormat format);
 // OpenRouter and Vercel's gateway nest it in "reasoning", others take
 // "reasoning_effort". RequestIn turns the latter into Anthropic's and
 // OpenAI's own fields. An empty `effort` leaves the request as it is.
+// Asks the model `abilities` describes, at a provider made from `preset`, to
+// answer over `format` without thinking: with effort "none" when the model
+// takes it, else with the provider's own switch when the catalog says the
+// model has one. That is thinking.type "disabled" over chat completions, as
+// DeepSeek reads it, reasoning.enabled false at OpenRouter and Vercel's
+// gateway, and reasoning_effort "none" at Ollama. Anthropic Messages thinks
+// only when asked to, so its request stays as it is. Nothing when uw knows
+// no way.
+std::optional<std::string> WithoutThinking(std::string_view chat_body,
+                                           ProviderPreset preset,
+                                           ProviderFormat format,
+                                           const ModelAbilities& abilities);
+
 std::string WithEffort(std::string_view chat_body,
                        ProviderPreset preset,
                        std::string_view effort);

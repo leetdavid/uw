@@ -132,6 +132,14 @@ void ModelTestServer::AnswerAbout(const std::string& path,
   answers_about_[{path, text}] = {net::HTTP_OK, std::move(body), std::string()};
 }
 
+void ModelTestServer::FailAbout(const std::string& path,
+                                const std::string& text,
+                                int status,
+                                std::string body) {
+  base::AutoLock hold(lock_);
+  answers_about_[{path, text}] = {status, std::move(body), std::string()};
+}
+
 void ModelTestServer::Fail(const std::string& path,
                            int status,
                            std::string body) {

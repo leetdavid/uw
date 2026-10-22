@@ -26,6 +26,10 @@
 namespace uw {
 namespace {
 
+// Output that has stopped for this long has settled, so the cursor line is
+// what the program waits at.
+constexpr base::TimeDelta kQuiet = base::Milliseconds(250);
+
 // A page asks for the size it measured. Anything else is a mistake.
 int Clamp(int32_t cells) {
   return std::clamp(cells, 1, 1000);
@@ -179,7 +183,27 @@ void UwTerminalHandler::GetActivity(
     std::move(done).Run(ShellHost::Activity());
     return;
   }
-  session_->GetActivity(std::move(done));
+  session_->GetActivity(base::BindOnce(&UwTerminalHandler::OnActivity,
+                                       weak_factory_.GetWeakPtr(),
+                                       std::move(done)));
+}
+
+void UwTerminalHandler::OnActivity(
+    base::OnceCallback<void(ShellHost::Activity)> done,
+    ShellHost::Activity activity) {
+  if (activity.password || !activity.program_reads_keys ||
+      base::TimeTicks::Now() - last_output() < kQuiet) {
+    std::move(done).Run(std::move(activity));
+    return;
+  }
+  page_->Read(-1, base::BindOnce(
+                      [](base::OnceCallback<void(ShellHost::Activity)> done,
+                         ShellHost::Activity activity, const std::string& line,
+                         int cursor_line) {
+                        activity.password = ShellHost::IsPasswordPrompt(line);
+                        std::move(done).Run(std::move(activity));
+                      },
+                      std::move(done), std::move(activity)));
 }
 
 base::TimeTicks UwTerminalHandler::last_output() const {
