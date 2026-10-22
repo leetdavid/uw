@@ -72,7 +72,8 @@ TEST(FormatsTest, AnthropicGetsBlocksAndItsThinkingBack) {
   EXPECT_EQ(request, base::test::ParseJsonDict(R"({
     "model": "a-model",
     "max_tokens": 16000,
-    "system": "Be brief.",
+    "system": [{"type": "text", "text": "Be brief.",
+                "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
     "messages": [
       {"role": "user", "content": [{"type": "text", "text": "Open example.com"}]},
       {"role": "assistant", "content": [
@@ -83,7 +84,8 @@ TEST(FormatsTest, AnthropicGetsBlocksAndItsThinkingBack) {
         {"type": "tool_result", "tool_use_id": "call_1", "content": "{\"ok\":true}"}]}
     ],
     "tools": [{"name": "open", "description": "Opens a page.",
-               "input_schema": {"type": "object"}}]
+               "input_schema": {"type": "object"}}],
+    "cache_control": {"type": "ephemeral"}
   })"));
 }
 
@@ -294,6 +296,20 @@ TEST(FormatsTest, ALimitCarriesOver) {
       Parsed(RequestIn(ProviderFormat::kOpenAiResponses, kNaming, kAddress))
           .FindInt("max_output_tokens"),
       4096);
+}
+
+// A request without tools is sent once, so only its instructions, which the
+// next one repeats, are cached.
+TEST(FormatsTest, AnthropicCachesAOneOffRequestsInstructionsOnly) {
+  constexpr char kCheck[] = R"({"model": "m", "messages": [
+    {"role": "system", "content": "Judge the command."},
+    {"role": "user", "content": "ls"}]})";
+  const base::DictValue request =
+      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, kCheck, kAddress));
+  EXPECT_FALSE(request.Find("cache_control"));
+  EXPECT_EQ(*request.FindList("system"), base::test::ParseJsonList(R"([
+    {"type": "text", "text": "Judge the command.",
+     "cache_control": {"type": "ephemeral", "ttl": "1h"}}])"));
 }
 
 // An image in a user message goes as each format's own image part. A message

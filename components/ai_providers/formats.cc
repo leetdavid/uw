@@ -241,9 +241,18 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
           .Set("max_tokens",
                chat.FindInt("max_tokens").value_or(kAnthropicMaxTokens))
           .Set("messages", std::move(out));
+  // Anthropic caches only what a request marks. The tools and instructions
+  // are the same in every chat, so they stay for an hour.
   if (std::string system = Instructions(messages ? *messages : empty);
       !system.empty()) {
-    request.Set("system", std::move(system));
+    request.Set("system",
+                base::ListValue().Append(
+                    base::DictValue()
+                        .Set("type", "text")
+                        .Set("text", std::move(system))
+                        .Set("cache_control", base::DictValue()
+                                                  .Set("type", "ephemeral")
+                                                  .Set("ttl", "1h"))));
   }
   // An effort level asks the model to think as much as it says.
   if (const std::string* effort = chat.FindString("reasoning_effort")) {
@@ -268,6 +277,9 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
                               : base::DictValue().Set("type", "object")));
     }
     request.Set("tools", std::move(converted));
+    // A chat with tools is the agent's, whose next request repeats this one,
+    // so all of it is cached for a few minutes.
+    request.Set("cache_control", base::DictValue().Set("type", "ephemeral"));
   }
   return request;
 }
