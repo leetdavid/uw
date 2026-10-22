@@ -208,13 +208,15 @@ Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need 
 
 Agreed schedules, on 2026-10-22: every hour or every 2, 3, 4, 6, or 12 hours; every day, or weekdays, at a time; every week on a day at a time; and once at a date and time, after which the chat keeps no schedule. Hourly is the shortest. A schedule follows the Mac's current time zone, shown as a quiet line under Repeat with Change, since most people never change it; one picked with Change stays fixed. 9:00 stays 9:00 across a daylight-saving change. No custom cron syntax. To watch more closely than hourly, use a trigger.
 
-Agreed on 2026-10-22, after Claude Code's background commands and Monitor tool: a [trigger](CONTEXT.md#language) is a command left running out of sight that wakes its chat once when it ends, or once for each line it prints. Lines that come close together are one wake. A trigger that prints too much is stopped, and the chat says so. Triggers do not expire.
+Agreed on 2026-10-22, after Claude Code's background commands and Monitor tool: a [trigger](CONTEXT.md#language) is a command left running out of sight that wakes its chat once when it ends, or once for each line it prints. Lines that come close together are one wake. A trigger that prints too much is stopped, and the chat says so.
 
 | | In a chat | In a scheduled chat |
 | --- | --- | --- |
 | Started by | The agent, under the usual command rules | The user, saving it on the schedule card |
 | A wake | Reaches the agent as a [steer](CONTEXT.md#language) does | Starts a run |
-| Lasts | Until the agent or the user stops it, or uw quits | Until the user removes it; it starts again when uw launches |
+| Lasts | Until the agent or the user stops it, uw quits, or 24 hours pass | Until the user removes it; it starts again when uw launches |
+
+Agreed on 2026-10-22, so a trigger the agent starts in a chat costs little when it is forgotten, with nothing for the user to do: it wakes the chat at most once every 2 minutes, and lines printed in between come with the next wake. After its first hour it wakes at most once every 15 minutes, and each wake is handled as a run by a subagent on the runs model, the one last picked on a schedule card or else the chat's own; that run adds one line and wakes the chat's model, and notifies, only when it finds something worth telling. After 24 hours it stops by itself, and the chat says so and that a schedule card can keep it going. A trigger saved on a schedule card has none of these limits.
 
 Agreed use cases: track a price on a page, look for news on a topic, and send a regular update.
 
