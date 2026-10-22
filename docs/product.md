@@ -233,7 +233,7 @@ A summary that combines several scheduled chats comes later.
 
 Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue.
 
-Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them.
+Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 
 Agreed on 2026-10-22: runs happen out of sight, whether or not a window is open. A run never adds tabs to the user's windows and never touches the user's own tab of a watched page; it opens its own. Its tabs close when it ends, and the chat keeps the answer and a card of each page. Opening the chat, from its notification or the Chats list, shows it in the user's window; a run waiting for approval brings its waiting tab along. A run under way when uw quits is marked "Stopped before it finished".
 
@@ -241,15 +241,14 @@ Agreed on 2026-10-22: a scheduled chat stays one conversation. Each [run](CONTEX
 
 Agreed on 2026-10-22: a run uses its scheduled chat's [approval mode](CONTEXT.md#language), shown on the schedule card, which turns amber for Full auto. One run of a scheduled chat goes at a time. A run waiting for approval waits until the user answers or stops it; the times due meanwhile are skipped, and the chat then says "Skipped 3 runs while this waited for you."
 
-Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go at once, and there is no spending cap. A run uses its chat's model and effort. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
+Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go at once, and there is no spending cap. A run uses its chat's model and effort.
+
+Agreed on 2026-10-22: the model judges whether something happened; uw does no page comparison of its own. A run ends by calling a `report` tool with whether it found what the user asked to hear about, a message, and its tracked values, such as `price: 99 USD`. uw acts only on that: it notifies per the chat's setting, saves the values, and writes the run's line. A run that ends without a report counts as "Didn't finish", never as no change. For runs, these settings replace the notification a chat sends when it answers.
 
 Other proposed behavior:
 
-- Check the page and compare it with the previous successful result.
 - Show the last result, next scheduled run, and any failure.
 - Allow editing, pausing, and deletion.
-
-Use ordinary page comparisons where sufficient and AI when interpretation is needed.
 
 ## Integrations
 
