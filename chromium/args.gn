@@ -6,6 +6,9 @@ is_component_build = false
 # Development checks crash tabs on real sites. See docs/architecture.md.
 dcheck_always_on = false
 enable_dangling_raw_ptr_checks = false
+# H.264 and AAC, the only video formats sites such as x.com serve.
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
 symbol_level = 0
 use_system_xcode = true
 use_remoteexec = false
