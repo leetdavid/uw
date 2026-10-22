@@ -16,7 +16,9 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/logging.h"
 #include "base/run_loop.h"
+#include "base/strings/escape.h"
 #include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
@@ -24,6 +26,7 @@
 #include "base/test/run_until.h"
 #include "base/test/scoped_command_line.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
@@ -2314,5 +2317,67 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
     EXPECT_EQ(text.find(u"Group"), std::u16string::npos) << text;
   }
 }
+
+// Name Task against the user's own language model, DeepSeek's
+// `deepseek-flash`. It runs only with DEEPSEEK_API_KEY set, as `.env.test`
+// sets it, and sends the task's tab titles to DeepSeek. The key stays in the
+// fixture's memory keychain.
+class LiveLanguageModelBrowserTest : public AutomaticOrganizerBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    AutomaticOrganizerBrowserTest::SetUpOnMainThread();
+    host_resolver()->AllowDirectLookup("api.deepseek.com");
+  }
+
+  // Loads a page titled `title` in `tab`.
+  void BrowseTo(tabs::TabInterface* tab, const std::string& title) {
+    Browse(tab, "page?title=" + base::EscapeQueryParamValue(title, true));
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(LiveLanguageModelBrowserTest, NameTaskWithDeepSeek) {
+  const std::string key =
+      base::Environment::Create()->GetVar("DEEPSEEK_API_KEY").value_or("");
+  if (key.empty()) {
+    GTEST_SKIP() << "DEEPSEEK_API_KEY is not set";
+  }
+  Provider provider = PresetProvider(ProviderPreset::kCustom);
+  provider.name = "DeepSeek";
+  provider.address = "https://api.deepseek.com";
+  provider.format = ProviderFormat::kChatCompletions;
+  provider.id = AddProvider(*prefs(), provider);
+  provider.key_account = KeyAccountFor(provider.id);
+  ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, key));
+  UpdateProvider(*prefs(), provider);
+  SetChoice(*prefs(), ModelSlot::kLanguage, provider.id, "deepseek-flash");
+  SetPauseState(prefs(), PauseMode::kIndefinite);
+
+  BrowseTo(InitialTab(), "SFO to LIS flights - Google Flights");
+  tabs::TabInterface* hotels = NewTab();
+  BrowseTo(hotels, "Hotels in Alfama, Lisbon - Booking.com");
+  tabs::TabInterface* food = NewTab();
+  BrowseTo(food, "Pasteis de Belem opening hours");
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask({Id(InitialTab()), Id(hotels), Id(food)},
+                                  u"Stuff");
+  ASSERT_TRUE(task);
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(organizer()->CanAskForName());
+
+  const base::TimeTicks asked = base::TimeTicks::Now();
+  organizer()->AskForName(task->ToString());
+  ASSERT_TRUE(organizer()->IsNaming(task->ToString()));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !organizer()->IsNaming(task->ToString()); }));
+  const std::u16string name = TitleOf(*task);
+  LOG(INFO) << "DeepSeek named the task \"" << name << "\" in "
+            << (base::TimeTicks::Now() - asked).InMilliseconds() << " ms";
+  EXPECT_TRUE(controller()->HasGeneratedName(task->ToString()))
+      << "No name came: " << bar()->card()->page();
+  EXPECT_NE(name, u"Stuff");
+  EXPECT_FALSE(name.empty());
+  EXPECT_LE(name.size(), 60u) << name;
+}
+
 }  // namespace
 }  // namespace uw
