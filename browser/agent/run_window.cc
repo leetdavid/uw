@@ -17,6 +17,7 @@
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
@@ -116,6 +117,20 @@ void CloseRunTabs(tabs::TabInterface& run_tab) {
   for (content::WebContents* contents : closing) {
     tabs->DetachAndDeleteWebContentsAt(tabs->GetIndexOfWebContents(contents));
   }
+}
+
+void BringRunTab(tabs::TabInterface& tab, tabs::TabInterface& next_to) {
+  BrowserWindowInterface* from = tab.GetBrowserWindowInterface();
+  BrowserWindowInterface* to = next_to.GetBrowserWindowInterface();
+  if (!from || !to || from == to || !IsRunWindow(from)) {
+    return;
+  }
+  TabStripModel* source = from->GetTabStripModel();
+  TabStripModel* target = to->GetTabStripModel();
+  target->InsertDetachedTabAt(
+      target->GetIndexOfTab(&next_to) + 1,
+      source->DetachTabAtForInsertion(source->GetIndexOfTab(&tab)),
+      AddTabTypes::ADD_NONE);
 }
 
 }  // namespace uw

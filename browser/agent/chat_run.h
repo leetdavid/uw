@@ -61,6 +61,9 @@ class ChatRun {
   void SetApprover(AgentLoop::Approve approve);
   void Stop();
 
+  // The agent's tab `number`, or null.
+  tabs::TabInterface* TabNumbered(int number);
+
  private:
   void OnStep(const AgentLoop::Step& step);
   base::DictValue OnReport(const base::DictValue& args);

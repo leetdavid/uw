@@ -21,6 +21,7 @@
 #include "mojo/public/cpp/bindings/remote.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_notification.h"
+#include "uw/browser/agent/run_window.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
@@ -296,6 +297,18 @@ void ScheduledChats::Stop(const std::string& chat_id) {
   const auto run = runs_.find(chat_id);
   if (run != runs_.end() && run->second.run) {
     run->second.run->Stop();
+  }
+}
+
+void ScheduledChats::BringWaitingTab(const std::string& chat_id,
+                                     tabs::TabInterface& chat_tab) {
+  const auto run = runs_.find(chat_id);
+  if (run == runs_.end() || !run->second.run || !run->second.step) {
+    return;
+  }
+  if (tabs::TabInterface* tab =
+          run->second.run->TabNumbered(run->second.step->tab)) {
+    BringRunTab(*tab, chat_tab);
   }
 }
 

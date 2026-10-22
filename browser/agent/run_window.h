@@ -23,6 +23,11 @@ tabs::TabInterface* OpenRunTab(Profile* profile);
 // adding them to Recently Closed. The run window closes with its last tab.
 void CloseRunTabs(tabs::TabInterface& run_tab);
 
+// Moves `tab`, a run's tab in the run window, into the window of `next_to`,
+// just after it, without selecting it, so the user sees what a waiting step
+// asks about. It stays there after the run ends.
+void BringRunTab(tabs::TabInterface& tab, tabs::TabInterface& next_to);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_AGENT_RUN_WINDOW_H_

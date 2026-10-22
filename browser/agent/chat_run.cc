@@ -64,6 +64,15 @@ void ChatRun::SetApprover(AgentLoop::Approve approve) {
   }
 }
 
+tabs::TabInterface* ChatRun::TabNumbered(int number) {
+  if (!loop_) {
+    return nullptr;
+  }
+  const std::map<int, tabs::TabInterface*> open = loop_->tools().OpenTabs();
+  const auto tab = open.find(number);
+  return tab == open.end() ? nullptr : tab->second;
+}
+
 void ChatRun::Stop() {
   if (loop_) {
     loop_->Stop();

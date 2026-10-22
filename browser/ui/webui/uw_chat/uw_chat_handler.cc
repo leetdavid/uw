@@ -816,6 +816,19 @@ void UwChatHandler::OnVisibilityChanged(content::Visibility visibility) {
     unread_ = false;
     UpdateIndex();
   }
+  if (visibility == content::Visibility::VISIBLE) {
+    BringWaitingTab();
+  }
+}
+
+void UwChatHandler::BringWaitingTab() {
+  ScheduledChats* chats = schedules_observation_.GetSource();
+  tabs::TabInterface* chat_tab =
+      tabs::TabInterface::MaybeGetFromContents(contents_);
+  if (chats && chat_tab && chats->Waiting(id_) &&
+      contents_->GetVisibility() == content::Visibility::VISIBLE) {
+    chats->BringWaitingTab(id_, *chat_tab);
+  }
 }
 
 void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
@@ -1596,6 +1609,7 @@ void UwChatHandler::SendSchedule() {
   if (step && !run_step_shown_) {
     run_step_shown_ = true;
     page_->OnApproval(PageApproval(*step, /*can_always_allow=*/false));
+    BringWaitingTab();
   } else if (!step) {
     run_step_shown_ = false;
   }

@@ -117,6 +117,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // Tells the page about the chat's schedule and how it stands, and shows a
   // step its run waits on.
   void SendSchedule();
+  // While the chat shows and its run waits for approval, brings the tab the
+  // run waits in next to the chat.
+  void BringWaitingTab();
   // The schedule card's state for `chat`, which runs on `schedule`.
   mojom::ScheduleStatePtr StateOf(const ScheduledChat& chat) const;
   // Gives the agent what the chat's scheduled runs reported, from their

@@ -20,9 +20,15 @@
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
+#include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
+#include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/keep_alive_registry/keep_alive_types.h"
+#include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -242,6 +248,12 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   ASSERT_TRUE(base::test::RunUntil([&] { return chats()->Waiting(kChat); }));
   ASSERT_EQ(Notifications().size(), 1u);
   EXPECT_EQ(Notifications()[0].context_message(), u"Waits for your approval");
+  // Opening the chat brings the tab the step waits in into the user's window.
+  TabStripModel* tabs = browser()->tab_strip_model();
+  chats()->BringWaitingTab(kChat, *tabs->GetActiveTab());
+  ASSERT_EQ(tabs->count(), 2);
+  EXPECT_EQ(tabs->GetWebContentsAt(1)->GetVisibleURL().path(), "/desk");
+  EXPECT_EQ(tabs->active_index(), 0);
 
   AgentLoop::ApprovalAnswer answer;
   answer.choice = AgentLoop::ApprovalAnswer::Choice::kDecline;
@@ -250,6 +262,32 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
 
   ASSERT_EQ(lines.size(), 1u);
   EXPECT_EQ(*lines[0].GetDict().FindString("end"), "reported");
+  // It stays with the user after the run ends.
+  EXPECT_EQ(tabs->count(), 2);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {
+  SaveChat();
+  const std::string provider = ProviderId();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/desk"))))),
+       Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  ScheduledChats* chats = this->chats();
+  Profile* profile = this->profile();
+  {
+    // Until the schedule's own keep-alive holds the profile.
+    ScopedKeepAlive keep_alive(KeepAliveOrigin::SESSION_RESTORE,
+                               KeepAliveRestartOption::DISABLED);
+    ScopedProfileKeepAlive profile_keep_alive(
+        profile, ProfileKeepAliveOrigin::kBrowserWindow);
+    CloseBrowserSynchronously(browser());
+    chats->Save(kChat, DeskWatch(provider));
+  }
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats->Running(kChat); }));
+  ASSERT_EQ(chats->Find(kChat)->recent.size(), 1u);
+  EXPECT_EQ(chats->Find(kChat)->recent.back().report.message, "Down to $479.");
+  SetBrowser(CreateBrowser(profile));
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

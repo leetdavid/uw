@@ -133,6 +133,7 @@ source_set("scheduled_chats") {
   ]
   deps = [
     ":chat_notification",
+    ":run_window",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles/keep_alive",
     "//content/public/browser",
