@@ -82,15 +82,6 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
     return window->GetWindow()->GetNativeWindow().GetNativeNSWindow();
   }
 
-  // Whether macOS's Window menu and Cmd+` offer `window`.
-  static bool InWindowMenu(BrowserWindowInterface* window) {
-    return !NSWindowOf(window).excludedFromWindowsMenu;
-  }
-  static bool InCycle(BrowserWindowInterface* window) {
-    return !(NSWindowOf(window).collectionBehavior &
-             NSWindowCollectionBehaviorIgnoresCycle);
-  }
-
   // Whether the Window menu has a row for `window`.
   static bool Listed(BrowserWindowInterface* window) {
     for (NSMenuItem* item in NSApp.windowsMenu.itemArray) {
@@ -482,23 +473,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   EXPECT_EQ(PageOf(browser())->GetVisibleURL(), GURL(kNotes));
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       TheWindowMenuAndCmdBacktickOfferOnlyTheShownWindow) {
-  const std::string personal = WorkspaceWindow::From(browser())->workspace();
-  BrowserWindowInterface* partner = SwitchAway(GURL(kNotes));
-  EXPECT_FALSE(InWindowMenu(browser()));
-  EXPECT_FALSE(InCycle(browser()));
-  EXPECT_TRUE(InWindowMenu(partner));
-  EXPECT_TRUE(InCycle(partner));
-
-  WorkspaceWindow::From(partner)->Switch(personal);
-  EXPECT_EQ(WaitForShown(partner, personal), browser());
-  EXPECT_TRUE(InWindowMenu(browser()));
-  EXPECT_TRUE(InCycle(browser()));
-  EXPECT_FALSE(InWindowMenu(partner));
-  EXPECT_FALSE(InCycle(partner));
-}
-
 // As an extension's windows.create({focused: false}) does.
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                        AHiddenWindowShownInactiveTakesItsGroupsPlace) {
@@ -649,8 +623,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
                                     WorkspaceWindow::From(behind)));
   EXPECT_TRUE(HasTab(shown, GURL(kArticle)));
   EXPECT_TRUE(HasTab(behind, GURL(kNotes)));
-  EXPECT_FALSE(InWindowMenu(behind));
-  EXPECT_FALSE(InCycle(behind));
 
   // The shown window's background tab loads, as Chromium loads restored
   // tabs. The hidden window's tabs wait until it shows.

@@ -121,7 +121,7 @@ class WorkspaceWindow : public views::WidgetObserver {
   void Reveal();
   // Hides the window's pages with it, so they neither load nor draw while it
   // is behind its partner. macOS counts a page in a window that is only
-  // ordered out as visible. The Window menu and Cmd+` leave it out too.
+  // ordered out as visible.
   void SetHidden(bool hidden);
   // Asked once something past BrowserView, such as macOS's Window menu,
   // showed the window while it is hidden.
