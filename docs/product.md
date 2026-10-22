@@ -208,6 +208,8 @@ Agreed on 2026-10-22: a scheduled chat is any request with a schedule, and need 
 
 Agreed use cases: track a price on a page, look for news on a topic, and send a regular update.
 
+Agreed on 2026-10-22: there are three ways to set one up, and all use the same schedule card. On a chat, "Run this chat again". On a page, "Watch this page", which also asks what to watch for; the command bar has the same command. In words in a chat, such as "check this every morning at 9": the agent fills in the card and the user saves it. The agent never saves a schedule on its own.
+
 Agreed access: the first watch release supports public pages and signed-in pages through the user's existing browser session. If sign-in expires, show "Sign in required" so the user can sign in manually. Automatic sign-in is deferred.
 
 Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of two ways.
@@ -221,7 +223,7 @@ A summary that combines several scheduled chats comes later.
 
 Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue.
 
-Agreed availability: scheduled chats run while the uw app is running, even with all windows closed. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
+Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 
 Other proposed behavior:
 
