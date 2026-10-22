@@ -40,6 +40,7 @@ class LocalTransport::Pipes {
  public:
   Pipes(const ConnectorConfig& connector,
         const base::FilePath& shell,
+        const std::optional<base::EnvironmentMap>& environment,
         const base::FilePath& log,
         base::RepeatingCallback<void(std::string)> on_line,
         base::OnceCallback<void(std::string)> on_stopped)
@@ -47,6 +48,8 @@ class LocalTransport::Pipes {
     if (base::GetFileSize(log).value_or(0) > kMaxLog) {
       base::DeleteFile(log);
     }
+    // The first connector added may start before its folder is made.
+    base::CreateDirectory(log.DirName());
     log_ =
         base::File(log, base::File::FLAG_OPEN_ALWAYS | base::File::FLAG_APPEND);
 
@@ -78,12 +81,21 @@ class LocalTransport::Pipes {
                             {errors_write.get(), STDERR_FILENO}};
     options.current_directory = base::GetHomeDir();
     options.new_process_group = true;
+    std::vector<std::string> argv;
+    if (environment) {
+      // The terminal's environment is complete; a login shell would read the
+      // user's profile again and could put another PATH first.
+      options.clear_environment = true;
+      options.environment = *environment;
+      argv = {"/bin/sh", "-c"};
+    } else {
+      argv = {shell.value(), "-l", "-c"};
+    }
     options.environment["SHELL"] = shell.value();
     for (const auto& [key, value] : connector.env) {
       options.environment[key] = value;
     }
-    std::vector<std::string> argv = {shell.value(), "-l", "-c",
-                                     "exec \"$0\" \"$@\"", connector.command};
+    argv.insert(argv.end(), {"exec \"$0\" \"$@\"", connector.command});
     argv.insert(argv.end(), connector.args.begin(), connector.args.end());
     process_ = base::LaunchProcess(argv, options);
     if (!process_.IsValid()) {
@@ -170,11 +182,7 @@ class LocalTransport::Pipes {
       return false;
     }
     if (got <= 0) {
-      const std::string_view rest =
-          base::TrimWhitespaceASCII(error_line_, base::TRIM_ALL);
-      if (!rest.empty()) {
-        last_error_ = std::string(rest.substr(0, kMaxErrorLine));
-      }
+      Keep(base::TrimWhitespaceASCII(error_line_, base::TRIM_ALL));
       error_line_.clear();
       errors_watch_.reset();
       errors_.reset();
@@ -187,11 +195,8 @@ class LocalTransport::Pipes {
     error_line_.append(text);
     for (size_t end = error_line_.find('\n'); end != std::string::npos;
          end = error_line_.find('\n')) {
-      const std::string_view line = base::TrimWhitespaceASCII(
-          std::string_view(error_line_).substr(0, end), base::TRIM_ALL);
-      if (!line.empty()) {
-        last_error_ = std::string(line.substr(0, kMaxErrorLine));
-      }
+      Keep(base::TrimWhitespaceASCII(
+          std::string_view(error_line_).substr(0, end), base::TRIM_ALL));
       error_line_.erase(0, end + 1);
     }
     if (error_line_.size() > kMaxErrorLine) {
@@ -200,8 +205,21 @@ class LocalTransport::Pipes {
     return true;
   }
 
-  // Reports the end once: `why`, or the last thing it said on its error
-  // output.
+  // Keeps `line` of the error output as the last one, and as the last that
+  // names an error when it does, such as "ReferenceError: File is not
+  // defined" before Node's closing "Node.js v18.6.0".
+  void Keep(std::string_view line) {
+    if (line.empty()) {
+      return;
+    }
+    last_error_ = std::string(line.substr(0, kMaxErrorLine));
+    if (line.find("rror:") != std::string_view::npos) {
+      named_error_ = last_error_;
+    }
+  }
+
+  // Reports the end once: `why`, or the last error it named on its error
+  // output, or else the last thing it said there.
   void Stop(std::string why) {
     output_watch_.reset();
     if (!on_stopped_) {
@@ -215,7 +233,9 @@ class LocalTransport::Pipes {
     while (ReadErrors()) {
     }
     if (why.empty()) {
-      why = last_error_.empty() ? "It stopped." : last_error_;
+      why = !named_error_.empty()  ? named_error_
+            : !last_error_.empty() ? last_error_
+                                   : "It stopped.";
     }
     std::move(on_stopped_).Run(std::move(why));
   }
@@ -231,21 +251,24 @@ class LocalTransport::Pipes {
   std::string line_;
   std::string error_line_;
   std::string last_error_;
+  std::string named_error_;
   base::RepeatingCallback<void(std::string)> on_line_;
   base::OnceCallback<void(std::string)> on_stopped_;
 };
 
-LocalTransport::LocalTransport(const ConnectorConfig& connector,
-                               const base::FilePath& shell,
-                               const base::FilePath& log,
-                               OnMessage on_notification,
-                               OnExit on_exit)
+LocalTransport::LocalTransport(
+    const ConnectorConfig& connector,
+    const base::FilePath& shell,
+    const std::optional<base::EnvironmentMap>& environment,
+    const base::FilePath& log,
+    OnMessage on_notification,
+    OnExit on_exit)
     : on_notification_(std::move(on_notification)),
       on_exit_(std::move(on_exit)) {
   pipes_.emplace(base::ThreadPool::CreateSequencedTaskRunner(
                      {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
                       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN}),
-                 connector, shell, log,
+                 connector, shell, environment, log,
                  base::BindPostTaskToCurrentDefault(base::BindRepeating(
                      &LocalTransport::OnLine, weak_factory_.GetWeakPtr())),
                  base::BindPostTaskToCurrentDefault(base::BindOnce(

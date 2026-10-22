@@ -13,6 +13,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/json/json_writer.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/synchronization/lock.h"
@@ -225,8 +226,8 @@ class ConnectorsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Starts the connectors as uw does when it starts, with what was saved.
-  void StartUw() {
-    Connectors::SetUpForTesting(folder_.GetPath(), base::FilePath("/bin/sh"));
+  void StartUw(base::FilePath shell = base::FilePath("/bin/sh")) {
+    Connectors::SetUpForTesting(folder_.GetPath(), shell);
     Connectors::Get().Start();
     ASSERT_TRUE(
         base::test::RunUntil([] { return Connectors::Get().loaded(); }));
@@ -271,6 +272,18 @@ class ConnectorsBrowserTest : public headless::HeadlessModeBrowserTest {
     Connectors::Get().CallTool(name, tool, std::move(arguments),
                                done.GetCallback());
     return done.Take();
+  }
+
+  // A shell that plays the user's: `interactive` runs when it is started as
+  // an interactive shell, before the shell itself.
+  base::FilePath FakeShell(std::string_view interactive) {
+    base::ScopedAllowBlockingForTesting allow;
+    const base::FilePath shell = folder_.GetPath().AppendASCII("shell");
+    EXPECT_TRUE(base::WriteFile(
+        shell, base::StrCat({"#!/bin/sh\ncase \" $* \" in *\" -i \"*) ",
+                             interactive, ";; esac\nexec /bin/sh \"$@\"\n"})));
+    EXPECT_TRUE(base::SetPosixFilePermissions(shell, 0700));
+    return shell;
   }
 
   std::unique_ptr<ScopedMemoryKeychain> keychain_;
@@ -351,6 +364,99 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
   EXPECT_EQ(call.error(),
             "railway isn't running: Unauthorized. Please login with railway "
             "login");
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       AFailedConnectorNamesTheErrorAndShowsItsLog) {
+  Add(Local("node",
+            {"--fail=ReferenceError: File is not defined\nNode.js v18.6.0"}));
+  EXPECT_EQ(Settled("node").error, "ReferenceError: File is not defined");
+  EXPECT_TRUE(base::test::RunUntil(
+      [] { return !Connectors::Get().Find("node")->log_lines.empty(); }));
+  EXPECT_THAT(Connectors::Get().Find("node")->log_lines,
+              ElementsAre("starting", "ReferenceError: File is not defined",
+                          "Node.js v18.6.0"));
+
+  Connectors::Get().Restart("node");
+  EXPECT_TRUE(Connectors::Get().Find("node")->log_lines.empty());
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       ALocalConnectorGetsWhatTheTerminalsStartupFilesSet) {
+  StartUw(FakeShell("FROM_STARTUP=yes; export FROM_STARTUP"));
+  EXPECT_EQ(Connectors::Get().environment_problem(), "");
+  Add(Local("fake"));
+  ASSERT_EQ(Settled("fake").state, Connectors::State::kReady);
+  EXPECT_EQ(
+      Call("fake", "env", base::DictValue().Set("name", "FROM_STARTUP"))->text,
+      "yes");
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       WithoutTheTerminalsEnvironmentTheLoginShellStartsThem) {
+  StartUw(FakeShell("exit 1"));
+  EXPECT_THAT(Connectors::Get().environment_problem(),
+              HasSubstr("couldn't read your terminal's environment"));
+  Add(Local("fake"));
+  ASSERT_EQ(Settled("fake").state, Connectors::State::kReady);
+  EXPECT_EQ(
+      Call("fake", "env", base::DictValue().Set("name", "FROM_STARTUP"))->text,
+      "(unset)");
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       ASavedMcpRemoteConnectorBecomesAWebConnector) {
+  ConnectorConfig saved;
+  saved.name = "linear";
+  saved.command = "npx";
+  saved.args = {"-y", "mcp-remote", "https://mcp.linear.app/sse", "--header",
+                "Authorization:${AUTH}"};
+  saved.env["AUTH"] = "Bearer lin_1";
+  ApiKeyStore().SetKey("connector:linear", SecretsToJson(saved));
+  base::DictValue value = ConnectorToValue(saved);
+  value.Set("on", false);
+  {
+    base::ScopedAllowBlockingForTesting allow;
+    ASSERT_TRUE(base::WriteFile(
+        folder_.GetPath().AppendASCII("connectors.json"),
+        *base::WriteJson(base::DictValue().Set(
+            "connectors", base::ListValue().Append(std::move(value))))));
+  }
+  StartUw();
+
+  const Connectors::Info* linear = Connectors::Get().Find("linear");
+  ASSERT_TRUE(linear);
+  EXPECT_TRUE(linear->config.remote());
+  EXPECT_EQ(linear->config.url, "https://mcp.linear.app/mcp");
+  EXPECT_THAT(ApiKeyStore().GetKey("connector:linear").value_or(""),
+              HasSubstr("Bearer lin_1"));
+  base::ScopedAllowBlockingForTesting allow;
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    std::string list;
+    return base::ReadFileToString(
+               folder_.GetPath().AppendASCII("connectors.json"), &list) &&
+           list.find("mcp-remote") == std::string::npos &&
+           list.find("\"header_names\":[\"Authorization\"]") !=
+               std::string::npos;
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest, AProbeTellsAConnectorFromAPage) {
+  net::test_server::EmbeddedTestServer server;
+  WebConnector web(server, /*legacy=*/false);
+  ASSERT_TRUE(server.Start());
+  base::test::TestFuture<bool> connector;
+  Connectors::Get().Probe(server.GetURL("/mcp"), connector.GetCallback());
+  EXPECT_TRUE(connector.Get());
+
+  web.RequireSignIn();
+  base::test::TestFuture<bool> signed_out;
+  Connectors::Get().Probe(server.GetURL("/mcp"), signed_out.GetCallback());
+  EXPECT_TRUE(signed_out.Get());
+
+  base::test::TestFuture<bool> page;
+  Connectors::Get().Probe(server.GetURL("/nothing"), page.GetCallback());
+  EXPECT_FALSE(page.Get());
 }
 
 IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,

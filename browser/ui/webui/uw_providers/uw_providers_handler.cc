@@ -29,6 +29,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/url_constants.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
+#include "net/base/filename_util.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/page_transition_types.h"
@@ -596,9 +597,11 @@ void UwProvidersHandler::GetConnectors(GetConnectorsCallback callback) {
           mojom::ConnectorPrompt::New(prompt.name, prompt.description));
     }
     connector->secret_names = SecretNames(info.config);
+    connector->log_lines = info.log_lines;
     connectors.push_back(std::move(connector));
   }
-  std::move(callback).Run(std::move(connectors));
+  std::move(callback).Run(std::move(connectors),
+                          Connectors::Get().environment_problem());
 }
 
 void UwProvidersHandler::WaitForConnectorChange(
@@ -637,9 +640,43 @@ void UwProvidersHandler::AddConnectors(const std::string& json,
     std::move(callback).Run(read.error());
     return;
   }
+  AddAfterProbes(std::move(read).value(), 0, std::move(callback));
+}
+
+void UwProvidersHandler::AddAfterProbes(std::vector<ConnectorConfig> connectors,
+                                        size_t next,
+                                        AddConnectorsCallback callback) {
+  for (size_t i = next; i < connectors.size(); ++i) {
+    if (std::optional<std::string> address =
+            connectors[i].remote() ? StreamableAddress(connectors[i].url)
+                                   : std::nullopt) {
+      const GURL url(*address);
+      Connectors::Get().Probe(
+          url, base::BindOnce(&UwProvidersHandler::OnProbed,
+                              weak_factory_.GetWeakPtr(), std::move(connectors),
+                              i, *address, std::move(callback)));
+      return;
+    }
+  }
   base::expected<void, std::string> added =
-      Connectors::Get().Add(std::move(read).value());
+      Connectors::Get().Add(std::move(connectors));
   std::move(callback).Run(added.has_value() ? std::string() : added.error());
+}
+
+void UwProvidersHandler::OnProbed(std::vector<ConnectorConfig> connectors,
+                                  size_t index,
+                                  std::string address,
+                                  AddConnectorsCallback callback,
+                                  bool answered) {
+  if (!answered) {
+    std::move(callback).Run(base::StrCat(
+        {connectors[index].name,
+         ": uw doesn't speak the old HTTP+SSE transport, and ", address,
+         " didn't answer. Use the server's Streamable HTTP address."}));
+    return;
+  }
+  connectors[index].url = std::move(address);
+  AddAfterProbes(std::move(connectors), index + 1, std::move(callback));
 }
 
 void UwProvidersHandler::RemoveConnector(const std::string& name) {
@@ -709,6 +746,20 @@ void UwProvidersHandler::OpenConnectorInTerminal(const std::string& name) {
   }
   OpenTerminalTabRunning(tab->GetBrowserWindowInterface(), command,
                          std::move(environment));
+}
+
+void UwProvidersHandler::ShowConnectorLog(const std::string& name) {
+  tabs::TabInterface* tab =
+      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
+  const Connectors::Info* info = Connectors::Get().Find(name);
+  if (!tab || !info || info->config.remote()) {
+    return;
+  }
+  NavigateParams params(tab->GetBrowserWindowInterface(),
+                        net::FilePathToFileURL(Connectors::Get().LogFile(name)),
+                        ui::PAGE_TRANSITION_LINK);
+  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&params);
 }
 
 }  // namespace uw

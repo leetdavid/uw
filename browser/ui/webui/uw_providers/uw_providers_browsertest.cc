@@ -789,8 +789,9 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
   SaveWindowScreenshot(browser(), "connector");
 }
 
-// A connector that fails shows its last error, and Open in terminal runs its
-// command in a terminal tab.
+// A connector that fails shows its last error and the last lines of its log.
+// Open in terminal runs its command in a terminal tab, and Show log opens the
+// log.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                        AFailedConnectorOpensInTerminal) {
   Connectors::Get().Start();
@@ -805,12 +806,28 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   ASSERT_TRUE(
       ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/connectors")));
   EXPECT_EQ("Unauthorized. Please login with railway login",
-            Run("const row = await until(() => document.querySelector("
-                "    '[data-row=\"railway\"] [data-action=\"Open in "
-                "terminal\"]'));"
-                "row.click();"
+            Run("await until(() => document.querySelector("
+                "    '[data-log=\"railway\"] pre'));"
                 "return document.querySelector("
                 "    '[data-row=\"railway\"] [data-line]').textContent;"));
+  EXPECT_THAT(
+      Run("return document.querySelector("
+          "    '[data-log=\"railway\"] pre').textContent;")
+          .ExtractString(),
+      HasSubstr("starting\nUnauthorized. Please login with railway login"));
+  content::WebContents* const settings = page();
+  ASSERT_EQ(true, Run("document.querySelector('[data-log=\"railway\"] "
+                      "[data-action=\"Show log\"]').click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return page() != settings &&
+           page()->GetVisibleURL().spec().ends_with("/connectors/railway.log");
+  }));
+  browser()->tab_strip_model()->ActivateTabAt(
+      browser()->tab_strip_model()->GetIndexOfWebContents(settings));
+  ASSERT_EQ(true, Run("document.querySelector('[data-log=\"railway\"] "
+                      "[data-action=\"Open in terminal\"]').click();"
+                      "return true;"));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return IsTerminalUrl(page()->GetVisibleURL()); }));
 }

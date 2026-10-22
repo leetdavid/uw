@@ -87,15 +87,50 @@ function Status({ connector }: { connector: ConnectorInfo }) {
         <Dot className="bg-destructive" />,
         connector.remote
           ? button("Try again", () => providersHandler.restartConnector(connector.name))
-          : button(
-              "Open in terminal",
-              () => providersHandler.openConnectorInTerminal(connector.name),
-              <SquareTerminal aria-hidden className="size-3" />,
-            ),
+          : "Failed",
       );
     default:
       return row(<Dot className="bg-muted-foreground/40" />, "Off");
   }
+}
+
+// A failed program's last lines of its log, and what to do about it.
+function FailureLog({ connector }: { connector: ConnectorInfo }) {
+  return (
+    <div data-log={connector.name} className="rounded-[10px] bg-accent px-3 py-2.5">
+      {connector.logLines.length > 0 && (
+        <pre className="overflow-x-auto font-mono text-[11.5px] leading-relaxed text-muted-foreground">
+          {connector.logLines.join("\n")}
+        </pre>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <span className="mr-auto text-xs text-muted-foreground">
+          {connector.logLines.length > 0 ? "The last lines of its log" : "It printed nothing"}
+        </span>
+        <Button
+          variant="secondary"
+          size="compact"
+          data-action="Show log"
+          onClick={() => providersHandler.showConnectorLog(connector.name)}
+        >
+          Show log
+        </Button>
+        <Button
+          variant="secondary"
+          size="compact"
+          leadingIcon={SquareTerminal}
+          data-action="Open in terminal"
+          onClick={() => providersHandler.openConnectorInTerminal(connector.name)}
+        >
+          Open in terminal
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function failedHere(connector: ConnectorInfo) {
+  return !connector.remote && connector.state === ConnectorState.kFailed;
 }
 
 function OnSwitch({ connector }: { connector: ConnectorInfo }) {
@@ -117,9 +152,11 @@ function OnSwitch({ connector }: { connector: ConnectorInfo }) {
 
 function ConnectorList({
   connectors,
+  environmentProblem,
   onAdd,
 }: {
   connectors: ConnectorInfo[];
+  environmentProblem: string;
   onAdd: () => void;
 }) {
   const on = connectors.filter((connector) => connector.on).length;
@@ -142,58 +179,69 @@ function ConnectorList({
       {connectors.length > 0 && (
         <div className="mt-[18px] overflow-hidden rounded-xl border border-border">
           {connectors.map((connector) => (
-            <a
-              key={connector.name}
-              href={`/connectors/${encodeURIComponent(connector.name)}`}
-              data-row={connector.name}
-              className="grid min-h-[58px] grid-cols-[32px_minmax(0,1fr)_76px_64px_152px_auto_16px] items-center gap-3 border-t border-border py-2 pl-3 pr-3.5 text-foreground first:border-t-0 hover:bg-hover"
-            >
-              <Tile connector={connector} />
-              <div className="min-w-0">
-                <div
-                  className={cn(
-                    "text-[13.5px] font-semibold",
-                    !connector.on && "text-muted-foreground",
-                  )}
-                >
-                  {connector.name}
+            <div key={connector.name} className="border-t border-border first:border-t-0">
+              <a
+                href={`/connectors/${encodeURIComponent(connector.name)}`}
+                data-row={connector.name}
+                className="grid min-h-[58px] grid-cols-[32px_minmax(0,1fr)_76px_64px_152px_auto_16px] items-center gap-3 py-2 pl-3 pr-3.5 text-foreground hover:bg-hover"
+              >
+                <Tile connector={connector} />
+                <div className="min-w-0">
+                  <div
+                    className={cn(
+                      "text-[13.5px] font-semibold",
+                      !connector.on && "text-muted-foreground",
+                    )}
+                  >
+                    {connector.name}
+                  </div>
+                  <div
+                    data-line
+                    className={cn(
+                      "truncate text-xs",
+                      connector.error &&
+                        (connector.state === ConnectorState.kFailed ||
+                          connector.state === ConnectorState.kCantSignIn ||
+                          connector.state === ConnectorState.kNeedsSignIn)
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                      !connector.remote && !connector.error && "font-mono text-[11.5px]",
+                    )}
+                  >
+                    {connector.error || connector.address}
+                  </div>
                 </div>
-                <div
-                  data-line
-                  className={cn(
-                    "truncate text-xs",
-                    connector.error &&
-                      (connector.state === ConnectorState.kFailed ||
-                        connector.state === ConnectorState.kCantSignIn ||
-                        connector.state === ConnectorState.kNeedsSignIn)
-                      ? "text-destructive"
-                      : "text-muted-foreground",
-                    !connector.remote && !connector.error && "font-mono text-[11.5px]",
-                  )}
-                >
-                  {connector.error || connector.address}
+                <span className="justify-self-start rounded-md bg-muted px-[7px] py-[3px] text-xs whitespace-nowrap text-muted-foreground">
+                  {connector.remote ? "Web" : "This Mac"}
+                </span>
+                <span className="text-[12.5px] whitespace-nowrap text-muted-foreground tabular-nums">
+                  {connector.tools.length
+                    ? `${connector.tools.length} tool${connector.tools.length === 1 ? "" : "s"}`
+                    : "—"}
+                </span>
+                <Status connector={connector} />
+                <OnSwitch connector={connector} />
+                <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
+              </a>
+              {failedHere(connector) && (
+                <div className="pr-3.5 pb-3 pl-[56px]">
+                  <FailureLog connector={connector} />
                 </div>
-              </div>
-              <span className="justify-self-start rounded-md bg-muted px-[7px] py-[3px] text-xs whitespace-nowrap text-muted-foreground">
-                {connector.remote ? "Web" : "This Mac"}
-              </span>
-              <span className="text-[12.5px] whitespace-nowrap text-muted-foreground tabular-nums">
-                {connector.tools.length
-                  ? `${connector.tools.length} tool${connector.tools.length === 1 ? "" : "s"}`
-                  : "—"}
-              </span>
-              <Status connector={connector} />
-              <OnSwitch connector={connector} />
-              <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
-            </a>
+              )}
+            </div>
           ))}
         </div>
       )}
       <p className="mt-3 max-w-[640px] text-[12px] text-muted-foreground">
         Connectors start with uw and serve every profile. Keys and sign-ins stay
-        in the macOS Keychain. Programs on this Mac start through your login
-        shell, so they find what your terminal finds.
+        in the macOS Keychain. Programs on this Mac start with your terminal's
+        environment, so they find what your terminal finds.
       </p>
+      {environmentProblem && (
+        <p role="alert" className="mt-1.5 max-w-[640px] text-[12px] text-destructive">
+          {environmentProblem}
+        </p>
+      )}
     </>
   );
 }
@@ -255,6 +303,11 @@ function ConnectorPage({ connector }: { connector: ConnectorInfo }) {
         <p role="alert" className="mt-3 text-[12.5px] text-destructive">
           {connector.error}
         </p>
+      )}
+      {failedHere(connector) && (
+        <div className="mt-2.5 max-w-[760px]">
+          <FailureLog connector={connector} />
+        </div>
       )}
       {connector.secretNames.length > 0 && (
         <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
@@ -409,7 +462,7 @@ function AddConnectorDialog({
           spellCheck={false}
           value={json}
           onChange={(event) => setJson(event.target.value)}
-          placeholder={'{\n  "mcpServers": {\n    "name": { "command": "npx", "args": ["-y", "..."] }\n  }\n}'}
+          placeholder={'{\n  "mcpServers": {\n    "linear": { "url": "https://mcp.linear.app/mcp" }\n  }\n}'}
           className={cn(
             "mt-3 h-52 w-full resize-none rounded-[10px] bg-accent px-3 py-2.5 font-mono text-[11.5px] leading-relaxed outline-none placeholder:text-muted-foreground",
             error && "ring-[1.5px] ring-destructive",
@@ -479,6 +532,7 @@ export function ConnectorsSection({
   onCount: (on: number) => void;
 }) {
   const [connectors, setConnectors] = useState<ConnectorInfo[] | null>(null);
+  const [environmentProblem, setEnvironmentProblem] = useState("");
   const [adding, setAdding] = useState(false);
   // Reads the list, and again each time a connector changes.
   useEffect(() => {
@@ -490,6 +544,7 @@ export function ConnectorsSection({
           return;
         }
         setConnectors(answer.connectors);
+        setEnvironmentProblem(answer.environmentProblem);
         await providersHandler.waitForConnectorChange();
       }
     })();
@@ -512,7 +567,11 @@ export function ConnectorsSection({
       {open ? (
         <ConnectorPage connector={open} />
       ) : (
-        <ConnectorList connectors={connectors} onAdd={() => setAdding(true)} />
+        <ConnectorList
+          connectors={connectors}
+          environmentProblem={environmentProblem}
+          onAdd={() => setAdding(true)}
+        />
       )}
       <AddConnectorDialog open={adding} onOpenChange={setAdding} />
     </>

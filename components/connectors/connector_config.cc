@@ -4,14 +4,18 @@
 #include "uw/components/connectors/connector_config.h"
 
 #include <algorithm>
+#include <cstring>
 #include <set>
+#include <span>
 #include <utility>
 
+#include "base/files/file_path.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "url/gurl.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -70,13 +74,14 @@ base::expected<ConnectorConfig, std::string> ReadConnector(
   const std::string* type = dict->FindString("type");
   const std::string* url = dict->FindString("url");
   const std::string* command = dict->FindString("command");
-  if (type && *type == "sse") {
+  if (type && *type == "sse" && !(url && StreamableAddress(*url))) {
     return Fail(name,
                 "uw doesn't speak the old HTTP+SSE transport. Use the "
                 "server's Streamable HTTP address.");
   }
-  const bool remote = type ? (*type == "http" || *type == "streamable-http")
-                           : (url && !command);
+  const bool remote =
+      type ? (*type == "http" || *type == "streamable-http" || *type == "sse")
+           : (url && !command);
   if (type && !remote && *type != "stdio") {
     return Fail(name,
                 base::StrCat({"uw doesn't know the type \"", *type, "\"."}));
@@ -114,7 +119,37 @@ base::expected<ConnectorConfig, std::string> ReadConnector(
   if (!ReadStrings(dict->FindDict("env"), connector.env)) {
     return Fail(name, "each value in \"env\" must be a string.");
   }
+  if (std::optional<ConnectorConfig> web = FromMcpRemote(connector)) {
+    if (!IsValidProviderEndpoint(web->url)) {
+      return Fail(name,
+                  "the address must be https, or http on this Mac or a "
+                  "private network.");
+    }
+    return std::move(*web);
+  }
   return connector;
+}
+
+// `text` with each `${NAME}` that `env` holds replaced by its value.
+std::string Substitute(std::string_view text,
+                       const std::map<std::string, std::string>& env) {
+  std::string out;
+  while (!text.empty()) {
+    const size_t start = text.find("${");
+    const size_t end =
+        start == std::string_view::npos ? start : text.find('}', start);
+    if (end == std::string_view::npos) {
+      out.append(text);
+      break;
+    }
+    out.append(text.substr(0, start));
+    const auto value =
+        env.find(std::string(text.substr(start + 2, end - start - 2)));
+    out.append(value == env.end() ? text.substr(start, end - start + 1)
+                                  : std::string_view(value->second));
+    text.remove_prefix(end + 1);
+  }
+  return out;
 }
 
 }  // namespace
@@ -173,6 +208,72 @@ bool IsConnectorName(std::string_view name) {
          std::ranges::all_of(name, [](char c) {
            return base::IsAsciiAlphaNumeric(c) || c == '-' || c == '_';
          });
+}
+
+std::optional<ConnectorConfig> FromMcpRemote(const ConnectorConfig& local) {
+  if (local.remote()) {
+    return std::nullopt;
+  }
+  const std::string runner = base::FilePath(local.command).BaseName().value();
+  std::span<const std::string> args(local.args);
+  const bool installed = runner == "mcp-remote";
+  if (runner == "pnpm" || runner == "yarn") {
+    if (args.empty() || args[0] != "dlx") {
+      return std::nullopt;
+    }
+    args = args.subspan(1);
+  } else if (!installed && runner != "npx" && runner != "bunx" &&
+             runner != "pnpx") {
+    return std::nullopt;
+  }
+  if (!installed) {
+    while (!args.empty() && args[0].starts_with("-")) {
+      args = args.subspan(1);
+    }
+    if (args.empty() ||
+        (args[0] != "mcp-remote" && !args[0].starts_with("mcp-remote@"))) {
+      return std::nullopt;
+    }
+    args = args.subspan(1);
+  }
+  if (args.empty()) {
+    return std::nullopt;
+  }
+  ConnectorConfig web;
+  web.name = local.name;
+  web.url = Substitute(args[0], local.env);
+  for (size_t i = 1; i < args.size(); ++i) {
+    std::string_view header;
+    if (args[i] == "--header" && i + 1 < args.size()) {
+      header = args[++i];
+    } else if (args[i].starts_with("--header=")) {
+      header = std::string_view(args[i]).substr(strlen("--header="));
+    } else {
+      continue;
+    }
+    const std::string value = Substitute(header, local.env);
+    const size_t colon = value.find(':');
+    if (colon == std::string::npos) {
+      continue;
+    }
+    web.headers[std::string(base::TrimWhitespaceASCII(
+        std::string_view(value).substr(0, colon), base::TRIM_ALL))] =
+        std::string(base::TrimWhitespaceASCII(
+            std::string_view(value).substr(colon + 1), base::TRIM_ALL));
+  }
+  return web;
+}
+
+std::optional<std::string> StreamableAddress(std::string_view url) {
+  const GURL address{std::string(url)};
+  if (!address.is_valid() || !address.path().ends_with("/sse")) {
+    return std::nullopt;
+  }
+  std::string path(address.path());
+  path.replace(path.size() - strlen("sse"), strlen("sse"), "mcp");
+  GURL::Replacements replacements;
+  replacements.SetPathStr(path);
+  return address.ReplaceComponents(replacements).spec();
 }
 
 base::DictValue ConnectorToValue(const ConnectorConfig& connector) {

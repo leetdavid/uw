@@ -11,6 +11,8 @@ source_set("connectors") {
     "mcp.h",
     "oauth.cc",
     "oauth.h",
+    "shell_environment.cc",
+    "shell_environment.h",
   ]
   public_deps = [
     "//base",
@@ -31,6 +33,7 @@ source_set("unit_tests") {
     "connector_tools_unittest.cc",
     "mcp_unittest.cc",
     "oauth_unittest.cc",
+    "shell_environment_unittest.cc",
   ]
   deps = [
     ":connectors",

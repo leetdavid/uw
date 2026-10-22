@@ -197,6 +197,8 @@ struct ConnectorInfo {
   array<ConnectorPrompt> prompts;
   // The names of its secrets, whose values stay in Keychain.
   array<string> secret_names;
+  // The last lines of a failed local connector's log.
+  array<string> log_lines;
 };
 
 // A connector in pasted JSON, before it is added.
@@ -244,13 +246,17 @@ interface ProvidersHandler {
   // open, or in a new tab.
   ShowAiPage(string section);
 
-  GetConnectors() => (array<ConnectorInfo> connectors);
+  // The problem, when there is one, is why programs on this Mac start
+  // without the terminal's environment.
+  GetConnectors() => (array<ConnectorInfo> connectors,
+                      string environment_problem);
   // Answers the next time a connector changes.
   WaitForConnectorChange() => ();
   // What pasted JSON holds, or what is wrong with it.
   ReadConnectors(string json) => (array<NewConnector> connectors,
                                   string error);
-  // Adds what the JSON holds and starts it. An empty error means it worked.
+  // Adds what the JSON holds and starts it. An address of the old HTTP+SSE
+  // transport is tried at /mcp first. An empty error means it worked.
   AddConnectors(string json) => (string error);
   RemoveConnector(string name);
   SetConnectorOn(string name, bool on);
@@ -265,4 +271,6 @@ interface ProvidersHandler {
   // Opens a terminal tab running a local connector's command, with its
   // environment.
   OpenConnectorInTerminal(string name);
+  // Opens a local connector's log in a new tab.
+  ShowConnectorLog(string name);
 };

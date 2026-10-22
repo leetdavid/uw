@@ -6,9 +6,11 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
+#include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
@@ -18,22 +20,25 @@
 
 namespace uw {
 
-// A connector that is a program on this Mac. uw starts it through the
-// user's login shell, so it finds the programs their terminal finds, and
-// talks to it one line of JSON at a time over its input and output. Its
-// error output goes to `log`. Destroying the transport closes its input,
-// which tells the program to quit, and ends it if it doesn't.
+// A connector that is a program on this Mac. uw starts it with the
+// environment of the user's terminal, so it finds the programs their
+// terminal finds, and talks to it one line of JSON at a time over its input
+// and output. Its error output goes to `log`. Destroying the transport
+// closes its input, which tells the program to quit, and ends it if it
+// doesn't.
 class LocalTransport : public McpTransport {
  public:
   using OnMessage = base::RepeatingCallback<void(const mcp::Message&)>;
-  // Gets the last line the program wrote to its error output, or why it
-  // could not start.
+  // Gets the last line the program wrote to its error output that names an
+  // error, or else its last line, or why it could not start.
   using OnExit = base::OnceCallback<void(std::string)>;
 
-  // The shell runs `exec "$0" "$@"` with the command and its arguments, so
-  // nothing in them is read by the shell.
+  // A shell runs `exec "$0" "$@"` with the command and its arguments, so
+  // nothing in them is read by the shell. With `environment`, the
+  // terminal's, that is /bin/sh; without it, `shell` as a login shell.
   LocalTransport(const ConnectorConfig& connector,
                  const base::FilePath& shell,
+                 const std::optional<base::EnvironmentMap>& environment,
                  const base::FilePath& log,
                  OnMessage on_notification,
                  OnExit on_exit);

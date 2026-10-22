@@ -3,24 +3,37 @@
 
 #include "uw/browser/connectors/connectors.h"
 
+#include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <unistd.h>
+
 #include <algorithm>
+#include <array>
 #include <utility>
 
 #include "base/files/file_util.h"
 #include "base/files/important_file_writer.h"
+#include "base/files/scoped_file.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/path_service.h"
+#include "base/posix/eintr_wrapper.h"
+#include "base/process/kill.h"
+#include "base/process/launch.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_split.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
+#include "base/time/time.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/common/chrome_paths.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/connectors/local_transport.h"
 #include "uw/browser/connectors/remote_transport.h"
+#include "uw/components/connectors/shell_environment.h"
 #include "uw/components/terminal/shell_host.h"
 #include "uw/components/terminal/shell_quote.h"
 
@@ -33,6 +46,10 @@ constexpr base::TimeDelta kCallTimeout = base::Minutes(10);
 // A connector that stops after it was ready starts again this many times
 // before it shows as failed.
 constexpr int kRestarts = 1;
+// How long the user's shell may take to read their startup files.
+constexpr base::TimeDelta kEnvironmentLimit = base::Seconds(10);
+// How much of a failed connector's log its page shows.
+constexpr size_t kLogLines = 8;
 
 std::string SecretsAccount(std::string_view name) {
   return base::StrCat({"connector:", name});
@@ -112,6 +129,73 @@ base::FilePath UserShell() {
   return ShellHost::ForUser().shell;
 }
 
+// The environment the user's terminal has: what `shell` holds as an
+// interactive login shell, once it has read their startup files. Nothing
+// when it fails or takes longer than kEnvironmentLimit. Blocks.
+std::optional<base::EnvironmentMap> ReadShellEnvironment(base::FilePath shell) {
+  std::array<int, 2> output;
+  if (pipe(output.data()) != 0) {
+    return std::nullopt;
+  }
+  base::ScopedFD read_end(output[0]);
+  base::ScopedFD write_end(output[1]);
+  base::ScopedFD nothing(HANDLE_EINTR(open("/dev/null", O_RDWR)));
+  if (!nothing.is_valid()) {
+    return std::nullopt;
+  }
+  base::LaunchOptions options;
+  options.fds_to_remap = {{nothing.get(), STDIN_FILENO},
+                          {write_end.get(), STDOUT_FILENO},
+                          {nothing.get(), STDERR_FILENO}};
+  options.current_directory = base::GetHomeDir();
+  options.new_process_group = true;
+  base::Process process = base::LaunchProcess(
+      {shell.value(), "-i", "-l", "-c", ShellEnvironmentCommand()}, options);
+  write_end.reset();
+  if (!process.IsValid()) {
+    return std::nullopt;
+  }
+  // A program the startup files leave running can keep the output open, so
+  // the reading stops at the closing mark rather than at the end.
+  const base::TimeTicks deadline = base::TimeTicks::Now() + kEnvironmentLimit;
+  std::optional<base::EnvironmentMap> environment;
+  std::string printed;
+  std::array<char, 16 * 1024> buffer;
+  while (!environment) {
+    const base::TimeDelta left = deadline - base::TimeTicks::Now();
+    pollfd ready = {read_end.get(), POLLIN, 0};
+    if (!left.is_positive() ||
+        HANDLE_EINTR(
+            poll(&ready, 1, static_cast<int>(left.InMilliseconds()))) <= 0) {
+      kill(-process.Pid(), SIGKILL);
+      break;
+    }
+    const ssize_t got =
+        HANDLE_EINTR(read(read_end.get(), buffer.data(), buffer.size()));
+    if (got <= 0) {
+      break;
+    }
+    printed.append(buffer.data(), static_cast<size_t>(got));
+    environment = ParseShellEnvironment(printed);
+  }
+  base::EnsureProcessTerminated(std::move(process));
+  return environment;
+}
+
+// The last lines of a connector's log.
+std::vector<std::string> LogTail(base::FilePath log) {
+  std::string text;
+  if (!base::ReadFileToString(log, &text)) {
+    return {};
+  }
+  std::vector<std::string> lines = base::SplitString(
+      text, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+  if (lines.size() > kLogLines) {
+    lines.erase(lines.begin(), lines.end() - kLogLines);
+  }
+  return lines;
+}
+
 }  // namespace
 
 // A connector that is starting or running.
@@ -159,6 +243,8 @@ void Connectors::SetUpForTesting(const base::FilePath& folder,
   connectors.refreshed_.clear();
   connectors.started_ = false;
   connectors.read_ = false;
+  connectors.environment_.reset();
+  connectors.environment_problem_.clear();
   connectors.folder_ = folder;
   connectors.shell_ = shell;
   connectors.loader_ = nullptr;
@@ -174,6 +260,23 @@ void Connectors::Start() {
   loader_ = g_browser_process->shared_url_loader_factory();
   if (shell_.empty()) {
     shell_ = UserShell();
+  }
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE,
+      {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN},
+      base::BindOnce(&ReadShellEnvironment, shell_),
+      base::BindOnce(&Connectors::OnEnvironment, weak_factory_.GetWeakPtr()));
+}
+
+void Connectors::OnEnvironment(
+    std::optional<base::EnvironmentMap> environment) {
+  environment_ = std::move(environment);
+  if (!environment_) {
+    environment_problem_ =
+        "uw couldn't read your terminal's environment, so programs on this "
+        "Mac start through your login shell and may miss what your shell's "
+        "startup files set.";
   }
   files_->PostTaskAndReplyWithResult(
       FROM_HERE, base::BindOnce(&ReadSaved, folder_),
@@ -195,12 +298,36 @@ void Connectors::OnRead(std::optional<base::DictValue> saved,
     Changed();
     return;
   }
+  ApiKeyStore keys;
+  bool converted = false;
   for (const base::Value& item : *connectors) {
     const base::DictValue* dict = item.GetIfDict();
     std::optional<ConnectorConfig> config =
         dict ? ConnectorFromValue(*dict) : std::nullopt;
     if (!config || FindInfo(config->name)) {
       continue;
+    }
+    // One saved as mcp-remote becomes the web connector it passes on to.
+    ConnectorConfig with_secrets = *config;
+    if (std::optional<std::string> secrets =
+            keys.GetKey(SecretsAccount(config->name))) {
+      SecretsFromJson(*secrets, with_secrets);
+    }
+    if (std::optional<ConnectorConfig> web = FromMcpRemote(with_secrets)) {
+      if (std::optional<std::string> address = StreamableAddress(web->url)) {
+        web->url = *address;
+      }
+      if (web->headers.empty()) {
+        keys.DeleteKey(SecretsAccount(web->name));
+      } else {
+        keys.SetKey(SecretsAccount(web->name), SecretsToJson(*web));
+      }
+      for (auto& [key, value] : web->headers) {
+        value.clear();
+      }
+      caches.erase(web->name);
+      config = std::move(*web);
+      converted = true;
     }
     Info info;
     info.config = std::move(*config);
@@ -236,6 +363,9 @@ void Connectors::OnRead(std::optional<base::DictValue> saved,
       }
     }
     list_.push_back(std::move(info));
+  }
+  if (converted) {
+    SaveList();
   }
   for (Info& info : list_) {
     if (info.on) {
@@ -381,6 +511,29 @@ void Connectors::Restart(std::string_view name) {
   Changed();
 }
 
+void Connectors::Probe(const GURL& url, base::OnceCallback<void(bool)> done) {
+  if (!loader_) {
+    std::move(done).Run(false);
+    return;
+  }
+  auto client = std::make_unique<McpClient>(std::make_unique<RemoteTransport>(
+      url, std::map<std::string, std::string>(), loader_,
+      base::BindRepeating([] { return std::string(); })));
+  McpClient& connect = *client;
+  connect.Connect(
+      std::nullopt,
+      base::BindOnce(
+          [](std::unique_ptr<McpClient> client,
+             base::OnceCallback<void(bool)> done,
+             base::expected<McpClient::Listing, McpReply> listing) {
+            base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+                FROM_HERE, std::move(client));
+            std::move(done).Run(listing.has_value() ||
+                                listing.error().needs_sign_in);
+          },
+          std::move(client), std::move(done)));
+}
+
 void Connectors::Launch(Info& info) {
   const std::string name = info.config.name;
   Stop(name);
@@ -412,7 +565,7 @@ void Connectors::Launch(Info& info) {
             [](std::string name) { return Get().AccessToken(name); }, name));
   } else {
     transport = std::make_unique<LocalTransport>(
-        config, shell_, LogFile(name),
+        config, shell_, environment_, LogFile(name),
         base::BindRepeating(&Connectors::OnNotification,
                             weak_factory_.GetWeakPtr(), name, live->generation),
         base::BindOnce(&Connectors::OnExit, weak_factory_.GetWeakPtr(), name,
@@ -424,6 +577,7 @@ void Connectors::Launch(Info& info) {
   live_[name] = std::move(live);
   info.state = State::kStarting;
   info.error.clear();
+  info.log_lines.clear();
   std::optional<mcp::Era> era;
   if (auto known = eras_.find(name); known != eras_.end()) {
     era = known->second;
@@ -557,7 +711,21 @@ void Connectors::Fail(Info& info, std::string error) {
   info.state = State::kFailed;
   info.error = error.empty() ? "It stopped." : std::move(error);
   Stop(info.config.name);
+  if (!info.config.remote()) {
+    files_->PostTaskAndReplyWithResult(
+        FROM_HERE, base::BindOnce(&LogTail, LogFile(info.config.name)),
+        base::BindOnce(&Connectors::OnLogTail, weak_factory_.GetWeakPtr(),
+                       info.config.name));
+  }
   Changed();
+}
+
+void Connectors::OnLogTail(std::string name, std::vector<std::string> lines) {
+  Info* info = FindInfo(name);
+  if (info && info->state == State::kFailed) {
+    info->log_lines = std::move(lines);
+    Changed();
+  }
 }
 
 void Connectors::CallTool(std::string_view name,

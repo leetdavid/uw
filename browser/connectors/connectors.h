@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "base/environment.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
@@ -21,6 +22,7 @@
 #include "base/observer_list_types.h"
 #include "base/types/expected.h"
 #include "base/values.h"
+#include "url/gurl.h"
 #include "uw/browser/connectors/mcp_client.h"
 #include "uw/browser/connectors/sign_in.h"
 #include "uw/components/connectors/connector_config.h"
@@ -74,6 +76,8 @@ class Connectors {
     std::vector<mcp::Prompt> prompts;
     std::set<std::string> tools_off;
     std::set<std::string> always_allowed;
+    // The last lines of a failed local connector's log.
+    std::vector<std::string> log_lines;
   };
 
   class Observer : public base::CheckedObserver {
@@ -95,6 +99,11 @@ class Connectors {
   bool started() const { return started_; }
   // The saved list has been read; until then nothing can be added.
   bool loaded() const { return read_; }
+  // Why programs on this Mac start without the terminal's environment, when
+  // uw could not read it.
+  const std::string& environment_problem() const {
+    return environment_problem_;
+  }
 
   const std::vector<Info>& list() const { return list_; }
   const Info* Find(std::string_view name) const;
@@ -110,6 +119,10 @@ class Connectors {
                         bool allowed);
   // Starts a failed connector again.
   void Restart(std::string_view name);
+
+  // Whether `url` answers as a connector does, or asks for a sign-in as one
+  // does.
+  void Probe(const GURL& url, base::OnceCallback<void(bool)> done);
 
   // Opens a web connector's sign-in page with `open`, and starts the
   // connector once the sign-in comes back.
@@ -150,6 +163,7 @@ class Connectors {
   ~Connectors();
 
   Info* FindInfo(std::string_view name);
+  void OnEnvironment(std::optional<base::EnvironmentMap> environment);
   void OnRead(std::optional<base::DictValue> saved,
               std::map<std::string, base::DictValue> caches);
   void Launch(Info& info);
@@ -165,6 +179,7 @@ class Connectors {
                 int generation,
                 base::expected<McpClient::Listing, McpReply> listing);
   void Fail(Info& info, std::string error);
+  void OnLogTail(std::string name, std::vector<std::string> lines);
   std::string AccessToken(std::string_view name) const;
   void OnSignedIn(std::string name,
                   base::expected<oauth::Tokens, SignInError> result);
@@ -197,6 +212,9 @@ class Connectors {
   scoped_refptr<network::SharedURLLoaderFactory> loader_;
   bool started_ = false;
   bool read_ = false;
+  // The terminal's environment, which programs on this Mac start with.
+  std::optional<base::EnvironmentMap> environment_;
+  std::string environment_problem_;
   std::vector<Info> list_;
   std::map<std::string, std::unique_ptr<Live>, std::less<>> live_;
   // Each era a connector was found to speak, by name.

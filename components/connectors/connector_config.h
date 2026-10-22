@@ -49,6 +49,17 @@ base::expected<std::vector<ConnectorConfig>, std::string> ParseConnectors(
 // 1 to 64 letters, digits, hyphens, and underscores.
 bool IsConnectorName(std::string_view name);
 
+// A local connector that only runs mcp-remote, such as `npx -y mcp-remote
+// <url> --header "Name: value"`, as the web connector it passes on to.
+// `${VAR}` in a header takes the value from its "env". Nothing for any other
+// program.
+std::optional<ConnectorConfig> FromMcpRemote(const ConnectorConfig& local);
+
+// The Streamable HTTP address to try for an address of the old HTTP+SSE
+// transport: the same address ending in /mcp in place of /sse. Nothing for
+// an address that doesn't end in /sse.
+std::optional<std::string> StreamableAddress(std::string_view url);
+
 // The connector as uw keeps it on disk: without its secrets, whose names
 // stay so that Keychain can fill them in.
 base::DictValue ConnectorToValue(const ConnectorConfig& connector);

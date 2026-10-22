@@ -1,6 +1,6 @@
 # Connect dialog
 
-Status: agreed on 2026-10-22. Nothing is built yet. The stages are T157 to T163 on the [board](roadmap.md#board).
+Status: agreed on 2026-10-22. T158, the fixes, was built on 2026-10-23; the rest is not built. The stages are T157 to T163 on the [board](roadmap.md#board).
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The hard parts:
 
@@ -97,11 +97,11 @@ GitHub, Slack, Gmail, and Google Calendar let no app register itself. uw signs i
 
 ### Fixes
 
-- **The terminal's environment.** When uw starts, it reads the environment once from `$SHELL -i -l`, with a 10-second limit, as VS Code does. Local connectors start with it, with the pasted `env` on top. If reading it fails, uw starts them through the login shell as before, and the Connectors page says so. This replaces the connectors plan's environment rule.
+- **The terminal's environment.** When uw starts, it reads the environment once from `$SHELL -i -l`, with a 10-second limit, as VS Code does. Local connectors start with it through `/bin/sh`, with the pasted `env` on top; a login shell would read the profile again, and macOS's `path_helper` there can put another PATH first. If reading it fails, uw starts them through the login shell as before, and the Connectors page says so. This replaces the connectors plan's environment rule.
 - **`mcp-remote`.** A pasted `npx`, `bunx`, or `pnpm dlx` command that runs `mcp-remote <url>` becomes a web connector at that address, and its `--header` arguments become headers. Saved ones convert when uw reads its list, keeping their names and switches.
 - **`/sse`.** A pasted address ending in `/sse` is tried with `/mcp` in its place and kept if it answers. Otherwise the paste box says why uw can't use it.
-- **Failures.** A failed connector's row shows the last lines of its log, with Show log and Open in terminal.
-- **Logs.** Removing a connector and then adding one with the same name no longer deletes the new connector's log.
+- **Failures.** A failed local connector's row names the error it printed: the last line with `Error:` or `error:` in it, or else its last line. Its page shows the last lines of its log, with Show log, which opens the log in a tab, beside Open in terminal.
+- **Logs.** The first connector added on a new profile keeps its log; its folder used to be made only after the log was opened. The race where removing a connector and quickly adding one with the same name deletes the new log is not built: it needs both within milliseconds, and it was not what hid the user's Linear log on 2026-10-22.
 
 ### Not in this plan
 
