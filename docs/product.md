@@ -245,10 +245,13 @@ Agreed on 2026-10-22: no cap on runs. Runs of different scheduled chats all go a
 
 Agreed on 2026-10-22: the model judges whether something happened; uw does no page comparison of its own. A run ends by calling a `report` tool with whether it found what the user asked to hear about, a message, and its tracked values, such as `price: 99 USD`. uw acts only on that: it notifies per the chat's setting, saves the values, and writes the run's line. A run that ends without a report counts as "Didn't finish", never as no change. For runs, these settings replace the notification a chat sends when it answers.
 
-Other proposed behavior:
+Agreed management, on 2026-10-22:
 
-- Show the last result, next scheduled run, and any failure.
-- Allow editing, pausing, and deletion.
+- A scheduled chat's page shows a strip under its title, such as `Every day at 9:00 · Next: tomorrow 9:00 · Last: No change, $129`, with Edit, which opens the schedule card, Pause, and Mute. A running trigger shows there with Stop.
+- The Chats list shows a clock and the next time.
+- A Scheduled filter at the top of the chat page's chat list shows every scheduled chat and every chat with a running trigger, next time first, with Pause all.
+- Pause stops runs and triggers. Resuming does not catch up on the paused time.
+- Deleting the chat deletes its schedule. Removing the schedule keeps it as an ordinary chat.
 
 ## Integrations
 
