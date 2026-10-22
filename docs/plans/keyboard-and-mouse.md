@@ -53,11 +53,13 @@ Agreed on 2026-10-19 as T122. uw keeps its own list of keys, so the same code ca
 - A click on a uw command's key lets the user press a new one, in the key recorder Chromium uses on `chrome://extensions/shortcuts`. Chromium's own keys show but cannot be changed yet.
 - A key must include Cmd, so it works while a terminal tab has focus. On Windows that would be Ctrl.
 - A key already in use moves to the new command, whether a uw or a Chromium command had it. The row that lost it reads "No key" and shows the old key.
-- Each row has Reset, back to uw's default, and can have no key. The section has Reset all.
+- Each row has Reset, back to uw's default, and can have no key. Reset gives the default key back even when another row has it then, and that row loses it. The section has Reset all, which asks nothing first.
+- The menus are listed in menu bar order. A submenu's commands are rows of their own.
+- Keys read as the recorder writes them, such as "Command + Ctrl + K". It cannot record Return, Tab, \`, or brackets, so only Reset brings back a default that uses one, such as Ctrl+Cmd+Return.
 - The keys are the same in every profile and workspace.
 - Settings search finds a command by name. Help → Keyboard Shortcuts… opens the section, and so will the command bar.
 - A key recorded from the [command bar](command-bar.md#aliases-and-recorded-keys) lands in the same list.
-- The design is drawn on the canvas page "Keyboard and mouse", in the frames "Keyboard shortcuts: settings" and "Keyboard shortcuts: every state". It waits for the user's sign-off.
+- The design is on the canvas page "Keyboard and mouse", in the frames "Keyboard shortcuts: settings" and "Keyboard shortcuts: every state", with its rules in the canvas guide `uw-keyboard-shortcuts`. The user signed it off on 2026-10-22.
 
 ### New child tab
 
