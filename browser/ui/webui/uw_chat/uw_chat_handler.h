@@ -26,6 +26,7 @@
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/components/agent/skills.h"
@@ -48,6 +49,8 @@ namespace uw {
 class UwChatHandler : public mojom::ChatHandler,
                       public ChatIndex::Observer,
                       public Connectors::Observer,
+                      public ScheduledChats::Observer,
+                      public ScheduledChats::Page,
                       public content::WebContentsObserver {
  public:
   UwChatHandler(content::WebContents* contents,
@@ -56,7 +59,6 @@ class UwChatHandler : public mojom::ChatHandler,
   UwChatHandler(const UwChatHandler&) = delete;
   UwChatHandler& operator=(const UwChatHandler&) = delete;
   ~UwChatHandler() override;
-
 
   // mojom::ChatHandler:
   void Send(const std::string& text,
@@ -84,6 +86,19 @@ class UwChatHandler : public mojom::ChatHandler,
                   const base::flat_map<std::string, std::string>& values,
                   const std::string& shown) override;
   void SetSeesImages(bool sees) override;
+  void NewSchedule(NewScheduleCallback callback) override;
+  void SaveSchedule(mojom::ChatSchedulePtr schedule) override;
+  void RemoveSchedule() override;
+  void SetSchedulePaused(bool paused) override;
+  void SetScheduleMuted(bool muted) override;
+  void StopRun() override;
+  void PauseAllSchedules(bool paused) override;
+
+  // ScheduledChats::Observer:
+  void OnScheduleChanged(const std::string& chat_id) override;
+
+  // ScheduledChats::Page:
+  void AddRunLines(base::ListValue lines) override;
 
   // Connectors::Observer:
   void OnConnectorsChanged() override;
@@ -99,6 +114,14 @@ class UwChatHandler : public mojom::ChatHandler,
 
  private:
   void OnLoaded(std::optional<base::DictValue> saved);
+  // Tells the page about the chat's schedule and how it stands, and shows a
+  // step its run waits on.
+  void SendSchedule();
+  // The schedule card's state for `chat`, which runs on `schedule`.
+  mojom::ScheduleStatePtr StateOf(const ScheduledChat& chat) const;
+  // Gives the agent what the chat's scheduled runs reported, from their
+  // lines.
+  void UpdateScheduledRuns();
   // Starts the agent on the chat's model, giving it back the tabs it had.
   // False, after telling the page why, when the chat has no model it can
   // reach or the page is not in a tab.
@@ -245,6 +268,12 @@ class UwChatHandler : public mojom::ChatHandler,
   base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval_answer_;
   // The agent's terminal tab that waits for the user's password, or 0.
   int password_tab_ = 0;
+  // Lines of the chat's runs that came before the chat was read, and whether
+  // the step a run waits on shows.
+  base::ListValue early_run_lines_;
+  bool run_step_shown_ = false;
+  base::ScopedObservation<ScheduledChats, ScheduledChats::Observer>
+      schedules_observation_{this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::WeakPtrFactory<UwChatHandler> weak_factory_{this};

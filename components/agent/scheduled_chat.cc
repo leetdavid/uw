@@ -57,6 +57,7 @@ bool ScheduledChat::operator==(const ScheduledChat& other) const {
          effort == other.effort && approval_mode == other.approval_mode &&
          paused == other.paused && muted == other.muted && last == other.last &&
          failures == other.failures && failing == other.failing &&
+         last_failure == other.last_failure &&
          pause_reason == other.pause_reason && same_runs(recent, other.recent);
 }
 
@@ -93,6 +94,7 @@ base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
       .Set("last", base::TimeToValue(chat.last))
       .Set("failures", chat.failures)
       .Set("failing", chat.failing)
+      .Set("last_failure", chat.last_failure)
       .Set("pause_reason", chat.pause_reason)
       .Set("recent", std::move(recent));
 }
@@ -137,6 +139,7 @@ std::optional<ScheduledChat> ScheduledChatFromValue(
   }
   chat.failures = value.FindInt("failures").value_or(0);
   chat.failing = value.FindBool("failing").value_or(false);
+  chat.last_failure = StringOr(value, "last_failure");
   chat.pause_reason = StringOr(value, "pause_reason");
   if (const base::ListValue* recent = value.FindList("recent")) {
     for (const base::Value& run : *recent) {
@@ -177,6 +180,7 @@ RunEffect AfterRun(ScheduledChat& chat,
     }
     chat.failures = 0;
     chat.failing = false;
+    chat.last_failure.clear();
     chat.pause_reason.clear();
     effect.text = report.message;
     if (chat.regular_updates) {
@@ -198,6 +202,7 @@ RunEffect AfterRun(ScheduledChat& chat,
       effect.counted = true;
       ++chat.failures;
     }
+    chat.last_failure = failure;
     effect.text = failure;
     if (first) {
       effect.what =

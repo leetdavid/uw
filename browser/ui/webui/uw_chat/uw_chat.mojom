@@ -63,6 +63,21 @@ interface ChatHandler {
   // Whether the chat's model sees images, which the page knows from the
   // model list.
   SetSeesImages(bool sees);
+  // What a new schedule card starts with: the chat's first message, daily at
+  // 9:00 in the Mac's time zone, change alerts, the model last picked on a
+  // schedule card or else the chat's, and the chat's approval mode.
+  NewSchedule() => (ScheduleState state);
+  // Saves the schedule card. A new schedule runs at once.
+  SaveSchedule(ChatSchedule schedule);
+  // Takes the chat's schedule off. The chat stays.
+  RemoveSchedule();
+  // Pausing stops runs; resuming does not catch up on the paused time.
+  SetSchedulePaused(bool paused);
+  SetScheduleMuted(bool muted);
+  // Ends the run under way.
+  StopRun();
+  // Pauses, or resumes, every scheduled chat of the profile.
+  PauseAllSchedules(bool paused);
 };
 
 // The model a chat runs on, from a provider on uw://ai/providers.
@@ -88,6 +103,40 @@ enum StepKind {
   kModel,
   // The user stopped the chat, with Stop or from an approval.
   kStoppedByUser,
+  // A run of the chat's schedule, which `run` describes.
+  kRun,
+  // Times a run of the chat's schedule let go by while it waited for the
+  // user. `text` says how many.
+  kRunSkipped,
+};
+
+// How a run of a scheduled chat ended.
+enum RunEnd {
+  kReported,
+  // It ended without a report. It counts toward the pause after three.
+  kFailed,
+  // It could not reach its model. It does not count.
+  kUnreachable,
+  kStopped,
+};
+
+// A run of a scheduled chat, as its line shows it.
+struct RunLine {
+  // When it ran, in milliseconds since the Unix epoch.
+  double time;
+  RunEnd end;
+  // Whether it found what the user asked to hear about.
+  bool found;
+  // What its notification said under the chat's title, such as "Change
+  // alert", or empty when it sent none.
+  string what;
+  // Its tracked values as a person reads them, such as "price 479 USD".
+  array<string> values;
+  // Its steps, folded under the line, such as "read tab 1".
+  array<string> steps;
+  // Whether it counted toward the pause, and whether it paused the schedule.
+  bool counted;
+  bool paused;
 };
 
 // One step of the agent's work.
@@ -103,6 +152,63 @@ struct Step {
   ChatModel? model;
   // For kUser: the images the message carried, as data: URLs.
   array<string> images;
+  // For kRun: the run. `text` holds what it reported, or what went wrong.
+  RunLine? run;
+};
+
+// How often a scheduled chat runs. Matches uw::Schedule::Repeat.
+enum ScheduleRepeat {
+  kEveryHours,
+  kDaily,
+  kWeekdays,
+  kWeekly,
+  kOnce,
+};
+
+// A scheduled chat's settings, as its schedule card shows and saves them.
+struct ChatSchedule {
+  ScheduleRepeat repeat;
+  // For kEveryHours: 1, 2, 3, 4, 6, or 12.
+  int32 hours;
+  // The wall time for kDaily, kWeekdays, and kWeekly, and for kWeekly its
+  // day, 0 for Sunday.
+  int32 hour;
+  int32 minute;
+  int32 weekday;
+  // For kOnce: when, in milliseconds since the Unix epoch.
+  double once;
+  // An IANA time zone, or empty for the Mac's own, wherever it is.
+  string time_zone;
+  // What each run is asked.
+  string request;
+  bool regular_updates;
+  bool even_when_nothing_changes;
+  // The model runs use.
+  ChatModel model;
+  ApprovalMode mode;
+};
+
+// How a scheduled chat stands, for the strip under its title.
+struct ScheduleState {
+  ChatSchedule schedule;
+  // The time zone its wall times are in, as a person reads it, such as
+  // "Los Angeles".
+  string zone_name;
+  // The next run, or 0 when there is none, and the last, in milliseconds
+  // since the Unix epoch.
+  double next;
+  double last;
+  // What the last run found, such as "Still above $500, price 549 USD".
+  string last_text;
+  bool paused;
+  bool muted;
+  bool running;
+  // A step of the run waits for the user.
+  bool waiting;
+  // Why uw paused it after three failed runs, and the site that wanted a
+  // sign-in on the last run, if any.
+  string pause_reason;
+  string sign_in;
 };
 
 // What the chat list shows beside a chat. Matches uw::ChatIndex::State.
@@ -122,6 +228,11 @@ struct ChatSummary {
   // When it last changed, in milliseconds since the Unix epoch.
   double updated;
   ChatState state;
+  // For a scheduled chat: its next run, in milliseconds since the Unix epoch,
+  // or 0 when it has none, and whether it is paused.
+  double next_run;
+  bool scheduled;
+  bool schedule_paused;
 };
 
 // A step that waits for the user's approval: its tab and site, what it does,
@@ -251,4 +362,7 @@ interface ChatPage {
   OnRunning(int32 tab, string command);
   // A connector changed: added, removed, turned on or off, or started.
   OnConnectorsChanged();
+  // The chat's schedule and how it stands, after OnOpened and after every
+  // change. Nothing when it has none.
+  OnSchedule(ScheduleState? state);
 };

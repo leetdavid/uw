@@ -12,11 +12,14 @@
 #include "base/base_paths.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/i18n/time_formatting.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
@@ -39,6 +42,8 @@
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
+#include "third_party/icu/source/common/unicode/unistr.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
@@ -224,6 +229,58 @@ int TabOf(const AgentLoop::Step& step) {
       step.result.FindInt("tab").value_or(0));
 }
 
+mojom::ApprovalPtr PageApproval(const AgentTools::Approval& approval,
+                                bool can_always_allow) {
+  return mojom::Approval::New(
+      approval.tab, approval.site, approval.action, approval.reason,
+      approval.folder, approval.command, approval.text, approval.keys,
+      approval.screen, approval.connector, approval.tool, approval.arguments,
+      can_always_allow, approval.sensitive, approval.file);
+}
+
+// A run's tracked value, as its line keeps it, as a person reads it.
+std::string ValueText(const base::DictValue& value) {
+  const std::string* name = value.FindString("name");
+  const std::string* unit = value.FindString("unit");
+  TrackedValue tracked;
+  tracked.name = name ? *name : std::string();
+  tracked.unit = unit ? *unit : std::string();
+  if (const std::optional<double> number = value.FindDouble("number")) {
+    tracked.value = *number;
+  } else if (const std::optional<bool> yes = value.FindBool("yes")) {
+    tracked.value = *yes;
+  } else if (const std::string* text = value.FindString("text")) {
+    tracked.value = *text;
+  }
+  return DescribeValue(tracked);
+}
+
+mojom::RunEnd RunEndNamed(const std::string* name) {
+  if (!name || *name == "reported") {
+    return mojom::RunEnd::kReported;
+  }
+  if (*name == "failed") {
+    return mojom::RunEnd::kFailed;
+  }
+  return *name == "unreachable" ? mojom::RunEnd::kUnreachable
+                                : mojom::RunEnd::kStopped;
+}
+
+// The city of an IANA time zone, such as "Los Angeles", or of the Mac's own
+// zone when `zone` is empty.
+std::string ZoneName(const std::string& zone) {
+  std::string id = zone;
+  if (id.empty()) {
+    icu::UnicodeString name;
+    std::unique_ptr<icu::TimeZone>(icu::TimeZone::createDefault())->getID(name);
+    name.toUTF8String(id);
+  }
+  const size_t slash = id.rfind('/');
+  std::string city = slash == std::string::npos ? id : id.substr(slash + 1);
+  base::ReplaceChars(city, "_", " ", &city);
+  return city;
+}
+
 }  // namespace
 
 UwChatHandler::UwChatHandler(content::WebContents* contents,
@@ -245,6 +302,10 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
   if (ChatIndex* index = ChatIndex::For(profile)) {
     index_observation_.Observe(index);
   }
+  if (ScheduledChats* chats = ScheduledChats::For(profile)) {
+    schedules_observation_.Observe(chats);
+    chats->SetPage(id_, this);
+  }
   LoadSkills(base::DoNothing());
   Connectors::Get().Start();
   connectors_observation_.Observe(&Connectors::Get());
@@ -259,6 +320,9 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
 
 UwChatHandler::~UwChatHandler() {
   OpenChats().erase(id_);
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->SetPage(id_, nullptr);
+  }
 }
 
 void UwChatHandler::Send(const std::string& text,
@@ -687,7 +751,9 @@ void UwChatHandler::AnswerSkill(bool save) {
 
 void UwChatHandler::AnswerApproval(mojom::ApprovalChoice choice,
                                    const std::string& note) {
-  if (!approval_answer_) {
+  ScheduledChats* chats = schedules_observation_.GetSource();
+  const bool for_run = !approval_answer_ && chats && chats->Waiting(id_);
+  if (!approval_answer_ && !for_run) {
     return;
   }
   AgentLoop::ApprovalAnswer answer;
@@ -709,6 +775,11 @@ void UwChatHandler::AnswerApproval(mojom::ApprovalChoice choice,
       answer.choice = AgentLoop::ApprovalAnswer::Choice::kAlwaysAllow;
       break;
   }
+  if (for_run) {
+    run_step_shown_ = false;
+    chats->AnswerApproval(id_, std::move(answer));
+    return;
+  }
   std::move(approval_answer_).Run(std::move(answer));
   UpdateIndex();
 }
@@ -725,6 +796,16 @@ void UwChatHandler::OnChatsChanged() {
     chat->title = entry.title;
     chat->updated = entry.updated.InMillisecondsFSinceUnixEpoch();
     chat->state = StateFor(entry.state);
+    if (const ScheduledChats* schedules = schedules_observation_.GetSource()) {
+      if (const ScheduledChat* scheduled = schedules->Find(entry.id)) {
+        chat->scheduled = true;
+        chat->schedule_paused = scheduled->paused;
+        if (const std::optional<base::Time> next =
+                schedules->NextRunOf(entry.id)) {
+          chat->next_run = next->InMillisecondsFSinceUnixEpoch();
+        }
+      }
+    }
     chats.push_back(std::move(chat));
   }
   page_->OnChats(std::move(chats));
@@ -779,6 +860,16 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
       Save();
     }
   }
+  // Runs that ended while the chat was read go in after what it read.
+  if (!early_run_lines_.empty()) {
+    for (base::Value& line : early_run_lines_) {
+      if (line.is_dict()) {
+        Log(std::move(line).TakeDict());
+      }
+    }
+    early_run_lines_.clear();
+    Save();
+  }
   std::vector<mojom::StepPtr> lines;
   for (const base::Value& entry : log_) {
     if (entry.is_dict()) {
@@ -793,6 +884,8 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
   page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
+  UpdateScheduledRuns();
+  SendSchedule();
   OnChatsChanged();
   if (start_) {
     page_->OnAsk(start_->text);
@@ -827,6 +920,7 @@ bool UwChatHandler::Start() {
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
+  UpdateScheduledRuns();
   for (const std::string& name : connectors_off_) {
     agent_->SetConnectorOn(name, false);
   }
@@ -1047,6 +1141,45 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
   } else if (*kind == "model") {
     line->kind = mojom::StepKind::kModel;
     line->model = PageModel(ModelFrom(entry.FindDict("model")));
+  } else if (*kind == "run") {
+    line->kind = mojom::StepKind::kRun;
+    auto run = mojom::RunLine::New();
+    run->time = base::ValueToTime(entry.Find("time"))
+                    .value_or(base::Time())
+                    .InMillisecondsFSinceUnixEpoch();
+    run->end = RunEndNamed(entry.FindString("end"));
+    run->found = entry.FindBool("found").value_or(false);
+    if (const std::string* what = entry.FindString("what")) {
+      run->what = *what;
+    }
+    if (const base::ListValue* values = entry.FindList("values")) {
+      for (const base::Value& value : *values) {
+        if (value.is_dict()) {
+          run->values.push_back(ValueText(value.GetDict()));
+        }
+      }
+    }
+    if (const base::ListValue* steps = entry.FindList("steps")) {
+      for (const base::Value& step : *steps) {
+        const base::DictValue* saved = step.GetIfDict();
+        const std::string* tool = saved ? saved->FindString("tool") : nullptr;
+        if (!tool) {
+          continue;
+        }
+        std::string shown =
+            base::StrCat({*tool, " ", Json(saved->FindDict("args"))});
+        if (const std::string* error = saved->FindString("error")) {
+          base::StrAppend(&shown, {": ", *error});
+        }
+        run->steps.push_back(std::move(shown));
+      }
+    }
+    run->counted = entry.FindBool("counted").value_or(false);
+    run->paused = entry.FindBool("paused").value_or(false);
+    line->run = std::move(run);
+  } else if (*kind == "run_skipped") {
+    line->kind = mojom::StepKind::kRunSkipped;
+    line->text = base::NumberToString(entry.FindInt("count").value_or(0));
   }
   return line;
 }
@@ -1279,14 +1412,10 @@ void UwChatHandler::AskApproval(
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",
                              base::NumberToString(approval.tab), "?"}));
-  page_->OnApproval(mojom::Approval::New(
-      approval.tab, approval.site, approval.action, approval.reason,
-      approval.folder, approval.command, approval.text, approval.keys,
-      approval.screen, approval.connector, approval.tool, approval.arguments,
-      /*can_always_allow=*/
-      !Profile::FromBrowserContext(contents_->GetBrowserContext())
-           ->IsOffTheRecord(),
-      approval.sensitive, approval.file));
+  page_->OnApproval(
+      PageApproval(approval, /*can_always_allow=*/
+                   !Profile::FromBrowserContext(contents_->GetBrowserContext())
+                        ->IsOffTheRecord()));
   UpdateIndex();
 }
 
@@ -1345,6 +1474,226 @@ void UwChatHandler::UpdateIndex() {
     state = ChatIndex::State::kUnread;
   }
   index->Update({id_, title_, updated_, state});
+}
+
+void UwChatHandler::NewSchedule(NewScheduleCallback callback) {
+  ScheduledChat chat;
+  for (const base::Value& entry : log_) {
+    const base::DictValue* line = entry.GetIfDict();
+    const std::string* kind = line ? line->FindString("kind") : nullptr;
+    const std::string* text = line ? line->FindString("text") : nullptr;
+    if (kind && *kind == "user" && text) {
+      chat.request = *text;
+      break;
+    }
+  }
+  const ScheduledChats* chats = schedules_observation_.GetSource();
+  std::optional<ModelChoice> model = chats ? chats->LastModel() : std::nullopt;
+  if (!model) {
+    model = model_;
+  }
+  if (model) {
+    chat.provider_id = model->provider_id;
+    chat.model = model->model;
+    chat.effort = model->effort;
+  }
+  chat.approval_mode = std::string(NameOf(mode_));
+  std::move(callback).Run(StateOf(chat));
+}
+
+void UwChatHandler::SaveSchedule(mojom::ChatSchedulePtr schedule) {
+  ScheduledChats* chats = schedules_observation_.GetSource();
+  if (!chats || !loaded_) {
+    return;
+  }
+  ScheduledChat chat;
+  chat.schedule.repeat = static_cast<Schedule::Repeat>(schedule->repeat);
+  chat.schedule.hours = schedule->hours;
+  chat.schedule.hour = schedule->hour;
+  chat.schedule.minute = schedule->minute;
+  chat.schedule.weekday = schedule->weekday;
+  chat.schedule.time_zone = schedule->time_zone;
+  chat.schedule.start =
+      chat.schedule.repeat == Schedule::Repeat::kOnce
+          ? base::Time::FromMillisecondsSinceUnixEpoch(schedule->once)
+          : base::Time::Now();
+  chat.request =
+      std::string(base::TrimWhitespaceASCII(schedule->request, base::TRIM_ALL));
+  chat.regular_updates = schedule->regular_updates;
+  chat.even_when_nothing_changes = schedule->even_when_nothing_changes;
+  chat.provider_id = schedule->model->provider_id;
+  chat.model = schedule->model->model;
+  chat.effort = schedule->model->effort;
+  chat.approval_mode =
+      std::string(NameOf(static_cast<ApprovalMode>(schedule->mode)));
+  if (chat.request.empty() || !IsValid(chat.schedule)) {
+    return;
+  }
+  // A run writes into the chat's file, so the chat is saved first.
+  Save();
+  chats->Save(id_, std::move(chat));
+}
+
+void UwChatHandler::RemoveSchedule() {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->Remove(id_);
+  }
+}
+
+void UwChatHandler::SetSchedulePaused(bool paused) {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->SetPaused(id_, paused);
+  }
+}
+
+void UwChatHandler::SetScheduleMuted(bool muted) {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->SetMuted(id_, muted);
+  }
+}
+
+void UwChatHandler::StopRun() {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->Stop(id_);
+  }
+}
+
+void UwChatHandler::PauseAllSchedules(bool paused) {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->SetAllPaused(paused);
+  }
+}
+
+void UwChatHandler::OnScheduleChanged(const std::string& chat_id) {
+  OnChatsChanged();
+  if (chat_id == id_ && loaded_) {
+    SendSchedule();
+  }
+}
+
+void UwChatHandler::AddRunLines(base::ListValue lines) {
+  if (!loaded_) {
+    for (base::Value& line : lines) {
+      early_run_lines_.Append(std::move(line));
+    }
+    return;
+  }
+  for (base::Value& line : lines) {
+    if (line.is_dict()) {
+      page_->OnStep(LineFor(line.GetDict()));
+      Log(std::move(line).TakeDict());
+    }
+  }
+  Save();
+  UpdateScheduledRuns();
+}
+
+void UwChatHandler::SendSchedule() {
+  const ScheduledChats* chats = schedules_observation_.GetSource();
+  const ScheduledChat* chat = chats ? chats->Find(id_) : nullptr;
+  page_->OnSchedule(chat ? StateOf(*chat) : nullptr);
+  const AgentTools::Approval* step = chats ? chats->WaitingStep(id_) : nullptr;
+  if (step && !run_step_shown_) {
+    run_step_shown_ = true;
+    page_->OnApproval(PageApproval(*step, /*can_always_allow=*/false));
+  } else if (!step) {
+    run_step_shown_ = false;
+  }
+}
+
+mojom::ScheduleStatePtr UwChatHandler::StateOf(
+    const ScheduledChat& chat) const {
+  auto schedule = mojom::ChatSchedule::New();
+  schedule->repeat = static_cast<mojom::ScheduleRepeat>(chat.schedule.repeat);
+  schedule->hours = chat.schedule.hours;
+  schedule->hour = chat.schedule.hour;
+  schedule->minute = chat.schedule.minute;
+  schedule->weekday = chat.schedule.weekday;
+  schedule->once = chat.schedule.repeat == Schedule::Repeat::kOnce
+                       ? chat.schedule.start.InMillisecondsFSinceUnixEpoch()
+                       : 0;
+  schedule->time_zone = chat.schedule.time_zone;
+  schedule->request = chat.request;
+  schedule->regular_updates = chat.regular_updates;
+  schedule->even_when_nothing_changes = chat.even_when_nothing_changes;
+  schedule->model =
+      mojom::ChatModel::New(chat.provider_id, chat.model, chat.effort);
+  schedule->mode =
+      static_cast<mojom::ApprovalMode>(ModeNamed(chat.approval_mode));
+
+  auto state = mojom::ScheduleState::New();
+  state->schedule = std::move(schedule);
+  state->zone_name = ZoneName(chat.schedule.time_zone);
+  const ScheduledChats* chats = schedules_observation_.GetSource();
+  if (chats && chats->Find(id_)) {
+    if (const std::optional<base::Time> next = chats->NextRunOf(id_)) {
+      state->next = next->InMillisecondsFSinceUnixEpoch();
+    }
+    state->running = chats->Running(id_);
+    state->waiting = chats->Waiting(id_);
+  }
+  if (!chat.last.is_null()) {
+    state->last = chat.last.InMillisecondsFSinceUnixEpoch();
+  }
+  if (!chat.recent.empty()) {
+    const RunReport& report = chat.recent.back().report;
+    state->last_text = report.message;
+    for (const TrackedValue& value : report.values) {
+      base::StrAppend(&state->last_text, {", ", DescribeValue(value)});
+    }
+  }
+  state->paused = chat.paused;
+  state->muted = chat.muted;
+  state->pause_reason = chat.pause_reason;
+  constexpr std::string_view kSignIn = "Sign in required on ";
+  if (chat.failing && chat.last_failure.starts_with(kSignIn)) {
+    state->sign_in = chat.last_failure.substr(kSignIn.size());
+  }
+  return state;
+}
+
+void UwChatHandler::UpdateScheduledRuns() {
+  // The latest runs, so the instructions stay short.
+  constexpr size_t kRunsShown = 20;
+  std::vector<std::string> runs;
+  for (const base::Value& entry : log_) {
+    const base::DictValue* line = entry.GetIfDict();
+    const std::string* kind = line ? line->FindString("kind") : nullptr;
+    if (!kind || *kind != "run") {
+      continue;
+    }
+    const std::optional<base::Time> time =
+        base::ValueToTime(line->Find("time"));
+    const std::string* end = line->FindString("end");
+    const std::string* text = line->FindString("text");
+    std::string run = base::StrCat(
+        {"- ",
+         time ? base::UnlocalizedTimeFormatWithPattern(*time, "EEE d MMM HH:mm")
+              : std::string(),
+         ": ", end && *end == "reported" ? "" : "didn't finish: ",
+         text ? *text : std::string()});
+    if (const base::ListValue* values = line->FindList("values")) {
+      for (size_t i = 0; i < values->size(); ++i) {
+        if ((*values)[i].is_dict()) {
+          base::StrAppend(
+              &run, {i == 0 ? " (" : ", ", ValueText((*values)[i].GetDict())});
+        }
+      }
+      if (!values->empty()) {
+        run += ")";
+      }
+    }
+    runs.push_back(std::move(run));
+  }
+  if (runs.size() > kRunsShown) {
+    runs.erase(runs.begin(), runs.end() - kRunsShown);
+  }
+  const std::string text = base::JoinString(runs, "\n");
+  if (agent_) {
+    agent_->SetScheduledRuns(text);
+  } else if (saved_context_) {
+    saved_context_->SetScheduledRuns(text);
+  }
 }
 
 }  // namespace uw

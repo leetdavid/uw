@@ -267,12 +267,17 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
 // Writes a schedule last due two days ago, as if uw had been quit since.
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
                        PRE_AMissedRunCatchesUpAfterARestart) {
+  // Once the schedules have loaded, the file is read again only at the next
+  // start.
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats()->loaded(); }));
   SaveChat();
   ScheduledChat chat = DeskWatch(ProviderId());
   chat.last = base::Time::Now() - base::Days(2);
   base::ScopedAllowBlockingForTesting allow_blocking;
+  const base::FilePath folder = ChatFile::FolderFor(profile()->GetPath());
+  ASSERT_TRUE(base::CreateDirectory(folder));
   ASSERT_TRUE(base::WriteFile(
-      ChatFile::FolderFor(profile()->GetPath()).AppendASCII("schedules.json"),
+      folder.AppendASCII("schedules.json"),
       *base::WriteJson(base::DictValue().Set(
           "chats", base::DictValue().Set(kChat, ScheduledChatToValue(chat))))));
 }

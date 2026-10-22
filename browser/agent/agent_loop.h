@@ -113,6 +113,10 @@ class AgentLoop {
   // The connectors this chat may use, with the tools the user left on. The
   // model loads one with the connector tool. See docs/plans/connectors.md.
   void SetConnectors(std::vector<ConnectorTools> connectors);
+  // What the chat's scheduled runs reported, as AgentContext takes it.
+  void SetScheduledRuns(std::string_view runs) {
+    context_->SetScheduledRuns(runs);
+  }
   // Whether the model sees images. A connector's images are left out for one
   // that does not.
   void SetSeesImages(bool sees) { sees_images_ = sees; }

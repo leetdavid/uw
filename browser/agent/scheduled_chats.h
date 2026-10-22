@@ -25,6 +25,7 @@
 #include "uw/browser/agent/chat_run.h"
 #include "uw/components/agent/chat_scheduler.h"
 #include "uw/components/agent/scheduled_chat.h"
+#include "uw/components/ai_providers/providers.h"
 
 class Profile;
 class ScopedProfileKeepAlive;
@@ -46,6 +47,16 @@ class ScheduledChats : public base::SupportsUserData::Data,
     virtual void OnScheduleChanged(const std::string& chat_id) = 0;
   };
 
+  // A chat's open page, which takes the lines its runs add, so that the
+  // page's own saves keep them.
+  class Page {
+   public:
+    virtual void AddRunLines(base::ListValue lines) = 0;
+
+   protected:
+    virtual ~Page() = default;
+  };
+
   // The scheduled chats of `profile`, made and started on first use. None in
   // a private profile.
   static ScheduledChats* For(Profile* profile);
@@ -63,6 +74,17 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // user to approve a step.
   bool Running(std::string_view chat_id) const;
   bool Waiting(std::string_view chat_id) const;
+  // The step a run of `chat_id` waits on, or null.
+  const AgentTools::Approval* WaitingStep(std::string_view chat_id) const;
+  // When `chat_id` runs next, or nothing while it is paused or done.
+  std::optional<base::Time> NextRunOf(std::string_view chat_id) const;
+  // The model the last saved schedule card picked, which a new card starts
+  // on.
+  std::optional<ModelChoice> LastModel() const { return last_model_; }
+
+  // Gives the lines of `chat_id`'s runs to `page` while it is open, or
+  // back to the chat file with null.
+  void SetPage(const std::string& chat_id, Page* page);
 
   // Saves the schedule card's settings for `chat_id` and runs it at once.
   void Save(const std::string& chat_id, ScheduledChat chat);
@@ -71,6 +93,8 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // Pausing stops runs; resuming does not catch up on the paused time.
   void SetPaused(const std::string& chat_id, bool paused);
   void SetMuted(const std::string& chat_id, bool muted);
+  // Pauses, or resumes, every schedule.
+  void SetAllPaused(bool paused);
   // Answers the step a run of `chat_id` waits on.
   void AnswerApproval(const std::string& chat_id,
                       AgentLoop::ApprovalAnswer answer);
@@ -98,6 +122,7 @@ class ScheduledChats : public base::SupportsUserData::Data,
 
     std::unique_ptr<ChatRun> run;
     // The step the run waits on, answered with this.
+    std::optional<AgentTools::Approval> step;
     base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval;
     // Times it was due while the run waited for the user.
     int skipped = 0;
@@ -132,6 +157,8 @@ class ScheduledChats : public base::SupportsUserData::Data,
   bool ending_ = false;
   std::map<std::string, ScheduledChat, std::less<>> chats_;
   std::map<std::string, Run, std::less<>> runs_;
+  std::map<std::string, raw_ptr<Page>, std::less<>> pages_;
+  std::optional<ModelChoice> last_model_;
   ChatScheduler scheduler_;
   std::unique_ptr<ScopedProfileKeepAlive> keep_alive_;
   mojo::Receiver<device::mojom::TimeZoneMonitorClient> time_zone_receiver_{

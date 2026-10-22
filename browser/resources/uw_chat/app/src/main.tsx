@@ -16,7 +16,9 @@ import {
   Columns2,
   Loader2,
   Pause,
+  Play,
   Blocks,
+  Clock,
   ImageIcon,
   Info,
   KeyRound,
@@ -95,6 +97,15 @@ import {
   type SlashItem,
 } from "./slash-menu";
 import { ModeChip } from "./mode-chip";
+import {
+  QuietRuns,
+  RunMessage,
+  ScheduleButtons,
+  ScheduleCard,
+  ScheduleStrip,
+  SkippedLine,
+  isQuietRun,
+} from "./schedule";
 import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
 import { ProviderIcon } from "./providers/provider-parts";
 import {
@@ -117,6 +128,7 @@ import {
   type ChatModel,
   type ChatPrompt,
   type ChatSummary,
+  type ScheduleState,
   type SkillProposal,
   type Step,
 } from "@/chat-api";
@@ -417,6 +429,7 @@ function userLine(text: string, images: string[]): Step {
     text,
     model: null,
     images,
+    run: null,
   };
 }
 
@@ -424,12 +437,17 @@ function isStep(line: Step): boolean {
   return line.kind === StepKind.kTool || line.kind === StepKind.kResumed;
 }
 
-// Runs of steps share one Thinking Steps block; every other line stands alone.
+// Runs of steps share one Thinking Steps block, and quiet runs of a schedule
+// in a row fold into one line; every other line stands alone.
 function group(lines: Step[]): Step[][] {
   const groups: Step[][] = [];
   for (const line of lines) {
     const last = groups.at(-1);
-    if (last && isStep(line) && isStep(last[0]!)) {
+    if (
+      last &&
+      ((isStep(line) && isStep(last[0]!)) ||
+        (isQuietRun(line) && isQuietRun(last[0]!)))
+    ) {
       last.push(line);
     } else {
       groups.push([line]);
@@ -638,6 +656,10 @@ function Line({
           {line.text}
         </p>
       );
+    case StepKind.kRun:
+      return <RunMessage line={line} />;
+    case StepKind.kRunSkipped:
+      return <SkippedLine count={line.text} />;
     case StepKind.kStopped:
       return (
         <Banner className="stopped">
@@ -714,15 +736,30 @@ function ChatList({
   skillsOn: number | null;
 }) {
   const [query, setQuery] = useState("");
+  const [scheduledOnly, setScheduledOnly] = useState(false);
   const wanted = query.trim().toLowerCase();
-  const shown = chats.filter((chat) =>
+  const scheduled = chats.filter((chat) => chat.scheduled);
+  const onlyScheduled = scheduledOnly && scheduled.length > 0;
+  const shown = (onlyScheduled ? scheduled : chats).filter((chat) =>
     (chat.title || "New chat").toLowerCase().includes(wanted),
   );
   const midnight = new Date().setHours(0, 0, 0, 0);
-  const groups = [
-    { label: "Today", chats: shown.filter((chat) => chat.updated >= midnight) },
-    { label: "Earlier", chats: shown.filter((chat) => chat.updated < midnight) },
-  ].filter((group) => group.chats.length);
+  // The Scheduled filter puts the next run first, and paused chats last.
+  const groups = onlyScheduled
+    ? [
+        {
+          label: "Scheduled",
+          chats: [...shown].sort(
+            (a, b) =>
+              Number(a.schedulePaused) - Number(b.schedulePaused) ||
+              (a.nextRun || Infinity) - (b.nextRun || Infinity),
+          ),
+        },
+      ]
+    : [
+        { label: "Today", chats: shown.filter((chat) => chat.updated >= midnight) },
+        { label: "Earlier", chats: shown.filter((chat) => chat.updated < midnight) },
+      ].filter((group) => group.chats.length);
   return (
     <Sidebar>
       <SidebarHeader>
@@ -744,6 +781,31 @@ function ChatList({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+        {scheduled.length > 0 && (
+          <div id="chat-filter" className="flex rounded-[9px] bg-accent p-[3px]" role="radiogroup">
+            {[false, true].map((only) => (
+              <button
+                key={String(only)}
+                type="button"
+                role="radio"
+                aria-checked={onlyScheduled === only}
+                className={cn(
+                  "flex h-[26px] flex-1 items-center justify-center gap-1.5 rounded-[7px] text-xs font-medium text-muted-foreground",
+                  onlyScheduled === only &&
+                    "bg-background text-foreground shadow-[0_1px_3px_rgba(30,27,46,.14)]",
+                )}
+                onClick={() => setScheduledOnly(only)}
+              >
+                {only ? "Scheduled" : "All"}
+                {only && (
+                  <span className="font-normal text-muted-foreground">
+                    {scheduled.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </SidebarHeader>
       <SidebarContent>
         {groups.map((group) => (
@@ -763,12 +825,21 @@ function ChatList({
                       }
                     }}
                     {...rowState(chat.state)}
+                    {...(chat.scheduled && chat.state === ChatState.kDone
+                      ? { icon: chat.schedulePaused ? Pause : Clock }
+                      : {})}
                   >
                     <span className="flex-1 truncate">
                       {chat.title || "New chat"}
                     </span>
                     <span className="text-muted-foreground tabular-nums group-hover/menu-item:opacity-0">
-                      {when(chat.updated)}
+                      {onlyScheduled
+                        ? chat.schedulePaused
+                          ? "Paused"
+                          : chat.nextRun
+                            ? when(chat.nextRun)
+                            : ""
+                        : when(chat.updated)}
                     </span>
                   </SidebarMenuButton>
                   <SidebarMenuAction
@@ -786,6 +857,26 @@ function ChatList({
         ))}
       </SidebarContent>
       <SidebarFooter>
+        {onlyScheduled && (
+          <Button
+            id="pause-all"
+            variant="secondary"
+            size="compact"
+            className="mx-2 mb-1"
+            leadingIcon={
+              scheduled.every((chat) => chat.schedulePaused) ? Play : Pause
+            }
+            onClick={() =>
+              chatHandler.pauseAllSchedules(
+                !scheduled.every((chat) => chat.schedulePaused),
+              )
+            }
+          >
+            {scheduled.every((chat) => chat.schedulePaused)
+              ? "Resume all"
+              : "Pause all"}
+          </Button>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -1334,6 +1425,9 @@ function Chat() {
   const [connectors, setConnectors] = useState<ChatConnector[]>([]);
   const [proposal, setProposal] = useState<SkillProposal | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
+  // The chat's schedule, and the schedule card while it is open.
+  const [schedule, setSchedule] = useState<ScheduleState | null>(null);
+  const [card, setCard] = useState<ScheduleState | null>(null);
   // A program in the agent's terminal tab that waits for the user's password.
   const [password, setPassword] = useState<{
     tab: number;
@@ -1408,6 +1502,9 @@ function Chat() {
         setModel(picked),
       ),
       chatPage.onMode.addListener((picked: ApprovalMode) => setMode(picked)),
+      chatPage.onSchedule.addListener((state: ScheduleState | null) =>
+        setSchedule(state),
+      ),
       chatPage.onChats.addListener((saved: ChatSummary[]) => setChats(saved)),
       chatPage.onAsk.addListener((text: string) => setAsked(text)),
       chatPage.onTabs.addListener(
@@ -1429,6 +1526,15 @@ function Chat() {
         setRunning(tab ? { tab, command, since: Date.now() } : null),
       ),
       chatPage.onStep.addListener((step: Step) => {
+        // A run of the chat's schedule adds its line on its own, while the
+        // chat's agent may be at work.
+        if (
+          step.kind === StepKind.kRun ||
+          step.kind === StepKind.kRunSkipped
+        ) {
+          setLines((before) => [...before, step]);
+          return;
+        }
         setApproval(null);
         if (step.tool === "save_skill") {
           setProposal(null);
@@ -1496,6 +1602,7 @@ function Chat() {
       text: "",
       model: picked,
       images: [],
+      run: null,
     };
     setLines((before) =>
       before.at(-1)?.kind === StepKind.kModel
@@ -1644,6 +1751,7 @@ function Chat() {
         text: "",
         model: null,
         images: [],
+        run: null,
       },
     ]);
     setWorking(true);
@@ -1811,7 +1919,9 @@ function Chat() {
         <TabStrip tabs={agentTabs} current={currentTab} sideBySide={sideBySide} />
       )}
       {title && (
-        <header className="mx-auto flex w-full max-w-[720px] items-center gap-2.5 px-7 pt-4">
+        <div className="relative mx-auto w-full max-w-[720px]">
+        <header className="flex w-full items-center gap-2.5 px-7 pt-4">
+          {schedule && <Clock aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
           <h1 id="chat-title" className="truncate text-base font-semibold">
             {title}
           </h1>
@@ -1830,7 +1940,49 @@ function Chat() {
               {state}
             </span>
           )}
+          {schedule ? (
+            <ScheduleButtons
+              state={schedule}
+              onEdit={() => setCard(schedule)}
+            />
+          ) : (
+            (
+              <Button
+                id="schedule"
+                variant="ghost"
+                size="compact"
+                className="ml-auto"
+                leadingIcon={Clock}
+                onClick={async () => {
+                  const { state } = await chatHandler.newSchedule();
+                  setCard(state);
+                }}
+              >
+                Schedule
+              </Button>
+            )
+          )}
         </header>
+        {schedule && (
+          <div className="px-7 pt-2">
+            <ScheduleStrip state={schedule} />
+          </div>
+        )}
+        {card && providers && (
+          <ScheduleCard
+            state={card}
+            editing={Boolean(schedule)}
+            providers={providers}
+            lists={lists}
+            onOpenModels={async () => {
+              for (const provider of await loadProviders()) {
+                listModels(provider.id);
+              }
+            }}
+            onClose={() => setCard(null)}
+          />
+        )}
+        </div>
       )}
       {!title && (
         <div id="start" className="px-7 pb-5 text-center">
@@ -1843,7 +1995,9 @@ function Chat() {
       <main className={cn("flex-1 overflow-y-auto", !title && "hidden")}>
         <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
           {groups.map((run, index) =>
-            isStep(run[0]!) ? (
+            isQuietRun(run[0]!) ? (
+              <QuietRuns key={index} runs={run} />
+            ) : isStep(run[0]!) ? (
               <ThinkingSteps key={index} className="w-full">
                 <ThinkingStepsContent>
                   {run.map((step, at) => (

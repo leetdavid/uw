@@ -44,6 +44,7 @@ TEST(ScheduledChatTest, KeepsEverythingItSaves) {
   chat.last = Utc(22);
   chat.failures = 1;
   chat.failing = true;
+  chat.last_failure = "fully.com didn't load";
   chat.recent = {
       {Utc(21), Report(false, "Still above $500.")},
       {Utc(22), {true, "Down to $479.", {{"in_stock", "", true}}, ""}}};
@@ -152,6 +153,7 @@ TEST(ScheduledChatTest, ASiteThatWantsASignInIsACountedFailure) {
       AfterRun(chat, RunEnd::kReported, report, "", Utc(22));
   EXPECT_EQ(effect.what, "Sign in required");
   EXPECT_EQ(effect.text, "Sign in required on fully.com");
+  EXPECT_EQ(chat.last_failure, "Sign in required on fully.com");
   EXPECT_TRUE(effect.counted);
   EXPECT_TRUE(chat.recent.empty());
 }

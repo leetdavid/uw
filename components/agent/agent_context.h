@@ -62,6 +62,9 @@ class AgentContext {
   // Says `connectors`, as ConnectorsForInstructions() writes them, in the
   // instructions. Empty for none.
   void SetConnectors(std::string_view connectors);
+  // Says what the chat's scheduled runs reported, one per line, in the
+  // instructions, marked as coming from web pages. Empty for none.
+  void SetScheduledRuns(std::string_view runs);
   // Tools every request offers beside uw's own: the connector tool and the
   // tools of each connector the model loaded.
   void SetExtraTools(base::ListValue tools);
@@ -145,6 +148,7 @@ class AgentContext {
   base::ListValue messages_;
   std::string skills_;
   std::string connectors_;
+  std::string scheduled_runs_;
   base::ListValue extra_tools_;
   std::set<std::string> loaded_connectors_;
   // "connector/tool".

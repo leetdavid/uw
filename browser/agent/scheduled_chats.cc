@@ -181,6 +181,29 @@ bool ScheduledChats::Waiting(std::string_view chat_id) const {
   return run != runs_.end() && !run->second.approval.is_null();
 }
 
+const AgentTools::Approval* ScheduledChats::WaitingStep(
+    std::string_view chat_id) const {
+  const auto run = runs_.find(chat_id);
+  return run != runs_.end() && run->second.step ? &*run->second.step : nullptr;
+}
+
+std::optional<base::Time> ScheduledChats::NextRunOf(
+    std::string_view chat_id) const {
+  const ScheduledChat* chat = Find(chat_id);
+  if (!chat || chat->paused) {
+    return std::nullopt;
+  }
+  return NextRun(chat->schedule, chat->last);
+}
+
+void ScheduledChats::SetPage(const std::string& chat_id, Page* page) {
+  if (page) {
+    pages_[chat_id] = page;
+  } else {
+    pages_.erase(chat_id);
+  }
+}
+
 void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
   const auto saved = chats_.find(chat_id);
   const bool is_new = saved == chats_.end();
@@ -197,6 +220,8 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
   if (is_new) {
     chat.last = now;
   }
+  last_model_ =
+      ModelChoice{chat.provider_id, chat.model, std::nullopt, chat.effort};
   chats_[chat_id] = std::move(chat);
   Persist();
   Arm(chat_id);
@@ -236,6 +261,16 @@ void ScheduledChats::SetPaused(const std::string& chat_id, bool paused) {
   Changed(chat_id);
 }
 
+void ScheduledChats::SetAllPaused(bool paused) {
+  std::vector<std::string> ids;
+  for (const auto& [id, chat] : chats_) {
+    ids.push_back(id);
+  }
+  for (const std::string& id : ids) {
+    SetPaused(id, paused);
+  }
+}
+
 void ScheduledChats::SetMuted(const std::string& chat_id, bool muted) {
   const auto chat = chats_.find(chat_id);
   if (chat == chats_.end() || chat->second.muted == muted) {
@@ -252,6 +287,7 @@ void ScheduledChats::AnswerApproval(const std::string& chat_id,
   if (run == runs_.end() || run->second.approval.is_null()) {
     return;
   }
+  run->second.step.reset();
   std::move(run->second.approval).Run(std::move(answer));
   Changed(chat_id);
 }
@@ -301,6 +337,16 @@ void ScheduledChats::OnTimeZoneChange(const std::string& zone_id) {
 
 void ScheduledChats::OnLoaded(std::optional<base::DictValue> saved) {
   const base::DictValue* chats = saved ? saved->FindDict("chats") : nullptr;
+  if (const base::DictValue* model =
+          saved ? saved->FindDict("last_model") : nullptr) {
+    const std::string* provider = model->FindString("provider_id");
+    const std::string* name = model->FindString("model");
+    const std::string* effort = model->FindString("effort");
+    if (provider && name) {
+      last_model_ = ModelChoice{*provider, *name, std::nullopt,
+                                effort ? *effort : std::string()};
+    }
+  }
   if (chats) {
     for (const auto [id, value] : *chats) {
       if (!ChatFile::IsChatId(id) || !value.is_dict() || chats_.contains(id)) {
@@ -351,8 +397,14 @@ void ScheduledChats::Persist() {
   for (const auto& [id, chat] : chats_) {
     chats.Set(id, ScheduledChatToValue(chat));
   }
-  if (std::optional<std::string> json =
-          base::WriteJson(base::DictValue().Set("chats", std::move(chats)))) {
+  base::DictValue saved = base::DictValue().Set("chats", std::move(chats));
+  if (last_model_) {
+    saved.Set("last_model", base::DictValue()
+                                .Set("provider_id", last_model_->provider_id)
+                                .Set("model", last_model_->model)
+                                .Set("effort", last_model_->effort));
+  }
+  if (std::optional<std::string> json = base::WriteJson(saved)) {
     writer_.WriteNow(std::move(*json));
   }
 }
@@ -442,7 +494,9 @@ void ScheduledChats::OnApproval(
     return;
   }
   run->second.approval = std::move(answer);
-  Notify(chat_id, "Waits for your approval", approval.action);
+  const std::string action = approval.action;
+  run->second.step = std::move(approval);
+  Notify(chat_id, "Waits for your approval", action);
   Changed(chat_id);
 }
 
@@ -480,12 +534,16 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
                    .Set("counted", effect.counted)
                    .Set("paused", effect.paused)
                    .Set("steps", StepsValue(outcome.steps)));
-  ChatFile::Sequence()->PostTask(
-      FROM_HERE,
-      base::BindOnce(&AppendToChat,
-                     ChatFile::FolderFor(profile_->GetPath())
-                         .AppendASCII(base::StrCat({chat_id, ".json"})),
-                     std::move(lines)));
+  if (const auto page = pages_.find(chat_id); page != pages_.end()) {
+    page->second->AddRunLines(std::move(lines));
+  } else {
+    ChatFile::Sequence()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&AppendToChat,
+                       ChatFile::FolderFor(profile_->GetPath())
+                           .AppendASCII(base::StrCat({chat_id, ".json"})),
+                       std::move(lines)));
+  }
   if (!effect.what.empty()) {
     Notify(chat_id, effect.what, effect.text);
   }

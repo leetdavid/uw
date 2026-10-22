@@ -47,6 +47,8 @@ struct ScheduledChat {
   // Whether the latest run failed, counted or not, so that a streak of
   // failures notifies once.
   bool failing = false;
+  // What went wrong with the latest run, while runs fail.
+  std::string last_failure;
   // Why uw paused it after kFailuresBeforePause failures.
   std::string pause_reason;
   // The latest kPastRuns reports, oldest first.

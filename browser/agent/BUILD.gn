@@ -129,6 +129,7 @@ source_set("scheduled_chats") {
     "//mojo/public/cpp/bindings",
     "//services/device/public/mojom",
     "//uw/components/agent",
+    "//uw/components/ai_providers",
   ]
   deps = [
     ":chat_notification",
@@ -136,7 +137,6 @@ source_set("scheduled_chats") {
     "//chrome/browser/profiles/keep_alive",
     "//content/public/browser",
     "//uw/browser/ai_providers",
-    "//uw/components/ai_providers",
   ]
 }
 

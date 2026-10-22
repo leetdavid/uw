@@ -19,6 +19,7 @@
 #include "base/strings/string_util.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/version.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
@@ -2215,6 +2216,62 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
   SaveWindowScreenshot(browser(), "chat-row-unread");
   tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
   EXPECT_TRUE(base::test::RunUntil([&] { return !MarkedState(); }));
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       TheScheduleCardSchedulesTheChatAndItsRunShows) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("It's $549.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Check the Jarvis desk price"), "It's $549.");
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "report", base::DictValue()
+                         .Set("found", true)
+                         .Set("message", "Down to $479.")))),
+       ScriptedModel::Answer("Reported.")});
+
+  ASSERT_TRUE(
+      content::ExecJs(chat, "document.querySelector('#schedule').click()"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat, "!!document.querySelector('#schedule-card')")
+        .ExtractBool();
+  }));
+  // A new card starts on the chat's first message.
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-request').value"),
+            "Check the Jarvis desk price");
+  SaveWindowScreenshot(browser(), "schedule-card");
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('#schedule-save').click()"));
+
+  // A new schedule runs at once; its line and the strip show.
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(
+               chat,
+               "document.querySelector('.run-message')?.textContent ?? ''")
+               .ExtractString()
+               .find("Down to $479.") != std::string::npos;
+  }));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(
+               chat,
+               "document.querySelector('#schedule-strip')?.textContent ?? ''")
+               .ExtractString()
+               .find("Every day at 9:00") != std::string::npos;
+  }));
+  SaveWindowScreenshot(browser(), "scheduled-chat");
+
+  // The page's own saves keep the run's line.
+  base::test::TestFuture<std::optional<base::DictValue>> loaded;
+  ChatFile(
+      browser()->GetProfile()->GetPath(),
+      content::EvalJs(chat, "document.body.dataset.chatId").ExtractString())
+      .Load(loaded.GetCallback());
+  std::optional<base::DictValue> saved = loaded.Take();
+  ASSERT_TRUE(saved);
+  const base::ListValue& log = *saved->FindList("log");
+  EXPECT_EQ(*log.back().GetDict().FindString("kind"), "run");
 }
 
 }  // namespace

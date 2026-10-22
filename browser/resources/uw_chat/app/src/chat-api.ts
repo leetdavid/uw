@@ -8,6 +8,8 @@ import {
   ChatPageCallbackRouter,
   ChatState,
   ChatConnectorState,
+  RunEnd,
+  ScheduleRepeat,
   StepKind,
 } from "uw-chat-mojom";
 import type {
@@ -16,19 +18,33 @@ import type {
   ChatConnector,
   ChatModel,
   ChatPrompt,
+  ChatSchedule,
   ChatSummary,
+  RunLine,
+  ScheduleState,
   SkillProposal,
   Step,
 } from "uw-chat-mojom";
 
-export { ApprovalChoice, ApprovalMode, ChatState, ChatConnectorState, StepKind };
+export {
+  ApprovalChoice,
+  ApprovalMode,
+  ChatState,
+  ChatConnectorState,
+  RunEnd,
+  ScheduleRepeat,
+  StepKind,
+};
 export type {
   AgentTab,
   Approval,
   ChatConnector,
   ChatModel,
   ChatPrompt,
+  ChatSchedule,
   ChatSummary,
+  RunLine,
+  ScheduleState,
   SkillProposal,
   Step,
 };
