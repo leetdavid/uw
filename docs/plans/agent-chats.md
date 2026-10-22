@@ -155,7 +155,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 18. T107: stop, steer, and queue.
 19. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
 20. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
-21. T51: scheduled chats.
+21. Scheduled chats, agreed on 2026-10-22, in this order: T147, the chat page design; T148, a window that is never shown; T149, the scheduler; T51, scheduled chats; T150, watch this page; T151, tracked values and charts; T152, the agent filling in the card; T153, triggers. See the [board](roadmap.md#board).
 22. T52: private chats.
 
 ## Acceptance checks for v2.0
