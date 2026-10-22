@@ -116,6 +116,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 - `uw-scheme-alias.patch` gives every [uw page](docs/CONTEXT.md#language) a `uw://` address. A `uw://` address opens its `chrome://` page, typed in the address bar or opened by the browser. The address bar shows and copies a `chrome://` address as `uw://`. A web page cannot open them, as with `chrome://`.
 - `uw-look.patch` adds the window tint: it hooks uw's colors and gradient into Chromium's frame painting and turns the transparent glass frame off by default.
 - `uw-workspaces.patch` brings each window back in its workspace after a restart or Cmd+Shift+T, and keeps a window that shows another workspace hidden until it is switched to. It gives the tab strip a slot for the workspace's name under the pins, hides the profile button, removes the Profiles menu, and never shows the profile picker at launch. See [ADR 0009](docs/adr/0009-switching-workspace-swaps-the-window.md).
+- `uw-trials.patch` turns on the Chromium trials uw's look is built on, which the build otherwise leaves off: Chrome's 2026 refresh (`GlowUp`: simplified menus, rounded icons, refreshed task colors, toolbar, and settings pages), the compositor loading spinner, and the sidebar's expand on hover. A `--disable-features` switch still turns any of them off. Check this list when updating Chromium: a trial that ships turns on by itself, and a new one uw needs has to be added here.
 
 Substantial Chromium product code lives in tracked `browser/` and `components/` directories. Preparation links them into the ignored Chromium checkout at `src/uw/`; it does not copy the files. The tab-tree patch ignores that generated source directory. This keeps product source reviewable while preserving an upstream-only checkout between prepare runs.
 
@@ -206,7 +207,7 @@ sudo route -n add -net 192.168.64.0/24 -interface 192.168.64.1 -cloning
 ## Build inputs and updates
 
 - [`chromium/pins.json`](chromium/pins.json) pins Chromium, `depot_tools`, and the SDK requirement.
-- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build that plays H.264 and AAC media, with debug symbols and [development checks](docs/architecture.md#native-lifetime-rules) disabled. Changing it rebuilds every file.
+- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build that plays H.264 and AAC media, with debug symbols and [development checks](docs/architecture.md#native-lifetime-rules) disabled. It leaves out the trials that Chromium's testing config turns on, so uw runs Chromium's features as released; `uw-trials.patch` turns on the few uw is built on. Changing it rebuilds every file.
 - [`chromium/patches/series`](chromium/patches/series) orders the reviewed uw changes on top of the pin.
 - [`browser/`](browser) and [`components/`](components) hold product-owned C++ source linked into the prepared checkout.
 - [`pnpm-lock.yaml`](pnpm-lock.yaml) locks the TypeScript tooling dependencies.

@@ -9,6 +9,10 @@ enable_dangling_raw_ptr_checks = false
 # H.264 and AAC, the only video formats sites such as x.com serve.
 proprietary_codecs = true
 ffmpeg_branding = "Chrome"
+# Chromium's features as released. Its testing config turns on hundreds of
+# trials, one of which crashed tabs in IndexedDB. The few uw is built on are
+# turned on in chrome_feature_list_creator.cc by uw-trials.patch.
+disable_fieldtrial_testing_config = true
 symbol_level = 0
 use_system_xcode = true
 use_remoteexec = false

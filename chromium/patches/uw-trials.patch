@@ -1,0 +1,58 @@
+diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
+index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..36ac48704e8c85a912a35ced82f4d4aaca719c34 100644
+--- a/chrome/browser/metrics/chrome_feature_list_creator.cc
++++ b/chrome/browser/metrics/chrome_feature_list_creator.cc
+@@ -22,6 +22,8 @@
+ #include "chrome/browser/metrics/chrome_metrics_services_manager_client.h"
+ #include "chrome/browser/prefs/browser_prefs.h"
+ #include "chrome/browser/prefs/chrome_pref_service_factory.h"
++#include "chrome/browser/ui/tabs/features.h"  // nogncheck
++#include "chrome/browser/ui/ui_features.h"
+ #include "chrome/common/chrome_paths.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "chrome/installer/util/initial_preferences.h"
+@@ -30,6 +32,7 @@
+ #include "components/prefs/json_pref_store.h"
+ #include "components/prefs/pref_registry_simple.h"
+ #include "components/privacy_sandbox/privacy_sandbox_features.h"
++#include "components/tab_groups/features.h"  // nogncheck
+ #include "components/variations/pref_names.h"
+ #include "components/variations/service/variations_service.h"
+ #include "components/variations/variations_crash_keys.h"
+@@ -40,6 +43,7 @@
+ #include "services/network/public/cpp/network_switches.h"
+ #include "services/network/public/cpp/shared_url_loader_factory.h"
+ #include "ui/base/resource/resource_bundle.h"
++#include "ui/base/ui_base_features.h"
+ 
+ #if BUILDFLAG(IS_WIN)
+ #include "chrome/installer/util/google_update_settings.h"
+@@ -238,11 +242,24 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
+ 
+   variations::VariationsService* variations_service =
+       metrics_services_manager_->GetVariationsService();
+-  variations_service->SetUpFieldTrials(
+-      variation_ids,
++  std::vector<base::FeatureList::FeatureOverrideInfo> overrides =
+       content::GetSwitchDependentFeatureOverrides(
+-          *base::CommandLine::ForCurrentProcess()),
+-      std::move(feature_list), browser_field_trials_.get());
++          *base::CommandLine::ForCurrentProcess());
++  // uw: the Chromium trials uw's look is built on. uw leaves out the rest of
++  // Chromium's testing config; see chromium/args.gn. A command-line switch
++  // still turns any of them off.
++  for (const base::Feature* trial :
++       {&features::kCompositorLoadingThrobber, &features::kMenuSimplification,
++        &features::kRoundedIcons, &features::kTabGroupColorRefresh,
++        &features::kTabStripDeclutter, &features::kToolbarGlowUp,
++        &features::kWebuiRefresh2026, &tab_groups::kUpdateTabGroupColors,
++        &tabs::kVerticalTabsExpandOnHover}) {
++    overrides.emplace_back(std::cref(*trial),
++                           base::FeatureList::OVERRIDE_ENABLE_FEATURE);
++  }
++  variations_service->SetUpFieldTrials(variation_ids, overrides,
++                                       std::move(feature_list),
++                                       browser_field_trials_.get());
+   variations::InitCrashKeys();
+ }
+ 
