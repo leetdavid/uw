@@ -14,7 +14,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - From T47 until T48 landed on 2026-10-15, chats ran without approvals, on test sites only. Approvals now gate every change.
 - Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now. In v2.1 the agent model moves to `uw://providers`, and each chat can switch its model and effort; see the [AI providers plan](ai-providers.md).
 - The agent may use the user's browsing history, the titles and addresses of open tabs, [agent memory](../CONTEXT.md#language), and saved passwords and passkeys.
-- [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification.
+- [Scheduled chats](../CONTEXT.md#language) replace page watches and keep the agreed [watch rules](../product.md#scheduled-chats). A step that needs approval waits and sends a notification. Runs happen out of sight, with no window needed, per those rules; agreed on 2026-10-22. Today the agent's tools open its tabs in the chat tab's window (`AgentTools`), so a run needs a window that is never shown, or a loop that does not hang off the chat page.
 - A [private chat](../CONTEXT.md#language) keeps nothing after the private windows close.
 - No cap on chats running at once. A chat the user starts is their own request, not background automation, so it never waits its turn.
 - Chats run on this Mac. Cloud runs are planned for later.
@@ -168,7 +168,6 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 ## Open questions
 
-- Where a scheduled chat runs when its tab was closed or no window is open. Proposal: it reopens its chat tab in the background in the most recent window. With no window open, it waits and runs as a [catch-up run](../CONTEXT.md#language) when a window opens.
 - Whether the model also gets a screenshot of the page, beside its text. T46 decides.
 - Whether the agent should work on `http` pages such as a local development server. The engine refuses to act on them.
 - Whether the agent learns a command's exit status. The shell does not report it without shell integration, which uw does not install. For now the agent can run `echo $?` itself.

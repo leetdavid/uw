@@ -223,7 +223,9 @@ A summary that combines several scheduled chats comes later.
 
 Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue.
 
-Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
+Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them.
+
+Agreed on 2026-10-22: runs happen out of sight, whether or not a window is open. A run never adds tabs to the user's windows and never touches the user's own tab of a watched page; it opens its own. Its tabs close when it ends, and the chat keeps the answer and a card of each page. Opening the chat, from its notification or the Chats list, shows it in the user's window; a run waiting for approval brings its waiting tab along. A run under way when uw quits is marked "Stopped before it finished". After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 
 Other proposed behavior:
 
