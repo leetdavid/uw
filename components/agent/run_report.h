@@ -67,9 +67,11 @@ base::DictValue TrackedValueToValue(const TrackedValue& value);
 // A value as a person reads it, such as "price 549 USD".
 std::string DescribeValue(const TrackedValue& value);
 
-// The message a run starts with: the chat's request, the time, and what the
-// latest kPastRuns of `past`, newest first, reported.
+// The message a run starts with: the chat's request, the watched `page` when
+// there is one, the time, and what the latest kPastRuns of `past`, newest
+// first, reported.
 std::string RunBrief(std::string_view request,
+                     std::string_view page,
                      base::Time now,
                      const std::vector<PastRun>& past);
 

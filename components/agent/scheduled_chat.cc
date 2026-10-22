@@ -7,9 +7,12 @@
 #include <array>
 #include <utility>
 
+#include "base/containers/fixed_flat_set.h"
 #include "base/json/values_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 
 namespace uw {
 
@@ -23,6 +26,12 @@ constexpr std::array<std::pair<Schedule::Repeat, std::string_view>, 5>
         {Schedule::Repeat::kWeekly, "weekly"},
         {Schedule::Repeat::kOnce, "once"},
     }};
+
+// Query parameters that only say where a visit came from. Any whose name
+// starts with utm_ goes too.
+constexpr auto kTrackingParameters = base::MakeFixedFlatSet<std::string_view>(
+    {"_ga", "dclid", "fbclid", "gclid", "igshid", "mc_cid", "mc_eid", "msclkid",
+     "ref", "ref_src", "yclid"});
 
 base::DictValue ReportToValue(const RunReport& report) {
   base::ListValue values;
@@ -51,6 +60,7 @@ bool ScheduledChat::operator==(const ScheduledChat& other) const {
     });
   };
   return schedule == other.schedule && request == other.request &&
+         page == other.page && watch_for == other.watch_for &&
          regular_updates == other.regular_updates &&
          even_when_nothing_changes == other.even_when_nothing_changes &&
          provider_id == other.provider_id && model == other.model &&
@@ -59,6 +69,27 @@ bool ScheduledChat::operator==(const ScheduledChat& other) const {
          failures == other.failures && failing == other.failing &&
          last_failure == other.last_failure &&
          pause_reason == other.pause_reason && same_runs(recent, other.recent);
+}
+
+GURL WatchedAddress(const GURL& url) {
+  std::vector<std::string_view> kept;
+  for (std::string_view pair :
+       base::SplitStringPiece(url.query(), "&", base::KEEP_WHITESPACE,
+                              base::SPLIT_WANT_NONEMPTY)) {
+    const std::string_view name = pair.substr(0, pair.find('='));
+    if (!name.starts_with("utm_") && !kTrackingParameters.contains(name)) {
+      kept.push_back(pair);
+    }
+  }
+  const std::string query = base::JoinString(kept, "&");
+  GURL::Replacements replacements;
+  replacements.ClearRef();
+  if (query.empty()) {
+    replacements.ClearQuery();
+  } else {
+    replacements.SetQueryStr(query);
+  }
+  return url.ReplaceComponents(replacements);
 }
 
 base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
@@ -83,6 +114,8 @@ base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
       .Set("start", base::TimeToValue(chat.schedule.start))
       .Set("time_zone", chat.schedule.time_zone)
       .Set("request", chat.request)
+      .Set("page", chat.page)
+      .Set("watch_for", chat.watch_for)
       .Set("regular_updates", chat.regular_updates)
       .Set("even_when_nothing_changes", chat.even_when_nothing_changes)
       .Set("provider_id", chat.provider_id)
@@ -122,6 +155,8 @@ std::optional<ScheduledChat> ScheduledChatFromValue(
   }
   chat.schedule.time_zone = StringOr(value, "time_zone");
   chat.request = StringOr(value, "request");
+  chat.page = StringOr(value, "page");
+  chat.watch_for = StringOr(value, "watch_for");
   chat.regular_updates = value.FindBool("regular_updates").value_or(false);
   chat.even_when_nothing_changes =
       value.FindBool("even_when_nothing_changes").value_or(false);

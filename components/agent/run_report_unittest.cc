@@ -101,7 +101,7 @@ TEST(RunReportTest, TheBriefHasTheRequestTheTimeAndTheLatestRuns) {
                   {true, "Down to $479.", {{"price", "USD", 479.0}}}});
 
   const std::string brief =
-      RunBrief("Tell me when the Jarvis desk drops below $500.",
+      RunBrief("Tell me when the Jarvis desk drops below $500.", "",
                Utc(2026, 10, 23, 16), past);
 
   EXPECT_THAT(brief, HasSubstr("It is Friday 23 October 2026, 09:00."));
@@ -114,10 +114,18 @@ TEST(RunReportTest, TheBriefHasTheRequestTheTimeAndTheLatestRuns) {
                                "- Tuesday 20 October 2026, 09:00:"));
   EXPECT_THAT(brief, Not(HasSubstr("Monday 19 October")));
   EXPECT_THAT(brief, HasSubstr("call report once"));
+  EXPECT_THAT(brief, Not(HasSubstr("The page it watches")));
+}
+
+TEST(RunReportTest, TheBriefNamesAWatchedPage) {
+  EXPECT_THAT(
+      RunBrief("Tell me when the price drops.",
+               "https://fully.com/desks/jarvis", Utc(2026, 10, 23, 16), {}),
+      HasSubstr("The page it watches: https://fully.com/desks/jarvis"));
 }
 
 TEST(RunReportTest, TheFirstRunIsToldItIsTheFirst) {
-  EXPECT_THAT(RunBrief("Summarize Hacker News.", Utc(2026, 10, 23, 14), {}),
+  EXPECT_THAT(RunBrief("Summarize Hacker News.", "", Utc(2026, 10, 23, 14), {}),
               HasSubstr("This is the first run."));
 }
 

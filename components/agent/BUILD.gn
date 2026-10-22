@@ -26,6 +26,7 @@ source_set("agent") {
   public_deps = [
     "//base",
     "//uw/components/tab_organization",
+    "//url",
   ]
   deps = [
     "//base:i18n",
@@ -56,5 +57,6 @@ source_set("unit_tests") {
     "//components/optimization_guide/proto:optimization_guide_proto",
     "//testing/gmock",
     "//testing/gtest",
+    "//url",
   ]
 }

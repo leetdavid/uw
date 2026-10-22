@@ -11,6 +11,7 @@
 
 #include "base/time/time.h"
 #include "base/values.h"
+#include "url/gurl.h"
 #include "uw/components/agent/run_report.h"
 #include "uw/components/agent/schedule.h"
 
@@ -25,6 +26,11 @@ struct ScheduledChat {
   Schedule schedule;
   // What each run is asked.
   std::string request;
+  // For a watched page, its address, and what the watch card's chip asked
+  // for, such as "Price drops below $500", which is empty when the user wrote
+  // the request in their own words. Both empty for any other scheduled chat.
+  std::string page;
+  std::string watch_for;
   // Regular updates tell the user after every run. Change alerts tell them
   // only when a run finds what they asked to hear about, or after every run
   // with `even_when_nothing_changes`.
@@ -56,6 +62,10 @@ struct ScheduledChat {
 
   bool operator==(const ScheduledChat&) const;
 };
+
+// The address that `url` matches a watched page by: `url` without the part
+// after # and without common tracking parameters, such as utm_source and ref.
+GURL WatchedAddress(const GURL& url);
 
 base::DictValue ScheduledChatToValue(const ScheduledChat& chat);
 std::optional<ScheduledChat> ScheduledChatFromValue(

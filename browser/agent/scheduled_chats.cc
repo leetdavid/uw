@@ -188,6 +188,19 @@ const AgentTools::Approval* ScheduledChats::WaitingStep(
   return run != runs_.end() && run->second.step ? &*run->second.step : nullptr;
 }
 
+const std::string* ScheduledChats::ChatWatching(const GURL& page) const {
+  if (!page.is_valid()) {
+    return nullptr;
+  }
+  const GURL address = WatchedAddress(page);
+  for (const auto& [id, chat] : chats_) {
+    if (!chat.page.empty() && WatchedAddress(GURL(chat.page)) == address) {
+      return &id;
+    }
+  }
+  return nullptr;
+}
+
 std::optional<base::Time> ScheduledChats::NextRunOf(
     std::string_view chat_id) const {
   const ScheduledChat* chat = Find(chat_id);
@@ -212,6 +225,12 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
     // A changed schedule keeps what its runs found, and starts again.
     chat.recent = std::move(saved->second.recent);
     chat.last = saved->second.last;
+    if (chat.page.empty()) {
+      chat.page = saved->second.page;
+      if (chat.request == saved->second.request) {
+        chat.watch_for = saved->second.watch_for;
+      }
+    }
   }
   chat.paused = false;
   chat.failures = 0;
@@ -231,6 +250,25 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
     StartRun(chat_id, now);
   }
   Changed(chat_id);
+}
+
+std::string ScheduledChats::Watch(ScheduledChat chat) {
+  const std::string id = ChatFile::NewChatId();
+  const base::Time now = base::Time::Now();
+  ChatFile(profile_->GetPath(), id)
+      .Save(base::DictValue()
+                .Set("version", 1)
+                .Set("title", chat.request)
+                .Set("updated", base::TimeToValue(now))
+                .Set("log",
+                     base::ListValue().Append(base::DictValue()
+                                                  .Set("kind", "user")
+                                                  .Set("text", chat.request))));
+  if (ChatIndex* index = ChatIndex::For(profile_)) {
+    index->Update({id, chat.request, now, ChatIndex::State::kDone});
+  }
+  Save(id, std::move(chat));
+  return id;
 }
 
 void ScheduledChats::Remove(const std::string& chat_id) {
@@ -491,7 +529,8 @@ void ScheduledChats::OnFormat(const std::string& chat_id,
   }
   run->second.run = std::make_unique<ChatRun>(
       profile_, std::move(model), ModeFrom(chat->second.approval_mode),
-      RunBrief(chat->second.request, when, chat->second.recent),
+      RunBrief(chat->second.request, chat->second.page, when,
+               chat->second.recent),
       base::BindOnce(&ScheduledChats::OnRunDone, weak_factory_.GetWeakPtr(),
                      chat_id, when));
   run->second.run->SetApprover(base::BindRepeating(

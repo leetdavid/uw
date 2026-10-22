@@ -122,11 +122,11 @@ class ScheduledChatsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Waits until the chat's run ends, and returns the chat's saved lines.
-  base::ListValue LinesAfterTheRun() {
+  base::ListValue LinesAfterTheRun(std::string_view chat_id = kChat) {
     EXPECT_TRUE(base::test::RunUntil(
-        [&] { return chats()->loaded() && !chats()->Running(kChat); }));
+        [&] { return chats()->loaded() && !chats()->Running(chat_id); }));
     base::test::TestFuture<std::optional<base::DictValue>> loaded;
-    ChatFile(profile()->GetPath(), kChat).Load(loaded.GetCallback());
+    ChatFile(profile()->GetPath(), chat_id).Load(loaded.GetCallback());
     std::optional<base::DictValue> chat = loaded.Take();
     const base::ListValue* log = chat ? chat->FindList("log") : nullptr;
     return log ? log->Clone() : base::ListValue();
@@ -288,6 +288,43 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {
   ASSERT_EQ(chats->Find(kChat)->recent.size(), 1u);
   EXPECT_EQ(chats->Find(kChat)->recent.back().report.message, "Down to $479.");
   SetBrowser(CreateBrowser(profile));
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       WatchingAPageMakesAChatThatRunsAtOnce) {
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/desk"))))),
+       Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  ScheduledChat watch = DeskWatch(ProviderId());
+  watch.page = Url("/desk");
+  watch.watch_for = "Price drops below $500";
+
+  const std::string id = chats()->Watch(watch);
+
+  ASSERT_TRUE(chats()->ChatWatching(GURL(Url("/desk?utm_source=news#top"))));
+  EXPECT_EQ(*chats()->ChatWatching(GURL(Url("/desk?utm_source=news#top"))), id);
+  EXPECT_FALSE(chats()->ChatWatching(GURL(Url("/desk?size=large"))));
+  const base::ListValue lines = LinesAfterTheRun(id);
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[0].GetDict().FindString("kind"), "user");
+  EXPECT_EQ(*lines[0].GetDict().FindString("text"), watch.request);
+  EXPECT_EQ(*lines[1].GetDict().FindString("kind"), "run");
+  EXPECT_EQ(*lines[1].GetDict().FindString("text"), "Down to $479.");
+  const std::vector<ChatIndex::Entry> entries =
+      ChatIndex::For(profile())->Entries();
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(entries[0].id, id);
+  EXPECT_EQ(entries[0].title, watch.request);
+
+  // The chat's own card, which has no page, keeps the watch.
+  ScheduledChat edited = *chats()->Find(id);
+  edited.page.clear();
+  edited.watch_for.clear();
+  edited.schedule.hour = 8;
+  chats()->Save(id, edited);
+  EXPECT_EQ(chats()->Find(id)->page, Url("/desk"));
+  EXPECT_EQ(chats()->Find(id)->watch_for, "Price drops below $500");
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

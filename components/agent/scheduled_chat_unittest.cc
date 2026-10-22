@@ -36,6 +36,8 @@ RunReport Report(bool found, std::string message) {
 TEST(ScheduledChatTest, KeepsEverythingItSaves) {
   ScheduledChat chat = DeskWatch();
   chat.schedule.time_zone = "America/Los_Angeles";
+  chat.page = "https://fully.com/desks/jarvis";
+  chat.watch_for = "Price drops below $500";
   chat.even_when_nothing_changes = true;
   chat.provider_id = "deepseek";
   chat.model = "deepseek-flash";
@@ -59,6 +61,23 @@ TEST(ScheduledChatTest, RefusesWhatTheCardCouldNotHaveSaved) {
   base::DictValue unknown =
       ScheduledChatToValue(DeskWatch()).Set("repeat", "fortnightly");
   EXPECT_EQ(ScheduledChatFromValue(unknown), std::nullopt);
+}
+
+TEST(ScheduledChatTest, AWatchedPageMatchesWithoutItsFragmentOrTracking) {
+  const GURL page("https://fully.com/desks/jarvis?color=bamboo");
+  EXPECT_EQ(WatchedAddress(GURL("https://fully.com/desks/jarvis?utm_source="
+                                "news&color=bamboo&ref=home#reviews")),
+            page);
+  EXPECT_EQ(WatchedAddress(
+                GURL("https://fully.com/desks/jarvis?color=bamboo&fbclid=1")),
+            page);
+  EXPECT_EQ(
+      WatchedAddress(GURL("https://fully.com/desks/jarvis?utm_campaign=fall")),
+      GURL("https://fully.com/desks/jarvis"));
+  EXPECT_NE(WatchedAddress(GURL("https://fully.com/desks/jarvis?color=walnut")),
+            page);
+  EXPECT_NE(WatchedAddress(GURL("https://fully.com/desks/jarvis?reference=1")),
+            GURL("https://fully.com/desks/jarvis"));
 }
 
 TEST(ScheduledChatTest, ChangeAlertsTellOnlyWhatWasAskedFor) {

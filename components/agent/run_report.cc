@@ -179,11 +179,15 @@ std::string DescribeValue(const TrackedValue& value) {
 }
 
 std::string RunBrief(std::string_view request,
+                     std::string_view page,
                      base::Time now,
                      const std::vector<PastRun>& past) {
   std::string brief =
       base::StrCat({"This is a scheduled run of the user's request. It is ",
                     When(now), ".\n\nThe request: ", request, "\n\n"});
+  if (!page.empty()) {
+    brief += base::StrCat({"The page it watches: ", page, "\n\n"});
+  }
   if (past.empty()) {
     brief += "This is the first run.\n\n";
   } else {
