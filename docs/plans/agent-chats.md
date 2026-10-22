@@ -86,6 +86,8 @@ Added on 2026-10-20 for T124: "Agent terminal: a command waits for you (Fluid)" 
 - A terminal tab card shows the screen's last lines in mono, the tab's title, and Running, Waits for your approval, or Ran 1 min ago.
 - The notes under the composer become "Every click, typing, and command waits for your approval", "Changes on a site and risky commands wait for your approval", and "Full auto: the agent acts without asking, except to read a sensitive file".
 
+Added on 2026-10-22 for scheduled chats: "Watch this page: the card" and "Watch this page: every state" draw the eye beside the star in the address bar, the schedule card with "Watch for", the card of a watched page, and the card from a chat with its Trigger row. They are proposals until the user signs off.
+
 How the chat is built:
 
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages. uw turns off the engine's Gemini-only pieces: the toolbar task icon, the take-over button, the overlay over the agent's tab, and the "Gemini is working" toast. The task icon brought Gemini's button with it, and clicking that button aborted uw on 2026-10-15. The blue icon on the agent's tab stays.
