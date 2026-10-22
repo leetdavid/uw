@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "base/files/file_path.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "chrome/app/chrome_command_ids.h"
@@ -48,6 +49,7 @@ namespace {
 constexpr char kForm[] = "data:text/html,<input id=field>";
 constexpr char kNotes[] = "chrome://version/?notes";
 constexpr char kArticle[] = "chrome://version/?article";
+constexpr char kOtherProfile[] = "Other";
 constexpr NSEventModifierFlags kOptionCmd =
     NSEventModifierFlagOption | NSEventModifierFlagCommand;
 
@@ -300,6 +302,32 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
 
   RemoveProvider(*other.GetPrefs(), id);
   EXPECT_FALSE(FindProvider(*prefs, id));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       PRE_ARemovedProviderStaysRemovedInAProfileNotLoaded) {
+  AddProvider(*profile()->GetPrefs(), PresetProvider(ProviderPreset::kOllama));
+  ProfileManager* manager = g_browser_process->profile_manager();
+  Profile& other = profiles::testing::CreateProfileSync(
+      manager, manager->user_data_dir().AppendASCII(kOtherProfile));
+  EXPECT_EQ(ReadProviders(*other.GetPrefs()).size(), 1u);
+}
+
+// The other profile still has the provider when it loads, but has joined
+// before, so it takes the shared providers.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       ARemovedProviderStaysRemovedInAProfileNotLoaded) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  const base::FilePath path =
+      manager->user_data_dir().AppendASCII(kOtherProfile);
+  ASSERT_FALSE(manager->GetProfileByPath(path));
+  const std::vector<Provider> providers = ReadProviders(*profile()->GetPrefs());
+  ASSERT_EQ(providers.size(), 1u);
+  RemoveProvider(*profile()->GetPrefs(), providers[0].id);
+
+  Profile& other = profiles::testing::CreateProfileSync(manager, path);
+  EXPECT_TRUE(ReadProviders(*other.GetPrefs()).empty());
+  EXPECT_TRUE(ReadProviders(*profile()->GetPrefs()).empty());
 }
 
 // As when the command bar's row for an open tab is picked.

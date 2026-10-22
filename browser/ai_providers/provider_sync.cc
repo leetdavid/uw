@@ -17,6 +17,7 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
+#include "components/prefs/scoped_user_pref_update.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -38,6 +39,7 @@ bool Has(const base::ListValue& providers, const std::string& id) {
 
 void RegisterSharedProviderPrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kSharedProvidersPref);
+  registry->RegisterListPref(kJoinedProfilesPref);
 }
 
 // static
@@ -80,11 +82,15 @@ void ProviderSync::Join(Profile* profile) {
   PrefService* prefs = profile->GetPrefs();
   base::ListValue shared = local_state_->GetList(kSharedProvidersPref).Clone();
   bool grew = false;
-  for (const base::Value& own : prefs->GetList(kProvidersPref)) {
-    if (const std::string* id = IdOf(own); id && !Has(shared, *id)) {
-      shared.Append(own.Clone());
-      grew = true;
+  const std::string name = profile->GetBaseName().AsUTF8Unsafe();
+  if (!local_state_->GetList(kJoinedProfilesPref).contains(name)) {
+    for (const base::Value& own : prefs->GetList(kProvidersPref)) {
+      if (const std::string* id = IdOf(own); id && !Has(shared, *id)) {
+        shared.Append(own.Clone());
+        grew = true;
+      }
     }
+    ScopedListPrefUpdate(local_state_, kJoinedProfilesPref)->Append(name);
   }
   local_state_->SetList(kSharedProvidersPref, shared.Clone());
   {

@@ -23,13 +23,16 @@ namespace uw {
 
 // Every profile's providers, in local state.
 inline constexpr char kSharedProvidersPref[] = "uw.providers.shared";
+// The folder names of the profiles that have joined, in local state.
+inline constexpr char kJoinedProfilesPref[] = "uw.providers.joined";
 
 void RegisterSharedProviderPrefs(PrefRegistrySimple* registry);
 
 // Keeps the providers of uw://ai/providers the same in every profile. A
 // provider added, changed, or removed in one profile changes local state and
-// every loaded profile. A profile that loads takes the shared providers,
-// after adding any only it had, so profiles from before keep theirs. Keys are
+// every loaded profile. A profile that loads takes the shared providers. The
+// first time, it adds any only it had, so profiles from before keep theirs;
+// later, a provider removed while it was not loaded stays removed. Keys are
 // in the Keychain under each provider's id, which every profile shares. Each
 // profile keeps its own model choices.
 class ProviderSync : public ProfileManagerObserver, public ProfileObserver {
