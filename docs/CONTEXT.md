@@ -108,6 +108,14 @@ _Avoid_: Pinned tab, locked tab, held tab.
 **Task extraction**:
 Separating a tab branch or selected tabs into a task of their own.
 
+**Tidy**:
+Filing the Scratchpad's tabs into tasks all at once, when the user asks. Tabs that fit no task and start none stay in the Scratchpad.
+_Avoid_: Reorganize all tabs, organize all, sort.
+
+**Clear**:
+Closing the Scratchpad's tabs all at once, except kept tabs and busy terminals.
+_Avoid_: Archive, close all.
+
 **Organization action**:
 A set of related changes to the tab tree, such as creating a task and moving tabs into it, treated as one operation.
 
