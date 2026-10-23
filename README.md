@@ -9,9 +9,57 @@
 
 <p align="center"><strong>ur web, ur way</strong></p>
 
-uw browser is a Chromium-based browser for macOS in early development. Its main features are [automatic tab organization](docs/product.md#automatic-tab-organization), [agent automation](docs/product.md#agent-automation), and [integrations](docs/product.md#integrations) such as a terminal tab. [Verification status](#verification-status) records what has been built and tested.
+<p align="center">A Chromium browser for macOS that keeps your tabs organized for you.</p>
 
-[Product docs and roadmap](docs/README.md)
+> [!WARNING]
+> **uw is in early development.** There are no downloads or releases yet, so you have to build it from source. Features are unfinished, things break, and behavior changes from week to week. Don't trust it with browsing data you care about.
+
+![uw with three tasks in the sidebar. Jev has just moved "The best pastel de nata in Lisbon" into the "Plan Lisbon trip" task, and a card at the foot of the sidebar offers Undo.](docs/assets/screenshots/organize.png)
+
+## Tabs that organize themselves
+
+Open tabs the way you always do. uw files each one into the task it belongs to.
+
+- A task is a Chromium tab group. A page you open from another page nests under it.
+- [Jev](https://typesafe.ai), a decision model from TypeSafe, decides where each tab goes and how sure it is. uw moves a tab only when the model is sure enough, and you set how sure on the settings page.
+- Tabs that fit no task wait in the Scratchpad. A page that starts something new gets a task of its own, named by your language model.
+- Every move shows a card with Undo. Option+Cmd+Z undoes it too.
+- It is off until you pick a model and turn it on. uw then sends each tab's title, address, and a short excerpt of its text to that model.
+
+## Bring your own key
+
+uw has no account and no AI service of its own. Add the providers you already use, and uw talks to them directly.
+
+- OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, or any other address with a compatible API.
+- Keys stay in the macOS Keychain.
+- Pick a model for each job: a decision model places tabs, a language model names tasks, and an agent model runs chats. Each sends its requests only to its own provider.
+- Use Ollama to keep everything on your Mac.
+
+![The uw://ai providers page. OpenAI, Anthropic, Ollama, and Jev are added, with a model picked for each job.](docs/assets/screenshots/bring-your-own-key.png)
+
+## Vertical tabs and workspaces
+
+uw looks and works like Arc, built on Chromium.
+
+- Tabs are always vertical, in a sidebar tinted with a theme you pick.
+- Workspaces keep work and personal browsing apart. Switch from the foot of the sidebar, or swipe.
+- Pinned tabs sit as tiles at the top of the sidebar, shared by every window.
+- Dark mode is true black.
+
+![uw in dark mode. Four pinned tabs sit as tiles above two tasks, and the switcher at the foot of the sidebar shows three workspaces.](docs/assets/screenshots/workspaces.png)
+
+## What's built
+
+| Feature | State |
+| --- | --- |
+| Automatic tab organization with Jev | Built, not yet verified |
+| Bring-your-own-key providers | Built, not yet verified |
+| Vertical tabs, themes, pinned tabs, and workspaces | Built, not yet verified |
+| Agent chats, a terminal tab, and a command bar | In progress |
+
+The [board](docs/plans/roadmap.md#board) tracks each piece, and [Try the current build](docs/try-uw.md) lists what to test and the known gaps. [Verification status](#verification-status) records what has been built and tested. The [product docs](docs/README.md) describe where uw is going.
+
+To try uw, build it from source. The rest of this page covers how.
 
 ## Build-host requirements
 
@@ -147,6 +195,8 @@ pnpm run check && pnpm run verify --jobs 8
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
 To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, the narrow sidebar, two picked tints, black dark mode with a picked tint, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, a suggestion with its Confirm button, the theme picker, the providers page, the terminal, and the command bar in dark mode, the Organize card while organizing and paused in light and dark mode, the task card in light and dark mode, a task renamed on its row in the wide and the collapsed sidebar, Name Task at work and failed, and the settings page with its models, a failed connection test with its details, and its theme row.
+
+`ReadmeScreenshotsBrowserTest` draws the pictures at the top of this page at twice the size, from pages and model providers it plays itself. To redraw them, run it from `.chromium/src` with `UW_SCREENSHOT_DIR` set to `../../docs/assets/screenshots`.
 
 `LiveLanguageModelBrowserTest.NameTaskWithDeepSeek` sends Name Task to DeepSeek's `deepseek-flash` and checks that a name comes back. It is skipped unless `DEEPSEEK_API_KEY` is set. Put the key in `.env.test` at the repo root, which git ignores, and run from `.chromium/src`:
 

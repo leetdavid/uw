@@ -40,7 +40,10 @@ source_set("look") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "tint_browsertest.cc" ]
+  sources = [
+    "readme_screenshots_browsertest.cc",
+    "tint_browsertest.cc",
+  ]
   if (is_mac) {
     sources += [ "window_buttons_browsertest.mm" ]
   }
@@ -55,15 +58,28 @@ source_set("browser_tests") {
     "//chrome/common:constants",
     "//chrome/test:test_support",
     "//components/prefs",
+    "//components/tab_groups",
     "//content/test:test_support",
+    "//services/network/public/cpp",
     "//skia",
     "//testing/gtest",
     "//ui/base/mojom",
     "//ui/color",
     "//ui/gfx:color_utils",
+    "//ui/gfx:gfx_switches",
     "//ui/views",
     "//url",
+    "//uw/browser/agent:skill_folders",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
+    "//uw/browser/connectors",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/workspaces",
+    "//uw/components/ai_providers",
+    "//uw/components/look",
     "//uw/components/look:prefs",
   ]
 }
