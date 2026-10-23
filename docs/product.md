@@ -61,7 +61,7 @@ Other day-one browser workflow requirements remain open.
 
 ## Automatic tab organization
 
-Agreed priority: the [automatic organization MVP](plans/automatic-organization.md) is part of the [minimum usable version](#minimum-usable-version). It classifies continuously into existing tasks and creates named new tasks. Jev fast classification, the separate naming call, user-directed proposals, and "Reorganize all tabs" land later.
+Agreed priority: the [automatic organization MVP](plans/automatic-organization.md) is part of the [minimum usable version](#minimum-usable-version). It classifies continuously into existing tasks and creates named new tasks. Jev fast classification, the separate naming call, user-directed proposals, and [Tidy](plans/scratchpad-buttons.md) land later.
 
 Agreed scope: the first tab-management release focuses on organization. Infer the user's browsing task, then decide how to organize the tabs. Preserve familiar Chromium behaviors where possible and expose tree-specific operations as explicit actions. Automatic tab closing and suspension are deferred.
 
@@ -98,7 +98,7 @@ Agreed:
 - When a selected tab moves into a collapsed task group, keep the group collapsed and show a brief destination cue rather than changing the user's expansion choice.
 - Let the user change grouping and ordering. Manual placement takes priority while the tab serves the same browsing task. A later clear change of activity makes the tab eligible for automatic regrouping again; ordinary navigation within the same task preserves the correction. Exception: a child tab the user nested by hand stays under its parent until the user moves it or the parent closes. Agreed on 2026-10-15. The user can also keep any tab where it is with Keep here, agreed on 2026-10-19; see [Automatic organization](plans/automatic-organization.md#agreed-scope).
 - For the first release, treat a manual correction as applying only to that tab or branch while its activity remains the same. Do not infer a broader placement rule from one correction.
-- Provide a "Reorganize all tabs" button for an additional on-demand AI pass across all tabs in the current window, including the current task group.
+- Provide Tidy, an on-demand AI pass that files the Scratchpad's tabs into tasks. Changed on 2026-10-24: it was a "Reorganize all tabs" button over every tab in the window. See the [Scratchpad buttons plan](plans/scratchpad-buttons.md).
 
 ### Organization latency
 
@@ -110,7 +110,9 @@ Reference hardware, representative input sizes and task counts, and cold-start e
 
 ### Scratchpad
 
-Agreed: each window has an always-visible Scratchpad section below every task group, at the foot of the tab list. Changed on 2026-10-13. It used to sit above the tasks. It contains every ungrouped regular tab and candidate branch, rendered as a nested tree. A confident placement moves a whole Scratchpad branch into the matched task by default. Tabs leave it only through confident automatic placement, an accepted task proposal, or a manual move. Scratchpad is not a task group and does not participate in task ordering or automatic task restructuring.
+Agreed: each window has an always-visible Scratchpad section below every task group, at the foot of the tab list. Changed on 2026-10-13. It used to sit above the tasks. It contains every ungrouped regular tab and candidate branch, rendered as a nested tree. A confident placement moves a whole Scratchpad branch into the matched task by default. Tabs leave it only through confident automatic placement, an accepted task proposal, Tidy, or a manual move. Scratchpad is not a task group and does not participate in task ordering or automatic task restructuring.
+
+Agreed on 2026-10-24: the Scratchpad heading has Tidy and Clear, as Arc has. Clear closes the Scratchpad's tabs. See the [Scratchpad buttons plan](plans/scratchpad-buttons.md).
 
 ### User-directed mode
 
@@ -156,11 +158,11 @@ Agreed: one Undo reverses a complete organization action, including task creatio
 
 Agreed: expose organization controls through a custom button menu inside the tab sidebar, so manual organization remains usable while automatic behavior is developed.
 
-Built: an "Organize" pill at the foot of the sidebar. It opens a card with a status line, one pause row, "Undo Move", "Show Activity", and "Settings…". A task's ⋮ button and a right-click on its row open the task's card, and a task is renamed on its own row. See the [sidebar menus plan](plans/sidebar-menus.md). Tab and branch actions such as "Move to New Task" and "Close Branch" are in each tab's right-click menu and the menu bar. Proposed: "Reorganize all tabs" and the automatic/user-directed mode choice join the Organize card when they are built.
+Built: an "Organize" pill at the foot of the sidebar. It opens a card with a status line, one pause row, "Undo Move", "Show Activity", and "Settings…". A task's ⋮ button and a right-click on its row open the task's card, and a task is renamed on its own row. See the [sidebar menus plan](plans/sidebar-menus.md). Tab and branch actions such as "Move to New Task" and "Close Branch" are in each tab's right-click menu and the menu bar. Proposed: the automatic/user-directed mode choice joins the Organize card when it is built. Tidy and Clear are on the Scratchpad heading.
 
 Agreed on 2026-10-15: the [new button](plans/keyboard-and-mouse.md#new-button), a "+" with a menu, sits at the right end of the sidebar's foot, across from Organize, and replaces the "+" under the tab list.
 
-Agreed: provide global pause choices for automatic organization: "Pause for 1 hour", "Pause until next launch", and "Pause indefinitely", plus "Resume automatic organization". Pausing stops automatic placements and task proposals across all windows, including application of pending automatic results. Manual tree controls and explicitly requested "Reorganize all tabs" remain available. An explicit reorganization still targets the current window.
+Agreed: provide global pause choices for automatic organization: "Pause for 1 hour", "Pause until next launch", and "Pause indefinitely", plus "Resume automatic organization". Pausing stops automatic placements and task proposals across all windows, including application of pending automatic results. Manual tree controls and Tidy remain available. Tidy still targets the current window.
 
 While automatic organization is off, the settings page hides the pause choices and the menus gray them out. Agreed on 2026-10-15.
 

@@ -122,7 +122,7 @@ Agreed on 2026-10-13. `PlaceBranch` in `components/tab_organization/placement` h
 - A tab that uw filed stays where it is until it shows something else. uw does not ask about it again before then.
 - The same answers give the same moves, and carrying them out twice changes nothing. `PlacementTest.TheSameAnswersGiveTheSameMovesAndASecondPassMovesNothing` checks it.
 
-"Reorganize all tabs" would run the same rules over every branch in the window. It is a [later stage](#later-stages).
+Tidy files every Scratchpad tab in one request, by the same rules. See the [Scratchpad buttons plan](scratchpad-buttons.md).
 
 ### Hub pages
 
@@ -236,7 +236,7 @@ Measured on the 115 placement requests the organizer log recorded on 2026-10-12,
 - A managed local model runtime and Anthropic-format providers.
 - Placing a moved branch under a page in the destination task.
 - Automatic merging and whole-window reorganization passes. A single branch leaving its task is in scope; splitting a task into several is not.
-- User-directed proposals and "Reorganize all tabs".
+- User-directed proposals, and Tidy, which has its own [plan](scratchpad-buttons.md).
 - Renaming a task whose name the user typed, unless they hand it back with the name lock or choose Name Task. Automatic renaming without a decision model.
 - Automatic tab closing and suspension.
 - The 200 ms placement budget in [Product](../product.md#organization-latency). Measure first.
@@ -313,7 +313,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 ## Later stages
 
 - The 200 ms placement path with measured provider latency.
-- User-directed proposals and "Reorganize all tabs".
+- User-directed proposals.
 - Managed local runtime and Anthropic-format providers.
 - A card with Undo for a new task name.
 - A browser test for an answer that waits while another request about its branch is out. The test server can hold back every request to one address, not the request about one tab, so only the unit tests cover the rule.
