@@ -51,15 +51,11 @@ function WhoStarts({ skill }: { skill: SkillInfo }) {
 // `onCount` hears how many skills are on, for the section list.
 export function SkillsSection({ onCount }: { onCount: (on: number) => void }) {
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
-  const [folder, setFolder] = useState("");
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SkillSource | null>(null);
 
   useEffect(() => {
-    providersHandler.getSkills().then((answer) => {
-      setSkills(answer.skills);
-      setFolder(answer.folder);
-    });
+    providersHandler.getSkills().then((answer) => setSkills(answer.skills));
   }, []);
   const on = skills?.filter((skill) => skill.on).length ?? 0;
   useEffect(() => {
@@ -107,7 +103,7 @@ export function SkillsSection({ onCount }: { onCount: (on: number) => void }) {
         The agent sees each skill's one-line description and reads a skill's
         instructions only when a request calls for it. Type / in a chat to
         start one yourself. Scripts in a skill do not run. Add a skill by
-        putting its folder in {folder}, or ask a chat to make one.
+        putting it in the skills folder, or ask a chat to make one.
       </p>
       <div className="flex flex-wrap items-center gap-2.5">
         <input

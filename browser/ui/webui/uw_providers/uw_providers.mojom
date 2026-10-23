@@ -236,8 +236,8 @@ interface ProvidersHandler {
   // the model tested.
   TestModel(ModelSlot slot) => (ModelTestResult result);
   DismissUpgradeNotice() => ();
-  // Every skill the agent can use, and the folder that holds uw's own.
-  GetSkills() => (array<SkillInfo> skills, string folder);
+  // Every skill the agent can use.
+  GetSkills() => (array<SkillInfo> skills);
   // Turns the skill `name` on or off for every chat.
   SetSkillOn(string name, bool on);
   // Shows uw's skills folder in Finder, making it first if need be.

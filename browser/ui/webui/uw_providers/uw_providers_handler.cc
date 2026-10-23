@@ -489,7 +489,7 @@ void UwProvidersHandler::ReplySkills(GetSkillsCallback callback,
         skill.name, skill.description, source, !off.contains(skill.name),
         skill.for_agent, skill.for_user, skill.argument_hint));
   }
-  std::move(callback).Run(std::move(infos), UwSkillsFolder().AsUTF8Unsafe());
+  std::move(callback).Run(std::move(infos));
 }
 
 void UwProvidersHandler::SetSkillOn(const std::string& name, bool on) {

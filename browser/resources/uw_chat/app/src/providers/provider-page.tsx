@@ -39,7 +39,7 @@ function abilitiesSource(provider: Provider) {
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid h-[50px] grid-cols-[110px_minmax(0,1fr)] items-center gap-3 pl-4 pr-3 [&+&]:border-t [&+&]:border-border">
+    <div className="grid min-h-[50px] grid-cols-[110px_minmax(0,1fr)] items-center gap-3 py-[9px] pl-4 pr-3 [&+&]:border-t [&+&]:border-border">
       <span className="font-medium text-muted-foreground">{label}</span>
       {children}
     </div>

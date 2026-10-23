@@ -36,6 +36,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
+#include "ui/color/color_id.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -43,6 +44,7 @@
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/button_test_api.h"
@@ -419,6 +421,9 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
   views::Widget* card = switcher->card();
   ASSERT_TRUE(card);
   EXPECT_FALSE(Dialog(card)->GetExtraView());
+  // Deleting is drawn red, as the design says for a button that destroys.
+  EXPECT_EQ(Dialog(card)->GetOkButton()->GetBgColorIdOverride(),
+            ui::kColorSysError);
   SaveWidgetScreenshot(card, "delete-workspace");
   Dialog(card)->AcceptDialog();
 

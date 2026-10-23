@@ -317,6 +317,13 @@ CardBubble* MakeDeleteCard(WorkspaceSwitcher* switcher,
     bubble->SetButtonLabel(ui::mojom::DialogButton::kOk,
                            l10n_util::GetStringUTF16(IDS_UW_DELETE_WORKSPACE));
     bubble->SetAcceptCallback(base::BindOnce(remove, id, false));
+    bubble->RegisterWidgetInitializedCallback(base::BindOnce(
+        [](CardBubble* bubble) {
+          views::MdTextButton* button = bubble->GetOkButton();
+          button->SetBgColorIdOverride(ui::kColorSysError);
+          button->SetEnabledTextColors(ui::kColorSysOnError);
+        },
+        base::Unretained(bubble)));
   }
   return bubble;
 }
