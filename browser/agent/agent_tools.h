@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
@@ -17,6 +18,7 @@
 #include "components/actor/core/task_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "uw/components/agent/page_text.h"
+#include "uw/components/agent/trigger.h"
 #include "uw/components/terminal/shell_host.h"
 
 namespace actor {
@@ -47,6 +49,8 @@ class TerminalShell;
 //   run {command, tab, new_tab, wait} -> {tab, folder, output, running}
 //   screen {tab} -> {tab, title, folder, text, program, password}
 //   keys {tab, text, keys} -> {tab, text}
+//   trigger {command, wake, request, tab} -> {}, when the chat takes triggers
+//   stop_trigger {} -> {}
 //
 // An element number comes from the latest read of that tab. The terminal
 // tools work only in terminal tabs the agent opened, which run the user's
@@ -120,6 +124,18 @@ class AgentTools {
   void SetOnRunning(OnRunning on_running) {
     on_running_ = std::move(on_running);
   }
+  // Leaves a trigger running for the chat, in `folder`, and answers the
+  // model; or stops the chat's trigger. Without them, a chat has no
+  // triggers.
+  using StartTrigger =
+      base::RepeatingCallback<base::DictValue(const TriggerAsk& ask,
+                                              const base::FilePath& folder)>;
+  using StopTrigger = base::RepeatingCallback<base::DictValue()>;
+  void SetTriggers(StartTrigger start, StopTrigger stop) {
+    start_trigger_ = std::move(start);
+    stop_trigger_ = std::move(stop);
+  }
+  bool takes_triggers() const { return !start_trigger_.is_null(); }
   // Ends a wait for a command or keys at once. The command keeps running in
   // its tab, and the step answers with what the tab shows so far.
   void EndWait();
@@ -181,6 +197,7 @@ class AgentTools {
   void Run(const base::DictValue& args, Done done);
   void Screen(const base::DictValue& args, Done done);
   void Keys(const base::DictValue& args, Done done);
+  void Trigger(const base::DictValue& args, Done done);
   std::optional<Approval> TerminalApprovalFor(std::string_view tool,
                                               const base::DictValue& args,
                                               bool every_step);
@@ -229,6 +246,8 @@ class AgentTools {
   ConfirmSite confirm_site_;
   OnPassword on_password_;
   OnRunning on_running_;
+  StartTrigger start_trigger_;
+  StopTrigger stop_trigger_;
   std::unique_ptr<TerminalWait> wait_;
   base::OneShotTimer check_;
   base::WeakPtrFactory<AgentTools> weak_factory_{this};

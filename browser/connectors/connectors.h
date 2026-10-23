@@ -104,6 +104,10 @@ class Connectors {
   const std::string& environment_problem() const {
     return environment_problem_;
   }
+  // The terminal's environment, once uw has read it.
+  const std::optional<base::EnvironmentMap>& environment() const {
+    return environment_;
+  }
 
   const std::vector<Info>& list() const { return list_; }
   const Info* Find(std::string_view name) const;

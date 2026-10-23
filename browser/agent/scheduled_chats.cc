@@ -3,6 +3,7 @@
 
 #include "uw/browser/agent/scheduled_chats.h"
 
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -84,6 +85,21 @@ base::ListValue StepsValue(const std::vector<AgentLoop::Step>& steps) {
     list.Append(std::move(saved));
   }
   return list;
+}
+
+std::string_view NameOf(ChatTriggers::Stop why) {
+  switch (why) {
+    case ChatTriggers::Stop::kByUser:
+      return "user";
+    case ChatTriggers::Stop::kByAgent:
+      return "agent";
+    case ChatTriggers::Stop::kAfterADay:
+      return "day";
+    case ChatTriggers::Stop::kPrintedTooMuch:
+      return "too_much";
+    case ChatTriggers::Stop::kPaused:
+      return "paused";
+  }
 }
 
 base::ListValue ValuesValue(const std::vector<TrackedValue>& values) {
@@ -232,6 +248,21 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
       }
     }
   }
+  const ChatTriggers::Trigger* running = triggers_.Find(chat_id);
+  if (running && !chat.trigger.empty() && running->command == chat.trigger) {
+    chat.trigger_wake = std::string(NameOf(running->wake));
+    chat.trigger_folder = running->folder.value();
+    triggers_.MakeLasting(chat_id);
+  } else if (!is_new && !chat.trigger.empty() &&
+             chat.trigger == saved->second.trigger) {
+    chat.trigger_wake = saved->second.trigger_wake;
+    chat.trigger_folder = saved->second.trigger_folder;
+  } else {
+    chat.trigger.clear();
+    if (running && running->lasting) {
+      triggers_.End(chat_id);
+    }
+  }
   chat.paused = false;
   chat.failures = 0;
   chat.failing = false;
@@ -245,11 +276,32 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
   chats_[chat_id] = std::move(chat);
   Persist();
   Arm(chat_id);
+  StartLastingTrigger(chat_id);
   UpdateKeepAlive();
   if (is_new) {
     StartRun(chat_id, now);
   }
   Changed(chat_id);
+}
+
+base::expected<void, std::string> ScheduledChats::StartTrigger(
+    const std::string& chat_id,
+    ChatTriggers::Trigger trigger) {
+  if (ending_) {
+    return base::unexpected("uw is closing.");
+  }
+  trigger.lasting = false;
+  return triggers_.Start(chat_id, std::move(trigger));
+}
+
+bool ScheduledChats::StopTrigger(const std::string& chat_id, bool by_agent) {
+  const ChatTriggers::Trigger* trigger = triggers_.Find(chat_id);
+  if (!trigger || trigger->lasting) {
+    return false;
+  }
+  triggers_.StopTrigger(chat_id, by_agent ? ChatTriggers::Stop::kByAgent
+                                          : ChatTriggers::Stop::kByUser);
+  return true;
 }
 
 std::string ScheduledChats::Watch(ScheduledChat chat) {
@@ -277,6 +329,10 @@ void ScheduledChats::Remove(const std::string& chat_id) {
   }
   scheduler_.Remove(chat_id);
   runs_.erase(chat_id);
+  if (const ChatTriggers::Trigger* trigger = triggers_.Find(chat_id);
+      trigger && trigger->lasting) {
+    triggers_.End(chat_id);
+  }
   Persist();
   UpdateKeepAlive();
   Changed(chat_id);
@@ -293,9 +349,16 @@ void ScheduledChats::SetPaused(const std::string& chat_id, bool paused) {
     chat->second.failures = 0;
     chat->second.failing = false;
     chat->second.pause_reason.clear();
+  } else if (const ChatTriggers::Trigger* trigger = triggers_.Find(chat_id)) {
+    if (trigger->lasting) {
+      triggers_.End(chat_id);
+    } else {
+      triggers_.StopTrigger(chat_id, ChatTriggers::Stop::kPaused);
+    }
   }
   Persist();
   Arm(chat_id);
+  StartLastingTrigger(chat_id);
   UpdateKeepAlive();
   Changed(chat_id);
 }
@@ -307,6 +370,14 @@ void ScheduledChats::SetAllPaused(bool paused) {
   }
   for (const std::string& id : ids) {
     SetPaused(id, paused);
+  }
+  if (paused) {
+    for (const std::string& id : triggers_.ChatIds()) {
+      if (const ChatTriggers::Trigger* trigger = triggers_.Find(id);
+          trigger && !trigger->lasting) {
+        triggers_.StopTrigger(id, ChatTriggers::Stop::kPaused);
+      }
+    }
   }
 }
 
@@ -369,6 +440,11 @@ void ScheduledChats::OnChatsChanged() {
   for (const std::string& id : deleted) {
     Remove(id);
   }
+  for (const std::string& id : triggers_.ChatIds()) {
+    if (index->WasDeleted(id)) {
+      triggers_.End(id);
+    }
+  }
 }
 
 void ScheduledChats::OnProfileWillBeDestroyed(Profile* profile) {
@@ -376,6 +452,7 @@ void ScheduledChats::OnProfileWillBeDestroyed(Profile* profile) {
   // no set order, so let go of them first.
   ending_ = true;
   runs_.clear();
+  triggers_.EndAll();
   keep_alive_.reset();
   index_observation_.Reset();
   time_zone_receiver_.reset();
@@ -411,6 +488,9 @@ void ScheduledChats::OnLoaded(std::optional<base::DictValue> saved) {
     }
   }
   loaded_ = true;
+  for (const auto& [id, chat] : chats_) {
+    StartLastingTrigger(id);
+  }
   UpdateKeepAlive();
   for (const auto& [id, chat] : chats_) {
     Changed(id);
@@ -430,8 +510,10 @@ void ScheduledChats::UpdateKeepAlive() {
   if (ending_) {
     return;
   }
-  const bool any = std::ranges::any_of(
-      chats_, [](const auto& entry) { return !entry.second.paused; });
+  const bool any =
+      !triggers_.empty() || std::ranges::any_of(chats_, [](const auto& entry) {
+        return !entry.second.paused;
+      });
   if (any && !keep_alive_) {
     keep_alive_ = ScopedProfileKeepAlive::TryAcquire(
         profile_, ProfileKeepAliveOrigin::kUwScheduledChats);
@@ -484,12 +566,19 @@ void ScheduledChats::OnDue(const std::string& chat_id, base::Time when) {
   StartRun(chat_id, when);
 }
 
-void ScheduledChats::StartRun(const std::string& chat_id, base::Time when) {
+void ScheduledChats::StartRun(const std::string& chat_id,
+                              base::Time when,
+                              const ChatTriggers::Trigger* trigger,
+                              std::string wake) {
   if (ending_) {
     return;
   }
   const ScheduledChat& chat = chats_.at(chat_id);
-  runs_[chat_id] = Run();
+  Run& run = runs_[chat_id] = Run();
+  if (trigger) {
+    run.trigger = trigger->command;
+    run.wake = std::move(wake);
+  }
   Changed(chat_id);
   const std::optional<Provider> provider =
       FindProvider(*profile_->GetPrefs(), chat.provider_id);
@@ -511,30 +600,214 @@ void ScheduledChats::OnFormat(const std::string& chat_id,
   if (chat == chats_.end() || run == runs_.end()) {
     return;
   }
-  AgentModel model;
-  model.connection =
-      ConfigForChoice(*profile_->GetPrefs(),
-                      ModelChoice{chat->second.provider_id, chat->second.model,
-                                  format, chat->second.effort});
-  if (!IsComplete(model.connection)) {
+  std::optional<AgentModel> model =
+      ModelFor(ModelChoice{chat->second.provider_id, chat->second.model, format,
+                           chat->second.effort});
+  if (!model) {
     ChatRun::Outcome outcome;
     outcome.kind = ChatRun::Outcome::Kind::kModelUnreachable;
     outcome.error = "The model this schedule runs on is not set up.";
     OnRunDone(chat_id, when, std::move(outcome));
     return;
   }
-  if (!model.connection.key_account.empty()) {
-    model.api_key =
-        ApiKeyStore().GetKey(model.connection.key_account).value_or("");
+  std::string brief = RunBrief(chat->second.request, chat->second.page, when,
+                               chat->second.recent, chat->second.tracked);
+  if (!run->second.wake.empty()) {
+    base::StrAppend(&brief, {"\n\nThis run is on a wake of the schedule's "
+                             "trigger. ",
+                             run->second.wake});
   }
   run->second.run = std::make_unique<ChatRun>(
-      profile_, std::move(model), ModeFrom(chat->second.approval_mode),
-      RunBrief(chat->second.request, chat->second.page, when,
-               chat->second.recent, chat->second.tracked),
+      profile_, std::move(*model), ModeFrom(chat->second.approval_mode), brief,
       base::BindOnce(&ScheduledChats::OnRunDone, weak_factory_.GetWeakPtr(),
                      chat_id, when));
   run->second.run->SetApprover(base::BindRepeating(
       &ScheduledChats::OnApproval, weak_factory_.GetWeakPtr(), chat_id));
+}
+
+std::optional<AgentModel> ScheduledChats::ModelFor(const ModelChoice& choice) {
+  AgentModel model;
+  model.connection = ConfigForChoice(*profile_->GetPrefs(), choice);
+  if (!IsComplete(model.connection)) {
+    return std::nullopt;
+  }
+  if (!model.connection.key_account.empty()) {
+    model.api_key =
+        ApiKeyStore().GetKey(model.connection.key_account).value_or("");
+  }
+  return model;
+}
+
+void ScheduledChats::StartTriggerRun(const std::string& chat_id,
+                                     ChatTriggers::Trigger trigger,
+                                     TriggerWakeLines wake) {
+  const base::Time when = base::Time::Now();
+  runs_[chat_id] = Run();
+  runs_[chat_id].trigger = trigger.command;
+  Changed(chat_id);
+  const std::optional<Provider> provider =
+      FindProvider(*profile_->GetPrefs(), trigger.provider_id);
+  if (!provider) {
+    OnTriggerRunFormat(chat_id, std::move(trigger), std::move(wake), when,
+                       std::nullopt);
+    return;
+  }
+  const std::string model = trigger.model;
+  CatalogStore::For(profile_)->FormatOf(
+      *provider, model,
+      base::BindOnce(&ScheduledChats::OnTriggerRunFormat,
+                     weak_factory_.GetWeakPtr(), chat_id, std::move(trigger),
+                     std::move(wake), when));
+}
+
+void ScheduledChats::OnTriggerRunFormat(const std::string& chat_id,
+                                        ChatTriggers::Trigger trigger,
+                                        TriggerWakeLines wake,
+                                        base::Time when,
+                                        std::optional<ProviderFormat> format) {
+  const auto run = runs_.find(chat_id);
+  if (run == runs_.end()) {
+    return;
+  }
+  std::optional<AgentModel> model = ModelFor(
+      ModelChoice{trigger.provider_id, trigger.model, format, trigger.effort});
+  if (!model) {
+    ChatRun::Outcome outcome;
+    outcome.kind = ChatRun::Outcome::Kind::kModelUnreachable;
+    outcome.error = "The model for this trigger's runs is not set up.";
+    OnTriggerRunDone(chat_id, trigger.command, when, std::move(outcome));
+    return;
+  }
+  run->second.run = std::make_unique<ChatRun>(
+      profile_, std::move(*model), ModeFrom(trigger.approval_mode),
+      TriggerRunBrief(trigger.command, trigger.request, wake, when),
+      base::BindOnce(&ScheduledChats::OnTriggerRunDone,
+                     weak_factory_.GetWeakPtr(), chat_id, trigger.command,
+                     when));
+  run->second.run->SetApprover(base::BindRepeating(
+      &ScheduledChats::OnApproval, weak_factory_.GetWeakPtr(), chat_id));
+}
+
+void ScheduledChats::OnTriggerRunDone(const std::string& chat_id,
+                                      std::string command,
+                                      base::Time when,
+                                      ChatRun::Outcome outcome) {
+  runs_.erase(chat_id);
+  const RunEnd end = EndOf(outcome.kind);
+  const bool found = end == RunEnd::kReported && outcome.report.found;
+  base::ListValue lines;
+  lines.Append(base::DictValue()
+                   .Set("kind", "run")
+                   .Set("time", base::TimeToValue(when))
+                   .Set("end", NameOf(end))
+                   .Set("found", found)
+                   .Set("text", end == RunEnd::kReported
+                                    ? outcome.report.message
+                                    : outcome.error)
+                   .Set("values", ValuesValue(outcome.report.values))
+                   .Set("sign_in", outcome.report.sign_in)
+                   .Set("what", found ? "Trigger" : "")
+                   .Set("counted", false)
+                   .Set("paused", false)
+                   .Set("steps", StepsValue(outcome.steps))
+                   .Set("trigger", command));
+  AddLines(chat_id, std::move(lines));
+  // Only what is worth telling wakes the chat's model and the user.
+  if (found) {
+    Notify(chat_id, "Trigger", outcome.report.message);
+    if (const auto page = pages_.find(chat_id); page != pages_.end()) {
+      page->second->Tell(base::StrCat(
+          {"A run looked at a wake of your trigger `", command,
+           "` and found: ", outcome.report.message,
+           "\nThe user did not write this message; uw sends it."}));
+    }
+  }
+  UpdateKeepAlive();
+  Changed(chat_id);
+  triggers_.Retry(chat_id);
+}
+
+void ScheduledChats::StartLastingTrigger(const std::string& chat_id) {
+  const ScheduledChat& chat = chats_.at(chat_id);
+  if (chat.trigger.empty() || chat.paused || triggers_.Find(chat_id) ||
+      ending_) {
+    return;
+  }
+  ChatTriggers::Trigger trigger;
+  trigger.command = chat.trigger;
+  trigger.wake = TriggerWakeNamed(chat.trigger_wake);
+  trigger.request = chat.request;
+  trigger.folder = base::FilePath(chat.trigger_folder);
+  trigger.lasting = true;
+  std::ignore = triggers_.Start(chat_id, std::move(trigger));
+}
+
+void ScheduledChats::AddLines(const std::string& chat_id,
+                              base::ListValue lines) {
+  if (const auto page = pages_.find(chat_id); page != pages_.end()) {
+    page->second->AddRunLines(std::move(lines));
+    return;
+  }
+  ChatFile::Sequence()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&AppendToChat,
+                     ChatFile::FolderFor(profile_->GetPath())
+                         .AppendASCII(base::StrCat({chat_id, ".json"})),
+                     std::move(lines)));
+}
+
+bool ScheduledChats::OnWake(const std::string& chat_id,
+                            const ChatTriggers::Trigger& trigger,
+                            const TriggerWakeLines& wake,
+                            bool as_run) {
+  if (ending_) {
+    return true;
+  }
+  if (!as_run) {
+    const auto page = pages_.find(chat_id);
+    base::DictValue line =
+        base::DictValue()
+            .Set("kind", "wake")
+            .Set("time", base::TimeToValue(base::Time::Now()))
+            .Set("command", trigger.command)
+            .Set("ended", wake.exit_code.has_value())
+            .Set("code", wake.exit_code.value_or(0))
+            .Set("lines", static_cast<int>(wake.lines.size()) + wake.dropped);
+    if (page != pages_.end() &&
+        page->second->Wake(
+            std::move(line),
+            WakeMessage(trigger.command, trigger.request, wake))) {
+      return true;
+    }
+  }
+  // One run of a chat goes at a time; the lines wait for this one.
+  if (runs_.contains(chat_id)) {
+    return false;
+  }
+  if (trigger.lasting && chats_.contains(chat_id)) {
+    StartRun(chat_id, base::Time::Now(), &trigger,
+             DescribeWake(trigger.command, wake));
+    return true;
+  }
+  StartTriggerRun(chat_id, trigger, wake);
+  return true;
+}
+
+void ScheduledChats::OnTriggerStopped(const std::string& chat_id,
+                                      const ChatTriggers::Trigger& trigger,
+                                      ChatTriggers::Stop why) {
+  base::ListValue lines;
+  lines.Append(base::DictValue()
+                   .Set("kind", "trigger_stopped")
+                   .Set("time", base::TimeToValue(base::Time::Now()))
+                   .Set("command", trigger.command)
+                   .Set("why", NameOf(why)));
+  AddLines(chat_id, std::move(lines));
+}
+
+void ScheduledChats::OnTriggersChanged(const std::string& chat_id) {
+  UpdateKeepAlive();
+  Changed(chat_id);
 }
 
 void ScheduledChats::OnApproval(
@@ -556,10 +829,21 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
                                base::Time when,
                                ChatRun::Outcome outcome) {
   int skipped = 0;
+  std::string trigger;
   if (const auto run = runs_.find(chat_id); run != runs_.end()) {
     skipped = run->second.skipped;
+    trigger = std::move(run->second.trigger);
     runs_.erase(run);
   }
+  // Lines a trigger printed while this run went wake the chat again.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<ScheduledChats> self, std::string id) {
+                       if (self) {
+                         self->triggers_.Retry(id);
+                       }
+                     },
+                     weak_factory_.GetWeakPtr(), chat_id));
   const auto chat = chats_.find(chat_id);
   if (chat == chats_.end()) {
     return;
@@ -588,17 +872,9 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
                    .Set("what", effect.what)
                    .Set("counted", effect.counted)
                    .Set("paused", effect.paused)
-                   .Set("steps", StepsValue(outcome.steps)));
-  if (const auto page = pages_.find(chat_id); page != pages_.end()) {
-    page->second->AddRunLines(std::move(lines));
-  } else {
-    ChatFile::Sequence()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&AppendToChat,
-                       ChatFile::FolderFor(profile_->GetPath())
-                           .AppendASCII(base::StrCat({chat_id, ".json"})),
-                       std::move(lines)));
-  }
+                   .Set("steps", StepsValue(outcome.steps))
+                   .Set("trigger", trigger));
+  AddLines(chat_id, std::move(lines));
   if (!effect.what.empty()) {
     Notify(chat_id, effect.what, effect.text);
   }
@@ -618,8 +894,9 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
 void ScheduledChats::Notify(const std::string& chat_id,
                             const std::string& what,
                             const std::string& text) {
+  // A chat without a schedule can still have a trigger's runs to tell of.
   const auto chat = chats_.find(chat_id);
-  if (chat == chats_.end() || chat->second.muted) {
+  if (chat != chats_.end() && chat->second.muted) {
     return;
   }
   std::string title;

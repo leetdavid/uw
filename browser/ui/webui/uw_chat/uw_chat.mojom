@@ -76,6 +76,8 @@ interface ChatHandler {
   SetScheduleMuted(bool muted);
   // Ends the run under way.
   StopRun();
+  // Stops the chat's trigger and its command.
+  StopTrigger();
   // Pauses, or resumes, every scheduled chat of the profile.
   PauseAllSchedules(bool paused);
 };
@@ -108,6 +110,12 @@ enum StepKind {
   // Times a run of the chat's schedule let go by while it waited for the
   // user. `text` says how many.
   kRunSkipped,
+  // The chat's trigger woke its agent. `args` holds its command, whether it
+  // ended, its exit code, and how many lines it printed, as JSON.
+  kWake,
+  // The chat's trigger stopped before its command ended. `args` holds its
+  // command and why: user, agent, day, too_much, or paused.
+  kTriggerStopped,
 };
 
 // How a run of a scheduled chat ended.
@@ -148,6 +156,8 @@ struct RunLine {
   // Whether it counted toward the pause, and whether it paused the schedule.
   bool counted;
   bool paused;
+  // The command of the trigger whose wake started it, or empty.
+  string trigger;
 };
 
 // One step of the agent's work.
@@ -197,6 +207,19 @@ struct ChatSchedule {
   // The model runs use.
   ChatModel model;
   ApprovalMode mode;
+  // The trigger the schedule keeps: the command of the chat's running
+  // trigger, or empty for none.
+  string trigger;
+};
+
+// A chat's running trigger, for the strip under its title.
+struct TriggerState {
+  string command;
+  // When it started, in milliseconds since the Unix epoch.
+  double started;
+  int32 wakes;
+  // Kept by the chat's schedule card, which removes it.
+  bool lasting;
 };
 
 // How a scheduled chat stands, for the strip under its title.
@@ -248,6 +271,8 @@ struct ChatSummary {
   double next_run;
   bool scheduled;
   bool schedule_paused;
+  // Whether a trigger of the chat runs.
+  bool trigger;
 };
 
 // A step that waits for the user's approval: its tab and site, what it does,
@@ -380,6 +405,9 @@ interface ChatPage {
   // The chat's schedule and how it stands, after OnOpened and after every
   // change. Nothing when it has none.
   OnSchedule(ScheduleState? state);
+  // The chat's running trigger, after OnOpened and after every change.
+  // Nothing when none runs.
+  OnTrigger(TriggerState? state);
   // The agent filled in the schedule card. The page opens it with `state`,
   // and nothing is saved until the user saves it.
   OnScheduleCard(ScheduleState state);

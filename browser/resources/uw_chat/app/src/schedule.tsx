@@ -19,6 +19,7 @@ import {
   Play,
   SkipForward,
   Square,
+  Terminal as TerminalIcon,
   TriangleAlert,
   WifiOff,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import {
   type ChatSchedule,
   type ScheduleState,
   type Step,
+  type TriggerState,
 } from "./chat-api";
 import { valueText } from "./chart";
 import { ModeChip } from "./mode-chip";
@@ -456,10 +458,20 @@ export function RunMessage({ line }: { line: Step }) {
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {alert ? (
           <Bell aria-hidden className="size-3.5 text-primary" />
+        ) : run.trigger ? (
+          <TerminalIcon aria-hidden className="size-3.5" />
         ) : (
           <Clock aria-hidden className="size-3.5" />
         )}
         {at}
+        {run.trigger && (
+          <>
+            {" · "}
+            <code className="rounded bg-accent px-1 font-mono text-[11px]">
+              {run.trigger}
+            </code>
+          </>
+        )}
         {run.what && (
           <span
             className={cn(
@@ -530,6 +542,7 @@ export function ScheduleRows({
   lists,
   onOpenModels,
   onChange: set,
+  triggers,
 }: {
   draft: ChatSchedule;
   // The Mac's time zone, as a person reads it.
@@ -538,6 +551,8 @@ export function ScheduleRows({
   lists: Record<string, ModelList | undefined>;
   onOpenModels: () => void;
   onChange: (change: Partial<ChatSchedule>) => void;
+  // On a chat's card: the commands its Trigger row offers besides None.
+  triggers?: string[];
 }) {
   const [changingZone, setChangingZone] = useState(false);
   const repeatIndex = REPEATS.findIndex(
@@ -655,6 +670,24 @@ export function ScheduleRows({
             )}
           </p>
         )}
+        {triggers && (
+          <Row label="Trigger">
+            <TerminalIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <select
+              id="schedule-trigger"
+              className={cn(FIELD, "flex-1 font-mono text-[12px]")}
+              value={draft.trigger}
+              onChange={(event) => set({ trigger: event.target.value })}
+            >
+              <option value="">None</option>
+              {triggers.map((command) => (
+                <option key={command} value={command}>
+                  {command}
+                </option>
+              ))}
+            </select>
+          </Row>
+        )}
         <Row label="Tell me">
           <div className="flex flex-1 rounded-[9px] bg-accent p-[3px]" role="radiogroup">
             {[
@@ -736,6 +769,7 @@ export function ScheduleCard({
   lists,
   onOpenModels,
   onClose,
+  trigger,
 }: {
   state: ScheduleState;
   // The chat has a schedule already.
@@ -744,8 +778,15 @@ export function ScheduleCard({
   lists: Record<string, ModelList | undefined>;
   onOpenModels: () => void;
   onClose: () => void;
+  // The chat's running trigger, which the card can keep.
+  trigger: TriggerState | null;
 }) {
   const [draft, setDraft] = useState<ChatSchedule>(state.schedule);
+  const triggers = [
+    ...new Set(
+      [state.schedule.trigger, trigger?.command ?? ""].filter(Boolean),
+    ),
+  ];
   const set = (change: Partial<ChatSchedule>) =>
     setDraft((before) => ({ ...before, ...change }));
   const save = () => {
@@ -781,6 +822,7 @@ export function ScheduleCard({
         lists={lists}
         onOpenModels={onOpenModels}
         onChange={set}
+        triggers={triggers}
       />
       <div className="mt-1.5 flex items-center gap-2">
         {editing && (

@@ -24,6 +24,8 @@ source_set("agent") {
     "skills.h",
     "suggestions.cc",
     "suggestions.h",
+    "trigger.cc",
+    "trigger.h",
   ]
   public_deps = [
     "//base",
@@ -52,6 +54,7 @@ source_set("unit_tests") {
     "scheduled_chat_unittest.cc",
     "skills_unittest.cc",
     "suggestions_unittest.cc",
+    "trigger_unittest.cc",
   ]
   deps = [
     ":agent",

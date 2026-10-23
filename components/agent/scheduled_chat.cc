@@ -76,7 +76,9 @@ bool ScheduledChat::operator==(const ScheduledChat& other) const {
          failures == other.failures && failing == other.failing &&
          last_failure == other.last_failure &&
          pause_reason == other.pause_reason &&
-         same_runs(recent, other.recent) && tracked == other.tracked;
+         same_runs(recent, other.recent) && tracked == other.tracked &&
+         trigger == other.trigger && trigger_wake == other.trigger_wake &&
+         trigger_folder == other.trigger_folder;
 }
 
 GURL WatchedAddress(const GURL& url) {
@@ -164,7 +166,11 @@ base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
       .Set("last_failure", chat.last_failure)
       .Set("pause_reason", chat.pause_reason)
       .Set("recent", std::move(recent))
-      .Set("tracked", std::move(tracked));
+      .Set("tracked", std::move(tracked))
+      .Set("trigger", base::DictValue()
+                          .Set("command", chat.trigger)
+                          .Set("wake", chat.trigger_wake)
+                          .Set("folder", chat.trigger_folder));
 }
 
 std::optional<ScheduledChat> ScheduledChatFromValue(
@@ -235,6 +241,11 @@ std::optional<ScheduledChat> ScheduledChatFromValue(
             {*dict->FindString("name"), StringOr(*dict, "unit")});
       }
     }
+  }
+  if (const base::DictValue* trigger = value.FindDict("trigger")) {
+    chat.trigger = StringOr(*trigger, "command");
+    chat.trigger_wake = StringOr(*trigger, "wake") == "lines" ? "lines" : "end";
+    chat.trigger_folder = StringOr(*trigger, "folder");
   }
   if (chat.request.empty() || !IsValid(chat.schedule)) {
     return std::nullopt;

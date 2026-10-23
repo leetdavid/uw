@@ -45,6 +45,11 @@ struct ScheduledChat {
   std::string approval_mode = "auto";
   bool paused = false;
   bool muted = false;
+  // The trigger the schedule keeps, saved from the chat's running one: its
+  // command, "end" or "lines", and the folder it runs in. Empty for none.
+  std::string trigger;
+  std::string trigger_wake = "end";
+  std::string trigger_folder;
 
   // When it last ran, or was due.
   base::Time last;

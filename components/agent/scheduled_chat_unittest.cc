@@ -51,6 +51,9 @@ TEST(ScheduledChatTest, KeepsEverythingItSaves) {
       {Utc(21), Report(false, "Still above $500.")},
       {Utc(22), {true, "Down to $479.", {{"in_stock", "", true}}, ""}}};
   chat.tracked = {{"price", "USD"}, {"in_stock", ""}};
+  chat.trigger = "gh run watch 48213";
+  chat.trigger_wake = "lines";
+  chat.trigger_folder = "/Users/david/dev/uw-site";
 
   EXPECT_EQ(ScheduledChatFromValue(ScheduledChatToValue(chat)), chat);
 }

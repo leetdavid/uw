@@ -730,6 +730,7 @@ void UwChatHandler::OnChatsChanged() {
     chat->updated = entry.updated.InMillisecondsFSinceUnixEpoch();
     chat->state = StateFor(entry.state);
     if (const ScheduledChats* schedules = schedules_observation_.GetSource()) {
+      chat->trigger = schedules->TriggerOf(entry.id) != nullptr;
       if (const ScheduledChat* scheduled = schedules->Find(entry.id)) {
         chat->scheduled = true;
         chat->schedule_paused = scheduled->paused;
@@ -865,6 +866,12 @@ bool UwChatHandler::Start() {
                                             base::Unretained(this)));
   agent_->SetScheduleCard(base::BindRepeating(&UwChatHandler::OpenScheduleCard,
                                               base::Unretained(this)));
+  if (schedules_observation_.GetSource()) {
+    agent_->SetTriggers(base::BindRepeating(&UwChatHandler::StartTrigger,
+                                            base::Unretained(this)),
+                        base::BindRepeating(&UwChatHandler::StopTriggerForAgent,
+                                            base::Unretained(this)));
+  }
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
@@ -1095,6 +1102,16 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
   } else if (*kind == "run_skipped") {
     line->kind = mojom::StepKind::kRunSkipped;
     line->text = base::NumberToString(entry.FindInt("count").value_or(0));
+  } else if (*kind == "wake" || *kind == "trigger_stopped") {
+    line->kind = *kind == "wake" ? mojom::StepKind::kWake
+                                 : mojom::StepKind::kTriggerStopped;
+    base::DictValue args = entry.Clone();
+    args.Remove("kind");
+    if (const std::optional<base::Time> time =
+            base::ValueToTime(entry.Find("time"))) {
+      args.Set("time", time->InMillisecondsFSinceUnixEpoch());
+    }
+    line->args = Json(&args);
   }
   return line;
 }
@@ -1486,6 +1503,75 @@ void UwChatHandler::OnScheduleChanged(const std::string& chat_id) {
   }
 }
 
+bool UwChatHandler::Wake(base::DictValue line, const std::string& message) {
+  if (!loaded_ || preparing_ || (!agent_ && !Start())) {
+    return false;
+  }
+  page_->OnStep(LineFor(line));
+  Log(std::move(line));
+  Save();
+  agent_->Steer(message);
+  return true;
+}
+
+void UwChatHandler::Tell(const std::string& message) {
+  if (loaded_ && agent_) {
+    agent_->Steer(message);
+  }
+}
+
+base::DictValue UwChatHandler::StartTrigger(const TriggerAsk& ask,
+                                            const base::FilePath& folder) {
+  ScheduledChats* chats = schedules_observation_.GetSource();
+  if (!chats) {
+    return base::DictValue().Set("error", "Triggers can't run in this chat.");
+  }
+  ChatTriggers::Trigger trigger;
+  trigger.command = ask.command;
+  trigger.wake = ask.wake;
+  trigger.request = ask.request;
+  trigger.folder = folder;
+  // Runs on its wakes use the runs model, as a schedule card would.
+  std::optional<ModelChoice> model = chats->LastModel();
+  if (!model) {
+    model = model_;
+  }
+  if (model) {
+    trigger.provider_id = model->provider_id;
+    trigger.model = model->model;
+    trigger.effort = model->effort;
+  }
+  trigger.approval_mode = std::string(NameOf(mode_));
+  base::expected<void, std::string> started =
+      chats->StartTrigger(id_, std::move(trigger));
+  if (!started.has_value()) {
+    return base::DictValue().Set("error", std::move(started.error()));
+  }
+  return base::DictValue().Set(
+      "result", ask.wake == TriggerWake::kEnd
+                    ? "It runs out of sight and wakes you once it ends."
+                    : "It runs out of sight and wakes you when it prints "
+                      "lines.");
+}
+
+base::DictValue UwChatHandler::StopTriggerForAgent() {
+  ScheduledChats* chats = schedules_observation_.GetSource();
+  if (chats && chats->StopTrigger(id_, /*by_agent=*/true)) {
+    return base::DictValue().Set("result", "The trigger stopped.");
+  }
+  return base::DictValue().Set(
+      "error", chats && chats->TriggerOf(id_)
+                   ? "The schedule card keeps this trigger; the user removes "
+                     "it there."
+                   : "This chat has no trigger running.");
+}
+
+void UwChatHandler::StopTrigger() {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->StopTrigger(id_, /*by_agent=*/false);
+  }
+}
+
 void UwChatHandler::AddRunLines(base::ListValue lines) {
   if (!loaded_) {
     for (base::Value& line : lines) {
@@ -1505,6 +1591,14 @@ void UwChatHandler::AddRunLines(base::ListValue lines) {
 
 void UwChatHandler::SendSchedule() {
   const ScheduledChats* chats = schedules_observation_.GetSource();
+  const ChatTriggers::Trigger* trigger =
+      chats ? chats->TriggerOf(id_) : nullptr;
+  page_->OnTrigger(trigger
+                       ? mojom::TriggerState::New(
+                             trigger->command,
+                             trigger->started.InMillisecondsFSinceUnixEpoch(),
+                             trigger->wakes, trigger->lasting)
+                       : nullptr);
   const ScheduledChat* chat = chats ? chats->Find(id_) : nullptr;
   page_->OnSchedule(chat ? StateOf(*chat) : nullptr);
   const AgentTools::Approval* step = chats ? chats->WaitingStep(id_) : nullptr;
@@ -1549,8 +1643,7 @@ void UwChatHandler::UpdateScheduledRuns() {
                 ? TrackedValueFromValue((*values)[i].GetDict())
                 : std::nullopt;
         if (value) {
-          base::StrAppend(&run,
-                          {i == 0 ? " (" : ", ", DescribeValue(*value)});
+          base::StrAppend(&run, {i == 0 ? " (" : ", ", DescribeValue(*value)});
         }
       }
       if (!values->empty()) {

@@ -107,6 +107,12 @@ void AgentLoop::SetScheduleCard(FillScheduleCard fill) {
   UpdateConnectorTools();
 }
 
+void AgentLoop::SetTriggers(AgentTools::StartTrigger start,
+                            AgentTools::StopTrigger stop) {
+  tools_.SetTriggers(std::move(start), std::move(stop));
+  UpdateConnectorTools();
+}
+
 void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
   skills_ = started_skills_;
   std::string list;
@@ -537,6 +543,10 @@ void AgentLoop::UpdateConnectorTools() {
   }
   if (schedule_card_) {
     tools.Append(ScheduleToolSchema());
+  }
+  if (tools_.takes_triggers()) {
+    tools.Append(TriggerToolSchema());
+    tools.Append(StopTriggerToolSchema());
   }
   if (!connectors_.empty()) {
     tools.Append(LoadConnectorToolSchema());

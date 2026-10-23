@@ -9,7 +9,9 @@
 #include <string_view>
 #include <utility>
 
+#include "base/environment.h"
 #include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -38,6 +40,7 @@
 #include "ui/message_center/public/cpp/notification.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
+#include "uw/browser/agent/chat_triggers.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/components/ai_providers/providers.h"
@@ -366,6 +369,161 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   ASSERT_TRUE(chat);
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return chat->last > base::Time::Now() - base::Hours(1); }));
+}
+
+// A trigger runs the user's shell, here without their startup files.
+class ScheduledChatTriggersBrowserTest : public ScheduledChatsBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    ScheduledChatsBrowserTest::SetUpOnMainThread();
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+  }
+
+  void TearDownOnMainThread() override {
+    ChatTriggers::SetLimitsForTesting(TriggerLimits());
+    ScheduledChatsBrowserTest::TearDownOnMainThread();
+  }
+
+  // A chat's trigger, as its agent would start it.
+  ChatTriggers::Trigger Trigger(std::string command, TriggerWake wake) {
+    ChatTriggers::Trigger trigger;
+    trigger.command = std::move(command);
+    trigger.wake = wake;
+    trigger.request = "Tell the user whether the deploy passed.";
+    trigger.provider_id = ProviderId();
+    trigger.model = "test-agent";
+    return trigger;
+  }
+
+  // Waits until the chat's trigger and any run on its wake are done, and
+  // returns the chat's saved lines.
+  base::ListValue LinesOnceItsTriggerEnds() {
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return !chats()->TriggerOf(kChat) && !chats()->Running(kChat);
+    }));
+    return LinesAfterTheRun();
+  }
+
+  base::ScopedTempDir zdotdir_;
+};
+
+// With the chat closed, a wake starts a run, which tells the user what it
+// found and says which trigger woke it.
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       AWakeWithTheChatClosedStartsARun) {
+  SaveChat();
+  model_.Script(
+      {Report(true, "The deploy passed."), ScriptedModel::Answer("Reported.")});
+  ASSERT_TRUE(chats()
+                  ->StartTrigger(
+                      kChat, Trigger("echo checks-passed", TriggerWake::kEnd))
+                  .has_value());
+  EXPECT_TRUE(chats()->TriggerOf(kChat));
+  const base::ListValue lines = LinesOnceItsTriggerEnds();
+
+  ASSERT_EQ(lines.size(), 1u);
+  const base::DictValue& run = lines[0].GetDict();
+  EXPECT_EQ(*run.FindString("kind"), "run");
+  EXPECT_EQ(*run.FindString("trigger"), "echo checks-passed");
+  EXPECT_EQ(*run.FindString("what"), "Trigger");
+  ASSERT_EQ(Notifications().size(), 1u);
+  EXPECT_EQ(Notifications()[0].context_message(), u"Trigger");
+  EXPECT_EQ(Notifications()[0].message(), u"The deploy passed.");
+  const std::string brief = model_.Requests().front();
+  EXPECT_THAT(brief, HasSubstr("woke this run"));
+  EXPECT_THAT(brief, HasSubstr("checks-passed"));
+  EXPECT_THAT(brief, HasSubstr("Tell the user whether the deploy passed."));
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       ATriggerThatPrintsTooMuchStops) {
+  SaveChat();
+  ASSERT_TRUE(chats()
+                  ->StartTrigger(kChat, Trigger("seq 1 5000; sleep 30",
+                                                TriggerWake::kLines))
+                  .has_value());
+  const base::ListValue lines = LinesOnceItsTriggerEnds();
+
+  ASSERT_FALSE(lines.empty());
+  const base::DictValue& stopped = lines.back().GetDict();
+  EXPECT_EQ(*stopped.FindString("kind"), "trigger_stopped");
+  EXPECT_EQ(*stopped.FindString("command"), "seq 1 5000; sleep 30");
+  EXPECT_EQ(*stopped.FindString("why"), "too_much");
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       AChatsTriggerStopsAfterADay) {
+  TriggerLimits limits;
+  limits.life = base::Seconds(1);
+  ChatTriggers::SetLimitsForTesting(limits);
+  SaveChat();
+  ASSERT_TRUE(chats()
+                  ->StartTrigger(kChat, Trigger("sleep 30", TriggerWake::kEnd))
+                  .has_value());
+  const base::ListValue lines = LinesOnceItsTriggerEnds();
+
+  ASSERT_EQ(lines.size(), 1u);
+  EXPECT_EQ(*lines[0].GetDict().FindString("why"), "day");
+}
+
+// Saved on the schedule card, the chat's trigger lasts, and its wake starts a
+// run of the schedule once the run under way ends.
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       TheScheduleCardKeepsAChatsTrigger) {
+  SaveChat();
+  model_.Script(
+      {Report(false, "Still building."), ScriptedModel::Answer("Done."),
+       Report(true, "The build is done."), ScriptedModel::Answer("Reported.")});
+  ASSERT_TRUE(chats()
+                  ->StartTrigger(
+                      kChat, Trigger("sleep 2; echo built", TriggerWake::kEnd))
+                  .has_value());
+  ScheduledChat chat = DeskWatch(ProviderId());
+  chat.trigger = "sleep 2; echo built";
+  chats()->Save(kChat, chat);
+  ASSERT_TRUE(chats()->TriggerOf(kChat));
+  EXPECT_TRUE(chats()->TriggerOf(kChat)->lasting);
+  EXPECT_EQ(chats()->Find(kChat)->trigger_wake, "end");
+
+  const base::ListValue lines = LinesOnceItsTriggerEnds();
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[0].GetDict().FindString("trigger"), "");
+  EXPECT_EQ(*lines[1].GetDict().FindString("trigger"), "sleep 2; echo built");
+  EXPECT_EQ(*lines[1].GetDict().FindString("what"), "Change alert");
+  EXPECT_EQ(chats()->Find(kChat)->trigger, "sleep 2; echo built");
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       PRE_ALastingTriggerStartsAgainWhenUwLaunches) {
+  SaveChat();
+  model_.Script(
+      {Report(false, "Nothing yet."), ScriptedModel::Answer("Done.")});
+  ASSERT_TRUE(chats()
+                  ->StartTrigger(kChat, Trigger("sleep 600", TriggerWake::kEnd))
+                  .has_value());
+  ScheduledChat chat = DeskWatch(ProviderId());
+  chat.trigger = "sleep 600";
+  chats()->Save(kChat, chat);
+  LinesAfterTheRun();
+  ASSERT_TRUE(chats()->TriggerOf(kChat));
+  EXPECT_TRUE(chats()->TriggerOf(kChat)->lasting);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatTriggersBrowserTest,
+                       ALastingTriggerStartsAgainWhenUwLaunches) {
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats()->loaded(); }));
+  const ChatTriggers::Trigger* trigger = chats()->TriggerOf(kChat);
+  ASSERT_TRUE(trigger);
+  EXPECT_EQ(trigger->command, "sleep 600");
+  EXPECT_TRUE(trigger->lasting);
+
+  // Pause stops it, and Resume starts it again.
+  chats()->SetPaused(kChat, true);
+  EXPECT_FALSE(chats()->TriggerOf(kChat));
+  chats()->SetPaused(kChat, false);
+  EXPECT_TRUE(chats()->TriggerOf(kChat));
 }
 
 }  // namespace

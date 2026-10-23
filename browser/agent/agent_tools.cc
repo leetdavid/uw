@@ -190,6 +190,14 @@ void AgentTools::Call(std::string_view tool,
     Keys(args, std::move(done));
     return;
   }
+  if (tool == kTriggerTool && start_trigger_) {
+    Trigger(args, std::move(done));
+    return;
+  }
+  if (tool == kStopTriggerTool && stop_trigger_) {
+    std::move(done).Run(stop_trigger_.Run());
+    return;
+  }
   if (!engine_ || !engine_->GetTask(task_)) {
     std::move(done).Run(Error("Chromium's agent engine is not running."));
     return;

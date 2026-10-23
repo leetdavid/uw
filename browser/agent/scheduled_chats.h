@@ -23,6 +23,7 @@
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_run.h"
+#include "uw/browser/agent/chat_triggers.h"
 #include "uw/components/agent/chat_scheduler.h"
 #include "uw/components/agent/scheduled_chat.h"
 #include "uw/components/ai_providers/providers.h"
@@ -39,6 +40,7 @@ namespace uw {
 class ScheduledChats : public base::SupportsUserData::Data,
                        public ChatIndex::Observer,
                        public ProfileObserver,
+                       public ChatTriggers::Delegate,
                        public device::mojom::TimeZoneMonitorClient {
  public:
   class Observer : public base::CheckedObserver {
@@ -52,6 +54,12 @@ class ScheduledChats : public base::SupportsUserData::Data,
   class Page {
    public:
     virtual void AddRunLines(base::ListValue lines) = 0;
+    // The chat's trigger woke it: `line` goes into the chat, and `message`
+    // to its agent, as a steer does. False when the chat cannot take it now,
+    // and the wake starts a run instead.
+    virtual bool Wake(base::DictValue line, const std::string& message) = 0;
+    // A run on a trigger's wake found something worth telling the agent.
+    virtual void Tell(const std::string& message) = 0;
 
    protected:
     virtual ~Page() = default;
@@ -83,6 +91,17 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // The model the last saved schedule card picked, which a new card starts
   // on.
   std::optional<ModelChoice> LastModel() const { return last_model_; }
+
+  // The trigger of `chat_id`, while one runs.
+  const ChatTriggers::Trigger* TriggerOf(std::string_view chat_id) const {
+    return triggers_.Find(chat_id);
+  }
+  // Leaves a command running as the trigger of `chat_id`, or says why not.
+  base::expected<void, std::string> StartTrigger(const std::string& chat_id,
+                                                 ChatTriggers::Trigger trigger);
+  // Stops the trigger of `chat_id`, as its user or its agent asks. A trigger
+  // the schedule card keeps is removed on the card. False when none stops.
+  bool StopTrigger(const std::string& chat_id, bool by_agent);
 
   // Gives the lines of `chat_id`'s runs to `page` while it is open, or
   // back to the chat file with null.
@@ -123,6 +142,16 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // device::mojom::TimeZoneMonitorClient:
   void OnTimeZoneChange(const std::string& zone_id) override;
 
+  // ChatTriggers::Delegate:
+  bool OnWake(const std::string& chat_id,
+              const ChatTriggers::Trigger& trigger,
+              const TriggerWakeLines& wake,
+              bool as_run) override;
+  void OnTriggerStopped(const std::string& chat_id,
+                        const ChatTriggers::Trigger& trigger,
+                        ChatTriggers::Stop why) override;
+  void OnTriggersChanged(const std::string& chat_id) override;
+
  private:
   struct Run {
     Run();
@@ -136,6 +165,10 @@ class ScheduledChats : public base::SupportsUserData::Data,
     base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval;
     // Times it was due while the run waited for the user.
     int skipped = 0;
+    // For a run on a trigger's wake: the trigger's command, and what woke
+    // it.
+    std::string trigger;
+    std::string wake;
   };
 
   void OnLoaded(std::optional<base::DictValue> saved);
@@ -146,7 +179,33 @@ class ScheduledChats : public base::SupportsUserData::Data,
   void Changed(const std::string& chat_id);
 
   void OnDue(const std::string& chat_id, base::Time when);
-  void StartRun(const std::string& chat_id, base::Time when);
+  // Starts a run of the schedule. On a wake of its lasting trigger, `wake`
+  // tells what woke it.
+  void StartRun(const std::string& chat_id,
+                base::Time when,
+                const ChatTriggers::Trigger* trigger = nullptr,
+                std::string wake = std::string());
+  // The model `choice` names in `format`, with its key, or nothing when it is
+  // not set up.
+  std::optional<AgentModel> ModelFor(const ModelChoice& choice);
+  // A run on a wake of a chat's own trigger, which no schedule keeps.
+  void StartTriggerRun(const std::string& chat_id,
+                       ChatTriggers::Trigger trigger,
+                       TriggerWakeLines wake);
+  void OnTriggerRunFormat(const std::string& chat_id,
+                          ChatTriggers::Trigger trigger,
+                          TriggerWakeLines wake,
+                          base::Time when,
+                          std::optional<ProviderFormat> format);
+  void OnTriggerRunDone(const std::string& chat_id,
+                        std::string command,
+                        base::Time when,
+                        ChatRun::Outcome outcome);
+  // Starts the trigger the schedule of `chat_id` keeps, unless it is paused
+  // or runs.
+  void StartLastingTrigger(const std::string& chat_id);
+  // Adds `lines` to the chat: to its open page, or to its file.
+  void AddLines(const std::string& chat_id, base::ListValue lines);
   void OnFormat(const std::string& chat_id,
                 base::Time when,
                 std::optional<ProviderFormat> format);
@@ -169,6 +228,7 @@ class ScheduledChats : public base::SupportsUserData::Data,
   std::map<std::string, Run, std::less<>> runs_;
   std::map<std::string, raw_ptr<Page>, std::less<>> pages_;
   std::optional<ModelChoice> last_model_;
+  ChatTriggers triggers_{this};
   ChatScheduler scheduler_;
   std::unique_ptr<ScopedProfileKeepAlive> keep_alive_;
   mojo::Receiver<device::mojom::TimeZoneMonitorClient> time_zone_receiver_{

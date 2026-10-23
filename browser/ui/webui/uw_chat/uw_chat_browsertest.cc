@@ -2547,5 +2547,72 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePrimaryColorFollowsTheTheme) {
   EXPECT_EQ(primary(), sys());
 }
 
+// The agent leaves a command running as a trigger, which shows under the
+// chat's title, and its end wakes the agent while the chat is open.
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest, ATriggerWakesTheChatsAgent) {
+  UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(0.95, "safe", 0.99));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "trigger",
+           base::DictValue()
+               .Set("command", "sleep 3 && echo deploy-ok")
+               .Set("wake", "end")
+               .Set("request", "Tell the user whether the deploy passed.")))),
+       ScriptedModel::Answer("I'll tell you when it ends."),
+       ScriptedModel::Answer("The deploy passed.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Tell me when the deploy ends"),
+            "I'll tell you when it ends.");
+  EXPECT_THAT(
+      Until(chat, "document.querySelector('#trigger-strip')?.textContent")
+          .ExtractString(),
+      ::testing::HasSubstr("Trigger sleep 3 && echo deploy-ok · running"));
+  EXPECT_THAT(Steps(chat)[0],
+              ::testing::HasSubstr(
+                  "Left sleep 3 && echo deploy-ok running as a trigger"));
+  SaveWindowScreenshot(browser(), "chat-trigger-runs");
+
+  EXPECT_THAT(Until(chat, "document.querySelector('.wake-line')?.textContent")
+                  .ExtractString(),
+              ::testing::HasSubstr("sleep 3 && echo deploy-ok ended"));
+  EXPECT_TRUE(Until(chat,
+                    "[...document.querySelectorAll('.answer')].some("
+                    "    answer => answer.textContent === 'The deploy "
+                    "passed.')")
+                  .ExtractBool());
+  EXPECT_THAT(model_.Requests().back(), ::testing::HasSubstr("deploy-ok"));
+  EXPECT_TRUE(
+      Until(chat, "!document.querySelector('#trigger-strip')").ExtractBool());
+  SaveWindowScreenshot(browser(), "chat-trigger-woke");
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
+                       StopOnTheStripStopsTheTrigger) {
+  UseAgentModel();
+  UseCheck(CheckDecisionsAnswer(0.95, "safe", 0.99));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "trigger", base::DictValue()
+                          .Set("command", "sleep 600")
+                          .Set("wake", "lines")
+                          .Set("request", "Tell the user what it prints.")))),
+       ScriptedModel::Answer("Watching.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Watch it"), "Watching.");
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "new Promise(resolve => { const check = () => { const stop = "
+      "document.querySelector('#trigger-stop'); if (stop) { stop.click(); "
+      "resolve(); } else { setTimeout(check, 50); } }; check(); })"));
+
+  EXPECT_THAT(
+      Until(chat, "document.querySelector('.trigger-stopped')?.textContent")
+          .ExtractString(),
+      ::testing::HasSubstr("Stopped the trigger sleep 600 · you stopped it"));
+  EXPECT_TRUE(
+      Until(chat, "!document.querySelector('#trigger-strip')").ExtractBool());
+}
+
 }  // namespace
 }  // namespace uw

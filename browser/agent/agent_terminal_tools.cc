@@ -182,7 +182,8 @@ std::string BusyError(int number, const ShellHost::Activity& activity) {
 
 // static
 bool AgentTools::IsTerminalTool(std::string_view tool) {
-  return tool == "run" || tool == "screen" || tool == "keys";
+  return tool == "run" || tool == "screen" || tool == "keys" ||
+         tool == kTriggerTool;
 }
 
 std::optional<AgentTools::Approval> AgentTools::TerminalApprovalFor(
@@ -198,7 +199,7 @@ std::optional<AgentTools::Approval> AgentTools::TerminalApprovalFor(
     approval.reason = "Ask first is on.";
   }
   std::string error;
-  if (tool == "run") {
+  if (tool == "run" || tool == kTriggerTool) {
     const std::string* command = args.FindString("command");
     const int number = TerminalFor(args, error);
     if (!command ||
@@ -210,7 +211,12 @@ std::optional<AgentTools::Approval> AgentTools::TerminalApprovalFor(
     approval.tab = number ? number : next_tab_;
     approval.folder = number ? FolderOf(number) : "~";
     approval.command = *command;
-    approval.action = base::StrCat({"Run ", *command});
+    approval.action =
+        base::StrCat({tool == "run" ? "Run " : "Leave running: ", *command});
+    // A trigger runs out of sight, in the tab's folder only.
+    if (tool == kTriggerTool) {
+      approval.tab = 0;
+    }
     return approval;
   }
   Tab* tab = TerminalTabFrom(args, error);
@@ -357,6 +363,23 @@ void AgentTools::Run(const base::DictValue& args, Done done) {
     }
   }
   CheckShell();
+}
+
+void AgentTools::Trigger(const base::DictValue& args, Done done) {
+  base::expected<TriggerAsk, std::string> ask = ParseTrigger(args);
+  std::string error;
+  const int number = ask.has_value() ? TerminalFor(args, error) : 0;
+  if (!ask.has_value() || number < 0) {
+    std::move(done).Run(Error(ask.has_value() ? error : ask.error()));
+    return;
+  }
+  const auto tab = tabs_.find(number);
+  tabs::TabInterface* open =
+      tab == tabs_.end() ? nullptr : tab->second.handle.Get();
+  const base::FilePath folder =
+      open ? TerminalFolder(open->GetContents()) : base::FilePath();
+  std::move(done).Run(
+      start_trigger_.Run(*ask, folder.empty() ? base::GetHomeDir() : folder));
 }
 
 void AgentTools::Keys(const base::DictValue& args, Done done) {

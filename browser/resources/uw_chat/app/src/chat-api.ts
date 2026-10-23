@@ -25,6 +25,7 @@ import type {
   SkillProposal,
   Step,
   TrackedValue,
+  TriggerState,
 } from "uw-chat-mojom";
 
 export {
@@ -49,6 +50,7 @@ export type {
   SkillProposal,
   Step,
   TrackedValue,
+  TriggerState,
 };
 
 export const chatPage = new ChatPageCallbackRouter();

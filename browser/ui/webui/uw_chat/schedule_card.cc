@@ -105,6 +105,7 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
       mojom::ChatModel::New(chat.provider_id, chat.model, chat.effort);
   schedule->mode =
       static_cast<mojom::ApprovalMode>(ModeNamed(chat.approval_mode));
+  schedule->trigger = chat.trigger;
 
   auto state = mojom::ScheduleState::New();
   state->schedule = std::move(schedule);
@@ -187,6 +188,9 @@ mojom::RunLinePtr RunLineFrom(const base::DictValue& line) {
   }
   run->counted = line.FindBool("counted").value_or(false);
   run->paused = line.FindBool("paused").value_or(false);
+  if (const std::string* trigger = line.FindString("trigger")) {
+    run->trigger = *trigger;
+  }
   return run;
 }
 
@@ -212,6 +216,7 @@ std::optional<ScheduledChat> ScheduledChatFrom(
   chat.effort = schedule.model->effort;
   chat.approval_mode =
       std::string(NameOf(static_cast<ApprovalMode>(schedule.mode)));
+  chat.trigger = schedule.trigger;
   if (chat.request.empty() || !IsValid(chat.schedule)) {
     return std::nullopt;
   }

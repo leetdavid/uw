@@ -92,6 +92,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void SetSchedulePaused(bool paused) override;
   void SetScheduleMuted(bool muted) override;
   void StopRun() override;
+  void StopTrigger() override;
   void PauseAllSchedules(bool paused) override;
 
   // ScheduledChats::Observer:
@@ -99,6 +100,8 @@ class UwChatHandler : public mojom::ChatHandler,
 
   // ScheduledChats::Page:
   void AddRunLines(base::ListValue lines) override;
+  bool Wake(base::DictValue line, const std::string& message) override;
+  void Tell(const std::string& message) override;
 
   // Connectors::Observer:
   void OnConnectorsChanged() override;
@@ -128,6 +131,10 @@ class UwChatHandler : public mojom::ChatHandler,
   // chat's schedule if it has one, and tells the model that nothing is saved
   // until the user saves it.
   base::DictValue OpenScheduleCard(const base::DictValue& args);
+  // The agent's trigger and stop_trigger calls.
+  base::DictValue StartTrigger(const TriggerAsk& ask,
+                               const base::FilePath& folder);
+  base::DictValue StopTriggerForAgent();
   // Gives the agent what the chat's scheduled runs reported, from their
   // lines.
   void UpdateScheduledRuns();

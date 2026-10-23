@@ -99,6 +99,7 @@ import {
 } from "./slash-menu";
 import { ScheduleChart, chartSeries } from "./chart";
 import { ModeChip } from "./mode-chip";
+import { TriggerStoppedLine, TriggerStrip, WakeLine } from "./trigger";
 import {
   QuietRuns,
   RunMessage,
@@ -133,6 +134,7 @@ import {
   type ScheduleState,
   type SkillProposal,
   type Step,
+  type TriggerState,
 } from "@/chat-api";
 
 // Fluid's .typeset styles an answer by its plain elements, and Streamdown's
@@ -365,6 +367,14 @@ function describe(step: Step): ReactNode {
           Filled in the <b>schedule card</b>
         </>
       );
+    case "trigger":
+      return (
+        <>
+          Left <Command>{args.command}</Command> running as a trigger
+        </>
+      );
+    case "stop_trigger":
+      return "Stopped the trigger";
     case "save_skill":
       return (
         <>
@@ -423,6 +433,8 @@ const TOOL_ICONS: Record<string, IconName> = {
   recall: "rotate-ccw",
   skill: "lightbulb",
   save_skill: "check",
+  trigger: "terminal",
+  stop_trigger: "terminal",
   schedule: "clock",
   connector: "link",
   prompt: "message-circle",
@@ -669,6 +681,10 @@ function Line({
       return <RunMessage line={line} />;
     case StepKind.kRunSkipped:
       return <SkippedLine count={line.text} />;
+    case StepKind.kWake:
+      return <WakeLine line={line} />;
+    case StepKind.kTriggerStopped:
+      return <TriggerStoppedLine line={line} />;
     case StepKind.kStopped:
       return (
         <Banner className="stopped">
@@ -747,7 +763,7 @@ function ChatList({
   const [query, setQuery] = useState("");
   const [scheduledOnly, setScheduledOnly] = useState(false);
   const wanted = query.trim().toLowerCase();
-  const scheduled = chats.filter((chat) => chat.scheduled);
+  const scheduled = chats.filter((chat) => chat.scheduled || chat.trigger);
   const onlyScheduled = scheduledOnly && scheduled.length > 0;
   const shown = (onlyScheduled ? scheduled : chats).filter((chat) =>
     (chat.title || "New chat").toLowerCase().includes(wanted),
@@ -834,8 +850,15 @@ function ChatList({
                       }
                     }}
                     {...rowState(chat.state)}
-                    {...(chat.scheduled && chat.state === ChatState.kDone
-                      ? { icon: chat.schedulePaused ? Pause : Clock }
+                    {...((chat.scheduled || chat.trigger) &&
+                    chat.state === ChatState.kDone
+                      ? {
+                          icon: chat.schedulePaused
+                            ? Pause
+                            : chat.scheduled
+                              ? Clock
+                              : TerminalIcon,
+                        }
                       : {})}
                   >
                     <span className="flex-1 truncate">
@@ -847,7 +870,9 @@ function ChatList({
                           ? "Paused"
                           : chat.nextRun
                             ? when(chat.nextRun)
-                            : ""
+                            : chat.trigger
+                              ? "Trigger"
+                              : ""
                         : when(chat.updated)}
                     </span>
                   </SidebarMenuButton>
@@ -1004,7 +1029,8 @@ function ApprovalCard({
           ) : terminal ? (
             <span className="flex items-center gap-1.5">
               <TerminalIcon aria-hidden className="size-3.5" />
-              Terminal · Tab {approval.tab} · {approval.folder}
+              Terminal · {approval.tab > 0 && `Tab ${approval.tab} · `}
+              {approval.folder}
               {approval.sensitive && fullAuto && (
                 <span className="full-auto ml-auto flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 font-medium text-warning">
                   <Shield aria-hidden className="size-3" />
@@ -1464,6 +1490,7 @@ function Chat() {
   const listed = useRef(new Set<string>());
   const [working, setWorking] = useState(false);
   const [since, setSince] = useState(0);
+  const [trigger, setTrigger] = useState<TriggerState | null>(null);
   const [, setNow] = useState(0);
   const [draft, setDraft] = useState("");
   // A prompt's argument values, while one is picked.
@@ -1520,6 +1547,9 @@ function Chat() {
       chatPage.onSchedule.addListener((state: ScheduleState | null) =>
         setSchedule(state),
       ),
+      chatPage.onTrigger.addListener((state: TriggerState | null) =>
+        setTrigger(state),
+      ),
       chatPage.onScheduleCard.addListener((state: ScheduleState) =>
         setCard(state),
       ),
@@ -1544,6 +1574,17 @@ function Chat() {
         setRunning(tab ? { tab, command, since: Date.now() } : null),
       ),
       chatPage.onStep.addListener((step: Step) => {
+        if (step.kind === StepKind.kTriggerStopped) {
+          setLines((before) => [...before, step]);
+          return;
+        }
+        // A trigger woke the agent, which goes to work.
+        if (step.kind === StepKind.kWake) {
+          setLines((before) => [...before, step]);
+          setWorking(true);
+          setSince(Date.now());
+          return;
+        }
         // A run of the chat's schedule adds its line on its own, while the
         // chat's agent may be at work.
         if (
@@ -1993,6 +2034,11 @@ function Chat() {
             <ScheduleStrip state={schedule} />
           </div>
         )}
+        {trigger && (
+          <div className="px-7 pt-2">
+            <TriggerStrip state={trigger} />
+          </div>
+        )}
         {schedule && chartOpen && (
           <div className="px-7 pt-2">
             <ScheduleChart
@@ -2004,6 +2050,7 @@ function Chat() {
         )}
         {card && providers && (
           <ScheduleCard
+            trigger={trigger}
             // The agent can fill in the card while it is open.
             key={JSON.stringify(card.schedule)}
             state={card}

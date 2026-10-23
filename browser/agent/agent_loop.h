@@ -144,6 +144,11 @@ class AgentLoop {
   using FillScheduleCard =
       base::RepeatingCallback<base::DictValue(const base::DictValue& args)>;
   void SetScheduleCard(FillScheduleCard fill);
+  // A chat's agent can leave a command running as a trigger. Once these are
+  // set, the model is offered the trigger tools, and a trigger call runs
+  // through the same approvals as a command.
+  void SetTriggers(AgentTools::StartTrigger start,
+                   AgentTools::StopTrigger stop);
   // The user's answer to a step that needs approval. A decline may carry a
   // note for the model.
   struct ApprovalAnswer {
