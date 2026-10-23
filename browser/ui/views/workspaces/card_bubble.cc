@@ -7,6 +7,8 @@
 
 #include "base/location.h"
 #include "base/task/sequenced_task_runner.h"
+#include "ui/gfx/geometry/outsets.h"
+#include "ui/gfx/geometry/rect.h"
 
 namespace uw {
 
@@ -21,6 +23,12 @@ void CardBubble::Watch(views::Widget* widget) {
   observation_.Observe(widget);
 }
 
+gfx::Rect CardBubble::GetAnchorRect() const {
+  gfx::Rect anchor = BubbleDialogDelegate::GetAnchorRect();
+  anchor.Outset(gfx::Outsets::VH(anchor_gap_, 0));
+  return anchor;
+}
+
 void CardBubble::OnWidgetClosing(views::Widget* widget) {
   if (closing_) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -30,6 +38,9 @@ void CardBubble::OnWidgetClosing(views::Widget* widget) {
 
 void CardBubble::OnWidgetDestroyed(views::Widget* widget) {
   observation_.Reset();
+  // The anchor can outlive the card, and would tell its gone widget of theme
+  // changes until this deletes.
+  SetAnchorView(nullptr);
   base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE, this);
 }
 

@@ -56,6 +56,8 @@ class WorkspaceSwitcher : public views::View,
   void ShowMenu(const std::string& id);
   // Opens the icon picker of workspace `id` above its icon.
   void ShowIconCard(const std::string& id);
+  // Opens the card that renames workspace `id`, above the sidebar's foot.
+  void ShowRenameCard(const std::string& id);
   // Asks before deleting workspace `id`, over the page.
   void ShowDeleteCard(const std::string& id);
 

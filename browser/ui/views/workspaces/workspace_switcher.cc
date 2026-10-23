@@ -298,6 +298,12 @@ void WorkspaceSwitcher::ShowIconCard(const std::string& id) {
   }
 }
 
+void WorkspaceSwitcher::ShowRenameCard(const std::string& id) {
+  views::View* foot =
+      parent() && parent()->parent() ? parent()->parent() : this;
+  ShowCard(MakeRenameCard(id, foot, CardClosing()), id);
+}
+
 void WorkspaceSwitcher::ShowDeleteCard(const std::string& id) {
   ShowCard(MakeDeleteCard(this, id, CardClosing()), id);
 }

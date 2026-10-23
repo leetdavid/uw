@@ -44,6 +44,11 @@ CardBubble* MakeIconCard(WorkspaceSwitcher* switcher,
                          const std::string& id,
                          views::View* icon,
                          base::OnceClosure closing);
+// Workspace `id`'s emoji and its name in a field, above `foot`. Return and a
+// click elsewhere save the name, and Esc leaves it.
+CardBubble* MakeRenameCard(const std::string& id,
+                           views::View* foot,
+                           base::OnceClosure closing);
 // A name, an emoji, and a profile for a new workspace, above `foot`.
 CardBubble* MakeNewWorkspaceCard(WorkspaceSwitcher* switcher,
                                  views::View* foot,
@@ -78,6 +83,31 @@ class WorkspaceMenu : public views::View {
 
   const raw_ptr<WorkspaceSwitcher> switcher_;
   const std::string id_;
+};
+
+// The rename card's emoji and name field.
+class RenameCard : public views::View, public views::TextfieldController {
+  METADATA_HEADER(RenameCard, views::View)
+
+ public:
+  RenameCard(const std::string& id, CardBubble* bubble);
+  RenameCard(const RenameCard&) = delete;
+  RenameCard& operator=(const RenameCard&) = delete;
+  ~RenameCard() override;
+
+  views::Textfield* field() { return field_; }
+
+  // Gives the workspace the typed name, unless it is blank.
+  void Save();
+
+  // views::TextfieldController:
+  bool HandleKeyEvent(views::Textfield* sender,
+                      const ui::KeyEvent& key_event) override;
+
+ private:
+  const std::string id_;
+  const raw_ptr<CardBubble> bubble_;
+  raw_ptr<views::Textfield> field_ = nullptr;
 };
 
 // The new workspace card, with its step that names a new profile.

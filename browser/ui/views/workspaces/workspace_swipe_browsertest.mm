@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "base/apple/owned_objc.h"
@@ -23,12 +24,15 @@
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -48,9 +52,12 @@
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/scroll_view.h"
 #include "ui/views/test/button_test_api.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
+#include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
@@ -296,6 +303,46 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
     return unloaded;
   }
 
+  // Pins a new tab in `window`.
+  static void PinATab(BrowserWindowInterface* window) {
+    chrome::AddTabAt(window->GetBrowserForMigrationOnly(), GURL("about:blank"),
+                     -1, true);
+    window->GetTabStripModel()->SetTabPinned(
+        window->GetTabStripModel()->active_index(), true);
+  }
+
+  // Where the part of `window`'s sidebar that slides starts, in its sidebar.
+  static int SlideTop(BrowserWindowInterface* window) {
+    TabStripRegionView* region =
+        BrowserView::GetBrowserViewForBrowser(window)->tab_strip_view();
+    for (views::View* child : region->children()) {
+      if (std::string_view(child->GetClassName()) == "SlideView" &&
+          child->GetVisible()) {
+        return child->y();
+      }
+    }
+    return -1;
+  }
+
+  // Where `window`'s tab strip starts, and where its pins end, in its sidebar.
+  static int StripTop(BrowserWindowInterface* window) {
+    TabStripRegionView* region =
+        BrowserView::GetBrowserViewForBrowser(window)->tab_strip_view();
+    gfx::Point top;
+    views::View::ConvertPointToTarget(region->GetTabStripView(), region, &top);
+    return top.y();
+  }
+  static int PinsBottom(BrowserWindowInterface* window) {
+    TabStripRegionView* region =
+        BrowserView::GetBrowserViewForBrowser(window)->tab_strip_view();
+    views::View* pins = views::ScrollView::GetScrollViewForContents(
+        views::AsViewClass<TabStripView>(region->GetTabStripView())
+            ->GetPinnedTabsContainer());
+    gfx::Point bottom(0, pins->height());
+    views::View::ConvertPointToTarget(pins, region, &bottom);
+    return bottom.y();
+  }
+
   // Swipes `window` all the way to its next workspace, and waits for it.
   BrowserWindowInterface* SwipeToNext(BrowserWindowInterface* window,
                                       const std::string& next) {
@@ -323,6 +370,33 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   EXPECT_TRUE(!page || page->transform().IsIdentity());
   EXPECT_EQ(ShownOf(browser()), browser());
   SaveWindowScreenshot(browser(), "swipe-started");
+  Lift(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
+
+// Within a profile the pins stay put, since both workspaces show them.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, ThePinsStayWithinAProfile) {
+  PinATab(browser());
+  AddWorkspace("Reading", browser()->GetProfile());
+  MoveFingers(browser(), -kShortSwipe);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  EXPECT_GT(PinsBottom(browser()), StripTop(browser()));
+  EXPECT_EQ(SlideTop(browser()), PinsBottom(browser()));
+  SaveWindowScreenshot(browser(), "swipe-pins-stay");
+  Lift(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
+
+// Toward another profile's workspace the pins slide with the rest.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       ThePinsSlideTowardAnotherProfile) {
+  PinATab(browser());
+  AddWorkspace("Personal", &MakeProfile());
+  MoveFingers(browser(), -kShortSwipe);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  EXPECT_EQ(SlideTop(browser()), StripTop(browser()));
   Lift(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
 }

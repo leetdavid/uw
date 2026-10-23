@@ -1139,20 +1139,19 @@ index afa40bfc3acb801c9745a05c5abdc72b685b6448..f70a5201e91ee080e085a7f776d270ce
  
    EnsureFocusOrder(target_index);
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c87562da3 100644
+index ab919030ae2fbd70240f192e1a7060776530523a..d53741f9739f468fe8cb638e7e29409d49976120 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-@@ -67,6 +67,9 @@
+@@ -67,6 +67,8 @@
  #include "ui/views/controls/focus_ring.h"
  #include "ui/views/controls/resize_area.h"
  #include "ui/views/controls/separator.h"
 +#include "uw/browser/ui/views/tab_organization/organize_bar.h"
-+#include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 +#include "uw/browser/ui/views/workspaces/workspace_switcher.h"
  #include "ui/views/focus/focus_manager.h"
  #include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/layout/flex_layout.h"
-@@ -156,6 +159,14 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+@@ -156,6 +158,14 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
                LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
            region_horizontal_padding, 0, region_horizontal_padding));
  
@@ -1167,7 +1166,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c
    gemini_button_ = AddChildView(std::make_unique<views::View>());
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
-@@ -279,14 +290,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
+@@ -279,14 +289,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
      return false;
    }
  
@@ -1188,16 +1187,6 @@ index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c
      gfx::Point point_in_child = point;
      views::View::ConvertPointToTarget(this, bottom_button_container_,
                                        &point_in_child);
-@@ -722,6 +737,9 @@ void VerticalTabStripRegionView::ClickEventHandler::OnMouseEvent(
- }
- 
- void VerticalTabStripRegionView::OnTabStripViewSet() {
-+  // uw: the workspace's name, under the pins.
-+  tab_strip_view()->SetUwRow(
-+      uw::WorkspaceNameRow::Make(browser_view()->browser()));
-   tab_strip_view()->SetProperty(
-       views::kFlexBehaviorKey,
-       views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5e13d4957 100644
 --- a/chrome/browser/ui/browser_command_controller.cc

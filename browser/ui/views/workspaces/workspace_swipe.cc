@@ -18,6 +18,8 @@
 #include "chrome/browser/ui/views/frame/main_background_region_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -32,16 +34,15 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/point.h"
-#include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
+#include "ui/views/controls/scroll_view.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
 #include "uw/browser/ui/look/tint_painter.h"
-#include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -137,30 +138,22 @@ class SlideView : public views::View {
   }
 
   // `coming` is the other workspace's tab strip, placed as `leaving` is.
-  // Without it, `name` stands in, at `name_bounds` once it lands.
-  void SetComing(const gfx::ImageSkia& coming,
-                 std::unique_ptr<views::View> name,
-                 const gfx::Rect& name_bounds) {
+  // Without it, only the tint comes in.
+  void SetComing(const gfx::ImageSkia& coming) {
     coming_ = coming;
-    name_ = nullptr;
-    RemoveAllChildViews();
-    if (name) {
-      name_ = AddChildView(std::move(name));
-    }
-    name_bounds_ = name_bounds;
-    Place();
+    SchedulePaint();
   }
 
   void Move(float offset, int direction) {
     offset_ = offset;
     direction_ = direction;
-    Place();
+    SchedulePaint();
   }
 
   // Lets the pictures go.
   void Clear() {
     leaving_ = gfx::ImageSkia();
-    SetComing(gfx::ImageSkia(), nullptr, gfx::Rect());
+    SetComing(gfx::ImageSkia());
   }
 
   // views::View:
@@ -176,21 +169,9 @@ class SlideView : public views::View {
   }
 
  private:
-  void Place() {
-    if (name_) {
-      name_->SetBoundsRect(name_bounds_ +
-                           gfx::Vector2d(base::ClampRound(offset_) +
-                                             direction_ * width(),
-                                         0));
-    }
-    SchedulePaint();
-  }
-
   const raw_ptr<BrowserView> browser_view_;
   gfx::ImageSkia leaving_;
   gfx::ImageSkia coming_;
-  raw_ptr<views::View> name_ = nullptr;
-  gfx::Rect name_bounds_;
   int strip_top_ = 0;
   float offset_ = 0;
   int direction_ = 0;
@@ -457,12 +438,8 @@ bool WorkspaceSwipe::SidebarCanSlide() const {
       controller && controller->IsCollapsed()) {
     return false;
   }
-  if (WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_);
-      switcher && switcher->card()) {
-    return false;
-  }
-  WorkspaceNameRow* row = WorkspaceNameRow::From(window_);
-  return !row || !row->renaming();
+  WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_);
+  return !switcher || !switcher->card();
 }
 
 bool WorkspaceSwipe::CanSwipe() const {
@@ -506,11 +483,16 @@ gfx::Rect WorkspaceSwipe::SlidingArea(const std::string& target) const {
   const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(target);
   const bool same_profile =
       !workspace || workspace->profile == window_->GetProfile()->GetBaseName();
-  WorkspaceNameRow* row = WorkspaceNameRow::From(window_);
-  if (same_profile && row && row->GetVisible() && strip->Contains(row)) {
-    gfx::Point top;
-    views::View::ConvertPointToTarget(row, region_, &top);
-    area.Inset(gfx::Insets::TLBR(top.y() - area.y(), 0, 0, 0));
+  auto* tabs = views::AsViewClass<TabStripView>(strip);
+  views::View* pins = tabs && tabs->GetPinnedTabsContainer()
+                          ? views::ScrollView::GetScrollViewForContents(
+                                tabs->GetPinnedTabsContainer())
+                          : nullptr;
+  if (same_profile && pins && pins->GetVisible()) {
+    gfx::Point bottom(0, pins->height());
+    views::View::ConvertPointToTarget(pins, region_, &bottom);
+    area.Inset(gfx::Insets::TLBR(
+        std::clamp(bottom.y() - area.y(), 0, area.height()), 0, 0, 0));
   }
   return area;
 }
@@ -565,20 +547,11 @@ void WorkspaceSwipe::ShowSlide() {
   views::View::ConvertPointToTarget(TabStrip(), region_, &strip_top);
   slide_view_->SetLeaving(leaving_, strip_top.y() - area_.y());
 
-  // The other workspace's sidebar, or its name where there is no picture.
+  // The other workspace's sidebar, or only its tint where there is no
+  // picture.
   WorkspaceWindow* partner = PartnerFor(target_);
   WorkspaceSwipe* other = partner ? From(partner->window()) : nullptr;
-  const gfx::ImageSkia coming = other ? other->picture() : gfx::ImageSkia();
-  std::unique_ptr<views::View> name;
-  gfx::Rect name_bounds;
-  WorkspaceNameRow* row = WorkspaceNameRow::From(window_);
-  if (coming.isNull() && !target_.empty() && row) {
-    name = MakeNameRowLook(target_);
-    gfx::Point origin;
-    views::View::ConvertPointToTarget(row, region_, &origin);
-    name_bounds = gfx::Rect(origin - area_.OffsetFromOrigin(), row->size());
-  }
-  slide_view_->SetComing(coming, std::move(name), name_bounds);
+  slide_view_->SetComing(other ? other->picture() : gfx::ImageSkia());
   slide_view_->Move(offset_, target_.empty() ? 0 : direction_);
   slide_view_->SetVisible(true);
 }

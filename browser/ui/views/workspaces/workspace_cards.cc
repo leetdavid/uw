@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/message_formatter.h"
 #include "base/location.h"
 #include "base/strings/string_util.h"
@@ -29,6 +30,8 @@
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
+#include "ui/events/event.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/font_list.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
@@ -50,7 +53,6 @@
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/workspaces/card_bubble.h"
 #include "uw/browser/ui/views/workspaces/icon_picker.h"
-#include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/ui/views/workspaces/workspace_text.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -61,6 +63,10 @@ namespace {
 
 constexpr int kCardWidth = 300;
 constexpr int kDeleteCardWidth = 340;
+constexpr int kRenameCardPadding = 10;
+constexpr int kRenameFieldHeight = 32;
+constexpr int kEmojiSize = 15;
+constexpr int kEmojiWidth = 22;
 constexpr int kFieldHeight = 34;
 constexpr int kFieldRadius = 9;
 constexpr int kRingWidth = 2;
@@ -241,6 +247,29 @@ CardBubble* MakeIconCard(WorkspaceSwitcher* switcher,
   return bubble;
 }
 
+CardBubble* MakeRenameCard(const std::string& id,
+                           views::View* foot,
+                           base::OnceClosure closing) {
+  CardBubble* bubble = MakeCardBubble(foot, views::BubbleBorder::BOTTOM_LEFT,
+                                      std::move(closing));
+  bubble->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
+  bubble->SetShowCloseButton(false);
+  bubble->set_margins(gfx::Insets(kRenameCardPadding));
+  bubble->set_fixed_width(foot->width());
+  bubble->set_anchor_gap(kGap);
+  bubble->SetBackgroundColor(kColorMenuCardBackground);
+  RenameCard* card =
+      bubble->SetContentsView(std::make_unique<RenameCard>(id, bubble));
+  bubble->SetInitiallyFocusedView(card->field());
+  bubble->SetAcceptCallback(
+      base::BindOnce(&RenameCard::Save, base::Unretained(card)));
+  bubble->SetCloseCallback(
+      base::BindOnce(&RenameCard::Save, base::Unretained(card)));
+  bubble->SetCancelCallback(base::DoNothing());
+  bubble->set_esc_should_cancel_dialog_override(true);
+  return bubble;
+}
+
 CardBubble* MakeNewWorkspaceCard(WorkspaceSwitcher* switcher,
                                  views::View* foot,
                                  base::OnceClosure closing) {
@@ -344,13 +373,7 @@ WorkspaceMenu::WorkspaceMenu(WorkspaceSwitcher* switcher, const std::string& id)
   add(kRenameId, vector_icons::kEditIcon, IDS_UW_RENAME_WORKSPACE,
       base::BindRepeating(
           [](const std::string& id, WorkspaceSwitcher* switcher) {
-            InWorkspace(
-                switcher->window(), id,
-                base::BindOnce([](BrowserWindowInterface* window) {
-                  if (WorkspaceNameRow* row = WorkspaceNameRow::From(window)) {
-                    row->StartRename();
-                  }
-                }));
+            switcher->ShowRenameCard(id);
           },
           id));
   add(kIconId, kSmileIcon, IDS_UW_CHANGE_WORKSPACE_ICON,
@@ -399,6 +422,56 @@ void WorkspaceMenu::Then(
 }
 
 BEGIN_METADATA(WorkspaceMenu)
+END_METADATA
+
+RenameCard::RenameCard(const std::string& id, CardBubble* bubble)
+    : id_(id), bubble_(bubble) {
+  auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+      views::BoxLayout::Orientation::kHorizontal, gfx::Insets(), kGap));
+  layout->set_cross_axis_alignment(
+      views::BoxLayout::CrossAxisAlignment::kCenter);
+  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
+  auto* emoji = AddChildView(std::make_unique<views::Label>(
+      workspace ? base::UTF8ToUTF16(workspace->icon) : std::u16string()));
+  emoji->SetFontList(gfx::FontList().DeriveWithSizeDelta(
+      kEmojiSize - gfx::FontList().GetFontSize()));
+  emoji->SetElideBehavior(gfx::NO_ELIDE);
+  emoji->SetBackgroundColor(SK_ColorTRANSPARENT);
+  emoji->SetSubpixelRenderingEnabled(false);
+  emoji->SetPreferredSize(gfx::Size(kEmojiWidth, kRenameFieldHeight));
+  field_ = AddChildView(RingedField(IDS_UW_WORKSPACE_NAME));
+  layout->SetFlexForView(field_, 1);
+  field_->SetPreferredSize(gfx::Size(0, kRenameFieldHeight));
+  field_->SetFontList(
+      field_->GetFontList().DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
+  field_->SetController(this);
+  if (workspace) {
+    field_->SetText(base::UTF8ToUTF16(workspace->name));
+  }
+  field_->SelectAll(/*reversed=*/false);
+}
+
+RenameCard::~RenameCard() = default;
+
+void RenameCard::Save() {
+  const std::u16string typed(
+      base::TrimWhitespace(field_->GetText(), base::TRIM_ALL));
+  if (!typed.empty()) {
+    WorkspaceList::Get().Rename(id_, base::UTF16ToUTF8(typed));
+  }
+}
+
+bool RenameCard::HandleKeyEvent(views::Textfield* sender,
+                                const ui::KeyEvent& key_event) {
+  if (key_event.type() != ui::EventType::kKeyPressed ||
+      key_event.key_code() != ui::VKEY_RETURN) {
+    return false;
+  }
+  bubble_->AcceptDialog();
+  return true;
+}
+
+BEGIN_METADATA(RenameCard)
 END_METADATA
 
 NewWorkspaceCard::NewWorkspaceCard(WorkspaceSwitcher* switcher,

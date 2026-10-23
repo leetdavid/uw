@@ -6,6 +6,7 @@
 
 #include "base/functional/callback.h"
 #include "base/scoped_observation.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
@@ -26,6 +27,11 @@ class CardBubble : public views::BubbleDialogDelegate,
   ~CardBubble() override;
 
   void Watch(views::Widget* widget);
+  // Keeps the card `gap` above or below its anchor.
+  void set_anchor_gap(int gap) { anchor_gap_ = gap; }
+
+  // views::BubbleDialogDelegate:
+  gfx::Rect GetAnchorRect() const override;
 
   // views::WidgetObserver:
   void OnWidgetClosing(views::Widget* widget) override;
@@ -33,6 +39,7 @@ class CardBubble : public views::BubbleDialogDelegate,
 
  private:
   base::OnceClosure closing_;
+  int anchor_gap_ = 0;
   base::ScopedObservation<views::Widget, views::WidgetObserver> observation_{
       this};
 };

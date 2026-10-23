@@ -35,6 +35,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "ui/base/accelerators/accelerator.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/events/base_event_utils.h"
@@ -47,6 +48,7 @@
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/textfield/textfield.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -60,7 +62,6 @@
 #include "uw/browser/ui/views/workspaces/icon_picker.h"
 #include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
 #include "uw/browser/ui/views/workspaces/workspace_cards.h"
-#include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/ui/views/workspaces/workspace_text.h"
 #include "uw/browser/workspaces/workspace_commands.h"
@@ -223,32 +224,132 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest, TheFootInDarkMode) {
   SaveWindowScreenshot(browser(), "workspaces-foot-dark");
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
-                       TheNameRowNamesTheWorkspaceAndRenamesIt) {
-  const std::string id = WorkspaceWindow::From(browser())->workspace();
-  WorkspaceNameRow* row = WorkspaceNameRow::From(browser());
-  ASSERT_TRUE(row);
-  EXPECT_TRUE(row->IsDrawn());
-  EXPECT_EQ(base::UTF16ToUTF8(row->name()->GetText()), list().Find(id)->name);
-  SaveWindowScreenshot(browser(), "workspace-name-row");
-
-  row->StartRename();
-  ASSERT_TRUE(row->renaming());
-  row->field()->SetText(u"Errands");
-  SaveWindowScreenshot(browser(), "workspace-rename");
-  row->HandleKeyEvent(row->field(), ui::KeyEvent(ui::EventType::kKeyPressed,
-                                                 ui::VKEY_ESCAPE, ui::EF_NONE));
-  EXPECT_FALSE(row->renaming());
-  EXPECT_NE(list().Find(id)->name, "Errands");
-
-  row->StartRename();
-  row->field()->SetText(u"  Home  ");
-  row->HandleKeyEvent(row->field(), ui::KeyEvent(ui::EventType::kKeyPressed,
-                                                 ui::VKEY_RETURN, ui::EF_NONE));
-  EXPECT_FALSE(row->renaming());
-  EXPECT_EQ(list().Find(id)->name, "Home");
+// With every tab pinned, nothing sits under the pins: the foot's icon says
+// which workspace the window shows.
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest, NothingSitsUnderThePins) {
+  chrome::AddTabAt(browser(), GURL(kNotes), -1, true);
+  TabStripModel* tabs = browser()->tab_strip_model();
+  tabs->SetTabPinned(0, true);
+  tabs->SetTabPinned(1, true);
   Settle();
-  EXPECT_EQ(row->name()->GetText(), u"Home");
+  views::View* strip = BrowserView::GetBrowserViewForBrowser(browser())
+                           ->tab_strip_view()
+                           ->GetTabStripView();
+  std::string children;
+  for (views::View* child : strip->children()) {
+    children += std::string(child->GetClassName()) + " ";
+  }
+  EXPECT_EQ(children, "ScrollView Separator ScrollView ");
+  SaveWindowScreenshot(browser(), "workspace-only-pins");
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       RenameWorkspaceOpensACardAboveTheFoot) {
+  const std::string id = WorkspaceWindow::From(browser())->workspace();
+  const std::string name = list().Find(id)->name;
+  WorkspaceSwitcher* switcher = SwitcherOf(browser());
+  switcher->ShowMenu(id);
+  Click(views::AsViewClass<views::Button>(
+      ContentsOf<WorkspaceMenu>(switcher->card())
+          ->GetViewByID(WorkspaceMenu::kRenameId)));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return switcher->card() && ContentsOf<RenameCard>(switcher->card());
+  }));
+  views::Widget* card = switcher->card();
+  RenameCard* rename = ContentsOf<RenameCard>(card);
+  EXPECT_EQ(base::UTF16ToUTF8(rename->field()->GetText()), name);
+  EXPECT_EQ(base::UTF16ToUTF8(rename->field()->GetSelectedText()), name);
+  EXPECT_FALSE(Dialog(card)->GetOkButton());
+
+  // It sits 8px over the foot, as wide.
+  const gfx::Rect foot = switcher->parent()->parent()->GetBoundsInScreen();
+  const gfx::Rect contents =
+      card->widget_delegate()->GetContentsView()->GetBoundsInScreen();
+  EXPECT_EQ(contents.x() - 10, foot.x());
+  EXPECT_EQ(contents.bottom() + 10 + 8, foot.y());
+  EXPECT_EQ(contents.width() + 20, foot.width());
+  SaveWidgetScreenshot(card, "workspace-rename-card");
+
+  rename->field()->SetText(u"  Errands  ");
+  rename->HandleKeyEvent(
+      rename->field(),
+      ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_RETURN, ui::EF_NONE));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !switcher->card(); }));
+  EXPECT_EQ(list().Find(id)->name, "Errands");
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       EscLeavesTheNameAndAClickElsewhereSavesIt) {
+  const std::string id = WorkspaceWindow::From(browser())->workspace();
+  const std::string name = list().Find(id)->name;
+  WorkspaceSwitcher* switcher = SwitcherOf(browser());
+
+  switcher->ShowRenameCard(id);
+  ContentsOf<RenameCard>(switcher->card())->field()->SetText(u"Errands");
+  switcher->card()->GetFocusManager()->ProcessAccelerator(
+      ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !switcher->card(); }));
+  EXPECT_EQ(list().Find(id)->name, name);
+
+  switcher->ShowRenameCard(id);
+  ContentsOf<RenameCard>(switcher->card())->field()->SetText(u"   ");
+  switcher->card()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !switcher->card(); }));
+  EXPECT_EQ(list().Find(id)->name, name);
+
+  switcher->ShowRenameCard(id);
+  ContentsOf<RenameCard>(switcher->card())->field()->SetText(u"Errands");
+  switcher->card()->CloseWithReason(views::Widget::ClosedReason::kLostFocus);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !switcher->card(); }));
+  EXPECT_EQ(list().Find(id)->name, "Errands");
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       RenamesAnotherWorkspaceWithoutSwitching) {
+  const std::string work = WorkspaceWindow::From(browser())->workspace();
+  const std::string reading = AddWorkspace("Reading", profile());
+  Settle();
+  WorkspaceSwitcher* switcher = SwitcherOf(browser());
+  switcher->ShowMenu(reading);
+  Click(views::AsViewClass<views::Button>(
+      ContentsOf<WorkspaceMenu>(switcher->card())
+          ->GetViewByID(WorkspaceMenu::kRenameId)));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return switcher->card() && ContentsOf<RenameCard>(switcher->card());
+  }));
+  RenameCard* rename = ContentsOf<RenameCard>(switcher->card());
+  EXPECT_EQ(rename->field()->GetText(), u"Reading");
+  rename->field()->SetText(u"Books");
+  rename->HandleKeyEvent(
+      rename->field(),
+      ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_RETURN, ui::EF_NONE));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !switcher->card(); }));
+  EXPECT_EQ(list().Find(reading)->name, "Books");
+  EXPECT_EQ(WorkspaceWindow::From(browser())->workspace(), work);
+  EXPECT_EQ(Windows().size(), 1u);
+}
+
+// A card that closes while its anchor stays, as when the list changes, hears
+// nothing of the window's theme after.
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       AClosedCardHearsNoThemeChange) {
+  const std::string id = WorkspaceWindow::From(browser())->workspace();
+  WorkspaceSwitcher* switcher = SwitcherOf(browser());
+  switcher->ShowRenameCard(id);
+  switcher->ShowMenu(id);
+  BrowserView::GetBrowserViewForBrowser(browser())->GetWidget()->ThemeChanged();
+  switcher->card()->CloseNow();
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest, TheRenameCardInDarkMode) {
+  ThemeServiceFactory::GetForProfile(profile())->SetBrowserColorScheme(
+      ThemeService::BrowserColorScheme::kDark);
+  Settle();
+  const std::string id = WorkspaceWindow::From(browser())->workspace();
+  SwitcherOf(browser())->ShowRenameCard(id);
+  SaveWidgetScreenshot(SwitcherOf(browser())->card(),
+                       "workspace-rename-card-dark");
+  SwitcherOf(browser())->card()->CloseNow();
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
@@ -299,7 +400,6 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
   EXPECT_FALSE(
       NewItemsMenu(incognito).GetIndexOfCommandId(kNewWorkspaceCommand));
   EXPECT_FALSE(SwitcherOf(incognito));
-  EXPECT_FALSE(WorkspaceNameRow::From(incognito));
   EXPECT_FALSE(chrome::IsCommandEnabled(CreateBrowserForPopup(profile()),
                                         kNewWorkspaceCommand));
 }
