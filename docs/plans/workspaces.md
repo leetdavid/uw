@@ -20,7 +20,7 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 - Right-clicking a workspace's icon offers Rename, Change icon, Theme…, and Delete. Delete asks first, then removes the workspace and its tabs. When it is the profile's last workspace, uw also asks "Also delete the profile 'Work' and its logins and history?", with Keep as the default.
 - Each existing profile becomes a workspace, with the profile's name and theme.
 - Chromium's profile button and menu are removed, and its profile picker never shows. Chromium's settings pages stay.
-- Each workspace has its own [theme](../CONTEXT.md#language): everything the theme picker sets.
+- Each workspace has its own [theme](../CONTEXT.md#language): everything the theme picker sets. That includes Light, Dark, and Auto, and web pages in the workspace's windows follow it, so a dark workspace shows sites in their dark style. Agreed on 2026-10-24.
 - The organizer works inside one workspace and never moves a tab to another. Right-click → Move to workspace ▸ moves a tab by hand. To a workspace on the same profile, the live page moves. To one on another profile, the address opens there and the tab closes here.
 - The command bar finds open tabs in every workspace of the current profile, and picking one switches to its workspace. It never lists another profile's tabs. Each workspace is a "Go to …" command, and "New workspace" is one too.
 - Private windows have no workspaces and no switcher.
@@ -111,7 +111,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 7. After a quit and launch, each window shows its last workspace, and switching shows the others with their tabs.
 8. Deleting a profile's last workspace asks about the profile, and Keep leaves its logins and history.
 9. The toolbar has no profile button, and launching never shows the profile picker.
-10. Two workspaces on one profile show two themes.
+10. Two workspaces on one profile show two themes. With one set to Dark and the other to Light, a page in each sees `prefers-color-scheme` as its workspace says.
 11. The organizer never files a tab into another workspace. Move to workspace keeps a page's state within a profile and reopens the address across profiles.
 12. The command bar lists a tab from another workspace of the same profile and switches there. It never lists another profile's tabs.
 13. A half swipe on the sidebar snaps back, and a full one follows the fingers to the next workspace.
