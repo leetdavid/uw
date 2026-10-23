@@ -38,6 +38,7 @@ Chosen by uw for T94 on 2026-10-16.
 - The colors, intensity, grain, and "Theme colors in dark mode" are four profile prefs, `uw.theme.*` in `components/look/theme_prefs.h`. They do not sync.
 - When Chromium's user color is not the saved first color at the saved intensity, the color was picked somewhere else, and the theme is that one color. This covers the "Customize Chromium" panel and tints picked before themes, with no migration step.
 - The window draws the more colors only when its frame color is the one the saved theme makes. Black dark mode and Chromium's own themes stay one color.
+- Since T131, on 2026-10-24, each workspace keeps its own theme; see [How workspace windows work](workspaces.md#how-workspace-windows-work). The profile's settings above hold the latest pick in any of its workspaces, which the "Customize Chromium" panel and the profile's private windows show.
 
 ## Design
 

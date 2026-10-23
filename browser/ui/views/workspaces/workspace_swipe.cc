@@ -44,6 +44,7 @@
 #include "uw/browser/ui/views/workspaces/workspace_name_row.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -166,7 +167,7 @@ class SlideView : public views::View {
   void OnPaint(gfx::Canvas* canvas) override {
     PaintTint(canvas, this, browser_view_,
               GetColorProvider()->GetColor(ui::kColorFrameActive),
-              *browser_view_->GetProfile()->GetPrefs());
+              ThemeOfWindow(browser_view_->browser()));
     const int x = base::ClampRound(offset_);
     canvas->DrawImageInt(leaving_, x, strip_top_);
     if (direction_ != 0 && !coming_.isNull()) {
@@ -243,7 +244,7 @@ WorkspaceSwipe::~WorkspaceSwipe() {
     shown->SetSlide({});
   }
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, nullptr, 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
   }
   if (region_) {
     region_->RemovePreTargetHandler(this);
@@ -437,7 +438,7 @@ void WorkspaceSwipe::OnViewHierarchyWillBeDeleted(views::View* view) {
     region_->RemovePreTargetHandler(this);
   }
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, nullptr, 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
   }
   slide_view_ = nullptr;
   cover_ = nullptr;
@@ -650,9 +651,9 @@ void WorkspaceSwipe::SetOffset(float offset) {
   if (browser_view_ && other && other->GetColorProvider()) {
     SetTintBlend(browser_view_,
                  other->GetColorProvider()->GetColor(ui::kColorFrameActive),
-                 partner->window()->GetProfile()->GetPrefs(), amount);
+                 ThemeOfWindow(partner->window()), amount);
   } else if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, nullptr, 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
   }
   if (WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_)) {
     switcher->SetSlide(target_, std::max(0.0f, amount));
@@ -820,7 +821,7 @@ void WorkspaceSwipe::Reset() {
     slide_view_->Clear();
   }
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, nullptr, 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
   }
   if (WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_)) {
     switcher->SetSlide(std::string(), 0);

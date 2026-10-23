@@ -25,6 +25,8 @@
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
@@ -48,6 +50,7 @@
 #include "ui/compositor/compositor.h"
 #include "url/gurl.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 namespace {
@@ -130,6 +133,20 @@ void WorkspaceWindow::Start() {
     widget_observation_.Observe(widget);
   }
   SaveSession();
+  theme_observation_.Observe(
+      ThemeServiceFactory::GetForProfile(window_->GetProfile()));
+  StartWindowTheme(window_);
+}
+
+void WorkspaceWindow::OnThemeChanged() {
+  FollowChromiumTheme(window_);
+}
+
+void WorkspaceWindow::TakeTheme() {
+  StartWindowTheme(window_);
+  if (views::Widget* widget = GetWidget()) {
+    widget->ThemeChanged();
+  }
 }
 
 base::CallbackListSubscription WorkspaceWindow::ObserveChanges(
@@ -260,6 +277,7 @@ void WorkspaceWindow::Restore(
   }
   self->SaveSession();
   self->changes_.Notify();
+  self->TakeTheme();
   // A group shows one window. A window revealed before this one came back
   // goes behind it again.
   if (!self->hidden_) {
@@ -494,6 +512,7 @@ void WorkspaceWindow::OpenPartner(const std::string& id,
   partner->SetHidden(true);
   partner->SaveSession();
   partner->changes_.Notify();
+  partner->TakeTheme();
   NavigateParams new_tab(opened, GURL(chrome::kChromeUINewTabURL),
                          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
   new_tab.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
@@ -520,6 +539,8 @@ void WorkspaceWindow::Create(BrowserWindowInterface* window,
         }
         const std::string id = WorkspaceList::Get().Add(
             std::move(name), std::move(icon), profile->GetBaseName());
+        WorkspaceList::Get().SetTheme(
+            id, NewWorkspaceTheme(ThemeOfWindow(self->window_)));
         self->Switch(id, std::move(shown));
       },
       self->weak_factory_.GetWeakPtr(), std::move(name), std::move(icon),

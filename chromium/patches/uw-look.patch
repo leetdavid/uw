@@ -39,10 +39,10 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/themed_background.cc b/chrome/browser/ui/views/frame/themed_background.cc
-index 169aee34fb3855b3e85fc99725013a2259290e08..829084ccc855505d47d5f22ab3c5474a889a4577 100644
+index 169aee34fb3855b3e85fc99725013a2259290e08..5e577f97d4a6b2c09ed3c8fd5d28f64648c5468d 100644
 --- a/chrome/browser/ui/views/frame/themed_background.cc
 +++ b/chrome/browser/ui/views/frame/themed_background.cc
-@@ -6,16 +6,20 @@
+@@ -6,16 +6,21 @@
  
  #include <optional>
  
@@ -60,10 +60,11 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..829084ccc855505d47d5f22ab3c5474a
  #include "ui/color/color_provider.h"
  #include "ui/gfx/canvas.h"
 +#include "uw/browser/ui/look/tint_painter.h"
++#include "uw/browser/workspaces/workspace_theme.h"
  
  namespace {
  
-@@ -109,10 +113,22 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
+@@ -109,10 +114,23 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
                                         ThemeChoice theme_choice) {
    bool painted =
        PaintThemeCustomImage(canvas, view, browser_view, theme_choice);
@@ -76,8 +77,9 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..829084ccc855505d47d5f22ab3c5474a
 +  const SkColor color = view->GetColorProvider()->GetColor(
 +      GetThemeChoiceInfo(theme_choice, view).second);
 +  if (theme_choice == kFrameTheme) {
-+    uw::PaintTint(canvas, view, browser_view, color,
-+                  *browser_view->GetProfile()->GetPrefs());
++    uw::PaintTint(
++        canvas, view, browser_view, color,
++        uw::ThemeOfWindow(const_cast<BrowserView*>(browser_view)->browser()));
 +    if (browser_view->ShouldDrawVerticalTabStrip()) {
 +      uw::PaintPageCardEdge(
 +          canvas, view, browser_view->toolbar(),
@@ -537,7 +539,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..ad68d492c5603c85dcf75708ac68b0ff
        break;
      }
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b862a1747 100644
+index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..970d64ca151def5f111b9c79ad3fe3bc60c7c0e0 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 @@ -37,6 +37,7 @@
@@ -548,22 +550,23 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..97127e5fba383f43612cb879c69a734b
  #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/tab_strip.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
-@@ -65,6 +66,7 @@
+@@ -65,6 +66,8 @@
  #include "ui/views/controls/label.h"
  #include "ui/views/layout/layout_types.h"
  #include "ui/views/widget/widget.h"
 +#include "uw/browser/ui/look/tint_painter.h"
++#include "uw/browser/workspaces/workspace_theme.h"
  
  namespace {
  
-@@ -506,7 +508,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+@@ -506,7 +509,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
                                      : kBrowserFrameAlphaLight;
      canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
    } else {
 -    canvas->DrawColor(frame_color);
 +    if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
 +      uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
-+                    *GetBrowserView()->GetProfile()->GetPrefs());
++                    uw::ThemeOfWindow(GetBrowserView()->browser()));
 +      uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
 +                            GetBrowserView()->multi_contents_view());
 +    } else {
@@ -635,24 +638,26 @@ index 73f2984811f4e4f5b7cd0e89b58a4fad8025c082..149ba1a647f04e4a00f0da4dc8657914
    public_deps = [
      "//base",
 diff --git a/chrome/browser/ui/views/frame/browser_widget.cc b/chrome/browser/ui/views/frame/browser_widget.cc
-index e6483eae651ee77f6bac3140fe46cb8be3e58296..eaf66bcdd0cebe298ec1eba23b8305b2e2fca5ae 100644
+index e6483eae651ee77f6bac3140fe46cb8be3e58296..bbedf454aadfa6b6bbcd0a92218836a36dcb6961 100644
 --- a/chrome/browser/ui/views/frame/browser_widget.cc
 +++ b/chrome/browser/ui/views/frame/browser_widget.cc
-@@ -41,6 +41,7 @@
+@@ -41,6 +41,8 @@
  #include "ui/color/color_provider_key.h"
  #include "ui/views/controls/menu/menu_runner.h"
  #include "ui/views/widget/native_widget.h"
 +#include "uw/browser/ui/look/page_color.h"
++#include "uw/browser/workspaces/workspace_theme.h"
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "chromeos/ui/base/window_properties.h"
-@@ -496,6 +497,9 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
+@@ -496,6 +498,10 @@ ui::ColorProviderKey BrowserWidget::GetColorProviderKey() const {
    // Apply BrowserWidget overrides:
    key.app_controller =
        web_app::AppBrowserController::From(browser_view_->browser());
 +  if (!key.app_controller) {
 +    key.app_controller = uw::PageColorMixers(browser_view_);
 +  }
++  uw::ApplyThemeOfWindow(browser_view_->browser(), key);
  
  #if BUILDFLAG(IS_CHROMEOS)
    // ChromeOS SystemWebApps use the OS theme all the time.

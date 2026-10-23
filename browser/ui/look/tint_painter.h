@@ -5,8 +5,7 @@
 #define UW_BROWSER_UI_LOOK_TINT_PAINTER_H_
 
 #include "third_party/skia/include/core/SkColor.h"
-
-class PrefService;
+#include "uw/components/look/theme.h"
 
 namespace gfx {
 class Canvas;
@@ -19,20 +18,20 @@ class View;
 namespace uw {
 
 // Fills `view` with its part of the window tint. The gradient starts at
-// `color`, runs through the more colors of the theme saved in `prefs`, and
-// spans `window`, so every view that calls this draws one continuous sheet.
+// `color`, runs through the more colors of `theme`, the window's, and spans
+// `window`, so every view that calls this draws one continuous sheet.
 void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
                SkColor color,
-               const PrefService& prefs);
+               const Theme& theme);
 
 // While the sidebar of `window` slides to another workspace, its tint fades
-// toward the one `color` and `prefs` give, by `amount` from 0 to 1. Zero
-// ends it. `prefs` must last as long as the blend.
+// toward the one `color` and `theme`, the other workspace's, give, by
+// `amount` from 0 to 1. Zero ends it.
 void SetTintBlend(const views::View* window,
                   SkColor color,
-                  const PrefService* prefs,
+                  const Theme& theme,
                   float amount);
 
 // Draws the edge of the page card, which holds `toolbar` and `page`: a 1px

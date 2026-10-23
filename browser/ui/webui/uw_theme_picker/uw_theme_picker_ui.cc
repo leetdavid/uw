@@ -10,6 +10,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/uw_theme_picker_resources.h"
 #include "chrome/grit/uw_theme_picker_resources_map.h"
@@ -20,6 +22,7 @@
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/webui/web_ui_util.h"
 #include "ui/webui/webui_util.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/look/theme.h"
 #include "uw/components/look/theme_prefs.h"
 
@@ -67,19 +70,24 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
 
   // mojom::ThemePickerHandler:
   void GetState(GetStateCallback callback) override {
-    const Theme theme =
-        ReadTheme(*profile_->GetPrefs(), themes()->GetUserColor());
+    BrowserWindowInterface* window = Window();
+    const Theme theme = window ? ThemeOfWindow(window) : Theme();
     auto state = mojom::Theme::New(ToMojo(theme.colors), theme.intensity,
                                    theme.grain, theme.colors_in_dark_mode);
     std::vector<std::vector<uint32_t>> suggested;
     for (const std::vector<SkColor>& colors : SuggestedThemes()) {
       suggested.push_back(ToMojo(colors));
     }
-    std::move(callback).Run(std::move(state), Mode(), std::move(suggested));
+    std::move(callback).Run(std::move(state), ModeOf(theme.mode),
+                            std::move(suggested));
   }
 
   void SetTheme(mojom::ThemePtr picked) override {
-    Theme theme;
+    BrowserWindowInterface* window = Window();
+    if (!window) {
+      return;
+    }
+    Theme theme = ThemeOfWindow(window);
     if (!picked->colors.empty()) {
       theme.colors.assign(picked->colors.begin(),
                           picked->colors.begin() +
@@ -88,27 +96,27 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
     theme.intensity = std::clamp(picked->intensity, 0, kFullIntensity);
     theme.grain = std::clamp(picked->grain, 0, kFullGrain);
     theme.colors_in_dark_mode = picked->colors_in_dark_mode;
-    WriteTheme(*profile_->GetPrefs(), theme);
-    themes()->SetUserColorAndBrowserColorVariant(
-        WithIntensity(theme.colors[0], theme.intensity),
-        ui::mojom::BrowserColorVariant::kTonalSpot);
+    SetThemeOfWindow(window, theme);
   }
 
   void SetMode(mojom::ColorMode mode) override {
+    BrowserWindowInterface* window = Window();
+    if (!window) {
+      return;
+    }
+    Theme theme = ThemeOfWindow(window);
     switch (mode) {
       case mojom::ColorMode::kAuto:
-        themes()->SetBrowserColorScheme(
-            ThemeService::BrowserColorScheme::kSystem);
+        theme.mode = ThemeMode::kAuto;
         break;
       case mojom::ColorMode::kLight:
-        themes()->SetBrowserColorScheme(
-            ThemeService::BrowserColorScheme::kLight);
+        theme.mode = ThemeMode::kLight;
         break;
       case mojom::ColorMode::kDark:
-        themes()->SetBrowserColorScheme(
-            ThemeService::BrowserColorScheme::kDark);
+        theme.mode = ThemeMode::kDark;
         break;
     }
+    SetThemeOfWindow(window, theme);
   }
 
   void ShowUI() override {
@@ -118,17 +126,27 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
   }
 
  private:
-  ThemeService* themes() {
-    return ThemeServiceFactory::GetForProfile(profile_);
+  // The window the picker opened in: the profile's front one.
+  BrowserWindowInterface* Window() {
+    BrowserWindowInterface* found = nullptr;
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [&](BrowserWindowInterface* window) {
+          if (window->GetProfile() == profile_) {
+            found = window;
+            return false;
+          }
+          return true;
+        });
+    return found;
   }
 
-  mojom::ColorMode Mode() {
-    switch (themes()->GetBrowserColorScheme()) {
-      case ThemeService::BrowserColorScheme::kSystem:
+  static mojom::ColorMode ModeOf(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode::kAuto:
         return mojom::ColorMode::kAuto;
-      case ThemeService::BrowserColorScheme::kLight:
+      case ThemeMode::kLight:
         return mojom::ColorMode::kLight;
-      case ThemeService::BrowserColorScheme::kDark:
+      case ThemeMode::kDark:
         return mojom::ColorMode::kDark;
     }
   }

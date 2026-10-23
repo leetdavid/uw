@@ -98,17 +98,26 @@ TEST_F(ThemePrefsTest, AColorPickedElsewhereIsAOneColorTheme) {
 TEST_F(ThemePrefsTest, TheGradientRunsThroughEveryColorOfTheTheme) {
   Theme theme;
   theme.colors = {kButter, kSky};
-  WriteTheme(prefs_, theme);
-  EXPECT_EQ(GradientColorsFor(prefs_, TintFrom(kButter).start),
+  EXPECT_EQ(GradientColorsFor(theme, TintFrom(kButter).start),
             (std::vector<SkColor>{TintFrom(kButter).start, kSky}));
-  EXPECT_TRUE(GradientColorsFor(prefs_, kWine).empty());
-  EXPECT_TRUE(GradientColorsFor(prefs_, SK_ColorBLACK).empty());
+  EXPECT_TRUE(GradientColorsFor(theme, kWine).empty());
+  EXPECT_TRUE(GradientColorsFor(theme, SK_ColorBLACK).empty());
 
   const SkColor dark_butter = TintFrom(DarkModeColorOf(kButter)).start;
-  EXPECT_TRUE(GradientColorsFor(prefs_, dark_butter).empty());
+  EXPECT_TRUE(GradientColorsFor(theme, dark_butter).empty());
   theme.colors_in_dark_mode = true;
-  WriteTheme(prefs_, theme);
-  EXPECT_EQ(GradientColorsFor(prefs_, dark_butter).size(), 2u);
+  EXPECT_EQ(GradientColorsFor(theme, dark_butter).size(), 2u);
+}
+
+TEST_F(ThemePrefsTest, AWorkspaceKeepsEveryPartOfItsTheme) {
+  Theme theme;
+  theme.colors = {kButter, kSky};
+  theme.intensity = 60;
+  theme.grain = 25;
+  theme.colors_in_dark_mode = true;
+  theme.mode = ThemeMode::kDark;
+  EXPECT_EQ(ThemeFromValue(ThemeToValue(theme)), theme);
+  EXPECT_FALSE(ThemeFromValue(base::DictValue()));
 }
 
 TEST_F(ThemePrefsTest, ATintFromBeforeThemesIsTheTheme) {

@@ -26,7 +26,7 @@
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/page_card.h"
-#include "uw/components/look/theme_prefs.h"
+#include "uw/components/look/theme.h"
 #include "uw/components/look/tint.h"
 
 #if BUILDFLAG(IS_MAC)
@@ -89,7 +89,7 @@ void PaintGrain(gfx::Canvas* canvas,
 
 struct Blend {
   SkColor color;
-  raw_ptr<const PrefService> prefs;
+  Theme theme;
   float amount;
 };
 
@@ -102,7 +102,7 @@ void PaintSheet(gfx::Canvas* canvas,
                 const views::View* view,
                 const views::View* window,
                 SkColor color,
-                const PrefService& prefs) {
+                const Theme& theme) {
   const Tint tint = TintFrom(color);
   const double across = std::sin(kAngle);
   const double down = -std::cos(kAngle);
@@ -117,7 +117,7 @@ void PaintSheet(gfx::Canvas* canvas,
                     static_cast<float>(middle_y - down * length / 2)),
       SkPoint::Make(static_cast<float>(middle_x + across * length / 2),
                     static_cast<float>(middle_y + down * length / 2))};
-  std::vector<SkColor> colors = GradientColorsFor(prefs, tint.start);
+  std::vector<SkColor> colors = GradientColorsFor(theme, tint.start);
   if (colors.empty()) {
     colors = {tint.start, tint.end};
   }
@@ -133,7 +133,7 @@ void PaintSheet(gfx::Canvas* canvas,
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
       SkTileMode::kClamp));
   canvas->DrawRect(view->GetLocalBounds(), flags);
-  PaintGrain(canvas, view, ReadTheme(prefs, std::nullopt).grain, IsDark(tint));
+  PaintGrain(canvas, view, theme.grain, IsDark(tint));
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.
   if (TextColorOn(tint) == kDarkTextOnTint) {
@@ -148,27 +148,27 @@ void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
                SkColor color,
-               const PrefService& prefs) {
-  PaintSheet(canvas, view, window, color, prefs);
+               const Theme& theme) {
+  PaintSheet(canvas, view, window, color, theme);
   const auto blend = Blends().find(window);
   if (blend == Blends().end()) {
     return;
   }
   canvas->SaveLayerAlpha(
       static_cast<uint8_t>(std::lround(blend->second.amount * 255)));
-  PaintSheet(canvas, view, window, blend->second.color, *blend->second.prefs);
+  PaintSheet(canvas, view, window, blend->second.color, blend->second.theme);
   canvas->Restore();
 }
 
 void SetTintBlend(const views::View* window,
                   SkColor color,
-                  const PrefService* prefs,
+                  const Theme& theme,
                   float amount) {
-  if (!prefs || amount <= 0) {
+  if (amount <= 0) {
     Blends().erase(window);
     return;
   }
-  Blends()[window] = {color, prefs, std::min(amount, 1.0f)};
+  Blends()[window] = {color, theme, std::min(amount, 1.0f)};
 }
 
 void PaintPageCardEdge(gfx::Canvas* canvas,

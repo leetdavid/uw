@@ -16,6 +16,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/timer/timer.h"
+#include "chrome/browser/themes/theme_service_observer.h"
 #include "components/sessions/core/session_id.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/views/widget/widget.h"
@@ -32,6 +33,8 @@ namespace tabs {
 class TabInterface;
 }
 
+class ThemeService;
+
 namespace uw {
 
 // Owned by EmbedderBrowserWindowFeatures for each normal window that is not
@@ -41,7 +44,8 @@ namespace uw {
 // at a time. Switching shows the partner and hides this window, per ADR 0009.
 // The workspace, the group, and whether the window is hidden are saved with the
 // session, so a restart or Cmd+Shift+T brings the whole group back.
-class WorkspaceWindow : public views::WidgetObserver {
+class WorkspaceWindow : public views::WidgetObserver,
+                        public ThemeServiceObserver {
  public:
   DECLARE_USER_DATA(WorkspaceWindow);
   static constexpr char kWorkspaceKey[] = "uw.workspace";
@@ -138,6 +142,9 @@ class WorkspaceWindow : public views::WidgetObserver {
   void OnWidgetVisibilityChanged(views::Widget* widget, bool visible) override;
   void OnWidgetDestroying(views::Widget* widget) override;
 
+  // ThemeServiceObserver:
+  void OnThemeChanged() override;
+
  private:
   // Puts this window where the group's shown window is, shows it, and hides
   // that one. It goes in just under the shown window first and comes to the
@@ -165,6 +172,8 @@ class WorkspaceWindow : public views::WidgetObserver {
                    WindowCallback found,
                    Profile* profile);
   void SaveSession();
+  // Shows the theme of the workspace the window shows now.
+  void TakeTheme();
   void OnClosed(BrowserWindowInterface* window);
   void RestorePartners();
   // Shows a window of each group no window shows, as when a group's shown
@@ -187,6 +196,8 @@ class WorkspaceWindow : public views::WidgetObserver {
   base::CallbackListSubscription close_subscription_;
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       widget_observation_{this};
+  base::ScopedObservation<ThemeService, ThemeServiceObserver>
+      theme_observation_{this};
   base::RepeatingClosureList changes_;
   base::RepeatingCallback<void(const std::string&)> slide_;
   ui::ScopedUnownedUserData<WorkspaceWindow> user_data_;

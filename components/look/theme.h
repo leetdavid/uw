@@ -16,7 +16,10 @@ inline constexpr size_t kMaxThemeColors = 3;
 inline constexpr int kFullIntensity = 100;
 inline constexpr int kFullGrain = 100;
 
-// A profile's theme, as the picker sets it.
+// Light, Dark, or Auto, which follows macOS.
+enum class ThemeMode { kAuto, kLight, kDark };
+
+// A theme, as the picker sets it: a workspace's, or a profile's.
 struct Theme {
   // One to three colors, in the order they were added.
   std::vector<SkColor> colors = {kDefaultLightTint};
@@ -26,6 +29,7 @@ struct Theme {
   int grain = 0;
   // Dark mode shows the theme darkened instead of black.
   bool colors_in_dark_mode = false;
+  ThemeMode mode = ThemeMode::kAuto;
 
   bool operator==(const Theme&) const = default;
 };
@@ -46,6 +50,12 @@ SkColor DarkModeColorOf(SkColor color);
 std::vector<SkColor> MoreGradientColors(const Theme& theme,
                                         bool dark,
                                         SkColor text);
+
+// The colors the window's gradient runs through when `frame_color` comes from
+// `theme`: the frame color, then the theme's more colors. Empty for a theme of
+// one color, and when the frame color comes from elsewhere, such as black dark
+// mode, Chromium's own themes, or a color picked in Chromium's color picker.
+std::vector<SkColor> GradientColorsFor(const Theme& theme, SkColor frame_color);
 
 }  // namespace uw
 

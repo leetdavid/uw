@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "ui/gfx/color_utils.h"
+#include "uw/components/look/tint.h"
 
 namespace uw {
 namespace {
@@ -79,6 +80,25 @@ std::vector<SkColor> MoreGradientColors(const Theme& theme,
     more.push_back(ReadableUnder(color, text));
   }
   return more;
+}
+
+std::vector<SkColor> GradientColorsFor(const Theme& theme,
+                                       SkColor frame_color) {
+  if (theme.colors.size() < 2 || frame_color == SK_ColorBLACK) {
+    return {};
+  }
+  const SkColor first = WithIntensity(theme.colors[0], theme.intensity);
+  for (bool dark : {false, true}) {
+    const Tint tint = TintFrom(dark ? DarkModeColorOf(first) : first);
+    if (tint.start != frame_color || (dark && !theme.colors_in_dark_mode)) {
+      continue;
+    }
+    std::vector<SkColor> colors =
+        MoreGradientColors(theme, dark, TextColorOn(tint));
+    colors.insert(colors.begin(), tint.start);
+    return colors;
+  }
+  return {};
 }
 
 }  // namespace uw

@@ -6,6 +6,8 @@ source_set("workspaces") {
     "workspace_list.h",
     "workspace_window.cc",
     "workspace_window.h",
+    "workspace_theme.cc",
+    "workspace_theme.h",
     "workspace_window_mac.mm",
   ]
   frameworks = [ "AppKit.framework" ]
@@ -15,9 +17,15 @@ source_set("workspaces") {
     "//components/sessions",
     "//ui/base/unowned_user_data",
     "//ui/views",
+    "//uw/components/look",
   ]
   deps = [
     ":prefs",
+    "//chrome/browser/themes",
+    "//ui/base/mojom",
+    "//ui/color",
+    "//ui/native_theme",
+    "//uw/components/look:prefs",
     "//chrome/browser/lifetime",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles:profile_manager",
@@ -78,5 +86,6 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/views/tab_organization",
     "//uw/components/ai_providers",
+    "//uw/components/look",
   ]
 }

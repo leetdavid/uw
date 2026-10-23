@@ -19,6 +19,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "components/prefs/pref_service.h"
 #include "uw/browser/workspaces/workspace_prefs.h"
+#include "uw/components/look/theme_prefs.h"
 
 namespace uw {
 namespace {
@@ -62,8 +63,10 @@ WorkspaceList::WorkspaceList(PrefService* local_state,
     const std::string* icon = dict ? dict->FindString("icon") : nullptr;
     const std::string* profile = dict ? dict->FindString("profile") : nullptr;
     if (id && name && icon && profile && !Find(*id)) {
-      workspaces_.push_back(
-          {*id, *name, *icon, base::FilePath::FromUTF8Unsafe(*profile)});
+      const base::DictValue* theme = dict->FindDict("theme");
+      workspaces_.push_back({*id, *name, *icon,
+                             base::FilePath::FromUTF8Unsafe(*profile),
+                             theme ? ThemeFromValue(*theme) : std::nullopt});
     }
   }
   if (!workspaces_.empty()) {
@@ -143,6 +146,14 @@ void WorkspaceList::SetIcon(std::string_view id, std::string icon) {
   }
 }
 
+void WorkspaceList::SetTheme(std::string_view id, const Theme& theme) {
+  if (Workspace* workspace = FindMutable(id);
+      workspace && workspace->theme != theme) {
+    workspace->theme = theme;
+    Changed();
+  }
+}
+
 void WorkspaceList::Remove(std::string_view id) {
   if (std::erase_if(workspaces_, [id](const Workspace& workspace) {
         return workspace.id == id;
@@ -193,11 +204,16 @@ std::string WorkspaceList::ProfileName(const base::FilePath& profile) const {
 void WorkspaceList::Save() {
   base::ListValue saved;
   for (const Workspace& workspace : workspaces_) {
-    saved.Append(base::DictValue()
-                     .Set("id", workspace.id)
-                     .Set("name", workspace.name)
-                     .Set("icon", workspace.icon)
-                     .Set("profile", workspace.profile.AsUTF8Unsafe()));
+    base::DictValue entry =
+        base::DictValue()
+            .Set("id", workspace.id)
+            .Set("name", workspace.name)
+            .Set("icon", workspace.icon)
+            .Set("profile", workspace.profile.AsUTF8Unsafe());
+    if (workspace.theme) {
+      entry.Set("theme", ThemeToValue(*workspace.theme));
+    }
+    saved.Append(std::move(entry));
   }
   local_state_->SetList(kWorkspacesPref, std::move(saved));
 }

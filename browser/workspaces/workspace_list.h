@@ -4,6 +4,7 @@
 #ifndef UW_BROWSER_WORKSPACES_WORKSPACE_LIST_H_
 #define UW_BROWSER_WORKSPACES_WORKSPACE_LIST_H_
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "base/scoped_observation.h"
 #include "chrome/browser/profiles/profile_attributes_storage_observer.h"
 #include "chrome/browser/profiles/profile_manager_observer.h"
+#include "uw/components/look/theme.h"
 
 class PrefService;
 class Profile;
@@ -36,6 +38,8 @@ class WorkspaceList : public ProfileAttributesStorageObserver,
     std::string icon;
     // The profile's directory name, under the user data directory.
     base::FilePath profile;
+    // Its theme, once one of its windows has started.
+    std::optional<Theme> theme;
   };
 
   // The icons the new workspace card offers, in its order.
@@ -63,6 +67,7 @@ class WorkspaceList : public ProfileAttributesStorageObserver,
                   const base::FilePath& profile);
   void Rename(std::string_view id, std::string name);
   void SetIcon(std::string_view id, std::string icon);
+  void SetTheme(std::string_view id, const Theme& theme);
   void Remove(std::string_view id);
 
   // The first suggested icon no workspace uses, or the first one.

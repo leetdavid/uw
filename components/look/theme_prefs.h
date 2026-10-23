@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 
+#include "base/values.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "uw/components/look/theme.h"
 
@@ -32,13 +33,10 @@ void RegisterThemeProfilePrefs(PrefRegistrySimple* registry);
 // Chromium's color picker or before themes, and the theme is that one color.
 Theme ReadTheme(const PrefService& prefs, std::optional<SkColor> user_color);
 
-// The colors the window's gradient runs through when `frame_color` comes from
-// the theme saved in `prefs`: the frame color, then the theme's more colors.
-// Empty for a theme of one color, and when the frame color comes from
-// elsewhere, such as black dark mode, Chromium's own themes, or a color picked
-// in Chromium's color picker.
-std::vector<SkColor> GradientColorsFor(const PrefService& prefs,
-                                       SkColor frame_color);
+// `theme` as a workspace keeps it, and back. Nothing for a value without
+// colors.
+base::DictValue ThemeToValue(const Theme& theme);
+std::optional<Theme> ThemeFromValue(const base::DictValue& value);
 
 // Saves `theme`. The caller sets Chromium's user color to its first color at
 // its intensity.

@@ -3,6 +3,10 @@
 
 #include "uw/components/look/theme_prefs.h"
 
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include "base/values.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
@@ -48,24 +52,45 @@ Theme ReadTheme(const PrefService& prefs, std::optional<SkColor> user_color) {
   return theme;
 }
 
-std::vector<SkColor> GradientColorsFor(const PrefService& prefs,
-                                       SkColor frame_color) {
-  const Theme theme = SavedTheme(prefs);
-  if (theme.colors.size() < 2 || frame_color == SK_ColorBLACK) {
-    return {};
+base::DictValue ThemeToValue(const Theme& theme) {
+  base::ListValue colors;
+  for (SkColor color : theme.colors) {
+    colors.Append(static_cast<int>(color));
   }
-  const SkColor first = WithIntensity(theme.colors[0], theme.intensity);
-  for (bool dark : {false, true}) {
-    const Tint tint = TintFrom(dark ? DarkModeColorOf(first) : first);
-    if (tint.start != frame_color || (dark && !theme.colors_in_dark_mode)) {
-      continue;
+  const std::string_view mode = theme.mode == ThemeMode::kLight  ? "light"
+                                : theme.mode == ThemeMode::kDark ? "dark"
+                                                                 : "auto";
+  return base::DictValue()
+      .Set("colors", std::move(colors))
+      .Set("intensity", theme.intensity)
+      .Set("grain", theme.grain)
+      .Set("colors_in_dark_mode", theme.colors_in_dark_mode)
+      .Set("mode", mode);
+}
+
+std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
+  Theme theme;
+  theme.colors.clear();
+  if (const base::ListValue* colors = value.FindList("colors")) {
+    for (const base::Value& color : *colors) {
+      if (color.is_int() && theme.colors.size() < kMaxThemeColors) {
+        theme.colors.push_back(static_cast<SkColor>(color.GetInt()));
+      }
     }
-    std::vector<SkColor> colors =
-        MoreGradientColors(theme, dark, TextColorOn(tint));
-    colors.insert(colors.begin(), tint.start);
-    return colors;
   }
-  return {};
+  if (theme.colors.empty()) {
+    return std::nullopt;
+  }
+  theme.intensity = value.FindInt("intensity").value_or(kFullIntensity);
+  theme.grain = value.FindInt("grain").value_or(0);
+  theme.colors_in_dark_mode =
+      value.FindBool("colors_in_dark_mode").value_or(false);
+  const std::string* mode = value.FindString("mode");
+  theme.mode = !mode              ? ThemeMode::kAuto
+               : *mode == "light" ? ThemeMode::kLight
+               : *mode == "dark"  ? ThemeMode::kDark
+                                  : ThemeMode::kAuto;
+  return theme;
 }
 
 void WriteTheme(PrefService& prefs, const Theme& theme) {

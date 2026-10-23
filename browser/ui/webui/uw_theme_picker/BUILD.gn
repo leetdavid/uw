@@ -23,11 +23,13 @@ source_set("uw_theme_picker") {
     "//chrome:strings",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/themes",
+    "//chrome/browser/ui/browser_window",
     "//components/prefs",
     "//ui/base",
     "//ui/base/mojom",
     "//ui/webui",
     "//uw/browser/resources/uw_theme_picker:resources",
+    "//uw/browser/workspaces",
     "//uw/components/look",
     "//uw/components/look:prefs",
   ]

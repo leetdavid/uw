@@ -49,6 +49,8 @@
 #include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/point.h"
@@ -58,8 +60,11 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/look/theme.h"
+#include "uw/components/look/tint.h"
 
 namespace uw {
 namespace {
@@ -293,6 +298,53 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, EachProfileStartsAsAWorkspace) {
   EXPECT_EQ(workspace->profile, profile()->GetBaseName());
   EXPECT_FALSE(workspace->icon.empty());
   EXPECT_FALSE(window->hidden());
+}
+
+// Each workspace keeps its own theme, its mode included, and the pages in its
+// windows see that mode.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
+  const std::string reading = AddWorkspace("Reading", profile());
+  const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
+  Theme butter;
+  butter.colors = suggested[3];
+  butter.mode = ThemeMode::kLight;
+  SetThemeOfWindow(browser(), butter);
+  Load(browser(), GURL(kForm));
+
+  RunWindowCommand(browser(), kGoToWorkspace1 + 1);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(partner);
+  Theme wine;
+  wine.colors = suggested[5];
+  wine.mode = ThemeMode::kDark;
+  wine.colors_in_dark_mode = true;
+  SetThemeOfWindow(partner, wine);
+  Load(partner, GURL(kForm));
+
+  const auto frame = [](BrowserWindowInterface* window) {
+    return BrowserView::GetBrowserViewForBrowser(window)
+        ->GetWidget()
+        ->GetColorProvider()
+        ->GetColor(ui::kColorFrameActive);
+  };
+  const auto dark = [](BrowserWindowInterface* window) {
+    return content::EvalJs(PageOf(window),
+                           "matchMedia('(prefers-color-scheme: dark)')"
+                           ".matches")
+        .ExtractBool();
+  };
+  EXPECT_EQ(ThemeOfWindow(browser()), butter);
+  EXPECT_EQ(ThemeOfWindow(partner), wine);
+  EXPECT_EQ(frame(browser()), TintFrom(suggested[3][0]).start);
+  EXPECT_EQ(frame(partner), TintFrom(DarkModeColorOf(suggested[5][0])).start);
+  EXPECT_FALSE(dark(browser()));
+  EXPECT_TRUE(dark(partner));
+  SaveWindowScreenshot(partner->GetBrowserForMigrationOnly(),
+                       "workspace-dark-wine");
+
+  // A new workspace starts on a suggested theme no workspace uses.
+  EXPECT_EQ(NewWorkspaceTheme(wine).colors, suggested[0]);
+  EXPECT_EQ(NewWorkspaceTheme(wine).mode, ThemeMode::kDark);
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, SwitchingSwapsTheWindowInPlace) {
