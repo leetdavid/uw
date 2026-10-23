@@ -13,6 +13,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
+#include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
@@ -20,6 +21,7 @@
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -34,6 +36,7 @@ namespace {
 
 constexpr char kSettingsSubPage[] = "uwOrganization";
 constexpr char kShortcutsSubPage[] = "shortcuts";
+constexpr char kProvidersUrl[] = "chrome://ai/providers";
 
 std::optional<tab_groups::TabGroupId> SelectedTask(
     BrowserWindowInterface* window) {
@@ -95,6 +98,14 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
           controller->tree().pages(), [controller](const Page& page) {
             return page.task.empty() && !controller->IsKept(page.id);
           });
+    // Without a language model, Tidy opens AI providers to pick one.
+    case kTidyScratchpad:
+      return organizer && !window->GetProfile()->IsOffTheRecord() &&
+             !organizer->IsTidying() &&
+             std::ranges::any_of(
+                 controller->tree().pages(), [controller](const Page& page) {
+                   return page.task.empty() && !controller->IsKept(page.id);
+                 });
     case kRenameTask:
       return SelectedTask(window).has_value();
     case kNameTask:
@@ -144,6 +155,13 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
     case kClearScratchpad:
       controller->ClearScratchpad();
       break;
+    case kTidyScratchpad:
+      if (AutomaticOrganizer::From(window)->CanTidy()) {
+        AutomaticOrganizer::From(window)->Tidy();
+      } else {
+        ShowAiProviders(window);
+      }
+      break;
     // The sidebar answers Chromium's request for the task editor by renaming
     // on the task's row.
     case kRenameTask:
@@ -185,6 +203,10 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       WatchCard::Open(window);
       break;
   }
+}
+
+void ShowAiProviders(BrowserWindowInterface* window) {
+  ShowSingletonTab(window, GURL(kProvidersUrl));
 }
 
 bool GetCommandAccelerator(BrowserWindowInterface* window,

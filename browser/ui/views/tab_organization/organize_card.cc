@@ -16,7 +16,6 @@
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/vector_icons/vector_icons.h"
@@ -34,13 +33,13 @@
 #include "ui/views/layout/flex_layout_view.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
-#include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
 namespace {
@@ -57,7 +56,6 @@ constexpr SkColor kOrganizingColor = SkColorSetRGB(0x18, 0x80, 0x38);
 constexpr SkColor kPausedColor = SkColorSetRGB(0xE8, 0x71, 0x0A);
 // The countdown is shown in minutes, so this keeps it within a few seconds.
 constexpr base::TimeDelta kCountdownStep = base::Seconds(5);
-constexpr char kProvidersUrl[] = "chrome://ai/providers";
 
 enum class State { kOrganizing, kPaused, kOff, kNeedsModel };
 
@@ -394,7 +392,7 @@ void OrganizeCard::RunAndClose(int command) {
 }
 
 void OrganizeCard::OpenProviders() {
-  ShowSingletonTab(window_, GURL(kProvidersUrl));
+  ShowAiProviders(window_);
   GetWidget()->Close();
 }
 

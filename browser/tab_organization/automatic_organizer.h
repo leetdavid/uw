@@ -94,6 +94,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
       // No name came of the name the user asked for with Name Task. `detail`
       // is the task's name, and `page` why, when there is a reason to give.
       kNameFailed,
+      // Tidy asks the language model about `tabs` tabs. `page` says which
+      // model.
+      kTidying,
+      // Tidy moved `tabs` tabs into `tasks` tasks. `page` names them.
+      kTidied,
+      // Tidy's answer moved no tab.
+      kTidyNothing,
+      // Tidy's request failed, or its answer could not be read. `page` says
+      // why.
+      kTidyFailed,
     };
     Kind kind;
     // The tab's title.
@@ -109,6 +119,10 @@ class AutomaticOrganizer : public TabStripModelObserver {
     base::TimeDelta took;
     // The task, for kNameFailed.
     std::string task;
+    // For Tidy: how many tabs it asks about or moved, and into how many
+    // tasks.
+    size_t tabs = 0;
+    size_t tasks = 0;
   };
 
   AutomaticOrganizer(BrowserWindowInterface* window,
@@ -136,6 +150,15 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Forgets the name asked for `task`, so its answer changes nothing. The
   // user is typing a name.
   void DropAskedName(const std::string& task);
+  // Tidy: asks the language model once where every Scratchpad tab but a kept
+  // one belongs, and carries out the whole answer as one undoable action,
+  // whether automatic organization is on, paused, or off. A tab that moved,
+  // closed, or shows something else by the time the answer arrives stays
+  // where it is. Meanwhile, automatic answers about Scratchpad tabs wait.
+  // Each step is reported as an event.
+  void Tidy();
+  bool CanTidy() const { return CanAskForName(); }
+  bool IsTidying() const { return tidy_ != nullptr; }
   base::WeakPtr<AutomaticOrganizer> AsWeakPtr();
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
@@ -230,6 +253,19 @@ class AutomaticOrganizer : public TabStripModelObserver {
     std::unique_ptr<RemoteModelClient> client;
     OrganizerExchange exchange;
   };
+  // Tidy's request on its way. Tab n of the request is `tabs[n - 1]`, which
+  // showed revision `revisions[n - 1]` under `parents[n - 1]`; task n is
+  // `tasks[n - 1]`.
+  struct TidyRequest {
+    TidyRequest();
+    ~TidyRequest();
+    std::vector<PageId> tabs;
+    std::vector<uint64_t> revisions;
+    std::vector<PageId> parents;
+    std::vector<std::string> tasks;
+    OrganizerExchange exchange;
+    std::unique_ptr<RemoteModelClient> client;
+  };
 
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
 
@@ -284,6 +320,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void OnName(uint64_t request_id, RemoteModelClient::Outcome outcome);
   void NameFailed(const std::string& task, std::u16string reason);
   void OnAskedName(const std::string& task, RemoteModelClient::Outcome outcome);
+  void OnTidy(RemoteModelClient::Outcome outcome);
+  void TidyFailed(std::u16string reason);
   // Decides about the branch `page` is in from the answers kept about its
   // tabs, and carries that out. It waits while a request about one of those
   // tabs is out, and first asks about the tabs nobody asked about when
@@ -354,6 +392,7 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::set<PageId> asked_;
   // The names the user asked for, by task.
   std::map<std::string, AskedName> asked_names_;
+  std::unique_ptr<TidyRequest> tidy_;
   // Tasks the language model is being asked to name.
   std::set<std::string> naming_;
   base::RepeatingClosureList naming_changed_;

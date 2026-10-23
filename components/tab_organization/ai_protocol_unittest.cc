@@ -799,5 +799,74 @@ TEST_F(AiProtocolTest, ChatRequestsLeaveRoomForAModelThatThinksFirst) {
           "reasoning_content":"The tab is a Lisbon travel"}}]})"));
 }
 
+// Tidy sends every Scratchpad tab, numbered, with the tab each was opened
+// from, and the tasks with their tabs' titles, in one request.
+TEST_F(AiProtocolTest, TidyAsksAboutEveryLooseTabAtOnce) {
+  const std::vector<TidyTab> tabs = {
+      {"Hacker News", "https://news.ycombinator.com/", "", 0},
+      {"Baratza Encore vs Niche Zero", "https://youtube.com/watch?v=1", "", 1},
+      {"zsh", "uw://terminal", "/Users/me/code/uw", 0}};
+  const std::vector<TidyTask> tasks = {
+      {"Plan Lisbon trip", {"SFO to LIS flights", "Hotels in Baixa"}}};
+  EXPECT_FALSE(BuildTidyRequestBody("", tabs, tasks));
+  EXPECT_FALSE(BuildTidyRequestBody("model", {}, tasks));
+  EXPECT_FALSE(BuildTidyRequestBody("model", {TidyTab()}, tasks));
+  auto body = BuildTidyRequestBody("llama3.2", tabs, tasks);
+  ASSERT_TRUE(body);
+  auto parsed = base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(*parsed->FindString("model"), "llama3.2");
+  const base::ListValue* messages = parsed->FindList("messages");
+  ASSERT_TRUE(messages);
+  ASSERT_EQ(messages->size(), 2u);
+  EXPECT_EQ(*(*messages)[1].GetDict().FindString("content"),
+            "Tasks:\n1. Plan Lisbon trip\n- SFO to LIS flights\n- Hotels in "
+            "Baixa\n\nLoose tabs:\n1. Title: Hacker News\nURL: "
+            "https://news.ycombinator.com/\n2. Title: Baratza Encore vs Niche "
+            "Zero\nURL: https://youtube.com/watch?v=1\nOpened from: tab 1\n3. "
+            "Title: zsh\nURL: uw://terminal\nFolder: /Users/me/code/uw");
+
+  body = BuildTidyRequestBody("llama3.2", tabs, {});
+  EXPECT_TRUE(
+      base::StartsWith(*base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC)
+                            ->FindList("messages")
+                            ->front()
+                            .GetDict()
+                            .FindString("content"),
+                       "File the user"));
+  EXPECT_NE(body->find("Tasks: none"), std::string::npos);
+}
+
+TEST_F(AiProtocolTest, TidyReadsOneChoicePerTab) {
+  auto choices = ParseTidyResponse(WrapContent(R"(```json
+{"tabs":[{"tab":1,"hub":true},{"tab":2,"new_task":" Choose a grinder "},
+ {"tab":3,"new_task":"Choose a grinder"},{"tab":4,"task":1},{"tab":5}]}
+```)"),
+                                   /*tab_count=*/6, /*task_count=*/1);
+  ASSERT_TRUE(choices);
+  EXPECT_EQ(*choices, (std::vector<TidyChoice>{{0, u""},
+                                               {0, u"Choose a grinder"},
+                                               {0, u"Choose a grinder"},
+                                               {1, u""},
+                                               {0, u""},
+                                               {0, u""}}));
+
+  // Anything that could put a tab in the wrong place makes it unreadable.
+  for (const char* bad : {
+           R"({"tabs":[{"tab":0}]})",
+           R"({"tabs":[{"tab":7}]})",
+           R"({"tabs":[{"tab":1},{"tab":1}]})",
+           R"({"tabs":[{"tab":1,"task":2}]})",
+           R"({"tabs":[{"tab":1,"task":0}]})",
+           R"({"tabs":[{"tab":1,"task":1,"new_task":"Grinders"}]})",
+           R"({"tabs":[{"tab":1,"new_task":"  "}]})",
+           R"({"tabs":[{"task":1}]})",
+           R"({"files":[]})",
+       }) {
+    EXPECT_FALSE(ParseTidyResponse(WrapContent(bad), 6, 1)) << bad;
+  }
+  EXPECT_FALSE(ParseTidyResponse("not json", 6, 1));
+}
+
 }  // namespace
 }  // namespace uw

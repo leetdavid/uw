@@ -32,7 +32,8 @@ enum WindowCommand {
   // Opens the watch card under the eye in the address bar.
   kWatchThisPage,
   kClearScratchpad,
-  kLastWindowCommand = kClearScratchpad,
+  kTidyScratchpad,
+  kLastWindowCommand = kTidyScratchpad,
 };
 
 bool IsWindowCommand(int command);

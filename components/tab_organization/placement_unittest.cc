@@ -596,5 +596,89 @@ TEST(PlacementTest, AThresholdSettingStaysInItsRange) {
   EXPECT_EQ(AsThreshold(0.5499999), 0.55);
 }
 
+TidyTarget ToTask(const std::string& task) {
+  return {task, u""};
+}
+
+TidyTarget ToNewTask(const std::u16string& name) {
+  return {"", name};
+}
+
+// A Scratchpad with a feed and two stories opened from it, a page about
+// grinders with a review under it, and a lone page.
+PageTree LooseTabs() {
+  return PageTree({{Id("feed"), "", PageId()},
+                   {Id("story"), "", Id("feed")},
+                   {Id("talk"), "", Id("feed")},
+                   {Id("grinders"), "", PageId()},
+                   {Id("review"), "", Id("grinders")},
+                   {Id("lone"), "", PageId()}});
+}
+
+TEST(PlanTidyTest, EachTabGoesWhereItsAnswerPutsIt) {
+  const std::vector<TidyMove> moves =
+      PlanTidy(LooseTabs(),
+               {{Id("feed"), TidyTarget()},
+                {Id("story"), ToTask("task-1")},
+                {Id("talk"), ToNewTask(u"Choose a grinder")},
+                {Id("grinders"), ToNewTask(u"Choose a grinder")},
+                {Id("review"), ToNewTask(u"Choose a grinder")},
+                {Id("lone"), TidyTarget()}},
+               {});
+  // The feed stays, and its stories leave it. The review goes along under
+  // its page.
+  EXPECT_EQ(moves, (std::vector<TidyMove>{
+                       {Id("story"), {}, ToTask("task-1")},
+                       {Id("talk"), {}, ToNewTask(u"Choose a grinder")},
+                       {Id("grinders"), {}, ToNewTask(u"Choose a grinder")}}));
+}
+
+TEST(PlanTidyTest, AChildPlacedElsewhereLeavesItsPage) {
+  const std::vector<TidyMove> moves =
+      PlanTidy(LooseTabs(),
+               {{Id("feed"), ToTask("task-1")},
+                {Id("story"), ToTask("task-1")},
+                {Id("talk"), ToTask("task-2")},
+                {Id("grinders"), ToTask("task-2")},
+                {Id("review"), TidyTarget()}},
+               {});
+  EXPECT_EQ(moves, (std::vector<TidyMove>{
+                       {Id("feed"), Ids({"talk"}), ToTask("task-1")},
+                       {Id("talk"), {}, ToTask("task-2")},
+                       {Id("grinders"), Ids({"review"}), ToTask("task-2")}}));
+}
+
+TEST(PlanTidyTest, AChildNestedByHandFollowsItsPage) {
+  const std::vector<TidyMove> moves = PlanTidy(
+      LooseTabs(),
+      {{Id("grinders"), ToTask("task-1")}, {Id("review"), TidyTarget()}},
+      {Id("review")});
+  EXPECT_EQ(moves,
+            (std::vector<TidyMove>{{Id("grinders"), {}, ToTask("task-1")}}));
+}
+
+// A kept tab is not asked about, so it stays, even under a page that moves.
+TEST(PlanTidyTest, ATabNotAskedAboutStays) {
+  const std::vector<TidyMove> moves =
+      PlanTidy(LooseTabs(), {{Id("grinders"), ToTask("task-1")}}, {});
+  EXPECT_EQ(moves, (std::vector<TidyMove>{
+                       {Id("grinders"), Ids({"review"}), ToTask("task-1")}}));
+}
+
+TEST(PlanTidyTest, ANewTaskNeedsTwoTabs) {
+  EXPECT_TRUE(PlanTidy(LooseTabs(),
+                       {{Id("lone"), ToNewTask(u"Read about bees")},
+                        {Id("feed"), ToNewTask(u"Read the news")}},
+                       {})
+                  .empty());
+  // A page and a tab nested under it by hand make two.
+  EXPECT_EQ(PlanTidy(LooseTabs(),
+                     {{Id("grinders"), ToNewTask(u"Choose a grinder")},
+                      {Id("review"), TidyTarget()}},
+                     {Id("review")}),
+            (std::vector<TidyMove>{
+                {Id("grinders"), {}, ToNewTask(u"Choose a grinder")}}));
+}
+
 }  // namespace
 }  // namespace uw

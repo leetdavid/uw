@@ -24,6 +24,8 @@ bool IsWindowCommandChecked(BrowserWindowInterface* window, int command);
 std::optional<std::u16string> GetWindowCommandTitle(
     BrowserWindowInterface* window,
     int command);
+// Opens the AI providers page, where the user picks a model.
+void ShowAiProviders(BrowserWindowInterface* window);
 // The key that runs `command`, for menus to show beside it.
 bool GetCommandAccelerator(BrowserWindowInterface* window,
                            int command,

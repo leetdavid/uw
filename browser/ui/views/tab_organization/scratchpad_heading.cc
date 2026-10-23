@@ -9,6 +9,8 @@
 
 #include "base/callback_list.h"
 #include "base/functional/bind.h"
+#include "base/memory/raw_ref.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -28,8 +30,11 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/tab_organization/automatic_organizer.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
 namespace {
@@ -37,19 +42,21 @@ namespace {
 constexpr int kLabelInset = 8;
 constexpr SkAlpha kLabelAlpha = 0x8C;
 constexpr SkAlpha kButtonAlpha = 0xC7;
+constexpr SkAlpha kGrayedAlpha = 0x52;
 constexpr int kButtonHeight = 22;
 constexpr int kButtonRadius = 7;
 constexpr int kIconSize = 12;
 constexpr int kIconGap = 4;
 
-// Clear's small icon and word. The tint's fill shows under the pointer.
-class ClearButton : public views::LabelButton {
-  METADATA_HEADER(ClearButton, views::LabelButton)
+// A small icon and word on the heading. The tint's fill shows under the
+// pointer.
+class HeadingButton : public views::LabelButton {
+  METADATA_HEADER(HeadingButton, views::LabelButton)
 
  public:
-  explicit ClearButton(PressedCallback callback)
-      : LabelButton(std::move(callback),
-                    l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD_CLEAR)) {
+  HeadingButton(PressedCallback callback, int text, const gfx::VectorIcon& icon)
+      : LabelButton(std::move(callback), l10n_util::GetStringUTF16(text)),
+        icon_(icon) {
     label()->SetFontList(
         gfx::FontList().DeriveWithSizeDelta(-2).DeriveWithWeight(
             gfx::Font::Weight::MEDIUM));
@@ -58,23 +65,45 @@ class ClearButton : public views::LabelButton {
     SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(0, 6, 0, 7)));
     SetMinSize(gfx::Size(0, kButtonHeight));
     SetVisible(false);
-    hovered_ = AddStateChangedCallback(
-        base::BindRepeating(&ClearButton::UpdateFill, base::Unretained(this)));
+    hovered_ = AddStateChangedCallback(base::BindRepeating(
+        &HeadingButton::UpdateFill, base::Unretained(this)));
+  }
+
+  // views::LabelButton:
+  void OnThemeChanged() override {
+    LabelButton::OnThemeChanged();
+    const SkColor color =
+        GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive);
+    const SkColor resting = SkColorSetA(color, kButtonAlpha);
+    const SkColor grayed = SkColorSetA(color, kGrayedAlpha);
+    SetTextColor(STATE_NORMAL, resting);
+    SetTextColor(STATE_HOVERED, color);
+    SetTextColor(STATE_PRESSED, color);
+    SetTextColor(STATE_DISABLED, grayed);
+    SetImageModel(STATE_NORMAL,
+                  ui::ImageModel::FromVectorIcon(*icon_, resting, kIconSize));
+    const ui::ImageModel hot =
+        ui::ImageModel::FromVectorIcon(*icon_, color, kIconSize);
+    SetImageModel(STATE_HOVERED, hot);
+    SetImageModel(STATE_PRESSED, hot);
+    SetImageModel(STATE_DISABLED,
+                  ui::ImageModel::FromVectorIcon(*icon_, grayed, kIconSize));
   }
 
  private:
   void UpdateFill() {
     SetBackground(
-        GetState() == STATE_NORMAL
-            ? nullptr
-            : views::CreateRoundedRectBackground(
-                  kColorNewTabButtonCRBackgroundFrameActive, kButtonRadius));
+        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED
+            ? views::CreateRoundedRectBackground(
+                  kColorNewTabButtonCRBackgroundFrameActive, kButtonRadius)
+            : nullptr);
   }
 
+  const raw_ref<const gfx::VectorIcon> icon_;
   base::CallbackListSubscription hovered_;
 };
 
-BEGIN_METADATA(ClearButton)
+BEGIN_METADATA(HeadingButton)
 END_METADATA
 
 }  // namespace
@@ -103,8 +132,12 @@ ScratchpadHeading::ScratchpadHeading() {
   label_->SetSubpixelRenderingEnabled(false);
   layout->SetFlexForView(label_, 1);
 
-  clear_ = AddChildView(std::make_unique<ClearButton>(
-      base::BindRepeating(&ScratchpadHeading::Clear, base::Unretained(this))));
+  tidy_ = AddChildView(std::make_unique<HeadingButton>(
+      base::BindRepeating(&ScratchpadHeading::Tidy, base::Unretained(this)),
+      IDS_UW_SCRATCHPAD_TIDY, kSparklesIcon));
+  clear_ = AddChildView(std::make_unique<HeadingButton>(
+      base::BindRepeating(&ScratchpadHeading::Clear, base::Unretained(this)),
+      IDS_UW_SCRATCHPAD_CLEAR, kArrowDownIcon));
 
   SetNotifyEnterExitOnChild(true);
 }
@@ -115,6 +148,9 @@ void ScratchpadHeading::OnMouseEntered(const ui::MouseEvent& event) {
   if (clear_->GetVisible()) {
     return;
   }
+  const Browser* window = Window();
+  tidy_->SetVisible(window && !window->GetProfile()->IsOffTheRecord());
+  UpdateTidy();
   clear_->SetVisible(true);
   if (const TabOrganizationController* controller = Controller()) {
     controller->FindClearable(base::BindOnce(&ScratchpadHeading::ShowCount,
@@ -124,35 +160,65 @@ void ScratchpadHeading::OnMouseEntered(const ui::MouseEvent& event) {
 
 void ScratchpadHeading::OnMouseExited(const ui::MouseEvent& event) {
   if (!IsMouseHovered()) {
+    tidy_->SetVisible(false);
     clear_->SetVisible(false);
   }
 }
 
 void ScratchpadHeading::OnThemeChanged() {
   views::View::OnThemeChanged();
-  const SkColor color =
-      GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive);
-  const SkColor resting = SkColorSetA(color, kButtonAlpha);
-  label_->SetEnabledColor(SkColorSetA(color, kLabelAlpha));
-  clear_->SetTextColor(views::Button::STATE_NORMAL, resting);
-  clear_->SetTextColor(views::Button::STATE_HOVERED, color);
-  clear_->SetTextColor(views::Button::STATE_PRESSED, color);
-  clear_->SetImageModel(
-      views::Button::STATE_NORMAL,
-      ui::ImageModel::FromVectorIcon(kArrowDownIcon, resting, kIconSize));
-  const ui::ImageModel hot =
-      ui::ImageModel::FromVectorIcon(kArrowDownIcon, color, kIconSize);
-  clear_->SetImageModel(views::Button::STATE_HOVERED, hot);
-  clear_->SetImageModel(views::Button::STATE_PRESSED, hot);
+  label_->SetEnabledColor(SkColorSetA(
+      GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive),
+      kLabelAlpha));
 }
 
-TabOrganizationController* ScratchpadHeading::Controller() const {
+void ScratchpadHeading::AddedToWidget() {
+  views::View::AddedToWidget();
+  if (AutomaticOrganizer* organizer = Organizer()) {
+    organizer_events_ = organizer->ObserveEvents(base::BindRepeating(
+        [](ScratchpadHeading* heading, const AutomaticOrganizer::Event&) {
+          heading->UpdateTidy();
+        },
+        base::Unretained(this)));
+  }
+}
+
+void ScratchpadHeading::RemovedFromWidget() {
+  organizer_events_ = {};
+  views::View::RemovedFromWidget();
+}
+
+Browser* ScratchpadHeading::Window() const {
   const views::Widget* widget = GetWidget();
   BrowserView* window =
       widget ? BrowserView::GetBrowserViewForNativeWindow(
                    widget->GetPrimaryWindowWidget()->GetNativeWindow())
              : nullptr;
-  return window ? TabOrganizationController::From(window->browser()) : nullptr;
+  return window ? window->browser() : nullptr;
+}
+
+TabOrganizationController* ScratchpadHeading::Controller() const {
+  Browser* window = Window();
+  return window ? TabOrganizationController::From(window) : nullptr;
+}
+
+AutomaticOrganizer* ScratchpadHeading::Organizer() const {
+  Browser* window = Window();
+  return window ? AutomaticOrganizer::From(window) : nullptr;
+}
+
+void ScratchpadHeading::UpdateTidy() {
+  const AutomaticOrganizer* organizer = Organizer();
+  tidy_->SetEnabled(organizer && !organizer->IsTidying());
+  tidy_->SetTooltipText(l10n_util::GetStringUTF16(
+      organizer && organizer->CanTidy() ? IDS_UW_SCRATCHPAD_TIDY_TOOLTIP
+                                        : IDS_UW_SCRATCHPAD_TIDY_NEEDS_MODEL));
+}
+
+void ScratchpadHeading::Tidy() {
+  if (Browser* window = Window()) {
+    RunWindowCommand(window, kTidyScratchpad);
+  }
 }
 
 void ScratchpadHeading::Clear() {

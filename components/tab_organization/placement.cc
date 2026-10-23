@@ -237,4 +237,58 @@ std::vector<BranchPlacement> PlaceBranch(
   return placements;
 }
 
+std::vector<TidyMove> PlanTidy(const PageTree& tree,
+                               const std::map<PageId, TidyTarget>& targets,
+                               const std::set<PageId>& held) {
+  // Pages come in tree order, so a held tab finds where the page above it
+  // goes.
+  std::map<PageId, TidyTarget> goes;
+  const auto destination = [&goes](const PageId& id) {
+    const auto found = goes.find(id);
+    return found == goes.end() ? TidyTarget() : found->second;
+  };
+  for (const Page& page : tree.pages()) {
+    const auto target = targets.find(page.id);
+    if (target != targets.end()) {
+      goes[page.id] =
+          held.contains(page.id) ? destination(page.parent) : target->second;
+    }
+  }
+  std::map<std::u16string, size_t> new_tasks;
+  for (const auto& [id, target] : goes) {
+    if (!target.new_task.empty()) {
+      ++new_tasks[target.new_task];
+    }
+  }
+  for (auto& [id, target] : goes) {
+    if (!target.new_task.empty() && new_tasks[target.new_task] < 2) {
+      target = TidyTarget();
+    }
+  }
+
+  std::vector<TidyMove> moves;
+  for (const Page& page : tree.pages()) {
+    const TidyTarget target = destination(page.id);
+    if (target == TidyTarget() ||
+        (!page.parent.value().empty() && destination(page.parent) == target)) {
+      continue;
+    }
+    TidyMove move{page.id, {}, target};
+    std::set<PageId> along = {page.id};
+    for (const PageId& id : tree.BranchOf(page.id)) {
+      const PageId& parent = tree.Find(id)->parent;
+      if (id == page.id || !along.contains(parent)) {
+        continue;
+      }
+      if (destination(id) == target) {
+        along.insert(id);
+      } else {
+        move.staying.push_back(id);
+      }
+    }
+    moves.push_back(std::move(move));
+  }
+  return moves;
+}
+
 }  // namespace uw

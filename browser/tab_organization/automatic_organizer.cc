@@ -95,7 +95,12 @@ const char* ResultName(Kind kind) {
       return "name_failed";
     case Kind::kNaming:
       return "new_task";
+    // Tidy writes its own results.
     case Kind::kAsking:
+    case Kind::kTidying:
+    case Kind::kTidied:
+    case Kind::kTidyNothing:
+    case Kind::kTidyFailed:
       return "";
   }
 }
@@ -251,6 +256,169 @@ void AutomaticOrganizer::NameFailed(const std::string& task,
   Event event{Event::Kind::kNameFailed, std::move(reason),
               controller_->TaskTitle(task)};
   event.task = task;
+  events_.Notify(event);
+}
+
+AutomaticOrganizer::TidyRequest::TidyRequest() = default;
+AutomaticOrganizer::TidyRequest::~TidyRequest() = default;
+
+void AutomaticOrganizer::Tidy() {
+  if (!CanTidy() || IsTidying()) {
+    return;
+  }
+  const PageTree& tree = controller_->tree();
+  auto request = std::make_unique<TidyRequest>();
+  std::vector<TidyTab> tabs;
+  std::map<PageId, size_t> numbers;
+  for (const Page& page : tree.pages()) {
+    const auto activity = pages_.find(page.id);
+    if (!page.task.empty() || controller_->IsKept(page.id) ||
+        activity == pages_.end() || activity->second.title.empty()) {
+      continue;
+    }
+    const auto parent = numbers.find(page.parent);
+    tabs.push_back({base::UTF16ToUTF8(activity->second.title),
+                    activity->second.url.spec(),
+                    activity->second.folder.value(),
+                    parent == numbers.end() ? 0 : parent->second});
+    numbers[page.id] = tabs.size();
+    request->tabs.push_back(page.id);
+    request->revisions.push_back(activity->second.revision);
+    request->parents.push_back(page.parent);
+  }
+  if (tabs.empty()) {
+    Event event{Event::Kind::kTidyNothing,
+                l10n_util::GetStringUTF16(IDS_UW_TIDY_NOTHING_DETAIL)};
+    events_.Notify(event);
+    return;
+  }
+  std::vector<TidyTask> tasks;
+  for (const std::string& task : tree.Tasks()) {
+    if (!Named(task)) {
+      continue;
+    }
+    TidyTask offered{base::UTF16ToUTF8(controller_->TaskTitle(task)), {}};
+    for (const Page& page : tree.pages()) {
+      const auto activity = pages_.find(page.id);
+      if (page.task == task && activity != pages_.end() &&
+          !activity->second.title.empty()) {
+        offered.titles.push_back(base::UTF16ToUTF8(activity->second.title));
+      }
+    }
+    tasks.push_back(std::move(offered));
+    request->tasks.push_back(task);
+  }
+  const AiConnectionConfig language =
+      ReadAiConnectionConfig(profile()->GetPrefs());
+  std::optional<std::string> body =
+      BuildTidyRequestBody(language.model, tabs, tasks);
+  request->client = body ? Client(language, *body) : nullptr;
+  if (!request->client) {
+    TidyFailed(l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_ANSWER_UNREADABLE));
+    return;
+  }
+  request->exchange.model = language.model;
+  request->exchange.url = LanguageModelUrl(language.endpoint, language.format);
+  request->exchange.body = std::move(*body);
+  request->exchange.sent_at = base::TimeTicks::Now();
+  RemoteModelClient* sender = request->client.get();
+  tidy_ = std::move(request);
+  Event event{Event::Kind::kTidying,
+              l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING,
+                                         base::UTF8ToUTF16(language.model))};
+  event.model = base::UTF8ToUTF16(language.model);
+  event.tabs = tabs.size();
+  events_.Notify(event);
+  sender->Send(
+      base::BindOnce(&AutomaticOrganizer::OnTidy, weak_factory_.GetWeakPtr()));
+}
+
+void AutomaticOrganizer::OnTidy(RemoteModelClient::Outcome outcome) {
+  std::unique_ptr<TidyRequest> request = std::move(tidy_);
+  if (!request) {
+    return;
+  }
+  ScheduleSettle();
+  request->exchange.took = base::TimeTicks::Now() - request->exchange.sent_at;
+  const std::optional<std::vector<TidyChoice>> choices =
+      outcome.ok ? ParseTidyResponse(outcome.body, request->tabs.size(),
+                                     request->tasks.size())
+                 : std::nullopt;
+  const std::u16string reason =
+      outcome.ok ? l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_ANSWER_UNREADABLE)
+                 : l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_REQUEST_FAILED,
+                                              FailureReason(outcome));
+  request->exchange.answer = std::move(outcome);
+  if (!choices) {
+    LogOrganizerExchange("tidy", request->exchange, "no usable answer");
+    TidyFailed(reason);
+    return;
+  }
+
+  const PageTree before = controller_->tree();
+  const std::vector<std::string> open_tasks = before.Tasks();
+  std::map<PageId, TidyTarget> targets;
+  std::set<PageId> held;
+  for (size_t i = 0; i < request->tabs.size(); ++i) {
+    const PageId& id = request->tabs[i];
+    const Page* page = before.Find(id);
+    const auto activity = pages_.find(id);
+    if (!page || !page->task.empty() || page->parent != request->parents[i] ||
+        controller_->IsKept(id) || activity == pages_.end() ||
+        activity->second.revision != request->revisions[i]) {
+      continue;
+    }
+    const TidyChoice& choice = (*choices)[i];
+    TidyTarget target{std::string(), choice.new_task};
+    if (choice.task) {
+      target.task = request->tasks[choice.task - 1];
+      if (!std::ranges::contains(open_tasks, target.task)) {
+        continue;
+      }
+    }
+    targets[id] = std::move(target);
+    if (controller_->IsHeld(id)) {
+      held.insert(id);
+    }
+    // Tidy has decided about the tab. It is asked about again once it shows
+    // something else.
+    activity->second.placed = true;
+    kept_.erase(id);
+  }
+  const std::vector<TidyMove> moves = PlanTidy(before, targets, held);
+  controller_->ApplyTidy(moves);
+  LogOrganizerExchange("tidy", request->exchange,
+                       moves.empty() ? "nothing moved" : "moved");
+  if (moves.empty()) {
+    Event event{Event::Kind::kTidyNothing,
+                l10n_util::GetStringUTF16(IDS_UW_TIDY_NOTHING_DETAIL)};
+    events_.Notify(event);
+    return;
+  }
+
+  Event event{Event::Kind::kTidied};
+  std::vector<std::u16string> names;
+  for (const TidyMove& move : moves) {
+    std::u16string name = move.target.task.empty()
+                              ? move.target.new_task
+                              : controller_->TaskTitle(move.target.task);
+    if (!std::ranges::contains(names, name)) {
+      names.push_back(std::move(name));
+    }
+  }
+  for (const Page& page : controller_->tree().pages()) {
+    const Page* earlier = before.Find(page.id);
+    if (earlier && earlier->task.empty() && !page.task.empty()) {
+      ++event.tabs;
+    }
+  }
+  event.tasks = names.size();
+  event.page = base::JoinString(names, u", ");
+  events_.Notify(event);
+}
+
+void AutomaticOrganizer::TidyFailed(std::u16string reason) {
+  Event event{Event::Kind::kTidyFailed, std::move(reason)};
   events_.Notify(event);
 }
 
@@ -729,6 +897,10 @@ void AutomaticOrganizer::Settle(const PageId& page) {
   const PageTree& tree = controller_->tree();
   const PageId top = tree.TopOf(page);
   if (!tree.Find(top)) {
+    return;
+  }
+  // Tidy's answer decides about the Scratchpad's tabs first.
+  if (IsTidying() && tree.Find(top)->task.empty()) {
     return;
   }
   const std::vector<PageId> branch = tree.BranchOf(top);

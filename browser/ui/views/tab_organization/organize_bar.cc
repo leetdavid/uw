@@ -77,7 +77,8 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       base::BindRepeating(&OrganizeBar::AcceptSuggestion,
                           base::Unretained(this)),
       base::BindRepeating(&OrganizeBar::AskForNameAgain,
-                          base::Unretained(this))));
+                          base::Unretained(this)),
+      base::BindRepeating(&OrganizeBar::TidyAgain, base::Unretained(this))));
   card_->Hide();
 
   // Organize at the left, the new button at the right end.
@@ -164,6 +165,13 @@ void OrganizeBar::AskForNameAgain(const std::string& task) {
   HideCard();
   if (AutomaticOrganizer* organizer = AutomaticOrganizer::From(window_)) {
     organizer->AskForName(task);
+  }
+}
+
+void OrganizeBar::TidyAgain() {
+  HideCard();
+  if (AutomaticOrganizer* organizer = AutomaticOrganizer::From(window_)) {
+    organizer->Tidy();
   }
 }
 
@@ -259,31 +267,36 @@ bool OrganizeBar::ShowsActivityDetails() const {
       kOrganizationShowActivityPref);
 }
 
-// A change that can be undone always shows, and so do a failed Name Task,
-// which the user asked for, and the first failed request after one that
-// worked. The rest, and the model's numbers, show only with Show Activity on.
+// A change that can be undone always shows, and so do a failed Name Task
+// and every step of Tidy, which the user asked for, and the first failed
+// request after one that worked. The rest, and the model's numbers, show only
+// with Show Activity on.
 void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
-  const bool asking =
-      event.kind == Kind::kAsking || event.kind == Kind::kNaming;
-  const bool changed =
-      event.kind == Kind::kMoved || event.kind == Kind::kCreated;
+  const bool asking = event.kind == Kind::kAsking ||
+                      event.kind == Kind::kNaming ||
+                      event.kind == Kind::kTidying;
+  const bool changed = event.kind == Kind::kMoved ||
+                       event.kind == Kind::kCreated ||
+                       event.kind == Kind::kTidied;
   const bool failed = event.kind == Kind::kRequestFailed;
   const bool first_failure = failed && !failing_;
-  const bool name_failed = event.kind == Kind::kNameFailed;
-  if (!asking && !name_failed) {
+  const bool asked =
+      event.kind == Kind::kNameFailed || event.kind == Kind::kTidying ||
+      event.kind == Kind::kTidyNothing || event.kind == Kind::kTidyFailed;
+  if (!asking && !asked) {
     failing_ = failed;
   }
   const bool details = ShowsActivityDetails();
-  if (collapsed_ || (!details && !changed && !first_failure && !name_failed)) {
+  if (collapsed_ || (!details && !changed && !first_failure && !asked)) {
     return;
   }
   card_->Show(event, details);
   card_timer_.Start(
       FROM_HERE,
-      asking                                       ? kAskingDuration
-      : changed                                    ? kChangeDuration
-      : event.kind == Kind::kUnsure || name_failed ? kSuggestionDuration
-                                                   : kAnswerDuration,
+      asking                                 ? kAskingDuration
+      : changed                              ? kChangeDuration
+      : event.kind == Kind::kUnsure || asked ? kSuggestionDuration
+                                             : kAnswerDuration,
       base::BindOnce(&OrganizeBar::HideCard, base::Unretained(this)));
 }
 

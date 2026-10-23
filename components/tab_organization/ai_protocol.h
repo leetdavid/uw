@@ -140,6 +140,47 @@ std::optional<std::string> BuildNamingRequestBody(
 // Extracts the generated task name from a chat-completions response body.
 std::optional<std::u16string> ParseNamingResponse(const std::string& body);
 
+// One Scratchpad tab in a Tidy request. `parent` is the number of the tab it
+// was opened from, or 0. `folder` is where a terminal tab's shell is.
+struct TidyTab {
+  std::string title;
+  std::string url;
+  std::string folder;
+  size_t parent = 0;
+};
+
+// One of the user's tasks in a Tidy request, with its tabs' titles. Only the
+// first kMaxNamingTitles titles are sent.
+struct TidyTask {
+  std::string name;
+  std::vector<std::string> titles;
+};
+
+// Builds the chat-completions request that asks the language model where
+// every Scratchpad tab belongs, all at once. Tabs and tasks are numbered from
+// 1 in the order given.
+std::optional<std::string> BuildTidyRequestBody(
+    const std::string& model,
+    const std::vector<TidyTab>& tabs,
+    const std::vector<TidyTask>& tasks);
+
+// Where Tidy's answer puts one tab: the task numbered `task`, the new task
+// named `new_task`, or neither, and the tab stays.
+struct TidyChoice {
+  size_t task = 0;
+  std::u16string new_task;
+
+  friend bool operator==(const TidyChoice&, const TidyChoice&) = default;
+};
+
+// Reads Tidy's answer about `tab_count` tabs and `task_count` tasks, as
+// `choices[n - 1]` for tab n. A tab the answer leaves out stays, and so does
+// a hub. A tab number out of range or listed twice, a task number out of
+// range, or a tab given both a task and a new task makes the whole answer
+// unreadable.
+std::optional<std::vector<TidyChoice>>
+ParseTidyResponse(const std::string& body, size_t tab_count, size_t task_count);
+
 // Parses the model ids out of a model-list response body. OpenAI-compatible
 // endpoints list them as `data[].id`, TypeSafe as `models[].name`. An empty
 // result means the endpoint lists no models.

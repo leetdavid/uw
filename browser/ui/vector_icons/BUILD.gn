@@ -13,6 +13,7 @@ aggregate_vector_icons("uw_vector_icons") {
     "log_in.icon",
     "palette.icon",
     "smile.icon",
+    "sparkles.icon",
     "user.icon",
   ]
 }

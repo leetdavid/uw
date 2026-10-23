@@ -76,6 +76,7 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/organizer_log.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -85,6 +86,7 @@
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/ui/views/tab_organization/task_card.h"
 #include "uw/browser/ui/views/tab_organization/task_name_field.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -378,6 +380,45 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
         controller()->MoveToNewTask({Id(grouped)}, u"Plan Lisbon trip");
     CHECK(task);
     return {ungrouped, *task};
+  }
+
+  // The tabs of TidyWindow(): its task, and the Scratchpad in the order Tidy
+  // numbers it, with the kept tab it leaves out last.
+  struct Loose {
+    tab_groups::TabGroupId task;
+    raw_ptr<tabs::TabInterface> tram;
+    raw_ptr<tabs::TabInterface> grinders;
+    raw_ptr<tabs::TabInterface> review;
+    raw_ptr<tabs::TabInterface> inbox;
+    raw_ptr<tabs::TabInterface> music;
+  };
+
+  // A window with the task "Plan Lisbon trip", which holds the pages
+  // "flights" and "hotels", and a Scratchpad of "tram", "grinders" with
+  // "review" opened from it, "inbox", and "music", which is kept. Automatic
+  // organization is paused, so only a request the user asks for goes out.
+  Loose TidyWindow() {
+    SetPauseState(prefs(), PauseMode::kIndefinite);
+    tabs::TabInterface* flights = InitialTab();
+    Browse(flights, "flights");
+    tabs::TabInterface* hotels = NewTab();
+    Browse(hotels, "hotels");
+    tabs::TabInterface* tram = NewTab();
+    Browse(tram, "tram");
+    tabs::TabInterface* grinders = NewTab();
+    Browse(grinders, "grinders");
+    tabs::TabInterface* review = OpenLinkFrom(grinders, "review");
+    tabs::TabInterface* inbox = NewTab();
+    Browse(inbox, "inbox");
+    tabs::TabInterface* music = NewTab();
+    Browse(music, "music");
+    controller()->ToggleKept({Id(music)});
+    const std::optional<tab_groups::TabGroupId> task =
+        controller()->MoveToNewTask({Id(flights), Id(hotels)},
+                                    u"Plan Lisbon trip");
+    CHECK(task);
+    base::RunLoop().RunUntilIdle();
+    return {*task, tram, grinders, review, inbox, music};
   }
 
   // Every visible view inside `view` lies within its parent and is at least
@@ -2454,6 +2495,159 @@ IN_PROC_BROWSER_TEST_F(LiveLanguageModelBrowserTest, NameTaskWithDeepSeek) {
   EXPECT_NE(name, u"Stuff");
   EXPECT_FALSE(name.empty());
   EXPECT_LE(name.size(), 60u) << name;
+}
+
+// Tidy asks the language model once about every Scratchpad tab but the kept
+// one, and carries out its whole answer as one action: a tab joins a task, two
+// start a task of their own and stay nested, and a hub stays. The card says
+// so with Show Activity off, and one Undo puts every tab back.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TidyFilesTheScratchpadInOneRequest) {
+  UseLanguageModel();
+  prefs()->SetBoolean(kOrganizationShowActivityPref, false);
+  const Loose loose = TidyWindow();
+  Answer("/v1/chat/completions",
+         ChatAnswer(R"({\"tabs\":[{\"tab\":1,\"task\":1},)"
+                    R"({\"tab\":2,\"new_task\":\"Choose a coffee grinder\"},)"
+                    R"({\"tab\":3,\"new_task\":\"Choose a coffee grinder\"},)"
+                    R"({\"tab\":4,\"hub\":true}]})"));
+
+  organizer()->Tidy();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return bar()->card()->headline() == u"Organized 3 tabs into 2 tasks";
+  })) << bar()->card()->headline();
+  EXPECT_EQ(bar()->card()->page(),
+            u"Plan Lisbon trip, Choose a coffee grinder");
+  EXPECT_TRUE(bar()->card()->offers_undo());
+  EXPECT_FALSE(organizer()->IsTidying());
+  SaveWindowScreenshot(browser(), "tidy-done");
+
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_EQ(requests[0].path, "/v1/chat/completions");
+  const std::string& body = requests[0].body;
+  EXPECT_NE(body.find("1. Plan Lisbon trip\\n- flights\\n- hotels"),
+            std::string::npos);
+  EXPECT_NE(body.find("3. Title: review\\nURL: " +
+                      embedded_test_server()->GetURL("/page/review").spec() +
+                      "\\nOpened from: tab 2"),
+            std::string::npos);
+  EXPECT_EQ(body.find("Title: music"), std::string::npos);
+
+  EXPECT_EQ(loose.tram->GetGroup(), loose.task);
+  const std::optional<tab_groups::TabGroupId> grinders =
+      loose.grinders->GetGroup();
+  ASSERT_TRUE(grinders);
+  EXPECT_NE(*grinders, loose.task);
+  EXPECT_EQ(TitleOf(*grinders), u"Choose a coffee grinder");
+  EXPECT_EQ(loose.review->GetGroup(), grinders);
+  EXPECT_EQ(controller()->DepthFor(loose.review), 1);
+  EXPECT_FALSE(controller()->HasManualName(grinders->ToString()));
+  EXPECT_FALSE(loose.inbox->GetGroup());
+  EXPECT_FALSE(loose.music->GetGroup());
+
+  controller()->Undo();
+  EXPECT_FALSE(loose.tram->GetGroup());
+  EXPECT_FALSE(loose.grinders->GetGroup());
+  EXPECT_FALSE(loose.review->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(loose.review), 1);
+  EXPECT_EQ(controller()->tree().Tasks().size(), 1u);
+}
+
+// While Tidy waits, the card says so, and a tab the user moves stays where
+// they put it. A new task left with one tab is not started.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATabMovedWhileTidyWaitsStaysPut) {
+  UseLanguageModel();
+  prefs()->SetBoolean(kOrganizationShowActivityPref, false);
+  const Loose loose = TidyWindow();
+  Answer("/v1/chat/completions",
+         ChatAnswer(R"({\"tabs\":[{\"tab\":1,\"new_task\":\"Get around\"},)"
+                    R"({\"tab\":2,\"task\":1},{\"tab\":3,\"task\":1},)"
+                    R"({\"tab\":4,\"new_task\":\"Get around\"}]})"));
+
+  organizer()->Tidy();
+  EXPECT_TRUE(organizer()->IsTidying());
+  ASSERT_TRUE(bar()->card()->GetVisible());
+  EXPECT_TRUE(bar()->card()->waiting());
+  EXPECT_EQ(bar()->card()->headline(), u"Organizing 4 tabs");
+  EXPECT_EQ(bar()->card()->page(), u"Asking language-model");
+  ASSERT_TRUE(controller()->MoveToTask({Id(loose.tram)}, loose.task));
+
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return bar()->card()->headline() == u"Organized 2 tabs into 1 task";
+  })) << bar()->card()->headline();
+  EXPECT_EQ(loose.tram->GetGroup(), loose.task);
+  EXPECT_EQ(loose.grinders->GetGroup(), loose.task);
+  EXPECT_EQ(loose.review->GetGroup(), loose.task);
+  EXPECT_FALSE(loose.inbox->GetGroup());
+  EXPECT_EQ(controller()->tree().Tasks().size(), 1u);
+}
+
+// A failed Tidy says why and offers Try Again, even with Show Activity off.
+// An answer that moves nothing says so.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AFailedTidySaysSoAndTriesAgain) {
+  UseLanguageModel();
+  Fail("/v1/chat/completions", 429);
+  prefs()->SetBoolean(kOrganizationShowActivityPref, false);
+  TidyWindow();
+
+  organizer()->Tidy();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return bar()->card()->headline() == u"Couldn't organize"; }));
+  EXPECT_EQ(bar()->card()->page(), u"The request failed: HTTP 429");
+  EXPECT_TRUE(bar()->card()->offers_retry());
+  EXPECT_FALSE(bar()->card()->offers_undo());
+  SaveWindowScreenshot(browser(), "tidy-failed");
+
+  Answer("/v1/chat/completions", ChatAnswer(R"({\"tabs\":[]})"));
+  bar()->TidyAgain();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return bar()->card()->headline() == u"Nothing to organize"; }));
+  EXPECT_EQ(bar()->card()->page(), u"Every Scratchpad tab stays where it is");
+  EXPECT_FALSE(bar()->card()->offers_undo());
+  EXPECT_EQ(Requests().size(), 2u);
+}
+
+// Without a language model, Tidy opens AI providers to pick one. A private
+// window has no Tidy.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TidyWithoutALanguageModelOpensProviders) {
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  TidyWindow();
+  EXPECT_FALSE(organizer()->CanTidy());
+  ASSERT_TRUE(CanRunWindowCommand(browser(), kTidyScratchpad));
+  const int before = tabs()->count();
+  RunWindowCommand(browser(), kTidyScratchpad);
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() > before; }));
+  EXPECT_EQ(tabs()->GetActiveWebContents()->GetVisibleURL().host(), "ai");
+  EXPECT_FALSE(organizer()->IsTidying());
+  EXPECT_TRUE(std::ranges::none_of(Requests(), [](const ModelRequest& request) {
+    return request.path == "/v1/chat/completions";
+  }));
+
+  Browser* incognito = CreateIncognitoBrowser();
+  EXPECT_FALSE(CanRunWindowCommand(incognito, kTidyScratchpad));
+}
+
+// While Tidy waits, the automatic organizer files no Scratchpad tab.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AutomaticAnswersWaitForTidy) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  UseLanguageModel();
+  Hold("/v1/chat/completions");
+
+  organizer()->Tidy();
+  ASSERT_TRUE(organizer()->IsTidying());
+  SaveWindowScreenshot(browser(), "tidy-asking");
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(2));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_TRUE(organizer()->IsTidying());
 }
 
 }  // namespace

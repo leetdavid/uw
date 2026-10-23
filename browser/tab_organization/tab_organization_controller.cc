@@ -446,6 +446,39 @@ bool TabOrganizationController::MoveToScratchpad(
   return true;
 }
 
+bool TabOrganizationController::ApplyTidy(const std::vector<TidyMove>& moves) {
+  if (moves.empty() || !tabs_->SupportsTabGroups()) {
+    return false;
+  }
+  std::vector<PageId> tops;
+  for (const TidyMove& move : moves) {
+    tops.push_back(move.top);
+  }
+  Record(tops, std::nullopt);
+  std::map<std::u16string, std::string> started;
+  for (const TidyMove& move : moves) {
+    if (!tree_.Find(move.top)) {
+      continue;
+    }
+    LeaveBehind({move.top}, move.staying);
+    if (!move.target.task.empty()) {
+      tree_.MoveToTask(move.top, move.target.task);
+      continue;
+    }
+    auto [task, fresh] = started.try_emplace(move.target.new_task);
+    if (!fresh) {
+      tree_.MoveToTask(move.top, task->second);
+      continue;
+    }
+    task->second = tab_groups::TabGroupId::GenerateNew().ToString();
+    tree_.MoveToNewTask(move.top, task->second);
+    generated_names_[task->second] = move.target.new_task;
+    pending_tasks_[task->second] = {move.target.new_task, std::nullopt};
+  }
+  Apply();
+  return true;
+}
+
 bool TabOrganizationController::Nest(const PageId& id) {
   Record({id});
   if (!tree_.Nest(id)) {

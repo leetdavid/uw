@@ -53,11 +53,13 @@ constexpr int kSmallerText = -1;
 constexpr double kStillWaiting = -1.0;
 
 bool Waits(Kind kind) {
-  return kind == Kind::kAsking || kind == Kind::kNaming;
+  return kind == Kind::kAsking || kind == Kind::kNaming ||
+         kind == Kind::kTidying;
 }
 
 bool OffersUndo(Kind kind) {
-  return kind == Kind::kMoved || kind == Kind::kCreated;
+  return kind == Kind::kMoved || kind == Kind::kCreated ||
+         kind == Kind::kTidied;
 }
 
 // The kinds that carry the model's confidence in a choice.
@@ -70,18 +72,22 @@ const gfx::VectorIcon& IconFor(Kind kind) {
   switch (kind) {
     case Kind::kMoved:
     case Kind::kCreated:
+    case Kind::kTidied:
       return vector_icons::kCheckCircleFilledIcon;
     case Kind::kUnsure:
       return vector_icons::kLightbulbIcon;
     case Kind::kRequestFailed:
     case Kind::kAnswerUnreadable:
     case Kind::kNameFailed:
+    case Kind::kTidyFailed:
       return vector_icons::kWarningIcon;
     case Kind::kAsking:
     case Kind::kNaming:
     case Kind::kLeft:
     case Kind::kNeedsName:
     case Kind::kDropped:
+    case Kind::kTidying:
+    case Kind::kTidyNothing:
       return vector_icons::kInfoIcon;
   }
 }
@@ -111,6 +117,20 @@ std::u16string Headline(const Event& event) {
     case Kind::kNameFailed:
       return l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_COULD_NOT_NAME,
                                         event.detail);
+    case Kind::kTidying:
+      return l10n_util::GetPluralStringFUTF16(IDS_UW_TIDY_ORGANIZING,
+                                              static_cast<int>(event.tabs));
+    case Kind::kTidied:
+      return l10n_util::GetStringFUTF16(
+          IDS_UW_TIDY_ORGANIZED,
+          l10n_util::GetPluralStringFUTF16(IDS_UW_TIDY_TAB_COUNT,
+                                           static_cast<int>(event.tabs)),
+          l10n_util::GetPluralStringFUTF16(IDS_UW_TIDY_TASK_COUNT,
+                                           static_cast<int>(event.tasks)));
+    case Kind::kTidyNothing:
+      return l10n_util::GetStringUTF16(IDS_UW_TIDY_NOTHING);
+    case Kind::kTidyFailed:
+      return l10n_util::GetStringUTF16(IDS_UW_TIDY_FAILED);
   }
 }
 
@@ -147,10 +167,12 @@ std::unique_ptr<views::Label> Line(int size_delta, gfx::Font::Weight weight) {
 
 ActivityCard::ActivityCard(base::RepeatingClosure undo,
                            base::RepeatingClosure accept,
-                           RetryCallback retry)
+                           RetryCallback retry,
+                           base::RepeatingClosure tidy)
     : undo_(std::move(undo)),
       accept_(std::move(accept)),
-      retry_(std::move(retry)) {
+      retry_(std::move(retry)),
+      tidy_(std::move(tidy)) {
   SetOrientation(views::LayoutOrientation::kVertical);
   SetInteriorMargin(gfx::Insets(kCardPadding));
   SetBackground(views::CreateRoundedRectBackground(ui::kColorSysHeaderContainer,
@@ -221,9 +243,11 @@ void ActivityCard::Show(const Event& event, bool details) {
 
   // A request that failed may never have been answered. While a name is
   // asked for, the line names the language model.
-  source_->SetVisible(details && event.kind != Kind::kAsking &&
-                      event.kind != Kind::kRequestFailed &&
-                      event.kind != Kind::kNameFailed);
+  source_->SetVisible(
+      details && event.kind != Kind::kAsking &&
+      event.kind != Kind::kRequestFailed && event.kind != Kind::kNameFailed &&
+      event.kind != Kind::kTidying && event.kind != Kind::kTidyFailed &&
+      event.kind != Kind::kTidyNothing);
   source_->SetText(
       event.kind == Kind::kNaming
           ? l10n_util::GetStringFUTF16(IDS_UW_ACTIVITY_ASKING, event.detail)
@@ -246,12 +270,12 @@ void ActivityCard::Show(const Event& event, bool details) {
 
   accepts_ = event.kind == Kind::kUnsure;
   retry_task_ = event.kind == Kind::kNameFailed ? event.task : std::string();
-  action_->SetVisible(accepts_ || !retry_task_.empty() ||
-                      OffersUndo(event.kind));
-  action_->SetText(l10n_util::GetStringUTF16(accepts_ ? IDS_CONFIRM
-                                             : retry_task_.empty()
-                                                 ? IDS_UW_AUTO_UNDO
-                                                 : IDS_UW_TRY_AGAIN));
+  retries_tidy_ = event.kind == Kind::kTidyFailed;
+  const bool retries = !retry_task_.empty() || retries_tidy_;
+  action_->SetVisible(accepts_ || retries || OffersUndo(event.kind));
+  action_->SetText(l10n_util::GetStringUTF16(accepts_  ? IDS_CONFIRM
+                                             : retries ? IDS_UW_TRY_AGAIN
+                                                       : IDS_UW_AUTO_UNDO));
   SetVisible(true);
 }
 
@@ -285,7 +309,8 @@ bool ActivityCard::waiting() const {
 }
 
 bool ActivityCard::offers_undo() const {
-  return action_->GetVisible() && !accepts_ && retry_task_.empty();
+  return action_->GetVisible() && !accepts_ && retry_task_.empty() &&
+         !retries_tidy_;
 }
 
 bool ActivityCard::offers_accept() const {
@@ -293,12 +318,16 @@ bool ActivityCard::offers_accept() const {
 }
 
 bool ActivityCard::offers_retry() const {
-  return action_->GetVisible() && !retry_task_.empty();
+  return action_->GetVisible() && (!retry_task_.empty() || retries_tidy_);
 }
 
 void ActivityCard::OnActionPressed() {
   if (!retry_task_.empty()) {
     retry_.Run(retry_task_);
+    return;
+  }
+  if (retries_tidy_) {
+    tidy_.Run();
     return;
   }
   (accepts_ ? accept_ : undo_).Run();

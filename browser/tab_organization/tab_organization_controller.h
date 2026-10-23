@@ -20,6 +20,7 @@
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "uw/browser/tab_organization/hidden_tabs.h"
 #include "uw/components/tab_organization/page_tree.h"
+#include "uw/components/tab_organization/placement.h"
 
 class BrowserWindowInterface;
 class TabStripModel;
@@ -119,6 +120,10 @@ class TabOrganizationController : public TabStripModelObserver,
   bool MoveToScratchpad(const std::vector<PageId>& ids,
                         Origin origin = Origin::kUser,
                         const std::vector<PageId>& staying = {});
+  // Tidy's moves, in order, as one undoable organization action of uw's. A
+  // new task starts the first time its name comes up, after every other
+  // task, under that name as one uw gave.
+  bool ApplyTidy(const std::vector<TidyMove>& moves);
   bool Nest(const PageId& id);
   bool Outdent(const PageId& id);
   // Open a selected blank tab first under `id`, or below its branch.

@@ -87,6 +87,7 @@ class OrganizeBar : public views::FlexLayoutView,
   void AcceptSuggestion();
   // Try Again after a failed Name Task.
   void AskForNameAgain(const std::string& task);
+  void TidyAgain();
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override;

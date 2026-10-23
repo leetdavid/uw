@@ -9,6 +9,7 @@
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
@@ -98,6 +99,20 @@ constexpr char kTaskNamingPrompt[] =
     "Name the browsing task that these tabs belong to. Reply with only the "
     "name: a short, action-oriented phrase of at most five words, with no "
     "quotes.";
+constexpr char kTidyPrompt[] =
+    "File the user's loose browser tabs into their browsing tasks. A browsing "
+    "task is the immediate activity the user pursues with a set of tabs, such "
+    "as \"Plan Lisbon trip\". For each loose tab, give the number of the task "
+    "it belongs to, or the name of a new task it starts together with other "
+    "loose tabs, or neither for a one-off page. A new task needs at least two "
+    "tabs, and all of them carry exactly the same name: a short, "
+    "action-oriented phrase of at most five words. Mark a hub with "
+    "\"hub\": true: a page the user comes back to for many things, such as a "
+    "home page, a feed, an inbox, or a dashboard. A hub joins no task. Reply "
+    "with only JSON, one entry per loose tab, like "
+    "{\"tabs\":[{\"tab\":1,\"task\":2},{\"tab\":2,\"new_task\":\"Choose a "
+    "coffee grinder\"},{\"tab\":3,\"new_task\":\"Choose a coffee "
+    "grinder\"},{\"tab\":4},{\"tab\":5,\"hub\":true}]}.";
 
 bool ValidConfidence(double value) {
   return value >= 0.0 && value <= 1.0;
@@ -617,6 +632,95 @@ std::optional<std::u16string> ParseNamingResponse(const std::string& body) {
   std::string trimmed;
   base::TrimWhitespaceASCII(*content, base::TRIM_ALL, &trimmed);
   return ValidTaskName(trimmed.substr(0, trimmed.find('\n')));
+}
+
+std::optional<std::string> BuildTidyRequestBody(
+    const std::string& model,
+    const std::vector<TidyTab>& tabs,
+    const std::vector<TidyTask>& tasks) {
+  if (model.empty() || tabs.empty()) {
+    return std::nullopt;
+  }
+  std::string text = tasks.empty() ? "Tasks: none" : "Tasks:";
+  for (size_t i = 0; i < tasks.size(); ++i) {
+    text += "\n" + base::NumberToString(i + 1) + ". " + tasks[i].name +
+            ListTitles(tasks[i].titles);
+  }
+  text += "\n\nLoose tabs:";
+  for (size_t i = 0; i < tabs.size(); ++i) {
+    const TidyTab& tab = tabs[i];
+    if (tab.title.empty()) {
+      return std::nullopt;
+    }
+    text += "\n" + base::NumberToString(i + 1) + ". Title: " + tab.title +
+            "\nURL: " + tab.url;
+    if (tab.parent) {
+      text += "\nOpened from: tab " + base::NumberToString(tab.parent);
+    }
+    if (!tab.folder.empty()) {
+      text += "\nFolder: " + tab.folder;
+    }
+  }
+  base::DictValue system_message;
+  system_message.Set("role", "system");
+  system_message.Set("content", kTidyPrompt);
+  base::DictValue user_message;
+  user_message.Set("role", "user");
+  user_message.Set("content", std::move(text));
+  base::ListValue messages;
+  messages.Append(std::move(system_message));
+  messages.Append(std::move(user_message));
+  base::DictValue body;
+  body.Set("model", model);
+  body.Set("messages", std::move(messages));
+  body.Set("max_tokens", kMaxChatAnswerTokens);
+  body.Set("temperature", 0);
+  return base::WriteJson(body);
+}
+
+std::optional<std::vector<TidyChoice>> ParseTidyResponse(
+    const std::string& body,
+    size_t tab_count,
+    size_t task_count) {
+  auto parsed = base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  const std::string* content = parsed ? FirstMessageContent(*parsed) : nullptr;
+  std::optional<base::DictValue> answer =
+      content ? ReadAnswerDict(*content) : std::nullopt;
+  const base::ListValue* listed = answer ? answer->FindList("tabs") : nullptr;
+  if (!listed) {
+    return std::nullopt;
+  }
+  std::vector<TidyChoice> choices(tab_count);
+  std::vector<bool> seen(tab_count);
+  for (const base::Value& item : *listed) {
+    const base::DictValue* entry = item.GetIfDict();
+    const std::optional<int> tab = entry ? entry->FindInt("tab") : std::nullopt;
+    if (!tab || *tab < 1 || static_cast<size_t>(*tab) > tab_count ||
+        seen[*tab - 1]) {
+      return std::nullopt;
+    }
+    seen[*tab - 1] = true;
+    const std::optional<int> task = entry->FindInt("task");
+    const std::string* new_task = entry->FindString("new_task");
+    if ((task && new_task) ||
+        (task && (*task < 1 || static_cast<size_t>(*task) > task_count))) {
+      return std::nullopt;
+    }
+    if (entry->FindBool("hub").value_or(false)) {
+      continue;
+    }
+    TidyChoice& choice = choices[*tab - 1];
+    if (task) {
+      choice.task = static_cast<size_t>(*task);
+    } else if (new_task) {
+      std::optional<std::u16string> name = ValidTaskName(*new_task);
+      if (!name) {
+        return std::nullopt;
+      }
+      choice.new_task = std::move(*name);
+    }
+  }
+  return choices;
 }
 
 std::optional<std::vector<std::u16string>> ParseModelList(

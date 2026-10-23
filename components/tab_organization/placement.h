@@ -6,6 +6,7 @@
 
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -132,6 +133,36 @@ std::vector<BranchPlacement> PlaceBranch(
     const std::map<PageId, TabAnswer>& tabs,
     const Position& position,
     const Thresholds& needed);
+
+// Where Tidy puts one Scratchpad tab: the task keyed `task`, the new task
+// named `new_task`, or neither, and the tab stays.
+struct TidyTarget {
+  std::string task;
+  std::u16string new_task;
+
+  friend bool operator==(const TidyTarget&, const TidyTarget&) = default;
+};
+
+// One branch Tidy moves: `top` and the tabs under it that go where it goes,
+// into `target`. `staying` are the tabs directly under those that do not go
+// along; each stays in the Scratchpad or moves on its own.
+struct TidyMove {
+  PageId top;
+  std::vector<PageId> staying;
+  TidyTarget target;
+
+  friend bool operator==(const TidyMove&, const TidyMove&) = default;
+};
+
+// Turns Tidy's answer into moves, in tree order. `targets` holds where the
+// answer puts each Scratchpad tab Tidy asked about; any other tab, such as a
+// kept one, stays. A tab in `held`, which the user nested by hand, goes where
+// the page above it goes. A new task needs at least two tabs, so the tab of a
+// new task named for one alone stays. A tab that goes where the page above
+// it goes stays under it, and one that goes elsewhere leaves it.
+std::vector<TidyMove> PlanTidy(const PageTree& tree,
+                               const std::map<PageId, TidyTarget>& targets,
+                               const std::set<PageId>& held);
 
 }  // namespace uw
 

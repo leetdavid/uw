@@ -1,6 +1,6 @@
 # Scratchpad buttons: Tidy and Clear
 
-Status: scope agreed on 2026-10-24, and the designs, T165, signed off the same day.
+Status: scope agreed on 2026-10-24, and the designs, T165, signed off the same day. Clear, T166, and Tidy, T167, were built the same day and are in review.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Clear alone is 7/10: it closes tabs the way Close Branch does, but the Scratchpad heading is painted text today and must become a view inside Chromium's tab container to hold buttons. Tidy is 5/10: a new request over many tabs, a plan with several tasks applied as one undo, and answer quality that has not been measured.
 
@@ -56,14 +56,14 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Acceptance checks
 
-1. The heading shows Tidy and Clear only while the pointer is over it. Both are in the Tasks menu. `TabOrganizationControllerBrowserTest.TheScratchpadHeadingShowsClearUnderThePointer` checks Clear.
+1. The heading shows Tidy and Clear only while the pointer is over it. Both are in the Tasks menu. `TabOrganizationControllerBrowserTest.TheScratchpadHeadingShowsClearUnderThePointer` checks it.
 2. Clear closes every Scratchpad tab but kept tabs and busy terminals, and leaves every task alone. ⇧⌘T reopens a cleared tab. `TabOrganizationControllerBrowserTest.ClearScratchpadClosesAllButKeptTabs` and `ClearingEveryTabLeavesABlankOne`, and `UwTerminalBrowserTest.ClearLeavesATerminalRunningACommand` check it.
-3. Against a test server, Tidy sends one request with each Scratchpad tab's title, address, and parent, and the tasks with their tabs' titles. It applies the answer as one action, and one Undo puts every tab back.
-4. A new task in the answer with one tab is not started. Hubs and kept tabs stay in the Scratchpad.
-5. A child placed with its parent stays nested. A child placed elsewhere leaves it. A child nested by hand follows its parent.
-6. A tab that changed while the request was out stays where it is, and the rest of the plan applies. No automatic answer moves a Scratchpad tab while Tidy waits.
-7. Tidy works while organization is paused or off. With no language model it opens AI providers. A private window shows no Tidy.
-8. The activity card shows asking, done with Undo, nothing to organize, and failure with Try Again, with Show Activity off.
+3. Against a test server, Tidy sends one request with each Scratchpad tab's title, address, and parent, and the tasks with their tabs' titles. It applies the answer as one action, and one Undo puts every tab back. `AutomaticOrganizerBrowserTest.TidyFilesTheScratchpadInOneRequest`, and `AiProtocolTest.TidyAsksAboutEveryLooseTabAtOnce` and `TidyReadsOneChoicePerTab`, check it.
+4. A new task in the answer with one tab is not started. Hubs and kept tabs stay in the Scratchpad. `PlanTidyTest.ANewTaskNeedsTwoTabs` and `ATabNotAskedAboutStays`, and `TidyFilesTheScratchpadInOneRequest`, check it.
+5. A child placed with its parent stays nested. A child placed elsewhere leaves it. A child nested by hand follows its parent. The `PlanTidyTest` cases check it.
+6. A tab that changed while the request was out stays where it is, and the rest of the plan applies. No automatic answer moves a Scratchpad tab while Tidy waits. `ATabMovedWhileTidyWaitsStaysPut` and `AutomaticAnswersWaitForTidy` check it.
+7. Tidy works while organization is paused or off. With no language model it opens AI providers. A private window shows no Tidy. `TidyWithoutALanguageModelOpensProviders` checks it; the Tidy tests run with organization paused.
+8. The activity card shows asking, done with Undo, nothing to organize, and failure with Try Again, with Show Activity off. `AFailedTidySaysSoAndTriesAgain` and the tests above check it.
 9. Headless screenshots of the heading and the cards match the frames in light and dark mode.
 10. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 

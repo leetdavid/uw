@@ -895,11 +895,16 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_TRUE(base::test::RunUntil([&] {
     return clear->GetTooltipText() == u"Close 1 tab";
   })) << clear->GetTooltipText();
+  views::LabelButton* tidy = heading->tidy_button();
+  EXPECT_TRUE(tidy->GetVisible());
+  EXPECT_TRUE(tidy->GetEnabled());
+  EXPECT_EQ(tidy->GetTooltipText(), u"Set up a language model to tidy");
   clear->SetState(views::Button::STATE_HOVERED);
   ViewsOfClass("ScratchpadHeading");
   EXPECT_LE(
       heading->GetBoundsInScreen().right() - clear->GetBoundsInScreen().right(),
       1);
+  EXPECT_LE(tidy->GetBoundsInScreen().right(), clear->GetBoundsInScreen().x());
   SaveWindowScreenshot(browser(), "scratchpad-heading-clear");
 
   const PageId in_task_id = Id(in_task);
@@ -916,6 +921,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
       ui::MouseEvent(ui::EventType::kMouseExited, gfx::PointF(), gfx::PointF(),
                      ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
   EXPECT_FALSE(clear->GetVisible());
+  EXPECT_FALSE(tidy->GetVisible());
 }
 
 // Clear Scratchpad in the Tasks menu closes the Scratchpad's tabs, a whole
