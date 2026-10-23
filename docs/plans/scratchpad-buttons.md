@@ -36,7 +36,12 @@ The user asked for Arc's Clear and Tidy on 2026-10-24. [Tidy](../CONTEXT.md#lang
 
 ## Design
 
-Drawn on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Scratchpad buttons": the heading at rest and with the pointer over it, the activity card while Tidy asks, after it, and after a failure, in light and dark mode.
+Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Automatic organization":
+
+- "Scratchpad buttons: the sidebar": the pointer on Clear, with its tooltip "Close 4 tabs".
+- "Scratchpad buttons: every state": the heading at rest and under the pointer, after Clear, Tidy asking, after Tidy, nothing to organize, a failure, no language model, and the pointer on the heading and after Tidy in dark mode.
+
+Tidy's icon is sparkles and Clear's is a down arrow, as in Arc. Each button is 22px tall with 11px text, in the tint's text color at about 78%, and takes the tint's fill under the pointer.
 
 ## Stages
 
