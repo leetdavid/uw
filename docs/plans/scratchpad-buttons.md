@@ -1,6 +1,6 @@
 # Scratchpad buttons: Tidy and Clear
 
-Status: scope agreed on 2026-10-24. The designs come first, for the user's sign-off.
+Status: scope agreed on 2026-10-24, and the designs, T165, signed off the same day.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Clear alone is 7/10: it closes tabs the way Close Branch does, but the Scratchpad heading is painted text today and must become a view inside Chromium's tab container to hold buttons. Tidy is 5/10: a new request over many tabs, a plan with several tasks applied as one undo, and answer quality that has not been measured.
 
