@@ -1,7 +1,10 @@
 # Connectors as the browser runs them: programs on this Mac, web addresses,
-# and the list every profile shares. See docs/plans/connectors.md.
+# the list every profile shares, and the catalog the connect dialog searches.
+# See docs/plans/connectors.md and docs/plans/connect-dialog.md.
 source_set("connectors") {
   sources = [
+    "connector_catalog_store.cc",
+    "connector_catalog_store.h",
     "connectors.cc",
     "connectors.h",
     "local_transport.cc",

@@ -6,9 +6,11 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -17,6 +19,7 @@
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/ai_providers/model_lister.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
+#include "uw/browser/connectors/connector_catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 #include "uw/components/agent/skills.h"
@@ -34,7 +37,8 @@ namespace uw {
 // it touches profile prefs and the providers' Keychain accounts. Keys never
 // reach prefs, logs, or the page.
 class UwProvidersHandler : public mojom::ProvidersHandler,
-                           public Connectors::Observer {
+                           public Connectors::Observer,
+                           public ConnectorCatalogStore::Observer {
  public:
   // The request that tests a model, and how its answer is read.
   struct ModelTest;
@@ -97,9 +101,17 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void SignOutConnector(const std::string& name) override;
   void OpenConnectorInTerminal(const std::string& name) override;
   void ShowConnectorLog(const std::string& name) override;
+  void SearchCatalog(const std::string& query,
+                     SearchCatalogCallback callback) override;
+  void AddFromCatalog(const std::string& id,
+                      const base::flat_map<std::string, std::string>& values,
+                      AddFromCatalogCallback callback) override;
 
   // Connectors::Observer:
   void OnConnectorsChanged() override;
+
+  // ConnectorCatalogStore::Observer:
+  void OnCatalogChanged() override;
 
  private:
   // A request the page waits on. Several model lists can be on their way at
@@ -145,6 +157,12 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   std::vector<WaitForConnectorChangeCallback> waiting_for_change_;
   base::ScopedObservation<Connectors, Connectors::Observer>
       connectors_observation_{this};
+  base::ScopedObservation<ConnectorCatalogStore,
+                          ConnectorCatalogStore::Observer>
+      catalog_observation_{this};
+  // Connectors added from the catalog whose sign-in opens once their server
+  // asks for it.
+  std::set<std::string> sign_in_when_asked_;
   mojo::Receiver<mojom::ProvidersHandler> receiver_;
   ModelLister lister_;
   std::map<int, std::unique_ptr<RemoteModelClient>> requests_;

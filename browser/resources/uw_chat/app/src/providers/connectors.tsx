@@ -1,7 +1,8 @@
 // uw://ai/connectors: the connectors that give the agent tools, one at
-// uw://ai/connectors/<name>, and adding one by pasting the JSON a server's
-// README gives. See the "AI page" frames on the canvas page "AI providers" and
-// docs/plans/connectors.md.
+// uw://ai/connectors/<name>, the connect dialog, and adding one by pasting an
+// address or the JSON a server's README gives. uw://ai/connectors?add opens
+// the dialog. See the "AI page" and "Connect dialog" frames on the canvas page
+// "AI providers", docs/plans/connectors.md, and docs/plans/connect-dialog.md.
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ChevronLeft,
@@ -22,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { ConnectDialog } from "./connect-dialog";
 import { cn } from "@/lib/utils";
 import {
   ConnectorState,
@@ -450,19 +452,19 @@ function AddConnectorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Add connector</DialogTitle>
+          <DialogTitle>Add by address or JSON</DialogTitle>
         </DialogHeader>
         <p className="text-[13px] text-muted-foreground">
-          Paste the JSON from the server's README. It can hold more than one
-          connector.
+          Paste a server's web address, or the JSON from its README. The JSON
+          can hold more than one connector.
         </p>
         <textarea
           id="connector-json"
-          aria-label="Connector JSON"
+          aria-label="Connector address or JSON"
           spellCheck={false}
           value={json}
           onChange={(event) => setJson(event.target.value)}
-          placeholder={'{\n  "mcpServers": {\n    "linear": { "url": "https://mcp.linear.app/mcp" }\n  }\n}'}
+          placeholder={'https://mcp.linear.app/mcp\n\nor\n\n{\n  "mcpServers": {\n    "fs": { "command": "npx", "args": ["-y", "..."] }\n  }\n}'}
           className={cn(
             "mt-3 h-52 w-full resize-none rounded-[10px] bg-accent px-3 py-2.5 font-mono text-[11.5px] leading-relaxed outline-none placeholder:text-muted-foreground",
             error && "ring-[1.5px] ring-destructive",
@@ -534,6 +536,15 @@ export function ConnectorsSection({
   const [connectors, setConnectors] = useState<ConnectorInfo[] | null>(null);
   const [environmentProblem, setEnvironmentProblem] = useState("");
   const [adding, setAdding] = useState(false);
+  const [connecting, setConnecting] = useState(() =>
+    new URLSearchParams(location.search).has("add"),
+  );
+  const connect = (open: boolean) => {
+    setConnecting(open);
+    if (!open && location.search) {
+      history.replaceState(null, "", location.pathname);
+    }
+  };
   // Reads the list, and again each time a connector changes.
   useEffect(() => {
     let live = true;
@@ -570,9 +581,18 @@ export function ConnectorsSection({
         <ConnectorList
           connectors={connectors}
           environmentProblem={environmentProblem}
-          onAdd={() => setAdding(true)}
+          onAdd={() => connect(true)}
         />
       )}
+      <ConnectDialog
+        open={connecting}
+        onOpenChange={connect}
+        connectors={connectors}
+        onPaste={() => {
+          connect(false);
+          setAdding(true);
+        }}
+      />
       <AddConnectorDialog open={adding} onOpenChange={setAdding} />
     </>
   );

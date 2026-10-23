@@ -25,6 +25,7 @@ app_files = [
   "icons/openrouter.svg",
   "icons/vercel.svg",
   "icons/ollama.svg",
+  "icons/exa.svg",
   "inter-latin.woff2",
   "inter-latin-ext.woff2",
 ]

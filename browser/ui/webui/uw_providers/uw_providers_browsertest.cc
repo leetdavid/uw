@@ -13,6 +13,7 @@
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/platform_util_internal.h"
 #include "chrome/browser/profiles/profile.h"
@@ -25,7 +26,11 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
+#include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/skill_folders.h"
@@ -33,6 +38,7 @@
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/connectors/connector_catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -741,6 +747,114 @@ std::string FakeServer() {
   return program.AppendASCII("uw_fake_mcp_server").value();
 }
 
+// A registry with a server that asks for a sign-in and one that needs a key,
+// with the sign-in server's pages. Served over https, as registry servers are.
+std::unique_ptr<net::test_server::HttpResponse> ServeCatalog(
+    const net::test_server::HttpRequest& request) {
+  const std::string base = request.base_url.spec();
+  const std::string issuer = base.substr(0, base.size() - 1);
+  const std::string path(request.GetURL().path());
+  auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+  response->set_content_type("application/json");
+  if (path == "/v0/servers") {
+    response->set_content(base::StrCat(
+        {R"({"servers": [
+          {"server": {"name": "io.github.a/signs-in", "title": "Signs in",
+                      "remotes": [{"type": "streamable-http", "url": ")",
+         base, R"(needs-sign-in"}]}},
+          {"server": {"name": "io.github.a/keyed", "title": "Keyed",
+                      "remotes": [{"type": "streamable-http", "url": ")",
+         base, R"(keyed", "headers": [{"name": "Authorization",
+                      "description": "Your key", "isRequired": true,
+                      "isSecret": true}]}]}}]})"}));
+  } else if (path == "/needs-sign-in") {
+    response->set_code(net::HTTP_UNAUTHORIZED);
+    response->AddCustomHeader(
+        "WWW-Authenticate",
+        base::StrCat({"Bearer resource_metadata=\"", base,
+                      ".well-known/oauth-protected-resource/needs-sign-in\""}));
+  } else if (path == "/.well-known/oauth-protected-resource/needs-sign-in") {
+    response->set_content(base::StrCat({R"({"resource": ")", base,
+                                        R"(needs-sign-in", "authorization_servers": [")",
+                                        issuer, R"("]})"}));
+  } else if (path == "/.well-known/oauth-authorization-server") {
+    response->set_content(base::StrCat(
+        {R"({"issuer": ")", issuer, R"(", "authorization_endpoint": ")", base,
+         R"(authorize", "token_endpoint": ")", base,
+         R"(token", "registration_endpoint": ")", base,
+         R"(register", "code_challenge_methods_supported": ["S256"]})"}));
+  } else if (path == "/register") {
+    response->set_content(R"({"client_id": "client-1"})");
+  } else if (path == "/authorize") {
+    response->set_content_type("text/html");
+    response->set_content("Sign in here");
+  } else {
+    return nullptr;
+  }
+  return response;
+}
+
+// The connect dialog opens from uw://ai/connectors?add with Recommended. A
+// server found in the registry opens its sign-in as soon as it is added, and
+// one that needs a key asks for it.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       TheConnectDialogAddsFromTheCatalog) {
+  net::EmbeddedTestServer https(net::EmbeddedTestServer::TYPE_HTTPS);
+  https.RegisterRequestHandler(base::BindRepeating(&ServeCatalog));
+  ASSERT_TRUE(https.Start());
+  ConnectorCatalogStore::SetUpForTesting(
+      home_.GetPath().AppendASCII("connectors"), https.GetURL("/"),
+      https.GetURL("/raw/"), g_browser_process->shared_url_loader_factory());
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://ai/connectors?add")));
+  EXPECT_EQ(8, Run("await until(() =>"
+                   "    all('[data-entry^=\"recommended:\"]').length >= 8);"
+                   "return all('[data-entry^=\"recommended:\"]').length;"));
+  SaveWindowScreenshot(browser(), "connect-dialog");
+  // Types `query` and clicks Add on the entry `id` once it shows.
+  const auto search = [&](std::string_view query, std::string_view id) {
+    return Run(content::JsReplace(
+        "const box = document.getElementById('catalog-search');"
+        "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')"
+        "    .set.call(box, $1);"
+        "box.dispatchEvent(new Event('input', {bubbles: true}));"
+        "const entry = await until(() => document.querySelector($2));"
+        "const said = entry.textContent;"
+        "entry.querySelector('[data-action=\"Add\"]').click();"
+        "return said;",
+        query, base::StrCat({"[data-entry=\"", id, "\"]"})));
+  };
+
+  content::WebContents* const settings = page();
+  EXPECT_THAT(search("signs", "registry:io.github.a/signs-in").ExtractString(),
+              HasSubstr("MCP Registry"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return page() != settings && page()->GetVisibleURL().path() == "/authorize";
+  }));
+  ASSERT_TRUE(Connectors::Get().Find("signs-in"));
+
+  browser()->tab_strip_model()->ActivateTabAt(
+      browser()->tab_strip_model()->GetIndexOfWebContents(settings));
+  EXPECT_THAT(search("keyed", "registry:io.github.a/keyed").ExtractString(),
+              HasSubstr("asks for a key"));
+  ASSERT_EQ(true,
+            Run("const key = await until(() =>"
+                "    document.querySelector('[data-field=\"Authorization\"]'));"
+                "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"
+                "    'value').set.call(key, 'Bearer k1');"
+                "key.dispatchEvent(new Event('input', {bubbles: true}));"
+                "document.querySelector("
+                "    '[data-action=\"Add with fields\"]').click();"
+                "return true;"));
+  EXPECT_TRUE(
+      base::test::RunUntil([] { return Connectors::Get().Find("keyed"); }));
+  EXPECT_THAT(ApiKeyStore().GetKey("connector:keyed").value_or(""),
+              HasSubstr("Bearer k1"));
+  SaveWindowScreenshot(browser(), "connect-dialog-added");
+  ConnectorCatalogStore::SetUpForTesting(base::FilePath(), GURL(), GURL(),
+                                         nullptr);
+}
+
 // uw://ai/connectors adds a connector from pasted JSON and starts it, and its
 // page turns one of its tools off.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
@@ -752,6 +866,8 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
   EXPECT_THAT(
       Run(content::JsReplace(
               "(await until(() => document.getElementById('add-connector')))"
+              "    .click();"
+              "(await until(() => document.getElementById('paste-connector')))"
               "    .click();"
               "const box = await until(() =>"
               "    document.getElementById('connector-json'));"

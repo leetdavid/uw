@@ -15,6 +15,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "url/gurl.h"
 #include "uw/components/ai_providers/providers.h"
 
@@ -163,6 +164,31 @@ ConnectorConfig::~ConnectorConfig() = default;
 
 base::expected<std::vector<ConnectorConfig>, std::string> ParseConnectors(
     std::string_view json) {
+  // A bare web address is a web connector named for its site.
+  const GURL address{
+      std::string(base::TrimWhitespaceASCII(json, base::TRIM_ALL))};
+  if (address.SchemeIsHTTPOrHTTPS() && !address.host().empty()) {
+    const std::string site =
+        net::registry_controlled_domains::GetDomainAndRegistry(
+            address,
+            net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
+    std::string name;
+    for (char c : site.empty() ? std::string(address.host()) : site) {
+      if (c == '.') {
+        break;
+      }
+      name.push_back(base::IsAsciiAlphaNumeric(c) || c == '-' ? c : '-');
+    }
+    base::expected<ConnectorConfig, std::string> connector =
+        ReadConnector(name.empty() ? "web" : name,
+                      base::Value(base::DictValue().Set("url", address.spec())));
+    if (!connector.has_value()) {
+      return base::unexpected(std::move(connector).error());
+    }
+    std::vector<ConnectorConfig> connectors;
+    connectors.push_back(std::move(connector).value());
+    return connectors;
+  }
   base::JSONReader::Result parsed =
       base::JSONReader::ReadAndReturnValueWithError(
           json, base::JSON_PARSE_CHROMIUM_EXTENSIONS |

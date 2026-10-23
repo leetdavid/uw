@@ -15,6 +15,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "chrome/browser/platform_util.h"  // nogncheck
@@ -44,6 +45,7 @@
 #include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/ai_providers/formats.h"
+#include "uw/components/connectors/catalog.h"
 #include "uw/components/connectors/connector_config.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 
@@ -203,6 +205,7 @@ UwProvidersHandler::UwProvidersHandler(
       receiver_(this, std::move(receiver)),
       lister_(profile) {
   connectors_observation_.Observe(&Connectors::Get());
+  catalog_observation_.Observe(&ConnectorCatalogStore::Get());
 }
 
 UwProvidersHandler::~UwProvidersHandler() = default;
@@ -610,10 +613,129 @@ void UwProvidersHandler::WaitForConnectorChange(
 }
 
 void UwProvidersHandler::OnConnectorsChanged() {
+  // A connector added from the catalog opens its sign-in once it has
+  // started far enough to ask.
+  std::vector<std::string> sign_in;
+  for (auto name = sign_in_when_asked_.begin();
+       name != sign_in_when_asked_.end();) {
+    const Connectors::Info* info = Connectors::Get().Find(*name);
+    if (info && info->state == Connectors::State::kStarting) {
+      ++name;
+      continue;
+    }
+    if (info && info->state == Connectors::State::kNeedsSignIn) {
+      sign_in.push_back(*name);
+    }
+    name = sign_in_when_asked_.erase(name);
+  }
+  // Signing in changes the connectors again, which must wait until every
+  // observer has heard of this change.
+  for (std::string& name : sign_in) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&UwProvidersHandler::SignInConnector,
+                                  weak_factory_.GetWeakPtr(), std::move(name)));
+  }
+  OnCatalogChanged();
+}
+
+void UwProvidersHandler::OnCatalogChanged() {
   for (WaitForConnectorChangeCallback& callback :
        std::exchange(waiting_for_change_, {})) {
     std::move(callback).Run();
   }
+}
+
+namespace {
+
+// The most entries one search shows.
+constexpr size_t kSearchLimit = 30;
+
+mojom::CatalogSource PageSource(CatalogSource source) {
+  switch (source) {
+    case CatalogSource::kRecommended:
+      return mojom::CatalogSource::kRecommended;
+    case CatalogSource::kClaudePlugin:
+      return mojom::CatalogSource::kClaudePlugin;
+    case CatalogSource::kOpenAiPlugin:
+      return mojom::CatalogSource::kOpenAiPlugin;
+    case CatalogSource::kRegistry:
+      return mojom::CatalogSource::kRegistry;
+  }
+}
+
+mojom::CatalogEntryPtr PageEntry(const CatalogEntry& entry) {
+  auto page = mojom::CatalogEntry::New();
+  page->id = entry.id;
+  page->source = PageSource(entry.source);
+  page->name = entry.name;
+  page->title = entry.title;
+  page->description = entry.description;
+  page->website = entry.website;
+  page->url = entry.url;
+  for (const CatalogField& field : entry.fields) {
+    page->fields.push_back(mojom::CatalogField::New(
+        field.name, field.description, field.required, field.secret,
+        field.value));
+  }
+  page->added = std::ranges::any_of(
+      Connectors::Get().list(), [&](const Connectors::Info& info) {
+        return info.config.remote() && SameServer(info.config.url, entry.url);
+      });
+  return page;
+}
+
+}  // namespace
+
+void UwProvidersHandler::SearchCatalog(const std::string& query,
+                                       SearchCatalogCallback callback) {
+  Connectors::Get().Start();
+  ConnectorCatalogStore& store = ConnectorCatalogStore::Get();
+  store.Open();
+  auto answer = mojom::CatalogAnswer::New();
+  for (const CatalogEntry& entry :
+       store.catalog().Search(query, kSearchLimit)) {
+    answer->entries.push_back(PageEntry(entry));
+  }
+  answer->refreshed =
+      store.catalog().refreshed.is_null()
+          ? 0
+          : store.catalog().refreshed.InMillisecondsFSinceUnixEpoch();
+  answer->refreshing = store.refreshing();
+  std::move(callback).Run(std::move(answer));
+}
+
+void UwProvidersHandler::AddFromCatalog(
+    const std::string& id,
+    const base::flat_map<std::string, std::string>& values,
+    AddFromCatalogCallback callback) {
+  std::optional<CatalogEntry> entry =
+      ConnectorCatalogStore::Get().catalog().Find(id);
+  if (!entry) {
+    std::move(callback).Run("uw no longer lists that connector. Search again.");
+    return;
+  }
+  std::string name = entry->name;
+  for (int next = 2; Connectors::Get().Find(name); ++next) {
+    name = base::StrCat(
+        {entry->name.substr(0, 60), "-", base::NumberToString(next)});
+  }
+  base::expected<ConnectorConfig, std::string> config = ConnectorFor(
+      *entry, name, std::map<std::string, std::string>(values.begin(),
+                                                       values.end()));
+  if (!config.has_value()) {
+    std::move(callback).Run(config.error());
+    return;
+  }
+  std::vector<ConnectorConfig> added;
+  added.push_back(std::move(config).value());
+  base::expected<void, std::string> result =
+      Connectors::Get().Add(std::move(added));
+  if (!result.has_value()) {
+    std::move(callback).Run(result.error());
+    return;
+  }
+  sign_in_when_asked_.insert(name);
+  std::move(callback).Run(std::string());
 }
 
 void UwProvidersHandler::ReadConnectors(const std::string& json,

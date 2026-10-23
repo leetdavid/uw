@@ -634,7 +634,7 @@ const TEST_SUITES = {
     "PageTreeTest.*", "AiProtocolTest.*", "PlacementTest.*", "TintTest.*", "VerticalTabStripPrefsTest.*",
     "VerticalTabStripStateControllerTest.*", "ShellHostTest.*", "ShellQuoteTest.*", "ShellSessionTest.*",
     "PageTextTest.*", "AgentProtocolTest.*", "AgentContextTest.*", "SkillsTest.*", "SuggestionsTest.*", "ProvidersTest.*", "FormatsTest.*", "CatalogTest.*",
-    "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*", "ShellEnvironmentTest.*",
+    "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*", "ShellEnvironmentTest.*", "CatalogTest.*",
     "ScheduleTest.*", "ChatSchedulerTest.*", "RunReportTest.*", "ScheduledChatTest.*",
     "CommandCheckTest.*", "ProviderAddressTest.*", "ShellHostPromptTest.*", "ThemeTest.*", "ThemePrefsTest.*",
   ],

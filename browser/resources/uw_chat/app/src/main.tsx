@@ -1103,6 +1103,11 @@ function PlusMenu({
             <DropdownSeparator />
             <MenuItem
               index={connectors.length}
+              label="Add connector…"
+              onSelect={() => providersHandler.showAiPage("connectors?add")}
+            />
+            <MenuItem
+              index={connectors.length + 1}
               label="Manage connectors"
               onSelect={() => providersHandler.showAiPage("connectors")}
             />

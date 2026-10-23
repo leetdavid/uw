@@ -1,6 +1,6 @@
 # Connect dialog
 
-Status: agreed on 2026-10-22. T158, the fixes, was built on 2026-10-23; the rest is not built. The stages are T157 to T163 on the [board](roadmap.md#board).
+Status: agreed on 2026-10-22. T158, the fixes, was built on 2026-10-23, and T159, the catalog and the dialog, on 2026-10-24; [Built](#built) lists where they differ. The rest is not built. The stages are T157 to T163 on the [board](roadmap.md#board).
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The hard parts:
 
@@ -114,6 +114,24 @@ GitHub, Slack, Gmail, and Google Calendar let no app register itself. uw signs i
 ## Design
 
 T157 draws the dialog on the [Doop canvas](../../AGENTS.md#designs), on the "AI providers" page, in Fluid like the connectors frames. The user signs it off before T159 starts. It shows Recommended, search results, an entry adding and signing in, ✓ Added with its menu, a key field, Add another account, a plugin's row on the Connectors page, and a failed connector with its log lines.
+
+## Built
+
+T159, built on 2026-10-24:
+
+- `components/connectors/catalog.h`, without I/O: the Recommended list, the registry's pages, both directories' plugins, search, and the connector an entry makes. `browser/connectors/connector_catalog_store.h` keeps the copy in `connectors/catalog.json` in the user data folder and refreshes it. The dialog is `src/providers/connect-dialog.tsx`.
+- A plugin pinned to a commit is read once; one that follows a branch is read at each refresh.
+
+Where the build differs from the design and the scope above:
+
+- The copy refreshes when the dialog opens and it is a day old, not in the background at launch: starting it at launch would reach the network from every browser test.
+- Logos are drawn from simple-icons' paths in the page's script, and Exa's from @lobehub/icons-static-svg, for the services the dialog knows by name. Registry servers and other plugins show a globe. Shipping each logo as a file overran the page's resource ids, and more ids would rebuild much of Chromium.
+- The dialog's header says how many connectors are added, without their logos.
+- "✓ Added" has no menu until T162 adds Add another account. Skill and command counts come with T160.
+- "Add connector…" in the composer opens `uw://ai/connectors?add`, the Connectors page with the dialog open.
+- Registry servers and plugins are listed only at https addresses.
+
+Tests: `CatalogTest.*` and `ConnectorConfigTest.ABareAddressIsNamedForItsSite` in unit_tests; `ConnectorsBrowserTest.TheCatalogCarriesOnWhereARefreshStopped` and `UwProvidersBrowserTest.TheConnectDialogAddsFromTheCatalog` in browser_tests.
 
 ## Stages
 

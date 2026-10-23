@@ -201,6 +201,48 @@ struct ConnectorInfo {
   array<string> log_lines;
 };
 
+// Where an entry of the connect dialog comes from. Matches
+// uw::CatalogSource.
+enum CatalogSource {
+  kRecommended,
+  kClaudePlugin,
+  kOpenAiPlugin,
+  kRegistry,
+};
+
+// Something the user types before a connector can start, such as a key.
+struct CatalogField {
+  string name;
+  string description;
+  bool required;
+  bool secret;
+  // What the field starts with.
+  string value;
+};
+
+// A web connector the connect dialog offers.
+struct CatalogEntry {
+  string id;
+  CatalogSource source;
+  string name;
+  string title;
+  string description;
+  string website;
+  string url;
+  array<CatalogField> fields;
+  // A connector at its address is already added.
+  bool added;
+};
+
+// What the connect dialog shows for a search.
+struct CatalogAnswer {
+  array<CatalogEntry> entries;
+  // When uw's copy was last refreshed whole, in milliseconds since 1970, or
+  // 0 when it never was.
+  double refreshed;
+  bool refreshing;
+};
+
 // A connector in pasted JSON, before it is added.
 struct NewConnector {
   string name;
@@ -273,4 +315,12 @@ interface ProvidersHandler {
   OpenConnectorInTerminal(string name);
   // Opens a local connector's log in a new tab.
   ShowConnectorLog(string name);
+
+  // Recommended for an empty query. Refreshes uw's copy when it is due;
+  // WaitForConnectorChange answers when the copy changes.
+  SearchCatalog(string query) => (CatalogAnswer answer);
+  // Adds the entry `id`, with `values` for its fields, under the entry's
+  // name or the next free one, such as linear-2. Its sign-in page opens as
+  // soon as its server asks. An empty error means it was added.
+  AddFromCatalog(string id, map<string, string> values) => (string error);
 };

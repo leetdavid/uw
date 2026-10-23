@@ -3,6 +3,8 @@
 # docs/plans/connectors.md.
 source_set("connectors") {
   sources = [
+    "catalog.cc",
+    "catalog.h",
     "connector_config.cc",
     "connector_config.h",
     "connector_tools.cc",
@@ -29,6 +31,7 @@ source_set("connectors") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "catalog_unittest.cc",
     "connector_config_unittest.cc",
     "connector_tools_unittest.cc",
     "mcp_unittest.cc",

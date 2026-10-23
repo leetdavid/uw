@@ -141,6 +141,26 @@ TEST(ConnectorConfigTest, AnSseAddressIsTriedAtMcp) {
   EXPECT_EQ((*old)[0].url, "https://mcp.linear.app/sse");
 }
 
+TEST(ConnectorConfigTest, ABareAddressIsNamedForItsSite) {
+  const auto name_of = [](std::string_view address) {
+    auto connectors = ParseConnectors(address);
+    EXPECT_TRUE(connectors.has_value()) << address;
+    return connectors.has_value() && connectors->size() == 1u
+               ? (*connectors)[0].name + " " + (*connectors)[0].url
+               : std::string();
+  };
+  EXPECT_EQ(name_of("  https://mcp.linear.app/mcp\n"),
+            "linear https://mcp.linear.app/mcp");
+  EXPECT_EQ(name_of("https://doop.design/mcp"), "doop https://doop.design/mcp");
+  EXPECT_EQ(name_of("https://tldraw-mcp-app.tldraw.workers.dev/mcp"),
+            "tldraw https://tldraw-mcp-app.tldraw.workers.dev/mcp");
+  EXPECT_EQ(name_of("http://localhost:3000/mcp"),
+            "localhost http://localhost:3000/mcp");
+  EXPECT_EQ(ParseConnectors("http://mcp.example.com/mcp").error(),
+            "example: the address must be https, or http on this Mac or a "
+            "private network.");
+}
+
 TEST(ConnectorConfigTest, KeepsSecretsOutOfTheStoredValue) {
   ConnectorConfig connector;
   connector.name = "brave";

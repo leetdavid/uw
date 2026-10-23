@@ -63,6 +63,7 @@ source_set("browser_tests") {
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
+    "//services/network/public/cpp",
     "//testing/gmock",
     "//testing/gtest",
     "//url",

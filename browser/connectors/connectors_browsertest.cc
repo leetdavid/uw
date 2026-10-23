@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "base/base_paths.h"
@@ -21,6 +22,7 @@
 #include "base/test/test_future.h"
 #include "base/thread_annotations.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
@@ -32,10 +34,12 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/connectors/connector_catalog_store.h"
 #include "uw/browser/connectors/fake_mcp_server.h"
 #include "uw/components/connectors/connector_config.h"
 #include "uw/components/connectors/oauth.h"
@@ -45,6 +49,14 @@ namespace {
 
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
+
+std::vector<std::string> Ids(const std::vector<CatalogEntry>& entries) {
+  std::vector<std::string> ids;
+  for (const CatalogEntry& entry : entries) {
+    ids.push_back(entry.id);
+  }
+  return ids;
+}
 
 std::vector<std::string> ToolNames(const Connectors::Info& info) {
   std::vector<std::string> names;
@@ -208,6 +220,85 @@ class WebConnector {
   std::string access_ GUARDED_BY(lock_) = "none yet";
   std::string challenge_ GUARDED_BY(lock_);
   std::vector<std::string> seen_ GUARDED_BY(lock_);
+};
+
+// The MCP Registry and both plugin directories, as a test server serves them
+// under /v0 and /raw. The registry's second page fails the first time.
+class FakeCatalog {
+ public:
+  explicit FakeCatalog(net::test_server::EmbeddedTestServer& server) {
+    server.RegisterRequestHandler(
+        base::BindRepeating(&FakeCatalog::Handle, base::Unretained(this)));
+  }
+
+  // The query of each request for a page of the registry.
+  std::vector<std::string> pages() {
+    base::AutoLock lock(lock_);
+    return pages_;
+  }
+
+ private:
+  static std::string Page(std::string_view name,
+                          std::string_view url,
+                          std::string_view next) {
+    return base::StrCat(
+        {R"({"servers": [{"server": {"name": ")", name,
+         R"(", "remotes": [{"type": "streamable-http", "url": ")", url,
+         R"("}]}}], "metadata": {"nextCursor": ")", next, R"("}})"});
+  }
+
+  std::unique_ptr<net::test_server::HttpResponse> Handle(
+      const net::test_server::HttpRequest& request) {
+    static constexpr std::pair<std::string_view, std::string_view> kFiles[] = {
+        {"/raw/anthropics/claude-plugins-official/main/.claude-plugin/"
+         "marketplace.json",
+         R"({"plugins": [{"name": "sentry", "description": "Errors.",
+             "source": "./external_plugins/sentry"}]})"},
+        {"/raw/anthropics/claude-plugins-official/main/external_plugins/"
+         "sentry/.mcp.json",
+         R"({"sentry": {"type": "http", "url": "https://mcp.sentry.dev/mcp"}})"},
+        {"/raw/openai/plugins/main/.agents/plugins/marketplace.json",
+         R"({"plugins": [{"name": "granola",
+             "source": {"source": "local", "path": "./plugins/granola"}}]})"},
+        {"/raw/openai/plugins/main/plugins/granola/.mcp.json",
+         R"({"mcpServers": {"granola": {"type": "http",
+                            "url": "https://mcp.granola.ai/mcp"}}})"},
+        {"/raw/openai/plugins/main/plugins/granola/.codex-plugin/plugin.json",
+         R"({"description": "Your meetings.",
+             "interface": {"displayName": "Granola"}})"},
+    };
+    const GURL url = request.GetURL();
+    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+    response->set_content_type("application/json");
+    if (url.path() == "/v0/servers") {
+      base::AutoLock lock(lock_);
+      pages_.emplace_back(url.query());
+      std::string cursor;
+      net::GetValueForKeyInQuery(url, "cursor", &cursor);
+      if (cursor.empty()) {
+        response->set_content(
+            Page("io.github.a/first", "https://first.dev/mcp", "second"));
+      } else if (!failed_) {
+        failed_ = true;
+        response->set_code(net::HTTP_SERVICE_UNAVAILABLE);
+      } else {
+        response->set_content(
+            Page("io.github.a/second", "https://second.dev/mcp", ""));
+      }
+      return response;
+    }
+    for (const auto& [path, body] : kFiles) {
+      if (url.path() == path) {
+        response->set_content(std::string(body));
+        return response;
+      }
+    }
+    return nullptr;
+  }
+
+  base::Lock lock_;
+  std::vector<std::string> pages_ GUARDED_BY(lock_);
+  bool failed_ GUARDED_BY(lock_) = false;
 };
 
 class ConnectorsBrowserTest : public headless::HeadlessModeBrowserTest {
@@ -457,6 +548,48 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest, AProbeTellsAConnectorFromAPage) {
   base::test::TestFuture<bool> page;
   Connectors::Get().Probe(server.GetURL("/nothing"), page.GetCallback());
   EXPECT_FALSE(page.Get());
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       TheCatalogCarriesOnWhereARefreshStopped) {
+  net::test_server::EmbeddedTestServer server;
+  FakeCatalog fake(server);
+  ASSERT_TRUE(server.Start());
+  ConnectorCatalogStore& store = ConnectorCatalogStore::Get();
+  const auto open = [&] {
+    ConnectorCatalogStore::SetUpForTesting(
+        folder_.GetPath(), server.GetURL("/"), server.GetURL("/raw/"),
+        g_browser_process->shared_url_loader_factory());
+    store.Open();
+    EXPECT_TRUE(base::test::RunUntil(
+        [&] { return store.loaded() && !store.refreshing(); }));
+  };
+
+  // The registry's second page fails; the plugins are read all the same.
+  open();
+  const ConnectorCatalog& catalog = store.catalog();
+  EXPECT_TRUE(catalog.Find("registry:io.github.a/first"));
+  EXPECT_FALSE(catalog.Find("registry:io.github.a/second"));
+  EXPECT_EQ(catalog.registry_cursor, "second");
+  EXPECT_TRUE(catalog.refreshed.is_null());
+  EXPECT_EQ(catalog.Find("openai:granola")->title, "Granola");
+  EXPECT_THAT(Ids(catalog.Search("sentry", 10)), ElementsAre("claude:sentry"));
+
+  // The next time, from where it stopped, read back from its file.
+  open();
+  EXPECT_TRUE(store.catalog().Find("registry:io.github.a/first"));
+  EXPECT_TRUE(store.catalog().Find("registry:io.github.a/second"));
+  EXPECT_EQ(store.catalog().registry_cursor, "");
+  EXPECT_FALSE(store.catalog().refreshed.is_null());
+  ASSERT_EQ(fake.pages().size(), 3u);
+  EXPECT_THAT(fake.pages()[2], HasSubstr("cursor=second"));
+
+  // A whole copy less than a day old is kept as it is.
+  open();
+  EXPECT_EQ(fake.pages().size(), 3u);
+  EXPECT_TRUE(store.catalog().Find("registry:io.github.a/second"));
+  ConnectorCatalogStore::SetUpForTesting(base::FilePath(), GURL(), GURL(),
+                                         nullptr);
 }
 
 IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
