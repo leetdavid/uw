@@ -789,6 +789,32 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, DeletingAChatClosesItsTab) {
   }));
 }
 
+// The chat fills the window. Its list follows the newest line, and the page
+// itself never scrolls, even when something reaches past the window.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePageItselfNeverScrolls) {
+  UseAgentModel();
+  std::string answer;
+  for (int line = 0; line < 80; ++line) {
+    answer += "Line " + base::NumberToString(line) + "\n\n";
+  }
+  model_.Script({ScriptedModel::Answer(answer)});
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat,
+                              "const tall = document.createElement('div');"
+                              "tall.style.height = '3000px';"
+                              "document.body.append(tall);"));
+  Ask(chat, "Write a long answer");
+  EXPECT_EQ("page 0 hidden, list scrolled",
+            content::EvalJs(
+                chat,
+                "new Promise(resolve => requestAnimationFrame(() => resolve("
+                "    'page ' + scrollY + ' ' +"
+                "    getComputedStyle(document.documentElement).overflowY +"
+                "    ', list ' + (document.querySelector('.answer')"
+                "        .closest('.overflow-y-auto').scrollTop > 0"
+                "        ? 'scrolled' : 'at the top'))))"));
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
   UseAgentModel();
   model_.Script({ScriptedModel::Answer(

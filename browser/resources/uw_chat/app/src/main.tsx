@@ -1476,7 +1476,7 @@ function Chat() {
   const promptItem = pickedPrompt(draft, menuItems);
   const composerBox = useRef<HTMLDivElement>(null);
   const [suggestions, setSuggestions] = useState(EXAMPLES);
-  const end = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLElement>(null);
 
   // Keeps the header's minutes current while the agent works.
   useEffect(() => {
@@ -1654,7 +1654,10 @@ function Chat() {
   };
 
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
+    // Only the list scrolls; scrollIntoView would scroll the page as well.
+    if (list.current) {
+      list.current.scrollTop = list.current.scrollHeight;
+    }
   }, [lines, working]);
 
   const chosen = providers?.find(
@@ -2004,7 +2007,7 @@ function Chat() {
           </p>
         </div>
       )}
-      <main className={cn("flex-1 overflow-y-auto", !title && "hidden")}>
+      <main ref={list} className={cn("flex-1 overflow-y-auto", !title && "hidden")}>
         <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
           {groups.map((run, index) =>
             isQuietRun(run[0]!) ? (
@@ -2079,7 +2082,6 @@ function Chat() {
           {working && !live && !proposal && !approval && !password && (
             <ThinkingIndicator id="working" />
           )}
-          <div ref={end} />
         </div>
       </main>
       <div
@@ -2112,6 +2114,9 @@ function Chat() {
     </SidebarProvider>
   );
 }
+
+// The chat fills the window. Its list and panels scroll; the page never does.
+document.documentElement.style.overflow = "hidden";
 
 // Fluid's parts read dark mode from a class on the root element.
 const dark = matchMedia("(prefers-color-scheme: dark)");
