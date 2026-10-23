@@ -64,6 +64,7 @@ class ModelLister {
   void OnOllamaModel(Listing* listing,
                      size_t index,
                      RemoteModelClient::Outcome outcome);
+  void OnCatalog(Listing* listing, const ModelCatalog* catalog);
   void Finish(Listing* listing);
 
   const raw_ptr<Profile> profile_;

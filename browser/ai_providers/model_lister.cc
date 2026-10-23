@@ -167,21 +167,23 @@ void ModelLister::OnList(std::unique_ptr<Listing> listing,
     Finish(raw);
     return;
   }
-  CatalogStore::For(profile_)->Get(base::BindOnce(
-      [](base::WeakPtr<ModelLister> self, Listing* raw,
-         const ModelCatalog* catalog) {
-        if (!self || !self->listings_.contains(raw)) {
-          return;
-        }
-        if (catalog) {
-          for (ListedModel& model : raw->result.models) {
-            model.abilities = catalog->For(raw->provider, model.name);
-            model.format = FormatOfModel(raw->provider, model.name, catalog);
-          }
-        }
-        self->Finish(raw);
-      },
-      weak_factory_.GetWeakPtr(), raw));
+  // A method on a weak pointer, so that an answer after the lister is gone
+  // never touches `raw`.
+  CatalogStore::For(profile_)->Get(
+      base::BindOnce(&ModelLister::OnCatalog, weak_factory_.GetWeakPtr(), raw));
+}
+
+void ModelLister::OnCatalog(Listing* listing, const ModelCatalog* catalog) {
+  if (!listings_.contains(listing)) {
+    return;
+  }
+  if (catalog) {
+    for (ListedModel& model : listing->result.models) {
+      model.abilities = catalog->For(listing->provider, model.name);
+      model.format = FormatOfModel(listing->provider, model.name, catalog);
+    }
+  }
+  Finish(listing);
 }
 
 // Ollama says what a model can do in "capabilities". Without an answer, the
