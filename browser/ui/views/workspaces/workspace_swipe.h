@@ -40,11 +40,12 @@ class WorkspaceWindow;
 // The slide between workspaces in a window's sidebar, per
 // docs/plans/workspaces.md. A two-finger swipe on the wide sidebar moves its
 // name row and tabs with the fingers, and its pins too toward another
-// profile, while the tint blends toward the other workspace's. Past halfway,
-// or on a flick, the other workspace lands: its window takes this one's place
-// and its page settles in as this page fades out. Short of that, the sidebar
-// slides back. Ctrl+1 to 9, Cmd+Option+arrows, and a click on a workspace
-// play the same slide on their own.
+// profile, while the tint blends toward the other workspace's. Once the
+// fingers pass halfway, the other workspace's page starts to load. Past
+// halfway, or on a flick, the other workspace lands: its window takes this
+// one's place and its page settles in as this page fades out. Short of that,
+// the sidebar slides back. Ctrl+1 to 9, Cmd+Option+arrows, and a click on a
+// workspace play the same slide on their own.
 //
 // The other workspace's sidebar is a picture of its window from when it last
 // slid away. A window that has not slid away since launch has no picture, so
@@ -189,6 +190,8 @@ class WorkspaceSwipe : public ui::EventHandler,
   // Counts slides, so a picture that comes in late for an older one is left.
   int slide_ = 0;
   std::string target_;
+  // The workspace whose page this swipe last started to load.
+  std::string preloaded_;
   int direction_ = 0;
   float offset_ = 0;
   gfx::Rect area_;

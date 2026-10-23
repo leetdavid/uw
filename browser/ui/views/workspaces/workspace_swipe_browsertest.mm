@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,11 +24,17 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/base_window.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -271,6 +278,24 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
     }
   }
 
+  // Puts an unloaded copy of `window`'s page in its place, as a restored tab
+  // that has not loaded yet.
+  static content::WebContents* Unload(BrowserWindowInterface* window) {
+    content::WebContents* page =
+        window->GetTabStripModel()->GetActiveWebContents();
+    content::WebContents::CreateParams params(page->GetBrowserContext());
+    params.initially_hidden = true;
+    params.desired_renderer_state =
+        content::WebContents::CreateParams::kNoRendererProcess;
+    std::unique_ptr<content::WebContents> copy =
+        content::WebContents::Create(params);
+    copy->GetController().CopyStateFrom(&page->GetController(),
+                                        /*needs_reload=*/true);
+    content::WebContents* unloaded = copy.get();
+    window->GetTabStripModel()->DiscardWebContents(page, std::move(copy));
+    return unloaded;
+  }
+
   // Swipes `window` all the way to its next workspace, and waits for it.
   BrowserWindowInterface* SwipeToNext(BrowserWindowInterface* window,
                                       const std::string& next) {
@@ -329,6 +354,37 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
           ->multi_contents_view()
           ->layer();
   EXPECT_TRUE(!page || page->transform().IsIdentity());
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       PastHalfwayTheOtherPageLoadsBeforeTheFingersLift) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL article = embedded_test_server()->GetURL("/title1.html");
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(content::NavigateToURL(
+      partner->GetTabStripModel()->GetActiveWebContents(), article));
+  WorkspaceWindow::From(partner)->Switch(work_);
+  WaitForShown(partner, work_);
+  content::WebContents* page = Unload(partner);
+
+  const float half = SidebarWidth(browser()) / 2;
+  MoveFingers(browser(), -(half - 10));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(page->GetController().NeedsReload());
+  for (int i = 0; i < 4; ++i) {
+    Scroll(browser(), Sidebar(browser()), -kSlowStepWidth, 0,
+           ui::EventMomentumPhase::NONE);
+  }
+  EXPECT_FALSE(page->GetController().NeedsReload());
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return page->GetPrimaryMainFrame()->GetLastCommittedURL() == article;
+  }));
+  EXPECT_TRUE(SwipeOf(browser())->sliding());
+  EXPECT_EQ(ShownOf(browser()), browser());
+  Lift(browser());
+  EXPECT_EQ(WaitForShown(browser(), reading), partner);
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, AFlickLands) {

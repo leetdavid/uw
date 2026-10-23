@@ -518,6 +518,7 @@ void WorkspaceSwipe::Begin(bool with_picture) {
   phase_ = Phase::kTracking;
   ++slide_;
   target_.clear();
+  preloaded_.clear();
   direction_ = 0;
   offset_ = 0;
   fingers_ = 0;
@@ -600,6 +601,11 @@ void WorkspaceSwipe::Track(float fingers, base::TimeTicks time) {
       target_.empty() ? kStretch * fingers_ / (std::abs(fingers_) + kStretch)
                       : fingers_;
   SetOffset(offset);
+  if (!target_.empty() && target_ != preloaded_ &&
+      -direction_ * offset_ > area_.width() / 2) {
+    preloaded_ = target_;
+    WorkspaceWindow::From(window_)->Preload(target_);
+  }
   samples_.push_back({time, offset});
   std::erase_if(samples_, [&](const Sample& sample) {
     return time - sample.time > kSpeedWindow;

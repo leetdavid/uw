@@ -232,6 +232,12 @@ void WorkspaceWindow::WithPartner(std::string_view id, WindowCallback found) {
                      workspace->id, std::move(found)));
 }
 
+void WorkspaceWindow::Preload(std::string_view id) {
+  WithPartner(id, base::BindOnce([](BrowserWindowInterface* window) {
+                From(window)->LoadActiveTab();
+              }));
+}
+
 // static
 void WorkspaceWindow::Restore(
     BrowserWindowInterface* window,

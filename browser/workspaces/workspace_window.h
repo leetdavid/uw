@@ -93,6 +93,9 @@ class WorkspaceWindow : public views::WidgetObserver {
   // Gives `found` this group's window for workspace `id`, opened hidden if
   // there is none yet.
   void WithPartner(std::string_view id, WindowCallback found);
+  // Starts loading the page this group shows for workspace `id`, opening its
+  // window hidden if there is none yet.
+  void Preload(std::string_view id);
 
   // Adds a workspace on `profile`, or on a new profile named `new_profile`
   // when `profile` is empty, and switches `window` to it.

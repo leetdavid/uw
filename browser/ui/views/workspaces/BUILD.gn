@@ -84,6 +84,7 @@ source_set("browser_tests") {
     "//components/tabs:public",
     "//content/public/browser",
     "//content/test:test_support",
+    "//net:test_support",
     "//testing/gtest",
     "//ui/base",
     "//ui/compositor",
