@@ -18,6 +18,7 @@ The user asked for Arc's Clear and Tidy on 2026-10-24. [Tidy](../CONTEXT.md#lang
 
 - Closes every Scratchpad tab except [kept tabs](../CONTEXT.md#language) and [busy terminals](../CONTEXT.md#language). A chat's tab closes too, since the chat is saved.
 - It asks nothing first. ⇧⌘T reopens the tabs one per press, as after Close Branch.
+- When Clear would close every tab of the window, it leaves a blank tab, as Close Task does, so the window stays.
 
 ### Tidy
 
@@ -43,6 +44,8 @@ Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 
 Tidy's icon is sparkles and Clear's is a down arrow, as in Arc. Each button is 22px tall with 11px text, in the tint's text color at about 78%, and takes the tint's fill under the pointer.
 
+The heading is a view in Chromium's unpinned tab container, `ScratchpadHeading`. uw's layout of that container gives it the 24px above the first tab in no task, and hides it when no tab is in the Scratchpad. Clear asks each Scratchpad terminal's shell whether a program other than the shell has it, so the tabs close a moment after the click.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
@@ -53,8 +56,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Acceptance checks
 
-1. The heading shows Tidy and Clear only while the pointer is over it. Both are in the Tasks menu.
-2. Clear closes every Scratchpad tab but kept tabs and busy terminals, and leaves every task alone. ⇧⌘T reopens a cleared tab.
+1. The heading shows Tidy and Clear only while the pointer is over it. Both are in the Tasks menu. `TabOrganizationControllerBrowserTest.TheScratchpadHeadingShowsClearUnderThePointer` checks Clear.
+2. Clear closes every Scratchpad tab but kept tabs and busy terminals, and leaves every task alone. ⇧⌘T reopens a cleared tab. `TabOrganizationControllerBrowserTest.ClearScratchpadClosesAllButKeptTabs` and `ClearingEveryTabLeavesABlankOne`, and `UwTerminalBrowserTest.ClearLeavesATerminalRunningACommand` check it.
 3. Against a test server, Tidy sends one request with each Scratchpad tab's title, address, and parent, and the tasks with their tabs' titles. It applies the answer as one action, and one Undo puts every tab back.
 4. A new task in the answer with one tab is not started. Hubs and kept tabs stay in the Scratchpad.
 5. A child placed with its parent stays nested. A child placed elsewhere leaves it. A child nested by hand follows its parent.

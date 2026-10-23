@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/auto_reset.h"
+#include "base/barrier_callback.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -31,6 +32,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
+#include "uw/browser/terminal/terminal_shell.h"
 
 namespace uw {
 namespace {
@@ -525,6 +527,74 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
     const std::vector<PageId> branch = tree_.BranchOf(root);
     closing.insert(closing.end(), branch.begin(), branch.end());
   }
+  Close(std::move(closing));
+}
+
+void TabOrganizationController::FindClearable(
+    base::OnceCallback<void(std::vector<PageId>)> done) const {
+  std::vector<PageId> pages;
+  for (const Page& page : tree_.pages()) {
+    if (page.task.empty() && !IsKept(page.id)) {
+      pages.push_back(page.id);
+    }
+  }
+  const auto answered = base::BarrierCallback<std::optional<PageId>>(
+      pages.size(), base::BindOnce(
+                        [](base::OnceCallback<void(std::vector<PageId>)> done,
+                           std::vector<std::optional<PageId>> answers) {
+                          std::vector<PageId> clearable;
+                          for (std::optional<PageId>& answer : answers) {
+                            if (answer) {
+                              clearable.push_back(std::move(*answer));
+                            }
+                          }
+                          std::move(done).Run(std::move(clearable));
+                        },
+                        std::move(done)));
+  for (const PageId& id : pages) {
+    tabs::TabInterface* tab = TabFor(id);
+    TerminalShell* shell =
+        tab ? TerminalShell::From(tab->GetContents()) : nullptr;
+    if (!shell) {
+      answered.Run(id);
+      continue;
+    }
+    // A terminal is running a command while a program other than its shell
+    // has it.
+    shell->GetActivity(base::BindOnce(
+        [](base::RepeatingCallback<void(std::optional<PageId>)> answered,
+           PageId id, ShellHost::Activity activity) {
+          answered.Run(activity.program.empty() ? std::optional(std::move(id))
+                                                : std::nullopt);
+        },
+        answered, id));
+  }
+}
+
+void TabOrganizationController::ClearScratchpad() {
+  FindClearable(base::BindOnce(
+      [](base::WeakPtr<TabOrganizationController> self,
+         std::vector<PageId> ids) {
+        if (!self) {
+          return;
+        }
+        // A tab may have moved or been kept while the shells answered.
+        std::erase_if(ids, [&self](const PageId& id) {
+          const Page* page = self->tree_.Find(id);
+          return !page || !page->task.empty() || self->IsKept(id);
+        });
+        if (ids.empty()) {
+          return;
+        }
+        if (ids.size() == static_cast<size_t>(self->tabs_->count())) {
+          chrome::AddTabAt(self->window_, GURL(), -1, /*foreground=*/true);
+        }
+        self->Close(std::move(ids));
+      },
+      weak_factory_.GetWeakPtr()));
+}
+
+void TabOrganizationController::Close(std::vector<PageId> ids) {
   // Closing the last tab can destroy this controller, and beforeunload can
   // delay the close, so the tabs are looked up again when it runs.
   tabs_->ExecuteCloseTabsCommand(
@@ -540,7 +610,7 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
             }
             return tabs;
           },
-          weak_factory_.GetWeakPtr(), closing),
+          weak_factory_.GetWeakPtr(), std::move(ids)),
       false);
 }
 

@@ -4,6 +4,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
 #include <algorithm>
+#include <climits>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -71,6 +72,7 @@
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/checkbox.h"
+#include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/test/button_test_api.h"
@@ -78,7 +80,10 @@
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/views/tab_organization/scratchpad_heading.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
 namespace {
@@ -843,6 +848,116 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
       .NotifyDefaultMouseClick();
   EXPECT_FALSE(controller()->IsKept(Id(page)));
   ASSERT_TRUE(base::test::RunUntil([&] { return !anchor->GetVisible(); }));
+}
+
+// The Scratchpad heading sits right above the first tab in no task. Clear
+// shows at its end while the pointer is on it, its tooltip says how many tabs
+// it closes, and a click closes them.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheScratchpadHeadingShowsClearUnderThePointer) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* in_task = InitialTab();
+  tabs::TabInterface* loose = NewTab();
+  tabs::TabInterface* kept = NewTab();
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(kept)});
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(in_task)}, u"Plan"));
+
+  // Once the sidebar settles, the heading ends where the first tab in no
+  // task starts.
+  ScratchpadHeading* heading = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::vector<views::View*> headings =
+        ViewsOfClass("ScratchpadHeading");
+    heading = headings.size() == 1u
+                  ? static_cast<ScratchpadHeading*>(headings[0])
+                  : nullptr;
+    if (!heading || !heading->GetVisible() ||
+        heading->height() != kScratchpadHeadingHeight) {
+      return false;
+    }
+    int first_loose = INT_MAX;
+    for (views::View* row : TabRows()) {
+      if (row->parent() == heading->parent()) {
+        first_loose = std::min(first_loose, row->y());
+      }
+    }
+    return first_loose == heading->bounds().bottom();
+  }));
+  views::LabelButton* clear = heading->clear_button();
+  EXPECT_FALSE(clear->GetVisible());
+  SaveWindowScreenshot(browser(), "scratchpad-heading");
+
+  heading->OnMouseEntered(
+      ui::MouseEvent(ui::EventType::kMouseEntered, gfx::PointF(), gfx::PointF(),
+                     ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  EXPECT_TRUE(clear->GetVisible());
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return clear->GetTooltipText() == u"Close 1 tab";
+  })) << clear->GetTooltipText();
+  clear->SetState(views::Button::STATE_HOVERED);
+  ViewsOfClass("ScratchpadHeading");
+  EXPECT_LE(
+      heading->GetBoundsInScreen().right() - clear->GetBoundsInScreen().right(),
+      1);
+  SaveWindowScreenshot(browser(), "scratchpad-heading-clear");
+
+  const PageId in_task_id = Id(in_task);
+  const PageId kept_id = Id(kept);
+  const PageId loose_id = Id(loose);
+  views::test::ButtonTestApi(clear).NotifyDefaultMouseClick();
+  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 2; }));
+  EXPECT_TRUE(controller()->TabFor(in_task_id));
+  EXPECT_TRUE(controller()->TabFor(kept_id));
+  EXPECT_FALSE(controller()->TabFor(loose_id));
+  ExpectStripMatchesTree();
+
+  heading->OnMouseExited(
+      ui::MouseEvent(ui::EventType::kMouseExited, gfx::PointF(), gfx::PointF(),
+                     ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  EXPECT_FALSE(clear->GetVisible());
+}
+
+// Clear Scratchpad in the Tasks menu closes the Scratchpad's tabs, a whole
+// branch included, but not a kept tab or a task's tabs. Shift+Cmd+T reopens a
+// cleared tab, and with only kept tabs left there is nothing to clear.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ClearScratchpadClosesAllButKeptTabs) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  tabs::TabInterface* in_task = InitialTab();
+  tabs::TabInterface* loose = NewTab();
+  ASSERT_TRUE(content::NavigateToURL(
+      loose->GetContents(), embedded_test_server()->GetURL("/title1.html")));
+  OpenLinkFrom(loose, embedded_test_server()->GetURL("/title2.html"));
+  tabs::TabInterface* kept = NewTab();
+  controller()->Execute(TabOrganizationController::kKeepHere, {Id(kept)});
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(in_task)}, u"Plan"));
+  const PageId in_task_id = Id(in_task);
+  const PageId kept_id = Id(kept);
+  ASSERT_EQ(tabs()->count(), 4);
+
+  ASSERT_TRUE(CanRunWindowCommand(browser(), kClearScratchpad));
+  chrome::ExecuteCommand(browser(), kClearScratchpad);
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 2; }));
+  EXPECT_TRUE(controller()->TabFor(in_task_id));
+  EXPECT_TRUE(controller()->TabFor(kept_id));
+  ExpectStripMatchesTree();
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kClearScratchpad));
+
+  chrome::RestoreTab(browser());
+  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 3; }));
+}
+
+// Clearing every tab of the window leaves a blank one, so the window stays.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ClearingEveryTabLeavesABlankOne) {
+  const PageId first = Id(InitialTab());
+  const PageId second = Id(NewTab());
+  controller()->ClearScratchpad();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs()->count() == 1 && !controller()->TabFor(first) &&
+           !controller()->TabFor(second);
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

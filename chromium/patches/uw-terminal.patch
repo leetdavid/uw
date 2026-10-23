@@ -114,7 +114,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef51
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..7f2f9c91c289326a5e84aa74805c7d5cdd728b8b 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..653010a6dad830436d5b616e0c90b6760f1d288a 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -190,7 +190,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..7f2f9c91c289326a5e84aa74805c7d5c
                Item(IDS_TAB_CXMENU_CLOSEOTHERTABS)
                    .command_id(IDC_WINDOW_CLOSE_OTHER_TABS),
                Item(is_rtl ? IDS_TAB_CXMENU_CLOSETABSTOLEFT
-@@ -583,12 +592,91 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -583,12 +592,92 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                Item(IDS_SEARCH_TABS)
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
@@ -247,6 +247,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..7f2f9c91c289326a5e84aa74805c7d5c
 +              .command_id(uw::TabOrganizationController::kScratchpad),
 +          Item(IDS_UW_KEEP_HERE_MAC)
 +              .command_id(uw::TabOrganizationController::kKeepHere),
++          Item(IDS_UW_CLEAR_SCRATCHPAD_MAC).command_id(uw::kClearScratchpad),
 +          Item().is_separator(),
 +          Item(IDS_UW_GO_TO_TASK_MAC).submenu(std::move(go_to_task)),
 +          Item(IDS_UW_RENAME_TASK_MAC).command_id(uw::kRenameTask),
@@ -282,7 +283,7 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..7f2f9c91c289326a5e84aa74805c7d5c
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
                            id app_delegate,
                            const std::u16string& product_name,
-@@ -644,6 +732,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+@@ -644,6 +733,7 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
             &BuildBookmarksMenu,
             &BuildPeopleMenu,
             &BuildTabMenu,

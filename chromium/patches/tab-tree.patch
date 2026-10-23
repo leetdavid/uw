@@ -1000,73 +1000,66 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb780188
      width = std::max(width, bounds.width());
    }
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
-index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..23ba9cb7976b0c927715fd4324a1eb0cb44f1ac2 100644
+index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..54741e212b77cb3b3771d997a4899d91e6092d3b 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 @@ -26,6 +26,8 @@
  #include "ui/views/view_targeter.h"
  #include "ui/views/view_targeter_delegate.h"
  #include "ui/views/view_utils.h"
-+#include "uw/browser/ui/views/tab_organization/scratchpad_label.h"
++#include "uw/browser/ui/views/tab_organization/scratchpad_heading.h"
 +#include "uw/browser/ui/views/tab_organization/tab_indent.h"
  
  namespace {
  
-@@ -107,10 +109,18 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
+@@ -107,6 +109,9 @@ UnpinnedTabContainerView::UnpinnedTabContainerView(
    node_destroyed_subscription_ = collection_node_->RegisterWillDestroyCallback(
        base::BindOnce(&UnpinnedTabContainerView::ResetCollectionNode,
                       base::Unretained(this)));
 +  uw_tree_subscription_ = uw::RelayoutOnTreeChange(collection_node_, this);
++  uw_scratchpad_heading_ =
++      AddChildView(std::make_unique<uw::ScratchpadHeading>());
  }
  
  UnpinnedTabContainerView::~UnpinnedTabContainerView() = default;
- 
-+void UnpinnedTabContainerView::OnPaint(gfx::Canvas* canvas) {
-+  views::View::OnPaint(canvas);
-+  if (collection_node_) {
-+    uw::PaintScratchpadLabel(this, collection_node_->GetDirectChildren(),
-+                             canvas);
-+  }
-+}
- 
- std::optional<BrowserRootView::DropIndex>
- UnpinnedTabContainerView::GetLinkDropIndex(const gfx::Point& loc_in_container) {
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..397943a376515aa3088ac117c5540fb01910765e 100644
+index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..8912e4dfaf427a678b49a9150346c4443f1162ef 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-@@ -58,6 +58,9 @@ class UnpinnedTabContainerView
-   // layout passes.
-   void SetAvailableSpace(views::SizeBound space) { available_space_ = space; }
+@@ -17,6 +17,10 @@ class TabCollectionNode;
+ class TabGroupView;
+ class UnpinnedTabContainerViewLayout;
  
-+  // views::View:
-+  void OnPaint(gfx::Canvas* canvas) override;
++namespace uw {
++class ScratchpadHeading;
++}
 +
-  private:
-   // DraggedTabsContainer:
-   views::ScrollView* GetScrollViewForContainer() const override;
-@@ -83,6 +86,7 @@ class UnpinnedTabContainerView
+ // The view class that represents the unpinned tab region for the
+ // tab strip. It hosts all the unpinned tabs and serves as the drag target
+ // for unpinned tabs which aren't grouped. Layout is managed by
+@@ -83,6 +87,8 @@ class UnpinnedTabContainerView
    const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
  
    base::CallbackListSubscription node_destroyed_subscription_;
 +  base::CallbackListSubscription uw_tree_subscription_;
++  raw_ptr<uw::ScratchpadHeading> uw_scratchpad_heading_ = nullptr;
  };
  
  #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
-index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05bda371b6 100644
+index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..ed5e3cc20ab7a4359bc07d78d5b5fb35e96661c9 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view_layout.cc
 @@ -21,6 +21,8 @@
  #include "ui/views/layout/proposed_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_utils.h"
-+#include "uw/browser/ui/views/tab_organization/scratchpad_label.h"
++#include "uw/browser/ui/views/tab_organization/scratchpad_heading.h"
 +#include "uw/browser/ui/views/tab_organization/tab_indent.h"
  
  namespace {
  constexpr int kTabVerticalPadding = 2;
-@@ -162,6 +164,11 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -162,6 +164,12 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
    int height = 0;
    int dragged_view_bottom = 0;
    auto collapse_state = tab_container_view->GetTabStripCollapseState();
@@ -1075,10 +1068,11 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
 +              !focused_group_id.has_value()
 +          ? uw::FirstScratchpadTab(children)
 +          : nullptr;
++  std::optional<int> heading_y;
  
    const int horizontal_padding =
        GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
-@@ -172,6 +179,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -172,6 +180,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
                  collapse_state != tabs::VerticalTabStripCollapseState::kExpanded
              ? 0
              : horizontal_padding;
@@ -1088,7 +1082,7 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
      views::SizeBound child_height_bound = size_bounds.height();
      // In focused mode, pass the scroll viewport height constraint to the child
      // focused group if the incoming size bounds height is unbounded, so that
-@@ -192,7 +202,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -192,7 +203,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
  
      auto drag_data = tab_container_view->GetVisualDataForDraggedView(*child);
      bool should_show_child =
@@ -1099,16 +1093,51 @@ index 6c4e35d84a6dcfeff94b13b75a4300ee4c2a0c3e..53541c30c96852b4c5c85d3ae99def05
  
      if (!should_show_child) {
        layouts.child_layouts.emplace_back(
-@@ -202,6 +214,9 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+@@ -202,6 +215,10 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
        continue;
      }
  
 +    if (child == scratchpad_top) {
-+      height += uw::kScratchpadLabelHeight;
++      heading_y = height;
++      height += uw::kScratchpadHeadingHeight;
 +    }
      bounds.set_y(drag_data ? drag_data->offset.y() : height);
  
      if (size_bounds.width().is_bounded()) {
+@@ -213,6 +230,20 @@ views::ProposedLayout UnpinnedTabContainerViewLayout::CalculateVerticalLayout(
+     width = std::max(width, bounds.width() + bounds.x());
+   }
+ 
++  // Without a Scratchpad the heading waits, hidden, where the next tab would
++  // go.
++  if (views::View* heading = tab_container_view->uw_scratchpad_heading_) {
++    const int heading_width =
++        size_bounds.width().is_bounded()
++            ? std::max(0, size_bounds.width().value() - 2 * horizontal_padding)
++            : heading->GetPreferredSize().width();
++    layouts.child_layouts.emplace_back(
++        heading, heading_y.has_value(),
++        gfx::Rect(horizontal_padding, heading_y.value_or(height),
++                  heading_width,
++                  heading_y ? uw::kScratchpadHeadingHeight : 0));
++  }
++
+   if (height > 0) {
+     height -= kTabVerticalPadding;
+   }
+diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_node.cc b/chrome/browser/ui/views/tabs/common/tab_collection_node.cc
+index afa40bfc3acb801c9745a05c5abdc72b685b6448..f70a5201e91ee080e085a7f776d270cea0cb0595 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_collection_node.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_collection_node.cc
+@@ -328,7 +328,7 @@ void TabCollectionNode::MoveChild(base::PassKey<TabCollectionNode> pass_key,
+   // appears over the other tabs in its parent container.
+   TabCollectionNode* moved_node = children_[target_index].get();
+   node_view_->ReorderChildView(moved_node->node_view_,
+-                               static_cast<int>(children_.size() - 1));
++                               node_view_->children().size());
+   node_view_->InvalidateLayout();
+ 
+   EnsureFocusOrder(target_index);
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 index ab919030ae2fbd70240f192e1a7060776530523a..df91075ff99050f28b373d4b84bc7e1c87562da3 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc

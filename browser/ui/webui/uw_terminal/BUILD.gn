@@ -61,6 +61,7 @@ source_set("browser_tests") {
     "//ui/events:dom_keycode_converter",
     "//ui/events:test_support",
     "//url",
+    "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
     "//uw/components/terminal",

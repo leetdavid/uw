@@ -60,6 +60,7 @@ constexpr struct {
     {Controller::kScratchpad, "move_to_scratchpad"},
     {Controller::kKeepHere, "keep_here"},
     {kGoToScratchpad, "go_to_scratchpad"},
+    {kClearScratchpad, "clear_scratchpad"},
     {kRenameTask, "rename_task"},
     {kNameTask, "name_task"},
     {IDC_CLOSE_TAB_GROUP, "close_task"},

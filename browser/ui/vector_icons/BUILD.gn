@@ -6,6 +6,7 @@ aggregate_vector_icons("uw_vector_icons") {
   icon_directory = "."
 
   sources = [
+    "arrow_down.icon",
     "chevrons_up_down.icon",
     "eye_filled.icon",
     "list_tree.icon",

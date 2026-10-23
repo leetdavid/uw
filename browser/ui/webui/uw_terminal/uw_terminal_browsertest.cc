@@ -46,7 +46,9 @@
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/terminal/shell_quote.h"
 
@@ -444,6 +446,36 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, ExitClosesTheTab) {
   Type(u"exit\r");
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return browser()->tab_strip_model()->count() == before; }));
+}
+
+// Clear closes a terminal at its prompt and leaves one running a command.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       ClearLeavesATerminalRunningACommand) {
+  content::WebContents* idle = OpenTerminal();
+  content::WebContents* busy = OpenTerminal();
+  Type(u"sleep 60\r");
+  TerminalShell* shell = TerminalShell::From(busy);
+  ASSERT_TRUE(shell);
+  bool asking = false;
+  bool running = false;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    if (!asking) {
+      asking = true;
+      shell->GetActivity(
+          base::BindLambdaForTesting([&](ShellHost::Activity activity) {
+            running = activity.program == "sleep";
+            asking = false;
+          }));
+    }
+    return running;
+  }));
+
+  chrome::ExecuteCommand(browser(), kClearScratchpad);
+  TabStripModel* tabs = browser()->tab_strip_model();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs->GetIndexOfWebContents(idle) == TabStripModel::kNoTab;
+  }));
+  EXPECT_NE(tabs->GetIndexOfWebContents(busy), TabStripModel::kNoTab);
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, TheAddressCarriesNoCommand) {

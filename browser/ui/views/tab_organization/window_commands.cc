@@ -90,6 +90,11 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
       return std::ranges::any_of(
           controller->tree().pages(),
           [](const Page& page) { return page.task.empty(); });
+    case kClearScratchpad:
+      return std::ranges::any_of(
+          controller->tree().pages(), [controller](const Page& page) {
+            return page.task.empty() && !controller->IsKept(page.id);
+          });
     case kRenameTask:
       return SelectedTask(window).has_value();
     case kNameTask:
@@ -135,6 +140,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
   switch (command) {
     case kGoToScratchpad:
       controller->SelectTask(std::string());
+      break;
+    case kClearScratchpad:
+      controller->ClearScratchpad();
       break;
     // The sidebar answers Chromium's request for the task editor by renaming
     // on the task's row.

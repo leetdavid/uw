@@ -131,6 +131,13 @@ class TabOrganizationController : public TabStripModelObserver,
   // Closes `task` and its tabs. A task that holds every tab leaves a blank
   // tab behind, so the window stays.
   void CloseTask(const tab_groups::TabGroupId& task);
+  // The Scratchpad's tabs that Clear closes: all but kept tabs and terminals
+  // running a command. Each terminal's shell is asked, so `done` runs later.
+  void FindClearable(base::OnceCallback<void(std::vector<PageId>)> done) const;
+  // Clear: closes the tabs FindClearable finds that are still in the
+  // Scratchpad when the shells answer. Closing every tab of the window
+  // leaves a blank tab behind, so the window stays.
+  void ClearScratchpad();
   // Opens a selected blank tab at the end of `task`.
   void OpenInTask(const tab_groups::TabGroupId& task);
   // Moves `tab`, just opened, to the end of `task` at its top level, and
@@ -247,6 +254,8 @@ class TabOrganizationController : public TabStripModelObserver,
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
   // Roots of `ids` with tabs under them.
   std::vector<PageId> Parents(const std::vector<PageId>& ids) const;
+  // Closes the tabs of `ids` as Chromium's Close Tabs does.
+  void Close(std::vector<PageId> ids);
   // Expands every collapsed branch that holds the selected tab below its top
   // page.
   void RevealSelected();
