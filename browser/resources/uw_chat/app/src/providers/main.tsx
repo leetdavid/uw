@@ -5,6 +5,7 @@
 // frames on the canvas page "AI providers", docs/plans/ai-providers.md, and
 // docs/plans/connectors.md#the-ai-page.
 import "@/trusted-types";
+import "@/theme-colors";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";

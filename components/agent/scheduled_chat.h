@@ -59,6 +59,8 @@ struct ScheduledChat {
   std::string pause_reason;
   // The latest kPastRuns reports, oldest first.
   std::vector<PastRun> recent;
+  // The values its runs track, in the order runs first reported them.
+  std::vector<TrackedName> tracked;
 
   bool operator==(const ScheduledChat&) const;
 };
@@ -70,6 +72,13 @@ GURL WatchedAddress(const GURL& url);
 base::DictValue ScheduledChatToValue(const ScheduledChat& chat);
 std::optional<ScheduledChat> ScheduledChatFromValue(
     const base::DictValue& value);
+
+// Gives `report`'s values the names and units of `chat`'s tracked values
+// they match, ignoring case and treating spaces and dashes as underscores,
+// and tracks the names it does not know yet, so that the first run names each
+// value and later runs reuse the name. A unit a value leaves out comes from
+// its tracked value.
+void NameValues(ScheduledChat& chat, RunReport& report);
 
 // How a run ended.
 enum class RunEnd { kReported, kFailed, kModelUnreachable, kStopped };

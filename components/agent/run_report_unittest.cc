@@ -102,7 +102,7 @@ TEST(RunReportTest, TheBriefHasTheRequestTheTimeAndTheLatestRuns) {
 
   const std::string brief =
       RunBrief("Tell me when the Jarvis desk drops below $500.", "",
-               Utc(2026, 10, 23, 16), past);
+               Utc(2026, 10, 23, 16), past, {});
 
   EXPECT_THAT(brief, HasSubstr("It is Friday 23 October 2026, 09:00."));
   EXPECT_THAT(brief, HasSubstr("The request: Tell me when the Jarvis desk "
@@ -115,18 +115,38 @@ TEST(RunReportTest, TheBriefHasTheRequestTheTimeAndTheLatestRuns) {
   EXPECT_THAT(brief, Not(HasSubstr("Monday 19 October")));
   EXPECT_THAT(brief, HasSubstr("call report once"));
   EXPECT_THAT(brief, Not(HasSubstr("The page it watches")));
+  EXPECT_THAT(brief, Not(HasSubstr("same names")));
+}
+
+TEST(RunReportTest, TheBriefAsksForTheTrackedNames) {
+  EXPECT_THAT(
+      RunBrief("Tell me when the price drops.", "", Utc(2026, 10, 23, 16), {},
+               {{"price", "USD"}, {"in_stock", ""}}),
+      HasSubstr("Report these values under the same names and units as "
+                "before: price in USD, in_stock.\n"));
+}
+
+TEST(RunReportTest, ReadsBackTheValuesItKeeps) {
+  for (const TrackedValue& value :
+       {TrackedValue{"price", "USD", 549.5}, TrackedValue{"in_stock", "", true},
+        TrackedValue{"size", "", std::string("B")}}) {
+    EXPECT_EQ(TrackedValueFromValue(TrackedValueToValue(value)), value);
+  }
+  EXPECT_EQ(TrackedValueFromValue(base::DictValue().Set("name", "price")),
+            std::nullopt);
 }
 
 TEST(RunReportTest, TheBriefNamesAWatchedPage) {
   EXPECT_THAT(
       RunBrief("Tell me when the price drops.",
-               "https://fully.com/desks/jarvis", Utc(2026, 10, 23, 16), {}),
+               "https://fully.com/desks/jarvis", Utc(2026, 10, 23, 16), {}, {}),
       HasSubstr("The page it watches: https://fully.com/desks/jarvis"));
 }
 
 TEST(RunReportTest, TheFirstRunIsToldItIsTheFirst) {
-  EXPECT_THAT(RunBrief("Summarize Hacker News.", "", Utc(2026, 10, 23, 14), {}),
-              HasSubstr("This is the first run."));
+  EXPECT_THAT(
+      RunBrief("Summarize Hacker News.", "", Utc(2026, 10, 23, 14), {}, {}),
+      HasSubstr("This is the first run."));
 }
 
 }  // namespace

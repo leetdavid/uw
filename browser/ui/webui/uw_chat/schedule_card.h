@@ -34,6 +34,9 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
                                         std::string_view chat_id,
                                         const ScheduledChat& chat);
 
+// A run's line as a chat file keeps it, for the page.
+mojom::RunLinePtr RunLineFrom(const base::DictValue& line);
+
 // What a schedule card saved, as uw keeps it. Nothing when it asks nothing or
 // its schedule cannot run.
 std::optional<ScheduledChat> ScheduledChatFrom(

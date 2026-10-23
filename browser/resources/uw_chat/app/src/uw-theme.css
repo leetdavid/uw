@@ -59,8 +59,9 @@
   --muted-foreground: #77748c;
   --accent: #f2f1f8;
   --border: rgb(30 27 46 / 0.09);
-  --primary: #1e1b2e;
-  --primary-foreground: #ffffff;
+  /* The theme's color, from chrome://theme/colors.css. */
+  --primary: var(--color-sys-primary, #1e1b2e);
+  --primary-foreground: var(--color-sys-on-primary, #ffffff);
   --focus-ring: #3b5bdb;
   --destructive: #d93025;
   --info: #3b5bdb;
@@ -83,8 +84,8 @@
     --muted-foreground: #a1a1a1;
     --accent: #262626;
     --border: rgb(255 255 255 / 0.09);
-    --primary: #ededed;
-    --primary-foreground: #0a0a0a;
+    --primary: var(--color-sys-primary, #ededed);
+    --primary-foreground: var(--color-sys-on-primary, #0a0a0a);
     --focus-ring: #9db0ff;
     --destructive: #f28b82;
     --info: #9db0ff;

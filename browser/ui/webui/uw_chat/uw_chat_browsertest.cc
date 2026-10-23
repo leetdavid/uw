@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license.
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -14,6 +15,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/json/values_util.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
@@ -30,6 +32,8 @@
 #include "chrome/browser/optimization_guide/browser_test_util.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -49,6 +53,8 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/message_center/public/cpp/notification.h"
@@ -62,6 +68,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
+#include "uw/browser/ai_providers/models.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -95,6 +102,36 @@ constexpr char kCheckout[] = R"(<!doctype html>
   <button>Place order</button>
 </form>
 <p id="done"></p>)";
+
+// A scheduled run's line as a chat file keeps it: a run that reported
+// `price` and `in_stock`, or one that didn't finish.
+base::DictValue SavedRun(base::Time time,
+                         std::optional<double> price,
+                         bool in_stock = false) {
+  base::DictValue line = base::DictValue()
+                             .Set("kind", "run")
+                             .Set("time", base::TimeToValue(time))
+                             .Set("steps", base::ListValue());
+  if (!price) {
+    return std::move(line)
+        .Set("end", "failed")
+        .Set("text", "fully.com didn't load")
+        .Set("counted", true);
+  }
+  return std::move(line)
+      .Set("end", "reported")
+      .Set("what", "Update")
+      .Set("text", base::StrCat({"It's $", base::NumberToString(*price), "."}))
+      .Set("values", base::ListValue()
+                         .Append(base::DictValue()
+                                     .Set("name", "price")
+                                     .Set("unit", "USD")
+                                     .Set("number", *price))
+                         .Append(base::DictValue()
+                                     .Set("name", "in_stock")
+                                     .Set("unit", "")
+                                     .Set("yes", in_stock)));
+}
 
 std::unique_ptr<net::test_server::HttpResponse> ServeForm(
     const net::test_server::HttpRequest& request) {
@@ -2355,6 +2392,159 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentFillsInTheScheduleCard) {
   EXPECT_EQ(schedule.weekday, 1);
   EXPECT_EQ(schedule.hour, 8);
   EXPECT_EQ(schedule.minute, 30);
+}
+
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       TheChartShowsTrackedValuesAndFindsARun) {
+  UseAgentModel();
+  Profile* profile = browser()->GetProfile();
+  const std::string id = ChatFile::NewChatId();
+  const base::Time now = base::Time::Now();
+  const auto prices = std::to_array<std::optional<double>>(
+      {599, 599, 589, 589, 579, 569, std::nullopt, 549, 549, 549, 539, 539, 529,
+       519});
+  base::ListValue log;
+  log.Append(
+      base::DictValue()
+          .Set("kind", "user")
+          .Set("text", "Tell me when the Jarvis desk drops below $500."));
+  for (size_t day = 0; day < std::size(prices); ++day) {
+    log.Append(SavedRun(now - base::Days(std::size(prices) - day), prices[day],
+                        day > 4 && day < 10));
+  }
+  ChatIndex::For(profile)->Update(
+      {id, "Jarvis desk price", now, ChatIndex::State::kDone});
+  ChatFile(profile->GetPath(), id)
+      .Save(base::DictValue()
+                .Set("version", 1)
+                .Set("title", "Jarvis desk price")
+                .Set("updated", base::TimeToValue(now))
+                .Set("log", std::move(log)));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), ChatUrl(id)));
+  content::WebContents* chat = tabs()->GetActiveWebContents();
+  WaitForChat(chat);
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "report", base::DictValue()
+                         .Set("found", true)
+                         .Set("message", "Down to $479.")
+                         .Set("values", base::ListValue().Append(
+                                            base::DictValue()
+                                                .Set("name", "price")
+                                                .Set("unit", "USD")
+                                                .Set("number", 479)))))),
+       ScriptedModel::Answer("Reported.")});
+  ScheduledChat watch;
+  watch.schedule.repeat = Schedule::Repeat::kDaily;
+  watch.schedule.hour = 9;
+  watch.request = "Tell me when the Jarvis desk drops below $500.";
+  watch.page = "https://www.fully.com/desks/jarvis";
+  watch.watch_for = "Price drops below $500";
+  watch.provider_id = AgentChoice(*profile->GetPrefs())->provider_id;
+  watch.model = "test-agent";
+  ScheduledChats::For(profile)->Save(id, watch);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat,
+                           "[...document.querySelectorAll('.run-message')]"
+                           ".at(-1)?.textContent ?? ''")
+               .ExtractString()
+               .find("Down to $479.") != std::string::npos;
+  }));
+
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('#schedule-chart-button').click()"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat,
+                           "!!document.querySelector('#schedule-chart "
+                           ".line-chart[data-value=price] svg') && "
+                           "!!document.querySelector('#schedule-chart "
+                           ".yes-no-strip[data-value=in_stock]')")
+        .ExtractBool();
+  }));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelectorAll('#schedule-chart "
+                            "h3').length"),
+            2);
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('#schedule-chart')"
+                            ".textContent.includes('USD · fully.com')"),
+            true);
+  SaveWindowScreenshot(browser(), "schedule-chart");
+
+  // The keys read each run, and Return goes to its line.
+  const double bottom =
+      content::EvalJs(
+          chat,
+          "document.querySelector('[data-run-time]').closest('main').scrollTop")
+          .ExtractDouble();
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "const line = document.querySelector('.line-chart [role=img]');"
+      "line.focus();"
+      "for (let i = 0; i < 20; ++i) {"
+      "  line.dispatchEvent(new KeyboardEvent('keydown',"
+      "      {key: 'ArrowLeft', bubbles: true}));"
+      "}"));
+  EXPECT_THAT(content::EvalJs(chat,
+                              "document.querySelector('.chart-tooltip')"
+                              "?.textContent ?? ''")
+                  .ExtractString(),
+              testing::HasSubstr("It's $599. · $599"));
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "document.querySelector('.line-chart [role=img]').dispatchEvent("
+      "    new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat,
+                           "document.querySelector('[data-run-time]').closest('"
+                           "main').scrollTop")
+               .ExtractDouble() < bottom - 100;
+  }))
+      << content::EvalJs(
+             chat,
+             "const main = "
+             "document.querySelector('[data-run-time]').closest('main');"
+             "JSON.stringify({top: main.scrollTop,"
+             "    height: main.scrollHeight,"
+             "    client: main.clientHeight,"
+             "    lines: document.querySelectorAll("
+             "        '[data-run-time]').length})")
+             .ExtractString()
+      << " from " << bottom;
+}
+
+// Primary buttons, and the scheduled chats' accents, take the theme's color,
+// as Chromium's colors do, and change with it.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePrimaryColorFollowsTheTheme) {
+  ThemeService* themes =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  themes->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  themes->SetUserColorAndBrowserColorVariant(
+      SkColorSetRGB(0x2e, 0x7d, 0x32),
+      ui::mojom::BrowserColorVariant::kTonalSpot);
+  content::WebContents* chat = OpenChat();
+  const auto primary = [&] {
+    return content::EvalJs(chat,
+                           "getComputedStyle(document.documentElement)"
+                           ".getPropertyValue('--primary').trim()")
+        .ExtractString();
+  };
+  const auto sys = [&] {
+    return content::EvalJs(chat,
+                           "getComputedStyle(document.documentElement)"
+                           ".getPropertyValue('--color-sys-primary').trim()")
+        .ExtractString();
+  };
+  ASSERT_TRUE(base::test::RunUntil([&] { return !sys().empty(); }));
+  EXPECT_EQ(primary(), sys());
+  const std::string green = primary();
+
+  themes->SetUserColorAndBrowserColorVariant(
+      SkColorSetRGB(0x8e, 0x24, 0xaa),
+      ui::mojom::BrowserColorVariant::kTonalSpot);
+  ASSERT_TRUE(base::test::RunUntil([&] { return primary() != green; }));
+  EXPECT_EQ(primary(), sys());
 }
 
 }  // namespace

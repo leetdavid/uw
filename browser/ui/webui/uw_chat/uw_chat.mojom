@@ -121,6 +121,17 @@ enum RunEnd {
 };
 
 // A run of a scheduled chat, as its line shows it.
+// A value a run tracked, such as a price. One of number, yes, and text is
+// set.
+struct TrackedValue {
+  string name;
+  // Such as "USD". May be empty.
+  string unit;
+  double? number;
+  bool? yes;
+  string? text;
+};
+
 struct RunLine {
   // When it ran, in milliseconds since the Unix epoch.
   double time;
@@ -130,8 +141,8 @@ struct RunLine {
   // What its notification said under the chat's title, such as "Change
   // alert", or empty when it sent none.
   string what;
-  // Its tracked values as a person reads them, such as "price 479 USD".
-  array<string> values;
+  // Its tracked values.
+  array<TrackedValue> values;
   // Its steps, folded under the line, such as "read tab 1".
   array<string> steps;
   // Whether it counted toward the pause, and whether it paused the schedule.
@@ -209,6 +220,10 @@ struct ScheduleState {
   // sign-in on the last run, if any.
   string pause_reason;
   string sign_in;
+  // For a watched page: its address, and what the watch card's chip asked
+  // for, such as "Price drops below $500". Both empty for any other chat.
+  string page;
+  string watch_for;
 };
 
 // What the chat list shows beside a chat. Matches uw::ChatIndex::State.
@@ -386,6 +401,9 @@ struct WatchCardState {
   string watch_for;
   // The watch's schedule and how it stands, or a new card's settings.
   ScheduleState state;
+  // The watch's runs of the last 14 days, oldest first, for its chart. Each
+  // is a kRun step.
+  array<Step> runs;
 };
 
 // Links the watch card's page to its handler.

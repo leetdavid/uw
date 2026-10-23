@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "base/base64.h"
+#include "base/functional/bind.h"
+#include "base/json/values_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -22,6 +24,7 @@
 #include "net/base/url_util.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/image/image.h"
+#include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -72,7 +75,7 @@ UwWatchCardHandler::UwWatchCardHandler(
           Profile::FromBrowserContext(contents->GetBrowserContext()))) {
     observation_.Observe(chats);
   }
-  SendCard();
+  LoadRuns();
 }
 
 UwWatchCardHandler::~UwWatchCardHandler() = default;
@@ -134,7 +137,7 @@ void UwWatchCardHandler::Close() {
 }
 
 void UwWatchCardHandler::OnScheduleChanged(const std::string& chat_id) {
-  SendCard();
+  LoadRuns();
 }
 
 tabs::TabInterface* UwWatchCardHandler::Tab() const {
@@ -149,6 +152,43 @@ std::string UwWatchCardHandler::Watcher() const {
           ? chats->ChatWatching(tab->GetContents()->GetLastCommittedURL())
           : nullptr;
   return id ? *id : std::string();
+}
+
+void UwWatchCardHandler::LoadRuns() {
+  const std::string id = Watcher();
+  if (id.empty()) {
+    runs_.clear();
+    SendCard();
+    return;
+  }
+  // A run's lines go into the chat file on its sequence before the schedule
+  // says it changed, so this reads them.
+  ChatFile(Profile::FromWebUI(ui_->web_ui())->GetPath(), id)
+      .Load(base::BindOnce(&UwWatchCardHandler::OnRunsLoaded,
+                           weak_factory_.GetWeakPtr(), id));
+}
+
+void UwWatchCardHandler::OnRunsLoaded(const std::string& chat_id,
+                                      std::optional<base::DictValue> saved) {
+  if (chat_id != Watcher()) {
+    return;
+  }
+  constexpr base::TimeDelta kChart = base::Days(14);
+  const base::Time since = base::Time::Now() - kChart;
+  runs_.clear();
+  const base::ListValue* log = saved ? saved->FindList("log") : nullptr;
+  if (log) {
+    for (const base::Value& entry : *log) {
+      const base::DictValue* line = entry.GetIfDict();
+      const std::string* kind = line ? line->FindString("kind") : nullptr;
+      if (kind && *kind == "run" &&
+          base::ValueToTime(line->Find("time")).value_or(base::Time()) >=
+              since) {
+        runs_.Append(line->Clone());
+      }
+    }
+  }
+  SendCard();
 }
 
 void UwWatchCardHandler::SendCard() {
@@ -168,6 +208,15 @@ void UwWatchCardHandler::SendCard() {
     card->chat_id = id;
     card->watch_for = chat.watch_for;
     card->state = ScheduleStateOf(chats, id, chat);
+    for (const base::Value& entry : runs_) {
+      auto run = mojom::Step::New();
+      run->kind = mojom::StepKind::kRun;
+      if (const std::string* text = entry.GetDict().FindString("text")) {
+        run->text = *text;
+      }
+      run->run = RunLineFrom(entry.GetDict());
+      card->runs.push_back(std::move(run));
+    }
   } else {
     const PrefService& prefs =
         *Profile::FromBrowserContext(contents->GetBrowserContext())->GetPrefs();

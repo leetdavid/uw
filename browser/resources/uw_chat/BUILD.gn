@@ -46,6 +46,7 @@ node("app") {
   }
   depfile = "$target_gen_dir/app.d"
   deps = [
+    "//ui/webui/resources/cr_components/color_change_listener:build_ts",
     "//ui/webui/resources/mojo:build_ts",
     "//uw/browser/ui/webui/uw_chat:mojo_bindings_ts__generator",
     "//uw/browser/ui/webui/uw_providers:mojo_bindings_ts__generator",

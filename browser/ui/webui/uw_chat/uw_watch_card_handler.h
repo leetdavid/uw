@@ -7,7 +7,9 @@
 #include <string>
 
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/values.h"
 #include "components/tabs/public/tab_interface.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -52,6 +54,10 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
   tabs::TabInterface* Tab() const;
   // The id of the chat that watches the tab's page, or empty.
   std::string Watcher() const;
+  // Reads the watch's runs from its chat, then sends the card.
+  void LoadRuns();
+  void OnRunsLoaded(const std::string& chat_id,
+                    std::optional<base::DictValue> saved);
   void SendCard();
 
   const raw_ptr<UwWatchCardUI> ui_;
@@ -60,6 +66,9 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
   mojo::Receiver<mojom::WatchCardHandler> receiver_;
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer>
       observation_{this};
+  // The lines of the watch's runs of the last 14 days, as its chat keeps them.
+  base::ListValue runs_;
+  base::WeakPtrFactory<UwWatchCardHandler> weak_factory_{this};
 };
 
 }  // namespace uw

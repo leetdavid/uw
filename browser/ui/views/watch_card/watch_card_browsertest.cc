@@ -3,12 +3,16 @@
 
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <string_view>
 
+#include "base/json/values_util.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
@@ -29,11 +33,14 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "content/public/test/test_navigation_observer.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "ui/actions/actions.h"
+#include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scheduled_chats.h"
@@ -50,6 +57,36 @@ namespace {
 constexpr char kDesk[] = R"(<!doctype html>
 <title>Jarvis Bamboo Standing Desk</title>
 <p>Price: $549</p>)";
+
+// A scheduled run's line as a chat file keeps it: a run that reported
+// `price` and `in_stock`, or one that didn't finish.
+base::DictValue SavedRun(base::Time time,
+                         std::optional<double> price,
+                         bool in_stock = false) {
+  base::DictValue line = base::DictValue()
+                             .Set("kind", "run")
+                             .Set("time", base::TimeToValue(time))
+                             .Set("steps", base::ListValue());
+  if (!price) {
+    return std::move(line)
+        .Set("end", "failed")
+        .Set("text", "fully.com didn't load")
+        .Set("counted", true);
+  }
+  return std::move(line)
+      .Set("end", "reported")
+      .Set("what", "Update")
+      .Set("text", base::StrCat({"It's $", base::NumberToString(*price), "."}))
+      .Set("values", base::ListValue()
+                         .Append(base::DictValue()
+                                     .Set("name", "price")
+                                     .Set("unit", "USD")
+                                     .Set("number", *price))
+                         .Append(base::DictValue()
+                                     .Set("name", "in_stock")
+                                     .Set("unit", "")
+                                     .Set("yes", in_stock)));
+}
 
 constexpr char16_t kWatch[] = u"Watch this page";
 constexpr char16_t kWatching[] = u"Watching for price drops below $500";
@@ -120,7 +157,12 @@ class WatchCardBrowserTest : public headless::HeadlessModeBrowserTest {
         {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
              "report", base::DictValue()
                            .Set("found", false)
-                           .Set("message", "Still $549.")))),
+                           .Set("message", "Still $549.")
+                           .Set("values", base::ListValue().Append(
+                                              base::DictValue()
+                                                  .Set("name", "price")
+                                                  .Set("unit", "USD")
+                                                  .Set("number", 549)))))),
          ScriptedModel::Answer("Reported.")});
   }
 
@@ -298,6 +340,35 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, TheCardLooksLikeTheFrames) {
                .ExtractString()
                .find("Still $549.") != std::string::npos;
   }));
+
+  // Earlier runs, as if the page had been watched for a week, with one that
+  // didn't finish.
+  base::test::TestFuture<std::optional<base::DictValue>> loaded;
+  ChatFile(browser()->GetProfile()->GetPath(), id).Load(loaded.GetCallback());
+  std::optional<base::DictValue> saved = loaded.Take();
+  ASSERT_TRUE(saved);
+  const base::ListValue& kept = *saved->FindList("log");
+  base::ListValue log;
+  log.Append(kept.front().Clone());
+  const auto prices = std::to_array<std::optional<double>>(
+      {599, 589, std::nullopt, 579, 569, 559});
+  for (size_t day = 0; day < std::size(prices); ++day) {
+    log.Append(SavedRun(base::Time::Now() - base::Days(6 - day), prices[day]));
+  }
+  for (size_t i = 1; i < kept.size(); ++i) {
+    log.Append(kept[i].Clone());
+  }
+  saved->Set("log", std::move(log));
+  ChatFile(browser()->GetProfile()->GetPath(), id).Save(*saved);
+  content::TestNavigationObserver reloaded(page);
+  page->GetController().Reload(content::ReloadType::NORMAL, false);
+  reloaded.Wait();
+  ASSERT_TRUE(Shows(page, "#watch-chart svg line"));
+  EXPECT_THAT(content::EvalJs(page,
+                              "document.querySelector('#watch-chart p')"
+                              ".textContent")
+                  .ExtractString(),
+              testing::StartsWith("$549Down $50 since "));
   SaveWindowScreenshot(browser(), "watch-card-watched");
 }
 

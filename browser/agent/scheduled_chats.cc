@@ -530,7 +530,7 @@ void ScheduledChats::OnFormat(const std::string& chat_id,
   run->second.run = std::make_unique<ChatRun>(
       profile_, std::move(model), ModeFrom(chat->second.approval_mode),
       RunBrief(chat->second.request, chat->second.page, when,
-               chat->second.recent),
+               chat->second.recent, chat->second.tracked),
       base::BindOnce(&ScheduledChats::OnRunDone, weak_factory_.GetWeakPtr(),
                      chat_id, when));
   run->second.run->SetApprover(base::BindRepeating(
@@ -565,6 +565,9 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
     return;
   }
   const RunEnd end = EndOf(outcome.kind);
+  if (end == RunEnd::kReported) {
+    NameValues(chat->second, outcome.report);
+  }
   const RunEffect effect =
       AfterRun(chat->second, end, outcome.report, outcome.error, when);
   base::ListValue lines;

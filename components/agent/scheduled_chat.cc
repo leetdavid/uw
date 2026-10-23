@@ -45,6 +45,13 @@ base::DictValue ReportToValue(const RunReport& report) {
       .Set("sign_in", report.sign_in);
 }
 
+// A value's name as runs are matched by it.
+std::string NameKey(std::string_view name) {
+  std::string key = base::ToLowerASCII(name);
+  base::ReplaceChars(key, " -", "_", &key);
+  return key;
+}
+
 std::string StringOr(const base::DictValue& dict, std::string_view key) {
   const std::string* value = dict.FindString(key);
   return value ? *value : std::string();
@@ -68,7 +75,8 @@ bool ScheduledChat::operator==(const ScheduledChat& other) const {
          paused == other.paused && muted == other.muted && last == other.last &&
          failures == other.failures && failing == other.failing &&
          last_failure == other.last_failure &&
-         pause_reason == other.pause_reason && same_runs(recent, other.recent);
+         pause_reason == other.pause_reason &&
+         same_runs(recent, other.recent) && tracked == other.tracked;
 }
 
 GURL WatchedAddress(const GURL& url) {
@@ -92,12 +100,38 @@ GURL WatchedAddress(const GURL& url) {
   return url.ReplaceComponents(replacements);
 }
 
+void NameValues(ScheduledChat& chat, RunReport& report) {
+  // Enough for every value of several reports.
+  constexpr size_t kMaxTracked = 20;
+  for (TrackedValue& value : report.values) {
+    const auto known = std::ranges::find(
+        chat.tracked, NameKey(value.name),
+        [](const TrackedName& tracked) { return NameKey(tracked.name); });
+    if (known == chat.tracked.end()) {
+      if (chat.tracked.size() < kMaxTracked) {
+        chat.tracked.push_back({value.name, value.unit});
+      }
+      continue;
+    }
+    value.name = known->name;
+    if (value.unit.empty() ||
+        base::EqualsCaseInsensitiveASCII(value.unit, known->unit)) {
+      value.unit = known->unit;
+    }
+  }
+}
+
 base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
   std::string_view repeat;
   for (const auto& [kind, name] : kRepeatNames) {
     if (kind == chat.schedule.repeat) {
       repeat = name;
     }
+  }
+  base::ListValue tracked;
+  for (const TrackedName& name : chat.tracked) {
+    tracked.Append(
+        base::DictValue().Set("name", name.name).Set("unit", name.unit));
   }
   base::ListValue recent;
   for (const PastRun& run : chat.recent) {
@@ -129,7 +163,8 @@ base::DictValue ScheduledChatToValue(const ScheduledChat& chat) {
       .Set("failing", chat.failing)
       .Set("last_failure", chat.last_failure)
       .Set("pause_reason", chat.pause_reason)
-      .Set("recent", std::move(recent));
+      .Set("recent", std::move(recent))
+      .Set("tracked", std::move(tracked));
 }
 
 std::optional<ScheduledChat> ScheduledChatFromValue(
@@ -190,6 +225,15 @@ std::optional<ScheduledChat> ScheduledChatFromValue(
       }
       chat.recent.push_back(
           {base::ValueToTime(*time).value_or(base::Time()), *parsed});
+    }
+  }
+  if (const base::ListValue* tracked = value.FindList("tracked")) {
+    for (const base::Value& name : *tracked) {
+      const base::DictValue* dict = name.GetIfDict();
+      if (dict && dict->FindString("name")) {
+        chat.tracked.push_back(
+            {*dict->FindString("name"), StringOr(*dict, "unit")});
+      }
     }
   }
   if (chat.request.empty() || !IsValid(chat.schedule)) {

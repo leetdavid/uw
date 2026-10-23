@@ -164,6 +164,14 @@ base::DictValue TrackedValueToValue(const TrackedValue& tracked) {
   return value;
 }
 
+std::optional<TrackedValue> TrackedValueFromValue(
+    const base::DictValue& value) {
+  base::expected<TrackedValue, std::string> tracked =
+      ParseValue(base::Value(value.Clone()));
+  return tracked.has_value() ? std::make_optional(std::move(*tracked))
+                             : std::nullopt;
+}
+
 std::string DescribeValue(const TrackedValue& value) {
   std::string text;
   if (const double* number = std::get_if<double>(&value.value)) {
@@ -181,7 +189,8 @@ std::string DescribeValue(const TrackedValue& value) {
 std::string RunBrief(std::string_view request,
                      std::string_view page,
                      base::Time now,
-                     const std::vector<PastRun>& past) {
+                     const std::vector<PastRun>& past,
+                     const std::vector<TrackedName>& tracked) {
   std::string brief =
       base::StrCat({"This is a scheduled run of the user's request. It is ",
                     When(now), ".\n\nThe request: ", request, "\n\n"});
@@ -209,6 +218,16 @@ std::string RunBrief(std::string_view request,
       brief += run->report.values.empty() ? "\n" : ")\n";
     }
     brief += "\n";
+  }
+  if (!tracked.empty()) {
+    brief += "Report these values under the same names and units as before:";
+    for (size_t i = 0; i < tracked.size(); ++i) {
+      brief += base::StrCat({i == 0 ? " " : ", ", tracked[i].name});
+      if (!tracked[i].unit.empty()) {
+        brief += base::StrCat({" in ", tracked[i].unit});
+      }
+    }
+    brief += ".\n\n";
   }
   brief +=
       "Do what the request asks, with your tools, and compare with the "

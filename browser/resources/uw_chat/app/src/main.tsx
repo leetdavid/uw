@@ -2,6 +2,7 @@
 // Functionalism's parts; see the "(Fluid)" frames on the canvas page
 // "Agent chats".
 import "@/trusted-types";
+import "@/theme-colors";
 import {
   Fragment,
   StrictMode,
@@ -96,6 +97,7 @@ import {
   useSlashMenu,
   type SlashItem,
 } from "./slash-menu";
+import { ScheduleChart, chartSeries } from "./chart";
 import { ModeChip } from "./mode-chip";
 import {
   QuietRuns,
@@ -1440,6 +1442,7 @@ function Chat() {
   // The chat's schedule, and the schedule card while it is open.
   const [schedule, setSchedule] = useState<ScheduleState | null>(null);
   const [card, setCard] = useState<ScheduleState | null>(null);
+  const [chartOpen, setChartOpen] = useState(false);
   // A program in the agent's terminal tab that waits for the user's password.
   const [password, setPassword] = useState<{
     tab: number;
@@ -1784,6 +1787,7 @@ function Chat() {
   };
 
   const groups = group(lines);
+  const runs = lines.filter((line) => line.kind === StepKind.kRun);
   // A model switch is never what the chat ends on.
   const lastGroup = groups.findLastIndex(
     (run) => run[0]!.kind !== StepKind.kModel,
@@ -1961,6 +1965,9 @@ function Chat() {
           {schedule ? (
             <ScheduleButtons
               state={schedule}
+              charted={chartSeries(runs).length > 0}
+              chartOpen={chartOpen}
+              onChart={() => setChartOpen(!chartOpen)}
               onEdit={() => setCard(schedule)}
             />
           ) : (
@@ -1984,6 +1991,15 @@ function Chat() {
         {schedule && (
           <div className="px-7 pt-2">
             <ScheduleStrip state={schedule} />
+          </div>
+        )}
+        {schedule && chartOpen && (
+          <div className="px-7 pt-2">
+            <ScheduleChart
+              runs={runs}
+              page={schedule.page}
+              watchFor={schedule.watchFor}
+            />
           </div>
         )}
         {card && providers && (

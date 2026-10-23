@@ -24,6 +24,7 @@ import type {
   ScheduleState,
   SkillProposal,
   Step,
+  TrackedValue,
 } from "uw-chat-mojom";
 
 export {
@@ -47,6 +48,7 @@ export type {
   ScheduleState,
   SkillProposal,
   Step,
+  TrackedValue,
 };
 
 export const chatPage = new ChatPageCallbackRouter();

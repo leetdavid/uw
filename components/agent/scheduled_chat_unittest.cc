@@ -50,8 +50,36 @@ TEST(ScheduledChatTest, KeepsEverythingItSaves) {
   chat.recent = {
       {Utc(21), Report(false, "Still above $500.")},
       {Utc(22), {true, "Down to $479.", {{"in_stock", "", true}}, ""}}};
+  chat.tracked = {{"price", "USD"}, {"in_stock", ""}};
 
   EXPECT_EQ(ScheduledChatFromValue(ScheduledChatToValue(chat)), chat);
+}
+
+TEST(ScheduledChatTest, TheFirstRunNamesEachValueAndLaterRunsReuseIt) {
+  ScheduledChat chat = DeskWatch();
+  RunReport first = Report(false, "It's $549.");
+  NameValues(chat, first);
+  EXPECT_EQ(chat.tracked, (std::vector<TrackedName>{{"price", "USD"}}));
+
+  RunReport later = {
+      false,
+      "Still $549.",
+      {{"Price", "usd", 549.0}, {"in-stock", "", true}, {"PRICE", "", 549.0}},
+      ""};
+  NameValues(chat, later);
+  EXPECT_EQ(later.values, (std::vector<TrackedValue>{{"price", "USD", 549.0},
+                                                     {"in-stock", "", true},
+                                                     {"price", "USD", 549.0}}));
+  RunReport another = {false, "In stock.", {{"In stock", "", true}}, ""};
+  NameValues(chat, another);
+  EXPECT_EQ(another.values[0].name, "in-stock");
+  EXPECT_EQ(chat.tracked,
+            (std::vector<TrackedName>{{"price", "USD"}, {"in-stock", ""}}));
+
+  // A unit that differs stays: the page may have changed its currency.
+  RunReport euros = {false, "Now in euros.", {{"price", "EUR", 510.0}}, ""};
+  NameValues(chat, euros);
+  EXPECT_EQ(euros.values[0].unit, "EUR");
 }
 
 TEST(ScheduledChatTest, RefusesWhatTheCardCouldNotHaveSaved) {

@@ -214,34 +214,6 @@ mojom::ApprovalPtr PageApproval(const AgentTools::Approval& approval,
       can_always_allow, approval.sensitive, approval.file);
 }
 
-// A run's tracked value, as its line keeps it, as a person reads it.
-std::string ValueText(const base::DictValue& value) {
-  const std::string* name = value.FindString("name");
-  const std::string* unit = value.FindString("unit");
-  TrackedValue tracked;
-  tracked.name = name ? *name : std::string();
-  tracked.unit = unit ? *unit : std::string();
-  if (const std::optional<double> number = value.FindDouble("number")) {
-    tracked.value = *number;
-  } else if (const std::optional<bool> yes = value.FindBool("yes")) {
-    tracked.value = *yes;
-  } else if (const std::string* text = value.FindString("text")) {
-    tracked.value = *text;
-  }
-  return DescribeValue(tracked);
-}
-
-mojom::RunEnd RunEndNamed(const std::string* name) {
-  if (!name || *name == "reported") {
-    return mojom::RunEnd::kReported;
-  }
-  if (*name == "failed") {
-    return mojom::RunEnd::kFailed;
-  }
-  return *name == "unreachable" ? mojom::RunEnd::kUnreachable
-                                : mojom::RunEnd::kStopped;
-}
-
 }  // namespace
 
 UwChatHandler::UwChatHandler(content::WebContents* contents,
@@ -1119,40 +1091,7 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
     line->model = PageModel(ModelFrom(entry.FindDict("model")));
   } else if (*kind == "run") {
     line->kind = mojom::StepKind::kRun;
-    auto run = mojom::RunLine::New();
-    run->time = base::ValueToTime(entry.Find("time"))
-                    .value_or(base::Time())
-                    .InMillisecondsFSinceUnixEpoch();
-    run->end = RunEndNamed(entry.FindString("end"));
-    run->found = entry.FindBool("found").value_or(false);
-    if (const std::string* what = entry.FindString("what")) {
-      run->what = *what;
-    }
-    if (const base::ListValue* values = entry.FindList("values")) {
-      for (const base::Value& value : *values) {
-        if (value.is_dict()) {
-          run->values.push_back(ValueText(value.GetDict()));
-        }
-      }
-    }
-    if (const base::ListValue* steps = entry.FindList("steps")) {
-      for (const base::Value& step : *steps) {
-        const base::DictValue* saved = step.GetIfDict();
-        const std::string* tool = saved ? saved->FindString("tool") : nullptr;
-        if (!tool) {
-          continue;
-        }
-        std::string shown =
-            base::StrCat({*tool, " ", Json(saved->FindDict("args"))});
-        if (const std::string* error = saved->FindString("error")) {
-          base::StrAppend(&shown, {": ", *error});
-        }
-        run->steps.push_back(std::move(shown));
-      }
-    }
-    run->counted = entry.FindBool("counted").value_or(false);
-    run->paused = entry.FindBool("paused").value_or(false);
-    line->run = std::move(run);
+    line->run = RunLineFrom(entry);
   } else if (*kind == "run_skipped") {
     line->kind = mojom::StepKind::kRunSkipped;
     line->text = base::NumberToString(entry.FindInt("count").value_or(0));
@@ -1605,9 +1544,13 @@ void UwChatHandler::UpdateScheduledRuns() {
          text ? *text : std::string()});
     if (const base::ListValue* values = line->FindList("values")) {
       for (size_t i = 0; i < values->size(); ++i) {
-        if ((*values)[i].is_dict()) {
-          base::StrAppend(
-              &run, {i == 0 ? " (" : ", ", ValueText((*values)[i].GetDict())});
+        const std::optional<TrackedValue> value =
+            (*values)[i].is_dict()
+                ? TrackedValueFromValue((*values)[i].GetDict())
+                : std::nullopt;
+        if (value) {
+          base::StrAppend(&run,
+                          {i == 0 ? " (" : ", ", DescribeValue(*value)});
         }
       }
       if (!values->empty()) {

@@ -7,6 +7,8 @@
 #include <string>
 #include <utility>
 
+#include "base/json/json_writer.h"
+#include "base/json/values_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
@@ -34,6 +36,17 @@ std::string ZoneName(const std::string& zone) {
   std::string city = slash == std::string::npos ? id : id.substr(slash + 1);
   base::ReplaceChars(city, "_", " ", &city);
   return city;
+}
+
+mojom::RunEnd RunEndNamed(const std::string* name) {
+  if (!name || *name == "reported") {
+    return mojom::RunEnd::kReported;
+  }
+  if (*name == "failed") {
+    return mojom::RunEnd::kFailed;
+  }
+  return *name == "unreachable" ? mojom::RunEnd::kUnreachable
+                                : mojom::RunEnd::kStopped;
 }
 
 }  // namespace
@@ -113,6 +126,8 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
       base::StrAppend(&state->last_text, {", ", DescribeValue(value)});
     }
   }
+  state->page = chat.page;
+  state->watch_for = chat.watch_for;
   state->paused = chat.paused;
   state->muted = chat.muted;
   state->pause_reason = chat.pause_reason;
@@ -121,6 +136,58 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
     state->sign_in = chat.last_failure.substr(kSignIn.size());
   }
   return state;
+}
+
+mojom::RunLinePtr RunLineFrom(const base::DictValue& line) {
+  auto run = mojom::RunLine::New();
+  run->time = base::ValueToTime(line.Find("time"))
+                  .value_or(base::Time())
+                  .InMillisecondsFSinceUnixEpoch();
+  run->end = RunEndNamed(line.FindString("end"));
+  run->found = line.FindBool("found").value_or(false);
+  if (const std::string* what = line.FindString("what")) {
+    run->what = *what;
+  }
+  if (const base::ListValue* values = line.FindList("values")) {
+    for (const base::Value& saved : *values) {
+      const std::optional<TrackedValue> value =
+          saved.is_dict() ? TrackedValueFromValue(saved.GetDict())
+                          : std::nullopt;
+      if (!value) {
+        continue;
+      }
+      auto sent = mojom::TrackedValue::New();
+      sent->name = value->name;
+      sent->unit = value->unit;
+      if (const double* number = std::get_if<double>(&value->value)) {
+        sent->number = *number;
+      } else if (const bool* yes = std::get_if<bool>(&value->value)) {
+        sent->yes = *yes;
+      } else {
+        sent->text = std::get<std::string>(value->value);
+      }
+      run->values.push_back(std::move(sent));
+    }
+  }
+  if (const base::ListValue* steps = line.FindList("steps")) {
+    for (const base::Value& step : *steps) {
+      const base::DictValue* saved = step.GetIfDict();
+      const std::string* tool = saved ? saved->FindString("tool") : nullptr;
+      if (!tool) {
+        continue;
+      }
+      const base::DictValue* args = saved->FindDict("args");
+      std::string shown = base::StrCat(
+          {*tool, " ", args ? base::WriteJson(*args).value_or("{}") : "{}"});
+      if (const std::string* error = saved->FindString("error")) {
+        base::StrAppend(&shown, {": ", *error});
+      }
+      run->steps.push_back(std::move(shown));
+    }
+  }
+  run->counted = line.FindBool("counted").value_or(false);
+  run->paused = line.FindBool("paused").value_or(false);
+  return run;
 }
 
 std::optional<ScheduledChat> ScheduledChatFrom(

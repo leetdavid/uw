@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import {
   Bell,
   BellOff,
+  ChartLine,
   Check,
   ChevronDown,
   ChevronRight,
@@ -33,6 +34,7 @@ import {
   type ScheduleState,
   type Step,
 } from "./chat-api";
+import { valueText } from "./chart";
 import { ModeChip } from "./mode-chip";
 import { EffortChip, ModelChip } from "./providers/model-chip";
 import type { ModelList, Provider } from "./providers/providers-api";
@@ -96,16 +98,35 @@ export function describeSchedule(schedule: ChatSchedule): string {
   }
 }
 
-// Chart comes with tracked values' charts (T151).
 export function ScheduleButtons({
   state,
+  charted,
+  chartOpen,
+  onChart,
   onEdit,
 }: {
   state: ScheduleState;
+  // Its runs tracked a value that charts.
+  charted: boolean;
+  chartOpen: boolean;
+  onChart: () => void;
   onEdit: () => void;
 }) {
   return (
     <span id="schedule-buttons" className="ml-auto flex items-center gap-0.5">
+      {charted && (
+        <Button
+          id="schedule-chart-button"
+          variant="ghost"
+          size="compact"
+          leadingIcon={ChartLine}
+          aria-pressed={chartOpen}
+          className={cn(chartOpen && "bg-accent")}
+          onClick={onChart}
+        >
+          Chart
+        </Button>
+      )}
       <Button
         id="schedule-edit"
         variant="ghost"
@@ -287,6 +308,7 @@ function QuietLine({ line, inner }: { line: Step; inner?: boolean }) {
   const run = line.run!;
   return (
     <div
+      data-run-time={run.time}
       className={cn(
         "quiet-run flex min-h-[26px] items-center gap-2 text-[12.5px] text-muted-foreground",
         inner && "pl-[22px]",
@@ -298,7 +320,7 @@ function QuietLine({ line, inner }: { line: Step; inner?: boolean }) {
       </span>
       {run.values[0] && (
         <span className="shrink-0 tabular-nums text-foreground/80">
-          {run.values[0]}
+          {valueText(run.values[0])}
         </span>
       )}
     </div>
@@ -314,8 +336,14 @@ export function QuietRuns({ runs }: { runs: Step[] }) {
   const first = runs[0]!.run!;
   const last = runs.at(-1)!.run!;
   const Chevron = open ? ChevronDown : ChevronRight;
+  const from = first.values[0] ? valueText(first.values[0]) : "";
+  const to = last.values[0] ? valueText(last.values[0]) : "";
   return (
-    <div className="quiet-runs flex flex-col">
+    <div
+      className="quiet-runs flex flex-col"
+      data-run-from={first.time}
+      data-run-to={last.time}
+    >
       <button
         type="button"
         className="flex min-h-[26px] items-center gap-2 text-left text-[12.5px] text-muted-foreground"
@@ -327,11 +355,9 @@ export function QuietRuns({ runs }: { runs: Step[] }) {
           {whenText(first.time)} to {whenText(last.time)} · {runs.length} runs
           with nothing to tell
         </span>
-        {first.values[0] && (
+        {from && (
           <span className="shrink-0 tabular-nums text-foreground/80">
-            {first.values[0] === last.values[0]
-              ? first.values[0]
-              : `${first.values[0]} to ${last.values[0] ?? ""}`}
+            {from === to || !to ? from : `${from} to ${to}`}
           </span>
         )}
       </button>
@@ -375,7 +401,10 @@ export function RunMessage({ line }: { line: Step }) {
   const run = line.run!;
   const at = whenText(run.time);
   const failure = (icon: ReactNode, text: ReactNode, className?: string) => (
-    <div className={cn("run-line flex min-h-[26px] items-center gap-2 text-[12.5px]", className)}>
+    <div
+      data-run-time={run.time}
+      className={cn("run-line flex min-h-[26px] items-center gap-2 text-[12.5px]", className)}
+    >
       {icon}
       <span className="min-w-0 flex-1 truncate">{text}</span>
     </div>
@@ -418,14 +447,15 @@ export function RunMessage({ line }: { line: Step }) {
   const alert = run.what === "Change alert";
   return (
     <div
+      data-run-time={run.time}
       className={cn(
         "run-message text-sm leading-relaxed",
-        alert && "rounded-xl bg-info/[0.06] px-3 py-2.5",
+        alert && "rounded-xl bg-primary/[0.06] px-3 py-2.5",
       )}
     >
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {alert ? (
-          <Bell aria-hidden className="size-3.5 text-info" />
+          <Bell aria-hidden className="size-3.5 text-primary" />
         ) : (
           <Clock aria-hidden className="size-3.5" />
         )}
@@ -434,7 +464,7 @@ export function RunMessage({ line }: { line: Step }) {
           <span
             className={cn(
               "rounded-full px-[7px] py-px font-medium",
-              alert ? "bg-info/[0.12] text-info" : "bg-accent text-muted-foreground",
+              alert ? "bg-primary/[0.12] text-primary" : "bg-accent text-muted-foreground",
             )}
           >
             {run.what}
@@ -444,7 +474,7 @@ export function RunMessage({ line }: { line: Step }) {
       <p className="mt-1">{line.text}</p>
       {run.values.length > 0 && (
         <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-          {run.values.join(" · ")}
+          {run.values.map(valueText).join(" · ")}
         </p>
       )}
       <FoldedSteps steps={run.steps} />
@@ -616,7 +646,7 @@ export function ScheduleRows({
               <button
                 type="button"
                 id="schedule-change-zone"
-                className="font-medium text-info"
+                className="font-medium text-primary"
                 onClick={() => setChangingZone(true)}
               >
                 Change
@@ -733,7 +763,7 @@ export function ScheduleCard({
       className="absolute top-12 right-7 z-20 flex w-96 flex-col gap-2.5 rounded-[14px] bg-background p-4 shadow-[0_0_0_1px_rgba(30,27,46,.08),0_18px_48px_rgba(30,27,46,.22)]"
     >
       <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-        <Clock aria-hidden className="size-[17px] text-info" />
+        <Clock aria-hidden className="size-[17px] text-primary" />
         Run this chat again
       </h2>
       <textarea

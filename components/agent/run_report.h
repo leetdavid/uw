@@ -4,6 +4,7 @@
 #ifndef UW_COMPONENTS_AGENT_RUN_REPORT_H_
 #define UW_COMPONENTS_AGENT_RUN_REPORT_H_
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -47,6 +48,15 @@ struct RunReport {
   bool operator==(const RunReport&) const = default;
 };
 
+// A value a scheduled chat's runs track, as the first run to report it named
+// it. Later runs report it under the same name and unit.
+struct TrackedName {
+  std::string name;
+  std::string unit;
+
+  bool operator==(const TrackedName&) const = default;
+};
+
 // An earlier run, as a later one is told about it.
 struct PastRun {
   base::Time time;
@@ -64,16 +74,20 @@ base::expected<RunReport, std::string> ParseReport(const base::DictValue& args);
 // number, yes, or text.
 base::DictValue TrackedValueToValue(const TrackedValue& value);
 
+// A value as TrackedValueToValue keeps it, or nothing when it is not one.
+std::optional<TrackedValue> TrackedValueFromValue(const base::DictValue& value);
+
 // A value as a person reads it, such as "price 549 USD".
 std::string DescribeValue(const TrackedValue& value);
 
 // The message a run starts with: the chat's request, the watched `page` when
-// there is one, the time, and what the latest kPastRuns of `past`, newest
-// first, reported.
+// there is one, the time, what the latest kPastRuns of `past`, newest first,
+// reported, and the names and units of the `tracked` values to report.
 std::string RunBrief(std::string_view request,
                      std::string_view page,
                      base::Time now,
-                     const std::vector<PastRun>& past);
+                     const std::vector<PastRun>& past,
+                     const std::vector<TrackedName>& tracked);
 
 }  // namespace uw
 

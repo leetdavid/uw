@@ -4,6 +4,7 @@
 // state" on the canvas page "Agent chats", and docs/product.md, "Scheduled
 // chats".
 import "@/trusted-types";
+import "@/theme-colors";
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
@@ -30,6 +31,7 @@ import {
   type ModelList,
   type Provider,
 } from "../providers/providers-api";
+import { WatchChart } from "../chart";
 import { ScheduleRows, describeSchedule, whenText } from "../schedule";
 import {
   connect,
@@ -195,7 +197,7 @@ function WatchForm({
   return (
     <>
       <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-        <Eye aria-hidden className="size-[17px] text-info" />
+        <Eye aria-hidden className="size-[17px] text-primary" />
         Watch this page
       </h2>
       <PageLine card={card} />
@@ -213,7 +215,7 @@ function WatchForm({
             className={cn(
               "inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-accent px-2.5 text-[13px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
               pick === each.pick &&
-                "bg-info/[0.08] text-info ring-1 ring-info",
+                "bg-primary/[0.08] text-primary ring-1 ring-primary",
             )}
             onClick={() => {
               setPick(each.pick);
@@ -232,7 +234,7 @@ function WatchForm({
           </label>
           <input
             id="watch-below"
-            className="h-7 w-24 rounded-[7px] bg-background px-2 ring-1 ring-info outline-none"
+            className="h-7 w-24 rounded-[7px] bg-background px-2 ring-1 ring-primary outline-none"
             placeholder="$500"
             value={below}
             onChange={(event) => setBelow(event.target.value)}
@@ -247,7 +249,7 @@ function WatchForm({
         aria-label="What to watch for, in your own words"
         rows={words ? 2 : 1}
         placeholder="Or describe it in your own words…"
-        className="resize-none rounded-[9px] bg-accent px-2.5 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-info"
+        className="resize-none rounded-[9px] bg-accent px-2.5 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-primary"
         value={words}
         onChange={(event) => {
           setWords(event.target.value);
@@ -347,17 +349,18 @@ function Watched({
   return (
     <>
       <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-        <FilledEye className="size-[17px] text-info" />
+        <FilledEye className="size-[17px] text-primary" />
         Watching this page
       </h2>
       <PageLine card={card} />
       <p
         id="watch-for"
-        className="flex items-center gap-2 rounded-[9px] bg-info/[0.08] px-3 py-2 text-[13px] font-medium text-info"
+        className="flex items-center gap-2 rounded-[9px] bg-primary/[0.08] px-3 py-2 text-[13px] font-medium text-primary"
       >
         <Tag aria-hidden className="size-3.5 shrink-0" />
         {card.watchFor || schedule.request}
       </p>
+      <WatchChart runs={card.runs} watchFor={card.watchFor} />
       <ul className="flex flex-col gap-1.5 text-[13px] text-muted-foreground">
         <li className="flex items-center gap-2">
           <Clock aria-hidden className="size-3.5 shrink-0" />

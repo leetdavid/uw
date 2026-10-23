@@ -21,6 +21,7 @@ The look of the window is in the [Arc-style look plan](arc-style-look.md). This 
 - A switch in the picker, "Theme colors in dark mode", shows the theme darkened in dark mode instead of black, as Arc does.
 - Suggested themes: lilac, sky, mint, butter, peach, wine, and forest as one-color themes, and three two-color gradients, such as lilac to sky, peach to butter, and mint to sky. Lilac is the default. Indigo, the old dark default, is gone.
 - The "Customize Chromium" panel stays. A color picked there becomes a one-color theme, and its mode is the picker's mode. Chromium's full browser themes still replace uw's look.
+- Agreed on 2026-10-24: the chat app's primary color, on the chat page, the AI page, and the watch card, is the theme's color. It is Chromium's primary color, which the theme's first color sets, read from `chrome://theme/colors.css`, and it changes at once with the theme. It covers primary buttons and the scheduled chats' accents, which the frames draw in the primary color. Blue stays for links and notices elsewhere.
 
 Defaults, proposed by uw and accepted on 2026-10-16:
 
