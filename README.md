@@ -12,7 +12,7 @@
 <p align="center">A Chromium browser for macOS that keeps your tabs organized for you.</p>
 
 > [!WARNING]
-> **uw is in early development.** There are no downloads or releases yet, so you have to build it from source. Features are unfinished, things break, and behavior changes from week to week. Don't trust it with browsing data you care about.
+> **uw is in early development.** Features are unfinished, things break, and behavior changes from week to week. Don't trust it with browsing data you care about.
 
 ![uw with three tasks in the sidebar. Jev has just moved "The best pastel de nata in Lisbon" into the "Plan Lisbon trip" task, and a card at the foot of the sidebar offers Undo.](docs/assets/screenshots/organize.png)
 
@@ -63,7 +63,17 @@ uw looks and works like Arc, built on Chromium.
 
 The [board](docs/plans/roadmap.md#board) tracks each piece, and [Try the current build](docs/try-uw.md) lists what to test and the known gaps. [Verification status](#verification-status) records what has been built and tested. The [product docs](docs/README.md) describe where uw is going.
 
-To try uw, build it from source. The rest of this page covers how.
+## Try a test build
+
+[Download uw 153.0.8010.53-1](https://github.com/leetdavid/uw/releases/download/153.0.8010.53-1/uw-153.0.8010.53-1-macos-arm64.zip) for Macs with Apple silicon on macOS 13 or later. [Releases](https://github.com/leetdavid/uw/releases) lists every build.
+
+Test builds are not signed by Apple, so macOS blocks the first launch:
+
+1. Open the zip and move `uw.app` to Applications.
+2. Open uw. macOS refuses to open it. Close the message.
+3. In System Settings, open Privacy & Security, scroll down, and click Open Anyway next to uw.
+
+To build uw yourself, read on.
 
 ## Build-host requirements
 
