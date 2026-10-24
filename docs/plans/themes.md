@@ -165,7 +165,7 @@ Proposed:
 - The page stays solid. Grain still lies on the theme.
 - Agreed on 2026-10-24: every visible uw window has glass, as on macOS. A window that is not active is frosted more, which macOS does by itself to clear glass. uw lifts Chromium's limit of one glass window, and the build measures the cost of three glass windows against one, with a video playing in a window behind.
 - Agreed on 2026-10-24: a switch on uw's settings page, under the Theme row, "Glass in windows behind the front one", turns that off. It is on by default and covers all of uw, since it saves power rather than changing a workspace's look. Off, only the front window is glass, as in Chromium, and the others are solid.
-- The window is solid, as with Glass off, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. While glass is paused, the picker says why under the slider.
+- Agreed on 2026-10-24: the window is solid, as at the left end, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium has each of these rules but Reduce transparency, which uw adds. Pop-up windows never have glass. Private windows have glass as the profile's latest pick has it, as they show that pick's theme. While glass is paused, the picker says why under the slider.
 - Before macOS 26 the picker has no Glass row.
 
 The numbers are in the `uw-themes` guide, section "Glass". The frames are on the canvas's "Themes" page: "Glass: light", "Glass: dark", and "Glass: every state".
