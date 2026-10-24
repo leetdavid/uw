@@ -29,9 +29,10 @@ diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
  	<string>APPL</string>
  	<key>CFBundleSignature</key>
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
+index a741f89bf54c65b3b188def7b03270015356debe..cbd9be1d67309d929dd9a14cab8c36f46b60528b 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
-@@ -294,15 +294,15 @@
+@@ -294,15 +294,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
          </then>
          <else>
            <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
@@ -50,7 +51,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
        </message>
        <if expr="is_win">
          <message name="IDS_SXS_SHORTCUT_NAME" desc="Unused in Chromium builds" translateable="false">
-@@ -320,7 +320,7 @@
+@@ -320,7 +320,7 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
        </if>
        <if expr="is_macosx or is_linux">
          <message name="IDS_FIRST_RUN_DIALOG_WINDOW_TITLE" desc="Window title of First Run dialog on Mac and Linux, displayed in title bar">
@@ -59,7 +60,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
          </message>
        </if>
        <if expr="is_linux">
-@@ -452,7 +452,7 @@
+@@ -452,7 +452,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
            </then>
            <else>
              <message name="IDS_BROWSER_WINDOW_TITLE_FORMAT" desc="The format for titles displayed in tabs and popup windows">
@@ -68,7 +69,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
              </message>
            </else>
          </if>
-@@ -491,7 +491,7 @@
+@@ -491,7 +491,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          </then>
          <else>
            <message name="IDS_ACCESSIBLE_BROWSER_WINDOW_TITLE_FORMAT" desc="The format for the accessible name of a tabbed browser window">
@@ -77,7 +78,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
            </message>
          </else>
        </if>
-@@ -576,7 +576,7 @@
+@@ -576,7 +576,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          </message>
        </if>
        <message name="IDS_ACCNAME_APP" desc="The accessible name for the app menu." translateable="false">
@@ -86,7 +87,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
        </message>
        <!-- Hung Browser Detector -->
        <if expr="is_win">
-@@ -1147,7 +1147,7 @@
+@@ -1147,7 +1147,7 @@ Chromium is unable to recover your settings.
            </then>
            <else>
              <message name="IDS_ABOUT" desc="In Title Case: The text label of the About Chrome menu item">
@@ -95,7 +96,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
              </message>
            </else>
          </if>
-@@ -1164,7 +1164,7 @@
+@@ -1164,7 +1164,7 @@ Chromium is unable to recover your settings.
            </then>
            <else>
              <message name="IDS_ABOUT" desc="The text label of the About Chrome menu item">
@@ -104,6 +105,33 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
              </message>
            </else>
          </if>
+@@ -1343,7 +1343,7 @@ Chromium is unable to recover your settings.
+         </then>
+         <else>
+           <message name="IDS_NTP_CUSTOMIZE_BUTTON_LABEL" desc="Label for button on the New Tab Page that opens dialog to customize Chromium browser.">
+-            Customize Chromium
++            Customize uw
+           </message>
+         </else>
+       </if>
+@@ -1573,7 +1573,7 @@ Chromium is unable to recover your settings.
+         Sign in to Chromium
+       </message>
+       <message name="IDS_PROFILE_MENU_PLACEHOLDER_PROFILE_NAME" desc="Placeholder profile name, used when the user did not enter a name for their profile.">
+-        Your Chromium
++        Personal
+       </message>
+       <if expr="not use_titlecase">
+         <message name="IDS_PROFILE_MENU_SIGN_OUT_WHEN_SIGNIN_PENDING" desc="The text label of the Sign out of Chromium button in the Profile Menu when the user is in sign in pending state.">
+@@ -2013,7 +2013,7 @@ Chromium is unable to recover your settings.
+ 
+       <!-- Side panel strings -->
+       <message name="IDS_SIDE_PANEL_CUSTOMIZE_CHROME_TITLE" desc="The name of the Customize Chrome feature in the side panel combo box.">
+-        Customize Chromium
++        Customize uw
+       </message>
+ 
+       <!-- History Strings -->
 diff --git a/chrome/app/settings_chromium_strings.grdp b/chrome/app/settings_chromium_strings.grdp
 --- a/chrome/app/settings_chromium_strings.grdp
 +++ b/chrome/app/settings_chromium_strings.grdp

@@ -50,6 +50,7 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//ui/base",
     "//url",
+    "//uw/browser/agent:skill_folders",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/views/theme_picker",

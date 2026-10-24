@@ -19,6 +19,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
@@ -61,6 +62,13 @@ constexpr char kHelpers[] = R"(
 // Drives the real uw page of chrome://settings.
 class UwOrganizationPageBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  void SetUpOnMainThread() override {
+    HeadlessModeBrowserTest::SetUpOnMainThread();
+    // The AI page lists skills: none from the user's own folder.
+    SetAgentsSkillsFolderForTesting(
+        browser()->GetProfile()->GetPath().AppendASCII("agents-skills"));
+  }
+
   PrefService* prefs() { return browser()->GetProfile()->GetPrefs(); }
 
   static std::string String(int id) { return l10n_util::GetStringUTF8(id); }

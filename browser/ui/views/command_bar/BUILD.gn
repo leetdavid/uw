@@ -54,6 +54,7 @@ source_set("browser_tests") {
     "//ui/gfx:gfx_switches",
     "//ui/views",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:skill_folders",
     "//components/tab_groups",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",

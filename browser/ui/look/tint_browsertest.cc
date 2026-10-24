@@ -47,6 +47,7 @@
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/sidebar_tab_fill.h"
@@ -86,6 +87,13 @@ int Roughness(const SkBitmap& window, int x, int y) {
 
 class TintBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  void SetUpOnMainThread() override {
+    HeadlessModeBrowserTest::SetUpOnMainThread();
+    // The chat page lists skills: none from the user's own folder.
+    SetAgentsSkillsFolderForTesting(
+        browser()->GetProfile()->GetPath().AppendASCII("agents-skills"));
+  }
+
   ThemeService* theme() {
     return ThemeServiceFactory::GetForProfile(browser()->GetProfile());
   }

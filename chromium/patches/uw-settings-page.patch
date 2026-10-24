@@ -1,7 +1,16 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..f7a4fdb94396ab0e2cb3a4433f9ec51aad1f03b2 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..f07a1ab448063461f0d0519f28a36e713b3af0d1 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
+@@ -3584,7 +3584,7 @@
+ 
+     <!-- Sync / People Page -->
+     <message name="IDS_SETTINGS_PEOPLE" desc="Name of the settings page which manages the user's relationship to Google.">
+-      You and Google
++      You and uw
+     </message>
+     <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
+       Google Profile photo
 @@ -3904,6 +3904,103 @@
          System
        </message>
@@ -10,7 +19,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..f7a4fdb94396ab0e2cb3a4433f9ec51a
 +    <!-- uw organization page -->
 +    <if expr="not is_chromeos">
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_TITLE" desc="Title of the uw settings page. uw is the product name and stays lowercase.">
-+        uw
++        uw features
 +      </message>
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_STATUS_ON" desc="Status line when automatic organization is on.">
 +        Automatic organization is on
@@ -476,7 +485,7 @@ index 4a53cfbc0ecc60b14902fdd344c851a2da932a3f..ca68b6ac22d198c01af5704ffa9802e2
  
    policy_indicator::AddLocalizedStrings(html_source);
 diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
-index 42854fe44420c30e654bfc3ad3076e65646bb391..503dd54679174003491edc7e57b293c9856d0b24 100644
+index 42854fe44420c30e654bfc3ad3076e65646bb391..401c1090a6ce441e0df21634f9d146e63d7b60a3 100644
 --- a/chrome/browser/ui/webui/settings/settings_ui.cc
 +++ b/chrome/browser/ui/webui/settings/settings_ui.cc
 @@ -162,6 +162,11 @@
@@ -509,6 +518,19 @@ index 42854fe44420c30e654bfc3ad3076e65646bb391..503dd54679174003491edc7e57b293c9
  #endif
  
    AddLocalizedStrings(html_source, profile, web_ui->GetWebContents());
+@@ -652,9 +661,9 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
+   // Within the AI subpage are separate sections for Glic and for all other AI
+   // features, the visibility of these are separately controlled but we want to
+   // show the subpage if any of the AI features or Glic are enabled.
+-  html_source->AddBoolean("showAiPage", show_glic_section ||
+-                                            show_ai_features_section ||
+-                                            enable_ai_mode_search);
++  // uw: Chrome's AI features need Google's models, so their page stays
++  // hidden. uw's own AI page is linked from the menu.
++  html_source->AddBoolean("showAiPage", false);
+   html_source->AddBoolean("showAiPageAiFeatureSection",
+                           show_ai_features_section);
+ 
 @@ -773,6 +782,12 @@ void SettingsUI::BindInterface(
    }
    signin_handler_factory_receiver_.Bind(std::move(pending_receiver));
@@ -580,7 +602,7 @@ index 595b377b5091b584e7347ee0d05f73d6f997823e..ed7f52de0bafa10f890ba92d6ae93e29
    tsconfig_base = "tsconfig_base.json"
    composite = true
 diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
-index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..d99431e8568a888e088169c20594bcefdd7d80a1 100644
+index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..1ce535f4e6cad30605a64671044b2c42c8f6c3ea 100644
 --- a/tools/gritsettings/resource_ids.spec
 +++ b/tools/gritsettings/resource_ids.spec
 @@ -1789,6 +1789,31 @@
@@ -597,11 +619,6 @@ index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..d99431e8568a888e088169c20594bcef
 +    "includes": [10260],
 +  },
 +
-+  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_chat/resources.grd": {
-+    "META": {"sizes": {"includes": [20],}},
-+    "includes": [10280],
-+  },
-+
 +  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_command_bar/resources.grd": {
 +    "META": {"sizes": {"includes": [10],}},
 +    "includes": [10300],
@@ -612,6 +629,24 @@ index 322591a3aa40b7729e3421d700f1f7181bdc2d1b..d99431e8568a888e088169c20594bcef
 +    "includes": [10320],
 +  },
 +
++  "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_chat/resources.grd": {
++    "META": {"sizes": {"includes": [100],}},
++    "includes": [10340],
++  },
++
    "<(SHARED_INTERMEDIATE_DIR)/THIS_IS_A_PLACEHOLDER.grd": {
      "META": {"sizes": {"includes": [800]}},
      "includes": [12000],
+diff --git a/chrome/browser/resources/settings/settings_ui/settings_ui.html b/chrome/browser/resources/settings/settings_ui/settings_ui.html
+index 193e7ff92522100c1827b5ce68a3bce18533a343..ad7907480e8132b36fa330d5e6509aa922f473ee 100644
+--- a/chrome/browser/resources/settings/settings_ui/settings_ui.html
++++ b/chrome/browser/resources/settings/settings_ui/settings_ui.html
+@@ -84,6 +84,8 @@
+         narrow="{{narrow_}}"
+         narrow-threshold="980"
+         show-menu="[[narrow_]]">
++      <!-- uw: the settings title shows without Chromium's logo. -->
++      <span slot="product-logo"></span>
+     </cr-toolbar>
+     <cr-drawer id="drawer" on-close="onMenuClose_" heading="$i18n{settings}"
+         align="$i18n{textdirection}">

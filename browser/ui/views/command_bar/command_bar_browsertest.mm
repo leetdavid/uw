@@ -55,6 +55,7 @@
 #include "ui/gfx/switches.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -66,6 +67,13 @@ namespace {
 
 class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  void SetUpOnMainThread() override {
+    HeadlessModeBrowserTest::SetUpOnMainThread();
+    // A chat the bar opens lists skills: none from the user's own folder.
+    SetAgentsSkillsFolderForTesting(
+        browser()->GetProfile()->GetPath().AppendASCII("agents-skills"));
+  }
+
   CommandBar* bar() { return CommandBar::From(browser()); }
 
   NSWindow* window() {
