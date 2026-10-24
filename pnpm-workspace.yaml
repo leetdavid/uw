@@ -1,5 +1,6 @@
 packages:
   - browser/resources/uw_chat/app
+  - command
 
 # Both ship prebuilt binaries for macOS; their install scripts are not needed.
 allowBuilds:
