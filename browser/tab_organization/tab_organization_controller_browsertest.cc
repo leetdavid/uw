@@ -599,7 +599,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   base::RunLoop().RunUntilIdle();
 
   const std::vector<views::View*> splits = ViewsOfClass("SplitTabView");
-  // Top to bottom, and the split's halves left to right.
+  // Top to bottom.
   std::vector<views::View*> rows = TabRows();
   std::ranges::sort(rows, {}, [](views::View* row) {
     const gfx::Rect bounds = row->GetBoundsInScreen();
@@ -616,6 +616,52 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   Collapse(page);
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return !ViewsOfClass("SplitTabView")[0]->GetVisible(); }));
+}
+
+// A split's pair stacks in the sidebar, one full row per page inside the
+// pair's box, the left page on top. The top row shows the split's icon while
+// the other page is in front.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ASplitStacksItsPairInTheSidebar) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* page = InitialTab();
+  tabs::TabInterface* other = NewTab();
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  tabs()->ExecuteAddToNewSplitCommand(tabs()->GetIndexOfTab(other),
+                                      split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(page->GetSplit());
+  base::RunLoop().RunUntilIdle();
+
+  const std::vector<views::View*> splits = ViewsOfClass("SplitTabView");
+  std::vector<views::View*> rows = TabRows();
+  ASSERT_EQ(splits.size(), 1u);
+  ASSERT_EQ(rows.size(), 2u);
+  std::ranges::sort(
+      rows, {}, [](views::View* row) { return row->GetBoundsInScreen().y(); });
+  const gfx::Rect pair = splits[0]->GetBoundsInScreen();
+  const gfx::Rect top = rows[0]->GetBoundsInScreen();
+  const gfx::Rect bottom = rows[1]->GetBoundsInScreen();
+  EXPECT_EQ(top.x(), pair.x() + 2);
+  EXPECT_EQ(top.width(), pair.width() - 4);
+  EXPECT_EQ(bottom.x(), top.x());
+  EXPECT_EQ(bottom.width(), top.width());
+  EXPECT_EQ(top.y(), pair.y() + 2);
+  EXPECT_EQ(bottom.y(), top.bottom() + 2);
+  EXPECT_EQ(pair.bottom(), bottom.bottom() + 2);
+
+  // Only the page in front is drawn selected, with its close button.
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(other));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return PartOf(rows[0], "SplitMark")->GetVisible(); }));
+  EXPECT_FALSE(PartOf(rows[1], "SplitMark")->GetVisible());
+  EXPECT_FALSE(PartOf(rows[0], "TabCloseButton")->GetVisible());
+  EXPECT_TRUE(PartOf(rows[1], "TabCloseButton")->GetVisible());
+  SaveWindowScreenshot(browser(), "side-by-side-pair");
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !PartOf(rows[0], "SplitMark")->GetVisible(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

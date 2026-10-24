@@ -730,3 +730,124 @@ index 335b2902fd43016d45fa176e4aeec65ec87dcb64..8754f8445d3c2c6c65fa4241be386450
    if (security_level == security_state::DANGEROUS) {
      id = kColorOmniboxSecurityChipDangerous;
    }
+diff --git a/chrome/browser/ui/views/tabs/common/split_tab_view.cc b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+index 440a3076e5f80c6b393dba0b311ba15ea808681e..4b3a2f667cfc6c6e763e05ce43dcaba5c871cbb5 100644
+--- a/chrome/browser/ui/views/tabs/common/split_tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
+ 
++#include <algorithm>
++#include <optional>
+ #include <vector>
+ 
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+@@ -20,6 +22,7 @@
+ #include "components/tabs/public/tab_collection_types.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_provider.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/border.h"
+ #include "ui/views/layout/delegating_layout_manager.h"
+@@ -28,6 +31,18 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/look/sidebar_tab_fill.h"
++
++namespace {
++
++// uw: a pair that is not pinned always stacks, inside a box of the sidebar's
++// tile fill, so each title gets a full row.
++constexpr int kPairInset = 2;
++constexpr int kPairRowTrim = 2;
++constexpr float kPairCornerRadius = 12.f;
++constexpr SkAlpha kPairEdgeAlpha = 0x0F;
++
++}  // namespace
+ 
+ SplitTabView::SplitTabView(TabCollectionNode* collection_node)
+     : collection_node_(collection_node),
+@@ -110,6 +125,21 @@ void SplitTabView::OnPaint(gfx::Canvas* canvas) {
+           GetInsets().top() / 2.0;
+       canvas->DrawRoundRect(GetContentsBounds(), corner_radius, flags);
+     }
++  } else if (const std::optional<SkColor> fill = uw::SidebarTabFill(
++                 this, /*pinned=*/true, TabStyle::TabSelectionState::kInactive,
++                 /*hover=*/0)) {
++    cc::PaintFlags flags;
++    flags.setAntiAlias(true);
++    flags.setColor(*fill);
++    gfx::RectF box(GetLocalBounds());
++    canvas->DrawRoundRect(box, kPairCornerRadius, flags);
++    flags.setStyle(cc::PaintFlags::kStroke_Style);
++    flags.setStrokeWidth(1);
++    flags.setColor(SkColorSetA(
++        GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive),
++        kPairEdgeAlpha));
++    box.Inset(0.5f);
++    canvas->DrawRoundRect(box, kPairCornerRadius - 0.5f, flags);
+   }
+ 
+   views::View::OnPaint(canvas);
+@@ -304,12 +334,14 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+   // Layout children in order. Children will have their preferred height and
+   // fill available width. If unbounded or uncollapsed and both children fit on
+   // one row they will share it, otherwise they will be stacked vertically.
+-  if (!size_bounds.width().is_bounded() ||
+-      (!collapsed_ &&
+-       size_bounds.width().value() >=
+-           static_cast<int>(
+-               GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) *
+-               children.size()))) {
++  // uw: a pair that is not pinned is always stacked.
++  if (pinned_ &&
++      (!size_bounds.width().is_bounded() ||
++       (!collapsed_ &&
++        size_bounds.width().value() >=
++            static_cast<int>(
++                GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) *
++                children.size())))) {
+     int x = 0;
+     for (auto* child : children) {
+       bool is_first_child = x == 0;
+@@ -333,19 +365,29 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+     }
+     width = x;
+   } else {
+-    int y = 0;
++    const int inset = pinned_ ? 0 : kPairInset;
++    const int trim = pinned_ ? 0 : kPairRowTrim;
++    width = 0;
++    if (size_bounds.width().is_bounded()) {
++      width = size_bounds.width().value();
++    } else {
++      for (auto* child : children) {
++        width = std::max(width, child->GetPreferredSize().width() + 2 * inset);
++      }
++    }
++    int y = inset;
+     for (auto* child : children) {
++      const bool is_first_child = y == inset;
+       gfx::Rect bounds = gfx::Rect(child->GetPreferredSize());
+-      bounds.set_y(y);
+-      bounds.set_width(size_bounds.width().value());
+-      bounds.set_height(bounds.height());
++      bounds.set_origin({inset, y});
++      bounds.set_width(width - 2 * inset);
++      bounds.set_height(bounds.height() - trim);
+       // Advance y position by child height, accounting for any border and gap.
+-      y +=
+-          bounds.height() - 2 * border_thickness + (y == 0 ? kSplitViewGap : 0);
++      y += bounds.height() - 2 * border_thickness +
++           (is_first_child ? kSplitViewGap : 0);
+       layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
+     }
+-    width = size_bounds.width().value();
+-    height = y + 2 * border_thickness;
++    height = y + 2 * border_thickness + inset;
+   }
+   layouts.host_size = gfx::Size(width, height);
+   return layouts;

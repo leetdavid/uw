@@ -26,6 +26,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/views/tab_organization/kept_mark.h"
+#include "uw/browser/ui/views/tab_organization/split_mark.h"
 
 namespace uw {
 namespace {
@@ -171,6 +172,7 @@ void AddBranchControls(views::View* row, tabs::TabHandle tab) {
   row->AddChildView(std::make_unique<BranchToggle>(tab));
   row->AddChildView(std::make_unique<ChatMark>(tab));
   row->AddChildView(std::make_unique<KeptMark>(tab));
+  row->AddChildView(std::make_unique<SplitMark>(tab));
 }
 
 void LayOutBranchControls(views::View* icon,
@@ -182,7 +184,8 @@ void LayOutBranchControls(views::View* icon,
   HiddenCount* count = ChildOfClass<HiddenCount>(row);
   ChatMark* mark = ChildOfClass<ChatMark>(row);
   KeptMark* kept = ChildOfClass<KeptMark>(row);
-  if (!toggle || !count || !mark || !kept) {
+  SplitMark* split = ChildOfClass<SplitMark>(row);
+  if (!toggle || !count || !mark || !kept || !split) {
     return;
   }
   views::ChildLayout* icon_layout = layout.GetLayoutFor(icon);
@@ -212,6 +215,17 @@ void LayOutBranchControls(views::View* icon,
     text.set_width(std::max(0, text.width() - kept_bounds.width()));
   }
 
+  // The split icon of a side-by-side pair's top row comes before it.
+  gfx::Rect split_bounds(split->GetPreferredSize());
+  const bool show_split = titled && split->ShownOnRow(hovered);
+  if (show_split) {
+    gfx::Rect& text = title_layout->bounds;
+    split_bounds.set_origin(
+        {text.right() - split_bounds.width(),
+         text.CenterPoint().y() - split_bounds.height() / 2});
+    text.set_width(std::max(0, text.width() - split_bounds.width()));
+  }
+
   // A chat's state comes next, after the hidden count.
   gfx::Rect mark_bounds(mark->GetPreferredSize());
   const bool show_mark = titled && mark->shown();
@@ -239,6 +253,7 @@ void LayOutBranchControls(views::View* icon,
   layout.child_layouts.push_back({count, show_count, count_bounds});
   layout.child_layouts.push_back({mark, show_mark, mark_bounds});
   layout.child_layouts.push_back({kept, show_kept, kept_bounds});
+  layout.child_layouts.push_back({split, show_split, split_bounds});
 }
 
 }  // namespace uw

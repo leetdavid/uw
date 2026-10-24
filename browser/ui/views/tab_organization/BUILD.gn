@@ -22,6 +22,8 @@ source_set("tab_organization") {
     "organize_card.h",
     "scratchpad_heading.cc",
     "scratchpad_heading.h",
+    "split_mark.cc",
+    "split_mark.h",
     "tab_indent.cc",
     "tab_indent.h",
     "task_card.cc",

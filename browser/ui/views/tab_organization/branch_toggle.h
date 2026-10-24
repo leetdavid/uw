@@ -67,14 +67,14 @@ class HiddenCount : public views::Label {
   void OnThemeChanged() override;
 };
 
-// Adds a BranchToggle, a HiddenCount, a ChatMark, and a KeptMark to `row`,
-// the vertical tab row of `tab`.
+// Adds a BranchToggle, a HiddenCount, a ChatMark, a KeptMark, and a SplitMark
+// to `row`, the vertical tab row of `tab`.
 void AddBranchControls(views::View* row, tabs::TabHandle tab);
 
 // Adds the controls of the row that holds `icon` and `title` to `layout`,
 // the row's layout. The toggle covers the icon while the row is `hovered`.
-// The count, the chat's mark, and a kept tab's anchor end the title and
-// shorten it.
+// The count, the chat's mark, a split's icon, and a kept tab's anchor end
+// the title and shorten it.
 void LayOutBranchControls(views::View* icon,
                           views::View* title,
                           bool hovered,

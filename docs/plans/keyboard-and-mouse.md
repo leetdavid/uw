@@ -114,6 +114,16 @@ Agreed on 2026-10-15.
 - Selecting a hidden tab expands its branch.
 - Drags and the chevron count as [manual adjustments](../CONTEXT.md#language), like the menu commands.
 
+### Side by side in the sidebar
+
+Agreed on 2026-10-24 from the frames "Side by side: the sidebar" and "Side by side: every state". Chromium put the two tabs of a side-by-side view on one row, about 115px each, so their titles shrank to a few letters.
+
+- The pair stacks: one full row per page, the left page on top, inside one box in the sidebar's tile fill. The box has 12px corners and 2px inside and between its 32px rows.
+- Only the page in front is drawn selected, with its close button.
+- While the top row is not in front, it ends in a 13px split icon at 55%, with the tooltip "Side by side". Under the pointer the close button takes its place.
+- A pinned pair keeps Chromium's look.
+- Built differently from the design: the pointer lights both rows of a pair, as Chromium's split does, and both show their close buttons.
+
 ### Mouse actions
 
 Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mouse" section of uw's settings page. A switch turned off leaves that click as Chromium has it.

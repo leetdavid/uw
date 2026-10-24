@@ -1526,7 +1526,7 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442fe
      }
    }
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
-index e8d8cb4facb9428bab15389a8fb137ada0982a21..a508026d02511a3c2e44a795c1ed0df359b5ea2b 100644
+index e8d8cb4facb9428bab15389a8fb137ada0982a21..ec0207b7a887066ecb08f2767090779cc24f0122 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
 @@ -90,6 +90,9 @@
@@ -1570,7 +1570,21 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..a508026d02511a3c2e44a795c1ed0df3
    }
    // Cancel the initialized drag (noop if not started). This is considered
    // a cancel because the drag handler assumes mouse capture when the drag
-@@ -1150,6 +1162,11 @@ void TabView::UpdateContrastRatioValues() {
+@@ -1012,7 +1024,12 @@ void TabView::OnTabStateChanged() {
+   int index = tab_strip_model->GetIndexOfTab(tab);
+   CHECK(index != TabStripModel::kNoTab);
+ 
+-  active_ = tab_strip_model->IsTabInForeground(index);
++  // uw: in the vertical sidebar only the selected half of a side-by-side
++  // pair that is not pinned is drawn active; the other half is not.
++  active_ =
++      tab_strip_model->IsTabInForeground(index) &&
++      (orientation_ != TabStripOrientation::kVertical || !tab->IsSplit() ||
++       tab->IsPinned() || tab->IsActivated());
+   split_ = tab->IsSplit();
+   pinned_ = tab->IsPinned();
+ 
+@@ -1150,6 +1167,11 @@ void TabView::UpdateContrastRatioValues() {
  void TabView::CloseButtonPressed(const ui::Event& event) {
    CHECK(collection_node_);
  
