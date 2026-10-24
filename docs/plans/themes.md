@@ -82,7 +82,7 @@ Implementability: **7/10**. Chromium decides in one place whether a page is told
 - Page mode is Same as window, Light, or Dark. Same as window is the default, so nothing changes until the user picks.
 - It covers websites and uw's own tab pages: the chat page, the providers page, and the terminal. Chromium's own pages, such as Settings, History, and the new tab page, follow the window mode, since their colors come from the window.
 - It covers extensions' pages wherever they show: their popups, side panels, and tabs.
-- It covers the command bar, which opens over the page. Agreed on 2026-10-24, T198: "i am saying that it should be in dark mode, but it is currently in light mode for some reason". uw's other panels, such as this picker, and Chromium's follow the window. Agreed on 2026-10-24, T191: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode".
+- It covers the command bar and the address bar's suggestion list, which open over the page. Agreed on 2026-10-24, T198: "i am saying that it should be in dark mode, but it is currently in light mode for some reason", and T199: "the address bar is not fixed yet". uw's other panels, such as this picker, and Chromium's follow the window. Agreed on 2026-10-24, T191: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode".
 - Pages are only told the mode (`prefers-color-scheme`). A site with no dark look of its own stays light. Chromium's auto-dark is not used.
 - The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones.
 - The page's scrollbar follows the toolbar, as in Chromium, and the toolbar takes the [page color](#page-colors). A site with no dark look of its own keeps a light scrollbar. Agreed on 2026-10-24; this replaced "the scrollbar follows page mode".
@@ -131,7 +131,7 @@ Agreed:
 Proposed by uw and drawn for T109 on the canvas's "Themes" page, as "Page colors: a red page" and "Page colors: every state". The numbers are in the `uw-themes` guide.
 
 - The fade takes 200 ms. The top of the card crossfades as a whole, so icons and text blend from their old color to their new one. Changed while building: the design had them switch halfway.
-- The address field keeps the page color while it has focus or holds typed text. The dropdown under it keeps the window's colors. Chromium gives the focused field the dropdown's colors, which would leave white text on a white field over a red page.
+- The address field keeps the page color while it has focus or holds typed text. The dropdown under it keeps the window's colors, or takes the [page mode](#page-mode) when one is set (T199). Chromium gives the focused field the dropdown's colors, which would leave white text on a white field over a red page.
 - Icons and text are near-black or white, whichever reads better on the page color, as on the theme. The address field and the line under the bars are the text color at a low strength over the page color.
 - A page whose color is today's toolbar color gets today's toolbar exactly, so the terminal does not change.
 - In a split view, the toolbar takes the color of the page that has focus. Private windows follow the same rules.
