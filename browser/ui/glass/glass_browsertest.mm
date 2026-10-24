@@ -17,6 +17,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/omnibox/omnibox_controller.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -36,7 +37,10 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/color/color_provider.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/compositor/layer.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/controls/menu/menu_controller.h"
 #include "ui/views/controls/menu/menu_item_view.h"
@@ -226,6 +230,37 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
     EXPECT_EQ(NSHeight(back.frame) - glass_height, back ? 100 : 0);
     suggestions->Hide();
   }
+}
+
+// The list opens over the page, so it takes the page mode, per T199.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesThePageMode) {
+  using ColorMode = ui::ColorProviderKey::ColorMode;
+  Theme theme = ThemeOfWindow(browser());
+  theme.mode = ThemeMode::kLight;
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  OmniboxPopupPresenterBase* suggestions = Suggestions();
+  suggestions->Show();
+  views::Widget* list = suggestions->get_widget_for_testing();
+  ASSERT_TRUE(list);
+  EXPECT_EQ(list->GetColorProviderKeyForTesting().color_mode, ColorMode::kDark);
+  EXPECT_TRUE(color_utils::IsDark(
+      list->GetColorProvider()->GetColor(kColorOmniboxResultsBackground)));
+  EXPECT_EQ(BrowserView::GetBrowserViewForBrowser(browser())
+                ->GetWidget()
+                ->GetColorProviderKeyForTesting()
+                .color_mode,
+            ColorMode::kLight);
+  suggestions->Hide();
+
+  theme.page_mode = PageMode::kWindow;
+  SetThemeOfWindow(browser(), theme);
+  suggestions->Show();
+  EXPECT_EQ(suggestions->get_widget_for_testing()
+                ->GetColorProviderKeyForTesting()
+                .color_mode,
+            ColorMode::kLight);
+  suggestions->Hide();
 }
 
 // Real windows only: macOS draws glass behind a window on screen. Saves how

@@ -19,6 +19,10 @@ namespace ui {
 struct ColorProviderKey;
 }
 
+namespace views {
+class Widget;
+}
+
 namespace uw {
 
 // The theme a window shows: its workspace's, per docs/plans/workspaces.md, or
@@ -40,6 +44,13 @@ Theme NewWorkspaceTheme(const Theme& like);
 // theme store still replaces uw's look.
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
                         ui::ColorProviderKey& key);
+
+// Sets the color and the mode in `key`, the color key of a panel that opens
+// over the page, such as the address bar's suggestion list, from the page
+// mode of the window `parent` belongs to. Leaves it under a page mode of
+// Window.
+void ApplyPageModeOverPage(const views::Widget* parent,
+                           ui::ColorProviderKey& key);
 
 // Whether `page` is told to look dark apart from its window, by the page mode
 // of the window that shows it, as a tab or in a bubble or panel such as an

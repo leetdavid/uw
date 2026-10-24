@@ -94,17 +94,9 @@ const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
 // The window that shows `page`: the window of its tab, the window a panel of
 // uw's such as the command bar belongs to, or the window under the bubble or
 // panel that holds it, such as an extension's popup.
-BrowserWindowInterface* WindowShowing(content::WebContents* page) {
-  if (tabs::TabInterface* tab =
-          tabs::TabInterface::MaybeGetFromContents(page)) {
-    return tab->GetBrowserWindowInterface();
-  }
-  if (BrowserWindowInterface* window = webui::GetBrowserWindowInterface(page)) {
-    return window;
-  }
-  for (views::Widget* widget =
-           views::Widget::GetTopLevelWidgetForNativeView(page->GetNativeView());
-       widget; widget = widget->parent()) {
+// The window `widget` is, or the one a bubble or panel it is belongs to.
+BrowserWindowInterface* WindowOfWidget(const views::Widget* widget) {
+  for (; widget; widget = widget->parent()) {
     BrowserWindowInterface* found = nullptr;
     ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
         [&](BrowserWindowInterface* window) {
@@ -120,6 +112,37 @@ BrowserWindowInterface* WindowShowing(content::WebContents* page) {
     }
   }
   return nullptr;
+}
+
+BrowserWindowInterface* WindowShowing(content::WebContents* page) {
+  if (tabs::TabInterface* tab =
+          tabs::TabInterface::MaybeGetFromContents(page)) {
+    return tab->GetBrowserWindowInterface();
+  }
+  if (BrowserWindowInterface* window = webui::GetBrowserWindowInterface(page)) {
+    return window;
+  }
+  return WindowOfWidget(
+      views::Widget::GetTopLevelWidgetForNativeView(page->GetNativeView()));
+}
+
+// Sets the colors of `theme` in `key`, whose mode is already set.
+void SetThemeColors(const Theme& theme, ui::ColorProviderKey& key) {
+  using Source = ui::ColorProviderKey::UserColorSource;
+  // Dark mode is black unless "Theme colors in dark mode" is on.
+  const bool black = key.color_mode == ui::ColorProviderKey::ColorMode::kDark &&
+                     !theme.colors_in_dark_mode;
+  // Until a color is picked, Chromium keeps its own colors, as it does for a
+  // profile with none.
+  if (theme.colors == Theme().colors && theme.intensity == kFullIntensity) {
+    key.user_color = std::nullopt;
+    key.scheme_variant = std::nullopt;
+    key.user_color_source = black ? Source::kGrayscale : Source::kBaseline;
+    return;
+  }
+  key.user_color = WithIntensity(theme.colors[0], theme.intensity);
+  key.scheme_variant = ui::ColorProviderKey::SchemeVariant::kTonalSpot;
+  key.user_color_source = black ? Source::kGrayscale : Source::kAccent;
 }
 
 // Each window that shows `workspace` takes its theme again.
@@ -214,21 +237,22 @@ void ApplyThemeOfWindow(BrowserWindowInterface* window,
       key.color_mode = ColorMode::kDark;
       break;
   }
-  using Source = ui::ColorProviderKey::UserColorSource;
-  // Dark mode is black unless "Theme colors in dark mode" is on.
-  const bool black =
-      key.color_mode == ColorMode::kDark && !theme.colors_in_dark_mode;
-  // Until a color is picked, Chromium keeps its own colors, as it does for a
-  // profile with none.
-  if (theme.colors == Theme().colors && theme.intensity == kFullIntensity) {
-    key.user_color = std::nullopt;
-    key.scheme_variant = std::nullopt;
-    key.user_color_source = black ? Source::kGrayscale : Source::kBaseline;
+  SetThemeColors(theme, key);
+}
+
+void ApplyPageModeOverPage(const views::Widget* parent,
+                           ui::ColorProviderKey& key) {
+  BrowserWindowInterface* window = WindowOfWidget(parent);
+  const WorkspaceList::Workspace* workspace =
+      window ? WorkspaceOf(window) : nullptr;
+  if (!workspace || !workspace->theme ||
+      workspace->theme->page_mode == PageMode::kWindow || key.custom_theme) {
     return;
   }
-  key.user_color = WithIntensity(theme.colors[0], theme.intensity);
-  key.scheme_variant = ui::ColorProviderKey::SchemeVariant::kTonalSpot;
-  key.user_color_source = black ? Source::kGrayscale : Source::kAccent;
+  key.color_mode = workspace->theme->page_mode == PageMode::kDark
+                       ? ui::ColorProviderKey::ColorMode::kDark
+                       : ui::ColorProviderKey::ColorMode::kLight;
+  SetThemeColors(*workspace->theme, key);
 }
 
 std::optional<bool> PageModeIsDark(content::WebContents* page) {
