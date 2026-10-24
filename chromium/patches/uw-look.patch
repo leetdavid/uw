@@ -1652,3 +1652,29 @@ index db53e40e591295311569835fae59eb340ad776a4..da1cf41ac3b6915d9ca762e96ea5f277
  
    if (!size_bounds.width().is_bounded()) {
      return layouts;
+diff --git a/ui/color/sys_color_mixer.cc b/ui/color/sys_color_mixer.cc
+index 8725df360ab579d28070ff0f191ec5f542800825..c1b578fd996e160374a02c665ac4f38e3f3a54fc 100644
+--- a/ui/color/sys_color_mixer.cc
++++ b/ui/color/sys_color_mixer.cc
+@@ -35,8 +35,9 @@ void AddThemedSysColorOverrides(ColorMixer& mixer,
+                                                   : kColorRefPrimary90};
+   mixer[kColorSysNeutralContainer] = {dark_mode ? kColorRefNeutralVariant15
+                                                 : kColorRefNeutral94};
++  // uw: lines stay neutral under a theme's color, as uw's own lines are.
+   mixer[kColorSysDivider] = {dark_mode ? kColorRefSecondary35
+-                                       : kColorRefPrimary90};
++                                       : kColorRefNeutral90};
+ 
+   // Chrome surfaces.
+   mixer[kColorSysBase] = {dark_mode ? kColorRefSecondary25
+@@ -216,8 +217,9 @@ void AddSysColorMixer(ColorProvider* provider, const ColorProviderKey& key) {
+                                               : kColorRefNeutral80};
+   mixer[kColorSysNeutralContainer] = {dark_mode ? kColorRefNeutral15
+                                                 : kColorRefNeutral95};
++  // uw: lines stay neutral, as uw's own lines are.
+   mixer[kColorSysDivider] = {dark_mode ? kColorRefNeutral40
+-                                       : kColorRefPrimary90};
++                                       : kColorRefNeutral90};
+ 
+   // Chrome surfaces.
+   mixer[kColorSysBase] = {dark_mode ? kColorRefNeutral25 : kColorRefNeutral100};

@@ -18,6 +18,7 @@ The look of the window is in the [Arc-style look plan](arc-style-look.md). This 
   - A grain slider.
 - Text on the theme stays readable, per the [readable tints](arc-style-look.md#scope) rule, at every color the gradient passes through.
 - Dark mode is black by default, after Vercel's neutral blacks: a black window, a near-black page card and toolbar with a thin gray edge, and white text. uw's own pages, such as the chat page, the providers page, and the command bar, use the same blacks. Chromium's own pages keep its dark gray.
+- Chromium's lines, such as the line above "Manage Extensions" in the extensions menu, are neutral gray in light mode, as uw's own lines are, and not a light tone of the theme's color. Since T202, after the user saw a cyan line there on 2026-10-25.
 - A switch in the picker, "Theme colors in dark mode", shows the theme darkened in dark mode instead of black, as Arc does.
 - Suggested themes: lilac, sky, mint, butter, peach, wine, and forest as one-color themes, and three two-color gradients, such as lilac to sky, peach to butter, and mint to sky. Lilac is the default. Indigo, the old dark default, is gone.
 - The "Customize Chromium" panel stays. A color picked there becomes a one-color theme, and its mode is the picker's mode. Chromium's full browser themes still replace uw's look.

@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "base/auto_reset.h"
 #include "base/files/file_path.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -36,10 +37,13 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/extensions/extension_popup.h"
+#include "chrome/browser/ui/views/extensions/extensions_menu_view.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
 #include "components/prefs/pref_service.h"
@@ -540,6 +544,37 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   content::WebContents* popup =
       ExtensionPopup::last_popup_for_testing()->host()->host_contents();
   EXPECT_TRUE(IsDark(popup));
+}
+
+// Lines in Chromium's menus are neutral, not tinted by the theme, per T202.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, ChromiumsLinesAreNeutral) {
+  const base::AutoReset<bool> menus =
+      ExtensionsMenuView::AllowInstancesForTesting();
+  extensions::TestExtensionDir dir;
+  dir.WriteManifest(R"({"name": "Popup", "version": "1",
+                        "manifest_version": 3,
+                        "action": {"default_popup": "popup.html"}})");
+  dir.WriteFile(FILE_PATH_LITERAL("popup.html"), "<p>Popup</p>");
+  ASSERT_TRUE(extensions::ChromeTestExtensionLoader(profile()).LoadExtension(
+      dir.UnpackedPath()));
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  theme.colors = SuggestedThemes()[1];
+  SetThemeOfWindow(browser(), theme);
+
+  BrowserView::GetBrowserViewForBrowser(browser())
+      ->toolbar()
+      ->extensions_container()
+      ->ToggleExtensionsMenu();
+  ASSERT_TRUE(
+      base::test::RunUntil([] { return ExtensionsMenuView::IsShowing(); }));
+  views::Widget* menu =
+      ExtensionsMenuView::GetExtensionsMenuViewForTesting()->GetWidget();
+  SaveWidgetScreenshot(menu, "extensions-menu-sky");
+  const ui::ColorProvider* colors = menu->GetColorProvider();
+  EXPECT_EQ(colors->GetColor(ui::kColorSeparator),
+            colors->GetColor(ui::kColorRefNeutral90));
+  ExtensionsMenuView::Hide();
 }
 
 // Before a page paints, the card behind it is black or white by page mode.
