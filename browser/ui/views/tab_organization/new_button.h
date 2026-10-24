@@ -22,9 +22,9 @@ class MenuRunner;
 
 namespace uw {
 
-// What the new button's caret lists, and a right-click on the narrow
-// sidebar's "+": New tab, New task, New chat, New terminal, New split view,
-// and New workspace, each with its key.
+// What the new button's caret and a right-click on it list: New tab, New
+// task, New chat, New terminal, New split view, and New workspace, each with
+// its key.
 class NewItemsMenu : public ui::SimpleMenuModel,
                      public ui::SimpleMenuModel::Delegate {
  public:
@@ -44,7 +44,7 @@ class NewItemsMenu : public ui::SimpleMenuModel,
 
 // The split button at the right end of the sidebar's foot. "+" does what
 // Cmd+T does, and the caret, or a right-click, opens a NewItemsMenu over the
-// page. Compact, in the narrow sidebar, it is a lone "+".
+// page.
 class NewButton : public views::FlexLayoutView,
                   public views::ContextMenuController {
   METADATA_HEADER(NewButton, views::FlexLayoutView)
@@ -54,8 +54,6 @@ class NewButton : public views::FlexLayoutView,
   NewButton(const NewButton&) = delete;
   NewButton& operator=(const NewButton&) = delete;
   ~NewButton() override;
-
-  void SetCompact(bool compact);
 
   views::ImageButton* plus() { return plus_; }
   views::ImageButton* caret() { return caret_; }

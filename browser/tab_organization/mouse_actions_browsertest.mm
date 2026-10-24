@@ -24,7 +24,6 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_close_button.h"
@@ -436,18 +435,6 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
   tree.d->GetContents()->Focus();
   row->RequestFocus();
   EXPECT_FALSE(plus->GetVisible());
-}
-
-IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
-                       TheNarrowSidebarHasNoTaskRowPlus) {
-  const Tree tree = OpenTree();
-  const tab_groups::TabGroupId task = TaskOf({tree.a});
-  tabs::VerticalTabStripStateController* sidebar =
-      tabs::VerticalTabStripStateController::From(browser());
-  sidebar->RequestCollapse(true);
-  ASSERT_TRUE(base::test::RunUntil([&] { return sidebar->IsCollapsed(); }));
-  TaskRowNewTabButton::ShowWithMenu(RowOf(task), true);
-  EXPECT_FALSE(PlusOn(RowOf(task))->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,

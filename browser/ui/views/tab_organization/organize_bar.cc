@@ -14,7 +14,6 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
-#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/grit/generated_resources.h"
@@ -131,11 +130,6 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
             },
             base::Unretained(this)));
   }
-  tabs::VerticalTabStripStateController* state =
-      tabs::VerticalTabStripStateController::From(window_);
-  collapse_subscription_ = state->RegisterOnCollapseChanged(base::BindRepeating(
-      &OrganizeBar::OnCollapseChanged, base::Unretained(this)));
-  OnCollapseChanged(state->GetCollapseState());
 }
 
 OrganizeBar::~OrganizeBar() {
@@ -204,19 +198,6 @@ bool OrganizeBar::GetAcceleratorForCommandId(
     int command_id,
     ui::Accelerator* accelerator) const {
   return GetCommandAccelerator(window_, command_id, accelerator);
-}
-
-void OrganizeBar::OnCollapseChanged(tabs::VerticalTabStripCollapseState state) {
-  collapsed_ = state != tabs::VerticalTabStripCollapseState::kExpanded;
-  // The narrow sidebar keeps only the new button's "+", centered.
-  button_->SetVisible(!collapsed_);
-  spacer_->SetVisible(!collapsed_);
-  row_->SetMainAxisAlignment(collapsed_ ? views::LayoutAlignment::kCenter
-                                        : views::LayoutAlignment::kStart);
-  new_button_->SetCompact(collapsed_);
-  if (collapsed_) {
-    HideCard();
-  }
 }
 
 void OrganizeBar::ShowMenu() {
@@ -290,7 +271,7 @@ void OrganizeBar::OnOrganizerEvent(const AutomaticOrganizer::Event& event) {
     failing_ = failed;
   }
   const bool details = ShowsActivityDetails();
-  if (collapsed_ || (!details && !changed && !first_failure && !asked)) {
+  if (!details && !changed && !first_failure && !asked) {
     return;
   }
   card_->Show(event, details);

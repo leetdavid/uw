@@ -24,10 +24,6 @@
 class BrowserWindowInterface;
 class ExpandOnHoverLock;
 
-namespace tabs {
-enum class VerticalTabStripCollapseState;
-}
-
 namespace views {
 class BubbleDialogDelegate;
 class Button;
@@ -46,8 +42,7 @@ class ThemePicker;
 // switcher between them. Above them, a card names the
 // task after each automatic move, with an Undo button, and says when a
 // request fails. With "Show organizer activity" on, the card also shows each
-// request and what every answer was. It never takes focus by itself. The
-// narrow sidebar keeps only the new button's "+".
+// request and what every answer was. It never takes focus by itself.
 class OrganizeBar : public views::FlexLayoutView,
                     public ui::SimpleMenuModel::Delegate,
                     public views::ContextMenuController {
@@ -76,7 +71,7 @@ class OrganizeBar : public views::FlexLayoutView,
   NewButton* new_button() { return new_button_; }
   views::Button* organize_button();
   // Puts `middle`, such as the workspace switcher, between Organize and the
-  // new button. The narrow sidebar hides it.
+  // new button.
   void SetMiddle(std::unique_ptr<views::View> middle);
   // The Organize card while it is open.
   views::Widget* organize_card() { return card_widget_.get(); }
@@ -103,7 +98,6 @@ class OrganizeBar : public views::FlexLayoutView,
       ui::mojom::MenuSourceType source_type) override;
 
  private:
-  void OnCollapseChanged(tabs::VerticalTabStripCollapseState state);
   void OnMenuClosed();
   void OnCardClosed(views::Widget::ClosedReason reason);
   bool ShowsActivityDetails() const;
@@ -116,7 +110,6 @@ class OrganizeBar : public views::FlexLayoutView,
   raw_ptr<views::FlexLayoutView> row_ = nullptr;
   raw_ptr<views::View> spacer_ = nullptr;
   raw_ptr<NewButton> new_button_ = nullptr;
-  bool collapsed_ = false;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   // The Organize card's bubble outlives its widget.
@@ -127,7 +120,6 @@ class OrganizeBar : public views::FlexLayoutView,
   base::OneShotTimer card_timer_;
   // The last answer was a failed request, so the next failure stays quiet.
   bool failing_ = false;
-  base::CallbackListSubscription collapse_subscription_;
   base::CallbackListSubscription event_subscription_;
   base::CallbackListSubscription manual_move_subscription_;
 };

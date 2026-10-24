@@ -9,6 +9,7 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "content/public/test/browser_test.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -66,6 +67,34 @@ IN_PROC_BROWSER_TEST_F(WindowButtonsBrowserTest,
   EXPECT_GT(color_utils::GetContrastRatio(active, inactive), 2.0f)
       << color_utils::SkColorToRgbaString(active) << " "
       << color_utils::SkColorToRgbaString(inactive);
+}
+
+// A hidden sidebar takes macOS's window buttons away, and its floating card
+// draws uw's. Showing the sidebar brings macOS's back.
+IN_PROC_BROWSER_TEST_F(WindowButtonsBrowserTest,
+                       AHiddenSidebarHidesTheWindowButtons) {
+  NSWindow* window =
+      browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  const NSWindowButton kinds[] = {
+      NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton};
+  for (NSWindowButton kind : kinds) {
+    ASSERT_TRUE([window standardWindowButton:kind]);
+    EXPECT_FALSE([window standardWindowButton:kind].hidden);
+  }
+
+  tabs::VerticalTabStripStateController* sidebar =
+      tabs::VerticalTabStripStateController::From(browser());
+  sidebar->RequestCollapse(true);
+  ASSERT_TRUE(base::test::RunUntil([&] { return sidebar->IsCollapsed(); }));
+  for (NSWindowButton kind : kinds) {
+    EXPECT_TRUE([window standardWindowButton:kind].hidden);
+  }
+
+  sidebar->RequestCollapse(false);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !sidebar->IsCollapsed(); }));
+  for (NSWindowButton kind : kinds) {
+    EXPECT_FALSE([window standardWindowButton:kind].hidden);
+  }
 }
 
 }  // namespace

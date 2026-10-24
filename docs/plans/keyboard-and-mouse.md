@@ -96,7 +96,6 @@ Agreed on 2026-10-15.
 - A split button, "+" and "▾", sits at the right end of the sidebar's foot, with the Organize button at the left. The "+" under the tab list goes away.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
 - A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and New split view.
-- A collapsed sidebar hides Organize and "▾" and keeps a lone "+" at its foot. A right-click on it opens the same menu.
 - The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user signed off the same day once the button moved from beside Organize to the right end.
 
 ### Branches with the mouse
@@ -136,7 +135,6 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 | Double-click empty space below the tabs | Does what the foot's "+" does. The space still drags the window, but a double-click there no longer zooms it, as in Arc. |
 | Middle-click a task's folder row | Closes the task and its tabs, like Close task. |
 
-- The "+" and the double-click are in the wide sidebar only. Option-click and middle-click also work in the narrow sidebar.
 - The task row's "+" opens the command bar since it landed. Agreed on 2026-10-21.
 - Elsewhere in the window, a double-click on space that drags the window still does what macOS's "Double-click a window's title bar" setting says. A double-click below the tabs did too until T58.
 - The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
@@ -207,7 +205,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 9. "New child tab" on a tab that is not selected and has children opens a selected blank tab directly under it, above those children. Ctrl+Cmd+T does the same for the selected tab. "New tab below" on a tab that is not selected opens below that tab's branch.
 10. A child nested by hand moves with its parent when the organizer moves the branch, and is not filed alone when its page changes. A child opened from a link still can be. The hold survives a restart and ends when the parent closes.
 11. A tab's right-click menu lists its items in the order of [Tab menu](#tab-menu), with no "Add tab to new group" or "Remove from group".
-12. A click on the foot's "+" does what Cmd+T does, "▾" lists its five items with their keys, and the tab list has no "+". A collapsed sidebar shows a lone "+" whose right-click opens the same menu.
+12. A click on the foot's "+" does what Cmd+T does, "▾" lists its five items with their keys, and the tab list has no "+".
 13. Ctrl+Cmd+N opens a new task, Shift+Ctrl+Cmd+N moves the selected branch to a new task, and Ctrl+Cmd+P does nothing.
 14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults. `MenuKeysBrowserTest` and `UwShortcutsPageBrowserTest` check this.
 15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tasks menu.

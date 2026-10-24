@@ -55,4 +55,33 @@ void PaintWindowButtonDots(gfx::Canvas* canvas,
   }
 }
 
+void SetWindowButtonsHidden(views::Widget* widget, bool hidden) {
+  NSWindow* window = widget->GetNativeWindow().GetNativeNSWindow();
+  for (NSWindowButton kind :
+       {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
+    [window standardWindowButton:kind].hidden = hidden;
+  }
+}
+
+void PressWindowButton(views::Widget* widget,
+                       WindowButton button,
+                       bool option) {
+  NSWindow* window = widget->GetNativeWindow().GetNativeNSWindow();
+  switch (button) {
+    case WindowButton::kClose:
+      [window performClose:nil];
+      break;
+    case WindowButton::kMinimize:
+      [window performMiniaturize:nil];
+      break;
+    case WindowButton::kZoom:
+      if (option) {
+        [window performZoom:nil];
+      } else {
+        [window toggleFullScreen:nil];
+      }
+      break;
+  }
+}
+
 }  // namespace uw

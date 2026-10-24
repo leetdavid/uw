@@ -67,7 +67,7 @@ class WorkspaceSwipe : public ui::EventHandler,
   static WorkspaceSwipe* From(BrowserWindowInterface* window);
 
   // Slides to workspace `id` on its own, then switches. With Reduce Motion,
-  // or in the narrow sidebar, only the page fades.
+  // or while the sidebar is hidden, only the page fades.
   void SlideTo(const std::string& id);
 
   // The tab strip as it was when this window last slid away. Null until then.

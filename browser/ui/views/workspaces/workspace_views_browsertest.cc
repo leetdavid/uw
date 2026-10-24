@@ -404,10 +404,10 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
                                         kNewWorkspaceCommand));
 }
 
-// The narrow sidebar keeps only the new button in its foot. New Workspace and
-// the keys still work there.
+// A hidden sidebar's foot is off the window. New Workspace opens its card in
+// the window all the same, and the keys still work.
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
-                       NewWorkspaceAndTheKeysWorkInTheNarrowSidebar) {
+                       NewWorkspaceAndTheKeysWorkWhileTheSidebarIsHidden) {
   const std::string work = AddWorkspace("Work", profile());
   Settle();
   tabs::VerticalTabStripStateController* state =
@@ -424,7 +424,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
   EXPECT_TRUE(window.Contains(card->GetWindowBoundsInScreen()))
       << card->GetWindowBoundsInScreen().ToString() << " in "
       << window.ToString();
-  SaveWidgetScreenshot(card, "new-workspace-card-narrow");
+  SaveWidgetScreenshot(card, "new-workspace-card-hidden-sidebar");
   card->CloseNow();
 
   RunWindowCommand(browser(), kGoToWorkspace1 + 1);

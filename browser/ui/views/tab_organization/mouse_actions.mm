@@ -16,7 +16,6 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
-#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
@@ -54,12 +53,6 @@ BrowserView* WindowOf(const views::View* view) {
 
 bool IsOn(BrowserWindowInterface* window, const char* pref) {
   return window && window->GetProfile()->GetPrefs()->GetBoolean(pref);
-}
-
-bool IsWide(BrowserWindowInterface* window) {
-  const tabs::VerticalTabStripStateController* sidebar =
-      tabs::VerticalTabStripStateController::From(window);
-  return sidebar && !sidebar->IsCollapsed();
 }
 
 // True while the second click of a double-click is down or coming up. Only
@@ -114,8 +107,7 @@ bool CloseTaskOnMiddleClick(views::View* row,
 }
 
 bool TakesDoubleClickBelowTabs(BrowserWindowInterface* window) {
-  return IsOn(window, kDoubleClickOpensTabPref) && IsWide(window) &&
-         IsSecondClick();
+  return IsOn(window, kDoubleClickOpensTabPref) && IsSecondClick();
 }
 
 bool OpenTabOnDoubleClick(BrowserWindowInterface* window,
@@ -155,9 +147,8 @@ TaskRowNewTabButton::~TaskRowNewTabButton() = default;
 // static
 void TaskRowNewTabButton::ShowWithMenu(views::View* row, bool menu_shown) {
   BrowserView* window = WindowOf(row);
-  const bool shown = menu_shown && window &&
-                     IsOn(window->browser(), kTaskRowNewTabPref) &&
-                     IsWide(window->browser());
+  const bool shown =
+      menu_shown && window && IsOn(window->browser(), kTaskRowNewTabPref);
   for (views::View* child : row->children()) {
     if (views::IsViewClass<TaskRowNewTabButton>(child)) {
       child->SetVisible(shown);

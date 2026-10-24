@@ -130,14 +130,6 @@ void NewButton::OnThemeChanged() {
                                      color, kCaretIconSize));
 }
 
-void NewButton::SetCompact(bool compact) {
-  for (views::View* child : children()) {
-    if (child != plus_) {
-      child->SetVisible(!compact);
-    }
-  }
-}
-
 bool NewButton::menu_showing() const {
   return menu_runner_ && menu_runner_->IsRunning();
 }

@@ -14,16 +14,18 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
-#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/top_container_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
@@ -36,23 +38,26 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "third_party/skia/include/core/SkBitmap.h"
-#include "third_party/skia/include/core/SkColor.h"
-#include "ui/color/color_provider.h"
+#include "ui/base/accelerators/accelerator.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/image_button.h"
-#include "ui/views/controls/image_view.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/test/button_test_api.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
+#include "uw/browser/ui/views/tab_organization/floating_window_buttons.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
@@ -222,44 +227,78 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
                        ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
   }
 
-  // Collapses the sidebar and checks the page card: it starts level with the
-  // narrow sidebar, below the window's close, minimize, and zoom buttons, and
-  // its toolbar and page share a left edge. Nothing in the toolbar's color
-  // covers the buttons, so the tint runs behind them.
-  void CheckTheNarrowSidebar(const std::string& screenshot) {
+  VerticalTabStripRegionView* Sidebar() {
+    return BrowserView::GetBrowserViewForBrowser(browser())
+        ->vertical_tab_strip_region_view_for_testing();
+  }
+
+  bool SidebarAnimating() {
+    return BrowserAnimationController::From(browser())->IsAnimating(
+        TabStripAnimations::kVerticalTabStrip);
+  }
+
+  // Where `view` is in the window.
+  gfx::Rect InWindow(const views::View* view) {
+    return views::View::ConvertRectToTarget(
+        view->parent(), BrowserView::GetBrowserViewForBrowser(browser()),
+        view->bounds());
+  }
+
+  void HideSidebar() {
     tabs::VerticalTabStripStateController* state =
         tabs::VerticalTabStripStateController::From(browser());
     state->RequestCollapse(true);
-    ASSERT_TRUE(base::test::RunUntil([&] { return state->IsCollapsed(); }));
-    const SkBitmap pixels = CaptureWindow(browser());
+    ASSERT_TRUE(base::test::RunUntil(
+        [&] { return state->IsCollapsed() && !SidebarAnimating(); }));
+  }
+
+  // Brings the hidden sidebar's card in, as the pointer resting on the
+  // window's edge does, and keeps it in.
+  std::unique_ptr<ExpandOnHoverLock> FloatSidebarIn() {
+    std::unique_ptr<ExpandOnHoverLock> lock =
+        Sidebar()->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepExpanded);
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return Sidebar()->floating_sidebar()->window_buttons()->GetVisible() &&
+             !SidebarAnimating();
+    }));
+    return lock;
+  }
+
+  // The card floats in over the page, which keeps its place, with uw's
+  // window buttons at its top left and its rows as wide as the shown
+  // sidebar's.
+  void CheckTheFloatingSidebar(const std::string& screenshot) {
+    HideSidebar();
     BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
-    const gfx::Rect rail =
-        view->vertical_tab_strip_region_view_for_testing()->bounds();
-    const gfx::Rect toolbar = views::View::ConvertRectToTarget(
-        view->toolbar()->parent(), view, view->toolbar()->bounds());
-    const gfx::Rect page = views::View::ConvertRectToTarget(
-        view->multi_contents_view()->parent(), view,
-        view->multi_contents_view()->bounds());
-    EXPECT_EQ(toolbar.x(), page.x());
-    EXPECT_EQ(toolbar.y(), rail.y());
-    EXPECT_EQ(view->top_container()->x(), page.x());
+    const gfx::Rect page = InWindow(view->multi_contents_view());
+    std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
 
-    const float scale = static_cast<float>(pixels.width()) / view->width();
-    const SkColor above_card =
-        pixels.getColor(static_cast<int>((toolbar.x() + 40) * scale),
-                        static_cast<int>((toolbar.y() - 3) * scale));
-    EXPECT_NE(above_card, view->GetColorProvider()->GetColor(kColorToolbar));
-
-    // The task's row shows its folder and no sliver of its name.
+    VerticalTabStripRegionView* sidebar = Sidebar();
+    const int width = sidebar->uncollapsed_width();
+    EXPECT_EQ(sidebar->x(), 0);
+    EXPECT_EQ(sidebar->width(), kHiddenSidebarEdge + width);
+    const gfx::Rect card = sidebar->floating_sidebar()->CardBounds();
+    EXPECT_EQ(card, gfx::Rect(kHiddenSidebarEdge, kHiddenSidebarEdge, width,
+                              sidebar->height() - 2 * kHiddenSidebarEdge));
+    EXPECT_TRUE(
+        card.Contains(sidebar->floating_sidebar()->window_buttons()->bounds()));
+    EXPECT_EQ(InWindow(view->multi_contents_view()), page);
     TabGroupHeaderView* row = RowOf(Task());
     ASSERT_TRUE(row);
-    for (views::View* child : row->children()) {
-      if (child->GetVisible() && !child->bounds().IsEmpty()) {
-        EXPECT_TRUE(views::IsViewClass<views::ImageView>(child))
-            << child->GetClassName() << " " << child->bounds().ToString();
-      }
-    }
+    EXPECT_GT(row->width(), width / 2);
     SaveWindowScreenshot(browser(), screenshot);
+
+    // It slides back out. Headless, the screen's pointer can lie over the
+    // card, so this sends the card out instead of moving the pointer away.
+    lock.reset();
+    std::unique_ptr<ExpandOnHoverLock> out =
+        sidebar->GetExpandOnHoverLock(ExpandOnHoverLockType::kForceCollapse);
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return !sidebar->floating_sidebar()->window_buttons()->GetVisible() &&
+             !SidebarAnimating();
+    }));
+    EXPECT_FALSE(sidebar->HitTestPoint(
+        gfx::Point(kHiddenSidebarEdge + 40, sidebar->height() / 2)));
   }
 };
 
@@ -275,24 +314,81 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, SidebarInDarkMode) {
   SaveWindowScreenshot(browser(), "sidebar-dark");
 }
 
+// Cmd+S hides the sidebar: it keeps only the edge left of the page card, and
+// the page card fills the window with the toolbar along its top.
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
-                       TheNarrowSidebarLeavesTheWindowButtonsOnTheTint) {
+                       AHiddenSidebarGivesThePageTheWindow) {
   StageSidebar();
-  CheckTheNarrowSidebar("sidebar-collapsed");
+  HideSidebar();
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  // The pointer finds the sidebar on the edge only, and its rows lie left of
+  // the window.
+  VerticalTabStripRegionView* sidebar = Sidebar();
+  EXPECT_EQ(sidebar->x(), 0);
+  EXPECT_TRUE(sidebar->HitTestPoint(
+      gfx::Point(kHiddenSidebarEdge / 2, sidebar->height() / 2)));
+  EXPECT_FALSE(sidebar->HitTestPoint(
+      gfx::Point(kHiddenSidebarEdge + 40, sidebar->height() / 2)));
+  for (const views::View* child : sidebar->children()) {
+    if (child->GetVisible() && !child->bounds().IsEmpty() &&
+        !child->GetProperty(views::kViewIgnoredByLayoutKey)) {
+      EXPECT_LE(child->bounds().right(), 0) << child->GetClassName();
+    }
+  }
+  const gfx::Rect toolbar = InWindow(view->toolbar());
+  const gfx::Rect page = InWindow(view->multi_contents_view());
+  EXPECT_EQ(toolbar.x(), kHiddenSidebarEdge);
+  EXPECT_EQ(toolbar.y(), kPageCardMargins.top());
+  EXPECT_EQ(page.x(), kHiddenSidebarEdge);
+  EXPECT_EQ(page.right(), view->width() - kPageCardMargins.right());
+  EXPECT_FALSE(Sidebar()->floating_sidebar()->window_buttons()->GetVisible());
+  SaveWindowScreenshot(browser(), "sidebar-hidden");
 }
 
-// Run with pnpm run window-tests. macOS draws the buttons only in a real
-// window.
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
-                       MANUAL_TheNarrowSidebarInARealWindow) {
+                       TheFloatingSidebarSlidesInOverThePage) {
   StageSidebar();
-  CheckTheNarrowSidebar("sidebar-collapsed-real-window");
-  SaveNativeWindowScreenshot(browser(), "sidebar-collapsed-native");
+  CheckTheFloatingSidebar("sidebar-floating");
+}
+
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       TheFloatingSidebarInDarkMode) {
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  StageSidebar();
+  CheckTheFloatingSidebar("sidebar-floating-dark");
+}
+
+// Esc sends the card away, though something keeps it in, until the pointer
+// leaves the sidebar.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, EscSendsTheCardAway) {
+  StageSidebar();
+  HideSidebar();
+  std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  ASSERT_FALSE(Sidebar()->Contains(view->GetFocusManager()->GetFocusedView()));
+  EXPECT_TRUE(view->GetFocusManager()->ProcessAccelerator(
+      ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !Sidebar()->floating_sidebar()->window_buttons()->GetVisible() &&
+           !SidebarAnimating();
+  }));
+}
+
+// Run with pnpm run window-tests. macOS draws its window buttons only in a
+// real window, where the hidden sidebar takes them away.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       MANUAL_TheFloatingSidebarInARealWindow) {
+  StageSidebar();
+  HideSidebar();
+  SaveNativeWindowScreenshot(browser(), "sidebar-hidden-native");
+  std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
+  SaveNativeWindowScreenshot(browser(), "sidebar-floating-native");
 }
 
 // The new button at the right end of the foot replaces Chromium's "+" under
 // the tab list. "+" opens a tab as Cmd+T does, and its menu lists what can
-// be started, each with its key. The narrow sidebar keeps a lone "+".
+// be started, each with its key.
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
                        TheNewButtonSitsAtTheFootAndOpensATab) {
   browser()->GetProfile()->GetPrefs()->SetBoolean(kCommandBarEnabledPref,
@@ -330,14 +426,6 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   EXPECT_EQ(key, ui::Accelerator(ui::VKEY_N,
                                  ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN));
 
-  tabs::VerticalTabStripStateController* state =
-      tabs::VerticalTabStripStateController::From(browser());
-  state->RequestCollapse(true);
-  ASSERT_TRUE(base::test::RunUntil([&] { return state->IsCollapsed(); }));
-  EXPECT_TRUE(bar()->GetVisible());
-  EXPECT_TRUE(button->plus()->GetVisible());
-  EXPECT_FALSE(button->caret()->GetVisible());
-  SaveWindowScreenshot(browser(), "new-button-narrow");
 }
 
 // The Organize card says what organization is doing and offers the one step

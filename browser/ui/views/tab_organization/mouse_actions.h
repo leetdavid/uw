@@ -60,7 +60,7 @@ class TaskRowNewTabButton : public views::LabelButton {
   ~TaskRowNewTabButton() override;
 
   // Shows the "+" on `row` while its menu button shows, unless the switch is
-  // off or the sidebar is narrow.
+  // off.
   static void ShowWithMenu(views::View* row, bool menu_shown);
 
   // views::LabelButton:

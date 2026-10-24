@@ -31,7 +31,7 @@ All of these are manual tests. Record anything that differs from the expected re
 
 Expected result: the tab moves into a new task named `New task`, above the ungrouped tabs and after any other task. The task shows as a folder row. Point at it: its folder icon turns into a chevron, as a parent tab's favicon does. The ungrouped tabs sit under a `Scratchpad` label at the foot of the list. Collapse and drag the task as you would a tab group in Chromium.
 
-Double-click the task's name. Expected result: the name turns into a field on the row with all of it selected, and the task stays open or collapsed as it was. Type a name and press Return, or click elsewhere, to save it. Esc puts the old name back. In a collapsed sidebar the sidebar stays wide until you are done.
+Double-click the task's name. Expected result: the name turns into a field on the row with all of it selected, and the task stays open or collapsed as it was. Type a name and press Return, or click elsewhere, to save it. Esc puts the old name back. With the sidebar hidden, the floating sidebar stays in until you are done.
 
 Open the task's card with the ⋮ button on its row, or right-click the row. Expected result: a card opens under the row with `Rename Task`, `Name Task` when a language model is set, a row of color dots with the task's color ringed, `New Tab in Task`, `Move Task to New Window`, `Move Tabs to Scratchpad`, and `Close Task`. It says task, never group, and has no `Delete` and no note that groups save. The arrow keys move between rows, Return runs one, and Esc closes the card. In a tab's right-click menu, `Move to Task` lists the tasks. Close a task, quit, and start uw again: ⋮ has no `Tab groups` menu and the closed task is not offered anywhere. Cmd+Shift+T still brings back a task you just closed.
 
@@ -87,7 +87,7 @@ Click `Organize` at the foot of the sidebar. A card opens above it.
 - Its first line says what automatic organization is doing: `Organizing`, `Paused, resuming in 42 min`, `Paused until uw restarts`, `Paused`, `Off`, or `Needs a model`. The countdown follows the clock while the card is open.
 - While organizing, `Pause` offers `1 hour`, `Until restart`, and `Until I resume`. While paused, the row is `Resume`. While off, it is `Turn On`, and while no model is set, `Set Up`, which opens `uw://providers`.
 - Ctrl+Cmd+N opens a new tab in a new task of its own, with the task's name field ready, and so does `New Task` in the new button's menu. Cmd-T still opens a tab beside the current one, inside its task.
-- The new button sits at the right end of the foot. Its `+` does what Cmd-T does. Its `▾` lists `New Tab`, `New Task`, `New Chat`, `New Terminal`, and `New Split View`, each with its key. There is no `+` under the tab list. Collapse the sidebar: a lone `+` stays at its foot, and a right-click on it opens the same menu.
+- The new button sits at the right end of the foot. Its `+` does what Cmd-T does. Its `▾` lists `New Tab`, `New Task`, `New Chat`, `New Terminal`, and `New Split View`, each with its key. There is no `+` under the tab list.
 - `Undo Move` names the move it reverses, such as `SFO to LIS flights → Plan Lisbon trip`, and reverses it, as in the tab menu. Option+Cmd+Z does the same at any time. With nothing to undo, the row is grayed and says `Nothing to undo`.
 - The `Show Activity` switch makes the card above the button show what the model answered for each tab: its choice, how long it took, and the number that decided it against what it had to reach. A suggestion that fell short has a `Confirm` button that carries it out. Each confirmation is written to the organizer log as an `accepted` line: an example of what the model saw and the choice you confirmed.
 - `Settings…` opens the settings page.
@@ -146,6 +146,12 @@ Play a video, then use the site's picture-in-picture button, or right-click the 
 
 Expected result: the video plays in a small window with rounded corners in the bottom right of the screen, over every app. Point at it: close and back to tab show in the top corners, back 10 seconds, play or pause, and forward 10 seconds in the middle, and the time, mute, and a progress bar you can drag at the bottom. Press and hold on the video and it plays at 2× while held, with a `2×` label at the top; let go and it plays at its old speed. Drag the video to move the window. With `Glass` on in the theme picker, the buttons turn to glass. It does not dock in the sidebar yet.
 
+### Hide the sidebar
+
+Press Cmd+S, or choose View → Hide Sidebar.
+
+Expected result: the sidebar and the window's close, minimize, and zoom buttons go, and the page fills the window inside a thin edge of the theme. Rest the pointer on the window's left edge: after a moment the sidebar slides in over the page as a card, with the window buttons at its top left, and the page does not move. Picking a tab leaves the card in. Move the pointer onto the page, or press Esc, and the card slides away. Cmd+S, or View → Show Sidebar, shows the sidebar again. Save Page As has no key.
+
 ### Terminal tabs
 
 Choose `New Terminal` from the File menu or the new button's `▾` menu, or press Ctrl+\`.
@@ -195,6 +201,7 @@ On the right, a card for each of the agent's tabs shows a picture of the tab aft
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
+- The activity card while the sidebar is hidden. It shows on the floating sidebar only.
 - A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
 - Verified extension compatibility or daily-use stability.
 

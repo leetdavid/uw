@@ -44,7 +44,7 @@ index 7274b66570dd11e3e6899974ef0f1307697f22c6..f496d60f28f4ffa040c27aa5b6a39dbf
          "$root_gen_dir/chrome/whats_new_resources.pak",
          "$root_gen_dir/components/headless/command_handler/headless_command_resources.pak",
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef516be8f798 100644
+index 12d6be60e250efa15872027b297baab899e250c9..9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -19,6 +19,9 @@
@@ -57,7 +57,7 @@ index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef51
  
  namespace {
  
-@@ -42,6 +45,55 @@ const struct AcceleratorMapping {
+@@ -42,11 +45,59 @@ const struct AcceleratorMapping {
      {IDC_NEW_INCOGNITO_WINDOW, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
       ui::VKEY_N},
      {IDC_NEW_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_T},
@@ -93,11 +93,11 @@ index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef51
 +    {uw::kGoToTask1 + 6, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_7},
 +    {uw::kGoToTask1 + 7, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_8},
 +    {uw::kGoToTask1 + 8, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_9},
-+    {uw::kGoToScratchpad,
-+     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_0},
++    {uw::kGoToScratchpad, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN,
++     ui::VKEY_0},
 +    {uw::kRenameTask, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_R},
-+    {uw::kConfirmSuggestion,
-+     ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_RETURN},
++    {uw::kConfirmSuggestion, ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN,
++     ui::VKEY_RETURN},
 +    {uw::kGoToWorkspace1, ui::EF_CONTROL_DOWN, ui::VKEY_1},
 +    {uw::kGoToWorkspace1 + 1, ui::EF_CONTROL_DOWN, ui::VKEY_2},
 +    {uw::kGoToWorkspace1 + 2, ui::EF_CONTROL_DOWN, ui::VKEY_3},
@@ -113,8 +113,25 @@ index 12d6be60e250efa15872027b297baab899e250c9..10460a88515127371e9c74ac3e89ef51
      {IDC_NEW_WINDOW, ui::EF_COMMAND_DOWN, ui::VKEY_N},
      {IDC_PASTE, ui::EF_COMMAND_DOWN, ui::VKEY_V},
      {IDC_PRINT, ui::EF_COMMAND_DOWN, ui::VKEY_P},
+     {IDC_RESTORE_TAB, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_T},
+-    {IDC_SAVE_PAGE, ui::EF_COMMAND_DOWN, ui::VKEY_S},
+     {IDC_SHOW_BOOKMARK_BAR, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
+      ui::VKEY_B},
+     {IDC_SHOW_BOOKMARK_MANAGER, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN,
+@@ -114,8 +165,9 @@ const struct AcceleratorMapping {
+      ui::VKEY_I},
+ #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+     {IDC_TAB_SEARCH, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_A},
+-    {IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
+-     ui::VKEY_L},
++    // uw: Cmd+S hides and shows the sidebar, as in Arc, and Save Page As has
++    // no key.
++    {IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, ui::EF_COMMAND_DOWN, ui::VKEY_S},
+     {IDC_NEW_SPLIT_TAB, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN, ui::VKEY_N},
+ };
+ 
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..31cd273f7c2d18b5d7f24f86395eca95ae7ec134 100644
+index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..3e47f7d599ba0dfbff643a2558cb2b2fe3ac36f9 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -9,6 +9,7 @@
@@ -169,7 +186,8 @@ index 1d8c774ed5766c6f7528f25eb1c248b824838fa9..31cd273f7c2d18b5d7f24f86395eca95
 -                  .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
                Item(IDS_VERTICAL_TABS_VIEW_MENU_TOGGLE_COLLAPSE)
                    .command_id(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE)
-                   .key_equivalent(@"L", NSEventModifierFlagCommand)
+-                  .key_equivalent(@"L", NSEventModifierFlagCommand)
++                  .key_equivalent(@"s", NSEventModifierFlagCommand)
                    .remove_if(!tabs::IsVerticalTabsFeatureEnabled()),
 +              Item(IDS_UW_THEME_MENU)
 +                  .command_id(uw::kShowThemePicker)

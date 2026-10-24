@@ -71,7 +71,7 @@ class TaskNameField : public views::Textfield,
   std::u16string started_with_;
   bool ending_ = false;
   views::ViewTracker previous_focus_;
-  // Keeps a collapsed sidebar wide while the name is typed.
+  // Keeps a hidden sidebar's floating card in while the name is typed.
   std::unique_ptr<ExpandOnHoverLock> expand_lock_;
   base::CallbackListSubscription renames_;
   base::WeakPtrFactory<TaskNameField> weak_factory_{this};

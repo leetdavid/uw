@@ -565,8 +565,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, ASwipeOnThePageIsNotASlide) {
   EXPECT_FALSE(SwipeOf(browser())->sliding());
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
-                       TheNarrowSidebarDoesNotSwipe) {
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, AHiddenSidebarDoesNotSwipe) {
   AddWorkspace("Reading", browser()->GetProfile());
   auto* state = tabs::VerticalTabStripStateController::From(browser());
   state->RequestCollapse(true);

@@ -56,6 +56,9 @@ constexpr int kRingWidth = 2;
 constexpr size_t kMostIcons = 4;
 constexpr float kDimOpacity = 0.6f;
 constexpr float kDimGrayscale = 0.35f;
+// Where a card opens while the sidebar is hidden: this far in from the
+// window's bottom-left corner.
+constexpr int kCardCornerInset = 16;
 // The tint's text color at about 55%, as the new button's caret is.
 constexpr SkAlpha kDotAlpha = 0x8C;
 // Under the pointer an icon lights on a fill of white at 30%, against the
@@ -292,9 +295,18 @@ void WorkspaceSwitcher::OnPaint(gfx::Canvas* canvas) {
 }
 
 void WorkspaceSwitcher::ShowNewWorkspaceCard() {
-  ShowCard(
-      MakeNewWorkspaceCard(this, parent() ? parent() : this, CardClosing()),
-      std::string());
+  views::View* foot = parent() ? parent() : this;
+  CardBubble* bubble = MakeNewWorkspaceCard(this, foot, CardClosing());
+  // A hidden sidebar's foot is off the window, so the card opens at the
+  // window's corner, where the foot floats in.
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(window_);
+  if (view && foot->GetVisibleBounds().IsEmpty()) {
+    const gfx::Rect window = view->GetBoundsInScreen();
+    bubble->SetAnchorView(nullptr);
+    bubble->SetAnchorRect(gfx::Rect(window.x() + kCardCornerInset,
+                                    window.bottom() - kCardCornerInset, 0, 0));
+  }
+  ShowCard(bubble, std::string());
 }
 
 void WorkspaceSwitcher::ShowMenu(const std::string& id) {

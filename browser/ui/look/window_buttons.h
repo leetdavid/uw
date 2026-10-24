@@ -12,7 +12,8 @@ class Canvas;
 
 namespace views {
 class View;
-}
+class Widget;
+}  // namespace views
 
 namespace uw {
 
@@ -23,6 +24,16 @@ namespace uw {
 void PaintWindowButtonDots(gfx::Canvas* canvas,
                            const views::View* view,
                            SkColor color);
+
+// Hides or shows macOS's close, minimize, and zoom buttons of `widget`. A
+// hidden sidebar takes them away, and its floating card draws uw's own.
+void SetWindowButtonsHidden(views::Widget* widget, bool hidden);
+
+enum class WindowButton { kClose, kMinimize, kZoom };
+
+// Does what a click on macOS's `button` of `widget` does: closes, minimizes,
+// or goes full screen. With `option`, the zoom button zooms instead.
+void PressWindowButton(views::Widget* widget, WindowButton button, bool option);
 
 }  // namespace uw
 

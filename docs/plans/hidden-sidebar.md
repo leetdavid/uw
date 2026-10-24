@@ -1,6 +1,6 @@
 # Hidden and floating sidebar
 
-Status: scope agreed on 2026-10-24. The design, T182, was signed off the same day, once the user chose window buttons drawn by uw. T183 is in progress.
+Status: scope agreed on 2026-10-24. The design, T182, was signed off the same day, once the user chose window buttons drawn by uw. T183 was built on 2026-10-25 and is in review. The line under the setting waits for a build that adds strings, since a new string rebuilds most of Chromium.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's hover expansion already has the pause before it opens, the locks that keep it open during a menu or a rename, the link drag that opens it, a shadow, and a blurred backdrop. uw sets the hidden width to zero and draws the inset card and the slide. uw draws the floating card's window buttons itself, so nothing macOS draws has to move; matching macOS's look and behavior is bounded work. The risks: The window layout this changes is Chromium's newest and changes with each release. The activity card needs a place outside the sidebar. Only a real window can judge the feel.
 
@@ -19,7 +19,7 @@ The user asked on 2026-10-24 for Arc's floating sidebar in place of the narrow s
 
 ### The floating sidebar
 
-- It comes in when the pointer rests at the window's left edge: the 8px of tint left of the card, or the screen's edge when the window touches it. It uses Chromium's pause: about 350 ms at rest, and 50 to 200 ms when the pointer moves fast toward the edge. A pointer passing over the edge does not open it.
+- It comes in when the pointer rests at the window's left edge: the 8px of tint left of the card, or the screen's edge when the window touches it. It uses Chromium's timing: the card comes in about 200 ms after the pointer reaches the edge, once the pointer has slowed there. A pointer passing over the edge does not open it.
 - A link, a tab from another window, or a side-by-side tab dragged to the edge brings it in the same way, and it stays until the drop.
 - Keys that need a row bring it in while they are in use, such as Focus the sidebar (Ctrl+Cmd+L) and Rename task (Ctrl+Cmd+R).
 - It is a card inset 8px from the window's top, left, and bottom, as wide as the shown sidebar, with the page card's 12px corners and a soft shadow. It shows everything the shown sidebar does, foot included, with the window buttons at its top left.
@@ -42,7 +42,9 @@ Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 - "Floating sidebar: over the page": the card with its window buttons, the pointer on a row.
 - "Floating sidebar: every state": hidden in light and dark, the pointer at the edge, sliding in, in place in light and dark, with Transparency, the activity card alone in light and dark, the View menu, the setting, and uw's window buttons in each state.
 
-uw's proposals in the frames: it slides in over 200 ms, ease out, and out over 150 ms, ease in. The user chose window buttons drawn by uw over a fade-in of macOS's own, which cannot ride the slide. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
+It slides in over 250 ms and out over 200 ms, the timing of Chromium's own hover animation, in place of the frames' 200 and 150 ms. The user chose window buttons drawn by uw over a fade-in of macOS's own, which cannot ride the slide. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
+
+Chromium's collapsed state is the hidden state, and its hover animation slides the card in. While hidden, Chromium's sidebar is 8px wide at the window's left edge; while the card is out, it spans the edge and the card, so the pointer can rest on the edge. `FloatingSidebar` (`browser/ui/views/tab_organization/floating_sidebar.h`) lays the sidebar's rows out on the card, paints the card, and places its shadow and `FloatingWindowButtons`. The views Chromium drew compactly while collapsed, such as the top row and the pins, lay out as in the shown sidebar.
 
 ## Stages
 
@@ -54,10 +56,10 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Acceptance checks
 
-1. Cmd+S hides the sidebar: the page card fills the window with an 8px inset, and the window buttons are gone. Cmd+S shows it again. The View menu names the command by state. Cmd+Shift+L does nothing, and Save Page As has no key.
-2. With the pointer at rest on the left edge, the floating sidebar comes in after about 350 ms. A pointer passing over the edge does not open it. The page's size and place do not change.
-3. The floating card is inset 8px from the window's top, left, and bottom, is the shown sidebar's width, has 12px corners and a shadow, and shows uw's window buttons at its top left, which slide with it. It slides in and out without its rows reflowing. The buttons close, minimize, and go full screen, Option-click on the green one zooms, and they show their glyphs under the pointer and the faint look in a window not in front.
-4. It slides out when the pointer moves onto the page, and not when a tab is picked. It stays while a menu, a rename, a drag, or keyboard focus is in it. Esc sends it away.
+1. Cmd+S hides the sidebar: the page card fills the window with an 8px inset, and the window buttons are gone. Cmd+S shows it again. The View menu names the command by state. Cmd+Shift+L does nothing, and Save Page As has no key. `MenuKeysBrowserTest.CmdSHidesTheSidebar`, `WindowScreenshotBrowserTest.AHiddenSidebarGivesThePageTheWindow`, and `WindowButtonsBrowserTest.AHiddenSidebarHidesTheWindowButtons` check it.
+2. With the pointer at rest on the left edge, the floating sidebar comes in after about 200 ms. A pointer passing over the edge does not open it. The page's size and place do not change.
+3. The floating card is inset 8px from the window's top, left, and bottom, is the shown sidebar's width, has 12px corners and a shadow, and shows uw's window buttons at its top left, which slide with it. It slides in and out without its rows reflowing. The buttons close, minimize, and go full screen, Option-click on the green one zooms, and they show their glyphs under the pointer and the faint look in a window not in front. `WindowScreenshotBrowserTest.TheFloatingSidebarSlidesInOverThePage` and `TheFloatingSidebarInDarkMode` check its place and its buttons.
+4. It slides out when the pointer moves onto the page, and not when a tab is picked. It stays while a menu, a rename, a drag, or keyboard focus is in it. Esc sends it away. `WindowScreenshotBrowserTest.EscSendsTheCardAway` checks Esc.
 5. Ctrl+Cmd+L and Ctrl+Cmd+R bring it in with focus in the right row.
 6. A link dragged to the left edge brings it in, and a drop on a row opens the link there.
 7. With Transparency above solid, the page shows blurred through the card.

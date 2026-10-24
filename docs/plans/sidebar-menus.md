@@ -25,7 +25,7 @@ The task menu and the Organize menu become uw cards in the [Arc-style look](arc-
 ### Naming in place
 
 - Double-clicking a task's name, Rename Task in its card, and Tasks → Rename Task in the menu bar each turn the name on the row into a text field. A task the user creates, with Ctrl+Cmd+N or New Task, starts that way. Return or a click elsewhere saves, and Esc puts the old name back.
-- In a collapsed sidebar, renaming widens the sidebar until the name is saved or dropped.
+- In a hidden sidebar, renaming keeps the floating sidebar in until the name is saved or dropped.
 - Name Task closes the card at once and asks the language model in the background:
   - The task's row shows its spinner, and the name lands on the row when it comes. No window has to stay open.
   - On failure the old name stays, and the activity card says "Couldn't name" with the task, the reason, and Try Again. It shows even with Show Organizer Activity off, because the user asked.

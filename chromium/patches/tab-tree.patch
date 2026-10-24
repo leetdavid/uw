@@ -9,7 +9,7 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..5ddc3d29278f8a4bff06f6216e04ebd76b797557 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..059e32b3e50e393cf41efe9aa558947171fffcad 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -277,6 +277,188 @@ are declared in tools/grit/grit_args.gni.
@@ -219,6 +219,59 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..5ddc3d29278f8a4bff06f6216e04ebd7
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
+@@ -10413,10 +10595,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
+             Show Tabs Horizontally
+           </message>
+           <message name="IDS_COLLAPSE_VERTICAL_TABS" desc="In Title Case: The tooltip for the button in the top container that collapses the vertical tab strip.">
+-            Collapse Tabs
++            Hide Sidebar
+           </message>
+           <message name="IDS_EXPAND_VERTICAL_TABS" desc="In Title Case: The tooltip for the button in the top container that expands the vertical tab strip.">
+-            Expand Tabs
++            Show Sidebar
+           </message>
+           <message name="IDS_VERTICAL_TABS_SEND_FEEDBACK" desc="In Title Case: The button in context menu that allows users to send feedback about vertical tabs.">
+             Send Feedback About the Tab Strip
+@@ -10437,7 +10619,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+             Turn off Auto Expanding Tabs
+           </message>
+           <message name="IDS_VERTICAL_TABS_COLLAPSE_BUTTON_TOGGLE_EXPAND_ON_HOVER" desc="In Title Case: The right click context menu opened by the collapse button that toggles expand on hover behavior.">
+-            Expand Collapsed Tabs by Hovering
++            Show the Sidebar at the Window's Edge
+           </message>
+         </then>
+         <else>
+@@ -10448,10 +10630,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
+             Show tabs horizontally
+           </message>
+           <message name="IDS_COLLAPSE_VERTICAL_TABS" desc="The tooltip for the button in the top container that collapses the vertical tab strip.">
+-            Collapse tabs
++            Hide sidebar
+           </message>
+           <message name="IDS_EXPAND_VERTICAL_TABS" desc="The tooltip for the button in the top container that expands the vertical tab strip.">
+-            Expand tabs
++            Show sidebar
+           </message>
+           <message name="IDS_VERTICAL_TABS_SEND_FEEDBACK" desc="The button in context menu that allows users to send feedback about vertical tabs.">
+             Send feedback about the tab strip
+@@ -10472,7 +10654,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+             Turn off auto expanding tabs
+           </message>
+           <message name="IDS_VERTICAL_TABS_COLLAPSE_BUTTON_TOGGLE_EXPAND_ON_HOVER" desc="The right click context menu opened by the collapse button that toggles expand on hover behavior.">
+-            Expand collapsed tabs by hovering
++            Show the sidebar at the window's edge
+           </message>
+         </else>
+       </if>
+@@ -10498,7 +10680,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
+             More Options
+       </message>
+       <message name="IDS_VERTICAL_TABS_VIEW_MENU_TOGGLE_COLLAPSE" desc="In Title Case: The mac view menu item that toggles the collapse state.">
+-            Collapse Vertical Tabs
++            Hide Sidebar
+       </message>
+       <!-- /Vertical Tab Strings -->
+ 
 @@ -11140,7 +11322,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
          Find your reading list and bookmarks in Bookmarks and Lists
        </message>
@@ -1147,19 +1200,20 @@ index afa40bfc3acb801c9745a05c5abdc72b685b6448..f70a5201e91ee080e085a7f776d270ce
  
    EnsureFocusOrder(target_index);
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index ab919030ae2fbd70240f192e1a7060776530523a..d53741f9739f468fe8cb638e7e29409d49976120 100644
+index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc258dd71150 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-@@ -67,6 +67,8 @@
+@@ -67,6 +67,9 @@
  #include "ui/views/controls/focus_ring.h"
  #include "ui/views/controls/resize_area.h"
  #include "ui/views/controls/separator.h"
++#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 +#include "uw/browser/ui/views/tab_organization/organize_bar.h"
 +#include "uw/browser/ui/views/workspaces/workspace_switcher.h"
  #include "ui/views/focus/focus_manager.h"
  #include "ui/views/interaction/element_tracker_views.h"
  #include "ui/views/layout/flex_layout.h"
-@@ -156,6 +158,14 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+@@ -156,6 +159,14 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
                LayoutConstant::kVerticalTabStripCollapsedVerticalPadding),
            region_horizontal_padding, 0, region_horizontal_padding));
  
@@ -1174,7 +1228,18 @@ index ab919030ae2fbd70240f192e1a7060776530523a..d53741f9739f468fe8cb638e7e29409d
    gemini_button_ = AddChildView(std::make_unique<views::View>());
  
    resize_area_ = AddChildView(std::make_unique<views::ResizeArea>(this));
-@@ -279,14 +289,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
+@@ -187,6 +198,10 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+       kExpandOnHoverShadowElevation, kExpandOnHoverShadowAlpha));
+   shadow_frame_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+ 
++  // uw: a hidden sidebar floats in over the page as a card.
++  uw_floating_sidebar_ =
++      std::make_unique<uw::FloatingSidebar>(this, browser_view);
++
+   if (base::FeatureList::IsEnabled(features::kTabGroupsFocusing)) {
+     focus_swipe_controller_ =
+         std::make_unique<VerticalTabStripFocusSwipeController>(this);
+@@ -279,14 +294,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
      return false;
    }
  
@@ -1195,6 +1260,70 @@ index ab919030ae2fbd70240f192e1a7060776530523a..d53741f9739f468fe8cb638e7e29409d
      gfx::Point point_in_child = point;
      views::View::ConvertPointToTarget(this, bottom_button_container_,
                                        &point_in_child);
+@@ -351,6 +370,7 @@ bool VerticalTabStripRegionView::WillWrapDueToOverflow(
+ 
+ void VerticalTabStripRegionView::AddedToWidget() {
+   BaseTabStripRegionView::AddedToWidget();
++  uw_floating_sidebar_->UpdateWindowButtons();
+   paint_as_active_subscription_ =
+       GetWidget()->RegisterPaintAsActiveChangedCallback(base::BindRepeating(
+           [](VerticalTabStripRegionView* view) {
+@@ -371,6 +391,12 @@ void VerticalTabStripRegionView::RemovedFromWidget() {
+ }
+ 
+ void VerticalTabStripRegionView::Layout(PassKey) {
++  flex_layout_->SetInteriorMargin(
++      uw_floating_sidebar_->Margin(gfx::Insets::TLBR(
++          0, 0,
++          GetLayoutConstant(
++              LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding),
++          0)));
+   LayoutSuperclass<views::AccessiblePaneView>(this);
+ 
+   // Manually position the resize area as it overlaps views handled by the flex
+@@ -385,6 +411,7 @@ void VerticalTabStripRegionView::Layout(PassKey) {
+   if (drop_arrow()) {
+     drop_arrow()->SetIndex(drop_arrow()->index());
+   }
++  uw_floating_sidebar_->Layout();
+ }
+ 
+ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+@@ -399,7 +426,7 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+ gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
+   auto min_size = BaseTabStripRegionView::GetMinimumSize();
+   min_size.set_width((state_controller_->IsCollapsed() || IsAnimatingSize())
+-                         ? kCollapsedWidth
++                         ? uw::kHiddenSidebarEdge
+                          : kUncollapsedMinWidth);
+   return min_size;
+ }
+@@ -411,12 +438,12 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
+       BrowserAnimationController::From(browser_view()->browser());
+   const auto motion =
+       controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
+-  const int expand_amount =
+-      std::max(0, target_collapse_state_.uncollapsed_width - kCollapsedWidth);
++  const int expand_amount = std::max(
++      0, target_collapse_state_.uncollapsed_width - uw::kHiddenSidebarEdge);
+   const double expand_percent =
+       *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+                                    TabStripAnimations::kTabStripWidth);
+-  size.set_width(kCollapsedWidth +
++  size.set_width(uw::kHiddenSidebarEdge +
+                  (motion == TabStripAnimations::kExpand
+                       ? std::floor<double>
+                       : std::ceil<double>)(expand_amount * expand_percent));
+@@ -783,6 +810,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+   if (tab_strip_view()) {
+     tab_strip_view()->SetCollapsedState(collapsed);
+   }
++  if (uw_floating_sidebar_) {
++    uw_floating_sidebar_->UpdateWindowButtons();
++  }
+ 
+   if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||
+       (state == tabs::VerticalTabStripCollapseState::kExpanded &&
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5e13d4957 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
@@ -1447,20 +1576,21 @@ index a6c53969ea00adc6c6ca3b6c1f3611003b626650..76b6e36adebcfb3bc4832c875e52229c
  
  bool TabGroupEditorBubbleView::CanShareGroups() const {
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index fd63fdec82640fdb42de8388dfd691900f706674..8920ed13ab7fa862700420d4995dde58fe49df7c 100644
+index fd63fdec82640fdb42de8388dfd691900f706674..de6d2b8a3a374b430515b061dd7fe4fd03c0f157 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-@@ -69,6 +69,9 @@
+@@ -69,6 +69,10 @@
  #include "ui/native_theme/native_theme.h"
  #import "ui/views/cocoa/native_widget_mac_ns_window_host.h"
  #include "ui/views/interaction/element_tracker_views.h"
 +#include "uw/browser/ui/glass/glass.h"
 +#include "uw/browser/tab_organization/commands.h"
++#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 +#include "uw/browser/ui/views/tab_organization/window_commands.h"
  
  namespace {
  
-@@ -297,7 +300,9 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameWidth() const {
+@@ -297,7 +301,9 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameWidth() const {
    // If vertical tabs are not being drawn (e.g. horizontal tab strip mode,
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
@@ -1471,7 +1601,7 @@ index fd63fdec82640fdb42de8388dfd691900f706674..8920ed13ab7fa862700420d4995dde58
      return std::nullopt;
    }
  
-@@ -388,6 +393,13 @@ void BrowserNativeWidgetMac::ValidateUserInterfaceItem(
+@@ -388,6 +394,13 @@ void BrowserNativeWidgetMac::ValidateUserInterfaceItem(
      result->enable = false;
      return;
    }
@@ -1485,7 +1615,20 @@ index fd63fdec82640fdb42de8388dfd691900f706674..8920ed13ab7fa862700420d4995dde58
  
    // Generate return value (enabled state).
    result->enable = chrome::IsCommandEnabled(browser, tag);
-@@ -972,17 +984,12 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
+@@ -405,6 +418,12 @@ void BrowserNativeWidgetMac::ValidateUserInterfaceItem(
+                                                : IDS_ENTER_FULLSCREEN_MAC));
+       break;
+     }
++    case IDC_TOGGLE_VERTICAL_TABS_COLLAPSE:
++      // uw: Hide Sidebar, or Show Sidebar while it is hidden.
++      result->new_title.emplace(l10n_util::GetStringUTF16(
++          uw::IsSidebarHidden(browser) ? IDS_EXPAND_VERTICAL_TABS
++                                       : IDS_COLLAPSE_VERTICAL_TABS));
++      break;
+     case IDC_SHOW_AS_TAB: {
+       // Hide this menu option if the window is tabbed or is the devtools
+       // window.
+@@ -972,17 +991,12 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
            [[GlassFrameBackgroundView alloc] initWithFrame:content_view.bounds];
        glass_view.wantsLayer = YES;
        glass_view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -2095,3 +2238,34 @@ index 6ff7745f13856bf4e385ea70852312435158d766..8dac07da131b145a057d17a5b08db0ec
      "//chrome/browser:primitives",
      "//chrome/browser/glic",
      "//chrome/browser/glic/browser_ui:glow",
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+index b35f686251462c443d02dcd284f9b4fc46b610ad..f4e64cf0ee6b540950b665178e635a122b5d5044 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+@@ -41,6 +41,10 @@ namespace tabs {
+ class VerticalTabStripStateController;
+ }  // namespace tabs
+ 
++namespace uw {
++class FloatingSidebar;
++}  // namespace uw
++
+ namespace views {
+ class ResizeArea;
+ class Separator;
+@@ -148,6 +152,7 @@ class VerticalTabStripRegionView final
+   }
+ 
+   views::ResizeArea* resize_area_for_testing() { return resize_area_; }
++  uw::FloatingSidebar* floating_sidebar() { return uw_floating_sidebar_.get(); }
+   tabs::VerticalTabStripState target_collapse_state_for_testing() {
+     return target_collapse_state_;
+   }
+@@ -247,6 +252,7 @@ class VerticalTabStripRegionView final
+   raw_ptr<views::View> gemini_button_ = nullptr;
+   raw_ptr<views::ResizeArea> resize_area_ = nullptr;
+   raw_ptr<ShadowFrameView> shadow_frame_ = nullptr;
++  std::unique_ptr<uw::FloatingSidebar> uw_floating_sidebar_;
+   int resize_area_width_;
+   raw_ptr<views::FlexLayout> flex_layout_ = nullptr;
+ 

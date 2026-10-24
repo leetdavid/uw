@@ -97,6 +97,17 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TheSectionListsEveryMenuOfTheBar) {
   EXPECT_EQ("uw", Row("Quit uw").menu);
 }
 
+// Cmd+S hides and shows the sidebar, as in Arc. Save Page As keeps no key, and
+// Chromium's Cmd+Shift+L for the sidebar is gone.
+IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, CmdSHidesTheSidebar) {
+  EXPECT_EQ(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, CommandFor(ui::VKEY_S, kCmd));
+  EXPECT_EQ("Command+S", Row("Hide Sidebar").key);
+  EXPECT_NE(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE,
+            CommandFor(ui::VKEY_L, kCmd | NSEventModifierFlagShift));
+  ui::Accelerator key;
+  EXPECT_FALSE(GetDefaultMacAcceleratorForCommandId(IDC_SAVE_PAGE, &key));
+}
+
 IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, ANewKeyRunsItsCommandInTheWindow) {
   ASSERT_TRUE(SetMenuKey(local_state(), "keep_here", "Command+Ctrl+J"));
 
