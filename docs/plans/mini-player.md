@@ -1,6 +1,6 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day and T187, docking in the sidebar, on 2026-10-25; both are in review.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, and T188, automatic mini players, on 2026-10-25. All three are in review.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
@@ -88,7 +88,7 @@ Proposed. Product code goes in `browser/ui/views/mini_player/`, per [Architectur
 
 - A patch makes `content::VideoOverlayWindow::Create` return uw's mini player in place of `VideoOverlayWindowViews`. It shows the surface Chromium hands it in a view, and moves that view between the front window's sidebar and uw's floating widget. The video keeps playing through the move, since the surface does not change.
 - The controls call the existing `VideoPictureInPictureWindowController` methods: play and pause, `SeekTo`, mute, back to tab, close.
-- Automatic mini players come from a watcher on each window's tabs. On a switch, it asks the left tab's media session for picture in picture, as Chrome's media controls do, when the setting is on and the video plays with its sound and is big enough. Chromium's own automatic picture in picture is left as it is: it needs HTTPS, a site the user watches often, a permission prompt, and no other mini player open.
+- Automatic mini players come from a watcher on each window's tabs. On a switch, it asks the left tab's media session for picture in picture, as Chrome's media controls do, when the setting is on and the video plays with its sound and is big enough. "Big enough" is Blink's own measure: at least 10,000 square pixels of the video in the viewport and not covered, which Blink only takes with `AutoPictureInPictureVideoHeuristics`, turned on in `uw-trials.patch`. Chromium's own automatic picture in picture is left as it is: it needs HTTPS, a site the user watches often, a permission prompt, and no other mini player open.
 - The stack keeps, for each paused video, its tab and a copy of the last frame taken before the surface goes.
 - 2× runs a short script in an isolated world in the video's frame that sets the picture-in-picture video's `playbackRate` and puts it back on release. Chromium has no browser-side call for playback speed.
 - Document picture in picture's frame gets its corners and edge in the patch that draws that window's frame.

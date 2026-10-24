@@ -16,11 +16,13 @@ class BrowserWindowInterface;
 
 namespace uw {
 
+class AutoMiniPlayer;
 class MiniPlayerView;
 
 // The place at the bottom of a window's sidebar, above the foot, where the
 // mini player docks, per docs/plans/mini-player.md. It spans the sidebar and
 // takes the video's shape, never taller than it is wide. Hidden while empty.
+// It also opens a mini player when the user leaves a tab whose video plays.
 class MiniPlayerDock : public views::View {
   METADATA_HEADER(MiniPlayerDock, views::View)
 
@@ -64,6 +66,7 @@ class MiniPlayerDock : public views::View {
   const raw_ptr<BrowserWindowInterface> window_;
   raw_ptr<MiniPlayerView> player_ = nullptr;
   base::OnceClosure on_destroying_;
+  std::unique_ptr<AutoMiniPlayer> auto_mini_player_;
   ui::ScopedUnownedUserData<MiniPlayerDock> user_data_;
 };
 

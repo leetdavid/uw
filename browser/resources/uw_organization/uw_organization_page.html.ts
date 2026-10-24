@@ -194,6 +194,19 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
       </cr-toggle>
     </div>
     <div class="uw-row">
+      <div id="miniPlayerOnTabSwitchLabel" class="uw-field">
+        ${this.i18n_('uwMiniPlayerOnTabSwitch')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwMiniPlayerOnTabSwitchDescription')}
+        </div>
+      </div>
+      <cr-toggle id="miniPlayerOnTabSwitchToggle"
+          aria-labelledby="miniPlayerOnTabSwitchLabel"
+          ?checked="${!!this.state_?.miniPlayerOnTabSwitch}"
+          @change="${this.onMiniPlayerOnTabSwitchChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-row">
       <div id="miniPlayerFloatLabel" class="uw-field">
         ${this.i18n_('uwMiniPlayerFloat')}
         <div class="uw-secondary">

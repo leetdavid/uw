@@ -48,6 +48,7 @@ struct State {
   bool middle_click_closes_task;
   // The mini player's switches, for all of uw.
   bool mini_player_in_sidebar;
+  bool mini_player_on_tab_switch;
   bool mini_player_float_in_background;
 };
 
@@ -62,6 +63,7 @@ enum MouseAction {
 // The mini player's switches.
 enum MiniPlayerSwitch {
   kInSidebar,
+  kOnTabSwitch,
   kFloatInBackground,
 };
 

@@ -269,8 +269,16 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        TheMiniPlayerSwitchesStartOnAndTurnItsPlacesOff) {
   PrefService* local_state = g_browser_process->local_state();
   EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerInSidebarPref));
+  EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerOnTabSwitchPref));
   EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref));
   OpenPage();
+  ASSERT_EQ(true, Run("const toggle = part('miniPlayerOnTabSwitchToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !local_state->GetBoolean(kMiniPlayerOnTabSwitchPref); }));
   ASSERT_EQ(true, Run("const toggle = part('miniPlayerFloatToggle');"
                       "await until(() => toggle.checked);"
                       "toggle.scrollIntoView({block: 'center'});"

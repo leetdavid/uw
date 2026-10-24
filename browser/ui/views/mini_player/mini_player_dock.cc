@@ -13,6 +13,7 @@
 #include "ui/color/color_provider.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/views/view_class_properties.h"
+#include "uw/browser/ui/views/mini_player/auto_mini_player.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 
 namespace uw {
@@ -29,7 +30,9 @@ constexpr gfx::Size kDefaultShape(16, 9);
 DEFINE_USER_DATA(MiniPlayerDock);
 
 MiniPlayerDock::MiniPlayerDock(BrowserWindowInterface* window)
-    : window_(window), user_data_(window->GetUnownedUserDataHost(), *this) {
+    : window_(window),
+      auto_mini_player_(std::make_unique<AutoMiniPlayer>(window)),
+      user_data_(window->GetUnownedUserDataHost(), *this) {
   SetVisible(false);
   SetProperty(views::kMarginsKey, gfx::Insets::TLBR(kTopGap, 0, 0, 0));
 }

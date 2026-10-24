@@ -45,6 +45,8 @@ const char* MiniPlayerPref(mojom::MiniPlayerSwitch which) {
   switch (which) {
     case mojom::MiniPlayerSwitch::kInSidebar:
       return kMiniPlayerInSidebarPref;
+    case mojom::MiniPlayerSwitch::kOnTabSwitch:
+      return kMiniPlayerOnTabSwitchPref;
     case mojom::MiniPlayerSwitch::kFloatInBackground:
       return kMiniPlayerFloatInBackgroundPref;
   }
@@ -120,6 +122,9 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMiniPlayerInSidebar", IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR},
       {"uwMiniPlayerInSidebarDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR_DESCRIPTION},
+      {"uwMiniPlayerOnTabSwitch", IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH},
+      {"uwMiniPlayerOnTabSwitchDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH_DESCRIPTION},
       {"uwMiniPlayerFloat", IDS_UW_SETTINGS_MINI_PLAYER_FLOAT},
       {"uwMiniPlayerFloatDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_FLOAT_DESCRIPTION},
@@ -196,6 +201,8 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   const PrefService* local_state = g_browser_process->local_state();
   state->mini_player_in_sidebar =
       local_state->GetBoolean(kMiniPlayerInSidebarPref);
+  state->mini_player_on_tab_switch =
+      local_state->GetBoolean(kMiniPlayerOnTabSwitchPref);
   state->mini_player_float_in_background =
       local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref);
   return state;

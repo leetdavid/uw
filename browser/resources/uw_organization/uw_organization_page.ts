@@ -283,6 +283,12 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.refresh_();
   }
 
+  protected async onMiniPlayerOnTabSwitchChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setMiniPlayer(
+        MiniPlayerSwitch.kOnTabSwitch, e.detail);
+    this.refresh_();
+  }
+
   protected async onMiniPlayerFloatChange_(e: CustomEvent<boolean>) {
     await this.browserProxy_.setMiniPlayer(
         MiniPlayerSwitch.kFloatInBackground, e.detail);

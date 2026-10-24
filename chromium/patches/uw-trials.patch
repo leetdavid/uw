@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
-index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..36ac48704e8c85a912a35ced82f4d4aaca719c34 100644
+index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..65d6b7458da85e825f87cfb391a9f013a3c5d8c8 100644
 --- a/chrome/browser/metrics/chrome_feature_list_creator.cc
 +++ b/chrome/browser/metrics/chrome_feature_list_creator.cc
 @@ -22,6 +22,8 @@
@@ -19,15 +19,17 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..36ac48704e8c85a912a35ced82f4d4aa
  #include "components/variations/pref_names.h"
  #include "components/variations/service/variations_service.h"
  #include "components/variations/variations_crash_keys.h"
-@@ -40,6 +43,7 @@
+@@ -39,7 +42,9 @@
+ #include "content/public/common/content_switches.h"
  #include "services/network/public/cpp/network_switches.h"
  #include "services/network/public/cpp/shared_url_loader_factory.h"
++#include "third_party/blink/public/common/features_generated.h"
  #include "ui/base/resource/resource_bundle.h"
 +#include "ui/base/ui_base_features.h"
  
  #if BUILDFLAG(IS_WIN)
  #include "chrome/installer/util/google_update_settings.h"
-@@ -238,11 +242,24 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
+@@ -238,11 +243,29 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
  
    variations::VariationsService* variations_service =
        metrics_services_manager_->GetVariationsService();
@@ -50,6 +52,11 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..36ac48704e8c85a912a35ced82f4d4aa
 +    overrides.emplace_back(std::cref(*trial),
 +                           base::FeatureList::OVERRIDE_ENABLE_FEATURE);
 +  }
++  // uw: pages measure how much of a video shows, so leaving a tab opens a
++  // mini player only for a video big enough on the page.
++  overrides.emplace_back(
++      std::cref(blink::features::kAutoPictureInPictureVideoHeuristics),
++      base::FeatureList::OVERRIDE_ENABLE_FEATURE);
 +  variations_service->SetUpFieldTrials(variation_ids, overrides,
 +                                       std::move(feature_list),
 +                                       browser_field_trials_.get());

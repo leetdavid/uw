@@ -21,12 +21,13 @@
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "content/public/browser/media_session.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
-#include "media/base/media_switches.h"
 #include "content/public/browser/video_picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "media/base/media_switches.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/compositor/layer.h"
@@ -39,6 +40,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
+#include "uw/browser/ui/views/mini_player/auto_mini_player.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
@@ -118,6 +120,22 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   static PrefService* LocalState() { return g_browser_process->local_state(); }
+
+  // Opens Chromium's picture-in-picture test page and plays its video with
+  // sound, in the tab in front.
+  void OpenPlayingVideo() {
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), embedded_test_server()->GetURL(
+                       "/media/picture-in-picture/window-size.html")));
+    video_ = active();
+    Play();
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      const media_session::mojom::MediaSessionInfoPtr info =
+          content::MediaSession::Get(video_)->GetMediaSessionInfoSync();
+      return info && info->playback_state ==
+                         media_session::mojom::MediaPlaybackState::kPlaying;
+    }));
+  }
 
   void Play() {
     ASSERT_EQ(true, content::EvalJs(video_, "video.play().then(() => true)"));
@@ -279,6 +297,59 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ClosingItEmptiesTheDock) {
   EXPECT_FALSE(dock->player());
   EXPECT_FALSE(dock->GetVisible());
   EXPECT_FALSE(mini_player->views::Widget::IsVisible());
+}
+
+// Opens the test page's video and plays it, in the tab in front.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       LeavingAPlayingTabOpensItAndComingBackPutsItBack) {
+  OpenPlayingVideo();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return Bool("isInPictureInPicture()"); }));
+  EXPECT_TRUE(AutoMiniPlayer::OpenedOnTabSwitch(video_));
+  browser()->tab_strip_model()->ActivateTabAt(
+      browser()->tab_strip_model()->GetIndexOfWebContents(video_));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
+  EXPECT_FALSE(Bool("video.paused"));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, LeavingAMutedVideoOpensNothing) {
+  OpenPlayingVideo();
+  ASSERT_TRUE(content::ExecJs(video_, "video.muted = true"));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  Settle();
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+}
+
+// Under 10,000 square pixels on the page, as Blink measures, a video stays.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, LeavingASmallVideoOpensNothing) {
+  OpenPlayingVideo();
+  ASSERT_TRUE(content::ExecJs(video_, "video.style.width = '80px';"
+                                      "video.style.height = '53px';"));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  Settle();
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithItsSwitchOffLeavingOpensNothing) {
+  LocalState()->SetBoolean(kMiniPlayerOnTabSwitchPref, false);
+  OpenPlayingVideo();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  Settle();
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       AMiniPlayerTheUserOpenedStaysWhenTheyComeBack) {
+  OpenMiniPlayer();
+  Play();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  browser()->tab_strip_model()->ActivateTabAt(
+      browser()->tab_strip_model()->GetIndexOfWebContents(video_));
+  Settle();
+  EXPECT_TRUE(Bool("isInPictureInPicture()"));
 }
 
 // The way macOS hands a window the pointer: to its content view.
