@@ -57,6 +57,8 @@ source_set("browser_tests") {
     "//content/test:test_support",
     "//skia",
     "//testing/gtest",
+    "//ui/compositor",
+    "//ui/views",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/workspaces",
     "//uw/components/look",

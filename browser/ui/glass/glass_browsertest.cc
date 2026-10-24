@@ -11,9 +11,13 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/compositor/layer.h"
+#include "ui/views/widget/widget.h"
+#include "ui/views/window/non_client_view.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -80,6 +84,27 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TransparencyLetsTheGlassThrough) {
 
   SetLook(0, 0);
   ASSERT_TRUE(base::test::RunUntil([&] { return !ShowsGlass(browser()); }));
+}
+
+// The frame hears of the glass with the theme, so it never paints the old look
+// under a toolbar that paints the new one.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheFrameTurnsToGlassWithTheTheme) {
+  if (!MacCanShowGlass()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  browser()->GetWindow()->Activate();
+  const ui::Layer* frame = BrowserView::GetBrowserViewForBrowser(browser())
+                               ->GetWidget()
+                               ->non_client_view()
+                               ->frame_view()
+                               ->layer();
+  SetLook(kFullTransparency / 2, 0);
+  ASSERT_TRUE(ShowsGlass(browser()));
+  EXPECT_FALSE(frame->fills_bounds_opaquely());
+
+  SetLook(0, 0);
+  ASSERT_FALSE(ShowsGlass(browser()));
+  EXPECT_TRUE(frame->fills_bounds_opaquely());
 }
 
 // Real windows only: macOS draws glass behind a window on screen. Saves how

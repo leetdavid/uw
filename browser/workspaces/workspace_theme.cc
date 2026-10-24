@@ -98,6 +98,15 @@ Theme ThemeOfWindow(BrowserWindowInterface* window) {
 
 void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
   Profile* profile = window->GetProfile();
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window);
+  const std::string workspace =
+      shown && WorkspaceList::Get().Find(shown->workspace())
+          ? shown->workspace()
+          : std::string();
+  // Before Chromium's settings, whose observers read the window's theme.
+  if (!workspace.empty()) {
+    WorkspaceList::Get().SetTheme(workspace, theme);
+  }
   {
     base::AutoReset<bool> saving(&g_saving, true);
     WriteTheme(*profile->GetPrefs(), theme);
@@ -108,13 +117,9 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
     themes->SetBrowserColorScheme(SchemeOf(theme.mode));
   }
   SeenThemes()[profile->GetPath()] = ProfileTheme(profile);
-  const WorkspaceWindow* shown = WorkspaceWindow::From(window);
-  if (!shown || !WorkspaceList::Get().Find(shown->workspace())) {
-    return;
+  if (!workspace.empty()) {
+    Redraw(workspace);
   }
-  const std::string workspace = shown->workspace();
-  WorkspaceList::Get().SetTheme(workspace, theme);
-  Redraw(workspace);
 }
 
 Theme NewWorkspaceTheme(const Theme& like) {
