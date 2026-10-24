@@ -163,6 +163,7 @@ Proposed:
 - Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass as much as the theme does, so a red page gives a red glass toolbar and the terminal's stays dark. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
 - The page, menus, the picker, and the command bar stay solid. Grain still lies on the theme.
 - Agreed on 2026-10-24: every visible uw window has glass, as on macOS. A window that is not active is frosted more, which macOS does by itself to clear glass. uw lifts Chromium's limit of one glass window, and the build measures the cost of three glass windows against one, with a video playing in a window behind.
+- Agreed on 2026-10-24: a switch on uw's settings page, under the Theme row, "Glass in windows behind the front one", turns that off. It is on by default and covers all of uw, since it saves power rather than changing a workspace's look. Off, only the front window is glass, as in Chromium, and the others are solid.
 - The window is solid, as with Glass off, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. While glass is paused, the picker says why under the slider.
 - Before macOS 26 the picker has no Glass row.
 
@@ -178,12 +179,11 @@ Acceptance checks:
 1. With the slider at the left end, the window looks as it does today.
 2. With the slider moved right, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
 3. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode. At the right end, the theme covers it at 20%.
-4. Two uw windows side by side both show the desktop through them. The one not active is more frosted.
+4. Two uw windows side by side both show the desktop through them. The one not active is more frosted. With "Glass in windows behind the front one" off, it is solid.
 5. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
 6. Two workspaces keep their own Glass setting.
 7. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
 
-Glass, until the user answers:
-
+None.
