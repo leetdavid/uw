@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, is in progress.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn the same day and waits for the user's sign-off.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -102,13 +102,19 @@ Not yet: images, the per-chat connector switches (every connector that is on is 
 
 ## Design
 
-T192 draws these on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), for the user to sign off:
+Drawn on 2026-10-24, T192, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Agent chats", for the user to sign off. The rules are in the canvas's `uw-command` guide.
 
-- The terminal interface at work: steps, a Markdown answer, and the status line.
-- Approval cards for a page step, a terminal command, and a connector tool.
-- Every state: the `/` menu, printed output, an exit for an approval or a sign-in, the Full auto warning, and waiting for a sign-in.
-- The settings row with "Install `uw` command", installed and not.
-- A chat marked "From terminal" in the Chats list.
+- "uw command: a chat in the terminal": steps, a Markdown answer, the composer, and the status line, under `uw mcp list` in the scrollback.
+- "uw command: a change waits for you": a page step's approval card, under `uw chats`.
+- "uw command: every state": steering, the `/` menu, a terminal command's and a connector tool's cards, `-p` with a terminal, no terminal with `--json` and `uw approve`, Full auto, adding connectors, settings, not installed and out of step, Ctrl-C and `--timeout`, the "From terminal" mark in the chat list, the installed settings row, and macOS's password prompt.
+- "uw command: install in settings": the "uw command" section on Settings › System.
+
+uw's proposals in the frames:
+
+- The terminal uses uw's dark palette, whatever the terminal's theme.
+- An approval card numbers its choices, as the chat page's terminal card does. A connector card's caret menu becomes two more rows.
+- The "uw command" section sits first on Settings › System.
+- A chat from the command shows a terminal icon before its time in the chat list.
 
 ## How it is built
 
