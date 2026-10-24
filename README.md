@@ -213,7 +213,13 @@ pnpm run window-tests
 pnpm run window-tests --gtest_filter='CommandBarBrowserTest.MANUAL_*' --gtest_repeat=100
 ```
 
-Build `browser_tests` first. The command starts the `uw-window-tests` VM, runs the tests in it against your `.chromium/src`, and stops the VM. A second run waits for the first. Options other than `--checkout-dir` go to `browser_tests`; without a `--gtest_filter`, it runs every `MANUAL_` test. With `UW_SCREENSHOT_DIR` set, screenshots land in that folder. If a test crashes, the output names a folder holding its crash report.
+Build `browser_tests` first. The command starts the `uw-window-tests` VM, runs the tests in it against your `.chromium/src`, and stops the VM. A second run waits for the first. Options other than `--checkout-dir` go to `browser_tests`; without a `--gtest_filter`, it runs every `MANUAL_` test, Chromium's own included. Many of Chromium's need the internet, a camera, or a second display, which the VM lacks, so they fail. With `UW_SCREENSHOT_DIR` set, screenshots land in that folder. If a test crashes, the output names a folder holding its crash report.
+
+A real-window test on a web page needs three things, all shown in `UwChatBrowserTest.MANUAL_TheUsageCardWorksWithARealMouse`:
+
+- Pass the browser's window as the last argument of `ui_controls::SendMouseMoveNotifyWhenDone`, or the page never sees the pointer.
+- Focus the page with `WebContents::Focus()` before sending keys.
+- Expect a smaller window: the VM's screen is 1024 by 768, and only headless screenshots set the window to 1280 by 800.
 
 ### Set up the VM once
 
