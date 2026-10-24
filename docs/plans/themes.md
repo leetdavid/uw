@@ -81,6 +81,7 @@ Implementability: **7/10**. Chromium decides in one place whether a page is told
 
 - Page mode is Same as window, Light, or Dark. Same as window is the default, so nothing changes until the user picks.
 - It covers websites and uw's own tab pages: the chat page, the providers page, and the terminal. Chromium's own pages, such as Settings, History, and the new tab page, follow the window mode, since their colors come from the window.
+- It covers extensions' pages wherever they show: their popups, side panels, and tabs. uw's and Chromium's own panels, such as the command bar and this picker, follow the window. Agreed on 2026-10-24, T191: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode".
 - Pages are only told the mode (`prefers-color-scheme`). A site with no dark look of its own stays light. Chromium's auto-dark is not used.
 - The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones.
 - The page's scrollbar follows the toolbar, as in Chromium, and the toolbar takes the [page color](#page-colors). A site with no dark look of its own keeps a light scrollbar. Agreed on 2026-10-24; this replaced "the scrollbar follows page mode".

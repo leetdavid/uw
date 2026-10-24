@@ -199,6 +199,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T188 | Automatic mini players | backlog | 6/10 | Switching away from a tab with a playing, audible, visible video starts a mini player, through Chromium's browser-initiated automatic picture in picture without its prompt, and selecting the tab puts it back, per the [plan](mini-player.md#starting-and-ending). Needs T187. Done when acceptance check 5 passes. |
 | T189 | The mini player stack | backlog | 5/10 | A second mini player pauses the first and stacks on it, up to three, with stills of the paused ones that fan out on hover and swap on a click, per the [plan](mini-player.md#the-stack). Needs T187. Done when acceptance check 6 passes. |
 | T190 | Document picture in picture's frame | backlog | 6/10 | Sites' own picture-in-picture windows, such as a Meet call, get the floating mini player's rounded Arc frame and never dock, per the [plan](mini-player.md#document-picture-in-picture). Needs T185. Done when acceptance check 8 passes for them. |
+| T191 | Extensions follow page mode | in progress | 8/10 | Extensions' popups and side panels are told the page mode, as websites are, per [Page mode](themes.md#page-mode). Asked for on 2026-10-24: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode". Done when a browser test shows an extension's popup dark under Dark pages in a light window. |
 
 ## 1. Choose the browser foundation
 
