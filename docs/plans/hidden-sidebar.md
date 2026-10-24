@@ -1,6 +1,6 @@
 # Hidden and floating sidebar
 
-Status: scope agreed on 2026-10-24. The design, T182, comes first.
+Status: scope agreed on 2026-10-24. The design, T182, is drawn and awaits sign-off.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's hover expansion already has the pause before it opens, the locks that keep it open during a menu or a rename, the link drag that opens it, a shadow, and a blurred backdrop. uw sets the hidden width to zero and draws the inset card and the slide. The risks: macOS, not Chromium, draws the window buttons, and they have to leave the window and come back on a moving card. The window layout this changes is Chromium's newest and changes with each release. The activity card needs a place outside the sidebar. Only a real window can judge the feel.
 
@@ -35,14 +35,13 @@ The user asked on 2026-10-24 for Arc's floating sidebar in place of the narrow s
 
 ## Design
 
-To draw on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Floating sidebar", in light and dark mode:
+Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", with the rules in the canvas guide `uw-hidden-sidebar`:
 
-- the hidden sidebar: a window with the page card filling it,
-- the floating sidebar over a page, with its window buttons,
-- the floating sidebar with Transparency,
-- the activity card alone over the page.
+- "Floating sidebar: hidden": the page card filling the window.
+- "Floating sidebar: over the page": the card with its window buttons, the pointer on a row.
+- "Floating sidebar: every state": hidden in light and dark, the pointer at the edge, sliding in, in place in light and dark, with Transparency, the activity card alone in light and dark, the View menu, and the setting.
 
-The design settles how the window buttons arrive with the sliding card.
+uw's proposals in the frames: it slides in over 200 ms, ease out, and out over 150 ms, ease in. The window buttons do not ride the slide, since macOS draws them; they fade in over 100 ms once the card is in place and fade out as it starts to leave. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
 
 ## Stages
 
