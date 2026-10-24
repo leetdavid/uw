@@ -39,7 +39,7 @@ Agreed on 2026-10-12:
 - Moving the address bar into the sidebar.
 - Arc's Spaces and per-space themes.
 - A color picker widget built by uw. The settings control uses preset colors and the browser's standard color input.
-- New icons, a new app icon, or custom window buttons.
+- New icons, a new app icon, or custom window buttons. Changed on 2026-10-24: the [floating sidebar](hidden-sidebar.md) draws its own.
 - Any change to how tabs, tasks, or the tab tree behave.
 
 ## Design

@@ -1,8 +1,8 @@
 # Hidden and floating sidebar
 
-Status: scope agreed on 2026-10-24. The design, T182, is drawn and awaits sign-off.
+Status: scope agreed on 2026-10-24. The design, T182, was signed off the same day, once the user chose window buttons drawn by uw. T183 is in progress.
 
-Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's hover expansion already has the pause before it opens, the locks that keep it open during a menu or a rename, the link drag that opens it, a shadow, and a blurred backdrop. uw sets the hidden width to zero and draws the inset card and the slide. The risks: macOS, not Chromium, draws the window buttons, and they have to leave the window and come back on a moving card. The window layout this changes is Chromium's newest and changes with each release. The activity card needs a place outside the sidebar. Only a real window can judge the feel.
+Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's hover expansion already has the pause before it opens, the locks that keep it open during a menu or a rename, the link drag that opens it, a shadow, and a blurred backdrop. uw sets the hidden width to zero and draws the inset card and the slide. uw draws the floating card's window buttons itself, so nothing macOS draws has to move; matching macOS's look and behavior is bounded work. The risks: The window layout this changes is Chromium's newest and changes with each release. The activity card needs a place outside the sidebar. Only a real window can judge the feel.
 
 The user asked on 2026-10-24 for Arc's floating sidebar in place of the narrow sidebar. A [hidden sidebar](../CONTEXT.md#language) takes no width. The [floating sidebar](../CONTEXT.md#language) comes in over the page when the pointer reaches the window's left edge.
 
@@ -23,6 +23,7 @@ The user asked on 2026-10-24 for Arc's floating sidebar in place of the narrow s
 - A link, a tab from another window, or a side-by-side tab dragged to the edge brings it in the same way, and it stays until the drop.
 - Keys that need a row bring it in while they are in use, such as Focus the sidebar (Ctrl+Cmd+L) and Rename task (Ctrl+Cmd+R).
 - It is a card inset 8px from the window's top, left, and bottom, as wide as the shown sidebar, with the page card's 12px corners and a soft shadow. It shows everything the shown sidebar does, foot included, with the window buttons at its top left.
+- uw draws the window buttons on the floating card, so they slide with it. They look like macOS's: its colors, with ×, −, and the full-screen arrows under the pointer, and the tint's text color at 24% in a window not in front. They close, minimize, and go full screen as macOS's do, and Option-click on the green one zooms. macOS's tiling menu on the green button is not offered there. The shown sidebar keeps macOS's own buttons.
 - It is painted in the theme's tint. With [Transparency](../CONTEXT.md#language) above solid, the page under it shows through, blurred, as the desktop does through the shown sidebar. [Glass](../CONTEXT.md#language) applies as in the shown sidebar.
 - It slides in from past the window's left edge at full width and slides back out. Its rows never reflow on the way. The page underneath does not move.
 - It slides out when the pointer leaves it for the page. Picking a tab does not send it away. It stays while one of its menus, a rename, a drag from it, or keyboard focus is in it. Esc sends it away.
@@ -39,15 +40,15 @@ Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 
 - "Floating sidebar: hidden": the page card filling the window.
 - "Floating sidebar: over the page": the card with its window buttons, the pointer on a row.
-- "Floating sidebar: every state": hidden in light and dark, the pointer at the edge, sliding in, in place in light and dark, with Transparency, the activity card alone in light and dark, the View menu, and the setting.
+- "Floating sidebar: every state": hidden in light and dark, the pointer at the edge, sliding in, in place in light and dark, with Transparency, the activity card alone in light and dark, the View menu, the setting, and uw's window buttons in each state.
 
-uw's proposals in the frames: it slides in over 200 ms, ease out, and out over 150 ms, ease in. The window buttons do not ride the slide, since macOS draws them; they fade in over 100 ms once the card is in place and fade out as it starts to leave. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
+uw's proposals in the frames: it slides in over 200 ms, ease out, and out over 150 ms, ease in. The user chose window buttons drawn by uw over a fade-in of macOS's own, which cannot ride the slide. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
 
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
 
-1. T182: the design, signed off by the user.
+1. T182: the design, signed off by the user on 2026-10-24.
 2. T183: hiding, the floating sidebar, the keys, and the setting. The narrow sidebar's code, tests, and docs go.
 3. T184: the activity card while hidden.
 
@@ -55,7 +56,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 1. Cmd+S hides the sidebar: the page card fills the window with an 8px inset, and the window buttons are gone. Cmd+S shows it again. The View menu names the command by state. Cmd+Shift+L does nothing, and Save Page As has no key.
 2. With the pointer at rest on the left edge, the floating sidebar comes in after about 350 ms. A pointer passing over the edge does not open it. The page's size and place do not change.
-3. The floating card is inset 8px from the window's top, left, and bottom, is the shown sidebar's width, has 12px corners and a shadow, and shows the window buttons at its top left. It slides in and out without its rows reflowing.
+3. The floating card is inset 8px from the window's top, left, and bottom, is the shown sidebar's width, has 12px corners and a shadow, and shows uw's window buttons at its top left, which slide with it. It slides in and out without its rows reflowing. The buttons close, minimize, and go full screen, Option-click on the green one zooms, and they show their glyphs under the pointer and the faint look in a window not in front.
 4. It slides out when the pointer moves onto the page, and not when a tab is picked. It stays while a menu, a rename, a drag, or keyboard focus is in it. Esc sends it away.
 5. Ctrl+Cmd+L and Ctrl+Cmd+R bring it in with focus in the right row.
 6. A link dragged to the left edge brings it in, and a drop on a row opens the link there.
