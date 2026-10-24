@@ -16,8 +16,9 @@ class Widget;
 
 namespace uw {
 
-// The whole window of `browser` at 1280 by 800, as it is drawn once its
-// animations have finished.
+// The whole window of `browser` as it is drawn once its animations have
+// finished. A headless window is set to 1280 by 800 first; a real one keeps
+// its size, so it stays on the screen.
 SkBitmap CaptureWindow(Browser* browser);
 
 // Saves the whole window of `browser` as <name>.png in the folder that the

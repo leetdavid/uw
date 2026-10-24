@@ -93,6 +93,8 @@ source_set("browser_tests") {
     "//testing/gmock",
     "//testing/gtest",
     "//ui/base",
+    "//ui/base:test_support",
+    "//ui/events:events_base",
     "//ui/message_center/public/cpp",
     "//ui/views",
     "//url",

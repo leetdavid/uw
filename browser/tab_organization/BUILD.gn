@@ -112,6 +112,7 @@ source_set("test_support") {
   deps = [
     "//base",
     "//base/test:test_support",
+    "//chrome/browser/headless",
     "//chrome/browser/ui",
     "//components/viz/common",
     "//skia",

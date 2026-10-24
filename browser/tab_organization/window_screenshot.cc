@@ -17,6 +17,7 @@
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
+#include "chrome/browser/headless/headless_mode_util.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
@@ -102,7 +103,9 @@ void Save(base::FunctionRef<SkBitmap()> pixels, const std::string& name) {
 SkBitmap CaptureWindow(Browser* browser) {
   views::Widget* widget =
       BrowserView::GetBrowserViewForBrowser(browser)->GetWidget();
-  widget->SetBounds(kWindowBounds);
+  if (headless::IsHeadlessMode()) {
+    widget->SetBounds(kWindowBounds);
+  }
   return CaptureSettled(widget);
 }
 

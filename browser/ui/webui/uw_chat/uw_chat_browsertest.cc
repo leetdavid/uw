@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -45,6 +46,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -55,8 +57,10 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/themes.mojom.h"
+#include "ui/base/test/ui_controls.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -227,6 +231,67 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     provider.address = address;
     SetChoice(prefs, ModelSlot::kAgent, AddProvider(prefs, provider),
               "test-agent");
+  }
+
+  // The agent model at $3 in and $15 out per million tokens, holding 184k
+  // tokens, answering two messages with 20k and then 41k tokens in.
+  void ScriptPricedChat() {
+    UseAgentModel();
+    catalog_ = base::StrCat(
+        {R"({"testlab": {"api": ")",
+         embedded_test_server()->GetURL("/v1").spec(),
+         R"(", "models": {"test-agent": {"tool_call": true,)"
+         R"( "cost": {"input": 3, "output": 15, "cache_read": 0.3},)"
+         R"( "limit": {"context": 200000, "output": 16000}}}}})"});
+    model_.ListModels({"test-agent"});
+    base::test::TestFuture<const ModelCatalog*> catalog;
+    CatalogStore::For(browser()->GetProfile())->Get(catalog.GetCallback());
+    ASSERT_TRUE(catalog.Get());
+    model_.Script(
+        {ScriptedModel::WithUsage(ScriptedModel::Answer("Hello."), 20000, 100),
+         ScriptedModel::WithUsage(ScriptedModel::Answer("Again."), 41000,
+                                  200)});
+  }
+
+  // The middle of `element`, a script expression for an element of the
+  // chat's page, on the screen. The page's pixels need not be the screen's
+  // points, so they are scaled by the page's width on the screen.
+  static gfx::Point CenterOf(content::WebContents* chat,
+                             const std::string& element) {
+    const content::EvalJsResult result =
+        content::EvalJs(chat,
+                        "(r => [r.left + r.width / 2, r.top + r.height / 2,"
+                        "    innerWidth])((" +
+                            element + ").getBoundingClientRect())");
+    const base::ListValue& at = result.ExtractList();
+    const gfx::Rect view = chat->GetRenderWidgetHostView()->GetViewBounds();
+    const double scale = view.width() / at[2].GetDouble();
+    return gfx::Point(view.x() + std::lround(at[0].GetDouble() * scale),
+                      view.y() + std::lround(at[1].GetDouble() * scale));
+  }
+
+  // Moves the real mouse, and clicks it. Chromium asks macOS where the
+  // pointer is and which button is held, so the events go through
+  // ui_controls, which answers for macOS. A move reaches a page only when
+  // ui_controls is told the window: macOS gives moves to the view under the
+  // pointer, not to the app's event queue.
+  void MoveMouse(const gfx::Point& point) {
+    ui_controls::EnableUIControls();
+    base::RunLoop moved;
+    ASSERT_TRUE(ui_controls::SendMouseMoveNotifyWhenDone(
+        point.x(), point.y(), moved.QuitClosure(),
+        browser()->GetWindow()->GetNativeWindow()));
+    moved.Run();
+  }
+
+  void Click(const gfx::Point& point) {
+    MoveMouse(point);
+    for (int state : {ui_controls::DOWN, ui_controls::UP}) {
+      base::RunLoop done;
+      ASSERT_TRUE(ui_controls::SendMouseEventsNotifyWhenDone(
+          ui_controls::LEFT, state, done.QuitClosure()));
+      done.Run();
+    }
   }
 
   content::WebContents* OpenChat() {
@@ -1914,19 +1979,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, APastedImageGoesWithTheMessage) {
 // The header's indicator says how full the context is and what the chat has
 // cost, once the chat has answered, and its card says why.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
-  UseAgentModel();
-  catalog_ = base::StrCat(
-      {R"({"testlab": {"api": ")", embedded_test_server()->GetURL("/v1").spec(),
-       R"(", "models": {"test-agent": {"tool_call": true,)"
-       R"( "cost": {"input": 3, "output": 15, "cache_read": 0.3},)"
-       R"( "limit": {"context": 200000, "output": 16000}}}}})"});
-  model_.ListModels({"test-agent"});
-  base::test::TestFuture<const ModelCatalog*> catalog;
-  CatalogStore::For(browser()->GetProfile())->Get(catalog.GetCallback());
-  ASSERT_TRUE(catalog.Get());
-  model_.Script(
-      {ScriptedModel::WithUsage(ScriptedModel::Answer("Hello."), 20000, 100),
-       ScriptedModel::WithUsage(ScriptedModel::Answer("Again."), 41000, 200)});
+  ScriptPricedChat();
   content::WebContents* chat = OpenChat();
   EXPECT_EQ(content::EvalJs(chat, "!document.getElementById('usage')"), true);
 
@@ -1934,11 +1987,13 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
   Ask(chat, "Once more");
 
   // 20k and 41k tokens in at $3, and 300 out at $15, per million.
-  EXPECT_EQ(Until(chat, "document.getElementById('usage')?.textContent ==="
-                        "    '41k·$0.19' && document.getElementById('usage')"
-                        "    .textContent"),
+  EXPECT_EQ(Until(chat,
+                  "document.getElementById('usage')?.textContent ==="
+                  "    '41k·$0.19' && document.getElementById('usage')"
+                  "    .textContent"),
             "41k·$0.19");
-  ASSERT_TRUE(content::ExecJs(chat, "document.getElementById('usage').click()"));
+  ASSERT_TRUE(
+      content::ExecJs(chat, "document.getElementById('usage').click()"));
   const std::string card =
       Until(chat, "document.getElementById('usage-card')?.textContent")
           .ExtractString();
@@ -1948,14 +2003,76 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
                         "makes room."));
   EXPECT_THAT(card, testing::HasSubstr("Fresh input61k$0.18"));
   EXPECT_THAT(card, testing::HasSubstr("$3 in · $15 out per 1M"));
-  EXPECT_EQ(content::EvalJs(chat, "document.querySelectorAll("
-                                  "    '#usage-card [data-bar]').length"),
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelectorAll("
+                            "    '#usage-card [data-bar]').length"),
             2);
   SaveWindowScreenshot(browser(), "usage-card");
   // A click outside closes it.
   ASSERT_TRUE(content::ExecJs(
-      chat, "document.body.dispatchEvent(new PointerEvent('pointerdown',"
-            "    {bubbles: true}))"));
+      chat,
+      "document.body.dispatchEvent(new PointerEvent('pointerdown',"
+      "    {bubbles: true}))"));
+  EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
+}
+
+// With a real mouse and keys: hovering the indicator says what it holds, a
+// click opens the card, hovering a bar says what its message cost, and Escape
+// or a click outside closes the card. Run with `pnpm run window-tests`.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       MANUAL_TheUsageCardWorksWithARealMouse) {
+  ScriptPricedChat();
+  content::WebContents* chat = OpenChat();
+  Ask(chat, "Hi");
+  Ask(chat, "Once more");
+  ASSERT_EQ(Until(chat,
+                  "document.getElementById('usage')?.textContent ==="
+                  "    '41k·$0.19'"),
+            true);
+
+  // macOS sends the mouse's moves and the keys only to the active window.
+  // The window settles on the screen after it shows, so the page's place is
+  // read once it has stopped moving.
+  browser()->GetWindow()->Activate();
+  gfx::Rect last;
+  int still = 0;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const gfx::Rect now = chat->GetRenderWidgetHostView()->GetViewBounds();
+    still = now == last ? still + 1 : 0;
+    last = now;
+    return browser()->GetWindow()->IsActive() && still >= 10;
+  }));
+  MoveMouse(CenterOf(chat, "document.getElementById('usage')"));
+  EXPECT_THAT(
+      Until(chat, "document.querySelector('[role=tooltip]')?.textContent")
+          .ExtractString(),
+      testing::HasSubstr("41k of 184k tokens (22%) · $0.19 this chat"));
+
+  Click(CenterOf(chat, "document.getElementById('usage')"));
+  ASSERT_EQ(Until(chat, "!!document.getElementById('usage-card')"), true);
+  MoveMouse(
+      CenterOf(chat, "document.querySelectorAll('#usage-card [data-bar]')[1]"));
+  EXPECT_EQ(Until(chat,
+                  "document.querySelector('.cost-chart .chart-tooltip')"
+                  "    ?.textContent"),
+            "“Once more” $0.13 · 1 request");
+  // A real window keeps its size for the picture, so the steps after it
+  // still find the page where it was.
+  SaveWindowScreenshot(browser(), "usage-card-real-mouse");
+
+  // Keys go to the focused view, which must be the page.
+  chat->Focus();
+  ASSERT_EQ(Until(chat, "document.hasFocus()"), true);
+  base::RunLoop escaped;
+  ASSERT_TRUE(ui_controls::SendKeyPressNotifyWhenDone(
+      browser()->GetWindow()->GetNativeWindow(), ui::VKEY_ESCAPE, false, false,
+      false, false, escaped.QuitClosure()));
+  escaped.Run();
+  EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
+
+  Click(CenterOf(chat, "document.getElementById('usage')"));
+  ASSERT_EQ(Until(chat, "!!document.getElementById('usage-card')"), true);
+  Click(CenterOf(chat, "document.querySelector('main main')"));
   EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
 }
 
