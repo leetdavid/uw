@@ -88,6 +88,33 @@ const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   return shown ? WorkspaceList::Get().Find(shown->workspace()) : nullptr;
 }
 
+// The window that shows `page`: the window of its tab, or the window under
+// the bubble or panel that holds it, such as an extension's popup.
+BrowserWindowInterface* WindowShowing(content::WebContents* page) {
+  if (tabs::TabInterface* tab =
+          tabs::TabInterface::MaybeGetFromContents(page)) {
+    return tab->GetBrowserWindowInterface();
+  }
+  for (views::Widget* widget =
+           views::Widget::GetTopLevelWidgetForNativeView(page->GetNativeView());
+       widget; widget = widget->parent()) {
+    BrowserWindowInterface* found = nullptr;
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [&](BrowserWindowInterface* window) {
+          if (window->GetWindow()->GetNativeWindow() ==
+              widget->GetNativeWindow()) {
+            found = window;
+            return false;
+          }
+          return true;
+        });
+    if (found) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
 // Each window that shows `workspace` takes its theme again.
 void Redraw(const std::string& workspace) {
   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
@@ -201,9 +228,7 @@ std::optional<bool> PageModeIsDark(content::WebContents* page) {
   if (!page || page->GetBrowserContext()->IsOffTheRecord()) {
     return std::nullopt;
   }
-  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(page);
-  BrowserWindowInterface* window =
-      tab ? tab->GetBrowserWindowInterface() : nullptr;
+  BrowserWindowInterface* window = WindowShowing(page);
   if (!window) {
     return std::nullopt;
   }

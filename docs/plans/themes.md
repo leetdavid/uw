@@ -108,9 +108,9 @@ Acceptance checks:
 How it is built, for T102:
 
 - The theme keeps `page_mode`, in each workspace's theme and in `uw.theme.page_mode` for windows without a workspace.
-- `PageModeIsDark` in `browser/workspaces/workspace_theme.h` decides for each tab from its window's theme and its address. `uw-scheme-alias` asks it in `GetPreferredColorScheme`, and `uw-look` asks `EmptyPageColor` in `ContentsWebView` for the card, also after each navigation.
+- `PageModeIsDark` in `browser/workspaces/workspace_theme.h` decides for each page from its window's theme and its address. A page outside a tab, such as an extension's popup, finds its window through the bubble or panel that holds it. `uw-scheme-alias` asks it in `GetPreferredColorScheme`, and `uw-look` asks `EmptyPageColor` in `ContentsWebView` for the card, also after each navigation.
 - A change redraws the workspace's windows, which makes Chromium tell each open page again.
-- `WorkspacesBrowserTest.PagesTakeThePageModeAndChromiumsPagesTheWindow`, `TwoWorkspacesKeepTwoPageModes`, `OpenPagesTakeANewPageModeAtOnce`, and `TheCardBehindAPageTakesThePageMode` cover checks 2 to 6, and `ThemePickerBrowserTest.ThePagesRowSetsThePageMode` the row.
+- `WorkspacesBrowserTest.PagesTakeThePageModeAndChromiumsPagesTheWindow`, `TwoWorkspacesKeepTwoPageModes`, `OpenPagesTakeANewPageModeAtOnce`, and `TheCardBehindAPageTakesThePageMode` cover checks 2 to 6, `AnExtensionsPopupTakesThePageMode` an extension's popup, and `ThemePickerBrowserTest.ThePagesRowSetsThePageMode` the row.
 
 ## Page colors
 

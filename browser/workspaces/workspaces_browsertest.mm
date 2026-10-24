@@ -19,6 +19,8 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/extensions/chrome_test_extension_loader.h"
+#include "chrome/browser/extensions/extension_view_host.h"
 #include "chrome/browser/global_keyboard_shortcuts_mac.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
@@ -29,9 +31,11 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/extensions/extension_action_test_helper.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/extensions/extension_popup.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
@@ -44,6 +48,8 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "extensions/common/extension.h"
+#include "extensions/test/test_extension_dir.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -434,6 +440,38 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, OpenPagesTakeANewPageModeAtOnce) {
   theme.page_mode = PageMode::kWindow;
   SetThemeOfWindow(browser(), theme);
   EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(PageOf(browser())); }));
+}
+
+// Extensions' pages follow page mode wherever they show, per T191.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       AnExtensionsPopupTakesThePageMode) {
+  extensions::TestExtensionDir dir;
+  dir.WriteManifest(R"({"name": "Popup", "version": "1",
+                        "manifest_version": 3,
+                        "action": {"default_popup": "popup.html"}})");
+  dir.WriteFile(FILE_PATH_LITERAL("popup.html"), "<p>Popup</p>");
+  scoped_refptr<const extensions::Extension> extension =
+      extensions::ChromeTestExtensionLoader(profile()).LoadExtension(
+          dir.UnpackedPath());
+  ASSERT_TRUE(extension);
+
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  std::unique_ptr<ExtensionActionTestHelper> actions =
+      ExtensionActionTestHelper::Create(browser());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return actions->HasAction(extension->id()); }));
+  actions->Press(extension->id());
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    ExtensionPopup* popup = ExtensionPopup::last_popup_for_testing();
+    return popup && popup->host()->has_loaded_once();
+  }));
+  content::WebContents* popup =
+      ExtensionPopup::last_popup_for_testing()->host()->host_contents();
+  EXPECT_TRUE(IsDark(popup));
+  EXPECT_EQ(popup->GetColorMode(), ui::ColorProviderKey::ColorMode::kLight);
 }
 
 // Before a page paints, the card behind it is black or white by page mode.
