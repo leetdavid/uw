@@ -32,3 +32,35 @@ index ae1efcd28d31a23846fb527da323829a95f5f373..f22fe26397ac1156180d404710658b59
  }
  
  VideoOverlayWindowViews::VideoOverlayWindowViews(
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+index cabdbd846c3c8a50e6467dbdcdc0a7318ea907b2..ae701c12ca707d4a21e880433f61bb73ea91da07 100644
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -210,6 +210,7 @@ source_set("impl") {
+     "//uw/browser/pins:prefs",
+     "//uw/browser/shortcuts:prefs",
+     "//uw/browser/tab_organization:ai_connection",
++    "//uw/browser/ui/views/mini_player:prefs",
+     "//uw/browser/workspaces:prefs",
+   ]
+ 
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+index 41bf5932c399fc425e6b5669aed0de4025d6cee3..205a56cefbd8177026db6e866c4ef215e6e08e5f 100644
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -564,6 +564,7 @@
+ #include "uw/browser/pins/pin_prefs.h"
+ #include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/ai_connection.h"
++#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
+ #include "uw/browser/workspaces/workspace_prefs.h"
+ 
+ #if BUILDFLAG(ENABLE_SESSION_SERVICE)
+@@ -1753,6 +1754,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+   uw::RegisterSharedProviderPrefs(registry);
+   uw::RegisterWorkspaceLocalStatePrefs(registry);
+   uw::RegisterMenuKeysPrefs(registry);
++  uw::RegisterMiniPlayerLocalStatePrefs(registry);
+ 
+   // This is intentionally last.
+   RegisterLocalStatePrefsForMigration(registry);

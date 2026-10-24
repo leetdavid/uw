@@ -404,17 +404,27 @@ void ControlsScrim::OnPaint(gfx::Canvas* canvas) {
 BEGIN_METADATA(ControlsScrim)
 END_METADATA
 
-LitRim::LitRim(float radius) : radius_(radius) {
+Rim::Rim(float radius, std::optional<SkColor> ring)
+    : radius_(radius), ring_(ring) {
   SetCanProcessEventsWithinSubtree(false);
   SetPaintToLayer();
   layer()->SetFillsBoundsOpaquely(false);
 }
 
-LitRim::~LitRim() = default;
+Rim::~Rim() = default;
 
-void LitRim::OnPaint(gfx::Canvas* canvas) {
+void Rim::OnPaint(gfx::Canvas* canvas) {
   gfx::RectF edge(GetLocalBounds());
   edge.Inset(0.5f);
+  if (ring_) {
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    flags.setStrokeWidth(1);
+    flags.setColor(*ring_);
+    canvas->DrawRoundRect(edge, radius_ - 0.5f, flags);
+    return;
+  }
   const SkPoint points[2] = {gfx::PointFToSkPoint(edge.origin()),
                              gfx::PointFToSkPoint(edge.bottom_right())};
   const SkColor4f colors[4] = {
@@ -430,7 +440,7 @@ void LitRim::OnPaint(gfx::Canvas* canvas) {
   canvas->DrawRoundRect(edge, radius_ - 0.5f, flags);
 }
 
-BEGIN_METADATA(LitRim)
+BEGIN_METADATA(Rim)
 END_METADATA
 
 }  // namespace uw

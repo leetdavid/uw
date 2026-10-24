@@ -21,7 +21,7 @@ import {getCss as getMdSelectCss} from 'chrome://resources/cr_elements/md_select
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {MouseAction, Waiting} from './uw_organization.mojom-webui.js';
+import {MiniPlayerSwitch, MouseAction, Waiting} from './uw_organization.mojom-webui.js';
 import type {State, Thresholds} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
@@ -274,6 +274,18 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     const toggle = e.currentTarget as CrToggleElement;
     await this.browserProxy_.setMouseAction(
         Number(toggle.dataset['action']) as MouseAction, e.detail);
+    this.refresh_();
+  }
+
+  protected async onMiniPlayerInSidebarChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setMiniPlayer(
+        MiniPlayerSwitch.kInSidebar, e.detail);
+    this.refresh_();
+  }
+
+  protected async onMiniPlayerFloatChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setMiniPlayer(
+        MiniPlayerSwitch.kFloatInBackground, e.detail);
     this.refresh_();
   }
 

@@ -179,6 +179,36 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     <div class="uw-note">${this.i18n_('uwCommandBarNote')}</div>
   </div>
   <div class="uw-section">
+    <h2 class="uw-heading">${this.i18n_('uwMiniPlayerTitle')}</h2>
+    <div class="uw-row">
+      <div id="miniPlayerInSidebarLabel" class="uw-field">
+        ${this.i18n_('uwMiniPlayerInSidebar')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwMiniPlayerInSidebarDescription')}
+        </div>
+      </div>
+      <cr-toggle id="miniPlayerInSidebarToggle"
+          aria-labelledby="miniPlayerInSidebarLabel"
+          ?checked="${!!this.state_?.miniPlayerInSidebar}"
+          @change="${this.onMiniPlayerInSidebarChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-row">
+      <div id="miniPlayerFloatLabel" class="uw-field">
+        ${this.i18n_('uwMiniPlayerFloat')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwMiniPlayerFloatDescription')}
+        </div>
+      </div>
+      <cr-toggle id="miniPlayerFloatToggle"
+          aria-labelledby="miniPlayerFloatLabel"
+          ?checked="${!!this.state_?.miniPlayerFloatInBackground}"
+          ?disabled="${!this.state_?.miniPlayerInSidebar}"
+          @change="${this.onMiniPlayerFloatChange_}">
+      </cr-toggle>
+    </div>
+  </div>
+  <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwMouseTitle')}</h2>
     ${this.mouseActions_().map(row => html`
     <div class="uw-row">

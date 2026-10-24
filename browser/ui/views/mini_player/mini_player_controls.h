@@ -175,21 +175,23 @@ class ControlsScrim : public views::View {
   void OnPaint(gfx::Canvas* canvas) override;
 };
 
-// The floating mini player's lit edge: a 1px line, brightest at the top left.
-class LitRim : public views::View {
-  METADATA_HEADER(LitRim, views::View)
+// The mini player's 1px edge: lit, brightest at the top left, when it
+// floats, or a plain `ring` when it is docked.
+class Rim : public views::View {
+  METADATA_HEADER(Rim, views::View)
 
  public:
-  explicit LitRim(float radius);
-  LitRim(const LitRim&) = delete;
-  LitRim& operator=(const LitRim&) = delete;
-  ~LitRim() override;
+  Rim(float radius, std::optional<SkColor> ring);
+  Rim(const Rim&) = delete;
+  Rim& operator=(const Rim&) = delete;
+  ~Rim() override;
 
   // views::View:
   void OnPaint(gfx::Canvas* canvas) override;
 
  private:
   const float radius_;
+  const std::optional<SkColor> ring_;
 };
 
 }  // namespace uw

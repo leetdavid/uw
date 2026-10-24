@@ -20,7 +20,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,109 @@
+@@ -3904,6 +3904,133 @@
          System
        </message>
      </if>
@@ -125,6 +125,30 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
 +      </message>
 +      <message name="IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK" desc="Label of the switch that makes a middle-click on a task's row close the task and its tabs. A task is a group of tabs.">
 +        Middle-click a task's row to close the task
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_TITLE" desc="Heading of the settings for the mini player: a video playing outside its page, docked at the bottom of the tab sidebar or floating in its own window.">
++        Mini player
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR" desc="Label of the switch that docks picture-in-picture videos at the bottom of the tab sidebar.">
++        Show the mini player in the sidebar
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR_DESCRIPTION" desc="Second line of the switch that docks picture-in-picture videos in the tab sidebar.">
++        Picture in picture docks at the bottom of the sidebar. Off, it floats.
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH" desc="Label of the switch that puts a playing video in the mini player when the user switches away from its tab.">
++        Open the mini player when you switch tabs
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH_DESCRIPTION" desc="Second line of the switch that puts a playing video in the mini player when the user leaves its tab.">
++        A playing video with sound comes with you when you leave its tab.
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_FLOAT" desc="Label of the switch that moves the mini player out of the sidebar into its own floating window while another app is in front. uw is the product name and stays lowercase.">
++        Float the mini player when uw is in the background
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_FLOAT_DESCRIPTION" desc="Second line of the switch that floats the mini player while another app is in front.">
++        It leaves the sidebar while another app is in front.
++      </message>
++      <message name="IDS_UW_SETTINGS_SIDEBAR_EDGE_SUBLABEL" desc="Sub-label of the appearance setting that shows the hidden sidebar over the page when the pointer rests at the window's left edge.">
++        While the sidebar is hidden, rest the pointer at the window's left edge to show it over the page
 +      </message>
 +    </if>
      <if expr="not is_chromeos">

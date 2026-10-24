@@ -24,6 +24,8 @@
 #include "ui/views/widget/widget_delegate.h"
 #include "ui/views/window/frame_view.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/views/mini_player/mini_player_dock.h"
+#include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 
 #if BUILDFLAG(IS_MAC)
@@ -32,9 +34,6 @@
 
 namespace uw {
 namespace {
-
-// The floating mini player's corners.
-constexpr float kCornerRadius = 12;
 
 // Chromium's smallest picture-in-picture window.
 constexpr gfx::Size kMinimumSize(284, 160);
@@ -137,20 +136,25 @@ std::unique_ptr<content::VideoOverlayWindow> MiniPlayer::Create(
 
   // The window's client area holds the video. It stays when the video goes
   // elsewhere.
-  auto* client = mini_player->delegate->SetContentsView(
-      std::make_unique<views::View>());
+  auto* client =
+      mini_player->delegate->SetContentsView(std::make_unique<views::View>());
   client->SetUseDefaultFillLayout(true);
   auto view = std::make_unique<MiniPlayerView>(
       controller, base::BindRepeating(&GlassOfLastActiveWindow,
                                       base::Unretained(controller)));
-  view->SetCorners(kCornerRadius, /*lit_rim=*/true);
+  view->SetFloatingLook();
   view->set_moves_widget(true);
   view->set_on_video_bounds_changed(base::BindRepeating(
       &content::VideoPictureInPictureWindowController::UpdateLayerBounds,
       base::Unretained(controller)));
   mini_player->view_ = client->AddChildView(std::move(view));
+  mini_player->client_ = client;
   mini_player->Init(std::move(params));
   mini_player->SetBounds(mini_player->CalculateBounds());
+  mini_player->placement_ = std::make_unique<MiniPlayerPlacement>(
+      mini_player.get(),
+      base::BindRepeating(&MiniPlayer::Place,
+                          base::Unretained(mini_player.get())));
 
   if (PictureInPictureOcclusionTracker* tracker =
           PictureInPictureWindowManager::GetInstance()->GetOcclusionTracker()) {
@@ -164,6 +168,13 @@ MiniPlayer::MiniPlayer(
     : controller_(controller) {}
 
 MiniPlayer::~MiniPlayer() {
+  placement_.reset();
+  if (dock_) {
+    // The video goes with this mini player, not with the window it docked in.
+    dock_->Release();
+    dock_ = nullptr;
+    view_ = nullptr;
+  }
   PictureInPictureWindowManager::GetInstance()->OnPictureInPictureWindowHidden(
       this);
 }
@@ -173,6 +184,8 @@ bool MiniPlayer::IsActive() const {
 }
 
 void MiniPlayer::Close() {
+  shown_ = false;
+  Undock();
   view_->DetachFromCompositor();
   views::Widget::Close();
   if (fade_animator_) {
@@ -183,20 +196,17 @@ void MiniPlayer::Close() {
 }
 
 void MiniPlayer::ShowInactive() {
-  if (!fade_animator_) {
-    fade_animator_ = std::make_unique<PictureInPictureWidgetFadeAnimator>();
-  }
-  fade_animator_->AnimateShowWindow(
-      this, PictureInPictureWidgetFadeAnimator::WidgetShowType::kShowInactive);
-  views::Widget::SetVisibleOnAllWorkspaces(true);
+  shown_ = true;
   view_->SetMuted(controller_->GetMuteStatus());
   view_->ShowControls(false);
-  has_been_shown_ = true;
+  placement_->Update();
   PictureInPictureWindowManager::GetInstance()->OnPictureInPictureWindowShown(
       this);
 }
 
 void MiniPlayer::Hide() {
+  shown_ = false;
+  Undock();
   views::Widget::Hide();
   if (fade_animator_) {
     fade_animator_->CancelAndReset();
@@ -207,10 +217,13 @@ void MiniPlayer::Hide() {
 }
 
 bool MiniPlayer::IsVisible() const {
-  return views::Widget::IsVisible();
+  return shown_;
 }
 
 gfx::Rect MiniPlayer::GetBounds() {
+  if (dock_) {
+    return view_->GetBoundsInScreen();
+  }
   return native_widget() ? GetWindowBoundsInScreen() : gfx::Rect();
 }
 
@@ -218,6 +231,9 @@ void MiniPlayer::UpdateNaturalSize(const gfx::Size& natural_size) {
   view_->SetNaturalSize(natural_size);
   SetAspectRatio(gfx::SizeF(natural_size));
   SetBounds(CalculateBounds());
+  if (dock_) {
+    dock_->UpdateShape();
+  }
 }
 
 void MiniPlayer::SetPlaybackState(PlaybackState playback_state) {
@@ -302,14 +318,14 @@ gfx::Size MiniPlayer::GetMaximumSize() const {
 
 void MiniPlayer::OnNativeWidgetMove() {
   views::Widget::OnNativeWidgetMove();
-  if (has_been_shown_ && IsVisible()) {
+  if (has_been_shown_ && views::Widget::IsVisible()) {
     LastBounds() = GetWindowBoundsInScreen();
   }
 }
 
 void MiniPlayer::OnNativeWidgetSizeChanged(const gfx::Size& new_size) {
   views::Widget::OnNativeWidgetSizeChanged(new_size);
-  if (has_been_shown_ && IsVisible()) {
+  if (has_been_shown_ && views::Widget::IsVisible()) {
     LastBounds() = GetWindowBoundsInScreen();
   }
   controller_->UpdateLayerBounds();
@@ -336,10 +352,66 @@ void MiniPlayer::OnAnyBrowserEnteredFullscreen() {
 }
 #endif
 
+void MiniPlayer::Place(MiniPlayerDock* dock) {
+  if (!shown_) {
+    return;
+  }
+  if (!dock) {
+    Undock();
+    ShowFloating();
+    return;
+  }
+  if (dock == dock_) {
+    return;
+  }
+  Undock();
+  if (fade_animator_) {
+    fade_animator_->CancelAndReset();
+  }
+  views::Widget::Hide();
+  view_->set_moves_widget(false);
+  dock_ = dock;
+  view_ = dock->Take(client_->RemoveChildViewT(view_.get()));
+  dock->set_on_destroying(base::BindOnce(
+      [](MiniPlayer* mini_player) {
+        mini_player->Undock();
+        mini_player->placement_->ScheduleUpdate();
+      },
+      base::Unretained(this)));
+  placement_->set_current(dock_);
+  controller_->UpdateLayerBounds();
+}
+
+void MiniPlayer::Undock() {
+  if (!dock_) {
+    return;
+  }
+  view_ = client_->AddChildView(dock_->Release());
+  dock_ = nullptr;
+  view_->SetFloatingLook();
+  view_->set_moves_widget(true);
+  placement_->set_current(nullptr);
+}
+
+void MiniPlayer::ShowFloating() {
+  if (views::Widget::IsVisible()) {
+    return;
+  }
+  SetBounds(CalculateBounds());
+  if (!fade_animator_) {
+    fade_animator_ = std::make_unique<PictureInPictureWidgetFadeAnimator>();
+  }
+  fade_animator_->AnimateShowWindow(
+      this, PictureInPictureWidgetFadeAnimator::WidgetShowType::kShowInactive);
+  views::Widget::SetVisibleOnAllWorkspaces(true);
+  has_been_shown_ = true;
+  controller_->UpdateLayerBounds();
+}
+
 gfx::Rect MiniPlayer::GetWorkArea() const {
   return display::Screen::Get()
       ->GetDisplayNearestWindow(
-          native_widget() && IsVisible()
+          native_widget() && views::Widget::IsVisible()
               ? GetNativeWindow()
               : controller_->GetWebContents()->GetTopLevelNativeWindow())
       .work_area();

@@ -4,8 +4,13 @@ source_set("mini_player") {
   sources = [
     "mini_player.cc",
     "mini_player.h",
+    "app_activity.h",
     "mini_player_controls.cc",
     "mini_player_controls.h",
+    "mini_player_dock.cc",
+    "mini_player_dock.h",
+    "mini_player_placement.cc",
+    "mini_player_placement.h",
     "mini_player_view.cc",
     "mini_player_view.h",
     "playback_speed.cc",
@@ -21,14 +26,20 @@ source_set("mini_player") {
     "//ui/views",
   ]
   deps = [
+    ":prefs",
     "//cc",
     "//cc/paint",
     "//chrome:strings",
+    "//chrome/browser:browser_process",
     "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/color:color_headers",
     "//chrome/common",
+    "//components/prefs",
     "//components/tabs:public",
     "//components/vector_icons",
     "//ui/base",
+    "//ui/base/unowned_user_data",
+    "//ui/color",
     "//ui/compositor",
     "//ui/display",
     "//uw/browser/ui/glass",
@@ -36,6 +47,7 @@ source_set("mini_player") {
   ]
   if (is_mac) {
     sources += [
+      "app_activity_mac.mm",
       "floating_native_widget_mac.h",
       "floating_native_widget_mac.mm",
     ]
@@ -44,19 +56,32 @@ source_set("mini_player") {
   }
 }
 
+# Kept apart, so registering the prefs pulls in no browser code.
+source_set("prefs") {
+  sources = [
+    "mini_player_prefs.cc",
+    "mini_player_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "mini_player_browsertest.mm" ]
   deps = [
     ":mini_player",
+    ":prefs",
     "//base",
+    "//chrome/browser:browser_process",
+    "//components/prefs",
     "//base/test:test_support",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
     "//chrome/test:test_support",
     "//content/public/browser",
     "//content/test:test_support",
+    "//media",
     "//net:test_support",
     "//testing/gtest",
     "//ui/base:test_support",

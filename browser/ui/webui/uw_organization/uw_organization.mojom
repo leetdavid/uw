@@ -46,6 +46,9 @@ struct State {
   bool task_row_new_tab;
   bool double_click_opens_tab;
   bool middle_click_closes_task;
+  // The mini player's switches, for all of uw.
+  bool mini_player_in_sidebar;
+  bool mini_player_float_in_background;
 };
 
 // The tab list's mouse actions that have a switch.
@@ -54,6 +57,12 @@ enum MouseAction {
   kTaskRowNewTab,
   kDoubleClickOpensTab,
   kMiddleClickClosesTask,
+};
+
+// The mini player's switches.
+enum MiniPlayerSwitch {
+  kInSidebar,
+  kFloatInBackground,
 };
 
 struct PauseResult {
@@ -79,4 +88,6 @@ interface OrganizationHandler {
   SetCurrency(string code) => ();
   // Every window follows at once.
   SetMouseAction(MouseAction action, bool on) => ();
+  // For all of uw. A mini player that shows moves at once.
+  SetMiniPlayer(MiniPlayerSwitch which, bool on) => ();
 };

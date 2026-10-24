@@ -28,6 +28,7 @@
 #include "ui/gfx/shadow_value.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/view_shadow.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/mini_player/mini_player_controls.h"
@@ -44,6 +45,10 @@ constexpr base::TimeDelta kTick = base::Milliseconds(250);
 
 // Below this width the mini player uses the docked sizes.
 constexpr int kFloatingSizesFrom = 320;
+
+constexpr int kFloatingCornerRadius = 12;
+constexpr int kDockedCornerRadius = 10;
+constexpr int kDockedShadowElevation = 4;
 
 // "12:41" or "1:02:41".
 std::u16string FormatTime(base::TimeDelta time) {
@@ -246,6 +251,7 @@ MiniPlayerView::MiniPlayerView(
 }
 
 MiniPlayerView::~MiniPlayerView() {
+  shadow_.reset();
   UnregisterFrameSink();
 }
 
@@ -358,7 +364,22 @@ void MiniPlayerView::SetControlsAllowed(bool allowed) {
   UpdateControlsVisibility();
 }
 
-void MiniPlayerView::SetCorners(float radius, bool lit_rim) {
+void MiniPlayerView::SetFloatingLook() {
+  shadow_.reset();
+  SetCorners(kFloatingCornerRadius, std::nullopt);
+}
+
+void MiniPlayerView::SetDockedLook(SkColor ring, bool shadow) {
+  SetCorners(kDockedCornerRadius, ring);
+  if (shadow && !shadow_) {
+    shadow_ = std::make_unique<views::ViewShadow>(this, kDockedShadowElevation);
+    shadow_->SetRoundedCornerRadius(kDockedCornerRadius);
+  } else if (!shadow) {
+    shadow_.reset();
+  }
+}
+
+void MiniPlayerView::SetCorners(float radius, std::optional<SkColor> ring) {
   layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(radius));
   layer()->SetIsFastRoundedCorner(true);
   if (rim_) {
@@ -366,9 +387,7 @@ void MiniPlayerView::SetCorners(float radius, bool lit_rim) {
     rim_ = nullptr;
     RemoveChildViewT(rim);
   }
-  if (lit_rim) {
-    rim_ = AddChildView(std::make_unique<LitRim>(radius));
-  }
+  rim_ = AddChildView(std::make_unique<Rim>(radius, ring));
   InvalidateLayout();
 }
 

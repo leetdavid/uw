@@ -7,14 +7,22 @@
 
 #include <string>
 
+#include "base/command_line.h"
 #include "base/memory/raw_ptr.h"
+#include "base/run_loop.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
+#include "media/base/media_switches.h"
 #include "content/public/browser/video_picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -30,6 +38,10 @@
 #include "ui/views/test/button_test_api.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_screenshot.h"
+#include "uw/browser/ui/views/mini_player/app_activity.h"
+#include "uw/browser/ui/views/mini_player/mini_player_dock.h"
+#include "uw/browser/ui/views/mini_player/mini_player_placement.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/look/theme.h"
@@ -44,9 +56,23 @@ ui::MouseEvent Mouse(ui::EventType type, const gfx::Point& point) {
 
 class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
  public:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    HeadlessModeBrowserTest::SetUpCommandLine(command_line);
+    // The test video has sound. Nobody near the Mac should hear it.
+    command_line->AppendSwitch(switches::kMuteAudio);
+  }
+
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     ASSERT_TRUE(embedded_test_server()->Start());
+    // uw is rarely the app in front while tests run. Most tests here look at
+    // the floating mini player, which uw in the background shows.
+    SetAppActiveForTesting(false);
+  }
+
+  void TearDownOnMainThread() override {
+    SetAppActiveForTesting(std::nullopt);
+    HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
  protected:
@@ -72,6 +98,26 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_TRUE(base::test::RunUntil([&] { return mini_player->IsVisible(); }));
     return mini_player;
   }
+
+  bool Floats(MiniPlayer* mini_player) {
+    return !mini_player->dock() && mini_player->views::Widget::IsVisible();
+  }
+
+  bool DocksIn(MiniPlayer* mini_player, BrowserWindowInterface* window) {
+    return mini_player->dock() &&
+           mini_player->dock() == MiniPlayerDock::From(window) &&
+           !mini_player->views::Widget::IsVisible();
+  }
+
+  // Lets the mini player's placement settle, for checks that it stayed.
+  void Settle() {
+    base::RunLoop settled;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, settled.QuitClosure(), base::Milliseconds(400));
+    settled.Run();
+  }
+
+  static PrefService* LocalState() { return g_browser_process->local_state(); }
 
   void Play() {
     ASSERT_EQ(true, content::EvalJs(video_, "video.play().then(() => true)"));
@@ -126,6 +172,113 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
             mini_player->view()->layer()->rounded_corner_radii());
   // At rest only the video shows.
   EXPECT_FALSE(mini_player->view()->controls_shown());
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ItDocksInTheSidebarOfTheWindowInFront) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  // The sidebar's width, the video's 3:2 shape, 10px corners.
+  MiniPlayerView* view = mini_player->view();
+  ASSERT_TRUE(base::test::RunUntil([&] { return view->width() > 0; }));
+  EXPECT_NEAR(view->width() * 2.0 / 3, view->height(), 1);
+  EXPECT_EQ(gfx::RoundedCornersF(10), view->layer()->rounded_corner_radii());
+  EXPECT_EQ(mini_player->GetBounds(), view->GetBoundsInScreen());
+  // It keeps playing there, and its controls work.
+  Play();
+  view->ShowControls(true);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return view->GetViewByID(MiniPlayerView::kPlayPauseButton)->GetVisible();
+  }));
+  SaveWindowScreenshot(browser(), "mini_player_docked");
+  Click(mini_player, MiniPlayerView::kPlayPauseButton);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Bool("video.paused"); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ItFloatsWhileUwIsInTheBackground) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  SetAppActiveForTesting(false);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  EXPECT_EQ(gfx::RoundedCornersF(12),
+            mini_player->view()->layer()->rounded_corner_radii());
+  SetAppActiveForTesting(true);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithFloatingInTheBackgroundOffItStaysDocked) {
+  LocalState()->SetBoolean(kMiniPlayerFloatInBackgroundPref, false);
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  SetAppActiveForTesting(false);
+  Settle();
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithTheSidebarSwitchOffItAlwaysFloats) {
+  LocalState()->SetBoolean(kMiniPlayerInSidebarPref, false);
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  Settle();
+  EXPECT_TRUE(Floats(mini_player));
+  // Turning it on docks the video at once.
+  LocalState()->SetBoolean(kMiniPlayerInSidebarPref, true);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, HidingTheSidebarFloatsIt) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  auto* sidebar = tabs::VerticalTabStripStateController::From(browser());
+  sidebar->RequestCollapse(true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  sidebar->RequestCollapse(false);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItFollowsTheWindowInFront) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, second); }));
+  // Closing that window brings the video back to the first.
+  CloseBrowserSynchronously(second);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  Play();
+  EXPECT_FALSE(Bool("video.paused"));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ClosingItEmptiesTheDock) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  mini_player->view()->ShowControls(true);
+  Click(mini_player, MiniPlayerView::kCloseButton);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
+  EXPECT_FALSE(dock->player());
+  EXPECT_FALSE(dock->GetVisible());
+  EXPECT_FALSE(mini_player->views::Widget::IsVisible());
 }
 
 // The way macOS hands a window the pointer: to its content view.

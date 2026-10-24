@@ -29,6 +29,7 @@ source_set("uw_organization_handler") {
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/ui/glass",
     "//uw/browser/ui/glass:prefs",
+    "//uw/browser/ui/views/mini_player:prefs",
     "//uw/browser/ui/webui/uw_command_bar",
     "//uw/components/tab_organization",
   ]
@@ -55,6 +56,7 @@ source_set("browser_tests") {
     "//uw/browser/agent:skill_folders",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/mini_player:prefs",
     "//uw/browser/ui/views/theme_picker",
     "//uw/components/ai_providers",
   ]

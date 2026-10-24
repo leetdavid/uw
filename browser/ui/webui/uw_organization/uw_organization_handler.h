@@ -50,6 +50,9 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetMouseAction(mojom::MouseAction action,
                       bool on,
                       SetMouseActionCallback callback) override;
+  void SetMiniPlayer(mojom::MiniPlayerSwitch which,
+                     bool on,
+                     SetMiniPlayerCallback callback) override;
 
  private:
   // The codes the last exchange rates cover, or none before the first.

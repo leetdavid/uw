@@ -25,6 +25,8 @@ class VideoPictureInPictureWindowController;
 
 namespace uw {
 
+class MiniPlayerDock;
+class MiniPlayerPlacement;
 class MiniPlayerView;
 
 namespace internal {
@@ -56,6 +58,9 @@ class MiniPlayer : private internal::MiniPlayerDelegateHolder,
   ~MiniPlayer() override;
 
   MiniPlayerView* view() { return view_; }
+  // The dock the video is in, or nullptr while it floats or is hidden.
+  MiniPlayerDock* dock() { return dock_; }
+  MiniPlayerPlacement* placement() { return placement_.get(); }
 
   // content::VideoOverlayWindow:
   bool IsActive() const override;
@@ -111,8 +116,20 @@ class MiniPlayer : private internal::MiniPlayerDelegateHolder,
   gfx::Rect CalculateBounds();
   gfx::Rect GetWorkArea() const;
 
+  // Docks the video in `dock`, or floats it when nullptr, while it shows.
+  void Place(MiniPlayerDock* dock);
+  // Brings the video back from its dock into the floating window, hidden.
+  void Undock();
+  void ShowFloating();
+
   const raw_ptr<content::VideoPictureInPictureWindowController> controller_;
   raw_ptr<MiniPlayerView> view_ = nullptr;
+  // The floating window's client area, where the video floats.
+  raw_ptr<views::View> client_ = nullptr;
+  raw_ptr<MiniPlayerDock> dock_ = nullptr;
+  std::unique_ptr<MiniPlayerPlacement> placement_;
+  // True from ShowInactive() to Hide(): docked or floating.
+  bool shown_ = false;
   std::unique_ptr<PictureInPictureWidgetFadeAnimator> fade_animator_;
   gfx::Size max_size_;
   bool has_been_shown_ = false;

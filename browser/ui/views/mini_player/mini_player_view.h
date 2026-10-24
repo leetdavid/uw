@@ -27,7 +27,8 @@ class Compositor;
 
 namespace views {
 class Label;
-}
+class ViewShadow;
+}  // namespace views
 
 namespace uw {
 
@@ -107,9 +108,11 @@ class MiniPlayerView : public views::View {
   // mini player does.
   void set_moves_widget(bool moves_widget) { moves_widget_ = moves_widget; }
 
-  // Rounds the corners to `radius`, with the floating mini player's lit edge
-  // when `lit_rim`.
-  void SetCorners(float radius, bool lit_rim);
+  // The floating look: 12px corners and a lit edge.
+  void SetFloatingLook();
+  // The docked look: 10px corners, a faint `ring`, and a soft shadow under
+  // it when `shadow`.
+  void SetDockedLook(SkColor ring, bool shadow);
 
   // Shows or hides the controls, as the pointer coming and going does.
   void ShowControls(bool show);
@@ -160,6 +163,7 @@ class MiniPlayerView : public views::View {
   void UpdateTime();
   void UpdateControlsVisibility();
   void SetFast(bool fast);
+  void SetCorners(float radius, std::optional<SkColor> ring);
   void RegisterFrameSink();
   void UnregisterFrameSink();
 
@@ -184,6 +188,7 @@ class MiniPlayerView : public views::View {
   raw_ptr<MiniPlayerProgress> progress_ = nullptr;
   raw_ptr<FastLabel> fast_label_ = nullptr;
   raw_ptr<views::View> rim_ = nullptr;
+  std::unique_ptr<views::ViewShadow> shadow_;
 
   gfx::Size natural_size_;
   std::optional<viz::SurfaceId> surface_id_;

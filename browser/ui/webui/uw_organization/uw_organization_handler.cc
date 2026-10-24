@@ -21,6 +21,7 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -37,6 +38,15 @@ const char* MouseActionPref(mojom::MouseAction action) {
       return kDoubleClickOpensTabPref;
     case mojom::MouseAction::kMiddleClickClosesTask:
       return kMiddleClickClosesTaskPref;
+  }
+}
+
+const char* MiniPlayerPref(mojom::MiniPlayerSwitch which) {
+  switch (which) {
+    case mojom::MiniPlayerSwitch::kInSidebar:
+      return kMiniPlayerInSidebarPref;
+    case mojom::MiniPlayerSwitch::kFloatInBackground:
+      return kMiniPlayerFloatInBackgroundPref;
   }
 }
 
@@ -106,6 +116,13 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMouseTaskRowPlus", IDS_UW_SETTINGS_MOUSE_TASK_ROW_PLUS},
       {"uwMouseDoubleClick", IDS_UW_SETTINGS_MOUSE_DOUBLE_CLICK},
       {"uwMouseMiddleClick", IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK},
+      {"uwMiniPlayerTitle", IDS_UW_SETTINGS_MINI_PLAYER_TITLE},
+      {"uwMiniPlayerInSidebar", IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR},
+      {"uwMiniPlayerInSidebarDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR_DESCRIPTION},
+      {"uwMiniPlayerFloat", IDS_UW_SETTINGS_MINI_PLAYER_FLOAT},
+      {"uwMiniPlayerFloatDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_FLOAT_DESCRIPTION},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
@@ -176,6 +193,11 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->double_click_opens_tab = prefs->GetBoolean(kDoubleClickOpensTabPref);
   state->middle_click_closes_task =
       prefs->GetBoolean(kMiddleClickClosesTaskPref);
+  const PrefService* local_state = g_browser_process->local_state();
+  state->mini_player_in_sidebar =
+      local_state->GetBoolean(kMiniPlayerInSidebarPref);
+  state->mini_player_float_in_background =
+      local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref);
   return state;
 }
 
@@ -229,6 +251,13 @@ void UwOrganizationHandler::SetMouseAction(mojom::MouseAction action,
                                            bool on,
                                            SetMouseActionCallback callback) {
   profile_->GetPrefs()->SetBoolean(MouseActionPref(action), on);
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetMiniPlayer(mojom::MiniPlayerSwitch which,
+                                          bool on,
+                                          SetMiniPlayerCallback callback) {
+  g_browser_process->local_state()->SetBoolean(MiniPlayerPref(which), on);
   std::move(callback).Run();
 }
 

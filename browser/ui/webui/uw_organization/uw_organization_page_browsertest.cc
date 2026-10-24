@@ -7,6 +7,7 @@
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
 #include "base/values.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -22,6 +23,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/tab_organization/placement.h"
@@ -261,6 +263,29 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
       return !prefs()->GetBoolean(pref);
     })) << pref;
   }
+}
+
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheMiniPlayerSwitchesStartOnAndTurnItsPlacesOff) {
+  PrefService* local_state = g_browser_process->local_state();
+  EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerInSidebarPref));
+  EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref));
+  OpenPage();
+  ASSERT_EQ(true, Run("const toggle = part('miniPlayerFloatToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref);
+  }));
+  SaveWindowScreenshot(browser(), "settings-mini-player");
+  // With the mini player out of the sidebar, floating is all it does.
+  ASSERT_EQ(true, Run("part('miniPlayerInSidebarToggle').click();"
+                      "await until(() =>"
+                      "    part('miniPlayerFloatToggle').disabled);"
+                      "return true;"));
+  EXPECT_FALSE(local_state->GetBoolean(kMiniPlayerInSidebarPref));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
