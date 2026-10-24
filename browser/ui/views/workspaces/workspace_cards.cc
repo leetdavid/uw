@@ -47,6 +47,7 @@
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
@@ -626,6 +627,7 @@ void NewWorkspaceCard::ShowProfileMenu() {
   menu_runner_->RunMenuAt(
       GetWidget(), nullptr, profile_button_->GetBoundsInScreen(),
       views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kNone);
+  FrostOpenMenu(switcher_->window());
 }
 
 void NewWorkspaceCard::EndNewProfile(bool keep) {

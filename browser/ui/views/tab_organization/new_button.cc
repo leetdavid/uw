@@ -26,6 +26,7 @@
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_commands.h"
@@ -160,6 +161,7 @@ void NewButton::ShowMenu() {
   menu_runner_->RunMenuAt(GetWidget(), nullptr, GetBoundsInScreen(),
                           views::MenuAnchorPosition::kTopLeft,
                           ui::mojom::MenuSourceType::kNone);
+  FrostOpenMenu(window_);
 }
 
 void NewButton::OnMenuClosed() {

@@ -81,6 +81,10 @@ void AddFrostedGlass(views::Widget* widget,
 // Nothing on a Mac that cannot draw glass.
 void FrostPageBubble(views::Widget* widget, content::WebContents* contents);
 
+// Frosts the menu that has just opened over `window`, and each of its submenus
+// as it opens, while the window's tiles and buttons are glass.
+void FrostOpenMenu(BrowserWindowInterface* window);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_UI_GLASS_GLASS_H_

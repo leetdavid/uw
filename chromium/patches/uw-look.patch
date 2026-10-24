@@ -1092,3 +1092,108 @@ index a387b27ccc1939fa4d685fcf0e0a170db91a4281..b997e4a4542ee8a6ebd71f931f1bb2ea
    ]
  }
  
+diff --git a/ui/views/controls/menu/menu_host.h b/ui/views/controls/menu/menu_host.h
+index 1b0dd04e1d2693c8b35e5e57306a27b09b72daab..69a7666df94e5f88062a054261ea9d043d5c49ed 100644
+--- a/ui/views/controls/menu/menu_host.h
++++ b/ui/views/controls/menu/menu_host.h
+@@ -8,6 +8,7 @@
+ #include <memory>
+ #include <string>
+ 
++#include "base/functional/callback.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/scoped_observation.h"
+ #include "build/build_config.h"
+@@ -66,6 +67,10 @@ class MenuHost : public Widget, public WidgetObserver {
+ 
+   ~MenuHost() override;
+ 
++  // uw: runs `made` with each menu's window once it is made, before it shows.
++  static void SetMadeCallback(
++      base::RepeatingCallback<void(Widget*, SubmenuView*)> made);
++
+   // Initializes and shows the MenuHost.
+   // WARNING: |init_params.parent| may be NULL.
+   void InitMenuHost(const InitParams& init_params);
+diff --git a/ui/views/controls/menu/menu_host.cc b/ui/views/controls/menu/menu_host.cc
+index 547be87232685847ab0caf1c07e22a329d68767a..b00cd1b2768a8e5a03a4c20784175535947c7ce6 100644
+--- a/ui/views/controls/menu/menu_host.cc
++++ b/ui/views/controls/menu/menu_host.cc
+@@ -12,6 +12,7 @@
+ #include "base/functional/bind.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/metrics/histogram_macros.h"
++#include "base/no_destructor.h"
+ #include "base/notimplemented.h"
+ #include "base/scoped_observation.h"
+ #include "base/trace_event/trace_event.h"
+@@ -117,6 +118,18 @@ void TransferGesture(ui::GestureRecognizer* gesture_recognizer,
+ 
+ }  // namespace internal
+ 
++namespace {
++
++// uw: told of each menu's window before it shows.
++base::RepeatingCallback<void(Widget*, SubmenuView*)>& MadeCallback() {
++  static base::NoDestructor<
++      base::RepeatingCallback<void(Widget*, SubmenuView*)>>
++      made;
++  return *made;
++}
++
++}  // namespace
++
+ ////////////////////////////////////////////////////////////////////////////////
+ // MenuHost, public:
+ 
+@@ -126,6 +139,12 @@ MenuHost::MenuHost(SubmenuView* submenu) : submenu_(submenu) {
+ 
+ MenuHost::~MenuHost() = default;
+ 
++// static
++void MenuHost::SetMadeCallback(
++    base::RepeatingCallback<void(Widget*, SubmenuView*)> made) {
++  MadeCallback() = std::move(made);
++}
++
+ void MenuHost::InitMenuHost(const InitParams& init_params) {
+   TRACE_EVENT0("views", "MenuHost::InitMenuHost");
+   Widget::InitParams params(Widget::InitParams::NATIVE_WIDGET_OWNS_WIDGET,
+@@ -203,6 +222,9 @@ void MenuHost::InitMenuHost(const InitParams& init_params) {
+   }
+   native_view_for_gestures_ = init_params.native_view_for_gestures;
+   SetContentsView(init_params.contents_view);
++  if (MadeCallback()) {
++    MadeCallback().Run(this, submenu_);
++  }
+   ShowMenuHost(init_params.do_capture);
+ }
+ 
+diff --git a/chrome/browser/ui/views/toolbar/app_menu.cc b/chrome/browser/ui/views/toolbar/app_menu.cc
+index f2c7a6f577fd10d277a3bdbc9ddde813c9b0382c..d931b1f2fea06f7c06ca090da45e1c7ce27931e9 100644
+--- a/chrome/browser/ui/views/toolbar/app_menu.cc
++++ b/chrome/browser/ui/views/toolbar/app_menu.cc
+@@ -122,6 +122,7 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/glass/glass.h"
+ 
+ using base::UserMetricsAction;
+ using content::WebContents;
+@@ -1146,6 +1147,7 @@ void AppMenu::RunMenu(views::MenuButtonController* host,
+                           /*native_view_for_gestures=*/gfx::NativeView(),
+                           /*corners=*/std::nullopt,
+                           "Chrome.AppMenu.MenuHostInitToNextFramePresented");
++  uw::FrostOpenMenu(browser_);
+ }
+ 
+ void AppMenu::RunMenu(views::Widget* parent,
+@@ -1160,6 +1162,7 @@ void AppMenu::RunMenu(views::Widget* parent,
+                           /*native_view_for_gestures=*/gfx::NativeView(),
+                           /*corners=*/std::nullopt,
+                           "Chrome.AppMenu.MenuHostInitToNextFramePresented");
++  uw::FrostOpenMenu(browser_);
+ }
+ 
+ void AppMenu::CloseMenu() {

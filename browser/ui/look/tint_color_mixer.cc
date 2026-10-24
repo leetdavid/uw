@@ -54,6 +54,8 @@ void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
                                       : SkColorSetRGB(0x3B, 0x5B, 0xDB)};
   mixer[kColorMenuCardGlass] =
       ui::SetAlpha(kColorMenuCardBackground, kMenuCardOverGlass);
+  mixer[kColorMenuGlass] =
+      ui::SetAlpha(ui::kColorMenuBackground, kMenuCardOverGlass);
 }
 
 // Custom themes bring their own frame and tab colors.

@@ -24,6 +24,8 @@ inline constexpr ui::ColorId kColorMenuCardChipHover = kChromeColorsEnd + 23;
 inline constexpr ui::ColorId kColorMenuCardAccent = kChromeColorsEnd + 24;
 // The card's color at 85%, over frosted glass while the window's glass is on.
 inline constexpr ui::ColorId kColorMenuCardGlass = kChromeColorsEnd + 25;
+// Chromium's menu color at 85%, for its menus that uw frosts.
+inline constexpr ui::ColorId kColorMenuGlass = kChromeColorsEnd + 26;
 
 inline constexpr int kMenuCardWidth = 264;
 inline constexpr int kMenuCardRadius = 14;

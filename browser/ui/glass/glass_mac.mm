@@ -17,13 +17,21 @@
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/class_property.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/bubble/bubble_frame_view.h"
+#include "ui/views/controls/menu/menu_config.h"
+#include "ui/views/controls/menu/menu_controller.h"
+#include "ui/views/controls/menu/menu_host.h"
+#include "ui/views/controls/menu/menu_item_view.h"
+#include "ui/views/controls/menu/menu_scroll_view_container.h"
+#include "ui/views/controls/menu/submenu_view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
+#include "uw/browser/ui/look/menu_card.h"
 
 // A glass view that leaves clicks to the views over it, as Chromium's window
 // glass does.
@@ -150,6 +158,25 @@ class GlassRules {
   base::RepeatingClosureList callbacks_;
 };
 
+// Set on the first item of each menu uw frosts.
+DEFINE_UI_CLASS_PROPERTY_KEY(bool, kFrostedMenuKey, false)
+
+// Lays Chromium's menu color at 85% over frosted glass in `window`, which
+// shows `submenu`.
+void FrostMenuWindow(views::Widget* window, views::SubmenuView* submenu) {
+  submenu->SetBorderColorId(kColorMenuGlass);
+  submenu->GetScrollViewContainer()->SchedulePaint();
+  AddFrostedGlass(window, gfx::Insets(),
+                  views::MenuConfig::instance().CornerRadiusForMenu(
+                      submenu->GetMenuItem()->GetMenuController()));
+}
+
+void OnMenuWindowMade(views::Widget* window, views::SubmenuView* submenu) {
+  if (submenu->GetMenuItem()->GetRootMenuItem()->GetProperty(kFrostedMenuKey)) {
+    FrostMenuWindow(window, submenu);
+  }
+}
+
 }  // namespace
 
 bool CanShowGlass() {
@@ -183,6 +210,27 @@ void FrostPageBubble(views::Widget* widget, content::WebContents* contents) {
   AddFrostedGlass(widget,
                   bubble->GetBubbleFrameView()->bubble_border()->GetInsets(),
                   bubble->GetCornerRadius());
+}
+
+void FrostOpenMenu(BrowserWindowInterface* window) {
+  views::MenuController* controller =
+      views::MenuController::GetActiveInstance();
+  if (!window || ElementGlassOfWindow(window) == 0 || !controller ||
+      !controller->GetSelectedMenuItem()) {
+    return;
+  }
+  static bool hooked = false;
+  if (!hooked) {
+    views::MenuHost::SetMadeCallback(base::BindRepeating(&OnMenuWindowMade));
+    hooked = true;
+  }
+  views::MenuItemView* menu =
+      controller->GetSelectedMenuItem()->GetRootMenuItem();
+  menu->SetProperty(kFrostedMenuKey, true);
+  views::SubmenuView* submenu = menu->GetSubmenu();
+  if (submenu && submenu->GetWidget()) {
+    FrostMenuWindow(submenu->GetWidget(), submenu);
+  }
 }
 
 }  // namespace uw
