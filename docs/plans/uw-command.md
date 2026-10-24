@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 is in progress.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built on 2026-10-25 and waits for the user's check.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -116,9 +116,25 @@ uw's proposals in the frames:
 - The "uw command" section sits first on Settings › System.
 - A chat from the command shows a terminal icon before its time in the chat list.
 
+## Built
+
+T193 was built on 2026-10-25:
+
+- `components/uw_command/`: the 20 settings `uw settings` reaches (`command_settings.h`) and the messages (`command_messages.h`).
+- `browser/uw_command/`: `CommandChannel`, the socket `uw-command.sock` in the user data folder. It is served on the IO thread to the user's own account while `/usr/local/bin/uw` points into this uw.app, and opens from `ChromeBrowserMainPartsMac::PostProfileInit` in `uw-shortcuts.patch`. `LinkCommand` and `UnlinkCommand` change the link, through macOS's password prompt when the user can't write the folder.
+- `command/`: the program. `build.ts` bundles it with esbuild and puts it in a copy of Chromium's Node with postject. GN puts it at `uw.app/Contents/Helpers/uw` through `uw-branding.patch`. It is about 117 MB and starts in about 50 ms.
+- Settings › System: the section is `settings-uw-command-section` in `browser/resources/uw_organization`, on the organization page's mojo handler.
+
+Where the build differs from the design:
+
+- The uw command's rows are the first rows of the System card, under a "uw command" heading, not a box of their own. A Chromium settings section draws one card.
+- A currency must be one uw has exchange rates for, as on the settings page.
+
+Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*` and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
+
 ## How it is built
 
-Proposed. Product code follows [Architecture](../architecture.md#code-organization).
+Proposed for the stages after T193. Product code follows [Architecture](../architecture.md#code-organization).
 
 - `components/uw_command/`, without I/O: the messages between the command and uw, and the settings list with names and allowed values.
 - `browser/uw_command/`: the channel, a Unix socket in the user data folder that only the user's account can open, served while the command is installed; install and uninstall; and a handler per command over `Connectors`, `ChatIndex`, the agent loop's approvals, and preferences.

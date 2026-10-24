@@ -31,6 +31,7 @@ export function getHtml(this: SettingsUwCommandSectionElement) {
   }
   .text {
     flex: 1;
+    min-width: 0;
   }
   .secondary {
     color: var(--cr-secondary-text-color);
@@ -41,19 +42,18 @@ export function getHtml(this: SettingsUwCommandSectionElement) {
   .problem {
     color: var(--cr-fallback-color-error, #D93025);
   }
-  .installed {
-    align-items: center;
-    display: flex;
-    gap: 6px;
-  }
   .installed::before {
     background: #188038;
     border-radius: 50%;
     content: '';
+    display: inline-block;
     height: 7px;
+    margin-inline-end: 6px;
+    vertical-align: 1px;
     width: 7px;
   }
   .note {
+    min-height: 0;
     padding-block: 12px;
   }
   code {
@@ -62,6 +62,7 @@ export function getHtml(this: SettingsUwCommandSectionElement) {
     color: var(--cr-primary-text-color);
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
     font-size: 11.5px;
+    overflow-wrap: anywhere;
     padding: 1px 5px;
   }
 </style>

@@ -196,6 +196,14 @@ On the right, a card for each of the agent's tabs shows a picture of the tab aft
 
 `Skills` at the foot of the chat list shows every skill the agent can use, from uw's `skills` folder in `~/Library/Application Support/uw-dev` and from `~/.agents/skills`, each with a switch. `Open skills folder` shows uw's folder in Finder. The agent reads a skill's instructions when a request matches its description, and the composer then says which skill it uses. Ask a chat to "make this a skill": a `Save a skill?` card appears, and nothing is written until you click `Save skill`.
 
+### The uw command
+
+Open `uw://settings/system` and click `Install uw command` at the top. macOS asks for your Mac's password once.
+
+Expected result: the row says `Installed at /usr/local/bin/uw`, with `Uninstall`. In a terminal, `uw settings list` prints uw's settings, each with its value, what it takes, and the workspaces that share it. `uw settings get organizer.enabled` prints `true` or `false`, and `uw settings set theme.grain 30 --workspace Work` changes that workspace's grain at once. A wrong value, such as `uw settings set theme.grain 140`, says what the setting takes. Quit uw and run `uw settings list` again: uw starts with no window and answers. `uw --help` and `uw settings --help` show examples. `Uninstall` removes the command, and uw stops listening for it.
+
+A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the command there: `UW_USER_DATA_DIR="$HOME/Library/Application Support/uw-dev" uw settings list`.
+
 ## Not available yet
 
 - The last details of the Arc-style look: the shadow around the page card and the slimmer toolbar.
@@ -205,6 +213,7 @@ On the right, a card for each of the agent's tabs shows a picture of the tab aft
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
 - The activity card while the sidebar is hidden. It shows on the floating sidebar only.
 - A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
+- The [uw command](plans/uw-command.md)'s chats, connectors, and terminal interface. Only `uw settings` works so far.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem
