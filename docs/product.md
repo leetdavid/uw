@@ -327,6 +327,10 @@ Agreed: pinned page sessions remain live when the last browser window closes whi
 
 Agreed: every launch after a quit restores the last session without asking, as Arc does. Pinned pages come back at their last live URLs, with Chromium-recoverable session state, alongside regular tabs. Chromium's "On startup" setting still lets the user start blank. After a crash, Chromium's "Restore pages?" prompt asks first. Its "Always restore after a crash" checkbox starts unticked; once ticked, later crashes restore without asking. uw follows Chromium's own Session Restore Infobar work and drops its parts once Chromium ships them. Changed on 2026-10-18: before, a "Restore tabs" popup offered restoration. The crash checkbox was agreed on 2026-10-20. See [Restore](plans/native-tab-tree.md#restore).
 
+### Mini player
+
+Agreed on 2026-10-24: a picture-in-picture video becomes a [mini player](CONTEXT.md#language), as in Arc. It docks at the bottom of the sidebar, so the user can browse other tabs while it plays, and floats in its own window while uw is in the background. Switching away from a playing video starts one. The [mini player plan](plans/mini-player.md) has the details.
+
 ## AI connections
 
 Agreed setup: when the user first enables an AI feature, ask them to choose a connection mode. Ordinary browsing works without AI setup.

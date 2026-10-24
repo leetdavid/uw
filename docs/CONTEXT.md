@@ -51,6 +51,18 @@ _Avoid_: Collapsed sidebar, narrow sidebar.
 A hidden sidebar shown over the page for a moment, as in Arc. The page stays where it is underneath.
 _Avoid_: Peek, overlay, expanded sidebar.
 
+**Mini player**:
+A video playing outside its page, as in Arc: docked at the bottom of the sidebar, or floating in its own window. Underneath it is Chromium's picture in picture; say "picture in picture" only for that mechanism.
+_Avoid_: PiP, sidebar player, video overlay.
+
+**Mini player stack**:
+Up to three mini players docked at the bottom of the sidebar. The top one plays; the ones under it are paused until the user picks one.
+_Avoid_: Queue, deck.
+
+**Floating mini player**:
+A mini player in its own window over other apps, shown while uw is in the background or the sidebar is hidden.
+_Avoid_: PiP window, pop-out.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 

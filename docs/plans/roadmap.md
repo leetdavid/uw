@@ -193,6 +193,12 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T182 | Floating sidebar design | done | 8/10 | Frames for a [hidden sidebar](hidden-sidebar.md), the floating sidebar over a page with its window buttons and with Transparency, and the activity card alone, in light and dark mode, per the [hidden sidebar plan](hidden-sidebar.md#design). The user asked for it on 2026-10-24. Signed off on 2026-10-24, once the user chose window buttons drawn by uw over a fade-in of macOS's own. |
 | T183 | Hidden and floating sidebar | in progress | 6/10 | Cmd+S hides the sidebar to no width with the window buttons; the left edge, drags, and the row keys bring in the floating card, which slides with uw's own window buttons and goes when the pointer leaves; the renamed hover setting; the narrow sidebar removed, per the [plan](hidden-sidebar.md#agreed-scope). Needs T182. Done when acceptance checks 1 to 7 and 9 to 13 pass. |
 | T184 | The activity card while hidden | backlog | 6/10 | The activity card shows alone over the page's bottom-left corner while the sidebar is hidden, with Undo working, per the [plan](hidden-sidebar.md#the-activity-card-while-hidden). Needs T183. Done when acceptance check 8 passes. |
+| T185 | Mini player design | in progress | 8/10 | Frames for the [mini player](mini-player.md) docked at the bottom of the sidebar with its controls on hover, floating over another app, the stack, holding for 2×, Glass at both ends, document picture in picture's frame, and the three settings, per the [plan](mini-player.md#design). The user asked for it on 2026-10-24. |
+| T186 | uw's floating mini player | backlog | 6/10 | uw's mini player in place of Chromium's picture-in-picture window, with rounded corners, the controls on hover following the Glass slider, and 2× while held, per the [plan](mini-player.md#controls-on-hover). Needs T185. Done when acceptance checks 1 and 2 pass for the floating mini player, and check 8. |
+| T187 | Docking in the sidebar | backlog | 4/10 | The mini player docks above the sidebar's foot in the front window, follows the user across windows and workspaces, floats while uw is in the background or the sidebar is hidden, and the three settings, per the [plan](mini-player.md#where-it-shows). Needs T186. Done when acceptance checks 1, 3, 4, and 7 pass. |
+| T188 | Automatic mini players | backlog | 6/10 | Switching away from a tab with a playing, audible, visible video starts a mini player, through Chromium's browser-initiated automatic picture in picture without its prompt, and selecting the tab puts it back, per the [plan](mini-player.md#starting-and-ending). Needs T187. Done when acceptance check 5 passes. |
+| T189 | The mini player stack | backlog | 5/10 | A second mini player pauses the first and stacks on it, up to three, with stills of the paused ones that fan out on hover and swap on a click, per the [plan](mini-player.md#the-stack). Needs T187. Done when acceptance check 6 passes. |
+| T190 | Document picture in picture's frame | backlog | 6/10 | Sites' own picture-in-picture windows, such as a Meet call, get the floating mini player's rounded Arc frame and never dock, per the [plan](mini-player.md#document-picture-in-picture). Needs T185. Done when acceptance check 8 passes for them. |
 
 ## 1. Choose the browser foundation
 
@@ -271,6 +277,12 @@ Agreed on 2026-10-24: a chat shows how full its model's context is and what it h
 
 Done when the plan's [acceptance checks](context-and-cost.md#acceptance-checks) pass.
 
+## Mini player
+
+Agreed on 2026-10-24: picture-in-picture videos dock at the bottom of the sidebar and float while uw is in the background, with Arc's controls on hover, as Arc's mini player. The [mini player plan](mini-player.md) has the scope and stages, T185 to T190 on the board.
+
+Done when the plan's [acceptance checks](mini-player.md#acceptance-checks) pass.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -288,6 +300,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Native tree-style tabs](../product.md#automatic-tab-organization) | 7/10 | Tasks are native tab groups. uw adds page parents, indentation, child promotion on close, and restore of parent links. |
 | [Arc-style look](arc-style-look.md) | 4/10 | Chromium already has settings for the sizes, colors, and rounded page corners. The tint gradient, the user's own tint, and the task folder row need custom drawing, and each Chromium update can move the views it touches. |
 | [Hidden and floating sidebar](hidden-sidebar.md) | 6/10 | Chromium's hover expansion has the timing, the locks, link drags, a shadow, and a blurred backdrop. uw draws the floating card's window buttons, so nothing macOS draws has to move. The window layout changes with each Chromium release. |
+| [Mini player](mini-player.md) | 4/10 | Chromium lets the browser supply its own picture-in-picture window and hands it the video as a surface any view can show. uw moves one live video between sidebars and a floating window, keeps stills of paused ones, and adds 2× speed, which Chromium has no call for. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
 | [Pinned-tab Peek previews](../product.md#pinned-tabs) | 6/10 | Same-site navigation remains in the pin; off-site links open a temporary preview that can promote into Scratchpad. |
 | [Shared live pinned-page state](../product.md#pinned-tabs) | 4/10 | The live page transfers between windows and remains alive without a browser window. Every launch restores the last session; Chromium ownership and lifecycle need a trial. Up from 3/10 on 2026-10-21: Chromium already moves a live tab between two windows of one profile when a tab is dragged across. |
