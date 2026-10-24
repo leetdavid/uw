@@ -151,14 +151,15 @@ How it is built, for T110:
 
 Status: proposed by uw on 2026-10-24, after the user asked for "an option to have glass in the theming now, like apple's liquid glass" that affects "the pinned tabs, the sidebar's transparency, etc." The design, T174, awaits sign-off. Not built.
 
-Implementability: **5/10**. Chromium already draws a Liquid Glass frame on macOS 26 and later (`GlassFrameService`, and the `NSGlassEffectView` in `browser_native_widget_mac.mm`), tinted with the frame color. uw turns it off because it hides the theme; see [Arc-style look](arc-style-look.md#design). The new work is to paint the theme see-through where `PaintTint` paints it solid today, keep the views on the frame from filling it, draw the lit tiles and rows, and handle the workspace swipe's tint layers. Glass needs a real window on a real screen, so headless tests can check the setting and the colors but not the look.
+Implementability: **5/10**. Chromium already draws a Liquid Glass frame on macOS 26 and later (`GlassFrameService`, and the `NSGlassEffectView` in `browser_native_widget_mac.mm`), tinted with the frame color. uw turns it off because it hides the theme; see [Arc-style look](arc-style-look.md#design). With vertical tabs, Chromium's glass covers only the sidebar, so uw widens it to the whole window. The new work is to paint the theme and the page color see-through where uw paints them solid today, keep the views on the frame from filling it, draw the lit tiles and rows, and handle the workspace swipe's tint layers. Glass needs a real window on a real screen, so headless tests can check the setting and the colors but not the look.
 
 Proposed:
 
 - A "Glass" switch in the theme picker, under the hairline, above "Theme colors in dark mode". Off by default. It belongs to the theme, so each workspace has its own.
 - With it on, the frame, the sidebar, and the strip around the page card show the desktop through macOS's glass, blurred. The theme covers the glass at 60% on a theme with near-black text. It covers it at 75% on a theme with white text, in black dark mode, and with theme colors in dark mode. Text keeps a 4.5:1 contrast ratio over any desktop.
 - Pin tiles, the active tab, the sidebar foot's buttons, and the window's edge get a lit top edge and a soft shadow, as glass does.
-- The page card, its toolbar, menus, the picker, and the command bar stay solid. Page colors still apply. Grain still lies on the theme.
+- Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass at the same 60% or 75%, so a red page gives a red glass toolbar and the terminal's stays nearly black. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
+- The page, menus, the picker, and the command bar stay solid. Grain still lies on the theme.
 - The window is solid, as with Glass off, behind another uw window, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium gives glass to the window in front only. While glass is paused, the picker says why under the switch.
 - Before macOS 26 the picker has no Glass row.
 
@@ -172,8 +173,8 @@ Stages:
 Acceptance checks:
 
 1. With Glass off, the window looks as it does today.
-2. With Glass on, in the front window on macOS 26 or later, the desktop shows through the sidebar and around the page card, blurred. The page card stays solid.
-3. Text on the sidebar keeps 4.5:1 over a white and a black desktop, in light and dark mode and on a theme with white text.
+2. With Glass on, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
+3. Text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode and on a theme with white text.
 4. Clicking another uw window moves the glass to it, and the window behind turns solid.
 5. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
 6. Two workspaces keep their own Glass setting.

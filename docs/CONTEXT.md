@@ -35,6 +35,10 @@ _Avoid_: Website theme, content theme, web dark mode.
 The color a page paints behind its content. The toolbar above the page and the bookmarks bar take it, whatever the window mode and page mode, and fade when it changes.
 _Avoid_: Theme color, site color, tint.
 
+**Glass**:
+A theme option that lets the desktop behind uw's window show through, blurred: through the sidebar and the edges around the page under the theme, and through the toolbar under the page color. The page stays solid; it does not scroll under the toolbar.
+_Avoid_: Transparency, translucency, vibrancy, blur.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
