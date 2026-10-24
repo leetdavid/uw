@@ -46,10 +46,10 @@ const modes = new Map<ColorMode, HTMLButtonElement>([
   [ColorMode.kLight, document.querySelector<HTMLButtonElement>('#light')!],
   [ColorMode.kDark, document.querySelector<HTMLButtonElement>('#dark')!],
 ]);
-const pagesWindow =
-    document.querySelector<HTMLButtonElement>('#pages-window')!;
+const pagesTheme =
+    document.querySelector<HTMLButtonElement>('#pages-theme')!;
 const pageModes = new Map<PageMode, HTMLButtonElement>([
-  [PageMode.kWindow, pagesWindow],
+  [PageMode.kTheme, pagesTheme],
   [
     PageMode.kLight,
     document.querySelector<HTMLButtonElement>('#pages-light')!,
@@ -316,7 +316,7 @@ function showPageMode(mode: PageMode) {
 }
 
 const pageModeNames = new Map<PageMode, string>([
-  [PageMode.kWindow, 'pagesWindow'],
+  [PageMode.kTheme, 'pagesTheme'],
   [PageMode.kLight, 'modeLight'],
   [PageMode.kDark, 'modeDark'],
 ]);
@@ -330,9 +330,9 @@ for (const [mode, button] of pageModes) {
 }
 document.querySelector('#pages-label')!.textContent =
     loadTimeData.getString('pages');
-pagesWindow.title = loadTimeData.getString('pagesSameAsWindow');
-pagesWindow.setAttribute(
-    'aria-label', loadTimeData.getString('pagesSameAsWindow'));
+pagesTheme.title = loadTimeData.getString('pagesSameAsTheme');
+pagesTheme.setAttribute(
+    'aria-label', loadTimeData.getString('pagesSameAsTheme'));
 
 field.setAttribute('aria-label', loadTimeData.getString('colorField'));
 add.title = loadTimeData.getString('addColor');

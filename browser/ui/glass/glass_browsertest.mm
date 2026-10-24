@@ -246,14 +246,13 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesThePageMode) {
   EXPECT_EQ(list->GetColorProviderKeyForTesting().color_mode, ColorMode::kDark);
   EXPECT_TRUE(color_utils::IsDark(
       list->GetColorProvider()->GetColor(kColorOmniboxResultsBackground)));
-  EXPECT_EQ(BrowserView::GetBrowserViewForBrowser(browser())
-                ->GetWidget()
-                ->GetColorProviderKeyForTesting()
-                .color_mode,
-            ColorMode::kLight);
+  EXPECT_FALSE(
+      color_utils::IsDark(BrowserView::GetBrowserViewForBrowser(browser())
+                              ->GetColorProvider()
+                              ->GetColor(ui::kColorFrameActive)));
   suggestions->Hide();
 
-  theme.page_mode = PageMode::kWindow;
+  theme.page_mode = PageMode::kTheme;
   SetThemeOfWindow(browser(), theme);
   suggestions->Show();
   EXPECT_EQ(suggestions->get_widget_for_testing()

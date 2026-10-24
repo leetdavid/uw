@@ -30,6 +30,7 @@
 #include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_commands.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -154,6 +155,7 @@ void NewButton::ShowMenu() {
                           views::MenuAnchorPosition::kTopLeft,
                           ui::mojom::MenuSourceType::kNone);
   FrostOpenMenu(window_);
+  ShowOpenMenuInThemeMode(window_);
 }
 
 void NewButton::OnMenuClosed() {

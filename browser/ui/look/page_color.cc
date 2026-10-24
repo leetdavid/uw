@@ -52,62 +52,7 @@ class Mixers : public ui::ColorProviderKey::InitializerSupplier {
 
   void AddColorMixers(ui::ColorProvider* provider,
                       const ui::ColorProviderKey& key) const override {
-    if (key.custom_theme || page_ == TodaysToolbar(key)) {
-      return;
-    }
-    const SkColor text = TextColorOn(Tint{page_, page_});
-    const bool white = text == kLightTextOnTint;
-    const auto over = [&](float strength) {
-      return color_utils::AlphaBlend(text, page_, strength);
-    };
-    const SkColor icon = over(kIcon);
-    const SkColor disabled = over(kDisabled);
-    const SkColor line = over(kLine);
-    const SkColor field = over(white ? kFieldOnDark : kFieldOnLight);
-    const SkColor field_hovered =
-        over(white ? kFieldHoveredOnDark : kFieldHoveredOnLight);
-    const SkColor hover = SkColorSetA(text, kInkDropHover);
-    const SkColor pressed = SkColorSetA(text, kInkDropPressed);
-
-    ui::ColorMixer& mixer = provider->AddMixer();
-    const auto set = [&](ui::ColorId id, SkColor color) {
-      mixer[id] = {color};
-    };
-    set(kColorToolbar, page_);
-    set(kColorToolbarText, text);
-    set(kColorToolbarTextDisabled, disabled);
-    set(kColorToolbarButtonIcon, icon);
-    set(kColorToolbarButtonIconInactive, disabled);
-    set(kColorToolbarButtonIconDisabled, disabled);
-    set(kColorToolbarButtonText, icon);
-    set(kColorToolbarInkDrop, text);
-    set(kColorToolbarInkDropHover, hover);
-    set(kColorToolbarInkDropRipple, pressed);
-    set(kColorToolbarContentAreaSeparator, line);
-    set(kColorToolbarExtensionSeparatorEnabled, line);
-
-    set(kColorLocationBarBackground, field);
-    set(kColorLocationBarBackgroundHovered, field_hovered);
-    set(kColorPageFieldFocused, field);
-    set(kColorPageFieldFocusedHovered, field_hovered);
-    set(kColorPageFieldText, text);
-    set(kColorPageFieldTextDimmed, over(kDimmedText));
-    set(kColorOmniboxIconForeground, icon);
-    set(kColorOmniboxIconForegroundTonal, icon);
-    set(kColorOmniboxIconBackground, field_hovered);
-    set(kColorOmniboxIconBackgroundTonal, field_hovered);
-    set(kColorOmniboxIconHover, hover);
-    set(kColorOmniboxActionIcon, icon);
-    set(kColorOmniboxActionIconHover, hover);
-    set(kColorOmniboxIconPressed, pressed);
-
-    set(kColorBookmarkBarBackground, page_);
-    set(kColorBookmarkBarForeground, text);
-    set(kColorBookmarkBarForegroundDisabled, disabled);
-    set(kColorBookmarkBarSeparator, line);
-    set(kColorBookmarkBarSeparatorChromeRefresh, line);
-    set(kColorBookmarkButtonIcon, icon);
-    set(kColorBookmarkFolderIcon, icon);
+    AddPageColorMixers(provider, key, page_);
   }
 
  private:
@@ -125,6 +70,65 @@ PageColors& GetPageColors() {
 }
 
 }  // namespace
+
+void AddPageColorMixers(ui::ColorProvider* provider,
+                        const ui::ColorProviderKey& key,
+                        SkColor page) {
+  if (key.custom_theme || page == TodaysToolbar(key)) {
+    return;
+  }
+  const SkColor text = TextColorOn(Tint{page, page});
+  const bool white = text == kLightTextOnTint;
+  const auto over = [&](float strength) {
+    return color_utils::AlphaBlend(text, page, strength);
+  };
+  const SkColor icon = over(kIcon);
+  const SkColor disabled = over(kDisabled);
+  const SkColor line = over(kLine);
+  const SkColor field = over(white ? kFieldOnDark : kFieldOnLight);
+  const SkColor field_hovered =
+      over(white ? kFieldHoveredOnDark : kFieldHoveredOnLight);
+  const SkColor hover = SkColorSetA(text, kInkDropHover);
+  const SkColor pressed = SkColorSetA(text, kInkDropPressed);
+
+  ui::ColorMixer& mixer = provider->AddMixer();
+  const auto set = [&](ui::ColorId id, SkColor color) { mixer[id] = {color}; };
+  set(kColorToolbar, page);
+  set(kColorToolbarText, text);
+  set(kColorToolbarTextDisabled, disabled);
+  set(kColorToolbarButtonIcon, icon);
+  set(kColorToolbarButtonIconInactive, disabled);
+  set(kColorToolbarButtonIconDisabled, disabled);
+  set(kColorToolbarButtonText, icon);
+  set(kColorToolbarInkDrop, text);
+  set(kColorToolbarInkDropHover, hover);
+  set(kColorToolbarInkDropRipple, pressed);
+  set(kColorToolbarContentAreaSeparator, line);
+  set(kColorToolbarExtensionSeparatorEnabled, line);
+
+  set(kColorLocationBarBackground, field);
+  set(kColorLocationBarBackgroundHovered, field_hovered);
+  set(kColorPageFieldFocused, field);
+  set(kColorPageFieldFocusedHovered, field_hovered);
+  set(kColorPageFieldText, text);
+  set(kColorPageFieldTextDimmed, over(kDimmedText));
+  set(kColorOmniboxIconForeground, icon);
+  set(kColorOmniboxIconForegroundTonal, icon);
+  set(kColorOmniboxIconBackground, field_hovered);
+  set(kColorOmniboxIconBackgroundTonal, field_hovered);
+  set(kColorOmniboxIconHover, hover);
+  set(kColorOmniboxActionIcon, icon);
+  set(kColorOmniboxActionIconHover, hover);
+  set(kColorOmniboxIconPressed, pressed);
+
+  set(kColorBookmarkBarBackground, page);
+  set(kColorBookmarkBarForeground, text);
+  set(kColorBookmarkBarForegroundDisabled, disabled);
+  set(kColorBookmarkBarSeparator, line);
+  set(kColorBookmarkBarSeparatorChromeRefresh, line);
+  set(kColorBookmarkButtonIcon, icon);
+  set(kColorBookmarkFolderIcon, icon);
+}
 
 void SetPageColor(const views::View* browser_view,
                   std::optional<SkColor> color) {
@@ -156,6 +160,16 @@ ui::ColorProviderKey::InitializerSupplier* PageColorMixers(
     return nullptr;
   }
   return page_colors.mixers.at(found->second).get();
+}
+
+std::optional<SkColor> PageColorOfMixers(
+    const ui::ColorProviderKey::InitializerSupplier* mixers) {
+  for (const auto& [color, each] : GetPageColors().mixers) {
+    if (each.get() == mixers) {
+      return color;
+    }
+  }
+  return std::nullopt;
 }
 
 void AddPageFieldDefaults(ui::ColorMixer& mixer) {

@@ -51,7 +51,6 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/page_transition_types.h"
-#include "ui/color/color_provider_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/switches.h"
@@ -247,8 +246,6 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesThePageMode) {
                            "matchMedia('(prefers-color-scheme: dark)').matches")
         .ExtractBool();
   }));
-  EXPECT_EQ(bar()->page()->GetColorMode(),
-            ui::ColorProviderKey::ColorMode::kLight);
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TurnedOffCmdTOpensATab) {

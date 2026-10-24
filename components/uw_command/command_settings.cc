@@ -127,7 +127,7 @@ std::string_view ModeName(ThemeMode mode) {
 
 std::string_view PageModeName(PageMode mode) {
   switch (mode) {
-    case PageMode::kWindow:
+    case PageMode::kTheme:
       return "window";
     case PageMode::kLight:
       return "light";
@@ -271,7 +271,7 @@ void SetThemeSetting(Theme& theme,
     const std::string& mode = stored.GetString();
     theme.page_mode = mode == "light"  ? PageMode::kLight
                       : mode == "dark" ? PageMode::kDark
-                                       : PageMode::kWindow;
+                                       : PageMode::kTheme;
   } else if (setting.name == "theme.colors-in-dark-mode" && stored.is_bool()) {
     theme.colors_in_dark_mode = stored.GetBool();
   } else if (int* percent = PercentOf(theme, setting.name);

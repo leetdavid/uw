@@ -57,6 +57,7 @@
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/ui/views/workspaces/workspace_text.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -628,6 +629,7 @@ void NewWorkspaceCard::ShowProfileMenu() {
       GetWidget(), nullptr, profile_button_->GetBoundsInScreen(),
       views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kNone);
   FrostOpenMenu(switcher_->window());
+  ShowOpenMenuInThemeMode(switcher_->window());
 }
 
 void NewWorkspaceCard::EndNewProfile(bool keep) {

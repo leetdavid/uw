@@ -38,8 +38,8 @@ constexpr webui::LocalizedString kStrings[] = {
     {"modeLight", IDS_UW_THEME_MODE_LIGHT},
     {"modeDark", IDS_UW_THEME_MODE_DARK},
     {"pages", IDS_UW_THEME_PAGES},
-    {"pagesWindow", IDS_UW_THEME_PAGES_WINDOW},
-    {"pagesSameAsWindow", IDS_UW_THEME_PAGES_SAME_AS_WINDOW},
+    {"pagesTheme", IDS_UW_THEME_PAGES_WINDOW},
+    {"pagesSameAsTheme", IDS_UW_THEME_PAGES_SAME_AS_WINDOW},
     {"colorField", IDS_UW_THEME_COLOR_FIELD},
     {"addColor", IDS_UW_THEME_ADD_COLOR},
     {"suggested", IDS_UW_THEME_SUGGESTED},
@@ -80,8 +80,8 @@ ThemeMode ThemeModeOf(mojom::ColorMode mode) {
 
 PageMode PageModeOf(mojom::PageMode mode) {
   switch (mode) {
-    case mojom::PageMode::kWindow:
-      return PageMode::kWindow;
+    case mojom::PageMode::kTheme:
+      return PageMode::kTheme;
     case mojom::PageMode::kLight:
       return PageMode::kLight;
     case mojom::PageMode::kDark:
@@ -91,8 +91,8 @@ PageMode PageModeOf(mojom::PageMode mode) {
 
 mojom::PageMode ToMojo(PageMode mode) {
   switch (mode) {
-    case PageMode::kWindow:
-      return mojom::PageMode::kWindow;
+    case PageMode::kTheme:
+      return mojom::PageMode::kTheme;
     case PageMode::kLight:
       return mojom::PageMode::kLight;
     case PageMode::kDark:

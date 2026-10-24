@@ -9,7 +9,7 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..059e32b3e50e393cf41efe9aa558947171fffcad 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8d4abc7e0e7239e3ca665b5f9a47fc30ce502cc6 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -277,6 +277,188 @@ are declared in tools/grit/grit_args.gni.
@@ -136,9 +136,9 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..059e32b3e50e393cf41efe9aa5589471
 +      <message name="IDS_UW_THEME_MODE_AUTO" desc="Theme picker choice that follows the system's light or dark appearance.">Auto</message>
 +      <message name="IDS_UW_THEME_MODE_LIGHT" desc="Theme picker choice for light mode.">Light</message>
 +      <message name="IDS_UW_THEME_MODE_DARK" desc="Theme picker choice for dark mode.">Dark</message>
-+      <message name="IDS_UW_THEME_PAGES" desc="Label of the theme picker's row that sets whether web pages in tabs are told to show their light or dark look, apart from the browser window's own light or dark mode. Its choices are Window, Light, and Dark.">Pages</message>
-+      <message name="IDS_UW_THEME_PAGES_WINDOW" desc="The first choice in the theme picker's Pages row, short for Same as window: web pages show the light or dark look of the browser window.">Window</message>
-+      <message name="IDS_UW_THEME_PAGES_SAME_AS_WINDOW" desc="Tooltip and accessible name of the Window choice in the theme picker's Pages row: web pages show the light or dark look of the browser window.">Same as window</message>
++      <message name="IDS_UW_THEME_PAGES" desc="Label of the theme picker's row that sets whether web pages and the browser's own pages, menus, and dialogs are light or dark, apart from the sidebar's theme. Its choices are Theme, Light, and Dark.">Pages</message>
++      <message name="IDS_UW_THEME_PAGES_WINDOW" desc="The first choice in the theme picker's Pages row, short for Same as the theme: pages, menus, and dialogs are light or dark as the sidebar's theme is.">Theme</message>
++      <message name="IDS_UW_THEME_PAGES_SAME_AS_WINDOW" desc="Tooltip and accessible name of the Theme choice in the theme picker's Pages row: pages, menus, and dialogs are light or dark as the sidebar's theme is.">Same as the theme</message>
 +      <message name="IDS_UW_THEME_COLOR_FIELD" desc="Accessible name of the theme picker's color field, where the user drags up to three dots to pick the window's colors.">Theme colors</message>
 +      <message name="IDS_UW_THEME_ADD_COLOR" desc="Tooltip of the button that adds a color dot to the theme picker's color field.">Add a color</message>
 +      <message name="IDS_UW_THEME_SUGGESTED" desc="Accessible name of the row of suggested themes in the theme picker.">Suggested themes</message>

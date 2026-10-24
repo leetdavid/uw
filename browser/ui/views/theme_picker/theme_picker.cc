@@ -14,6 +14,7 @@
 #include "url/gurl.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 namespace {
@@ -72,6 +73,7 @@ void ThemePicker::Show() {
                              ->GetBoundsInScreen();
   bubble_->ShowBubble(gfx::Rect(card.x() + kGap, card.y() + kTopInset, 0, 0),
                       views::BubbleBorder::TOP_LEFT);
+  ShowInThemeMode(bubble_->GetBubbleWidget(), window_);
   // The page frosts itself while the theme's glass is on.
   FrostPageBubble(bubble_->GetBubbleWidget(), page());
 }

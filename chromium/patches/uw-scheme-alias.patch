@@ -12,32 +12,18 @@ index eaa7929a316674a9d2673e07bab3b8a110b895b1..4df973b6628747b7688e41a0f650f781
      ":after_startup_task_utils",
      ":bad_message",
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
-index e30528ed87d953945e26395ce2c7c1ff52ac7d5a..c4a2a4ebdb1b64c7bc7d441a4f4577daeaeca3b5 100644
+index e30528ed87d953945e26395ce2c7c1ff52ac7d5a..ca86e9178a9b605d489cd7a15ba364322a2f198a 100644
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -454,6 +454,8 @@
+@@ -454,6 +454,7 @@
  #include "url/origin.h"
  #include "url/third_party/mozilla/url_parse.h"
  #include "url/url_constants.h"
 +#include "uw/browser/ui/uw_url_rewrite.h"
-+#include "uw/browser/workspaces/workspace_theme.h"
  
  #if BUILDFLAG(IS_WIN)
  #include "base/files/file_util.h"
-@@ -4053,6 +4055,12 @@ GetPreferredColorScheme(const WebPreferences& web_prefs,
-     // Incognito contents follow the device color mode.
-     preferred_color_scheme = ToBlinkPreferredColorScheme(
-         ui::NativeTheme::GetInstanceForWeb()->preferred_color_scheme());
-+  } else if (const std::optional<bool> dark =
-+                 uw::PageModeIsDark(web_contents)) {
-+    // uw's page mode tells websites and uw's tab pages light or dark apart
-+    // from the window.
-+    preferred_color_scheme = *dark ? blink::mojom::PreferredColorScheme::kDark
-+                                   : blink::mojom::PreferredColorScheme::kLight;
-   } else {
-     // WebUI and regular pages follow the browser theme color mode, provided by
-     // the color provider.
-@@ -5059,6 +5067,10 @@ void ChromeContentBrowserClient::BrowserURLHandlerCreated(
+@@ -5059,6 +5060,10 @@ void ChromeContentBrowserClient::BrowserURLHandlerCreated(
      part->BrowserURLHandlerCreated(handler);
    }
  

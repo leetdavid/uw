@@ -31,6 +31,7 @@
 #include "uw/browser/pins/pin_sync.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 namespace {
@@ -112,6 +113,9 @@ views::Widget* HomeUrlCard::Show(const tabs::TabInterface* tab,
   bubble->SetAcceptCallback(base::BindOnce(&Save, tab->GetHandle(),
                                            base::Unretained(card->field())));
   OpenCard() = views::BubbleDialogDelegate::CreateBubble(bubble);
+  ShowInThemeMode(OpenCard().get(),
+                  tabs::TabInterface::GetFromContents(tab->GetContents())
+                      ->GetBrowserWindowInterface());
   bubble->Watch(OpenCard().get());
   OpenCard()->Show();
   return OpenCard().get();

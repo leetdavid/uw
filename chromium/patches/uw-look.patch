@@ -1458,39 +1458,10 @@ index acd863a7cce82d52aa4103f60c1093e2fb4eb31d..f762213877f91a349e8942a1e3467374
    const int corner_radius = views::LayoutProvider::Get()->GetCornerRadiusMetric(
        views::ShapeContextTokens::kOmniboxExpandedRadius);
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc b/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc
-index 0b1958c63e480dd7a3c6b51a279e3a6352d58263..aacbe270114f11af02e9b94e716b2afbcf85338d 100644
+index 0b1958c63e480dd7a3c6b51a279e3a6352d58263..2be9c4522ca60b6b18a0b6a352ad237ab3ce29fe 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.cc
-@@ -29,11 +29,28 @@
- #include "ui/views/view_class_properties.h"
- #include "ui/views/view_utils.h"
- #include "ui/views/widget/native_widget.h"
-+#include "uw/browser/workspaces/workspace_theme.h"
- 
- namespace omnibox {
- const void* kOmniboxWebUIPopupWidgetId = &kOmniboxWebUIPopupWidgetId;
- }
- 
-+namespace {
-+
-+// uw: the list opens over the page, so it takes uw's page mode.
-+class PageModeWidget : public ThemeCopyingWidget {
-+ public:
-+  using ThemeCopyingWidget::ThemeCopyingWidget;
-+
-+  ui::ColorProviderKey GetColorProviderKey() const override {
-+    ui::ColorProviderKey key = ThemeCopyingWidget::GetColorProviderKey();
-+    uw::ApplyPageModeOverPage(parent(), key);
-+    return key;
-+  }
-+};
-+
-+}  // namespace
-+
- DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(OmniboxPopupPresenterBase,
-                                       kRoundedResultsFrame);
- 
-@@ -75,6 +92,10 @@ void OmniboxPopupPresenterBase::Show() {
+@@ -75,6 +75,10 @@ void OmniboxPopupPresenterBase::Show() {
  
    EnsureWidgetCreated();
    SynchronizePopupBounds();
@@ -1501,15 +1472,6 @@ index 0b1958c63e480dd7a3c6b51a279e3a6352d58263..aacbe270114f11af02e9b94e716b2afb
  
    if (auto* content = GetWebUIContent()) {
      content->ShowUI();
-@@ -363,7 +384,7 @@ void OmniboxPopupPresenterBase::EnsureWidgetCreated() {
-     return;
-   }
-   views::Widget* parent_widget = presenter_delegate_->GetLocationBarWidget();
--  widget_ = std::make_unique<ThemeCopyingWidget>(parent_widget);
-+  widget_ = std::make_unique<PageModeWidget>(parent_widget);
- 
-   views::Widget::InitParams params(
-       views::Widget::InitParams::CLIENT_OWNS_WIDGET,
 diff --git a/chrome/browser/resources/omnibox_popup/omnibox_popup.html b/chrome/browser/resources/omnibox_popup/omnibox_popup.html
 index d53118eb4bd9d2dc34c497c0affd781631f8353c..196e7170868cada43b4d4eabcd0d9f279e3cf45a 100644
 --- a/chrome/browser/resources/omnibox_popup/omnibox_popup.html

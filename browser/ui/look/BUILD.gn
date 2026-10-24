@@ -8,6 +8,8 @@ source_set("look") {
     "page_color.h",
     "sidebar_tab_fill.cc",
     "sidebar_tab_fill.h",
+    "theme_colors.cc",
+    "theme_colors.h",
     "tint_color_mixer.cc",
     "tint_color_mixer.h",
     "tint_painter.cc",

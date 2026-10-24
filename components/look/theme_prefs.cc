@@ -25,9 +25,10 @@ void RegisterThemeProfilePrefs(PrefRegistrySimple* registry) {
 
 namespace {
 
+// Theme is saved as "window", its name before T201.
 std::string_view PageModeName(PageMode mode) {
   switch (mode) {
-    case PageMode::kWindow:
+    case PageMode::kTheme:
       return "window";
     case PageMode::kLight:
       return "light";
@@ -39,7 +40,7 @@ std::string_view PageModeName(PageMode mode) {
 PageMode PageModeNamed(std::string_view name) {
   return name == "light"  ? PageMode::kLight
          : name == "dark" ? PageMode::kDark
-                          : PageMode::kWindow;
+                          : PageMode::kTheme;
 }
 
 // The theme as saved, with no saved colors as none.

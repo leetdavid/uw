@@ -42,6 +42,7 @@
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 namespace {
@@ -212,6 +213,7 @@ void OrganizeBar::ShowMenu() {
   card_widget_ = views::BubbleDialogDelegate::CreateBubble(
       card_bubble_.get(),
       base::BindOnce(&OrganizeBar::OnCardClosed, base::Unretained(this)));
+  ShowInThemeMode(card_widget_.get(), window_);
   hover_lock_ =
       BrowserView::GetBrowserViewForBrowser(window_)
           ->tab_strip_view()
@@ -244,6 +246,7 @@ void OrganizeBar::ShowContextMenuForViewImpl(
       base::BindRepeating(&OrganizeBar::OnMenuClosed, base::Unretained(this)));
   menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
                           views::MenuAnchorPosition::kTopLeft, source_type);
+  ShowOpenMenuInThemeMode(window_);
 }
 
 void OrganizeBar::OnMenuClosed() {

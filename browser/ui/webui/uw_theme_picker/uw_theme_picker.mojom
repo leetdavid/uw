@@ -10,9 +10,10 @@ enum ColorMode {
   kDark,
 };
 
-// What pages in tabs are told: the window's mode, Light, or Dark.
+// The light or dark of everything outside the sidebar: the theme's own, Light,
+// or Dark.
 enum PageMode {
-  kWindow,
+  kTheme,
   kLight,
   kDark,
 };

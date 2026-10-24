@@ -19,6 +19,7 @@ source_set("theme_picker") {
     "//url",
     "//uw/browser/ui/glass",
     "//uw/browser/ui/webui/uw_theme_picker",
+    "//uw/browser/workspaces",
   ]
 }
 

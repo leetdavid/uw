@@ -36,6 +36,7 @@
 #include "ui/base/test/ui_controls.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
 #include "ui/gfx/geometry/point.h"
@@ -283,11 +284,11 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
   themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   content::WebContents* page = Open();
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
-                                          "'pages-window').getAttribute("
+                                          "'pages-theme').getAttribute("
                                           "'aria-pressed')"));
   EXPECT_EQ(
       l10n_util::GetStringUTF8(IDS_UW_THEME_PAGES_SAME_AS_WINDOW),
-      content::EvalJs(page, "document.getElementById('pages-window').title"));
+      content::EvalJs(page, "document.getElementById('pages-theme').title"));
 
   ASSERT_TRUE(
       content::ExecJs(page, "document.getElementById('pages-dark').click();"));
@@ -298,6 +299,18 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
                                           "'pages-dark').getAttribute("
                                           "'aria-pressed')"));
+  // The picker opens from the sidebar, so it keeps the theme's light while
+  // the rest of the window turns dark.
+  EXPECT_EQ(picker()
+                ->GetWidgetForTesting()
+                ->GetColorProviderKeyForTesting()
+                .color_mode,
+            ui::ColorProviderKey::ColorMode::kLight);
+  EXPECT_EQ(BrowserView::GetBrowserViewForBrowser(browser())
+                ->GetWidget()
+                ->GetColorProviderKeyForTesting()
+                .color_mode,
+            ui::ColorProviderKey::ColorMode::kDark);
 }
 
 // A real window can close a bubble as soon as it shows, which a headless one

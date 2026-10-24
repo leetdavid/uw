@@ -44,6 +44,16 @@ ui::ColorProviderKey::InitializerSupplier* PageColorMixers(
     const views::View* browser_view);
 
 // Chromium's own colors for the field, used while no page color is set.
+// Gives the toolbar, the address field, and the bookmarks bar the colors of
+// `page`, a page color, unless it is the toolbar's own color under `key`.
+void AddPageColorMixers(ui::ColorProvider* provider,
+                        const ui::ColorProviderKey& key,
+                        SkColor page);
+
+// The page color whose mixers `mixers` are, from PageColorMixers().
+std::optional<SkColor> PageColorOfMixers(
+    const ui::ColorProviderKey::InitializerSupplier* mixers);
+
 void AddPageFieldDefaults(ui::ColorMixer& mixer);
 
 }  // namespace uw

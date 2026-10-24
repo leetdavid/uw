@@ -21,8 +21,9 @@ inline constexpr int kFullGlass = 100;
 // Light, Dark, or Auto, which follows macOS.
 enum class ThemeMode { kAuto, kLight, kDark };
 
-// What pages in tabs are told: the window's mode, Light, or Dark.
-enum class PageMode { kWindow, kLight, kDark };
+// The light or dark of everything outside the sidebar: the theme's own, Light,
+// or Dark.
+enum class PageMode { kTheme, kLight, kDark };
 
 // A theme, as the picker sets it: a workspace's, or a profile's.
 struct Theme {
@@ -41,7 +42,7 @@ struct Theme {
   // Dark mode shows the theme darkened instead of black.
   bool colors_in_dark_mode = false;
   ThemeMode mode = ThemeMode::kAuto;
-  PageMode page_mode = PageMode::kWindow;
+  PageMode page_mode = PageMode::kTheme;
 
   bool operator==(const Theme&) const = default;
 };

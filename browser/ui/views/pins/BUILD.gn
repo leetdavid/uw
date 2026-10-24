@@ -32,6 +32,7 @@ source_set("pins") {
     "//uw/browser/pins",
     "//uw/browser/ui/look",
     "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/workspaces",
     "//uw/browser/ui/vector_icons",
   ]
 }

@@ -42,26 +42,20 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme);
 Theme NewWorkspaceTheme(const Theme& like);
 
 // Sets the color and the mode in the color key of `window` from the theme its
-// workspace has. Chromium's BrowserWidget calls it. A theme from Chromium's
-// theme store still replaces uw's look.
+// workspace has: the page mode's, with mixers that keep the theme's colors in
+// the sidebar, per docs/plans/themes.md#the-theme-apart-from-chromium.
+// Chromium's BrowserWidget calls it. A theme from Chromium's theme store still
+// replaces uw's look.
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
                         ui::ColorProviderKey& key);
 
-// Sets the color and the mode in `key`, the color key of a panel that opens
-// over the page, such as the address bar's suggestion list, from the page
-// mode of the window `parent` belongs to. Leaves it under a page mode of
-// Window.
-void ApplyPageModeOverPage(const views::Widget* parent,
-                           ui::ColorProviderKey& key);
+// Shows `widget`, a menu or card that opens from the sidebar of `window`,
+// such as the theme picker, in the theme's light or dark, while page mode
+// gives the rest of the window another.
+void ShowInThemeMode(views::Widget* widget, BrowserWindowInterface* window);
 
-// Whether `page` is told to look dark apart from its window, by the page mode
-// of the window that shows it, as a tab or in a bubble or panel such as an
-// extension's popup, per docs/plans/themes.md#page-mode. Nothing while it
-// follows the window: under a page mode of Window, for uw's and Chromium's own
-// pages other than uw's tab pages and the command bar, and in a private
-// window, whose pages follow macOS. Chromium asks it for each page's
-// prefers-color-scheme.
-std::optional<bool> PageModeIsDark(content::WebContents* page);
+// The same for the views menu just opened from the sidebar of `window`.
+void ShowOpenMenuInThemeMode(BrowserWindowInterface* window);
 
 // The page card's color behind `page` before it paints, while page mode tells
 // it Light or Dark: white or #0A0A0A.

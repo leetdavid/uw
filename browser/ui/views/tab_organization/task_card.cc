@@ -41,6 +41,7 @@
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 namespace {
@@ -149,6 +150,7 @@ std::unique_ptr<views::Widget> TaskCard::Show(
   bubble->SetContentsView(std::make_unique<TaskCard>(window, group));
   std::unique_ptr<views::Widget> widget =
       views::BubbleDialogDelegate::CreateBubble(bubble);
+  ShowInThemeMode(widget.get(), window);
   bubble->Watch(widget.get());
   widget->Show();
   return widget;

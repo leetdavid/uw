@@ -116,9 +116,9 @@ How it is built, for T102:
 
 ### The theme apart from Chromium
 
-Status: agreed with the user on 2026-10-25 in a grilling session. The designs, T200, were pre-approved: "the designs are pre-approved, just start the implementation right after". Being built in T201.
+Status: agreed with the user on 2026-10-25 in a grilling session. The designs, T200, were pre-approved: "the designs are pre-approved, just start the implementation right after". T201 built it the same day. Nobody has used it in a real window yet.
 
-Implementability: **5/10**. Chromium works out every color of a window from one color key, which held the theme's light or dark. Page mode becomes the key's light or dark, and the theme's goes into a field of its own that only uw's sidebar colors read, per [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Every Chromium surface then follows page mode by itself. The risks are Chromium colors made for the tab strip that the sidebar uses, uw's sidebar menus and cards, which must ask for the theme's mode, macOS's own menus and window, and a first build that rebuilds nearly all of Chromium.
+Implementability: **5/10**. Chromium works out every color of a window from one color key, which held the theme's light or dark. Page mode becomes the key's light or dark, and the theme's key rides along in it for the sidebar's colors, per [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Every Chromium surface then follows page mode by itself. The risks are general Chromium colors that a view in the sidebar uses, uw's sidebar menus and cards, which must ask for the theme's mode, and macOS's own menus, which take the window's look.
 
 Stages:
 
@@ -132,6 +132,13 @@ Acceptance checks:
 3. With Pages on Theme, every surface looks as it did before T201.
 4. Two workspaces keep their own theme and page mode. In a private window, pages and Chromium's menus follow macOS.
 5. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
+How it is built, for T201:
+
+- `ApplyThemeOfWindow` (`browser/workspaces/workspace_theme.h`) gives a window's key the page mode, neutral black for dark pages, and, when that differs from the theme, the mixers of `browser/ui/look/theme_colors.h` in the key's slot for extra mixers. They copy the theme key's colors for Chromium's header, frame, tab, task, and window button colors, picked by name, and for uw's cards and the edge around the page card. The page color's mixers come along in the same slot.
+- Chromium tells each page its light or dark from the window's key, so websites, Chromium's pages, uw's pages, and every bubble, menu, and dialog follow page mode by themselves. The per-surface hooks of T191, T198, and T199 are gone.
+- `ShowInThemeMode` keeps the theme picker and the sidebar's cards in the theme's mode, and `ShowOpenMenuInThemeMode` the views menus the sidebar opens, also when the theme changes while they are open. macOS's tab and pin menus take the window's look, whose background is the theme's.
+- `WorkspacesBrowserTest.EverythingButTheSidebarTakesThePageMode` covers checks 1 and 2 and `TheSidebarKeepsTheThemeUnderAnyPageMode` compares the sidebar's pixels between Pages on Theme and on Dark, and on Light for a dark theme. `ThemePickerBrowserTest.ThePagesRowSetsThePageMode` checks that the picker keeps the theme's light under dark pages.
 
 ## Page colors
 
