@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn the same day and waits for the user's sign-off.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 is in progress.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -102,7 +102,7 @@ Not yet: images, the per-chat connector switches (every connector that is on is 
 
 ## Design
 
-Drawn on 2026-10-24, T192, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Agent chats", for the user to sign off. The rules are in the canvas's `uw-command` guide.
+Drawn on 2026-10-24, T192, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Agent chats". The user signed them off the same day. The rules are in the canvas's `uw-command` guide.
 
 - "uw command: a chat in the terminal": steps, a Markdown answer, the composer, and the status line, under `uw mcp list` in the scrollback.
 - "uw command: a change waits for you": a page step's approval card, under `uw chats`.
