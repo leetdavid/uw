@@ -45,7 +45,7 @@ Agreed on 2026-10-12:
 ## Design
 
 - **Colors.** `components/look/tint` holds the color rules, tested without a window. A uw color mixer in `browser/ui/look` sets Chromium's existing color IDs from them. It is added in `chrome/browser/ui/color/chrome_color_mixers.cc`. No view picks colors by itself.
-- **Glass frame.** Chromium's transparent macOS frame hides every frame color, so uw turns it off by default. Its preference still works.
+- **Glass frame.** Chromium's Liquid Glass frame shows only where the theme asks for it, per [Glass](themes.md#glass). Chromium's own switch for it no longer does anything.
 - **Tint control.** Replaced on 2026-10-16 by the [theme picker](themes.md). uw's settings page has a `Theme` row that opens it. The theme's first color is stored as Chromium's theme color, so the "Customize Chromium" panel changes the same value.
 - **Gradient.** `PaintTint` paints the gradient in window coordinates wherever Chromium paints the frame color, so every view draws one continuous sheet.
 - **Sizes.** `chrome/browser/ui/layout_constants.cc` already has values for the vertical tab height, radius, padding, and pinned tab height. The patch changes those numbers.

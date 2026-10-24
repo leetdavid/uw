@@ -149,46 +149,59 @@ How it is built, for T110:
 
 ## Glass
 
-Status: scope agreed with the user on 2026-10-24 in a grilling session, after they asked for "an option to have glass in the theming now, like apple's liquid glass" that affects "the pinned tabs, the sidebar's transparency, etc." The design, T174, was redrawn to match and signed off by the user the same day. Not built.
+Status: scope agreed with the user on 2026-10-24 in a grilling session, after they asked for "an option to have glass in the theming now, like apple's liquid glass" that affects "the pinned tabs, the sidebar's transparency, etc." The design, T174, was signed off the same day. After trying the first build, the user split the one setting in two the same day: "macos decided to have just the glass effect on UI elements of the window, so let's make the transparency of the window a separate control, and glass only affects the UI elements". Being built in T175.
 
-Implementability: **4/10**, down from 5/10 once menus and cards were added. Chromium already draws a Liquid Glass frame on macOS 26 and later (`GlassFrameService`, and the `NSGlassEffectView` in `browser_native_widget_mac.mm`), tinted with the frame color. uw turns it off because it hides the theme; see [Arc-style look](arc-style-look.md#design). With vertical tabs, Chromium's glass covers only the sidebar, so uw widens it to the whole window. The new work is to paint the theme and the page color see-through where uw paints them solid today, keep the views on the frame from filling it, draw the lit tiles and rows, and handle the workspace swipe's tint layers. uw's menus, cards, the command bar, and the picker are each their own small window, so each kind needs its own glass view. Real glass on each pin tile is the hardest part: Chromium draws the sidebar into one layer, so each tile's glass view goes behind that layer, beside the window's, and has to follow its tile through drags, the swipe, scrolling, and collapsing the sidebar. A prototype comes first. Glass needs a real window on a real screen, so headless tests can check the setting and the colors but not the look.
+Implementability: **4/10**. Chromium already draws a Liquid Glass frame on macOS 26 and later (`GlassFrameService`, and the `NSGlassEffectView` in `browser_native_widget_mac.mm`). With vertical tabs it covers only the sidebar, so uw widens it to the whole window and paints the theme and the page color see-through over it. Glass on the window's elements is drawing only. uw's menus, cards, the command bar, and the picker are each their own small window, so each kind needs its own glass view. Real glass on each pin tile, T176, is the hardest part. Glass needs a real window on a real screen, so headless tests check the settings and the rules, and the look is checked by eye.
 
-Scope:
+Transparency, the window:
 
-- Agreed on 2026-10-24: a "Glass" slider in the theme picker, under Grain, like the Liquid Glass slider in macOS's settings. At the left end the window is solid, as today; that is the default.
-- Agreed on 2026-10-24: it belongs to the theme, so each workspace has its own, like everything else in the picker. A swipe between a glass workspace and a solid one blends the two.
-- Moving it right lets the desktop show through the frame, the sidebar, and the strip around the page card, blurred by macOS's glass. The theme covers the glass from 100% at the left end down to 20% at the right end, Clear.
-- Agreed on 2026-10-24: text keeps a 4.5:1 contrast ratio over any desktop while the theme covers the glass at 60% or more, or 75% on a theme with white text. Clearer than that, the user picks clear over readable, as macOS allows. This is the one exception to the [readable tints](arc-style-look.md#scope) rule.
-- Agreed on 2026-10-24: a small tick on the slider's track marks that point, half way on a theme with near-black text and about a third of the way on one with white text. Its tooltip and VoiceOver label say "Clearer than this, text may be hard to read on some desktops."
-- Agreed on 2026-10-24: each pin tile is real Liquid Glass, bending and magnifying what is behind it at its edges, as macOS's glass buttons do. Its favicon sits on top. The active tab, the sidebar foot's buttons, and the window's edge get a lit top edge and a soft shadow, as glass does.
-- Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass as much as the theme does, so a red page gives a red glass toolbar and the terminal's stays dark. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
-- Agreed on 2026-10-24: the toolbar never goes clearer than the strength that keeps its own text 4.5:1 over a white and a black desktop, whatever the slider says, so the address always reads. That is 52% for a white page, 60% for the terminal's `#0A0A0A`, and 88% for a red `#C62828`.
-- Agreed on 2026-10-24: uw's menus and cards, the command bar, and the theme picker are frosted glass while the slider is above solid, as macOS's menus are. They use macOS's heavier regular glass under their own color at about 85%, whatever the slider says, so their text always keeps 4.5:1. The cards include the sidebar's, such as the activity card and the rename card.
-- The page stays solid. Grain still lies on the theme.
-- Agreed on 2026-10-24: every visible uw window has glass, as on macOS. A window that is not active is frosted more, which macOS does by itself to clear glass. uw lifts Chromium's limit of one glass window, and the build measures the cost of three glass windows against one, with a video playing in a window behind.
-- Agreed on 2026-10-24: a switch on uw's settings page, under the Theme row, "Glass in windows behind the front one", turns that off. It is on by default and covers all of uw, since it saves power rather than changing a workspace's look. The Theme row's second line becomes "The window's colors, grain, glass, and light or dark mode". Off, only the front window is glass, as in Chromium, and the others are solid.
-- Agreed on 2026-10-24: the window is solid, as at the left end, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium has each of these rules but Reduce transparency, which uw adds. Pop-up windows never have glass. Private windows have glass as the profile's latest pick has it, as they show that pick's theme. While glass is paused, the picker says why under the slider.
-- Before macOS 26 the picker has no Glass row.
+- A "Transparency" slider in the theme picker, under Grain. It belongs to the theme, so each workspace has its own. At the left end the window is solid, as today; that is the default.
+- Moving it right lets the desktop show through the sidebar, the strip around the page card, the toolbar, and the bookmarks bar, blurred by macOS's glass. The theme covers the glass from 100% at the left end down to 20% at the right end. The page stays solid, starts below the toolbar, and does not scroll under it; Blink cannot lay a desktop page out under the toolbar.
+- Text keeps a 4.5:1 contrast ratio over any desktop while the theme covers the glass at 60% or more, or 75% on a theme with white text. Clearer than that, the user picks clear over readable, as macOS allows. This is the one exception to the [readable tints](arc-style-look.md#scope) rule. A small tick on the track marks that point; its tooltip and VoiceOver label say "Clearer than this, text may be hard to read on some desktops."
+- The toolbar and the bookmarks bar keep the page color over the glass, as much as the theme covers it, but never so little that the toolbar's text stops reading over a white or a black desktop: 52% for a white page, 56% for the terminal's `#0A0A0A`, and 86% for a red `#C62828`.
+- Every visible uw window is see-through, as on macOS. A window that is not active is frosted more, which macOS does by itself to clear glass. A switch on uw's settings page, under the Theme row, turns that off for all of uw, since it saves power rather than changing a workspace's look: off, only the front window is see-through. Its label is to become "Transparency in windows behind the front one", since "Glass" now names the elements. The Theme row's second line is "The window's colors, grain, glass, and light or dark mode".
+- The window is solid in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium has each of these rules but Reduce transparency, which uw adds. Pop-up windows are never see-through. Private windows follow the profile's latest pick, as they show that pick's theme. While it is paused, the picker says why under the sliders.
+
+Glass, the window's elements:
+
+- A "Glass" slider under Transparency, also part of the theme. At the left end the elements are flat, as today; that is the default.
+- Moving it right turns pin tiles, the active tab, and the Organize and new buttons at the sidebar's foot into lit glass: a white that fades down the element, a lit top edge, and a faint ring, from frosted, keeping all of the white, to clear, keeping a seventh of it, like the Liquid Glass slider in macOS's settings. The active tab keeps enough white to stand out.
+- It works whatever the Transparency. Over a solid sidebar, the elements show the sidebar's color through them, as macOS's glass controls show what is behind them in the window.
+- uw's menus and cards, the command bar, and the theme picker are frosted glass while Glass is off its left end, as macOS's menus are. They use macOS's heavier regular glass under their own color at about 85%, so their text always keeps 4.5:1. The cards include the sidebar's, such as the rename card.
+- Reduce transparency in macOS makes the elements flat too.
+- Real glass on each pin tile, which bends what is behind it, is T176, prototyped first. If a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
+
+Before macOS 26 the picker has neither slider.
 
 The numbers are in the `uw-themes` guide, section "Glass". The frames are on the canvas's "Themes" page: "Glass: light", "Glass: dark", and "Glass: every state".
+
+How it is built, for T175:
+
+- The theme keeps `transparency` and `glass` from 0 to 100, as `uw.theme.transparency` and `uw.theme.glass`, and so does each workspace's theme. `components/look/theme` turns them into how much the theme covers the glass, the place of the tick, the toolbar's least cover, and how much white a glass element keeps.
+- `browser/ui/glass` holds uw's rules: a window asks for Liquid Glass behind it when its theme's transparency is above 0, the Mac runs macOS 26 or later, and Reduce transparency is off. The settings switch is `uw.glass.windows_behind` in local state.
+- Chromium's `GlassFrameService` picks the windows that show it. The `uw-look` patch starts it on macOS 26 whatever the `GlassFrame` feature says, and swaps its `glass_frame.enabled` switch and its limit of one window for uw's rules. Its Energy Saver, full screen, and web store theme rules stay.
+- The `tab-tree` patch spans the `NSGlassEffectView` behind the window across the whole window, in Apple's clear style, with no tint of its own.
+- `BrowserFrameViewMac` paints the theme at its cover around the page card. The toolbar and the bookmarks bar paint the page color at the toolbar's cover. Over glass the top container paints nothing behind them, and the toolbar's top corners have no fill of their own.
+- `PaintGlassTabFill` draws pin tiles and the active tab as lit glass, and `CreateGlassPillBackground` the foot's buttons. Tiles have no drop shadow, since a tab cannot paint outside itself.
 
 Stages:
 
 1. T174: the glass frames, signed off by the user.
-2. T175: glass built, but for the pin tiles, which keep drawn glass until T176.
-3. T176: real glass on each pin tile, prototyped first. Agreed on 2026-10-24: if a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
+2. T175: both settings built, with drawn glass on the pin tiles.
+3. T176: real glass on each pin tile, prototyped first.
 
 Acceptance checks:
 
-1. With the slider at the left end, the window looks as it does today.
-2. With the slider moved right, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
-3. At the right end, the toolbar on a white page covers the glass at 52% and on a `#C62828` page at 88%, and its address keeps 4.5:1 over a white and a black desktop.
-4. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode. At the right end, the theme covers it at 20%.
-5. Two uw windows side by side both show the desktop through them. The one not active is more frosted. With "Glass in windows behind the front one" off, it is solid.
-6. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
-7. Two workspaces keep their own Glass setting.
-8. With the slider above solid, a task's menu, the command bar, and the picker show what is behind them frosted, and their text keeps 4.5:1.
-9. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+1. With both sliders at the left end, the window looks as it does today.
+2. With Transparency moved right, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
+3. At the right end of Transparency, the toolbar on a white page covers the glass at 52% and on a `#C62828` page at 86%, and its address keeps 4.5:1 over a white and a black desktop.
+4. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode.
+5. With Glass moved right and Transparency at the left end, pin tiles, the active tab, and the foot's buttons are lit glass over a solid sidebar, clearer the further right.
+6. Two uw windows side by side are both see-through. The one not active is more frosted. With the switch for windows behind off, it is solid.
+7. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. Reduce transparency also makes the elements flat. For the first two, the picker says why.
+8. Two workspaces keep their own Transparency and Glass.
+9. With Glass off its left end, a task's menu, the command bar, and the picker show what is behind them frosted, and their text keeps 4.5:1.
+10. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
 
