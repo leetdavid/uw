@@ -22,6 +22,7 @@ namespace uw {
 inline constexpr char kThemeColorsPref[] = "uw.theme.colors";
 inline constexpr char kThemeIntensityPref[] = "uw.theme.intensity";
 inline constexpr char kThemeGrainPref[] = "uw.theme.grain";
+inline constexpr char kThemeGlassPref[] = "uw.theme.glass";
 inline constexpr char kThemeColorsInDarkModePref[] =
     "uw.theme.colors_in_dark_mode";
 

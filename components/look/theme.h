@@ -15,6 +15,7 @@ namespace uw {
 inline constexpr size_t kMaxThemeColors = 3;
 inline constexpr int kFullIntensity = 100;
 inline constexpr int kFullGrain = 100;
+inline constexpr int kFullGlass = 100;
 
 // Light, Dark, or Auto, which follows macOS.
 enum class ThemeMode { kAuto, kLight, kDark };
@@ -27,6 +28,9 @@ struct Theme {
   int intensity = kFullIntensity;
   // How strong the grain over the theme is, from 0 to 100.
   int grain = 0;
+  // How much of the desktop shows through the window, from 0, solid, to 100,
+  // the clearest.
+  int glass = 0;
   // Dark mode shows the theme darkened instead of black.
   bool colors_in_dark_mode = false;
   ThemeMode mode = ThemeMode::kAuto;
@@ -43,6 +47,19 @@ SkColor WithIntensity(SkColor color, int intensity);
 // `color` as theme colors show in dark mode: the same hue and saturation at
 // 14% lightness.
 SkColor DarkModeColorOf(SkColor color);
+
+// How much of the glass behind the window the theme covers at `glass`: all of
+// it when solid, down to a fifth at the clearest.
+float GlassCover(int glass);
+
+// The glass past which text in `text` stops keeping its contrast over any
+// desktop: where the theme covers 60% of the glass under near-black text, and
+// 75% under white text.
+int ReadableGlass(SkColor text);
+
+// The least that `color` covers the glass so that `text` on it keeps its
+// contrast over a white and a black desktop alike.
+float ReadableCover(SkColor color, SkColor text);
 
 // The colors after the first that the window's gradient runs through: each at
 // the theme's intensity, darkened in dark mode, and made lighter or darker

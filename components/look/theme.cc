@@ -4,6 +4,7 @@
 #include "uw/components/look/theme.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "ui/gfx/color_utils.h"
 #include "uw/components/look/tint.h"
@@ -19,6 +20,14 @@ constexpr SkColor kWine = SkColorSetRGB(0x5A, 0x1F, 0x3A);
 constexpr SkColor kForest = SkColorSetRGB(0x1F, 0x3A, 0x2E);
 
 constexpr double kDarkModeLightness = 0.14;
+
+// The theme covers the glass from all of it, solid, down to a fifth.
+constexpr float kClearestCover = 0.2f;
+// The least cover that keeps text readable over any desktop, as the designs
+// mark it on the slider.
+constexpr float kReadableCoverUnderDarkText = 0.6f;
+constexpr float kReadableCoverUnderLightText = 0.75f;
+constexpr int kCoverSteps = 100;
 constexpr double kLightnessStep = 0.01;
 
 // `color` made lighter under dark text, or darker under light text, until the
@@ -66,6 +75,33 @@ SkColor DarkModeColorOf(SkColor color) {
   color_utils::SkColorToHSL(color, &hsl);
   hsl.l = kDarkModeLightness;
   return color_utils::HSLToSkColor(hsl, SK_AlphaOPAQUE);
+}
+
+float GlassCover(int glass) {
+  return 1.0f - (1.0f - kClearestCover) * std::clamp(glass, 0, kFullGlass) /
+                    kFullGlass;
+}
+
+int ReadableGlass(SkColor text) {
+  const float cover = color_utils::IsDark(text) ? kReadableCoverUnderDarkText
+                                                : kReadableCoverUnderLightText;
+  return static_cast<int>(
+      std::lround((1.0f - cover) / (1.0f - kClearestCover) * kFullGlass));
+}
+
+float ReadableCover(SkColor color, SkColor text) {
+  for (int step = 0; step < kCoverSteps; ++step) {
+    const float cover = static_cast<float>(step) / kCoverSteps;
+    if (color_utils::GetContrastRatio(
+            color_utils::AlphaBlend(color, SK_ColorWHITE, cover), text) >=
+            kReadableContrast &&
+        color_utils::GetContrastRatio(
+            color_utils::AlphaBlend(color, SK_ColorBLACK, cover), text) >=
+            kReadableContrast) {
+      return cover;
+    }
+  }
+  return 1.0f;
 }
 
 std::vector<SkColor> MoreGradientColors(const Theme& theme,

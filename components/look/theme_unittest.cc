@@ -66,6 +66,35 @@ TEST(ThemeTest, EveryGradientColorKeepsTheTextReadable) {
   EXPECT_GT(HslOf(more[0]).l, HslOf(kWine).l);
 }
 
+TEST(ThemeTest, GlassRunsFromSolidToAFifth) {
+  EXPECT_EQ(Theme().glass, 0);
+  EXPECT_FLOAT_EQ(GlassCover(0), 1.0f);
+  EXPECT_FLOAT_EQ(GlassCover(kFullGlass / 2), 0.6f);
+  EXPECT_FLOAT_EQ(GlassCover(kFullGlass), 0.2f);
+  EXPECT_FLOAT_EQ(GlassCover(-5), 1.0f);
+  EXPECT_FLOAT_EQ(GlassCover(kFullGlass + 5), 0.2f);
+}
+
+TEST(ThemeTest, TheReadableGlassIsWhereTheTickSits) {
+  EXPECT_EQ(ReadableGlass(kDarkTextOnTint), 50);
+  EXPECT_EQ(ReadableGlass(kLightTextOnTint), 31);
+  EXPECT_GE(GlassCover(ReadableGlass(kLightTextOnTint)), 0.75f);
+}
+
+TEST(ThemeTest, TheToolbarCoversTheGlassEnoughForItsText) {
+  EXPECT_NEAR(ReadableCover(SK_ColorWHITE, kDarkTextOnTint), 0.52f, 0.011f);
+  EXPECT_NEAR(ReadableCover(SkColorSetRGB(0xC6, 0x28, 0x28), SK_ColorWHITE),
+              0.86f, 0.011f);
+  EXPECT_NEAR(ReadableCover(kBlackCard, SK_ColorWHITE), 0.56f, 0.011f);
+  for (SkColor desktop : {SK_ColorWHITE, SK_ColorBLACK}) {
+    const float cover = ReadableCover(kBlackCard, SK_ColorWHITE);
+    EXPECT_GE(
+        color_utils::GetContrastRatio(
+            color_utils::AlphaBlend(kBlackCard, desktop, cover), SK_ColorWHITE),
+        kReadableContrast);
+  }
+}
+
 TEST_F(ThemePrefsTest, WithNoUserColorTheThemeIsTheDefault) {
   prefs_.SetInteger(kThemeGrainPref, 40);
   const Theme theme = ReadTheme(prefs_, std::nullopt);
@@ -78,6 +107,7 @@ TEST_F(ThemePrefsTest, ASavedThemeComesBackWhole) {
   theme.colors = {kButter, kSky, kWine};
   theme.intensity = 60;
   theme.grain = 25;
+  theme.glass = 70;
   theme.colors_in_dark_mode = true;
   WriteTheme(prefs_, theme);
   EXPECT_EQ(ReadTheme(prefs_, WithIntensity(kButter, 60)), theme);
@@ -114,6 +144,7 @@ TEST_F(ThemePrefsTest, AWorkspaceKeepsEveryPartOfItsTheme) {
   theme.colors = {kButter, kSky};
   theme.intensity = 60;
   theme.grain = 25;
+  theme.glass = 40;
   theme.colors_in_dark_mode = true;
   theme.mode = ThemeMode::kDark;
   EXPECT_EQ(ThemeFromValue(ThemeToValue(theme)), theme);
