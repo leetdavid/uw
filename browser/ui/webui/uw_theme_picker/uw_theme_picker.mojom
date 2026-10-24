@@ -18,7 +18,27 @@ struct Theme {
   int32 intensity;
   // How strong the grain over the theme is, from 0 to 100.
   int32 grain;
+  // How much of the desktop shows through the window, from 0, solid, to 100.
+  int32 transparency;
+  // How glassy the window's tiles and buttons are, from 0, flat, to 100.
+  int32 glass;
   bool colors_in_dark_mode;
+};
+
+// Why the window is solid and its tiles flat while the sliders ask for glass.
+enum GlassPause {
+  kNone,
+  kEnergySaver,
+  kReduceTransparency,
+};
+
+// The Transparency and Glass sliders: whether this Mac can show glass, where
+// the Transparency tick sits past which text may stop reading, from 0 to 100,
+// and why glass is paused.
+struct GlassSliders {
+  bool shown;
+  int32 readable_transparency;
+  GlassPause pause;
 };
 
 // Links the theme picker page to its handler.
@@ -28,9 +48,13 @@ interface ThemePickerHandlerFactory {
 
 // Browser side. Only the theme picker page can reach it.
 interface ThemePickerHandler {
-  // The theme, the color mode, and the suggested themes, each one to three
-  // colors.
-  GetState() => (Theme theme, ColorMode mode, array<array<uint32>> suggested);
+  // The theme, the color mode, the suggested themes, each one to three
+  // colors, and the glass sliders.
+  GetState() => (Theme theme, ColorMode mode, array<array<uint32>> suggested,
+                 GlassSliders glass);
+
+  // The glass sliders for `theme` in `mode`, whose colors move the tick.
+  GetGlassSliders(Theme theme, ColorMode mode) => (GlassSliders glass);
 
   // Saves the theme. The window changes at once.
   SetTheme(Theme theme);

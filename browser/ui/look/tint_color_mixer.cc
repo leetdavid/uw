@@ -29,6 +29,9 @@ constexpr SkAlpha kFillOnDarkAlpha = 0x14;
 // The active tab on black: white at 12%.
 constexpr float kActiveTabOnBlack = 0.12f;
 
+// A menu card over frosted glass keeps 85% of its color.
+constexpr SkAlpha kMenuCardOverGlass = 0xD9;
+
 // uw's menu cards, in light mode and on black. They follow the mode, not the
 // theme.
 void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
@@ -49,6 +52,8 @@ void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
                                          : SkColorSetRGB(0xE4, 0xE2, 0xEF)};
   mixer[kColorMenuCardAccent] = {dark ? SkColorSetRGB(0x9D, 0xB0, 0xFF)
                                       : SkColorSetRGB(0x3B, 0x5B, 0xDB)};
+  mixer[kColorMenuCardGlass] =
+      ui::SetAlpha(kColorMenuCardBackground, kMenuCardOverGlass);
 }
 
 // Custom themes bring their own frame and tab colors.

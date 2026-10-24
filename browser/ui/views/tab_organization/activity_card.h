@@ -11,6 +11,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
+#include "uw/browser/ui/glass/glass_background.h"
 
 namespace views {
 class ImageView;
@@ -37,9 +38,11 @@ class ActivityCard : public views::FlexLayoutView {
  public:
   // `undo` reverses the move the card reports. `accept` carries out the
   // suggestion it shows. `retry` asks again for the name of the task whose
-  // Name Task failed, and `tidy` runs Tidy again after it failed.
+  // Name Task failed, and `tidy` runs Tidy again after it failed. The card is
+  // glass as `glass` says.
   using RetryCallback = base::RepeatingCallback<void(const std::string&)>;
-  ActivityCard(base::RepeatingClosure undo,
+  ActivityCard(GlassOf glass,
+               base::RepeatingClosure undo,
                base::RepeatingClosure accept,
                RetryCallback retry,
                base::RepeatingClosure tidy);

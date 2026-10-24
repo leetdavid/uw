@@ -17,6 +17,7 @@ source_set("theme_picker") {
     "//ui/gfx",
     "//ui/views",
     "//url",
+    "//uw/browser/ui/glass",
     "//uw/browser/ui/webui/uw_theme_picker",
   ]
 }

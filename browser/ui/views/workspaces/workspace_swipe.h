@@ -166,6 +166,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   // its place.
   void PostUncovered(int cover);
   void OnUncovered();
+  // Over glass the slide draws no tint of its own, so the tabs under it are
+  // hidden while it shows, and shown again after.
+  void HideTabsUnderSlide(bool hide);
   // Ends the slide and puts the sidebar back as it was.
   void Reset();
   void RepaintTint();
@@ -198,6 +201,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   gfx::ImageSkia leaving_;
   gfx::ImageSkia picture_;
   raw_ptr<SlideView> slide_view_ = nullptr;
+  // The tab areas hidden under the slide, and those given a layer to hide.
+  std::vector<raw_ptr<views::View>> hidden_;
+  std::vector<raw_ptr<views::View>> layered_;
   // What a key's slide does once the tab strip's picture is in.
   base::OnceClosure after_leaving_;
 

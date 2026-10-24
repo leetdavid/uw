@@ -50,6 +50,7 @@ source_set("workspaces") {
     "//ui/events",
     "//ui/gfx",
     "//uw/browser/tab_organization",
+    "//uw/browser/ui/glass",
     "//uw/browser/ui/look",
     "//uw/browser/ui/vector_icons",
     "//uw/browser/ui/views/tab_organization",

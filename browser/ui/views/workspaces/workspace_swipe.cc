@@ -20,6 +20,7 @@
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
+#include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -42,6 +43,7 @@
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/tint_painter.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -158,9 +160,12 @@ class SlideView : public views::View {
 
   // views::View:
   void OnPaint(gfx::Canvas* canvas) override {
-    PaintTint(canvas, this, browser_view_,
-              GetColorProvider()->GetColor(ui::kColorFrameActive),
-              ThemeOfWindow(browser_view_->browser()));
+    // Over glass the frame draws the tint as it blends, behind this.
+    if (!ShowsGlass(browser_view_->browser())) {
+      PaintTint(canvas, this, browser_view_,
+                GetColorProvider()->GetColor(ui::kColorFrameActive),
+                ThemeOfWindow(browser_view_->browser()));
+    }
     const int x = base::ClampRound(offset_);
     canvas->DrawImageInt(leaving_, x, strip_top_);
     if (direction_ != 0 && !coming_.isNull()) {
@@ -225,7 +230,7 @@ WorkspaceSwipe::~WorkspaceSwipe() {
     shown->SetSlide({});
   }
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 1.0f, 0);
   }
   if (region_) {
     region_->RemovePreTargetHandler(this);
@@ -419,9 +424,11 @@ void WorkspaceSwipe::OnViewHierarchyWillBeDeleted(views::View* view) {
     region_->RemovePreTargetHandler(this);
   }
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 1.0f, 0);
   }
   slide_view_ = nullptr;
+  hidden_.clear();
+  layered_.clear();
   cover_ = nullptr;
   page_layer_made_ = false;
   region_ = nullptr;
@@ -554,6 +561,47 @@ void WorkspaceSwipe::ShowSlide() {
   slide_view_->SetComing(other ? other->picture() : gfx::ImageSkia());
   slide_view_->Move(offset_, target_.empty() ? 0 : direction_);
   slide_view_->SetVisible(true);
+  HideTabsUnderSlide(ShowsGlass(window_));
+}
+
+void WorkspaceSwipe::HideTabsUnderSlide(bool hide) {
+  if (!hide) {
+    for (views::View* view : layered_) {
+      view->DestroyLayer();
+    }
+    for (views::View* view : hidden_) {
+      if (view->layer()) {
+        view->layer()->SetOpacity(1);
+      }
+    }
+    layered_.clear();
+    hidden_.clear();
+    return;
+  }
+  auto* tabs = views::AsViewClass<TabStripView>(TabStrip());
+  if (!tabs || !hidden_.empty()) {
+    return;
+  }
+  for (views::View* contents :
+       {static_cast<views::View*>(tabs->GetPinnedTabsContainer()),
+        static_cast<views::View*>(tabs->GetUnpinnedTabsContainer())}) {
+    views::View* area =
+        contents ? views::ScrollView::GetScrollViewForContents(contents)
+                 : nullptr;
+    if (!area || !area->GetVisible() ||
+        !views::View::ConvertRectToTarget(area->parent(), region_,
+                                          area->bounds())
+             .Intersects(area_)) {
+      continue;
+    }
+    if (!area->layer()) {
+      area->SetPaintToLayer();
+      area->layer()->SetFillsBoundsOpaquely(false);
+      layered_.push_back(area);
+    }
+    area->layer()->SetOpacity(0);
+    hidden_.push_back(area);
+  }
 }
 
 void WorkspaceSwipe::Aim(const std::string& target, int direction) {
@@ -622,11 +670,14 @@ void WorkspaceSwipe::SetOffset(float offset) {
       partner ? BrowserView::GetBrowserViewForBrowser(partner->window())
               : nullptr;
   if (browser_view_ && other && other->GetColorProvider()) {
-    SetTintBlend(browser_view_,
-                 other->GetColorProvider()->GetColor(ui::kColorFrameActive),
-                 ThemeOfWindow(partner->window()), amount);
+    const Theme other_theme = ThemeOfWindow(partner->window());
+    SetTintBlend(
+        browser_view_,
+        other->GetColorProvider()->GetColor(ui::kColorFrameActive), other_theme,
+        ShowsGlass(window_) ? WindowCover(other_theme.transparency) : 1.0f,
+        amount);
   } else if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 1.0f, 0);
   }
   if (WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_)) {
     switcher->SetSlide(target_, std::max(0.0f, amount));
@@ -793,8 +844,9 @@ void WorkspaceSwipe::Reset() {
     slide_view_->SetVisible(false);
     slide_view_->Clear();
   }
+  HideTabsUnderSlide(false);
   if (browser_view_) {
-    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 0);
+    SetTintBlend(browser_view_, SK_ColorTRANSPARENT, Theme(), 1.0f, 0);
   }
   if (WorkspaceSwitcher* switcher = WorkspaceSwitcher::From(window_)) {
     switcher->SetSlide(std::string(), 0);

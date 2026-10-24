@@ -18,11 +18,14 @@
 #include "cc/paint/paint_shader.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkMatrix.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/skia_conversions.h"
+#include "ui/gfx/scoped_canvas.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/page_card.h"
@@ -90,6 +93,7 @@ void PaintGrain(gfx::Canvas* canvas,
 struct Blend {
   SkColor color;
   Theme theme;
+  float cover;
   float amount;
 };
 
@@ -98,11 +102,33 @@ std::map<const views::View*, Blend>& Blends() {
   return *blends;
 }
 
+SkAlpha AlphaOf(float amount) {
+  return static_cast<SkAlpha>(
+      std::lround(std::clamp(amount, 0.0f, 1.0f) * 255));
+}
+
+// Where the page card is laid out in `view`, leaving out any transform on the
+// toolbar or the page themselves, such as the page's nudge as a workspace
+// switch fades in. A view drawn mid-nudge keeps its drawing after the nudge
+// ends.
+gfx::RectF PageCardIn(const views::View* view,
+                      const views::View* toolbar,
+                      const views::View* page) {
+  const auto laid_out = [view](const views::View* part) {
+    return views::View::ConvertRectToTarget(part->parent(), view,
+                                            gfx::RectF(part->bounds()));
+  };
+  gfx::RectF card = laid_out(toolbar);
+  card.Union(laid_out(page));
+  return card;
+}
+
 void PaintSheet(gfx::Canvas* canvas,
                 const views::View* view,
                 const views::View* window,
                 SkColor color,
-                const Theme& theme) {
+                const Theme& theme,
+                float cover) {
   const Tint tint = TintFrom(color);
   const double across = std::sin(kAngle);
   const double down = -std::cos(kAngle);
@@ -132,8 +158,14 @@ void PaintSheet(gfx::Canvas* canvas,
   flags.setShader(cc::PaintShader::MakeLinearGradient(
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
       SkTileMode::kClamp));
-  canvas->DrawRect(view->GetLocalBounds(), flags);
-  PaintGrain(canvas, view, theme.grain, IsDark(tint));
+  {
+    gfx::ScopedCanvas scoped_canvas(canvas);
+    if (cover < 1.0f) {
+      canvas->SaveLayerAlpha(AlphaOf(cover));
+    }
+    canvas->DrawRect(view->GetLocalBounds(), flags);
+    PaintGrain(canvas, view, theme.grain, IsDark(tint));
+  }
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.
   if (TextColorOn(tint) == kDarkTextOnTint) {
@@ -148,27 +180,48 @@ void PaintTint(gfx::Canvas* canvas,
                const views::View* view,
                const views::View* window,
                SkColor color,
-               const Theme& theme) {
-  PaintSheet(canvas, view, window, color, theme);
+               const Theme& theme,
+               float cover) {
   const auto blend = Blends().find(window);
   if (blend == Blends().end()) {
+    PaintSheet(canvas, view, window, color, theme, cover);
     return;
   }
-  canvas->SaveLayerAlpha(
-      static_cast<uint8_t>(std::lround(blend->second.amount * 255)));
-  PaintSheet(canvas, view, window, blend->second.color, blend->second.theme);
+  // Each sheet in proportion and added together, so a fade between sheets over
+  // glass lets through as much as the sheets do.
+  const float amount = blend->second.amount;
+  canvas->SaveLayerAlpha(AlphaOf(1.0f - amount));
+  PaintSheet(canvas, view, window, color, theme, cover);
+  canvas->Restore();
+  cc::PaintFlags added;
+  added.setBlendMode(SkBlendMode::kPlus);
+  added.setAlphaf(amount);
+  canvas->SaveLayerWithFlags(added);
+  PaintSheet(canvas, view, window, blend->second.color, blend->second.theme,
+             blend->second.cover);
   canvas->Restore();
 }
 
 void SetTintBlend(const views::View* window,
                   SkColor color,
                   const Theme& theme,
+                  float cover,
                   float amount) {
   if (amount <= 0) {
     Blends().erase(window);
     return;
   }
-  Blends()[window] = {color, theme, std::min(amount, 1.0f)};
+  Blends()[window] = {color, theme, cover, std::min(amount, 1.0f)};
+}
+
+void ClipOutPageCard(gfx::Canvas* canvas,
+                     const views::View* view,
+                     const views::View* toolbar,
+                     const views::View* page) {
+  canvas->sk_canvas()->clipRRect(
+      SkRRect::MakeRectXY(gfx::RectFToSkRect(PageCardIn(view, toolbar, page)),
+                          kPageCardRadius, kPageCardRadius),
+      SkClipOp::kDifference, /*do_anti_alias=*/true);
 }
 
 void PaintPageCardEdge(gfx::Canvas* canvas,
@@ -180,15 +233,7 @@ void PaintPageCardEdge(gfx::Canvas* canvas,
       view->GetWidget()->IsFullscreen()) {
     return;
   }
-  // Where the card is laid out, leaving out any transform on the toolbar or
-  // the page themselves, such as the page's nudge as a workspace switch fades
-  // in. A view drawn mid-nudge keeps its drawing after the nudge ends.
-  const auto laid_out = [view](const views::View* part) {
-    return views::View::ConvertRectToTarget(part->parent(), view,
-                                            gfx::RectF(part->bounds()));
-  };
-  gfx::RectF edge = laid_out(toolbar);
-  edge.Union(laid_out(page));
+  gfx::RectF edge = PageCardIn(view, toolbar, page);
   edge.Outset(0.5f);
   cc::PaintFlags flags;
   flags.setAntiAlias(true);

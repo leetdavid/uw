@@ -11,7 +11,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..f07a1ab448063461f0d0519f28a36e71
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,103 @@
+@@ -3904,6 +3904,109 @@
          System
        </message>
      </if>
@@ -72,11 +72,17 @@ index 63c989a76dadc13953e35513998e83326ee3612b..f07a1ab448063461f0d0519f28a36e71
 +      <message name="IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE" desc="Heading of the pause controls.">
 +        Pause automatic organization
 +      </message>
-+      <message name="IDS_UW_SETTINGS_THEME" desc="Row that opens the theme picker, which sets the colors, grain, and light or dark mode of the browser window.">
++      <message name="IDS_UW_SETTINGS_THEME" desc="Row that opens the theme picker, which sets the colors, grain, glass, and light or dark mode of the browser window.">
 +        Theme
 +      </message>
 +      <message name="IDS_UW_SETTINGS_THEME_DESCRIPTION" desc="Second line of the row that opens the theme picker.">
-+        The window's colors, grain, and light or dark mode
++        The window's colors, grain, glass, and light or dark mode
++      </message>
++      <message name="IDS_UW_SETTINGS_GLASS_BEHIND" desc="Label of the switch under the Theme row that keeps browser windows behind the front one see-through. Transparency lets the desktop show through a window.">
++        Transparency in windows behind the front one
++      </message>
++      <message name="IDS_UW_SETTINGS_GLASS_BEHIND_DESCRIPTION" desc="Second line of the switch that keeps browser windows behind the front one see-through. uw is the product name and stays lowercase.">
++        On for all of uw. Off saves power.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_COMMAND_BAR_TITLE" desc="Heading of the command bar settings. The command bar is a panel for opening pages and running commands from the keyboard.">
 +        Command bar
@@ -418,7 +424,7 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a296a14b8e 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -1332,7 +1332,17 @@ static_library("ui") {
+@@ -1332,7 +1332,18 @@ static_library("ui") {
 
      # Non-android deps for "ui" target.
      deps += [
@@ -433,6 +439,7 @@ index 2e7510e36dd0cf138f4249dbad4ba02b18869b9f..9c8d31c4d6d0d494fa13e896104d30a2
 +      "//uw/browser/pins",
 +      "//uw/browser/workspaces",
 +      "//uw/browser/ui/views/workspaces",
++      "//uw/browser/ui/glass",
        ":accelerator_table",
        ":browser_actions",
        ":browser_select_file_dialog_controller",

@@ -26,6 +26,7 @@
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_commands.h"
 #include "uw/browser/workspaces/workspace_window.h"
@@ -83,8 +84,9 @@ bool NewItemsMenu::GetAcceleratorForCommandId(
 NewButton::NewButton(BrowserWindowInterface* window) : window_(window) {
   SetOrientation(views::LayoutOrientation::kHorizontal);
   SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
-  SetBackground(views::CreateRoundedRectBackground(
-      kColorNewTabButtonCRBackgroundFrameActive, kHeight / 2));
+  SetBackground(CreateGlassPillBackground(
+      GlassOfWindow(window), kColorNewTabButtonCRBackgroundFrameActive,
+      kHeight / 2.0f));
 
   plus_ = AddChildView(Half(base::BindRepeating(
                                 [](BrowserWindowInterface* window) {

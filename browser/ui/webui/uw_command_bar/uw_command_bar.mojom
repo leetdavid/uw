@@ -11,7 +11,7 @@ struct ExchangeRates {
   map<string, double> per_euro;
 };
 
-// What the command bar's calculator asks of its window.
+// What the command bar's page asks of its window.
 interface CalculatorHandler {
   // The last rates uw downloaded, if any, and the currency a bare amount
   // converts to. Downloads the day's rates when the last are a day old.
@@ -21,4 +21,7 @@ interface CalculatorHandler {
   GetClock() => (string time_zone, bool twenty_four_hour);
   // Copies an answer and closes the command bar.
   CopyAnswer(string text);
+  // Whether the bar is frosted glass this time it shows: its window's glass
+  // is on.
+  IsFrosted() => (bool frosted);
 };

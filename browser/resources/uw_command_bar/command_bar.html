@@ -50,6 +50,19 @@
         width: 640px;
       }
 
+      /* Over frosted glass while the window's glass is on. */
+      body.frosted {
+        background: rgb(255 255 255 / 85%);
+      }
+      @media (prefers-color-scheme: dark) {
+        body.frosted {
+          background: rgb(23 23 23 / 85%);
+        }
+      }
+      html:has(> body.frosted) {
+        background: transparent;
+      }
+
       svg {
         fill: none;
         flex: none;

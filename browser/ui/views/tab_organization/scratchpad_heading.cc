@@ -34,6 +34,7 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 
 namespace uw {
@@ -92,11 +93,12 @@ class HeadingButton : public views::LabelButton {
 
  private:
   void UpdateFill() {
-    SetBackground(
-        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED
-            ? views::CreateRoundedRectBackground(
-                  kColorNewTabButtonCRBackgroundFrameActive, kButtonRadius)
-            : nullptr);
+    SetBackground(GetState() == STATE_HOVERED || GetState() == STATE_PRESSED
+                      ? CreateGlassPillBackground(
+                            GlassOfView(this),
+                            kColorNewTabButtonCRBackgroundFrameActive,
+                            kButtonRadius)
+                      : nullptr);
   }
 
   const raw_ref<const gfx::VectorIcon> icon_;

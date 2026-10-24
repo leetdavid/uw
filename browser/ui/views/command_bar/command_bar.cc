@@ -43,6 +43,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
 namespace uw {
@@ -283,6 +284,9 @@ void CommandBar::Show() {
     bubble_->ResizeDueToAutoResize(page(),
                                    gfx::ScaleToCeiledSize(*size, 1.f / scale));
   }
+  // The page asks, as it shows, whether to frost itself.
+  SetCommandBarFrosted(page(), ElementGlassOfWindow(window_) > 0);
+  FrostPageBubble(bubble_->GetWidget(), page());
   contents_->HoldKeys();
   bubble_->ShowUI();
 }

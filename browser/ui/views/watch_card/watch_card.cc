@@ -29,6 +29,7 @@
 #include "ui/color/color_id.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
@@ -130,6 +131,9 @@ void WatchCard::Show(tabs::TabInterface& tab) {
   bubble_ = WebUIBubbleManager::Create<UwWatchCardUI>(
       window_, WatchCardUrl(tab), IDS_UW_WATCH_THIS_PAGE);
   bubble_->ShowBubble(eye, views::BubbleBorder::TOP_RIGHT);
+  // The page frosts itself while the window's glass is on.
+  FrostPageBubble(bubble_->GetBubbleWidget(),
+                  bubble_->GetContentsWrapper()->web_contents());
 }
 
 void WatchCard::UpdateEye(tabs::TabInterface& tab) {

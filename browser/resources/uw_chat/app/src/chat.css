@@ -633,3 +633,12 @@
     background-color: rgb(var(--overlay) / 0.16);
     }
 }
+
+/* The watch card over frosted glass, while its window's glass is on. */
+html.frosted {
+  background: transparent;
+}
+
+html.frosted body {
+  background: color-mix(in srgb, var(--background) 85%, transparent);
+}

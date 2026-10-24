@@ -12,6 +12,7 @@
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
 
 namespace uw {
@@ -71,6 +72,8 @@ void ThemePicker::Show() {
                              ->GetBoundsInScreen();
   bubble_->ShowBubble(gfx::Rect(card.x() + kGap, card.y() + kTopInset, 0, 0),
                       views::BubbleBorder::TOP_LEFT);
+  // The page frosts itself while the theme's glass is on.
+  FrostPageBubble(bubble_->GetBubbleWidget(), page());
 }
 
 }  // namespace uw

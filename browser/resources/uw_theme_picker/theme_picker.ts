@@ -5,8 +5,8 @@ import '/strings.m.js';
 
 import {loadTimeData} from '//resources/js/load_time_data.js';
 
-import type {Theme} from './uw_theme_picker.mojom-webui.js';
-import {ColorMode, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
+import type {GlassSliders, Theme} from './uw_theme_picker.mojom-webui.js';
+import {ColorMode, GlassPause, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
 
 const MAX_COLORS = 3;
 // The field is pale at the top and full from 52% of its height down.
@@ -18,6 +18,8 @@ const FULL_LIGHTNESS = 0.7;
 const REMOVE_DISTANCE = 24;
 const KEY_STEP = 0.02;
 const SAVE_DELAY_MS = 16;
+// Half the slider knob, which the tick lines up with.
+const KNOB_RADIUS_PX = 7;
 
 const handler = new ThemePickerHandlerRemote();
 ThemePickerHandlerFactory.getRemote().createHandler(
@@ -28,6 +30,15 @@ const add = document.querySelector<HTMLButtonElement>('#add')!;
 const suggestedRow = document.querySelector<HTMLElement>('#suggested')!;
 const intensity = document.querySelector<HTMLInputElement>('#intensity')!;
 const grain = document.querySelector<HTMLInputElement>('#grain')!;
+const transparencyRow =
+    document.querySelector<HTMLElement>('#transparency-row')!;
+const transparency =
+    document.querySelector<HTMLInputElement>('#transparency')!;
+const transparencyTick =
+    document.querySelector<HTMLElement>('#transparency-tick')!;
+const glassRow = document.querySelector<HTMLElement>('#glass-row')!;
+const glass = document.querySelector<HTMLInputElement>('#glass')!;
+const glassWhy = document.querySelector<HTMLElement>('#glass-why')!;
 const colorsInDarkMode =
     document.querySelector<HTMLInputElement>('#colors-in-dark-mode')!;
 const modes = new Map<ColorMode, HTMLButtonElement>([
@@ -37,6 +48,8 @@ const modes = new Map<ColorMode, HTMLButtonElement>([
 ]);
 
 let theme: Theme;
+let currentMode: ColorMode;
+let glassSliders: GlassSliders;
 let suggestions: number[][] = [];
 let savePending = false;
 
@@ -96,7 +109,42 @@ function save() {
   setTimeout(() => {
     savePending = false;
     handler.setTheme(theme);
+    refreshGlass();
   }, SAVE_DELAY_MS);
+}
+
+const glassPauses = new Map<GlassPause, string>([
+  [GlassPause.kEnergySaver, 'glassEnergySaver'],
+  [GlassPause.kReduceTransparency, 'glassReduceTransparency'],
+]);
+
+// The picker is frosted glass while the theme's glass is on.
+function frost() {
+  document.body.classList.toggle(
+      'frosted',
+      glassSliders.shown && theme.glass > 0 &&
+          glassSliders.pause !== GlassPause.kReduceTransparency);
+}
+
+function showGlass(sliders: GlassSliders) {
+  glassSliders = sliders;
+  frost();
+  transparencyRow.hidden = !sliders.shown;
+  glassRow.hidden = !sliders.shown;
+  transparencyTick.style.left = `calc(${KNOB_RADIUS_PX}px + (100% - ${
+      2 * KNOB_RADIUS_PX}px) * ${sliders.readableTransparency / 100})`;
+  const why = glassPauses.get(sliders.pause);
+  glassWhy.hidden = !sliders.shown || !why;
+  glassWhy.textContent = why ? loadTimeData.getString(why) : '';
+  document.body.classList.toggle(
+      'glass-off', sliders.pause === GlassPause.kReduceTransparency);
+}
+
+// The tick moves with the theme's colors and mode.
+async function refreshGlass() {
+  const {glass: sliders} =
+      await handler.getGlassSliders(theme, currentMode);
+  showGlass(sliders);
 }
 
 function sameColors(a: number[], b: number[]): boolean {
@@ -134,6 +182,9 @@ function draw() {
   intensity.value = String(theme.intensity);
   intensity.style.setProperty('--value', `${theme.intensity}%`);
   grain.value = String(theme.grain);
+  transparency.value = String(theme.transparency);
+  glass.value = String(theme.glass);
+  glass.style.setProperty('--value', `${theme.glass}%`);
   colorsInDarkMode.checked = theme.colorsInDarkMode;
 }
 
@@ -209,6 +260,18 @@ grain.addEventListener('input', () => {
   save();
 });
 
+transparency.addEventListener('input', () => {
+  theme.transparency = Number(transparency.value);
+  save();
+});
+
+glass.addEventListener('input', () => {
+  theme.glass = Number(glass.value);
+  glass.style.setProperty('--value', `${theme.glass}%`);
+  frost();
+  save();
+});
+
 colorsInDarkMode.addEventListener('change', () => {
   theme.colorsInDarkMode = colorsInDarkMode.checked;
   save();
@@ -229,8 +292,10 @@ for (const [mode, button] of modes) {
   button.querySelector('span')!.textContent =
       loadTimeData.getString(modeNames.get(mode)!);
   button.addEventListener('click', () => {
+    currentMode = mode;
     showMode(mode);
     handler.setMode(mode);
+    refreshGlass();
   });
 }
 
@@ -242,11 +307,21 @@ document.querySelector('label[for=intensity]')!.textContent =
     loadTimeData.getString('intensity');
 document.querySelector('label[for=grain]')!.textContent =
     loadTimeData.getString('grain');
+document.querySelector('label[for=transparency]')!.textContent =
+    loadTimeData.getString('transparency');
+document.querySelector('label[for=glass]')!.textContent =
+    loadTimeData.getString('glass');
+transparencyTick.title = loadTimeData.getString('glassTick');
+transparencyTick.setAttribute(
+    'aria-label', loadTimeData.getString('glassTick'));
 document.querySelector('label[for=colors-in-dark-mode]')!.textContent =
     loadTimeData.getString('colorsInDarkMode');
 
-const {theme: saved, mode, suggested} = await handler.getState();
+const {theme: saved, mode, suggested, glass: sliders} =
+    await handler.getState();
 theme = saved;
+currentMode = mode;
+showGlass(sliders);
 suggestions = suggested;
 suggestedRow.replaceChildren(...suggestions.map((colors, i) => {
   const button = document.createElement('button');

@@ -15,6 +15,7 @@ namespace uw {
 inline constexpr size_t kMaxThemeColors = 3;
 inline constexpr int kFullIntensity = 100;
 inline constexpr int kFullGrain = 100;
+inline constexpr int kFullTransparency = 100;
 inline constexpr int kFullGlass = 100;
 
 // Light, Dark, or Auto, which follows macOS.
@@ -30,6 +31,9 @@ struct Theme {
   int grain = 0;
   // How much of the desktop shows through the window, from 0, solid, to 100,
   // the clearest.
+  int transparency = 0;
+  // How glassy the window's pin tiles, active tab, and buttons are, from 0,
+  // flat, through frosted to 100, clear.
   int glass = 0;
   // Dark mode shows the theme darkened instead of black.
   bool colors_in_dark_mode = false;
@@ -48,14 +52,18 @@ SkColor WithIntensity(SkColor color, int intensity);
 // 14% lightness.
 SkColor DarkModeColorOf(SkColor color);
 
-// How much of the glass behind the window the theme covers at `glass`: all of
-// it when solid, down to a fifth at the clearest.
-float GlassCover(int glass);
+// How much of the glass behind the window the theme covers at `transparency`:
+// all of it when solid, down to a fifth at the clearest.
+float WindowCover(int transparency);
 
-// The glass past which text in `text` stops keeping its contrast over any
-// desktop: where the theme covers 60% of the glass under near-black text, and
-// 75% under white text.
-int ReadableGlass(SkColor text);
+// The transparency past which text in `text` stops keeping its contrast over
+// any desktop: where the theme covers 60% of the glass under near-black text,
+// and 75% under white text.
+int ReadableTransparency(SkColor text);
+
+// How much of its frosted white a glass element keeps at `glass`: nearly all
+// at the least glass, down to a seventh at the clearest.
+float GlassTint(int glass);
 
 // The least that `color` covers the glass so that `text` on it keeps its
 // contrast over a white and a black desktop alike.

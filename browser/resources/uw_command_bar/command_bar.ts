@@ -494,6 +494,12 @@ router.setInputText.addListener((input: string) => {
   setShell(input === '>');
 });
 
+// The bar is frosted glass while its window's glass is on.
+async function refreshFrost() {
+  const {frosted} = await calculatorHandler.isFrosted();
+  document.body.classList.toggle('frosted', frosted);
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     clear();
@@ -506,6 +512,7 @@ document.addEventListener('visibilitychange', () => {
 // which frame has focus, and ignores the field's.
 window.addEventListener('focus', () => {
   setTimeout(() => field.focus());
+  refreshFrost();
   refreshCurrencies();
   refreshClock();
 });

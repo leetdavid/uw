@@ -23,9 +23,9 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
-#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
@@ -35,6 +35,7 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
@@ -73,6 +74,7 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
                           LayoutConstant::kVerticalTabStripHorizontalPadding)));
 
   card_ = AddChildView(std::make_unique<ActivityCard>(
+      GlassOfWindow(window_),
       base::BindRepeating(&OrganizeBar::Undo, base::Unretained(this)),
       base::BindRepeating(&OrganizeBar::AcceptSuggestion,
                           base::Unretained(this)),
@@ -97,8 +99,9 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       ui::ImageModel::FromVectorIcon(kListTreeIcon,
                                      kColorTabForegroundInactiveFrameActive,
                                      kOrganizeIconSize));
-  button_->SetBackground(views::CreateRoundedRectBackground(
-      kColorNewTabButtonCRBackgroundFrameActive, kOrganizeHeight / 2));
+  button_->SetBackground(CreateGlassPillBackground(
+      GlassOfWindow(window_), kColorNewTabButtonCRBackgroundFrameActive,
+      kOrganizeHeight / 2.0f));
   views::InstallPillHighlightPathGenerator(button_);
   const std::u16string organize = l10n_util::GetStringUTF16(IDS_UW_ORGANIZE);
   button_->SetTooltipText(organize);

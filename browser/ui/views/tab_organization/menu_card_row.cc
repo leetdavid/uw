@@ -5,6 +5,8 @@
 
 #include <utility>
 
+#include "base/functional/bind.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -15,7 +17,9 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
+#include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/separator.h"
@@ -23,6 +27,7 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/platform_style.h"
 #include "ui/views/view_class_properties.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/menu_card.h"
 
 namespace uw {
@@ -236,6 +241,28 @@ void SetUpMenuCard(views::BubbleDialogDelegate* bubble) {
   bubble->set_fixed_width(kMenuCardWidth);
   bubble->SetBackgroundColor(kColorMenuCardBackground);
   bubble->SetEnableArrowKeyTraversal(true);
+  FrostOverGlass(bubble);
+}
+
+void FrostOverGlass(views::BubbleDialogDelegate* bubble) {
+  bubble->RegisterWidgetInitializedCallback(base::BindOnce(
+      [](views::BubbleDialogDelegate* bubble) {
+        views::Widget* anchor = bubble->anchor_widget();
+        BrowserView* browser_view =
+            anchor ? BrowserView::GetBrowserViewForNativeWindow(
+                         anchor->GetNativeWindow())
+                   : nullptr;
+        if (!browser_view ||
+            ElementGlassOfWindow(browser_view->browser()) == 0) {
+          return;
+        }
+        bubble->SetBackgroundColor(kColorMenuCardGlass);
+        AddFrostedGlass(
+            bubble->GetWidget(),
+            bubble->GetBubbleFrameView()->bubble_border()->GetInsets(),
+            kMenuCardRadius);
+      },
+      base::Unretained(bubble)));
 }
 
 void LayOutMenuCard(views::View* contents) {

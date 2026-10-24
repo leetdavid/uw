@@ -136,6 +136,18 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
         sub-label="${this.i18n_('uwOrganizationThemeDescription')}"
         @click="${this.onThemeClick_}">
     </cr-link-row>
+    <div class="uw-row" ?hidden="${!this.state_?.canShowGlass}">
+      <div id="glassBehindLabel" class="uw-field">
+        ${this.i18n_('uwGlassBehind')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwGlassBehindDescription')}
+        </div>
+      </div>
+      <cr-toggle id="glassBehindToggle" aria-labelledby="glassBehindLabel"
+          ?checked="${!!this.state_?.glassBehind}"
+          @change="${this.onGlassBehindChange_}">
+      </cr-toggle>
+    </div>
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwCommandBarTitle')}</h2>

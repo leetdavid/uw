@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 
+#include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
@@ -18,6 +19,8 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/glass/glass_prefs.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/components/tab_organization/placement.h"
 
@@ -88,6 +91,8 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationPauseTitle", IDS_UW_SETTINGS_ORGANIZATION_PAUSE_TITLE},
       {"uwOrganizationTheme", IDS_UW_SETTINGS_THEME},
       {"uwOrganizationThemeDescription", IDS_UW_SETTINGS_THEME_DESCRIPTION},
+      {"uwGlassBehind", IDS_UW_SETTINGS_GLASS_BEHIND},
+      {"uwGlassBehindDescription", IDS_UW_SETTINGS_GLASS_BEHIND_DESCRIPTION},
       {"uwCommandBarTitle", IDS_UW_SETTINGS_COMMAND_BAR_TITLE},
       {"uwCommandBarToggle", IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE},
       {"uwCommandBarNote", IDS_UW_SETTINGS_COMMAND_BAR_NOTE},
@@ -158,6 +163,9 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->language_model = IsComplete(language) ? language.model : "";
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   state->thresholds = CurrentThresholds();
+  state->can_show_glass = CanShowGlass();
+  state->glass_behind =
+      g_browser_process->local_state()->GetBoolean(kGlassBehindPref);
   state->command_bar = prefs->GetBoolean(kCommandBarEnabledPref);
   state->currency = prefs->GetString(kCommandBarCurrencyPref);
   state->region_currency = RegionCurrency();
@@ -183,6 +191,12 @@ void UwOrganizationHandler::OpenThemePicker() {
               ->GetLastActiveBrowser()) {
     chrome::ExecuteCommand(window, kShowThemePicker);
   }
+}
+
+void UwOrganizationHandler::SetGlassBehind(bool on,
+                                           SetGlassBehindCallback callback) {
+  g_browser_process->local_state()->SetBoolean(kGlassBehindPref, on);
+  std::move(callback).Run();
 }
 
 void UwOrganizationHandler::SetCommandBar(bool on,

@@ -165,7 +165,8 @@ std::unique_ptr<views::Label> Line(int size_delta, gfx::Font::Weight weight) {
 
 }  // namespace
 
-ActivityCard::ActivityCard(base::RepeatingClosure undo,
+ActivityCard::ActivityCard(GlassOf glass,
+                           base::RepeatingClosure undo,
                            base::RepeatingClosure accept,
                            RetryCallback retry,
                            base::RepeatingClosure tidy)
@@ -175,8 +176,8 @@ ActivityCard::ActivityCard(base::RepeatingClosure undo,
       tidy_(std::move(tidy)) {
   SetOrientation(views::LayoutOrientation::kVertical);
   SetInteriorMargin(gfx::Insets(kCardPadding));
-  SetBackground(views::CreateRoundedRectBackground(ui::kColorSysHeaderContainer,
-                                                   kCardRadius));
+  SetBackground(CreateGlassCardBackground(
+      std::move(glass), ui::kColorSysHeaderContainer, kCardRadius));
 
   auto* header = AddChildView(Row());
   header->SetProperty(views::kMarginsKey, gfx::Insets());

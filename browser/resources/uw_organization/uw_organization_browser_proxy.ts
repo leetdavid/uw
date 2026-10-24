@@ -13,6 +13,7 @@ export interface UwOrganizationBrowserProxy {
   setPause(mode: number): Promise<PauseResult>;
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
   openThemePicker(): void;
+  setGlassBehind(on: boolean): Promise<void>;
   setCommandBar(on: boolean): Promise<void>;
   setCurrency(code: string): Promise<void>;
   setMouseAction(action: MouseAction, on: boolean): Promise<void>;
@@ -42,6 +43,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   openThemePicker() {
     this.handler.openThemePicker();
+  }
+
+  async setGlassBehind(on: boolean) {
+    await this.handler.setGlassBehind(on);
   }
 
   async setCommandBar(on: boolean) {

@@ -32,6 +32,8 @@
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/workspaces/card_bubble.h"
@@ -127,12 +129,18 @@ class WorkspaceIcon : public views::Button {
     }
     const SkColor fill =
         colors->GetColor(kColorNewTabButtonCRBackgroundFrameActive);
-    if (current_) {
+    const int glass = ElementGlassOfWindow(window_);
+    const bool hovered =
+        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
+    if (glass > 0 && ((current_ && !fill_moved_) || hovered)) {
+      PaintGlassPill(canvas, this, bounds, kRadius, glass,
+                     current_ ? 0 : kHoverFill);
+    } else if (current_) {
       if (!fill_moved_) {
         flags.setColor(fill);
         canvas->DrawRoundRect(bounds, kRadius, flags);
       }
-    } else if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+    } else if (hovered) {
       flags.setColor(SkColorSetA(
           fill, static_cast<SkAlpha>(SkColorGetA(fill) * kHoverFill)));
       canvas->DrawRoundRect(bounds, kRadius, flags);
@@ -269,15 +277,18 @@ void WorkspaceSwitcher::OnPaint(gfx::Canvas* canvas) {
   const auto between = [this](float start, float end) {
     return gfx::Tween::FloatValueBetween(slide_amount_, start, end);
   };
+  const gfx::RectF fill(between(a.x(), b.x()), between(a.y(), b.y()),
+                        between(a.width(), b.width()),
+                        between(a.height(), b.height()));
+  if (const int glass = ElementGlassOfWindow(window_)) {
+    PaintGlassPill(canvas, this, fill, kRadius, glass, /*hover=*/0);
+    return;
+  }
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
   flags.setColor(
       GetColorProvider()->GetColor(kColorNewTabButtonCRBackgroundFrameActive));
-  canvas->DrawRoundRect(
-      gfx::RectF(between(a.x(), b.x()), between(a.y(), b.y()),
-                 between(a.width(), b.width()),
-                 between(a.height(), b.height())),
-      kRadius, flags);
+  canvas->DrawRoundRect(fill, kRadius, flags);
 }
 
 void WorkspaceSwitcher::ShowNewWorkspaceCard() {

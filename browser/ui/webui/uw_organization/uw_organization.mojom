@@ -29,6 +29,10 @@ struct State {
   // Matches uw::PauseMode.
   int32 pause_mode;
   Thresholds thresholds;
+  // Whether this Mac can show glass, and whether windows behind the front one
+  // keep theirs.
+  bool can_show_glass;
+  bool glass_behind;
   // Whether Cmd+T opens the command bar.
   bool command_bar;
   // The currency a bare amount in the command bar converts to, as a code.
@@ -67,6 +71,8 @@ interface OrganizationHandler {
 
   // Opens the theme picker in the window that shows the page.
   OpenThemePicker();
+  // For all of uw. Every window follows at once.
+  SetGlassBehind(bool on) => ();
   // Every window follows at once.
   SetCommandBar(bool on) => ();
   // Empty follows the Mac's region. A code the rates do not cover is ignored.

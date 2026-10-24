@@ -30,6 +30,7 @@
 #include "url/gurl.h"
 #include "uw/browser/pins/pin_sync.h"
 #include "uw/browser/ui/look/menu_card.h"
+#include "uw/browser/ui/views/tab_organization/menu_card_row.h"
 
 namespace uw {
 namespace {
@@ -103,6 +104,7 @@ views::Widget* HomeUrlCard::Show(const tabs::TabInterface* tab,
                          l10n_util::GetStringUTF16(IDS_SAVE));
   bubble->set_fixed_width(kWidth);
   bubble->set_corner_radius(kMenuCardRadius);
+  FrostOverGlass(bubble);
   HomeUrlCard* card =
       bubble->SetContentsView(std::make_unique<HomeUrlCard>(pin->home));
   card->field()->GetViewAccessibility().SetName(bubble->GetWindowTitle());

@@ -43,6 +43,7 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetThresholds(mojom::ThresholdsPtr thresholds,
                      SetThresholdsCallback callback) override;
   void OpenThemePicker() override;
+  void SetGlassBehind(bool on, SetGlassBehindCallback callback) override;
   void SetCommandBar(bool on, SetCommandBarCallback callback) override;
   void SetCurrency(const std::string& code,
                    SetCurrencyCallback callback) override;

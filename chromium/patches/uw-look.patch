@@ -39,11 +39,14 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/themed_background.cc b/chrome/browser/ui/views/frame/themed_background.cc
-index 169aee34fb3855b3e85fc99725013a2259290e08..5e577f97d4a6b2c09ed3c8fd5d28f64648c5468d 100644
+index 169aee34fb3855b3e85fc99725013a2259290e08..30b596029c33a2157416e45826988baea15861cc 100644
 --- a/chrome/browser/ui/views/frame/themed_background.cc
 +++ b/chrome/browser/ui/views/frame/themed_background.cc
-@@ -6,16 +6,21 @@
+@@ -4,18 +4,25 @@
  
+ #include "chrome/browser/ui/views/frame/themed_background.h"
+ 
++#include <cmath>
  #include <optional>
  
 +#include "chrome/browser/profiles/profile.h"
@@ -59,12 +62,13 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..5e577f97d4a6b2c09ed3c8fd5d28f646
  #include "ui/color/color_id.h"
  #include "ui/color/color_provider.h"
  #include "ui/gfx/canvas.h"
++#include "uw/browser/ui/glass/glass.h"
 +#include "uw/browser/ui/look/tint_painter.h"
 +#include "uw/browser/workspaces/workspace_theme.h"
  
  namespace {
  
-@@ -109,10 +114,23 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
+@@ -109,10 +116,32 @@ void ThemedBackground::PaintBackground(gfx::Canvas* canvas,
                                         ThemeChoice theme_choice) {
    bool painted =
        PaintThemeCustomImage(canvas, view, browser_view, theme_choice);
@@ -76,10 +80,11 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..5e577f97d4a6b2c09ed3c8fd5d28f646
    }
 +  const SkColor color = view->GetColorProvider()->GetColor(
 +      GetThemeChoiceInfo(theme_choice, view).second);
++  BrowserWindowInterface* const browser =
++      const_cast<BrowserView*>(browser_view)->browser();
 +  if (theme_choice == kFrameTheme) {
-+    uw::PaintTint(
-+        canvas, view, browser_view, color,
-+        uw::ThemeOfWindow(const_cast<BrowserView*>(browser_view)->browser()));
++    uw::PaintTint(canvas, view, browser_view, color, uw::ThemeOfWindow(browser),
++                  uw::CoverOfWindow(browser));
 +    if (browser_view->ShouldDrawVerticalTabStrip()) {
 +      uw::PaintPageCardEdge(
 +          canvas, view, browser_view->toolbar(),
@@ -87,23 +92,100 @@ index 169aee34fb3855b3e85fc99725013a2259290e08..5e577f97d4a6b2c09ed3c8fd5d28f646
 +    }
 +    return;
 +  }
++  if (browser_view->ShouldDrawVerticalTabStrip()) {
++    // uw: over glass, the toolbar and the bookmarks bar let the desktop through
++    // as far as their text allows.
++    canvas->DrawColor(SkColorSetA(
++        color, static_cast<SkAlpha>(std::lround(
++                   uw::ToolbarCoverOfWindow(browser, color) * 255))));
++    return;
++  }
 +  canvas->DrawColor(color);
  }
  
  std::optional<SkColor> ThemedBackground::GetBackgroundColor(
 diff --git a/chrome/browser/ui/views/frame/glass_frame_service.cc b/chrome/browser/ui/views/frame/glass_frame_service.cc
-index 17e0dba1800ebd223a67fb84c33593744d7f9745..736eeb5ebd4dbb33d3719e4c730feb48427e44bc 100644
+index 17e0dba1800ebd223a67fb84c33593744d7f9745..08bf82dc98f8f769a3bd2d6e84ae5d72307b4938 100644
 --- a/chrome/browser/ui/views/frame/glass_frame_service.cc
 +++ b/chrome/browser/ui/views/frame/glass_frame_service.cc
-@@ -37,7 +37,7 @@ GlassFrameService* GlassFrameService::GetInstance() {
+@@ -23,6 +23,8 @@
+ #include "chrome/common/pref_names.h"
+ #include "components/prefs/pref_registry_simple.h"
+ #include "components/prefs/pref_service.h"
++#include "uw/browser/ui/glass/glass.h"
++#include "uw/browser/ui/glass/glass_prefs.h"
  
+ #if BUILDFLAG(IS_MAC)
+ #include "base/mac/mac_util.h"
+@@ -38,6 +40,7 @@ GlassFrameService* GlassFrameService::GetInstance() {
  // static
  void GlassFrameService::RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
--  registry->RegisterBooleanPref(prefs::kGlassFrameEnabled, true);
-+  registry->RegisterBooleanPref(prefs::kGlassFrameEnabled, false);
+   registry->RegisterBooleanPref(prefs::kGlassFrameEnabled, true);
++  uw::RegisterGlassLocalStatePrefs(registry);
  }
  
  GlassFrameService::GlassFrameService(BrowserProcess& process)
+@@ -72,9 +75,17 @@ GlassFrameService::GlassFrameService(BrowserProcess& process)
+       BrowserCollection::Order::kActivation);
+ 
+   LogGlassFramePreferredLook();
++
++  // uw: a window shows glass when its theme asks for it, per uw's rules.
++  uw::SetGlassQuery(base::BindRepeating(
++      &GlassFrameService::IsBrowserWindowEligible, base::Unretained(this)));
++  glass_rules_subscription_ = uw::OnGlassRulesChanged(base::BindRepeating(
++      &GlassFrameService::OnEligibleStateChanged, base::Unretained(this)));
+ }
+ 
+-GlassFrameService::~GlassFrameService() = default;
++GlassFrameService::~GlassFrameService() {
++  uw::SetGlassQuery({});
++}
+ 
+ base::CallbackListSubscription
+ GlassFrameService::RegisterGlassFrameEligibilityChangedCallback(
+@@ -125,7 +136,8 @@ GlassFrameService::ActivationOrderedEligibleBrowsers() {
+       [&activation_ordered_eligible_browsers,
+        this](BrowserWindowInterface* browser) {
+         // Stop iterating once the maximum number of glass windows is reached.
+-        if (activation_ordered_eligible_browsers.size() >= kMaxGlassWindows) {
++        if (activation_ordered_eligible_browsers.size() >=
++            uw::MaxGlassWindows()) {
+           return false;
+         }
+         // Skip untracked windows (e.g. non-normal windows or background windows
+@@ -142,6 +154,10 @@ GlassFrameService::ActivationOrderedEligibleBrowsers() {
+                 ->IsFullscreenForBrowser()) {
+           return true;
+         }
++        // uw: skip windows whose theme is solid.
++        if (!uw::WantsGlass(browser)) {
++          return true;
++        }
+         // Skip windows using an extension theme, which disables glass.
+         if (auto* const theme_service =
+                 ThemeServiceFactory::GetForProfile(browser->GetProfile())) {
+@@ -150,7 +166,8 @@ GlassFrameService::ActivationOrderedEligibleBrowsers() {
+           }
+         }
+         activation_ordered_eligible_browsers.insert(browser);
+-        return activation_ordered_eligible_browsers.size() < kMaxGlassWindows;
++        return activation_ordered_eligible_browsers.size() <
++               uw::MaxGlassWindows();
+       },
+       BrowserCollection::Order::kActivation);
+   return activation_ordered_eligible_browsers;
+@@ -158,10 +175,6 @@ GlassFrameService::ActivationOrderedEligibleBrowsers() {
+ 
+ base::flat_set<BrowserWindowInterface*>
+ GlassFrameService::GetEligibleBrowserWindowInterfaces() {
+-  if (!is_glass_frame_enabled_) {
+-    return {};
+-  }
+-
+   if (is_battery_saver_mode_active_) {
+     return {};
+   }
 diff --git a/chrome/browser/ui/layout_constants.cc b/chrome/browser/ui/layout_constants.cc
 index a8b7ef68008b132ec786b91ddcb232c16a0c5750..542eb8b79437be476858fe676b1806af3a6821c0 100644
 --- a/chrome/browser/ui/layout_constants.cc
@@ -129,19 +211,45 @@ index a8b7ef68008b132ec786b91ddcb232c16a0c5750..542eb8b79437be476858fe676b1806af
        return 12;
      case LayoutConstant::kVerticalTabStripCollapsedVerticalPadding:
 diff --git a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60767676bd 100644
+index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..5154c35214d7ef567cab5c17d41fddd1ad0b0e8b 100644
 --- a/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
 +++ b/chrome/browser/ui/views/tabs/vertical_tab_style_views.cc
-@@ -24,6 +24,7 @@
+@@ -24,6 +24,9 @@
  #include "ui/gfx/scoped_canvas.h"
  #include "ui/views/view_utils.h"
  #include "ui/views/widget/widget.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "uw/browser/ui/glass/glass.h"
 +#include "uw/browser/ui/look/sidebar_tab_fill.h"
  
  VerticalTabStyleViews::VerticalTabStyleViews(
      std::unique_ptr<TabStyleViewDelegate> delegate)
-@@ -142,7 +143,11 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
-                                     hovered)) {
+@@ -138,11 +141,33 @@ void VerticalTabStyleViews::PaintTabBackgroundFill(
+ 
+   canvas->ClipPath(fill_path, true);
+ 
+-  if (ShouldPaintTabBackgroundColor(selection_state, fill_id.has_value(),
+-                                    hovered)) {
++  // uw: with the theme's glass on, tiles and the active tab are lit glass.
++  const bool active = selection_state == TabStyle::TabSelectionState::kActive;
++  const views::Widget* widget = delegate_->GetView()->GetWidget();
++  BrowserView* const browser_view =
++      widget ? BrowserView::GetBrowserViewForNativeWindow(
++                   widget->GetNativeWindow())
++             : nullptr;
++  const int glass =
++      browser_view ? uw::ElementGlassOfWindow(browser_view->browser()) : 0;
++  if (glass > 0 && !fill_id.has_value() &&
++      (active || (delegate_->IsPinned() &&
++                  selection_state == TabStyle::TabSelectionState::kInactive))) {
++    uw::PaintGlassTabFill(
++        canvas, delegate_->GetView(), fill_path,
++        gfx::ScaleToEnclosingRect(delegate_->GetView()->GetLocalBounds(),
++                                  scale),
++        scale, active, hovered ? delegate_->GetHoverAnimationValue() : 0,
++        glass);
++  } else if (ShouldPaintTabBackgroundColor(selection_state, fill_id.has_value(),
++                                           hovered)) {
      cc::PaintFlags flags;
      flags.setAntiAlias(true);
 -    flags.setColor(GetCurrentTabBackgroundColor(selection_state));
@@ -153,7 +261,7 @@ index cbec9de4fa9c629e50e8c13330f50ad2cca235e4..fd342ac0defceab0c3a51060352b4c60
      canvas->DrawRect(gfx::ScaleToEnclosingRect(
                           delegate_->GetView()->GetLocalBounds(), scale),
                       flags);
-@@ -178,7 +183,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+@@ -178,7 +203,7 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
      return true;
    }
  
@@ -404,7 +512,7 @@ index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c8
    // The sync icon that is displayed in the tab group header of saved groups in
    // the tabstrip.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 75f02715c7af13fa992eb95586cfbd860286bef6..ad68d492c5603c85dcf75708ac68b0ff1665e1dc 100644
+index 75f02715c7af13fa992eb95586cfbd860286bef6..adf3876a1f906ce438853a1f60f901cbd584e571 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -47,6 +47,7 @@
@@ -519,7 +627,31 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..ad68d492c5603c85dcf75708ac68b0ff
      }
  
      views().vertical_tab_strip_region_view->SetToolbarHeightForLayout(
-@@ -1613,11 +1608,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1322,8 +1317,11 @@ void BrowserViewTabbedLayoutImpl::ConfigureTopContainerBackground(
+     CustomCornersBackground* background) {
+   CHECK(layout_data_);
+   // The top container always draws an opaque background in tabbed browser mode
+-  // to avoid cracking between visual elements.
+-  background->SetVisible(true);
++  // to avoid cracking between visual elements. uw: but not over glass, where
++  // the toolbar and the bookmarks bar draw their own see-through colors.
++  background->SetVisible(
++      !(in_glass_mode() &&
++        layout_data_->tab_strip_type == TabStripType::kVertical));
+ 
+   // In immersive mode and ChromeOS touch UI mode, the top Chrome UI is
+   // parented to the `top_container()` and the frame header is not visible.
+@@ -1371,6 +1369,9 @@ void BrowserViewTabbedLayoutImpl::OnLayoutParamsChanged(
+ }
+ 
+ void BrowserViewTabbedLayoutImpl::OnGlassModeChanged() {
++  // uw: the top container and the toolbar corners change with glass.
++  views().browser_view->InvalidateLayout();
++  views().top_container->SchedulePaint();
+   if (IsParentedToAndVisible(views().horizontal_tab_strip_region_view,
+                              views().browser_view)) {
+     views().horizontal_tab_strip_region_view->InvalidateLayout();
+@@ -1613,11 +1614,16 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      case TabStripType::kVertical: {
        // Curve trailing corner when it becomes the top trailing corner of the
        // browser.
@@ -529,17 +661,20 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..ad68d492c5603c85dcf75708ac68b0ff
 -        toolbar_corners[CornerOrientation::kTopTrailing] =
 -            toolbar_background->GetWindowCorner(/*upper=*/true);
 +      if (!is_fullscreen(layout_data_->window_state)) {
-+        toolbar_corners[CornerOrientation::kTopLeading] = {
-+            CustomCornersBackground::CornerType::kRoundedWithBackground,
-+            uw::kPageCardRadius};
++        // uw: over glass, the frame already draws the theme behind the corners.
++        const auto corner =
++            in_glass_mode()
++                ? CustomCornersBackground::CornerType::kRounded
++                : CustomCornersBackground::CornerType::kRoundedWithBackground;
++        toolbar_corners[CornerOrientation::kTopLeading] = {corner,
++                                                           uw::kPageCardRadius};
 +        toolbar_corners[CornerOrientation::kTopTrailing] = {
-+            CustomCornersBackground::CornerType::kRoundedWithBackground,
-+            uw::kPageCardRadius};
++            corner, uw::kPageCardRadius};
        }
        break;
      }
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..970d64ca151def5f111b9c79ad3fe3bc60c7c0e0 100644
+index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..82cdd3bb8411dea5d933c65377160daecf8db762 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 @@ -37,6 +37,7 @@
@@ -550,16 +685,40 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..970d64ca151def5f111b9c79ad3fe3bc
  #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/tab_strip.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
-@@ -65,6 +66,8 @@
+@@ -65,6 +66,10 @@
  #include "ui/views/controls/label.h"
  #include "ui/views/layout/layout_types.h"
  #include "ui/views/widget/widget.h"
++#include "ui/gfx/scoped_canvas.h"
++#include "uw/browser/ui/glass/glass.h"
 +#include "uw/browser/ui/look/tint_painter.h"
 +#include "uw/browser/workspaces/workspace_theme.h"
  
  namespace {
  
-@@ -506,7 +509,14 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+@@ -500,13 +505,35 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+   }
+ 
+   SkColor frame_color = GetFrameColor(BrowserFrameActiveState::kUseCurrent);
+-  if (is_glass_frame_eligible_) {
++  if (is_glass_frame_eligible_ &&
++      GetBrowserView()->ShouldDrawVerticalTabStrip()) {
++    // uw: the theme over the glass around the page card, whose toolbar lays
++    // its own color over the glass.
++    BrowserView* const browser_view = GetBrowserView();
++    {
++      gfx::ScopedCanvas scoped_canvas(canvas);
++      uw::ClipOutPageCard(canvas, this, browser_view->toolbar(),
++                          browser_view->multi_contents_view());
++      uw::PaintTint(canvas, this, browser_view, frame_color,
++                    uw::ThemeOfWindow(browser_view->browser()),
++                    uw::CoverOfWindow(browser_view->browser()));
++    }
++    uw::PaintPageCardEdge(canvas, this, browser_view->toolbar(),
++                          browser_view->multi_contents_view());
++  } else if (is_glass_frame_eligible_) {
+     const SkAlpha frame_alpha = color_utils::IsDark(frame_color)
+                                     ? kBrowserFrameAlphaDark
                                      : kBrowserFrameAlphaLight;
      canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
    } else {
@@ -576,7 +735,7 @@ index 6c489fb0e2d75d7ba400e46caa38b5e446d9a24e..970d64ca151def5f111b9c79ad3fe3bc
      auto* theme_service = ThemeServiceFactory::GetForProfile(
          GetBrowserView()->browser()->GetProfile());
 diff --git a/chrome/browser/themes/theme_service.cc b/chrome/browser/themes/theme_service.cc
-index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..9eb22fd7d53c9efee3c6a57ba67e5b242e45d9f3 100644
+index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..3199f87ac4b3e5dfff13c83954c7aab4bf3ba1b8 100644
 --- a/chrome/browser/themes/theme_service.cc
 +++ b/chrome/browser/themes/theme_service.cc
 @@ -72,6 +72,7 @@
@@ -595,12 +754,13 @@ index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..9eb22fd7d53c9efee3c6a57ba67e5b24
  #if BUILDFLAG(IS_LINUX)
    registry->RegisterIntegerPref(prefs::kSystemTheme,
                                  static_cast<int>(ui::GetDefaultSystemTheme()));
-@@ -405,6 +407,13 @@ void ThemeService::Init() {
+@@ -405,6 +407,14 @@ void ThemeService::Init() {
    pref_change_registrar_.Add(
        prefs::kUserColor, base::BindRepeating(&ThemeService::NotifyThemeChanged,
                                               base::Unretained(this)));
 +  for (const char* pref :
 +       {uw::kThemeColorsPref, uw::kThemeIntensityPref, uw::kThemeGrainPref,
++        uw::kThemeTransparencyPref, uw::kThemeGlassPref,
 +        uw::kThemeColorsInDarkModePref}) {
 +    pref_change_registrar_.Add(
 +        pref, base::BindRepeating(&ThemeService::NotifyThemeChanged,
@@ -609,7 +769,7 @@ index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..9eb22fd7d53c9efee3c6a57ba67e5b24
  }
  
  void ThemeService::Shutdown() {
-@@ -765,6 +774,15 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
+@@ -765,6 +775,15 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
      key.custom_theme = GetThemeSupplier();
    }
  
@@ -851,3 +1011,55 @@ index 440a3076e5f80c6b393dba0b311ba15ea808681e..4b3a2f667cfc6c6e763e05ce43dcaba5
    }
    layouts.host_size = gfx::Size(width, height);
    return layouts;
+diff --git a/chrome/browser/ui/views/frame/glass_frame_service.h b/chrome/browser/ui/views/frame/glass_frame_service.h
+index 3fb15b6083c28fd0152f9038010cb2e46932ced2..dd074e582525492cda203968cdaf5c18fc57dacc 100644
+--- a/chrome/browser/ui/views/frame/glass_frame_service.h
++++ b/chrome/browser/ui/views/frame/glass_frame_service.h
+@@ -110,6 +110,8 @@ class GlassFrameService : public BrowserCollectionObserver,
+   PrefChangeRegistrar pref_change_registrar_;
+   bool is_glass_frame_enabled_ = true;
+   bool is_battery_saver_mode_active_ = false;
++  // uw: Reduce transparency and the setting for windows behind the front one.
++  base::CallbackListSubscription glass_rules_subscription_;
+   ::ui::ScopedUnownedUserData<GlassFrameService> scoped_unowned_user_data_;
+ };
+ 
+diff --git a/chrome/browser/global_features.cc b/chrome/browser/global_features.cc
+index 0b349d5149d03673f512037a70d17a26831861a1..c11cbbca94a82019803d17bf2e6128385227ef65 100644
+--- a/chrome/browser/global_features.cc
++++ b/chrome/browser/global_features.cc
+@@ -44,6 +44,10 @@
+ #include "chrome/browser/ui/tabs/tab_drag_api/desktop_tab_drag_impl/tab_drag_session_desktop_injector.h"
+ #endif
+ 
++#if BUILDFLAG(IS_MAC)
++#include "base/mac/mac_util.h"
++#endif
++
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+ // This causes a gn error on Android builds, because gn does not understand
+ // buildflags, so we include it only on platforms where it is used.
+@@ -242,7 +246,9 @@ void GlobalFeatures::Init() {
+ 
+ void GlobalFeatures::PreMainMessageLoopRun() {
+ #if BUILDFLAG(IS_MAC)
+-  if (features::IsGlassFrameEnabled()) {
++  // uw: glass follows each window's theme, so the service runs wherever
++  // macOS can draw glass.
++  if (base::mac::MacOSMajorVersion() >= 26) {
+     glass_frame_service_ =
+         GetUserDataFactory().CreateInstance<GlassFrameService>(
+             *g_browser_process, *g_browser_process);
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index a387b27ccc1939fa4d685fcf0e0a170db91a4281..b997e4a4542ee8a6ebd71f931f1bb2ea9c4ee930 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -156,6 +156,8 @@ source_set("glass_frame_service") {
+     "//chrome/common:constants",
+     "//components/prefs",
+     "//ui/base/unowned_user_data",
++    "//uw/browser/ui/glass",
++    "//uw/browser/ui/glass:prefs",
+   ]
+ }
+ 

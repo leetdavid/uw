@@ -1,0 +1,64 @@
+# Glass: the window see-through onto macOS's Liquid Glass, under the theme.
+# See the "Glass" section of docs/plans/themes.md.
+source_set("glass") {
+  sources = [
+    "glass.cc",
+    "glass.h",
+    "glass_background.cc",
+    "glass_background.h",
+  ]
+  if (is_mac) {
+    sources += [ "glass_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  }
+  public_deps = [
+    "//base",
+    "//skia",
+  ]
+  deps = [
+    ":prefs",
+    "//cc/paint",
+    "//chrome/browser:browser_process",
+    "//chrome/browser/ui/browser_window",
+    "//components/prefs",
+    "//content/public/browser",
+    "//ui/color",
+    "//ui/gfx",
+    "//ui/views",
+    "//uw/browser/ui/look",
+    "//uw/browser/workspaces",
+    "//uw/components/look",
+  ]
+}
+
+# Kept apart, so registering the pref pulls in no browser code.
+source_set("prefs") {
+  sources = [
+    "glass_prefs.cc",
+    "glass_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "glass_browsertest.cc" ]
+  deps = [
+    ":glass",
+    ":prefs",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//content/test:test_support",
+    "//skia",
+    "//testing/gtest",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/workspaces",
+    "//uw/components/look",
+  ]
+}

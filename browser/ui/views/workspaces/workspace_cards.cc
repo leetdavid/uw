@@ -122,6 +122,7 @@ CardBubble* MakeCardBubble(views::View* anchor,
   auto* bubble = new CardBubble(anchor, arrow, std::move(closing));
   bubble->set_corner_radius(kMenuCardRadius);
   bubble->set_adjust_if_offscreen(true);
+  FrostOverGlass(bubble);
   return bubble;
 }
 

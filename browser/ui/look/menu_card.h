@@ -22,6 +22,8 @@ inline constexpr ui::ColorId kColorMenuCardDisabled = kChromeColorsEnd + 21;
 inline constexpr ui::ColorId kColorMenuCardLine = kChromeColorsEnd + 22;
 inline constexpr ui::ColorId kColorMenuCardChipHover = kChromeColorsEnd + 23;
 inline constexpr ui::ColorId kColorMenuCardAccent = kChromeColorsEnd + 24;
+// The card's color at 85%, over frosted glass while the window's glass is on.
+inline constexpr ui::ColorId kColorMenuCardGlass = kChromeColorsEnd + 25;
 
 inline constexpr int kMenuCardWidth = 264;
 inline constexpr int kMenuCardRadius = 14;

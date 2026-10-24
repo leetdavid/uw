@@ -502,6 +502,8 @@ struct WatchCardState {
   // The watch's runs of the last 14 days, oldest first, for its chart. Each
   // is a kRun step.
   array<Step> runs;
+  // Whether the card is frosted glass: its window's glass is on.
+  bool frosted;
 };
 
 // Links the watch card's page to its handler.

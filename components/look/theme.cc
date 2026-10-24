@@ -23,6 +23,8 @@ constexpr double kDarkModeLightness = 0.14;
 
 // The theme covers the glass from all of it, solid, down to a fifth.
 constexpr float kClearestCover = 0.2f;
+// A glass element keeps from all of its frosted white down to this much.
+constexpr float kClearestTint = 0.15f;
 // The least cover that keeps text readable over any desktop, as the designs
 // mark it on the slider.
 constexpr float kReadableCoverUnderDarkText = 0.6f;
@@ -77,16 +79,22 @@ SkColor DarkModeColorOf(SkColor color) {
   return color_utils::HSLToSkColor(hsl, SK_AlphaOPAQUE);
 }
 
-float GlassCover(int glass) {
-  return 1.0f - (1.0f - kClearestCover) * std::clamp(glass, 0, kFullGlass) /
-                    kFullGlass;
+float WindowCover(int transparency) {
+  return 1.0f - (1.0f - kClearestCover) *
+                    std::clamp(transparency, 0, kFullTransparency) /
+                    kFullTransparency;
 }
 
-int ReadableGlass(SkColor text) {
+int ReadableTransparency(SkColor text) {
   const float cover = color_utils::IsDark(text) ? kReadableCoverUnderDarkText
                                                 : kReadableCoverUnderLightText;
-  return static_cast<int>(
-      std::lround((1.0f - cover) / (1.0f - kClearestCover) * kFullGlass));
+  return static_cast<int>(std::lround((1.0f - cover) / (1.0f - kClearestCover) *
+                                      kFullTransparency));
+}
+
+float GlassTint(int glass) {
+  return 1.0f -
+         (1.0f - kClearestTint) * std::clamp(glass, 0, kFullGlass) / kFullGlass;
 }
 
 float ReadableCover(SkColor color, SkColor text) {

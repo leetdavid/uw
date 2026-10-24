@@ -430,6 +430,9 @@ function WatchCard() {
     };
   }, []);
   useEffect(() => {
+    document.documentElement.classList.toggle('frosted', !!card?.frosted);
+  }, [card]);
+  useEffect(() => {
     if (card && !shown.current) {
       shown.current = true;
       watchCardHandler.showUI();

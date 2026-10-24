@@ -66,19 +66,26 @@ TEST(ThemeTest, EveryGradientColorKeepsTheTextReadable) {
   EXPECT_GT(HslOf(more[0]).l, HslOf(kWine).l);
 }
 
-TEST(ThemeTest, GlassRunsFromSolidToAFifth) {
-  EXPECT_EQ(Theme().glass, 0);
-  EXPECT_FLOAT_EQ(GlassCover(0), 1.0f);
-  EXPECT_FLOAT_EQ(GlassCover(kFullGlass / 2), 0.6f);
-  EXPECT_FLOAT_EQ(GlassCover(kFullGlass), 0.2f);
-  EXPECT_FLOAT_EQ(GlassCover(-5), 1.0f);
-  EXPECT_FLOAT_EQ(GlassCover(kFullGlass + 5), 0.2f);
+TEST(ThemeTest, TransparencyRunsFromSolidToAFifth) {
+  EXPECT_EQ(Theme().transparency, 0);
+  EXPECT_FLOAT_EQ(WindowCover(0), 1.0f);
+  EXPECT_FLOAT_EQ(WindowCover(kFullTransparency / 2), 0.6f);
+  EXPECT_FLOAT_EQ(WindowCover(kFullTransparency), 0.2f);
+  EXPECT_FLOAT_EQ(WindowCover(-5), 1.0f);
+  EXPECT_FLOAT_EQ(WindowCover(kFullTransparency + 5), 0.2f);
 }
 
-TEST(ThemeTest, TheReadableGlassIsWhereTheTickSits) {
-  EXPECT_EQ(ReadableGlass(kDarkTextOnTint), 50);
-  EXPECT_EQ(ReadableGlass(kLightTextOnTint), 31);
-  EXPECT_GE(GlassCover(ReadableGlass(kLightTextOnTint)), 0.75f);
+TEST(ThemeTest, TheReadableTransparencyIsWhereTheTickSits) {
+  EXPECT_EQ(ReadableTransparency(kDarkTextOnTint), 50);
+  EXPECT_EQ(ReadableTransparency(kLightTextOnTint), 31);
+  EXPECT_GE(WindowCover(ReadableTransparency(kLightTextOnTint)), 0.75f);
+}
+
+TEST(ThemeTest, GlassRunsFromFrostedToClear) {
+  EXPECT_EQ(Theme().glass, 0);
+  EXPECT_FLOAT_EQ(GlassTint(0), 1.0f);
+  EXPECT_FLOAT_EQ(GlassTint(kFullGlass), 0.15f);
+  EXPECT_GT(GlassTint(1), GlassTint(kFullGlass / 2));
 }
 
 TEST(ThemeTest, TheToolbarCoversTheGlassEnoughForItsText) {
@@ -107,7 +114,8 @@ TEST_F(ThemePrefsTest, ASavedThemeComesBackWhole) {
   theme.colors = {kButter, kSky, kWine};
   theme.intensity = 60;
   theme.grain = 25;
-  theme.glass = 70;
+  theme.transparency = 70;
+  theme.glass = 20;
   theme.colors_in_dark_mode = true;
   WriteTheme(prefs_, theme);
   EXPECT_EQ(ReadTheme(prefs_, WithIntensity(kButter, 60)), theme);
@@ -144,7 +152,8 @@ TEST_F(ThemePrefsTest, AWorkspaceKeepsEveryPartOfItsTheme) {
   theme.colors = {kButter, kSky};
   theme.intensity = 60;
   theme.grain = 25;
-  theme.glass = 40;
+  theme.transparency = 40;
+  theme.glass = 90;
   theme.colors_in_dark_mode = true;
   theme.mode = ThemeMode::kDark;
   EXPECT_EQ(ThemeFromValue(ThemeToValue(theme)), theme);

@@ -50,6 +50,9 @@ CommandBarActions* GetCommandBarActions(content::WebContents* page);
 // ">" does.
 void StartShellCommand(content::WebContents* page);
 
+// Whether the command bar's page in `page` shows as frosted glass.
+void SetCommandBarFrosted(content::WebContents* page, bool frosted);
+
 class UwCommandBarUI;
 
 class UwCommandBarUIConfig
@@ -93,6 +96,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void GetCurrencies(GetCurrenciesCallback callback) override;
   void GetClock(GetClockCallback callback) override;
   void CopyAnswer(const std::string& text) override;
+  void IsFrosted(IsFrostedCallback callback) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
   mojo::Receiver<searchbox::mojom::PageHandlerFactory> factory_{this};

@@ -206,6 +206,11 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.browserProxy_.openThemePicker();
   }
 
+  protected async onGlassBehindChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setGlassBehind(e.detail);
+    this.refresh_();
+  }
+
   protected async onCommandBarChange_(e: CustomEvent<boolean>) {
     await this.browserProxy_.setCommandBar(e.detail);
     this.refresh_();

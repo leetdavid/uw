@@ -106,6 +106,8 @@ std::unique_ptr<views::Label> MakeMenuCardDetail(const std::u16string& text);
 void SetUpMenuCard(views::BubbleDialogDelegate* bubble);
 // Lays out the rows of a menu card's contents top to bottom.
 void LayOutMenuCard(views::View* contents);
+// Frosts the card of `bubble` once it shows, while its window's glass is on.
+void FrostOverGlass(views::BubbleDialogDelegate* bubble);
 
 }  // namespace uw
 

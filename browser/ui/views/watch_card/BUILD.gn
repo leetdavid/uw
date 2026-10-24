@@ -24,6 +24,7 @@ source_set("watch_card") {
     "//ui/color",
     "//ui/views",
     "//url",
+    "//uw/browser/ui/glass",
     "//uw/browser/ui/vector_icons",
     "//uw/browser/ui/webui/uw_chat",
   ]

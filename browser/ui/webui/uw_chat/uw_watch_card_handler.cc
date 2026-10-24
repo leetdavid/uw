@@ -28,6 +28,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
 
@@ -202,6 +203,7 @@ void UwWatchCardHandler::SendCard() {
   card->host = url_formatter::StripWWW(
       std::string(contents->GetLastCommittedURL().host()));
   card->favicon = FaviconOf(contents);
+  card->frosted = ElementGlassOfWindow(tab->GetBrowserWindowInterface()) > 0;
   const ScheduledChats* chats = observation_.GetSource();
   if (const std::string id = Watcher(); !id.empty()) {
     const ScheduledChat& chat = *chats->Find(id);

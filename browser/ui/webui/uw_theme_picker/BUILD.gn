@@ -21,14 +21,17 @@ source_set("uw_theme_picker") {
   ]
   deps = [
     "//chrome:strings",
+    "//chrome/browser/performance_manager/public/user_tuning",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/themes",
     "//chrome/browser/ui/browser_window",
     "//components/prefs",
     "//ui/base",
     "//ui/base/mojom",
+    "//ui/native_theme",
     "//ui/webui",
     "//uw/browser/resources/uw_theme_picker:resources",
+    "//uw/browser/ui/glass",
     "//uw/browser/workspaces",
     "//uw/components/look",
     "//uw/components/look:prefs",

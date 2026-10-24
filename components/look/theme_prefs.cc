@@ -17,6 +17,7 @@ void RegisterThemeProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kThemeColorsPref);
   registry->RegisterIntegerPref(kThemeIntensityPref, kFullIntensity);
   registry->RegisterIntegerPref(kThemeGrainPref, 0);
+  registry->RegisterIntegerPref(kThemeTransparencyPref, 0);
   registry->RegisterIntegerPref(kThemeGlassPref, 0);
   registry->RegisterBooleanPref(kThemeColorsInDarkModePref, false);
 }
@@ -34,6 +35,7 @@ Theme SavedTheme(const PrefService& prefs) {
   }
   theme.intensity = prefs.GetInteger(kThemeIntensityPref);
   theme.grain = prefs.GetInteger(kThemeGrainPref);
+  theme.transparency = prefs.GetInteger(kThemeTransparencyPref);
   theme.glass = prefs.GetInteger(kThemeGlassPref);
   theme.colors_in_dark_mode = prefs.GetBoolean(kThemeColorsInDarkModePref);
   return theme;
@@ -66,6 +68,7 @@ base::DictValue ThemeToValue(const Theme& theme) {
       .Set("colors", std::move(colors))
       .Set("intensity", theme.intensity)
       .Set("grain", theme.grain)
+      .Set("transparency", theme.transparency)
       .Set("glass", theme.glass)
       .Set("colors_in_dark_mode", theme.colors_in_dark_mode)
       .Set("mode", mode);
@@ -86,6 +89,7 @@ std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
   }
   theme.intensity = value.FindInt("intensity").value_or(kFullIntensity);
   theme.grain = value.FindInt("grain").value_or(0);
+  theme.transparency = value.FindInt("transparency").value_or(0);
   theme.glass = value.FindInt("glass").value_or(0);
   theme.colors_in_dark_mode =
       value.FindBool("colors_in_dark_mode").value_or(false);
@@ -105,6 +109,7 @@ void WriteTheme(PrefService& prefs, const Theme& theme) {
   prefs.SetList(kThemeColorsPref, std::move(colors));
   prefs.SetInteger(kThemeIntensityPref, theme.intensity);
   prefs.SetInteger(kThemeGrainPref, theme.grain);
+  prefs.SetInteger(kThemeTransparencyPref, theme.transparency);
   prefs.SetInteger(kThemeGlassPref, theme.glass);
   prefs.SetBoolean(kThemeColorsInDarkModePref, theme.colors_in_dark_mode);
 }

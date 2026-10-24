@@ -16,6 +16,10 @@
         --track-faint: rgb(30 27 46 / 4%);
         --switch-off: rgb(30 27 46 / 18%);
         --primary: #3b5bdb;
+        --muted: #77748c;
+        --glass-solid: rgb(30 27 46 / 30%);
+        --glass-clear: rgb(30 27 46 / 5%);
+        --tick: rgb(30 27 46 / 50%);
       }
 
       @media (prefers-color-scheme: dark) {
@@ -30,9 +34,25 @@
           --track-faint: rgb(255 255 255 / 5%);
           --switch-off: rgb(255 255 255 / 18%);
           --primary: #9db0ff;
+          --muted: #737373;
+          --glass-solid: rgb(255 255 255 / 30%);
+          --glass-clear: rgb(255 255 255 / 5%);
+          --tick: rgb(255 255 255 / 50%);
         }
       }
 
+      /* Over frosted glass while the theme's glass is on. */
+      body.frosted {
+        --panel: rgb(255 255 255 / 85%);
+      }
+      @media (prefers-color-scheme: dark) {
+        body.frosted {
+          --panel: rgb(23 23 23 / 85%);
+        }
+      }
+      html:has(> body.frosted) {
+        background: transparent;
+      }
       html,
       body {
         background: var(--panel);
@@ -168,7 +188,7 @@
       }
 
       .row label {
-        width: 58px;
+        width: 78px;
       }
 
       input[type='range'] {
@@ -190,6 +210,42 @@
                                               var(--track-faint) 2px 4px);
       }
 
+      #transparency-row[hidden],
+      #glass-row[hidden],
+      #glass-why[hidden] {
+        display: none;
+      }
+      #transparency-track {
+        display: flex;
+        flex: 1;
+        position: relative;
+      }
+      #transparency {
+        background: linear-gradient(to right, var(--glass-solid),
+                                    var(--glass-clear));
+      }
+      #glass {
+        background: linear-gradient(to right, var(--text) var(--value),
+                                    var(--track) var(--value));
+      }
+      body.glass-off #transparency,
+      body.glass-off #glass {
+        opacity: 45%;
+      }
+      #transparency-tick {
+        background: var(--tick);
+        border-radius: 1px;
+        height: 12px;
+        margin: -6px 0 0 -1px;
+        position: absolute;
+        top: 50%;
+        width: 2px;
+      }
+      #glass-why {
+        color: var(--muted);
+        font-size: 11.5px;
+        margin: -8px 0 0 88px;
+      }
       input[type='range']::-webkit-slider-thumb {
         appearance: none;
         background: #fff;
@@ -269,6 +325,18 @@
       <label for="grain"></label>
       <input id="grain" type="range" min="0" max="100">
     </div>
+    <div class="row" id="transparency-row" hidden>
+      <label for="transparency"></label>
+      <div id="transparency-track">
+        <input id="transparency" type="range" min="0" max="100">
+        <span id="transparency-tick" role="img"></span>
+      </div>
+    </div>
+    <div class="row" id="glass-row" hidden>
+      <label for="glass"></label>
+      <input id="glass" type="range" min="0" max="100">
+    </div>
+    <p id="glass-why" hidden></p>
     <div id="switch-row">
       <label for="colors-in-dark-mode"></label>
       <input id="colors-in-dark-mode" type="checkbox" role="switch">

@@ -69,6 +69,7 @@ source_set("tab_organization") {
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/terminal",
+    "//uw/browser/ui/glass",
     "//uw/browser/ui/look",
     "//uw/browser/ui/vector_icons",
     "//uw/browser/ui/views/command_bar",

@@ -28,7 +28,6 @@
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
-#include "chrome/common/pref_names.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_contents.h"
@@ -466,11 +465,6 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, GrainShowsOnADarkWindow) {
         << colors_in_dark_mode;
   }
   SaveWindowScreenshot(browser(), "theme-grain-dark");
-}
-
-IN_PROC_BROWSER_TEST_F(TintBrowserTest, GlassFrameIsOffUnlessTurnedOn) {
-  EXPECT_FALSE(
-      g_browser_process->local_state()->GetBoolean(prefs::kGlassFrameEnabled));
 }
 
 }  // namespace

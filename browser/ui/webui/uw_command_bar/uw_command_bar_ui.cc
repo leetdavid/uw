@@ -33,9 +33,14 @@ namespace uw {
 namespace {
 
 const void* const kActionsKey = &kActionsKey;
+const void* const kFrostedKey = &kFrostedKey;
 
 struct ActionsData : base::SupportsUserData::Data {
   raw_ptr<CommandBarActions> actions;
+};
+
+struct FrostedData : base::SupportsUserData::Data {
+  bool frosted = false;
 };
 
 // The system's zone is read again each time, so a change of zone shows.
@@ -70,6 +75,12 @@ void SetCommandBarActions(content::WebContents* page,
   auto data = std::make_unique<ActionsData>();
   data->actions = actions;
   page->SetUserData(kActionsKey, std::move(data));
+}
+
+void SetCommandBarFrosted(content::WebContents* page, bool frosted) {
+  auto data = std::make_unique<FrostedData>();
+  data->frosted = frosted;
+  page->SetUserData(kFrostedKey, std::move(data));
 }
 
 void StartShellCommand(content::WebContents* page) {
@@ -134,6 +145,12 @@ void UwCommandBarUI::CopyAnswer(const std::string& text) {
   if (embedder()) {
     embedder()->CloseUI();
   }
+}
+
+void UwCommandBarUI::IsFrosted(IsFrostedCallback callback) {
+  const auto* data = static_cast<FrostedData*>(
+      web_ui()->GetWebContents()->GetUserData(kFrostedKey));
+  std::move(callback).Run(data && data->frosted);
 }
 
 void UwCommandBarUI::CreatePageHandler(
