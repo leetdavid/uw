@@ -16,7 +16,7 @@ uw browser means "ur web, ur way". It is a planned Chromium-based browser with A
 
 - Start with [docs/README.md](docs/README.md).
 - The main features are automatic tab organization, agent automation, and integrations such as a terminal tab. See [Product](docs/product.md#main-features). The README's verification status and the [board](docs/plans/roadmap.md#board) say what is built.
-- Never write project-owned Python code, including build helpers and tests. Use TypeScript for repository tooling and C++ for Chromium changes.
+- Never write project-owned Python code, including build helpers and tests. Use TypeScript for repository tooling and C++ for Chromium changes. The shipped `uw` command is TypeScript too; see [ADR 0016](docs/adr/0016-the-uw-command-is-typescript-with-ink.md).
 - Chromium's upstream build tools require Python. Make that dependency explicit; do not claim the entire build chain is Python-free.
 - Use pnpm for dependencies and package scripts. Keep `pnpm-lock.yaml` as the package lockfile.
 - Use [README.md](README.md) for build-host requirements, setup, building, running, and verification.

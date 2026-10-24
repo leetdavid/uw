@@ -18,7 +18,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 - A [private chat](../CONTEXT.md#language) keeps nothing after the private windows close.
 - No cap on chats running at once. A chat the user starts is their own request, not background automation, so it never waits its turn.
 - Chats run on this Mac. Cloud runs are planned for later.
-- [Outside agents](../CONTEXT.md#language) reach the same tools through uw's own tool server, in v2.2.
+- [Outside agents](../CONTEXT.md#language) reach the same tools through uw's own tool server, `uw mcp serve`, in v2.2. It runs over the [`uw` command](uw-command.md)'s channel.
 
 Added on 2026-10-15:
 

@@ -200,6 +200,12 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T189 | The mini player stack | backlog | 5/10 | A second mini player pauses the first and stacks on it, up to three, with stills of the paused ones that fan out on hover and swap on a click, per the [plan](mini-player.md#the-stack). Needs T187. Done when acceptance check 6 passes. |
 | T190 | Document picture in picture's frame | backlog | 6/10 | Sites' own picture-in-picture windows, such as a Meet call, get the floating mini player's rounded Arc frame and never dock, per the [plan](mini-player.md#document-picture-in-picture). Needs T185. Done when acceptance check 8 passes for them. |
 | T191 | Extensions follow page mode | in progress | 8/10 | Extensions' popups and side panels are told the page mode, as websites are, per [Page mode](themes.md#page-mode). Asked for on 2026-10-24: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode". Done when a browser test shows an extension's popup dark under Dark pages in a light window. |
+| T192 | uw command design | in progress | 8/10 | Frames for the [`uw` command](uw-command.md): the terminal interface at work, approval cards for a page step, a terminal command, and a connector tool, every state, the "Install `uw` command" settings row, and a chat marked "From terminal", per the [plan](uw-command.md#design). The user asked for it on 2026-10-24. The user signs off before T193. |
+| T193 | The uw command's channel and settings | backlog | 7/10 | The channel, "Install `uw` command" with its admin prompt and Uninstall, starting uw with no window, the version check, and `uw settings list/get/set` with `--workspace`, per the [plan](uw-command.md#reaching-uw). The Node program built into one binary inside uw.app, per [ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md). Needs T192. Done when acceptance checks 1 and 2 pass. |
+| T194 | Connectors from the uw command | backlog | 7/10 | `uw connectors` and `uw mcp`: add with Claude Code's arguments or the paste box's JSON, list, remove, and sign-in, per the [plan](uw-command.md#connectors). Needs T193. Done when acceptance check 3 passes. |
+| T195 | Printed chats from the uw command | backlog | 5/10 | `uw chat -p`, `--json`, the exit codes, approvals asked in the terminal or answered with `uw approve`, `-c`, `-r`, `--mode`, `--model`, `--effort`, `--timeout`, piped text as attached material, and `uw chats`, per the [plan](uw-command.md#chats). Needs T193. Done when acceptance checks 4 to 7 pass. |
+| T196 | The uw command's terminal interface | backlog | 5/10 | The Claude Code-like interface for `uw chat`: steps, Markdown answers, approval cards, steering, Esc, the `/` menu, the status line, and Ctrl-O, per the [plan](uw-command.md#the-terminal-interface). Needs T195. Done when acceptance check 8 passes. |
+| T197 | uw mcp serve | backlog | 5/10 | The tool server for [outside agents](agent-chats.md#releases), `uw mcp serve`, over the `uw` command's channel, with the agent's tools only, per the [plan](uw-command.md#commands). Part of v2.2. Needs T193. |
 
 ## 1. Choose the browser foundation
 
@@ -284,6 +290,12 @@ Agreed on 2026-10-24: picture-in-picture videos dock at the bottom of the sideba
 
 Done when the plan's [acceptance checks](mini-player.md#acceptance-checks) pass.
 
+## The uw command
+
+Agreed on 2026-10-24: a `uw` command that runs chats, manages connectors, and changes settings, for scripts, outside agents, and the user at a terminal. The [uw command plan](uw-command.md) has the scope and stages, T192 to T197 on the board.
+
+Done when the plan's [acceptance checks](uw-command.md#acceptance-checks) pass.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -316,6 +328,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Connectors](connectors.md) | 5/10 | uw's own MCP client in C++ over two protocol versions, and OAuth sign-in that meets each server's quirks only live. The pages and menus reuse the chat page's parts. |
 | [Connect dialog](connect-dialog.md) | 5/10 | A local copy of the MCP Registry and two plugin directories, whose formats uw does not control; each service's own sign-in app; and Google asking for sign-in only at the first tool call. The dialog reuses the connectors page's parts. |
 | [Context and cost](context-and-cost.md) | 6/10 | Three wire formats report usage their own ways, streamed answers included, and saved chats must keep opening. Prices and limits come from the models.dev catalog uw already reads. |
+| [The uw command](uw-command.md) | 5/10 | The agent, connectors, runs out of sight, and approvals exist. New: a channel to the running uw, a Node program built, signed, and shipped inside uw.app, a terminal interface that has to keep up with the chat page, approvals answered from a second place, and an admin prompt to link `/usr/local/bin/uw`. |
 | [Decision model connection](../architecture.md#tab-organization-models) | 7/10 | Jev, the OpenAI Decisions API, or a compatible endpoint decides placement. Request shapes come from public documentation; no provider has been called live yet. |
 | [Tidy and Clear](scratchpad-buttons.md) | 5/10 | Clear is 7/10: it closes tabs as Close Branch does, but the painted Scratchpad heading must become a view to hold buttons. Tidy is 5/10: one language-model request over the Scratchpad answers with a whole plan, so related tabs merge and new tasks are named at once, but the plan applied as one undo is new code, and answer quality is unmeasured. Changed on 2026-10-24 from on-demand reorganization of every tab in the window. |
 | [Automatic task-based tree organization](../product.md#automatic-tab-organization) | 5/10 | The initial title/URL/source fast path must meet the agreed latency budget, then a clearer excerpt-informed pass may correct it. Background LLM discovery handles unmatched Scratchpad branches, with stale-result cancellation. |
@@ -337,7 +350,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Prompt-built extensions and site customization](../product.md#prompt-built-extensions) | 5/10 | Generating working changes across different sites and coding tools. |
 | [Customization persistence and controls](../product.md#prompt-built-extensions) | 8/10 | Remember enabled changes across visits and expose per-site editing and removal. |
 | [Agent chats, v2.0](agent-chats.md) | 4/10 | Arbitrary multi-step tasks are hard to complete and verify consistently. Chromium's agent engine is internal and changes with each update. The [engine spike](../research/agent-engine-spike.md) passed, which raised it from 3/10. |
-| [Outside agents](agent-chats.md#releases) | 5/10 | uw's own tool server for Claude Code and other agents, on the same tools and approvals as chats. |
+| [Outside agents](agent-chats.md#releases) | 5/10 | uw's own tool server for Claude Code and other agents, `uw mcp serve` over the [`uw` command](uw-command.md)'s channel, on the same tools and approvals as chats. |
 | [Terminal tab](terminal-tab.md) | 6/10 | The first uw page outside settings, a pre-1.0 dependency whose JavaScript has [gaps uw's page must cover](../research/terminal-spike.md#gaps-uw-has-to-cover), and a close warning on four closing paths. The [spike](../research/terminal-spike.md) removed the WebAssembly and shell-start risks. |
 | [Terminal commands from other sources](../product.md#terminal-tabs) | 4/10 | Pages and other parts of uw asking to run a command with the user's approval. The prompt and what is remembered are undecided, and a mistake gives a website the shell. |
 | [The agent's terminal](agent-chats.md#agreed-scope) | 4/10 | Commands in a terminal tab under the chat, judged by a [command check](../CONTEXT.md#language) as in Claude Code's auto mode. Reading a terminal's screen and knowing when a command ends rest on uw's page and the busy-shell rule, with no shell integration. How well the check judges depends on the user's model, and a tricked check can let a harmful command run in Auto. |

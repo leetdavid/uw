@@ -193,7 +193,7 @@ Agreed on 2026-10-14 as v2, after the minimum usable version: a built-in agent b
 - Agreed on 2026-10-20: the agent can run commands on this Mac in a [terminal tab](CONTEXT.md#language) under its chat. In Auto, a [command check](CONTEXT.md#language) asks only before potentially dangerous commands, as Claude Code's auto mode does, and every mode asks before a command reads a [sensitive file](CONTEXT.md#language).
 - Agreed on 2026-10-21: [connectors](CONTEXT.md#language) give the agent tools from MCP servers, and the user can start a [skill](CONTEXT.md#language) by typing `/` and its name. See the [connectors plan](plans/connectors.md). Agreed on 2026-10-22: a connect dialog finds a service and adds its connector and skills with one click and a sign-in. See the [connect dialog plan](plans/connect-dialog.md).
 - Agreed on 2026-10-24: a chat shows how full its model's context is and what the chat has cost. See the [context and cost plan](plans/context-and-cost.md).
-- [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later.
+- [Outside agents](CONTEXT.md#language) such as Claude Code use the same tools later, through `uw mcp serve`.
 
 Example use cases:
 
@@ -267,6 +267,10 @@ Agreed management, on 2026-10-22:
 - A Scheduled filter at the top of the chat page's chat list shows every scheduled chat and every chat with a running trigger, next time first, with Pause all.
 - Pause stops runs and triggers. Resuming does not catch up on the paused time.
 - Deleting the chat deletes its schedule. Removing the schedule keeps it as an ordinary chat.
+
+### The uw command
+
+Agreed on 2026-10-24: the [`uw` command](CONTEXT.md#language) runs chats, manages connectors, and changes settings from a terminal, a script, or an outside agent. In a terminal, a chat looks and asks for approval as Claude Code does; with no terminal, it never waits for input. The user installs it from uw's settings. The [uw command plan](plans/uw-command.md) has the details.
 
 ## Integrations
 
