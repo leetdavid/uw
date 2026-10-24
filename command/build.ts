@@ -46,5 +46,6 @@ execFileSync("codesign", ["--remove-signature", program]);
 await inject(program, "NODE_SEA_BLOB", readFileSync(blob), { sentinelFuse: SEA_FUSE, machoSegmentName: "NODE_SEA" });
 execFileSync("codesign", ["--sign", "-", "--force", program]);
 
-const inputs = [import.meta.filename, ...Object.keys(built.metafile.inputs)].map((input) => relative(process.cwd(), input));
+const inputs = [import.meta.filename, ...Object.keys(built.metafile.inputs).map((input) => resolve(input))];
+mkdirSync(dirname(resolve(values.depfile)), { recursive: true });
 writeFileSync(values.depfile, `${relative(process.cwd(), program)}: ${inputs.join(" ")}\n`);
