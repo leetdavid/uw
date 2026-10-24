@@ -24,6 +24,7 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -43,6 +44,10 @@
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/display/display.h"
+#include "ui/display/screen.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/switches.h"
 #include "ui/views/view_utils.h"
 #include "url/gurl.h"
@@ -55,9 +60,12 @@
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/look/theme.h"
@@ -395,6 +403,9 @@ class ReadmeScreenshotsBrowserTest : public headless::HeadlessModeBrowserTest {
     return provider.id;
   }
 
+  // Three workspaces, four pins, and two tasks, in the workspace "Work".
+  void ShowWorkspacesAndPins();
+
   OrganizeBar* Bar(views::View* view) {
     if (auto* bar = views::AsViewClass<OrganizeBar>(view)) {
       return bar;
@@ -496,6 +507,32 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, BringYourOwnKey) {
 
 IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, WorkspacesAndPins) {
   SetScheme(ThemeService::BrowserColorScheme::kDark);
+  ShowWorkspacesAndPins();
+  SaveWindowScreenshot(browser(), "workspaces");
+}
+
+// Real windows only: macOS draws glass behind a window on the screen. Draws
+// the glass picture over a macOS desktop picture, as macOS shows it.
+IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest,
+                       MANUAL_GlassOverTheDesktop) {
+  if (!CanShowGlass() || ReducesTransparency()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  SetScheme(ThemeService::BrowserColorScheme::kLight);
+  ShowWorkspacesAndPins();
+  gfx::Rect bounds = display::Screen::Get()->GetPrimaryDisplay().work_area();
+  bounds.ClampToCenteredSize(gfx::Size(1180, 740));
+  browser()->GetWindow()->SetBounds(bounds);
+  browser()->GetWindow()->Activate();
+  Theme theme = ThemeOfWindow(browser());
+  theme.transparency = kFullTransparency / 2;
+  theme.glass = 60;
+  SetThemeOfWindow(browser(), theme);
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsGlass(browser()); }));
+  SaveWindowOverDesktop(browser(), "glass");
+}
+
+void ReadmeScreenshotsBrowserTest::ShowWorkspacesAndPins() {
   NameWorkspace("Work", "💼");
   AddWorkspace("Personal", "🏡");
   AddWorkspace("Side project", "🚀");
@@ -514,7 +551,6 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, WorkspacesAndPins) {
   Task({launch, pricing}, u"Ship the new pricing");
   Task({run, retries}, u"Fix flaky CI");
   Activate(launch);
-  SaveWindowScreenshot(browser(), "workspaces");
 }
 
 }  // namespace

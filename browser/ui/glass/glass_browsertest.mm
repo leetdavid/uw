@@ -4,14 +4,12 @@
 #include "uw/browser/ui/glass/glass.h"
 
 #import <AppKit/AppKit.h>
-#import <ScreenCaptureKit/ScreenCaptureKit.h>
 
 #include <string>
 #include <utility>
 
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/browser_process.h"
@@ -34,7 +32,6 @@
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "skia/ext/skia_utils_mac.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -50,6 +47,7 @@
 #include "ui/views/window/non_client_view.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
+#include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -110,60 +108,6 @@ class GlassBrowserTest : public headless::HeadlessModeBrowserTest {
                    ->location_bar_view()
                    ->GetOmniboxPopupView())
         ->presenter();
-  }
-
-  // Saves the window of `browser` with the menus and popups open over it, as
-  // macOS shows them. Their windows are children of the browser's, and macOS
-  // offers no picture of one alone.
-  static void SaveWindowWithPopups(Browser* browser, const std::string& name) {
-    if (@available(macOS 14.4, *)) {
-      // A menu's window shows before its first frame has drawn.
-      base::RunLoop drawn;
-      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-          FROM_HERE, drawn.QuitClosure(), base::Milliseconds(500));
-      drawn.Run();
-      const CGWindowID number = static_cast<CGWindowID>(browser->GetWindow()
-                                                            ->GetNativeWindow()
-                                                            .GetNativeNSWindow()
-                                                            .windowNumber);
-      __block SkBitmap pixels;
-      base::RunLoop captured;
-      __block base::OnceClosure done = captured.QuitClosure();
-      [SCShareableContent
-          getCurrentProcessShareableContentWithCompletionHandler:^(
-              SCShareableContent* content, NSError* error) {
-            SCWindow* window = nil;
-            for (SCWindow* each in content.windows) {
-              if (each.windowID == number) {
-                window = each;
-              }
-            }
-            if (!window) {
-              std::move(done).Run();
-              return;
-            }
-            SCContentFilter* filter = [[SCContentFilter alloc]
-                initWithDesktopIndependentWindow:window];
-            SCStreamConfiguration* config =
-                [[SCStreamConfiguration alloc] init];
-            config.width = window.frame.size.width * filter.pointPixelScale;
-            config.height = window.frame.size.height * filter.pointPixelScale;
-            config.showsCursor = NO;
-            config.includeChildWindows = YES;
-            [SCScreenshotManager
-                captureImageWithFilter:filter
-                         configuration:config
-                     completionHandler:^(CGImageRef image, NSError* error2) {
-                       if (image) {
-                         pixels = skia::CGImageToSkBitmap(image);
-                       }
-                       std::move(done).Run();
-                     }];
-          }];
-      captured.Run();
-      ASSERT_FALSE(pixels.drawsNothing());
-      SaveBitmap(pixels, name);
-    }
   }
 };
 

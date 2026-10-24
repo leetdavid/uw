@@ -43,14 +43,34 @@ source_set("prefs") {
   deps = [ "//components/prefs" ]
 }
 
+source_set("test_support") {
+  testonly = true
+  sources = [
+    "glass_screenshot.h",
+    "glass_screenshot.mm",
+  ]
+  frameworks = [
+    "AppKit.framework",
+    "QuartzCore.framework",
+    "ScreenCaptureKit.framework",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/ui",
+    "//skia",
+    "//testing/gtest",
+    "//uw/browser/tab_organization:test_support",
+  ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "glass_browsertest.mm" ]
-  frameworks = [ "ScreenCaptureKit.framework" ]
   deps = [
     ":glass",
     ":prefs",
+    ":test_support",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
