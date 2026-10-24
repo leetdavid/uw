@@ -174,7 +174,7 @@ Stages:
 
 1. T174: the glass frames, signed off by the user.
 2. T175: glass built, but for the pin tiles, which keep drawn glass until T176.
-3. T176: real glass on each pin tile, prototyped first.
+3. T176: real glass on each pin tile, prototyped first. Agreed on 2026-10-24: if a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
 
 Acceptance checks:
 
