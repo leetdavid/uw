@@ -9,7 +9,7 @@ import "@/theme-colors";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, MessageCircle, Plus } from "lucide-react";
 import {
   Banner,
   BannerAction,
@@ -379,7 +379,10 @@ function SectionList({
   counts: Record<string, string>;
 }) {
   return (
-    <nav aria-label="AI" className="flex flex-col gap-0.5 border-r border-border px-2 py-4">
+    <nav
+      aria-label="AI"
+      className="sticky top-0 flex h-screen flex-col gap-0.5 border-r border-border px-2 pb-2 pt-4"
+    >
       <h2 className="px-2.5 pb-2.5 text-[15px] font-semibold">AI</h2>
       {AI_SECTIONS.map(({ path, name, icon: Icon }) => (
         <a
@@ -399,6 +402,17 @@ function SectionList({
           </span>
         </a>
       ))}
+      <div className="mt-auto border-t border-border pt-2">
+        <button
+          type="button"
+          id="back-to-chat"
+          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-foreground hover:bg-hover"
+          onClick={() => providersHandler.showChat()}
+        >
+          <MessageCircle aria-hidden className="size-4 text-muted-foreground" />
+          Back to chat
+        </button>
+      </div>
     </nav>
   );
 }

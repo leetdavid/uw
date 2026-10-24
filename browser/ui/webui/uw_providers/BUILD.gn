@@ -35,6 +35,7 @@ source_set("uw_providers") {
     "//services/network/public/cpp",
     "//ui/base",
     "//url",
+    "//uw/browser/agent:chat_tab",
     "//uw/browser/agent:skill_folders",
     "//uw/browser/connectors",
     "//uw/browser/resources/uw_chat:resources",

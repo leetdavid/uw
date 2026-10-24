@@ -36,6 +36,7 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
@@ -531,6 +532,20 @@ void UwProvidersHandler::ShowAiPage(const std::string& section) {
   // Any uw://ai tab will do; it goes to the section.
   params.path_behavior = NavigateParams::IGNORE_AND_NAVIGATE;
   ShowSingletonTabOverwritingNTP(&params);
+}
+
+void UwProvidersHandler::ShowChat() {
+  tabs::TabInterface* tab =
+      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
+  if (!tab) {
+    return;
+  }
+  BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
+  if (tabs::TabInterface* chat = LastChatTab(window)) {
+    GoToTab(chat);
+  } else {
+    OpenChatTab(window);
+  }
 }
 
 namespace {

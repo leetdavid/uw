@@ -54,6 +54,20 @@ std::vector<tabs::TabInterface*> TabsShowingChat(Profile* profile,
   return showing;
 }
 
+tabs::TabInterface* LastChatTab(BrowserWindowInterface* window) {
+  tabs::TabInterface* last = nullptr;
+  for (tabs::TabInterface* tab :
+       TabListInterface::From(window)->GetAllTabs()) {
+    const GURL& url = tab->GetContents()->GetVisibleURL();
+    if (url.SchemeIs(content::kChromeUIScheme) && url.host() == kChatHost &&
+        (!last || tab->GetContents()->GetLastActiveTimeTicks() >
+                      last->GetContents()->GetLastActiveTimeTicks())) {
+      last = tab;
+    }
+  }
+  return last;
+}
+
 void GoToTab(tabs::TabInterface* tab) {
   BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
   TabListInterface::From(window)->ActivateTab(tab->GetHandle());

@@ -81,6 +81,7 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void SetSkillOn(const std::string& name, bool on) override;
   void OpenSkillsFolder() override;
   void ShowAiPage(const std::string& section) override;
+  void ShowChat() override;
   void GetConnectors(GetConnectorsCallback callback) override;
   void WaitForConnectorChange(WaitForConnectorChangeCallback callback) override;
   void ReadConnectors(const std::string& json,

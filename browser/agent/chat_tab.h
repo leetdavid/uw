@@ -35,6 +35,9 @@ GURL ChatUrl(std::string_view id = {});
 std::vector<tabs::TabInterface*> TabsShowingChat(Profile* profile,
                                                  std::string_view id);
 
+// The chat tab of `window` the user was on last, or null when it has none.
+tabs::TabInterface* LastChatTab(BrowserWindowInterface* window);
+
 // Selects `tab` and brings its window, and uw, to the front.
 void GoToTab(tabs::TabInterface* tab);
 

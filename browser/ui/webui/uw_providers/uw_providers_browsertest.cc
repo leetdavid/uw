@@ -697,6 +697,43 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, UwAiOpensOnItsProviders) {
                            "    .getAttribute('href');"));
 }
 
+// "Back to chat" opens a new chat when the window has none, and otherwise goes
+// to the chat tab used last, even one opened before another.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       BackToChatGoesToTheChatUsedLast) {
+  TabStripModel* tabs = browser()->tab_strip_model();
+  Open();
+  SaveWindowScreenshot(browser(), "back-to-chat");
+  content::WebContents* ai = page();
+  const int count = tabs->count();
+  const auto back = [&] {
+    tabs->ActivateTabAt(tabs->GetIndexOfWebContents(ai));
+    ASSERT_TRUE(content::ExecJs(
+        ai, "document.getElementById('back-to-chat').click();"));
+  };
+  const auto is_chat = [](content::WebContents* contents) {
+    return contents->GetVisibleURL().host() == "chat";
+  };
+
+  back();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return tabs->count() == count + 1 && is_chat(page()); }));
+  content::WebContents* first = page();
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      browser(), GURL("chrome://chat/"),
+      WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  content::WebContents* second = page();
+  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(first));
+
+  back();
+  EXPECT_TRUE(base::test::RunUntil([&] { return page() == first; }));
+  tabs->ActivateTabAt(tabs->GetIndexOfWebContents(second));
+  back();
+  EXPECT_TRUE(base::test::RunUntil([&] { return page() == second; }));
+  EXPECT_EQ(tabs->count(), count + 2);
+}
+
 // uw://ai/skills lists the skills of both folders, and a switch turns one off
 // for every chat.
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsSectionTurnsASkillOff) {

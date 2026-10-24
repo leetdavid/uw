@@ -287,6 +287,9 @@ interface ProvidersHandler {
   // Shows uw://ai/<section> in this window: in its uw://ai tab if one is
   // open, or in a new tab.
   ShowAiPage(string section);
+  // Goes to this window's chat tab the user was on last, or opens a new chat
+  // when the window has none.
+  ShowChat();
 
   // The problem, when there is one, is why programs on this Mac start
   // without the terminal's environment.
