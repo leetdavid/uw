@@ -16,6 +16,7 @@
 #include "content/public/browser/web_contents_user_data.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
+#include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 
 namespace uw {
 namespace {
@@ -73,6 +74,7 @@ void AutoMiniPlayer::OnTabStripModelChanged(
     return;
   }
   if (selection.new_contents) {
+    MiniPlayerStack::Get().Remove(selection.new_contents);
     PutBack(selection.new_contents);
   }
   if (selection.old_contents && !tab_strip_model->empty() &&

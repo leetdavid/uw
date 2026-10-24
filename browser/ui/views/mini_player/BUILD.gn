@@ -13,10 +13,14 @@ source_set("mini_player") {
     "mini_player_dock.h",
     "mini_player_placement.cc",
     "mini_player_placement.h",
+    "mini_player_stack.cc",
+    "mini_player_stack.h",
     "mini_player_view.cc",
     "mini_player_view.h",
     "playback_speed.cc",
     "playback_speed.h",
+    "stack_row.cc",
+    "stack_row.h",
   ]
   public_deps = [
     "//base",
@@ -43,6 +47,7 @@ source_set("mini_player") {
     "//ui/base",
     "//ui/base/unowned_user_data",
     "//ui/color",
+    "//skia",
     "//ui/compositor",
     "//ui/display",
     "//uw/browser/ui/glass",

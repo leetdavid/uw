@@ -15,6 +15,8 @@
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/vector_icons/vector_icons.h"
+#include "components/viz/common/frame_sinks/copy_output_request.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/video_picture_in_picture_window_controller.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -42,6 +44,9 @@ constexpr base::TimeDelta kFadeIn = base::Milliseconds(150);
 constexpr base::TimeDelta kFadeOut = base::Milliseconds(200);
 constexpr base::TimeDelta kHideAfterLeaving = base::Seconds(1);
 constexpr base::TimeDelta kTick = base::Milliseconds(250);
+constexpr base::TimeDelta kStillEvery = base::Seconds(2);
+// The stack's rows show stills 78px wide; this is twice that.
+constexpr int kStillWidth = 156;
 
 // Below this width the mini player uses the docked sizes.
 constexpr int kFloatingSizesFrom = 320;
@@ -279,6 +284,13 @@ void MiniPlayerView::SetPlaybackState(
     content::VideoOverlayWindow::PlaybackState state) {
   playback_state_ = state;
   const bool playing = state == content::VideoOverlayWindow::kPlaying;
+  if (playing && !still_timer_.IsRunning()) {
+    still_timer_.Start(FROM_HERE, kStillEvery,
+                       base::BindRepeating(&MiniPlayerView::CopyStill,
+                                           base::Unretained(this)));
+  } else if (!playing) {
+    still_timer_.Stop();
+  }
   play_pause_->SetIcon(playing ? kMiniPlayerPauseIcon : kMiniPlayerPlayIcon,
                        l10n_util::GetStringUTF16(
                            playing ? IDS_PICTURE_IN_PICTURE_PAUSE_CONTROL_TEXT
@@ -679,6 +691,30 @@ void MiniPlayerView::UpdateTime() {
   time_->SetText(base::StrCat(
       {FormatTime(now), u" / ", FormatTime(position_.duration())}));
   progress_->SetProgress(now / position_.duration());
+}
+
+void MiniPlayerView::CopyStill() {
+  const gfx::Rect video = video_->bounds();
+  if (!GetWidget() || !frame_sink_compositor_ || video.IsEmpty()) {
+    return;
+  }
+  auto request = std::make_unique<viz::CopyOutputRequest>(
+      viz::CopyOutputRequest::ResultFormat::RGBA,
+      viz::CopyOutputRequest::ResultDestination::kSystemMemory,
+      base::BindOnce(
+          [](base::WeakPtr<MiniPlayerView> view,
+             std::unique_ptr<viz::CopyOutputResult> result) {
+            if (!view || result->IsEmpty()) {
+              return;
+            }
+            const auto access = result->ScopedAccessSkBitmap();
+            view->still_ = gfx::ImageSkia::CreateFrom1xBitmap(access.bitmap());
+          },
+          weak_factory_.GetWeakPtr()));
+  request->SetScaleRatio(
+      gfx::Vector2d(video.width(), video.height()),
+      gfx::Vector2d(kStillWidth, kStillWidth * video.height() / video.width()));
+  video_->layer()->RequestCopyOfOutput(std::move(request));
 }
 
 void MiniPlayerView::UpdateControlsVisibility() {

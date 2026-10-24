@@ -44,7 +44,9 @@
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
+#include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
+#include "uw/browser/ui/views/mini_player/stack_row.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/look/theme.h"
 
@@ -350,6 +352,75 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
       browser()->tab_strip_model()->GetIndexOfWebContents(video_));
   Settle();
   EXPECT_TRUE(Bool("isInPictureInPicture()"));
+}
+
+// A second video pauses the first and docks over it; the first waits in the
+// stack, and a click on its row plays it again.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ASecondVideoPausesTheFirstAndStacksOnIt) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* first = OpenMiniPlayer();
+  Play();
+  content::WebContents* first_video = video_;
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(first, browser()); }));
+  // A still is copied every two seconds while the video plays.
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return !first->view()->still().isNull(); }));
+
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* second = OpenMiniPlayer();
+  ASSERT_NE(first, second);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(first_video, "video.paused").ExtractBool();
+  }));
+  ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
+  EXPECT_EQ(first_video, MiniPlayerStack::Get().paused()[0].contents.get());
+
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(second, browser()); }));
+  dock->OnMouseEntered(Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  ASSERT_TRUE(dock->fanned());
+  ASSERT_EQ(1u, dock->rows().size());
+  SaveWindowScreenshot(browser(), "mini_player_stack_fanned");
+  views::test::ButtonTestApi(dock->rows()[0].get())
+      .NotifyClick(Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(first_video, "isInPictureInPicture()").ExtractBool();
+  }));
+  EXPECT_FALSE(content::EvalJs(first_video, "video.paused").ExtractBool());
+  ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
+  EXPECT_EQ(video_, MiniPlayerStack::Get().paused()[0].contents.get());
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       GoingToAPausedVideosTabTakesItOutOfTheStack) {
+  SetAppActiveForTesting(true);
+  OpenMiniPlayer();
+  Play();
+  content::WebContents* first_video = video_;
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  OpenMiniPlayer();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return MiniPlayerStack::Get().paused().size() == 1; }));
+  browser()->tab_strip_model()->ActivateTabAt(
+      browser()->tab_strip_model()->GetIndexOfWebContents(first_video));
+  EXPECT_TRUE(MiniPlayerStack::Get().paused().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, AFourthVideoDropsTheOldest) {
+  std::vector<content::WebContents*> videos;
+  for (int i = 0; i < 4; ++i) {
+    if (i > 0) {
+      chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+    }
+    OpenMiniPlayer();
+    videos.push_back(video_);
+  }
+  const std::vector<MiniPlayerStack::Entry>& paused =
+      MiniPlayerStack::Get().paused();
+  ASSERT_EQ(2u, paused.size());
+  EXPECT_EQ(videos[2], paused[0].contents.get());
+  EXPECT_EQ(videos[1], paused[1].contents.get());
 }
 
 // The way macOS hands a window the pointer: to its content view.

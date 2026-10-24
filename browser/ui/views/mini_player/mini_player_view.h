@@ -8,6 +8,7 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "components/viz/common/surfaces/surface_id.h"
 #include "content/public/browser/overlay_window.h"
@@ -15,6 +16,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/views/view.h"
 
 namespace content {
@@ -124,6 +126,12 @@ class MiniPlayerView : public views::View {
   // Where the video is drawn, in the view's coordinates.
   gfx::Rect GetVideoBounds() const;
 
+  // The video as it was at most a couple of seconds ago, small, for the
+  // stack. Empty before the first copy.
+  const gfx::ImageSkia& still() const { return still_; }
+  // Where the video is now.
+  base::TimeDelta position() const { return position_.GetPosition(); }
+
   // Called when the video's place in the view changes, so the controller can
   // tell the page what size it is shown at.
   void set_on_video_bounds_changed(base::RepeatingClosure callback) {
@@ -161,6 +169,7 @@ class MiniPlayerView : public views::View {
   void SeekTo(base::TimeDelta time);
   void ToggleMute();
   void UpdateTime();
+  void CopyStill();
   void UpdateControlsVisibility();
   void SetFast(bool fast);
   void SetCorners(float radius, std::optional<SkColor> ring);
@@ -219,8 +228,12 @@ class MiniPlayerView : public views::View {
   base::OneShotTimer hide_timer_;
   // Moves the time and the progress bar along while the video plays.
   base::RepeatingTimer tick_;
+  // Copies the video for the stack while it plays.
+  base::RepeatingTimer still_timer_;
+  gfx::ImageSkia still_;
 
   base::RepeatingClosure on_video_bounds_changed_;
+  base::WeakPtrFactory<MiniPlayerView> weak_factory_{this};
 };
 
 }  // namespace uw

@@ -26,6 +26,7 @@
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
+#include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 
 #if BUILDFLAG(IS_MAC)
@@ -197,6 +198,7 @@ void MiniPlayer::Close() {
 
 void MiniPlayer::ShowInactive() {
   shown_ = true;
+  MiniPlayerStack::Get().OnShown(controller_->GetWebContents());
   view_->SetMuted(controller_->GetMuteStatus());
   view_->ShowControls(false);
   placement_->Update();
@@ -205,6 +207,10 @@ void MiniPlayer::ShowInactive() {
 }
 
 void MiniPlayer::Hide() {
+  if (shown_ && controller_->GetWebContents()) {
+    MiniPlayerStack::Get().OnHidden(controller_->GetWebContents(),
+                                    view_->still(), view_->position());
+  }
   shown_ = false;
   Undock();
   views::Widget::Hide();
