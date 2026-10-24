@@ -51,7 +51,7 @@ jobs:
         run: pnpm run smoke
       - name: List crash reports on failure
         if: failure()
-        run: ls -lt ~/Library/Logs/DiagnosticReports/uw*.ips | head -3 || true
+        run: find ~/Library/Logs/DiagnosticReports -maxdepth 1 -name 'uw*.ips' -exec ls -lt {} + | head -3 || true
       - name: Package application
         run: ditto -c -k --sequesterRsrc --keepParent "$UW_CHROMIUM_ROOT/src/out/uw/uw.app" "$RUNNER_TEMP/uw-macos.zip"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
