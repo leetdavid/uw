@@ -335,7 +335,7 @@ On 2026-10-12, TypeSafe's live API answered the validation request that uw sends
 
 On 2026-10-24, [glass](docs/plans/themes.md#glass) built on the same host. The theme, workspace, pin, and settings suites in `browser_tests` pass, 140 tests with `GlassBrowserTest.*` among them, and so do the theme tests in `unit_tests`. In the VM, `GlassBrowserTest.MANUAL_*` passed. Their screenshots showed the desktop through the window at the shares the plan sets, read from the pixels, and showed the menus and the suggestion list frosted. Not yet checked: the look by eye on a real desktop, and the power that see-through windows behind the front one cost.
 
-On 2026-10-24, [page mode](docs/plans/themes.md#page-mode) built on the same host. The theme, workspace, page color, glass, and chat suites in `browser_tests` pass, the new page mode tests among them, and so do the theme tests in `unit_tests`. A headless screenshot shows the dark chat page beside a light sidebar. Not yet checked: a real window.
+On 2026-10-24, [page mode](docs/plans/themes.md#page-mode) built on the same host. The theme, workspace, page color, glass, and chat suites in `browser_tests` pass, the new page mode tests among them, and so do the theme tests in `unit_tests`. A headless screenshot shows the dark chat page beside a light sidebar, and the user tried it in uw the same day.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
