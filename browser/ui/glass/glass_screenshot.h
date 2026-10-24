@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include "ui/gfx/native_ui_types.h"
+
 class Browser;
 
 namespace uw {
@@ -20,6 +22,11 @@ void SaveWindowWithPopups(Browser* browser, const std::string& name);
 // Only this process's windows are in the shot, so nothing else on the screen
 // shows.
 void SaveWindowOverDesktop(Browser* browser, const std::string& name);
+
+// Does the same for any of this process's windows, such as the floating mini
+// player.
+void SaveNativeWindowOverDesktop(gfx::NativeWindow native_window,
+                                 const std::string& name);
 
 }  // namespace uw
 

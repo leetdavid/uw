@@ -1,0 +1,19 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+// An arrow out of a square, back to the video's tab.
+CANVAS_DIMENSIONS, 24,
+STROKE, 2,
+MOVE_TO, 13, 3,
+R_H_LINE_TO, 6,
+R_ARC_TO, 2, 2, 0, 0, 1, 2, 2,
+R_V_LINE_TO, 14,
+R_ARC_TO, 2, 2, 0, 0, 1, -2, 2,
+H_LINE_TO, 5,
+R_ARC_TO, 2, 2, 0, 0, 1, -2, -2,
+R_V_LINE_TO, -6,
+MOVE_TO, 3, 3,
+R_LINE_TO, 9, 9,
+MOVE_TO, 3, 9,
+V_LINE_TO, 3,
+R_H_LINE_TO, 6

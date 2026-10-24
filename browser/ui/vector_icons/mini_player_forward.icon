@@ -1,0 +1,12 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+// A circle turning forward, with room for the seconds inside.
+CANVAS_DIMENSIONS, 24,
+STROKE, 2,
+MOVE_TO, 20.5f, 12,
+R_ARC_TO, 8.5f, 8.5f, 0, 1, 1, -2.6f, -6.1f,
+R_LINE_TO, 2.6f, 2.5f,
+MOVE_TO, 20.5f, 3.5f,
+R_V_LINE_TO, 4.9f,
+R_H_LINE_TO, -4.9f

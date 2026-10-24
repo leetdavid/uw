@@ -1,0 +1,73 @@
+# The mini player: uw's picture in picture, in place of Chromium's window. See
+# docs/plans/mini-player.md.
+source_set("mini_player") {
+  sources = [
+    "mini_player.cc",
+    "mini_player.h",
+    "mini_player_controls.cc",
+    "mini_player_controls.h",
+    "mini_player_view.cc",
+    "mini_player_view.h",
+    "playback_speed.cc",
+    "playback_speed.h",
+  ]
+  public_deps = [
+    "//base",
+    "//chrome/browser/picture_in_picture",
+    "//components/viz/common",
+    "//content/public/browser",
+    "//services/media_session/public/cpp",
+    "//ui/gfx",
+    "//ui/views",
+  ]
+  deps = [
+    "//cc",
+    "//cc/paint",
+    "//chrome:strings",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/common",
+    "//components/tabs:public",
+    "//components/vector_icons",
+    "//ui/base",
+    "//ui/compositor",
+    "//ui/display",
+    "//uw/browser/ui/glass",
+    "//uw/browser/ui/vector_icons",
+  ]
+  if (is_mac) {
+    sources += [
+      "floating_native_widget_mac.h",
+      "floating_native_widget_mac.mm",
+    ]
+    deps += [ "//components/remote_cocoa/common:mojo" ]
+    frameworks = [ "Cocoa.framework" ]
+  }
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "mini_player_browsertest.mm" ]
+  deps = [
+    ":mini_player",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/base:test_support",
+    "//ui/compositor",
+    "//ui/events",
+    "//ui/events:test_support",
+    "//ui/views",
+    "//ui/views:test_support",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/glass:test_support",
+    "//uw/browser/workspaces",
+    "//uw/components/look",
+  ]
+}

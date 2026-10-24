@@ -1,0 +1,9 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+CANVAS_DIMENSIONS, 24,
+STROKE, 2,
+MOVE_TO, 18, 6,
+LINE_TO, 6, 18,
+MOVE_TO, 6, 6,
+LINE_TO, 18, 18

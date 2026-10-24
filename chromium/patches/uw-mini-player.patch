@@ -1,0 +1,34 @@
+diff --git a/chrome/browser/ui/views/overlay/BUILD.gn b/chrome/browser/ui/views/overlay/BUILD.gn
+index 942c7ad5fec7cbe19b066d25b7285fae66bdee08..f9a917ba3cb8b7b370fc4f541f1b861498fa2790 100644
+--- a/chrome/browser/ui/views/overlay/BUILD.gn
++++ b/chrome/browser/ui/views/overlay/BUILD.gn
+@@ -80,6 +80,7 @@ source_set("impl") {
+     "//chrome/browser/ui/views:layout_provider",
+     "//chrome/browser/ui/views/picture_in_picture",
+     "//components/live_caption:constants",
++    "//uw/browser/ui/views/mini_player",
+   ]
+ 
+   # video_overlay_window_views.cc includes chrome/browser/ui/browser.h to read
+diff --git a/chrome/browser/ui/views/overlay/video_overlay_window_views.cc b/chrome/browser/ui/views/overlay/video_overlay_window_views.cc
+index ae1efcd28d31a23846fb527da323829a95f5f373..f22fe26397ac1156180d404710658b5955bfbff3 100644
+--- a/chrome/browser/ui/views/overlay/video_overlay_window_views.cc
++++ b/chrome/browser/ui/views/overlay/video_overlay_window_views.cc
+@@ -77,6 +77,7 @@
+ #include "ui/views/widget/widget_delegate.h"
+ #include "ui/views/window/frame_view.h"
+ #include "url/origin.h"
++#include "uw/browser/ui/views/mini_player/mini_player.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/public/cpp/window_properties.h"  // nogncheck
+@@ -424,7 +425,8 @@ std::unique_ptr<VideoOverlayWindowViews> VideoOverlayWindowViews::Create(
+ std::unique_ptr<content::VideoOverlayWindow>
+ content::VideoOverlayWindow::Create(
+     content::VideoPictureInPictureWindowController* controller) {
+-  return VideoOverlayWindowViews::Create(controller);
++  // uw shows every picture-in-picture video in its own mini player.
++  return uw::MiniPlayer::Create(controller);
+ }
+ 
+ VideoOverlayWindowViews::VideoOverlayWindowViews(

@@ -1,0 +1,12 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+CANVAS_DIMENSIONS, 24,
+MOVE_TO, 7, 4.8f,
+R_V_LINE_TO, 14.4f,
+R_ARC_TO, 1, 1, 0, 0, 0, 1.5f, 0.86f,
+R_LINE_TO, 11.7f, -7.2f,
+R_ARC_TO, 1, 1, 0, 0, 0, 0, -1.72f,
+LINE_TO, 8.5f, 3.94f,
+ARC_TO, 1, 1, 0, 0, 0, 7, 4.8f,
+CLOSE

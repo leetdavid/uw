@@ -1,0 +1,6 @@
+// Copyright 2026 The uw Authors
+// Use of this source code is governed by a BSD-style license.
+
+CANVAS_DIMENSIONS, 24,
+ROUND_RECT, 6, 4.5f, 4.2f, 15, 1.3f,
+ROUND_RECT, 13.8f, 4.5f, 4.2f, 15, 1.3f

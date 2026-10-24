@@ -140,6 +140,12 @@ Open the theme picker from View → Theme…, from `Theme…` in the menu of emp
 
 Expected result: a panel opens beside the sidebar. Click a suggested theme, or drag a dot in the color field, and the window changes as you drag. `+` adds a dot, up to three, and dragging a dot out of the field removes it. Text on the window stays white on a dark color and near-black on a light one. `Intensity` grays the colors and `Grain` adds a fine texture around the page card. `Light`, `Dark`, and `Auto` change uw and the color scheme web pages see. `Pages` gives pages their own: with `Light` above and `Pages` on `Dark`, sites with a dark look of their own, extensions' popups and side panels, and uw's chat, AI, and terminal pages turn dark, while the sidebar and Chromium's pages, such as Settings, stay light. A site with no dark look stays light. Each workspace keeps its own. In dark mode the window is black unless `Theme colors in dark mode` is on. A color picked in the "Customize Chromium" panel becomes a one-color theme.
 
+### Mini player
+
+Play a video, then use the site's picture-in-picture button, or right-click the video twice and choose `Picture in Picture`.
+
+Expected result: the video plays in a small window with rounded corners in the bottom right of the screen, over every app. Point at it: close and back to tab show in the top corners, back 10 seconds, play or pause, and forward 10 seconds in the middle, and the time, mute, and a progress bar you can drag at the bottom. Press and hold on the video and it plays at 2× while held, with a `2×` label at the top; let go and it plays at its old speed. Drag the video to move the window. With `Glass` on in the theme picker, the buttons turn to glass. It does not dock in the sidebar yet.
+
 ### Terminal tabs
 
 Choose `New Terminal` from the File menu or the new button's `▾` menu, or press Ctrl+\`.

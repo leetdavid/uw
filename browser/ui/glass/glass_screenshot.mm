@@ -102,8 +102,13 @@ void SaveWindowWithPopups(Browser* browser, const std::string& name) {
 }
 
 void SaveWindowOverDesktop(Browser* browser, const std::string& name) {
+  SaveNativeWindowOverDesktop(browser->GetWindow()->GetNativeWindow(), name);
+}
+
+void SaveNativeWindowOverDesktop(gfx::NativeWindow native_window,
+                                 const std::string& name) {
   if (@available(macOS 14.4, *)) {
-    NSWindow* window = WindowOf(browser);
+    NSWindow* window = native_window.GetNativeNSWindow();
     const NSRect area =
         NSInsetRect(window.frame, -kDesktopMargin, -kDesktopMargin);
     NSWindow* desktop =
