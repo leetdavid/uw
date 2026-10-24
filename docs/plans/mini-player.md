@@ -1,6 +1,6 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn the same day and waits for the user's sign-off. Nothing is built.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186 is in progress.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
@@ -68,7 +68,7 @@ Three switches on uw's settings page, all on by default:
 
 ## Design
 
-Drawn on 2026-10-24 for sign-off, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar. The numbers are in the canvas's `uw-mini-player` guide.
+Drawn and signed off on 2026-10-24, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar. The numbers are in the canvas's `uw-mini-player` guide.
 
 - "Mini player: the sidebar": a docked mini player under the pointer, with its controls, in light mode.
 - "Mini player: floating": the floating mini player over another app, with Glass on.
