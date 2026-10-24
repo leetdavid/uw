@@ -59,27 +59,29 @@ diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 index 4df973b6628747b7688e41a0f650f7816902458b..542d521ecc50f924e68515959e21095f13651f3b 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -886,6 +886,8 @@ source_set("core") {
+@@ -886,6 +886,9 @@ source_set("core") {
    deps = [
      "//uw/browser/tab_organization",
      "//uw/browser/ui:ui",
 +    "//uw/browser/shortcuts",
 +    "//uw/browser/workspaces",
++    "//uw/browser/uw_command",
      ":active_use_util",
      ":after_startup_task_utils",
      ":bad_message",
 diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
 --- a/chrome/browser/chrome_browser_main_mac.mm
 +++ b/chrome/browser/chrome_browser_main_mac.mm
-@@ -49,6 +49,7 @@
+@@ -49,6 +49,8 @@
  #include "ui/base/resource/resource_handle.h"
  #include "ui/native_theme/native_theme_mac.h"
  #include "ui/views/cocoa/native_widget_mac_ns_window_host.h"
 +#include "uw/browser/shortcuts/menu_keys.h"
++#include "uw/browser/uw_command/command_channel.h"
  
  // ChromeBrowserMainPartsMac ---------------------------------------------------
  
-@@ -164,6 +165,7 @@ int ChromeBrowserMainPartsMac::PreCreateThreads() {
+@@ -164,6 +166,7 @@ int ChromeBrowserMainPartsMac::PreCreateThreads() {
                          /*is_pwa=*/false,
                          /*is_rtl=*/base::i18n::IsRTL());
    [app_controller mainMenuCreated];
@@ -87,6 +89,16 @@ diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_b
  
    return content::RESULT_CODE_NORMAL_EXIT;
  }
+@@ -179,6 +182,9 @@ void ChromeBrowserMainPartsMac::PreProfileInit() {
+ void ChromeBrowserMainPartsMac::PostProfileInit(Profile* profile,
+                                                 bool is_initial_profile) {
+   ChromeBrowserMainPartsPosix::PostProfileInit(profile, is_initial_profile);
++  if (is_initial_profile) {
++    uw::CommandChannel::Get().Start();
++  }
+ }
+ 
+ void ChromeBrowserMainPartsMac::DidEndMainMessageLoop() {
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm

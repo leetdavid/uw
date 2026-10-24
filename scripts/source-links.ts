@@ -8,6 +8,7 @@ const MARKER_TEXT = "uw browser managed source links\n";
 const LINKS = {
   browser: "browser",
   components: "components",
+  command: "command",
   "ghostty-web": "node_modules/ghostty-web",
   mathjs: "node_modules/mathjs",
 } as const;

@@ -5,11 +5,13 @@
 #define UW_BROWSER_WORKSPACES_WORKSPACE_THEME_H_
 
 #include <optional>
+#include <string_view>
 
 #include "third_party/skia/include/core/SkColor.h"
 #include "uw/components/look/theme.h"
 
 class BrowserWindowInterface;
+class Profile;
 
 namespace content {
 class WebContents;
@@ -75,6 +77,13 @@ void FollowChromiumTheme(BrowserWindowInterface* window);
 // own takes its profile's, and uw notes the profile's theme, so that
 // FollowChromiumTheme tells uw's own changes from Chromium's.
 void StartWindowTheme(BrowserWindowInterface* window);
+
+// The theme of workspace `id` of `profile`: its window's when one shows it,
+// else the one it keeps, else the profile's.
+Theme ThemeOfWorkspace(std::string_view id, Profile* profile);
+
+// Gives workspace `id` `theme`, through its window when one shows it.
+void SetThemeOfWorkspace(std::string_view id, const Theme& theme);
 
 }  // namespace uw
 

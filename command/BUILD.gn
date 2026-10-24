@@ -1,0 +1,26 @@
+# The uw command, built into one program and put in uw.app/Contents/Helpers.
+# See docs/plans/uw-command.md and docs/adr/0016.
+import("//chrome/version.gni")
+import("//third_party/node/node.gni")
+
+node("program") {
+  script = "//third_party/node/node.py"
+  inputs = [ "build.ts" ]
+  outputs = [ "$root_out_dir/uw_command/uw" ]
+  depfile = "$target_gen_dir/program.d"
+  args = [
+    rebase_path("build.ts", root_build_dir),
+    "--out",
+    rebase_path(outputs[0], root_build_dir),
+    "--version",
+    chrome_version_full,
+    "--depfile",
+    rebase_path(depfile, root_build_dir),
+  ]
+}
+
+bundle_data("bundle_data") {
+  sources = get_target_outputs(":program")
+  outputs = [ "{{bundle_contents_dir}}/Helpers/{{source_file_part}}" ]
+  public_deps = [ ":program" ]
+}

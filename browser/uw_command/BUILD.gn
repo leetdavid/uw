@@ -1,0 +1,56 @@
+# The uw command's channel inside uw: the socket, and the answers to the
+# command's requests. See docs/plans/uw-command.md.
+source_set("uw_command") {
+  sources = [
+    "command_channel.cc",
+    "command_channel.h",
+    "command_handler.cc",
+    "command_handler.h",
+    "command_install.h",
+    "command_install.mm",
+    "command_socket.cc",
+    "command_socket.h",
+    "command_workspace.cc",
+    "command_workspace.h",
+    "settings_command.cc",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/common:constants",
+    "//components/prefs",
+    "//components/version_info",
+    "//content/public/browser",
+    "//net",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/workspaces",
+    "//uw/components/look",
+    "//uw/components/uw_command",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "uw_command_browsertest.cc" ]
+  deps = [
+    ":uw_command",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//components/version_info",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/workspaces",
+    "//uw/components/uw_command",
+  ]
+}

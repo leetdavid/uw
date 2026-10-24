@@ -5,6 +5,7 @@ group("browser_tests") {
     "connectors:browser_tests",
     "pins:browser_tests",
     "shortcuts:browser_tests",
+    "uw_command:browser_tests",
     "workspaces:browser_tests",
     "tab_organization:browser_tests",
     "ui:browser_tests",

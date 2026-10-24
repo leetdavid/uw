@@ -85,6 +85,21 @@ Theme ProfileTheme(Profile* profile) {
   return theme;
 }
 
+// The front window that shows workspace `id`, or null.
+BrowserWindowInterface* WindowOfWorkspace(std::string_view id) {
+  BrowserWindowInterface* found = nullptr;
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [&](BrowserWindowInterface* window) {
+        const WorkspaceWindow* shown = WorkspaceWindow::From(window);
+        if (shown && shown->workspace() == id && !shown->hidden()) {
+          found = window;
+          return false;
+        }
+        return true;
+      });
+  return found;
+}
+
 // The workspace that `window` shows, or null.
 const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   const WorkspaceWindow* shown = WorkspaceWindow::From(window);
@@ -344,6 +359,23 @@ void StartWindowTheme(BrowserWindowInterface* window) {
   if (workspace && !workspace->theme) {
     WorkspaceList::Get().SetTheme(shown->workspace(), theme);
   }
+}
+
+Theme ThemeOfWorkspace(std::string_view id, Profile* profile) {
+  if (BrowserWindowInterface* window = WindowOfWorkspace(id)) {
+    return ThemeOfWindow(window);
+  }
+  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
+  return workspace && workspace->theme ? *workspace->theme
+                                       : ProfileTheme(profile);
+}
+
+void SetThemeOfWorkspace(std::string_view id, const Theme& theme) {
+  if (BrowserWindowInterface* window = WindowOfWorkspace(id)) {
+    SetThemeOfWindow(window, theme);
+    return;
+  }
+  WorkspaceList::Get().SetTheme(id, theme);
 }
 
 }  // namespace uw

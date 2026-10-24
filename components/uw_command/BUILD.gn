@@ -1,0 +1,26 @@
+# What the uw command and uw say to each other, and the settings it reaches.
+# No browser dependencies, so they are tested without a window.
+source_set("uw_command") {
+  sources = [
+    "command_messages.cc",
+    "command_messages.h",
+    "command_settings.cc",
+    "command_settings.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//uw/components/look" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [
+    "command_messages_unittest.cc",
+    "command_settings_unittest.cc",
+  ]
+  deps = [
+    ":uw_command",
+    "//base",
+    "//testing/gtest",
+    "//uw/components/look",
+  ]
+}

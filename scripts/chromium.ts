@@ -655,6 +655,7 @@ const TEST_SUITES = {
     "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*", "ShellEnvironmentTest.*", "ConnectorCatalogTest.*", "UsageTest.*", "ChatUsageTest.*",
     "ScheduleTest.*", "ChatSchedulerTest.*", "RunReportTest.*", "ScheduledChatTest.*",
     "CommandCheckTest.*", "ProviderAddressTest.*", "ShellHostPromptTest.*", "ThemeTest.*", "ThemePrefsTest.*",
+    "CommandSettingsTest.*", "CommandMessagesTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
@@ -668,7 +669,7 @@ const TEST_SUITES = {
     "AgentCheckBrowserTest.*", "AgentLanguageCheckBrowserTest.*", "AgentTerminalBrowserTest.*", "CommandBarForATaskBrowserTest.*",
     "MouseActionsBrowserTest.*", "PageColorsBrowserTest.*", "ThemePickerBrowserTest.*", "UndoShortcutBrowserTest.*",
     "UwChatDarkModeBrowserTest.*", "UwChatSensitiveSiteBrowserTest.*", "UwChatTerminalBrowserTest.*", "WorkspaceSwipeBrowserTest.*",
-    "MiniPlayerBrowserTest.*",
+    "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*",
   ],
 } as const;
 
