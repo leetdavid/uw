@@ -75,17 +75,18 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Page mode
 
-Status: scope agreed with the user on 2026-10-16. Not built. The design, T101, comes first.
+Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24. Being built in T102.
 
-Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a profile pref, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
+Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a part of the theme, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
 
 - Page mode is Same as window, Light, or Dark. Same as window is the default, so nothing changes until the user picks.
 - It covers websites and uw's own tab pages: the chat page, the providers page, and the terminal. Chromium's own pages, such as Settings, History, and the new tab page, follow the window mode, since their colors come from the window.
 - Pages are only told the mode (`prefers-color-scheme`). A site with no dark look of its own stays light. Chromium's auto-dark is not used.
-- The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones. So does the page's scrollbar.
+- The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones.
+- The page's scrollbar follows the toolbar, as in Chromium, and the toolbar takes the [page color](#page-colors). A site with no dark look of its own keeps a light scrollbar. Agreed on 2026-10-24; this replaced "the scrollbar follows page mode".
 - Open pages change as soon as the setting does.
 - The control is a "Pages" row in the picker, under the window's Auto, Light, and Dark.
-- It is saved per profile and does not sync. Incognito pages keep following macOS, as Chromium does.
+- It belongs to the theme, so each [workspace](workspaces.md) has its own, as its window mode is. Agreed on 2026-10-24; it was per profile. It does not sync. Incognito pages keep following macOS, as Chromium does.
 - No per-site exceptions for now.
 
 Stages:
@@ -100,7 +101,7 @@ Acceptance checks:
 3. In a dark window with Light pages, the reverse.
 4. In a light window with Dark pages, the card is `#0A0A0A` before a page paints.
 5. Changing the row changes open pages without a reload.
-6. Two profiles keep two page modes. Incognito pages follow macOS.
+6. Two workspaces keep two page modes. Incognito pages follow macOS.
 7. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Page colors
