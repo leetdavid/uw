@@ -131,7 +131,7 @@ Where the build differs from the design and the scope above:
 - "Add connector…" in the composer opens `uw://ai/connectors?add`, the Connectors page with the dialog open.
 - Registry servers and plugins are listed only at https addresses.
 
-Tests: `CatalogTest.*` and `ConnectorConfigTest.ABareAddressIsNamedForItsSite` in unit_tests; `ConnectorsBrowserTest.TheCatalogCarriesOnWhereARefreshStopped` and `UwProvidersBrowserTest.TheConnectDialogAddsFromTheCatalog` in browser_tests.
+Tests: `ConnectorCatalogTest.*` and `ConnectorConfigTest.ABareAddressIsNamedForItsSite` in unit_tests; `ConnectorsBrowserTest.TheCatalogCarriesOnWhereARefreshStopped` and `UwProvidersBrowserTest.TheConnectDialogAddsFromTheCatalog` in browser_tests.
 
 ## Stages
 

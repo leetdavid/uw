@@ -47,6 +47,8 @@ class ScriptedModel {
   static std::string Calls(base::ListValue calls);
   // A reply that answers the user.
   static std::string Answer(std::string_view text);
+  // `reply` with chat-completions usage of `input` and `output` tokens.
+  static std::string WithUsage(std::string_view reply, int input, int output);
   // A reply that never comes, as when uw quits while the model thinks.
   static std::string Hang();
 

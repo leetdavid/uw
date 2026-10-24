@@ -32,7 +32,7 @@ RegistryPage Page(std::string_view json) {
   return page ? std::move(*page) : RegistryPage();
 }
 
-TEST(CatalogTest, ReadsTheRegistrysWebServers) {
+TEST(ConnectorCatalogTest, ReadsTheRegistrysWebServers) {
   RegistryPage page = Page(R"({
     "servers": [
       {"server": {"name": "app.linear/linear", "title": "Linear",
@@ -91,7 +91,7 @@ TEST(CatalogTest, ReadsTheRegistrysWebServers) {
   EXPECT_FALSE(ParseRegistryPage("{}"));
 }
 
-TEST(CatalogTest, FindsEachPluginsFolderOnGitHub) {
+TEST(ConnectorCatalogTest, FindsEachPluginsFolderOnGitHub) {
   std::vector<PluginRef> claude = ParseClaudeMarketplace(R"({"plugins": [
     {"name": "linear", "description": "Linear issue tracking.",
      "source": "./external_plugins/linear"},
@@ -128,7 +128,7 @@ TEST(CatalogTest, FindsEachPluginsFolderOnGitHub) {
   EXPECT_EQ(openai[0].title, "Granola");
 }
 
-TEST(CatalogTest, APluginsWebConnectorAndItsKeys) {
+TEST(ConnectorCatalogTest, APluginsWebConnectorAndItsKeys) {
   PluginRef github{.source = CatalogSource::kClaudePlugin,
                    .name = "github",
                    .description = "Official GitHub MCP server.",
@@ -181,7 +181,7 @@ TEST(CatalogTest, APluginsWebConnectorAndItsKeys) {
   EXPECT_FALSE(PluginEntry(github, "", ""));
 }
 
-TEST(CatalogTest, SearchShowsEachServerOnce) {
+TEST(ConnectorCatalogTest, SearchShowsEachServerOnce) {
   ConnectorCatalog catalog;
   catalog.AddRegistryPage(Page(R"({"servers": [
     {"server": {"name": "app.linear/linear", "title": "Linear",
@@ -228,7 +228,7 @@ TEST(CatalogTest, SearchShowsEachServerOnce) {
   EXPECT_FALSE(catalog.Find("registry:nothing"));
 }
 
-TEST(CatalogTest, KeepsItsCopyAndWhereARefreshStopped) {
+TEST(ConnectorCatalogTest, KeepsItsCopyAndWhereARefreshStopped) {
   ConnectorCatalog catalog;
   catalog.AddRegistryPage(Page(R"({"servers": [
     {"server": {"name": "a.b/c", "remotes": [{"type": "streamable-http",
@@ -266,7 +266,7 @@ TEST(CatalogTest, KeepsItsCopyAndWhereARefreshStopped) {
   EXPECT_FALSE(ConnectorCatalog::FromJson("not json"));
 }
 
-TEST(CatalogTest, SameServerIgnoresTheQueryAndClosingSlash) {
+TEST(ConnectorCatalogTest, SameServerIgnoresTheQueryAndClosingSlash) {
   EXPECT_TRUE(SameServer("https://mcp.exa.ai/mcp?client=claude-code-plugin",
                          "https://MCP.exa.ai/mcp/"));
   EXPECT_FALSE(SameServer("https://mcp.exa.ai/mcp", "https://mcp.exa.ai/sse"));

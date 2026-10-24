@@ -14,7 +14,10 @@
 namespace uw {
 namespace {
 
-constexpr int kSavedVersion = 3;
+constexpr int kSavedVersion = 4;
+// What an answer may need of a model's context, at most, when the catalog
+// gives no input limit of its own.
+constexpr int64_t kAnswerRoom = 16000;
 
 constexpr ProviderPreset kCatalogPresets[] = {
     ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
@@ -78,12 +81,47 @@ base::DictValue Abilities(const base::DictValue& model) {
   }
   const base::ListValue* inputs =
       model.FindListByDottedPath("modalities.input");
-  return base::DictValue()
-      .Set("tools", model.FindBool("tool_call").value_or(true))
-      .Set("images",
-           !inputs || std::ranges::contains(*inputs, base::Value("image")))
-      .Set("efforts", std::move(efforts))
-      .Set("toggle", toggle);
+  base::DictValue kept =
+      base::DictValue()
+          .Set("tools", model.FindBool("tool_call").value_or(true))
+          .Set("images",
+               !inputs || std::ranges::contains(*inputs, base::Value("image")))
+          .Set("efforts", std::move(efforts))
+          .Set("toggle", toggle);
+  // Prices above a context size, as some models have, are left out: uw's
+  // requests stay well below them.
+  const base::DictValue* cost = model.FindDict("cost");
+  const std::optional<double> input =
+      cost ? cost->FindDouble("input") : std::nullopt;
+  const std::optional<double> output =
+      cost ? cost->FindDouble("output") : std::nullopt;
+  if (input && output) {
+    base::DictValue price =
+        base::DictValue().Set("input", *input).Set("output", *output);
+    for (const char* key : {"cache_read", "cache_write"}) {
+      if (std::optional<double> each = cost->FindDouble(key)) {
+        price.Set(key, *each);
+      }
+    }
+    kept.Set("price", std::move(price));
+  }
+  const std::optional<double> limit_input =
+      model.FindDoubleByDottedPath("limit.input");
+  const std::optional<double> context =
+      model.FindDoubleByDottedPath("limit.context");
+  const std::optional<double> answer =
+      model.FindDoubleByDottedPath("limit.output");
+  if (limit_input && *limit_input > 0) {
+    kept.Set("input_limit", *limit_input);
+  } else if (context && *context > 0) {
+    const int64_t room =
+        std::min<int64_t>(kAnswerRoom, answer && *answer > 0
+                                           ? static_cast<int64_t>(*answer)
+                                           : kAnswerRoom);
+    kept.Set("input_limit",
+             static_cast<double>(static_cast<int64_t>(*context) - room));
+  }
+  return kept;
 }
 
 }  // namespace
@@ -202,6 +240,15 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
       }
     }
   }
+  if (const base::DictValue* price = known->FindDict("price")) {
+    abilities.price = ModelPrice{
+        .input = price->FindDouble("input").value_or(0),
+        .output = price->FindDouble("output").value_or(0),
+        .cache_read = price->FindDouble("cache_read"),
+        .cache_write = price->FindDouble("cache_write")};
+  }
+  abilities.input_limit = std::max<int64_t>(
+      0, static_cast<int64_t>(known->FindDouble("input_limit").value_or(0)));
   return abilities;
 }
 

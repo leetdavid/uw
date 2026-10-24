@@ -4,6 +4,7 @@
 #ifndef UW_COMPONENTS_AI_PROVIDERS_CATALOG_H_
 #define UW_COMPONENTS_AI_PROVIDERS_CATALOG_H_
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,7 @@
 
 #include "base/values.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/ai_providers/usage.h"
 
 namespace uw {
 
@@ -24,6 +26,12 @@ struct ModelAbilities {
   std::vector<std::string> efforts;
   // Whether its thinking can be switched off, as the catalog's toggle says.
   bool toggles_thinking = false;
+  // Its price, when the catalog lists one.
+  std::optional<ModelPrice> price;
+  // How many input tokens a request may hold: the catalog's input limit, or
+  // its context limit less what the answer needs. 0 when the catalog does
+  // not say.
+  int64_t input_limit = 0;
 };
 
 // The levels of a model the catalog does not know, over chat completions.

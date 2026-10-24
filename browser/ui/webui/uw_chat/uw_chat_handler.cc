@@ -56,7 +56,6 @@
 #include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/skill_folders.h"
-#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
@@ -945,21 +944,11 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
 }
 
 std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
-  const PrefService& prefs =
-      *Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPrefs();
-  AgentModel model;
-  if (model_) {
-    model.connection = ConfigForChoice(prefs, *model_);
-  }
-  if (!IsComplete(model.connection)) {
+  if (!model_) {
     return std::nullopt;
   }
-  if (!model.connection.key_account.empty()) {
-    model.api_key = ApiKeyStore()
-                        .GetKey(model.connection.key_account)
-                        .value_or(std::string());
-  }
-  return model;
+  return AgentModelFor(
+      *Profile::FromBrowserContext(contents_->GetBrowserContext()), *model_);
 }
 
 void UwChatHandler::SetModel(const std::string& provider_id,

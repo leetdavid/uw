@@ -66,11 +66,13 @@ class ChatRunBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Runs the chat's request with the scripted model and waits for the end.
-  ChatRun::Outcome Run(std::string_view brief) {
+  ChatRun::Outcome Run(std::string_view brief,
+                       std::optional<ModelPrice> price = std::nullopt) {
     AgentModel model;
     model.connection.endpoint = embedded_test_server()->GetURL("/v1").spec();
     model.connection.model = "test-agent";
     model.api_key = "agent-key";
+    model.price = price;
     base::test::TestFuture<ChatRun::Outcome> done;
     run_ = std::make_unique<ChatRun>(browser()->GetProfile(), std::move(model),
                                      ApprovalMode::kAuto, brief,
@@ -151,6 +153,19 @@ IN_PROC_BROWSER_TEST_F(ChatRunBrowserTest, ARunWithoutAReportFails) {
 
   EXPECT_EQ(outcome.kind, Kind::kFailed);
   EXPECT_EQ(outcome.error, "The run ended without a report.");
+}
+
+IN_PROC_BROWSER_TEST_F(ChatRunBrowserTest, ARunSaysWhatItsRequestsCost) {
+  model_.Script({ScriptedModel::WithUsage(
+      ScriptedModel::Answer("I looked, but forgot to report."), 500, 20)});
+
+  const ChatRun::Outcome outcome = Run("The request: Any news about uw?",
+                                       ModelPrice{.input = 1, .output = 2});
+
+  EXPECT_EQ(outcome.usage.usage.input, 500);
+  EXPECT_EQ(outcome.usage.usage.output, 20);
+  EXPECT_DOUBLE_EQ(outcome.usage.cost, (500 * 1 + 20 * 2) / 1e6);
+  EXPECT_TRUE(outcome.usage.priced);
 }
 
 IN_PROC_BROWSER_TEST_F(ChatRunBrowserTest, AModelThatCannotBeReachedIsNoFault) {

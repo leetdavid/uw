@@ -1,10 +1,10 @@
 # Context and cost
 
-Status: agreed on 2026-10-24. Nothing is built yet. The stages are T169 to T172 on the [board](roadmap.md#board).
+Status: agreed on 2026-10-24. T170 and T172 were built on 2026-10-24; see [Built](#built). T171, the indicator and card, is not built. The stages are T169 to T172 on the [board](roadmap.md#board).
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). The hard parts:
 
-- Each of the three [wire formats](../adr/0007-uw-speaks-three-wire-formats-to-language-models.md) reports token usage its own way, also when streamed, and chat completions leave it out unless asked.
+- Each of the three [wire formats](../adr/0007-uw-speaks-three-wire-formats-to-language-models.md) reports token usage its own way.
 - Saved chats must keep opening after usage is added to their files.
 
 ## Agreed scope
@@ -45,7 +45,7 @@ Left out: the session's id and times, message counts, the instructions' text, an
 
 - Each request's tokens by kind, its cost, and its model are saved in the chat's file, so the card and its charts come back after a restart. A chat from before this shows "uw counts from Oct 24".
 - A private chat shows the indicator and card, and saves nothing.
-- Chat completions requests ask for usage (`stream_options.include_usage`).
+- uw reads a model's answer whole, never streamed, and a whole answer carries its usage in every format, so no request has to ask for it.
 
 ### Not in this plan
 
@@ -56,6 +56,21 @@ Left out: the session's id and times, message counts, the instructions' text, an
 ## Design
 
 T169 draws the indicator in its states, the card, and its charts on the [Doop canvas](../../AGENTS.md#designs), on the "Agent chats" page. The user signs it off before T171 starts.
+
+## Built
+
+T170 and T172, built on 2026-10-24:
+
+- `components/ai_providers/usage.h` reads an answer's usage and prices it. The Anthropic and Responses answers carry their usage in the chat-completions shape, so one reader serves all three formats. The models.dev copy keeps each model's price and input limit: the catalog's input limit, or its context less up to 16,000 tokens for the answer.
+- `components/agent/chat_usage.h` is one request's record. `AgentContext` keeps the chat's records with the chat, splits each request's characters into its parts, and notes when it made room. `AgentLoop` records each answer and each command check; a run's total goes on its line.
+- A request stays under the model's input limit at 3 characters a token, or under 400,000 characters, whichever is less.
+
+Where the build differs:
+
+- Prices tiered above a context size, as some models have, are left out: uw's requests stay well below them.
+- A command check through the decision model counts its tokens only when its answer carries chat-completions usage, and has no price.
+
+Tests: `UsageTest.*`, `CatalogTest.PricesAndInputLimitsComeFromTheCatalog`, and `AgentContextTest.*` in unit_tests; `AgentLoopBrowserTest.EachRequestCountsWhatItUsedAndCost`, `AgentLoopBrowserTest.ASmallModelsRequestsStayUnderItsLimit`, `AgentCheckBrowserTest.ACheckCountsOnItsOwn`, `ChatRunBrowserTest.ARunSaysWhatItsRequestsCost`, and `ScheduledChatsBrowserTest.ASavedScheduleRunsAtOnceAndTellsWhatItFound` in browser_tests.
 
 ## Stages
 

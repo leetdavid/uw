@@ -44,6 +44,8 @@ class ChatRun {
     std::string error;
     // Its steps, which fold under its line in the chat.
     std::vector<AgentLoop::Step> steps;
+    // What its model requests used and cost.
+    UsageTotal usage;
   };
   using Done = base::OnceCallback<void(Outcome)>;
 

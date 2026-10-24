@@ -113,6 +113,9 @@ void ChatRun::OnStep(const AgentLoop::Step& step) {
 
 void ChatRun::End(Outcome outcome) {
   outcome.steps = std::move(steps_);
+  if (loop_) {
+    outcome.usage = TotalOf(loop_->context().usage());
+  }
   // The loop that called OnStep may still be on the stack, and `done` may
   // destroy this run.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(

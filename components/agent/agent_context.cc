@@ -130,6 +130,17 @@ std::unique_ptr<AgentContext> AgentContext::FromValue(
     read("allowed", context->allowed_for_chat_);
     read("off", context->connectors_off_);
   }
+  if (const base::ListValue* usage = saved.FindList("usage")) {
+    for (const base::Value& entry : *usage) {
+      if (std::optional<UsageRecord> record = UsageRecordFromValue(entry)) {
+        context->usage_.push_back(std::move(*record));
+      }
+    }
+    context->usage_partial_ = saved.FindBool("usage_partial").value_or(false);
+  } else {
+    // Saved before uw counted: its earlier requests are not in the totals.
+    context->usage_partial_ = context->UserMessages() > 0;
+  }
   return context;
 }
 
@@ -159,10 +170,16 @@ base::DictValue AgentContext::ToValue() const {
     }
     return values;
   };
+  base::ListValue usage;
+  for (const UsageRecord& record : usage_) {
+    usage.Append(UsageRecordToValue(record));
+  }
   return base::DictValue()
       .Set("messages", messages_.Clone())
       .Set("results", std::move(results))
       .Set("images", std::move(images))
+      .Set("usage", std::move(usage))
+      .Set("usage_partial", usage_partial_)
       .Set("connectors", base::DictValue()
                              .Set("loaded", list(loaded_connectors_))
                              .Set("allowed", list(allowed_for_chat_))
@@ -474,9 +491,14 @@ void AgentContext::CloseOpenCalls(std::string_view error) {
 std::optional<std::string> AgentContext::Request(std::string_view model,
                                                  size_t max_length) {
   std::optional<std::string> body = Body(model);
+  last_made_room_ = false;
+  if (body) {
+    last_parts_ = PartsOf(*body);
+  }
   if (!body || Length(*body) <= max_length) {
     return body;
   }
+  last_made_room_ = true;
   // A shrunk result changes an earlier message, and the provider's cache
   // serves nothing after it. Shrinking well below the limit at once lets the
   // requests after this one only add to it.
@@ -488,7 +510,53 @@ std::optional<std::string> AgentContext::Request(std::string_view model,
          ShortenOldestBefore(messages_.size())) {
     body = Body(model);
   }
+  if (body) {
+    last_parts_ = PartsOf(*body);
+  }
   return body;
+}
+
+RequestParts AgentContext::PartsOf(const std::string& body) const {
+  RequestParts parts;
+  const std::string* instructions =
+      messages_.empty() ? nullptr : messages_[0].GetDict().FindString("content");
+  parts.instructions =
+      (instructions ? instructions->size() : 0) +
+      base::WriteJson(AgentToolSchemas()).value_or("").size() +
+      base::WriteJson(extra_tools_).value_or("").size();
+  for (const base::Value& message : messages_) {
+    const std::string* role = message.GetDict().FindString("role");
+    const std::string* content = message.GetDict().FindString("content");
+    if (role && *role == "tool" && content) {
+      parts.results += content->size();
+    }
+  }
+  for (const Image& image : images_) {
+    if (!image.shortened) {
+      parts.images += kImageLength;
+    }
+  }
+  parts.conversation =
+      std::max<int64_t>(0, static_cast<int64_t>(Length(body)) -
+                               parts.instructions - parts.results -
+                               parts.images);
+  return parts;
+}
+
+int AgentContext::UserMessages() const {
+  int count = 0;
+  for (const base::Value& message : messages_) {
+    const std::string* role = message.GetDict().FindString("role");
+    if (role && *role == "user" &&
+        !message.GetDict().FindBool(kShownKey).value_or(false)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+void AgentContext::AddUsage(UsageRecord record) {
+  usage_.push_back(std::move(record));
 }
 
 std::optional<std::string> AgentContext::Body(std::string_view model) const {

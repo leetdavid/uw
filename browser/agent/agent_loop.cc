@@ -3,6 +3,7 @@
 
 #include "uw/browser/agent/agent_loop.h"
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -23,6 +24,8 @@
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/agent/command_check.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/components/agent/run_report.h"
 #include "uw/components/agent/schedule_tool.h"
@@ -36,6 +39,9 @@ constexpr int kMaxTurns = 40;
 constexpr base::TimeDelta kModelTimeout = base::Minutes(2);
 // Long enough for a dozen full readings, short enough for most models.
 constexpr size_t kMaxRequestLength = 400000;
+// Fewer characters than a token usually holds, so a request kept under a
+// model's input limit by this count stays under it in tokens.
+constexpr int64_t kCharsPerToken = 3;
 
 // A file of a skill larger than this is not read.
 constexpr size_t kMaxSkillFile = 256 * 1024;
@@ -80,6 +86,29 @@ AgentLoop::Step StoppedByUser() {
 }
 
 }  // namespace
+
+std::optional<AgentModel> AgentModelFor(Profile& profile,
+                                        const ModelChoice& choice) {
+  const PrefService& prefs = *profile.GetPrefs();
+  AgentModel model;
+  model.connection = ConfigForChoice(prefs, choice);
+  if (!IsComplete(model.connection)) {
+    return std::nullopt;
+  }
+  if (!model.connection.key_account.empty()) {
+    model.api_key =
+        ApiKeyStore().GetKey(model.connection.key_account).value_or("");
+  }
+  const ModelCatalog* catalog = CatalogStore::For(&profile)->Current();
+  const std::optional<Provider> provider =
+      FindProvider(prefs, choice.provider_id);
+  if (catalog && provider) {
+    const ModelAbilities abilities = catalog->For(*provider, choice.model);
+    model.price = abilities.price;
+    model.input_limit = abilities.input_limit;
+  }
+  return model;
+}
 
 AgentLoop::AgentLoop(tabs::TabInterface& chat,
                      AgentModel model,
@@ -209,7 +238,7 @@ void AgentLoop::AskModel() {
     return;
   }
   const std::optional<std::string> body =
-      context_->Request(model_.connection.model, kMaxRequestLength);
+      context_->Request(model_.connection.model, MaxRequestLength());
   if (!body || model_.connection.endpoint.empty()) {
     Step failed = Failed("No agent model is set.");
     failed.model_unreachable = true;
@@ -239,6 +268,19 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
     failed.model_unreachable = true;
     Finish(std::move(failed));
     return;
+  }
+  if (std::optional<ModelUsage> usage = UsageInAnswer(outcome.body)) {
+    UsageRecord record;
+    record.time = base::Time::Now();
+    record.model = model_.connection.model;
+    record.usage = *usage;
+    record.cost = CostOf(*usage, model_.price);
+    record.parts = context_->last_parts();
+    record.max_length = static_cast<int64_t>(MaxRequestLength());
+    record.input_limit = model_.input_limit;
+    record.made_room = context_->last_made_room();
+    record.message = context_->UserMessages();
+    context_->AddUsage(std::move(record));
   }
   std::optional<ModelTurn> turn = ParseAgentResponse(outcome.body);
   if (!turn) {
@@ -285,7 +327,8 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     return;
   }
   if (call.name == "recall") {
-    base::DictValue recalled = context_->RecallWithin(*args, kMaxRequestLength);
+    base::DictValue recalled =
+        context_->RecallWithin(*args, MaxRequestLength());
     if (const std::optional<int> image = recalled.FindInt("image")) {
       recalled_images_.push_back(*image);
     }
@@ -393,8 +436,25 @@ void AgentLoop::CheckStep(ModelTurn turn,
   }
 }
 
+size_t AgentLoop::MaxRequestLength() const {
+  if (model_.input_limit <= 0) {
+    return kMaxRequestLength;
+  }
+  return static_cast<size_t>(std::min<int64_t>(
+      kMaxRequestLength, model_.input_limit * kCharsPerToken));
+}
+
 void AgentLoop::OnCheck(std::optional<CommandCheckAnswer> answer) {
   std::unique_ptr<Check> check = std::move(check_);
+  if (check->client && check->client->usage()) {
+    UsageRecord record;
+    record.kind = UsageRecord::Kind::kCommandCheck;
+    record.time = base::Time::Now();
+    record.model = check->client->model();
+    record.usage = *check->client->usage();
+    record.cost = CostOf(record.usage, check->client->price());
+    context_->AddUsage(std::move(record));
+  }
   if (check->client) {
     // The client that answered may still be on the stack.
     base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(

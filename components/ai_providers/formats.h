@@ -60,9 +60,10 @@ std::optional<std::string> RequestIn(ProviderFormat format,
                                      std::string_view chat_body,
                                      std::string_view address);
 
-// Turns a successful answer in `format` into a chat-completions answer. What
-// uw does not read is kept on the message, marked with `address` and the
-// `model` that was asked. Nothing for a body that is not such an answer.
+// Turns a successful answer in `format` into a chat-completions answer, its
+// token usage included. What uw does not read is kept on the message, marked
+// with `address` and the `model` that was asked. Nothing for a body that is
+// not such an answer.
 std::optional<std::string> AnswerFrom(ProviderFormat format,
                                       std::string_view body,
                                       std::string_view address,

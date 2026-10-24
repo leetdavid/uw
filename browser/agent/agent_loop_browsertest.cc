@@ -14,6 +14,8 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
@@ -70,13 +72,23 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
     embedded_https_test_server().RegisterRequestHandler(base::BindRepeating(
         [](const net::test_server::HttpRequest& request)
             -> std::unique_ptr<net::test_server::HttpResponse> {
-          if (request.relative_url != "/form") {
+          if (request.relative_url != "/form" &&
+              request.relative_url != "/long") {
             return nullptr;
           }
           auto response =
               std::make_unique<net::test_server::BasicHttpResponse>();
           response->set_content_type("text/html");
-          response->set_content(kForm);
+          if (request.relative_url == "/long") {
+            std::string page;
+            for (int i = 0; i < 1200; ++i) {
+              page += "<p>Lisbon-tram-marker: the tram climbs hill " +
+                      base::NumberToString(i) + ".</p>";
+            }
+            response->set_content(page);
+          } else {
+            response->set_content(kForm);
+          }
           return response;
         }));
     ASSERT_TRUE(embedded_https_test_server().Start());
@@ -92,12 +104,16 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Talks to the model in `format` from now on.
-  void UseFormat(ProviderFormat format) {
+  void UseFormat(ProviderFormat format,
+                 std::optional<ModelPrice> price = std::nullopt,
+                 int64_t input_limit = 0) {
     AgentModel model;
     model.connection.endpoint = embedded_test_server()->GetURL("/v1").spec();
     model.connection.format = format;
     model.connection.model = "test-agent";
     model.api_key = "agent-key";
+    model.price = price;
+    model.input_limit = input_limit;
     agent_ = std::make_unique<AgentLoop>(
         *chat_, std::move(model),
         base::BindRepeating(&AgentLoopBrowserTest::OnStep,
@@ -299,6 +315,79 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
   EXPECT_THAT(requests[1], HasSubstr(R"("signature":"sig")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("type":"tool_result")"));
   EXPECT_THAT(requests[1], HasSubstr(R"("tool_use_id":"toolu_1")"));
+}
+
+// Each of the agent's requests counts what it used, priced from the model's
+// catalog entry, with what filled the request.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, EachRequestCountsWhatItUsedAndCost) {
+  UseFormat(ProviderFormat::kAnthropicMessages,
+            ModelPrice{.input = 3,
+                       .output = 15,
+                       .cache_read = 0.3,
+                       .cache_write = 3.75});
+  model_.Script(
+      {R"({"stop_reason":"tool_use","content":[)"
+       R"({"type":"tool_use","id":"toolu_1","name":"fly","input":{}}],)"
+       R"("usage":{"input_tokens":20,"cache_creation_input_tokens":1000,)"
+       R"("cache_read_input_tokens":0,"output_tokens":10}})",
+       R"({"stop_reason":"end_turn","content":[{"type":"text","text":"No."}],)"
+       R"("usage":{"input_tokens":30,"cache_read_input_tokens":1000,)"
+       R"("output_tokens":20}})"});
+
+  EXPECT_EQ(Ask("Fly to Lisbon").kind, Kind::kAnswer);
+
+  const std::vector<UsageRecord>& usage = agent_->context().usage();
+  ASSERT_EQ(usage.size(), 2u);
+  EXPECT_EQ(usage[0].kind, UsageRecord::Kind::kAgent);
+  EXPECT_EQ(usage[0].model, "test-agent");
+  EXPECT_EQ(usage[0].usage,
+            (ModelUsage{.input = 1020, .cache_write = 1000, .output = 10}));
+  EXPECT_DOUBLE_EQ(*usage[0].cost, (20 * 3 + 1000 * 3.75 + 10 * 15) / 1e6);
+  EXPECT_EQ(usage[1].usage.cache_read, 1000);
+  EXPECT_DOUBLE_EQ(*usage[1].cost, (30 * 3 + 1000 * 0.3 + 20 * 15) / 1e6);
+  EXPECT_EQ(usage[1].message, 1);
+  EXPECT_GT(usage[1].parts.instructions, 0);
+  EXPECT_GT(usage[1].parts.results, 0);
+  EXPECT_EQ(usage[1].max_length, 400000);
+  EXPECT_FALSE(usage[1].made_room);
+}
+
+// A model whose input limit is below uw's own gets requests shrunk to fit it.
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest,
+                       ASmallModelsRequestsStayUnderItsLimit) {
+  model_.Script({ScriptedModel::Answer("Hi.")});
+  Ask("Hello");
+  const size_t empty = model_.Requests()[0].size();
+  const size_t limit = empty + 6000;
+  UseFormat(ProviderFormat::kChatCompletions, std::nullopt,
+            static_cast<int64_t>(limit / 3));
+  model_.Script(
+      {ScriptedModel::WithUsage(
+           ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+               "open", base::DictValue().Set("url", Url("/long"))))),
+           1000, 5),
+       ScriptedModel::WithUsage(
+           ScriptedModel::Calls(base::ListValue().Append(
+               ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+           1100, 5),
+       ScriptedModel::WithUsage(ScriptedModel::Answer("Read it."), 1200, 5)});
+
+  EXPECT_EQ(Ask("Read the long page").kind, Kind::kAnswer);
+
+  // The reading alone is longer than the limit.
+  ASSERT_GE(steps_.size(), 2u);
+  ASSERT_TRUE(steps_[1].result.FindString("text"));
+  EXPECT_GT(steps_[1].result.FindString("text")->size(), 10000u);
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 4u);
+  EXPECT_LE(requests[3].size(), limit);
+  EXPECT_THAT(requests[3], Not(HasSubstr("Lisbon-tram-marker")));
+  const std::vector<UsageRecord>& usage = agent_->context().usage();
+  ASSERT_EQ(usage.size(), 3u);
+  EXPECT_EQ(usage[2].max_length, static_cast<int64_t>(limit / 3 * 3));
+  EXPECT_EQ(usage[2].input_limit, static_cast<int64_t>(limit / 3));
+  EXPECT_TRUE(usage[2].made_room);
+  EXPECT_FALSE(usage[2].cost);
 }
 
 // Steps in one answer run in order, and the first that fails ends the rest:
@@ -862,6 +951,32 @@ IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, TheCheckSeesNoPageOrOutput) {
     EXPECT_THAT(check, Not(HasSubstr("Book a tour")));
     EXPECT_THAT(check, Not(HasSubstr("out-42")));
   }
+}
+
+// A command check counts on its own, beside the agent's requests.
+IN_PROC_BROWSER_TEST_F(AgentCheckBrowserTest, ACheckCountsOnItsOwn) {
+  std::optional<base::DictValue> answer = base::JSONReader::ReadDict(
+      CheckDecisionsAnswer(0.95, "safe", 0.99), base::JSON_PARSE_RFC);
+  ASSERT_TRUE(answer);
+  answer->Set("usage", base::DictValue()
+                           .Set("prompt_tokens", 300)
+                           .Set("completion_tokens", 5));
+  checks_.Answer("/v1/decisions", *base::WriteJson(*answer));
+  model_.Script({ScriptedModel::Calls(Run(base::DictValue().Set("command", "pwd"))),
+                 ScriptedModel::Answer("Done.")});
+
+  EXPECT_EQ(Ask("Where am I").kind, Kind::kAnswer);
+
+  std::vector<UsageRecord> checks;
+  for (const UsageRecord& record : agent_->context().usage()) {
+    if (record.kind == UsageRecord::Kind::kCommandCheck) {
+      checks.push_back(record);
+    }
+  }
+  ASSERT_EQ(checks.size(), 1u);
+  EXPECT_EQ(checks[0].model, "check-model");
+  EXPECT_EQ(checks[0].usage, (ModelUsage{.input = 300, .output = 5}));
+  EXPECT_FALSE(checks[0].cost);
 }
 
 // No answer, or an unsure one, asks. A declined command does not run.

@@ -23,7 +23,6 @@
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/run_window.h"
-#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/components/ai_providers/providers.h"
@@ -71,6 +70,14 @@ ApprovalMode ModeFrom(std::string_view name) {
 
 // A run's steps as its line keeps them, to fold under it: each tool, what it
 // was asked, and what went wrong, if anything.
+// What a run's model requests used and cost, for its line.
+base::DictValue RunUsageValue(const UsageTotal& total) {
+  base::DictValue value = UsageToValue(total.usage);
+  value.Set("cost", total.cost);
+  value.Set("priced", total.priced);
+  return value;
+}
+
 base::ListValue StepsValue(const std::vector<AgentLoop::Step>& steps) {
   base::ListValue list;
   for (const AgentLoop::Step& step : steps) {
@@ -626,16 +633,7 @@ void ScheduledChats::OnFormat(const std::string& chat_id,
 }
 
 std::optional<AgentModel> ScheduledChats::ModelFor(const ModelChoice& choice) {
-  AgentModel model;
-  model.connection = ConfigForChoice(*profile_->GetPrefs(), choice);
-  if (!IsComplete(model.connection)) {
-    return std::nullopt;
-  }
-  if (!model.connection.key_account.empty()) {
-    model.api_key =
-        ApiKeyStore().GetKey(model.connection.key_account).value_or("");
-  }
-  return model;
+  return AgentModelFor(*profile_, choice);
 }
 
 void ScheduledChats::StartTriggerRun(const std::string& chat_id,
@@ -873,7 +871,8 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
                    .Set("counted", effect.counted)
                    .Set("paused", effect.paused)
                    .Set("steps", StepsValue(outcome.steps))
-                   .Set("trigger", trigger));
+                   .Set("trigger", trigger)
+                   .Set("usage", RunUsageValue(outcome.usage)));
   AddLines(chat_id, std::move(lines));
   if (!effect.what.empty()) {
     Notify(chat_id, effect.what, effect.text);

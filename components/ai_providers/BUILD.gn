@@ -8,6 +8,8 @@ source_set("ai_providers") {
     "formats.h",
     "providers.cc",
     "providers.h",
+    "usage.cc",
+    "usage.h",
   ]
   public_deps = [ "//base" ]
   deps = [
@@ -23,6 +25,7 @@ source_set("unit_tests") {
     "catalog_unittest.cc",
     "formats_unittest.cc",
     "providers_unittest.cc",
+    "usage_unittest.cc",
   ]
   deps = [
     ":ai_providers",

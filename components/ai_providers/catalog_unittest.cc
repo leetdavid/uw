@@ -24,14 +24,20 @@ constexpr char kApiJson[] = R"({
               "modalities": {"input": ["text", "image"]},
               "reasoning_options": [{"type": "effort",
                                      "values": ["minimal", "low", "medium", "high"]}]},
-    "gpt-4o": {"tool_call": true, "reasoning": false}
+    "gpt-4o": {"tool_call": true, "reasoning": false,
+               "cost": {"input": 2.5, "output": 10},
+               "limit": {"context": 128000, "input": 120000, "output": 16384}}
   }},
   "anthropic": {"models": {
     "claude-opus-5-5": {"tool_call": true, "reasoning": true,
                         "reasoning_options": [{"type": "effort",
                                                "values": ["low", "medium", "high", "xhigh", "max"]}]},
     "claude-sonnet-4-5": {"tool_call": true, "reasoning": true,
-                          "reasoning_options": [{"type": "budget_tokens", "min": 1024}]}
+                          "reasoning_options": [{"type": "budget_tokens", "min": 1024}],
+                          "cost": {"input": 3, "output": 15, "cache_read": 0.3,
+                                   "cache_write": 3.75,
+                                   "tiers": [{"input": 6, "output": 22.5}]},
+                          "limit": {"context": 200000, "output": 64000}}
   }},
   "openrouter": {"models": {
     "x/switch-only": {"tool_call": true, "reasoning": true,
@@ -84,6 +90,29 @@ TEST(CatalogTest, NamedLevelsAndToolCallsComeFromTheCatalog) {
       catalog
           ->For(Preset(ProviderPreset::kOpenRouter), "sao10k/l3.3-euryale-70b")
           .calls_tools);
+}
+
+TEST(CatalogTest, PricesAndInputLimitsComeFromTheCatalog) {
+  std::optional<ModelCatalog> catalog = ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  catalog = ModelCatalog::FromSaved(catalog->ToSaved());
+  ASSERT_TRUE(catalog);
+  const ModelAbilities sonnet =
+      catalog->For(Preset(ProviderPreset::kAnthropic), "claude-sonnet-4-5");
+  EXPECT_EQ(sonnet.price, (ModelPrice{.input = 3,
+                                      .output = 15,
+                                      .cache_read = 0.3,
+                                      .cache_write = 3.75}));
+  // The context less what an answer may need.
+  EXPECT_EQ(sonnet.input_limit, 200000 - 16000);
+  const ModelAbilities gpt4o =
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-4o");
+  EXPECT_EQ(gpt4o.price, (ModelPrice{.input = 2.5, .output = 10}));
+  EXPECT_EQ(gpt4o.input_limit, 120000);
+  const ModelAbilities gpt5 =
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-5");
+  EXPECT_FALSE(gpt5.price);
+  EXPECT_EQ(gpt5.input_limit, 0);
 }
 
 TEST(CatalogTest, ABudgetOrASwitchIsNoLevels) {

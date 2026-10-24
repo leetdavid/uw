@@ -56,6 +56,7 @@ std::unique_ptr<CommandCheck> CommandCheck::Send(
           : std::nullopt;
   if (body) {
     check->format_ = decision.format;
+    check->model_name_ = decision.model;
     check->Start(std::make_unique<RemoteModelClient>(
         check->loader_, DecisionUrl(decision), *decision_key, std::move(*body),
         kProviderTimeout));
@@ -101,6 +102,8 @@ void CommandCheck::SendLanguageCheck(const ModelCatalog* catalog) {
   const ModelAbilities abilities = catalog
                                        ? catalog->For(provider, language_.model)
                                        : UnknownModelAbilities(provider);
+  model_name_ = language_.model;
+  price_ = abilities.price;
   started_ = base::TimeTicks::Now();
   const std::optional<std::string> quiet =
       WithoutThinking(body_, language_.preset, language_.format, abilities);
@@ -139,6 +142,9 @@ void CommandCheck::OnAnswer(RemoteModelClient::Outcome outcome) {
     SendToLanguageModel(language_, body_,
                         kThinkingTimeout - (base::TimeTicks::Now() - started_));
     return;
+  }
+  if (outcome.ok) {
+    usage_ = UsageInAnswer(outcome.body);
   }
   std::move(done_).Run(
       outcome.ok ? ParseCommandCheckResponse(format_, outcome.body, input_)

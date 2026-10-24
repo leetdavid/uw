@@ -455,6 +455,46 @@ std::optional<base::DictValue> ResponsesAnswer(const base::DictValue& answer,
                                   : "stop");
 }
 
+// A count in a provider's usage, which JSON may give as a decimal number.
+int CountIn(const base::DictValue* usage, std::string_view path) {
+  const base::Value* value = usage ? usage->FindByDottedPath(path) : nullptr;
+  return value && (value->is_int() || value->is_double())
+             ? static_cast<int>(value->GetDouble())
+             : 0;
+}
+
+// An Anthropic or Responses answer's usage, as chat completions report it:
+// every input token in prompt_tokens, with the cached ones and, for
+// Anthropic, those written to its cache, among them.
+std::optional<base::DictValue> ChatUsage(ProviderFormat format,
+                                         const base::DictValue& answer) {
+  const base::DictValue* usage = answer.FindDict("usage");
+  if (!usage) {
+    return std::nullopt;
+  }
+  if (format == ProviderFormat::kAnthropicMessages) {
+    const int read = CountIn(usage, "cache_read_input_tokens");
+    const int written = CountIn(usage, "cache_creation_input_tokens");
+    return base::DictValue()
+        .Set("prompt_tokens", CountIn(usage, "input_tokens") + read + written)
+        .Set("completion_tokens", CountIn(usage, "output_tokens"))
+        .Set("prompt_tokens_details", base::DictValue()
+                                          .Set("cached_tokens", read)
+                                          .Set("cache_write_tokens", written));
+  }
+  return base::DictValue()
+      .Set("prompt_tokens", CountIn(usage, "input_tokens"))
+      .Set("completion_tokens", CountIn(usage, "output_tokens"))
+      .Set("prompt_tokens_details",
+           base::DictValue().Set(
+               "cached_tokens",
+               CountIn(usage, "input_tokens_details.cached_tokens")))
+      .Set("completion_tokens_details",
+           base::DictValue().Set(
+               "reasoning_tokens",
+               CountIn(usage, "output_tokens_details.reasoning_tokens")));
+}
+
 }  // namespace
 
 std::string_view LanguageModelPath(ProviderFormat format) {
@@ -562,7 +602,13 @@ std::optional<std::string> AnswerFrom(ProviderFormat format,
       format == ProviderFormat::kAnthropicMessages
           ? AnthropicAnswer(*answer, address, model)
           : ResponsesAnswer(*answer, address, model);
-  return chat ? Write(*chat) : std::nullopt;
+  if (!chat) {
+    return std::nullopt;
+  }
+  if (std::optional<base::DictValue> usage = ChatUsage(format, *answer)) {
+    chat->Set("usage", std::move(*usage));
+  }
+  return Write(*chat);
 }
 
 }  // namespace uw

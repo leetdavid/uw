@@ -75,6 +75,66 @@ class AgentContextTest : public testing::Test {
   AgentContext context_;
 };
 
+TEST_F(AgentContextTest, ARequestSaysWhatFillsItAndWhenItMadeRoom) {
+  context_.AddUser("Book a tour");
+  context_.AddResult("call_1", "read", Tab(1),
+                     Reading(std::string(20000, 'a')));
+  const std::string body = Request();
+  const RequestParts& parts = context_.last_parts();
+  EXPECT_GT(parts.instructions, 1000);
+  EXPECT_GT(parts.results, 20000);
+  EXPECT_GT(parts.conversation, 0);
+  EXPECT_EQ(parts.images, 0);
+  EXPECT_EQ(parts.Total(), static_cast<int64_t>(body.size()));
+  EXPECT_FALSE(context_.last_made_room());
+  EXPECT_EQ(context_.UserMessages(), 1);
+
+  Request(10000);
+  EXPECT_TRUE(context_.last_made_room());
+  EXPECT_LT(context_.last_parts().results, 20000);
+}
+
+TEST_F(AgentContextTest, UsageIsKeptWithTheChat) {
+  context_.AddUser("Book a tour");
+  UsageRecord record;
+  record.time = base::Time::FromSecondsSinceUnixEpoch(1000);
+  record.model = "claude-sonnet-4-5";
+  record.usage = {.input = 1200, .cache_read = 1000, .output = 80};
+  record.cost = 0.01;
+  record.parts = {.instructions = 3, .conversation = 4, .results = 5};
+  record.max_length = 400000;
+  record.input_limit = 184000;
+  record.made_room = true;
+  record.message = 1;
+  context_.AddUsage(record);
+  UsageRecord check;
+  check.kind = UsageRecord::Kind::kCommandCheck;
+  check.model = "deepseek-flash";
+  check.usage = {.input = 300, .output = 5};
+  context_.AddUsage(check);
+
+  std::unique_ptr<AgentContext> back =
+      AgentContext::FromValue(context_.ToValue());
+  ASSERT_TRUE(back);
+  ASSERT_EQ(back->usage().size(), 2u);
+  EXPECT_EQ(back->usage()[0], record);
+  EXPECT_EQ(back->usage()[1], check);
+  EXPECT_FALSE(back->usage_partial());
+  const UsageTotal total = TotalOf(back->usage());
+  EXPECT_EQ(total.usage.input, 1500);
+  EXPECT_DOUBLE_EQ(total.cost, 0.01);
+  EXPECT_FALSE(total.priced);
+
+  // A chat saved before uw counted says so.
+  base::DictValue old = context_.ToValue();
+  old.Remove("usage");
+  old.Remove("usage_partial");
+  back = AgentContext::FromValue(old);
+  ASSERT_TRUE(back);
+  EXPECT_TRUE(back->usage().empty());
+  EXPECT_TRUE(back->usage_partial());
+}
+
 TEST_F(AgentContextTest, ARereadTabSendsOnlyItsLatestReading) {
   context_.AddUser("Book a tour");
   context_.AddResult("call_1", "read", Tab(1), Reading("Tours start at noon"));

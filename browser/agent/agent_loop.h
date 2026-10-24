@@ -29,6 +29,7 @@
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/ai_providers/usage.h"
 #include "uw/components/connectors/connector_tools.h"
 
 class Profile;
@@ -50,7 +51,16 @@ enum class ApprovalMode { kAskFirst, kAuto, kFullAuto };
 struct AgentModel {
   AiConnectionConfig connection;
   std::string api_key;
+  // From the models.dev catalog: its price, and how many input tokens a
+  // request may hold, 0 when unknown.
+  std::optional<ModelPrice> price;
+  int64_t input_limit = 0;
 };
+
+// The model `choice` names, with its key, price, and input limit. Nothing
+// while the choice is incomplete.
+std::optional<AgentModel> AgentModelFor(Profile& profile,
+                                        const ModelChoice& choice);
 
 // Runs one chat. Each message from the user goes to the model, and the model
 // and the tools take turns until the model answers without calling a tool.
@@ -177,6 +187,9 @@ class AgentLoop {
  private:
   void AskModel();
   void OnModel(RemoteModelClient::Outcome outcome);
+  // The most characters a request may reach: kMaxRequestLength, or less for
+  // a model whose input limit is smaller.
+  size_t MaxRequestLength() const;
   void RunCall(ModelTurn turn, size_t index);
   void LoadSkill(ModelTurn turn, size_t index, base::DictValue args);
   void UpdateConnectorTools();

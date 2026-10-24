@@ -14,6 +14,7 @@
 
 #include "base/values.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/chat_usage.h"
 
 namespace uw {
 
@@ -107,6 +108,19 @@ class AgentContext {
   // a screenshot costs.
   static constexpr size_t kImageLength = 6000;
 
+  // The latest request Request() built: its characters by part, and whether
+  // uw made room for it by shrinking earlier results or images.
+  const RequestParts& last_parts() const { return last_parts_; }
+  bool last_made_room() const { return last_made_room_; }
+  // How many messages the user has sent.
+  int UserMessages() const;
+
+  // What the chat's model requests used, oldest first. A chat saved before
+  // uw counted has `usage_partial`.
+  void AddUsage(UsageRecord record);
+  const std::vector<UsageRecord>& usage() const { return usage_; }
+  bool usage_partial() const { return usage_partial_; }
+
  private:
   struct Result {
     int step = 0;
@@ -132,6 +146,7 @@ class AgentContext {
   void UpdateInstructions();
   std::optional<std::string> Body(std::string_view model) const;
   size_t Length(const std::string& body) const;
+  RequestParts PartsOf(const std::string& body) const;
   // Where the user's latest message sits in `messages_`.
   size_t ReplyStart() const;
   // Shortens the oldest long result or image before `end`, or returns false
@@ -157,6 +172,10 @@ class AgentContext {
   std::vector<Result> results_;
   // A recalled image appears again under its own number.
   std::vector<Image> images_;
+  RequestParts last_parts_;
+  bool last_made_room_ = false;
+  std::vector<UsageRecord> usage_;
+  bool usage_partial_ = false;
 };
 
 }  // namespace uw

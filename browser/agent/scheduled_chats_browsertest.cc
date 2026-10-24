@@ -163,7 +163,8 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   model_.Script(
       {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
            "open", base::DictValue().Set("url", Url("/desk"))))),
-       Report(true, "The desk is $479, below your $500."),
+       ScriptedModel::WithUsage(
+           Report(true, "The desk is $479, below your $500."), 900, 30),
        ScriptedModel::Answer("Reported.")});
 
   chats()->Save(kChat, DeskWatch(ProviderId()));
@@ -178,6 +179,10 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_EQ(run.FindList("values")->front().GetDict().FindDouble("number"),
             479);
   EXPECT_EQ(run.FindList("steps")->size(), 2u);
+  // What the run's requests used goes on its line; this model has no price.
+  EXPECT_EQ(run.FindDoubleByDottedPath("usage.input"), 900);
+  EXPECT_EQ(run.FindDoubleByDottedPath("usage.output"), 30);
+  EXPECT_EQ(run.FindBoolByDottedPath("usage.priced"), false);
   const std::vector<message_center::Notification> shown = Notifications();
   ASSERT_EQ(shown.size(), 1u);
   EXPECT_EQ(shown[0].title(), u"Jarvis desk price");

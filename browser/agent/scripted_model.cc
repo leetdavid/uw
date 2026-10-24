@@ -5,6 +5,7 @@
 
 #include <utility>
 
+#include "base/json/json_reader.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_number_conversions.h"
@@ -78,6 +79,19 @@ std::string ScriptedModel::Calls(base::ListValue calls) {
 std::string ScriptedModel::Answer(std::string_view text) {
   return Choice(
       base::DictValue().Set("role", "assistant").Set("content", text));
+}
+
+// static
+std::string ScriptedModel::WithUsage(std::string_view reply,
+                                     int input,
+                                     int output) {
+  std::optional<base::DictValue> answer =
+      base::JSONReader::ReadDict(reply, base::JSON_PARSE_RFC);
+  CHECK(answer);
+  answer->Set("usage", base::DictValue()
+                           .Set("prompt_tokens", input)
+                           .Set("completion_tokens", output));
+  return base::WriteJson(*answer).value_or("");
 }
 
 // static
