@@ -16,6 +16,7 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
@@ -150,6 +151,12 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(button->GetVisible());
     views::test::ButtonTestApi(button).NotifyClick(
         Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  }
+
+  // Makes uw the app in front, with the test window as its active window.
+  void BringUwToFront() {
+    [NSApp activate];
+    browser()->GetWindow()->Activate();
   }
 
   // Moves the real mouse over the mini player's window. macOS gives moves to
@@ -594,6 +601,34 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
            bounds.origin() + gfx::Vector2d(-80, -50);
   }));
   EXPECT_FALSE(view->fast());
+}
+
+// A real window, for pnpm run window-tests: with uw in front the video docks
+// in the sidebar, behind another app it floats, and back in front it docks.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       MANUAL_ItDocksInFrontAndFloatsBehindAnotherApp) {
+  SetAppActiveForTesting(std::nullopt);
+  BringUwToFront();
+  ASSERT_TRUE(base::test::RunUntil([] { return IsAppActive(); }));
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  Play();
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  SaveNativeWindowOverDesktop(browser()->GetWindow()->GetNativeWindow(),
+                              "mini_player_docked_real");
+
+  NSRunningApplication* finder =
+      [NSRunningApplication
+          runningApplicationsWithBundleIdentifier:@"com.apple.finder"]
+          .firstObject;
+  ASSERT_TRUE(finder);
+  [finder activateWithOptions:0];
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  EXPECT_FALSE(Bool("video.paused"));
+
+  BringUwToFront();
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
 }
 
 }  // namespace
