@@ -166,8 +166,9 @@ Glass, the window's elements:
 
 - A "Glass" slider under Transparency, also part of the theme. At the left end the elements are flat, as today; that is the default.
 - Moving it right turns pin tiles, the active tab, and the Organize and new buttons at the sidebar's foot into lit glass: a white that fades down the element, a lit top edge, and a faint ring, from frosted, keeping all of the white, to clear, keeping a seventh of it, like the Liquid Glass slider in macOS's settings. The active tab keeps enough white to stand out.
-- It works whatever the Transparency. Over a solid sidebar, the elements show the sidebar's color through them, as macOS's glass controls show what is behind them in the window.
-- uw's menus and cards, the command bar, and the theme picker are frosted glass while Glass is off its left end, as macOS's menus are. They use macOS's heavier regular glass under their own color at about 85%, so their text always keeps 4.5:1. The cards include the sidebar's, such as the rename card.
+- It works whatever the Transparency. Over a solid sidebar, the elements show the sidebar's color through them, as macOS's glass controls show what is behind them in the window. Agreed on 2026-10-24: no holes cut through the sidebar under the pin tiles.
+- Agreed on 2026-10-24, "add the glass effect to any other leftover interfaces": the workspace switcher's current workspace and the Scratchpad's Tidy and Clear under the pointer are glass pills, and the activity card above the foot is a glass card, its color at 85% under the lit edge. The tab and pin menus are macOS's own, which macOS draws as Liquid Glass already.
+- uw's menus and cards, the command bar, the theme picker, and the "Watch this page" card are frosted glass while Glass is off its left end, as macOS's menus are. The picker frosts as the slider moves. They use macOS's heavier regular glass under their own color at about 85%, so their text always keeps 4.5:1. The cards include the sidebar's, such as the rename card.
 - Reduce transparency in macOS makes the elements flat too.
 - Real glass on each pin tile, which bends what is behind it, is T176, prototyped first. If a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
 
@@ -182,7 +183,8 @@ How it is built, for T175:
 - Chromium's `GlassFrameService` picks the windows that show it. The `uw-look` patch starts it on macOS 26 whatever the `GlassFrame` feature says, and swaps its `glass_frame.enabled` switch and its limit of one window for uw's rules. Its Energy Saver, full screen, and web store theme rules stay.
 - The `tab-tree` patch spans the `NSGlassEffectView` behind the window across the whole window, in Apple's clear style, with no tint of its own.
 - `BrowserFrameViewMac` paints the theme at its cover around the page card. The toolbar and the bookmarks bar paint the page color at the toolbar's cover. Over glass the top container paints nothing behind them, and the toolbar's top corners have no fill of their own.
-- `PaintGlassTabFill` draws pin tiles and the active tab as lit glass, and `CreateGlassPillBackground` the foot's buttons. Tiles have no drop shadow, since a tab cannot paint outside itself.
+- `PaintGlassTabFill` draws pin tiles and the active tab as lit glass, and `browser/ui/glass/glass_background` the foot's buttons, the switcher, Tidy and Clear, and the activity card. Tiles have no drop shadow, since a tab cannot paint outside itself.
+- A card's bubble gets macOS's regular glass behind it, an `NSGlassEffectView` inside its shadow, and its color at 85%: `FrostOverGlass` for uw's own cards, and `FrostPageBubble` for the bubbles that hold a web page, whose page draws its own see-through color while the window's glass is on.
 
 Stages:
 
@@ -200,7 +202,7 @@ Acceptance checks:
 6. Two uw windows side by side are both see-through. The one not active is more frosted. With the switch for windows behind off, it is solid.
 7. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. Reduce transparency also makes the elements flat. For the first two, the picker says why.
 8. Two workspaces keep their own Transparency and Glass.
-9. With Glass off its left end, a task's menu, the command bar, and the picker show what is behind them frosted, and their text keeps 4.5:1.
+9. With Glass off its left end, a task's menu, the command bar, the picker, and the "Watch this page" card show what is behind them frosted, and their text keeps 4.5:1. The switcher's current workspace, Tidy and Clear under the pointer, and the activity card are lit glass.
 10. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
