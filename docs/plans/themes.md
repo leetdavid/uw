@@ -162,7 +162,7 @@ Scope:
 - Agreed on 2026-10-24: a small tick on the slider's track marks that point, half way on a theme with near-black text and about a third of the way on one with white text. Its tooltip and VoiceOver label say "Clearer than this, text may be hard to read on some desktops."
 - Agreed on 2026-10-24: each pin tile is real Liquid Glass, bending and magnifying what is behind it at its edges, as macOS's glass buttons do. Its favicon sits on top. The active tab, the sidebar foot's buttons, and the window's edge get a lit top edge and a soft shadow, as glass does.
 - Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass as much as the theme does, so a red page gives a red glass toolbar and the terminal's stays dark. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
-- Proposed by uw on 2026-10-24 while drawing, awaiting the user's answer: the toolbar never goes clearer than the strength that keeps its own text 4.5:1 over a white and a black desktop, whatever the slider says, so the address always reads. That is 52% for a white page, 60% for the terminal's `#0A0A0A`, and 88% for a red `#C62828`.
+- Agreed on 2026-10-24: the toolbar never goes clearer than the strength that keeps its own text 4.5:1 over a white and a black desktop, whatever the slider says, so the address always reads. That is 52% for a white page, 60% for the terminal's `#0A0A0A`, and 88% for a red `#C62828`.
 - Agreed on 2026-10-24: uw's menus and cards, the command bar, and the theme picker are frosted glass while the slider is above solid, as macOS's menus are. They use macOS's heavier regular glass under their own color at about 85%, whatever the slider says, so their text always keeps 4.5:1. The cards include the sidebar's, such as the activity card and the rename card.
 - The page stays solid. Grain still lies on the theme.
 - Agreed on 2026-10-24: every visible uw window has glass, as on macOS. A window that is not active is frosted more, which macOS does by itself to clear glass. uw lifts Chromium's limit of one glass window, and the build measures the cost of three glass windows against one, with a video playing in a window behind.
@@ -182,13 +182,14 @@ Acceptance checks:
 
 1. With the slider at the left end, the window looks as it does today.
 2. With the slider moved right, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
-3. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode. At the right end, the theme covers it at 20%.
-4. Two uw windows side by side both show the desktop through them. The one not active is more frosted. With "Glass in windows behind the front one" off, it is solid.
-5. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
-6. Two workspaces keep their own Glass setting.
-7. With the slider above solid, a task's menu, the command bar, and the picker show what is behind them frosted, and their text keeps 4.5:1.
-8. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+3. At the right end, the toolbar on a white page covers the glass at 52% and on a `#C62828` page at 88%, and its address keeps 4.5:1 over a white and a black desktop.
+4. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode. At the right end, the theme covers it at 20%.
+5. Two uw windows side by side both show the desktop through them. The one not active is more frosted. With "Glass in windows behind the front one" off, it is solid.
+6. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
+7. Two workspaces keep their own Glass setting.
+8. With the slider above solid, a task's menu, the command bar, and the picker show what is behind them frosted, and their text keeps 4.5:1.
+9. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
 
-- Glass: should the toolbar keep the floor proposed above, so the address always reads, or follow the slider as the sidebar does?
+None.
