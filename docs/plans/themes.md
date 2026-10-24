@@ -155,7 +155,8 @@ Implementability: **5/10**. Chromium already draws a Liquid Glass frame on macOS
 
 Proposed:
 
-- Agreed on 2026-10-24: a "Glass" slider in the theme picker, under Grain, like the Liquid Glass slider in macOS's settings. At the left end the window is solid, as today; that is the default. It belongs to the theme, so each workspace has its own.
+- Agreed on 2026-10-24: a "Glass" slider in the theme picker, under Grain, like the Liquid Glass slider in macOS's settings. At the left end the window is solid, as today; that is the default.
+- Agreed on 2026-10-24: it belongs to the theme, so each workspace has its own, like everything else in the picker. A swipe between a glass workspace and a solid one blends the two.
 - Moving it right lets the desktop show through the frame, the sidebar, and the strip around the page card, blurred by macOS's glass. The theme covers the glass from 100% at the left end down to 20% at the right end, Clear.
 - Agreed on 2026-10-24: text keeps a 4.5:1 contrast ratio over any desktop while the theme covers the glass at 60% or more, or 75% on a theme with white text. Clearer than that, the user picks clear over readable, as macOS allows. This is the one exception to the [readable tints](arc-style-look.md#scope) rule.
 - Pin tiles, the active tab, the sidebar foot's buttons, and the window's edge get a lit top edge and a soft shadow, as glass does.
@@ -185,5 +186,4 @@ Acceptance checks:
 
 Glass, until the user answers:
 
-- Glass for each workspace's theme, or one setting for all of uw?
 - Glass on the front window only, as Chromium does, or on every window?
