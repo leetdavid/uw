@@ -159,6 +159,7 @@ The model sees what the chat has gathered, and a `recall` tool brings back what 
 - What a provider kept, such as Anthropic's thinking, goes back with every step after uw last changed the chat: shrank a message, or changed the instructions or tools. Anthropic refuses thinking whose earlier conversation changed. A chat restored after a restart keeps none, since its instructions may be a newer version's.
 - An Anthropic request marks the instructions and tools for an hour in Anthropic's cache. The agent's requests also ask for the rest to be cached for 5 minutes.
 - When the model refuses a request, the chat shows the model's own error text.
+- Agreed on 2026-10-24: the chat's header shows how full the context is and what the chat has cost; see the [context and cost plan](context-and-cost.md). The 400,000 characters above are what its ring fills toward, unless the model's own limit is smaller.
 
 ## Stages
 

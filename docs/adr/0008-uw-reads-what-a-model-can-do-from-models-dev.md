@@ -13,5 +13,6 @@ So uw downloads the catalog from `https://models.dev/api.json` the first time th
 - The catalog gives some models only an on/off switch or a token budget instead of named levels. uw treats them as having no effort levels, and they run without thinking. These are older models, such as claude-sonnet-4-5.
 - A model the catalog does not know gets its format's usual levels: `low`, `medium`, and `high` over chat completions. Over Anthropic Messages and OpenAI Responses it has no effort levels and is sent no effort, so nothing is rejected; it can think once the catalog lists it.
 - A level a provider rejects shows the provider's error in the chat.
+- Agreed on 2026-10-24: uw also keeps each model's prices and context limit from the catalog, to show what a chat costs and how full its context is. A provider's own cost for a request, such as OpenRouter's, counts instead when it sends one. See the [context and cost plan](../plans/context-and-cost.md).
 
 Considered options: testing each model on first use (rejected: extra requests, a wait before the first message, and less accurate than the catalog); a copy shipped in the build as well (rejected: a build step and app size for the first launch only); a copy in the build only (rejected: a new model would show the wrong levels until a uw release).
