@@ -137,6 +137,17 @@ How the chat is built:
   - The Trigger row of a chat's schedule card offers None and the chat's running trigger. Saving the card with it makes the trigger lasting: it keeps running, without limits, and each wake starts a run of the schedule. Pause stops it and Resume starts it again. A lasting trigger whose command ends starts again when uw next launches, or when the card is saved. Pause stops a chat's own trigger for good.
   - The chat shows a wake as the line `Trigger · 10:42 · gh run watch 48213 ended`, or `printed 3 lines`, and a stop as `Stopped the trigger gh run watch 48213` with why: by you, by the agent, after 24 hours, for printing too much, or when you paused it.
 
+## New tab page
+
+T49, proposed on 2026-10-24. The user chose to build it after a UI review that day. Drawn in the frame "New tab: Search or Ask". Implementability 6/10: the page reuses the chat page's composer, and the risk is in Chromium's many special cases for its own new tab page.
+
+- Every tab that would show Chromium's new tab page shows `uw://newtab` instead: "New blank tab" in the command bar, Cmd+T with the command bar off, and the first tab of a new window or workspace. Chromium's page, with its Google logo, shortcuts, and "Customize uw" button, no longer shows. The patch points `NewTabURLDetails::ForProfile` at it, and the page counts as a new tab page wherever Chromium checks, so the address bar stays empty and the box takes the focus.
+- The page is uw's logo, one box, and a Search | Ask switch, centered, as drawn. It follows light and dark mode. Its tab reads "New Tab".
+- Search is on when the page opens. Return goes where the address bar would with the same text: an address opens, other text searches with the default search engine, in this tab.
+- Ask turns this tab into a chat whose first message is the text, as Cmd+Return in the command bar does in a new tab. The box shows the chat page's model chip and the "Once" chip, which opens the schedule card. The agent's tabs open under it, per acceptance check 1.
+- Tab moves between Search and Ask; the switch keeps no memory between pages.
+- Not in T49: chat cards on the page (v2.1) and a Chats section in the sidebar (T50).
+
 ## Context
 
 The model sees what the chat has gathered, and a `recall` tool brings back what has shrunk. Each request repeats the one before it and adds to its end, so a provider can serve most of it from its cache, at a small part of the price.
