@@ -188,8 +188,11 @@ void PaintTint(gfx::Canvas* canvas,
     return;
   }
   // Each sheet in proportion and added together, so a fade between sheets over
-  // glass lets through as much as the sheets do.
+  // glass lets through as much as the sheets do. They are added up in a layer
+  // of their own, so what is drawn under the view shows through the sum only
+  // as it would through one sheet.
   const float amount = blend->second.amount;
+  canvas->SaveLayerWithFlags(cc::PaintFlags());
   canvas->SaveLayerAlpha(AlphaOf(1.0f - amount));
   PaintSheet(canvas, view, window, color, theme, cover);
   canvas->Restore();
@@ -199,6 +202,7 @@ void PaintTint(gfx::Canvas* canvas,
   canvas->SaveLayerWithFlags(added);
   PaintSheet(canvas, view, window, blend->second.color, blend->second.theme,
              blend->second.cover);
+  canvas->Restore();
   canvas->Restore();
 }
 

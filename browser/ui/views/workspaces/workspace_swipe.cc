@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -857,13 +858,15 @@ void WorkspaceSwipe::Reset() {
 void WorkspaceSwipe::RepaintTint() {
   // Each view keeps its last drawing until it is told to draw again, so each
   // one that draws the tint is told: the frame, the background around the
-  // page, the sidebar, and the corners between them.
+  // page, the sidebar, the toolbar's top corners, and the corners between
+  // them.
   if (region_) {
     region_->SchedulePaint();
   }
   if (!browser_view_ || !browser_view_->GetWidget()) {
     return;
   }
+  browser_view_->toolbar()->SchedulePaint();
   if (views::NonClientView* frame =
           browser_view_->GetWidget()->non_client_view();
       frame && frame->frame_view()) {

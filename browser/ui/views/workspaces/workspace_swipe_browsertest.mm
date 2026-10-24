@@ -33,6 +33,7 @@
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -64,7 +65,9 @@
 #include "uw/browser/ui/views/workspaces/workspace_swipe.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -163,36 +166,82 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
     return page->ConvertRectToWidget(page->GetLocalBounds()).x();
   }
 
-  // Checks that `pixels`, a picture of `window`, shows only the tint in the
-  // sidebar's strip that ends 11px left of the page card, below the tabs.
-  static void ExpectNoEdgeLeftOfTheCard(BrowserWindowInterface* window,
-                                        const SkBitmap& pixels) {
+  // Where `window`'s page card, its toolbar and page, is laid out, in the
+  // window.
+  static gfx::Rect Card(BrowserWindowInterface* window) {
+    BrowserView* view = BrowserView::GetBrowserViewForBrowser(window);
+    gfx::Rect card =
+        view->toolbar()->ConvertRectToWidget(view->toolbar()->GetLocalBounds());
+    card.Union(view->multi_contents_view()->ConvertRectToWidget(
+        view->multi_contents_view()->GetLocalBounds()));
+    return card;
+  }
+
+  // The color at `x`,`y` in `pixels`, a picture of `window`.
+  static SkColor At(BrowserWindowInterface* window,
+                    const SkBitmap& pixels,
+                    int x,
+                    int y) {
     const float scale = static_cast<float>(pixels.width()) /
                         BrowserView::GetBrowserViewForBrowser(window)
                             ->GetWidget()
                             ->GetRootView()
                             ->width();
+    return pixels.getColor(static_cast<int>(x * scale),
+                           static_cast<int>(y * scale));
+  }
+
+  static int Difference(SkColor a, SkColor b) {
+    return std::abs(static_cast<int>(SkColorGetR(a)) -
+                    static_cast<int>(SkColorGetR(b))) +
+           std::abs(static_cast<int>(SkColorGetG(a)) -
+                    static_cast<int>(SkColorGetG(b))) +
+           std::abs(static_cast<int>(SkColorGetB(a)) -
+                    static_cast<int>(SkColorGetB(b)));
+  }
+
+  // Checks that `pixels`, a picture of `window`, shows only the tint in the
+  // sidebar's strip that ends 11px left of the page card, below the tabs.
+  static void ExpectNoEdgeLeftOfTheCard(BrowserWindowInterface* window,
+                                        const SkBitmap& pixels) {
     const int card = CardLeft(window);
-    const int height = static_cast<int>(pixels.height() / scale);
-    const auto at = [&](int x, int y) {
-      return pixels.getColor(static_cast<int>(x * scale),
-                             static_cast<int>(y * scale));
-    };
+    const int height = BrowserView::GetBrowserViewForBrowser(window)
+                           ->GetWidget()
+                           ->GetRootView()
+                           ->height();
     // Low in the sidebar, under its tabs and over its foot.
     for (int y : {height * 6 / 10, height * 7 / 10, height * 8 / 10}) {
-      const SkColor tint = at(card - 30, y);
+      const SkColor tint = At(window, pixels, card - 30, y);
       for (int x : {card - 13, card - 12, card - 11}) {
-        const SkColor color = at(x, y);
-        const int difference =
-            std::abs(static_cast<int>(SkColorGetR(color)) -
-                     static_cast<int>(SkColorGetR(tint))) +
-            std::abs(static_cast<int>(SkColorGetG(color)) -
-                     static_cast<int>(SkColorGetG(tint))) +
-            std::abs(static_cast<int>(SkColorGetB(color)) -
-                     static_cast<int>(SkColorGetB(tint)));
-        EXPECT_LT(difference, 24) << "at " << x << "," << y << ": "
-                                  << std::hex << color << " beside " << tint;
+        const SkColor color = At(window, pixels, x, y);
+        EXPECT_LT(Difference(color, tint), 24)
+            << "at " << x << "," << y << ": " << std::hex << color << " beside "
+            << tint;
       }
+    }
+  }
+
+  // Checks that in `pixels`, a picture of `window`, the tint is one sheet all
+  // around the page card: each corner of the card, outside its curve, and the
+  // sidebar beside the card show what the margin next to them shows.
+  static void ExpectOneTintAroundTheCard(BrowserWindowInterface* window,
+                                         const SkBitmap& pixels) {
+    const gfx::Rect card = Card(window);
+    const gfx::Point seams[][2] = {
+        {{card.x() + 1, card.y() + 1}, {card.x() + 1, card.y() - 4}},
+        {{card.right() - 2, card.y() + 1}, {card.right() + 4, card.y() + 1}},
+        {{card.right() - 2, card.bottom() - 2},
+         {card.right() + 4, card.bottom() - 2}},
+        {{card.x() + 1, card.bottom() - 2}, {card.x() + 1, card.bottom() + 4}},
+        {{card.x() - 4, card.y() - 4}, {card.x() + 4, card.y() - 4}},
+        {{card.x() - 4, card.bottom() + 4}, {card.x() + 4, card.bottom() + 4}},
+    };
+    for (const auto& [part, margin] : seams) {
+      const SkColor color = At(window, pixels, part.x(), part.y());
+      const SkColor beside = At(window, pixels, margin.x(), margin.y());
+      EXPECT_LT(Difference(color, beside), 16)
+          << "at " << part.ToString() << ": " << std::hex << color << " beside "
+          << beside << " at " << margin.ToString();
     }
   }
 
@@ -592,6 +641,43 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   SaveWindowScreenshot(work->GetBrowserForMigrationOnly(),
                        "swipe-halfway-other-profile-dark");
   Lift(work);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
+
+// While the fingers hold the sidebar partway toward a workspace of another
+// theme, every part of the window that draws the tint draws the same blend.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       HeldPartwayTheTintAroundTheCardIsOneBlend) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
+  Theme butter;
+  butter.colors = suggested[3];
+  butter.mode = ThemeMode::kLight;
+  SetThemeOfWindow(browser(), butter);
+  RunWindowCommand(browser(), kNextWorkspace);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  Theme wine;
+  wine.colors = suggested[5];
+  wine.mode = ThemeMode::kDark;
+  wine.colors_in_dark_mode = true;
+  SetThemeOfWindow(partner, wine);
+  RunWindowCommand(partner, kPreviousWorkspace);
+  WaitForShown(browser(), work_);
+  const SkBitmap before = CaptureWindow(browser());
+  ExpectOneTintAroundTheCard(browser(), before);
+
+  MoveFingers(browser(), -SidebarWidth(browser()) * 0.4f);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  const SkBitmap held = CaptureWindow(browser());
+  SaveBitmap(held, "swipe-held-blend");
+  const gfx::Rect card = Card(browser());
+  const gfx::Point margin(card.right() + 4, card.CenterPoint().y());
+  EXPECT_GT(Difference(At(browser(), held, margin.x(), margin.y()),
+                       At(browser(), before, margin.x(), margin.y())),
+            40);
+  ExpectOneTintAroundTheCard(browser(), held);
+  Lift(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
 }
 
