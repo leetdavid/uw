@@ -19,6 +19,7 @@ import {
   Pause,
   Play,
   Blocks,
+  ChevronUp,
   Clock,
   ImageIcon,
   Info,
@@ -26,6 +27,7 @@ import {
   Link2,
   Plus,
   Shield,
+  SlidersHorizontal,
   Sparkles,
   Square,
   Terminal as TerminalIcon,
@@ -110,7 +112,7 @@ import {
   isQuietRun,
 } from "./schedule";
 import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
-import { ProviderIcon } from "./providers/provider-parts";
+import { AI_SECTIONS, ProviderIcon } from "./providers/provider-parts";
 import {
   providersHandler,
   type ModelList,
@@ -756,11 +758,9 @@ function when(updated: number): string {
 function ChatList({
   chats,
   current,
-  skillsOn,
 }: {
   chats: ChatSummary[];
   current: string;
-  skillsOn: number | null;
 }) {
   const [query, setQuery] = useState("");
   const [scheduledOnly, setScheduledOnly] = useState(false);
@@ -915,20 +915,64 @@ function ChatList({
         )}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              id="skills"
-              icon={Sparkles}
-              onClick={() => providersHandler.showAiPage("skills")}
-            >
-              <span className="flex-1">Skills</span>
-              <span className="text-muted-foreground tabular-nums">
-                {skillsOn === null ? "" : `${skillsOn} on`}
-              </span>
-            </SidebarMenuButton>
+            <AiSettingsMenu />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+// The foot of the chat list: each section of uw://ai with the count its
+// sidebar shows, read as the menu opens. See "AI settings: every state
+// (Fluid)" on the canvas page "Agent chats".
+function AiSettingsMenu() {
+  const [counts, setCounts] = useState<Record<string, string>>({});
+  const count = async () => {
+    const [{ state }, { skills }, { connectors }] = await Promise.all([
+      providersHandler.getState(),
+      providersHandler.getSkills(),
+      providersHandler.getConnectors(),
+    ]);
+    setCounts({
+      providers: String(state.providers.length),
+      skills: `${skills.filter((skill) => skill.on).length} on`,
+      connectors: `${connectors.filter((connector) => connector.on).length} on`,
+    });
+  };
+  return (
+    <DropdownMenu onOpenChange={(open) => open && count()}>
+      <DropdownTrigger
+        render={
+          <SidebarMenuButton
+            id="ai-settings"
+            icon={SlidersHorizontal}
+            className="data-[state=open]:bg-hover"
+          >
+            <span className="flex-1">AI settings</span>
+            <ChevronUp aria-hidden className="size-3.5 text-muted-foreground" />
+          </SidebarMenuButton>
+        }
+      />
+      <DropdownContent
+        side="top"
+        align="start"
+        className="w-[var(--radix-dropdown-menu-trigger-width)]"
+      >
+        {AI_SECTIONS.map(({ path, name, icon }, index) => (
+          <MenuItem
+            key={path}
+            index={index}
+            icon={icon}
+            label={name}
+            data-section={path}
+            data-count={counts[path] ?? ""}
+            className="after:ml-auto after:pl-2 after:text-[11.5px] after:tabular-nums after:text-muted-foreground after:content-[attr(data-count)]"
+            onSelect={() => providersHandler.showAiPage(path)}
+          />
+        ))}
+      </DropdownContent>
+    </DropdownMenu>
   );
 }
 
@@ -1460,7 +1504,6 @@ function Chat() {
   const [agentTabs, setAgentTabs] = useState<AgentTab[]>([]);
   const [currentTab, setCurrentTab] = useState(0);
   const [sideBySide, setSideBySide] = useState(false);
-  const [skillsOn, setSkillsOn] = useState<number | null>(null);
   // What the / menu offers: the skills the user may start.
   const [slashItems, setSlashItems] = useState<SlashItem[]>([]);
   // The connectors that are on, and whether this chat uses each.
@@ -1692,7 +1735,6 @@ function Chat() {
 
   const loadSkills = () => {
     providersHandler.getSkills().then(({ skills }) => {
-      setSkillsOn(skills.filter((skill) => skill.on).length);
       setSlashItems(
         skills
           .filter((skill) => skill.on && skill.forUser)
@@ -1975,11 +2017,7 @@ function Chat() {
   );
   return (
     <SidebarProvider persist={false} width="15rem" className="h-full">
-      <ChatList
-        chats={chats}
-        current={chatId}
-        skillsOn={skillsOn}
-      />
+      <ChatList chats={chats} current={chatId} />
       <SidebarInset className="flex h-full flex-row">
       <div className={cn("flex min-w-0 flex-1 flex-col", !title && "justify-center")}>
       {agentTabs.length > 0 && (

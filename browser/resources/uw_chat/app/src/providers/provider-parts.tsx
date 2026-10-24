@@ -1,5 +1,5 @@
 // Small parts every view of uw://ai/providers shares.
-import { Link2, Split } from "lucide-react";
+import { Blocks, Link2, Plug, Sparkles, Split } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ModelSlot,
@@ -21,6 +21,14 @@ const ICON_FILES: Partial<Record<ProviderPreset, string>> = {
   [ProviderPreset.kVercelAiGateway]: "vercel",
   [ProviderPreset.kOllama]: "ollama",
 };
+
+// uw://ai's sections, each at its own address, in the order its sidebar
+// and the chat page's AI settings menu list them.
+export const AI_SECTIONS = [
+  { path: "providers", name: "Providers", icon: Plug },
+  { path: "skills", name: "Skills", icon: Sparkles },
+  { path: "connectors", name: "Connectors", icon: Blocks },
+];
 
 export const PRESET_NAMES: Record<ProviderPreset, string> = {
   [ProviderPreset.kOpenAi]: "OpenAI",

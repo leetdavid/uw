@@ -9,7 +9,7 @@ import "@/theme-colors";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { Blocks, ChevronRight, Plug, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import {
   Banner,
   BannerAction,
@@ -25,6 +25,7 @@ import { ProviderPage } from "./provider-page";
 import { ConnectorsSection } from "./connectors";
 import { SkillsSection } from "./skills";
 import {
+  AI_SECTIONS,
   FORMAT_NAMES,
   ProviderTile,
   modelOf,
@@ -370,13 +371,6 @@ function ProvidersList({
   );
 }
 
-// The page's sections, each at its own address.
-const SECTIONS = [
-  { path: "providers", name: "Providers", icon: Plug },
-  { path: "skills", name: "Skills", icon: Sparkles },
-  { path: "connectors", name: "Connectors", icon: Blocks },
-];
-
 function SectionList({
   section,
   counts,
@@ -387,7 +381,7 @@ function SectionList({
   return (
     <nav aria-label="AI" className="flex flex-col gap-0.5 border-r border-border px-2 py-4">
       <h2 className="px-2.5 pb-2.5 text-[15px] font-semibold">AI</h2>
-      {SECTIONS.map(({ path, name, icon: Icon }) => (
+      {AI_SECTIONS.map(({ path, name, icon: Icon }) => (
         <a
           key={path}
           id={`section-${path}`}
@@ -486,7 +480,7 @@ function AiPage() {
       ? data?.providers.find((each) => each.id === id)
       : undefined;
   const sectionName =
-    SECTIONS.find((each) => each.path === section)?.name ?? "Providers";
+    AI_SECTIONS.find((each) => each.path === section)?.name ?? "Providers";
   useEffect(() => {
     document.title = `${provider ? provider.name : section === "connectors" && id ? id : sectionName} – AI`;
   }, [provider, section, id, sectionName]);

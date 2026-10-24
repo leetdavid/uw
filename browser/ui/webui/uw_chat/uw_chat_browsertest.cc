@@ -1347,26 +1347,64 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AConnectorsPromptTakesItsArguments) {
             std::vector<std::string>{"Used the fake:greet prompt"});
 }
 
-// The Skills row opens uw://ai/skills, and goes back to that tab after.
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheSkillsRowOpensTheAiPage) {
+// The AI settings menu at the foot of the chat list counts what uw://ai
+// counts as it opens, and each row opens its section in one uw://ai tab.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAiSettingsMenuOpensEachSection) {
+  UseAgentModel();
+  WriteSkillFile(UwSkills(), "book-activities", "Books tours and tickets.",
+                 "Compare the sites.");
+  WriteSkillFile(AgentsSkills(), "research", "Researches a question.",
+                 "Read primary sources.");
+  ScopedListPrefUpdate(browser()->GetProfile()->GetPrefs(),
+                       kAgentDisabledSkillsPref)
+      ->Append("research");
+  AddFakeConnector();
   content::WebContents* chat = OpenChat();
   const int count = tabs()->count();
-  const GURL skills("chrome://ai/skills");
 
-  ASSERT_TRUE(
-      content::ExecJs(chat, "document.getElementById('skills').click();"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return tabs()->count() == count + 1 &&
-           tabs()->GetActiveWebContents()->GetVisibleURL() == skills;
-  }));
+  // Opens the menu unless it is open, waits for its counts, and clicks the
+  // row of `section` unless it is empty. Answers each row's name and count.
+  const auto menu = [&](const std::string& section) {
+    return content::EvalJs(chat, content::JsReplace(R"((async () => {
+      const until = (probe) => new Promise((resolve) => {
+        const check = () => probe() ? resolve(probe()) : setTimeout(check, 20);
+        check();
+      });
+      const button = document.getElementById('ai-settings');
+      if (button.getAttribute('aria-expanded') !== 'true') {
+        await until(() => !document.querySelector('[data-section]'));
+        button.dispatchEvent(new PointerEvent('pointerdown',
+            {bubbles: true, button: 0, pointerType: 'mouse'}));
+      }
+      const rows = await until(() => {
+        const found = [...document.querySelectorAll('[data-section]')];
+        return found.length && found.every((row) => row.dataset.count) &&
+            found;
+      });
+      const shown = rows.map((row) =>
+          row.getAttribute('aria-label') + ' ' + row.dataset.count)
+          .join(', ');
+      if ($1) {
+        rows.find((row) => row.dataset.section === $1).click();
+      }
+      return shown;
+    })())",
+                                                    section));
+  };
 
-  tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
-  ASSERT_TRUE(
-      content::ExecJs(chat, "document.getElementById('skills').click();"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return tabs()->GetActiveWebContents()->GetVisibleURL() == skills;
-  }));
-  EXPECT_EQ(tabs()->count(), count + 1);
+  const std::string counts = "Providers 1, Skills 1 on, Connectors 1 on";
+  EXPECT_EQ(menu(""), counts);
+  SaveWindowScreenshot(browser(), "ai-settings");
+
+  for (const char* section : {"providers", "skills", "connectors"}) {
+    tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
+    EXPECT_EQ(menu(section), counts);
+    const GURL address(base::StrCat({"chrome://ai/", section}));
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return tabs()->GetActiveWebContents()->GetVisibleURL() == address;
+    })) << section;
+    EXPECT_EQ(tabs()->count(), count + 1);
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ASkillIsSavedOnlyWhenTheUserSaysSo) {
