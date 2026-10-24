@@ -25,7 +25,6 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
-#include "ui/gfx/scoped_canvas.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/page_card.h"
@@ -158,13 +157,13 @@ void PaintSheet(gfx::Canvas* canvas,
   flags.setShader(cc::PaintShader::MakeLinearGradient(
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
       SkTileMode::kClamp));
-  {
-    gfx::ScopedCanvas scoped_canvas(canvas);
-    if (cover < 1.0f) {
-      canvas->SaveLayerAlpha(AlphaOf(cover));
-    }
-    canvas->DrawRect(view->GetLocalBounds(), flags);
-    PaintGrain(canvas, view, theme.grain, IsDark(tint));
+  if (cover < 1.0f) {
+    canvas->SaveLayerAlpha(AlphaOf(cover));
+  }
+  canvas->DrawRect(view->GetLocalBounds(), flags);
+  PaintGrain(canvas, view, theme.grain, IsDark(tint));
+  if (cover < 1.0f) {
+    canvas->Restore();
   }
 #if BUILDFLAG(IS_MAC)
   // A dark tint already shows the inactive window buttons.

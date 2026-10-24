@@ -61,6 +61,7 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/workspaces/workspace_swipe.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
@@ -681,6 +682,49 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
 }
 
+// Over glass, a held swipe between two workspaces of one theme lets no more of
+// the desktop through than the theme does.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       HeldOverGlassTheWindowStaysAsSolidAsItsTheme) {
+  if (!CanShowGlass() || ReducesTransparency()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  Theme look;
+  look.colors = SuggestedThemes()[3];
+  look.mode = ThemeMode::kLight;
+  look.transparency = 2;
+  SetThemeOfWindow(browser(), look);
+  RunWindowCommand(browser(), kNextWorkspace);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  SetThemeOfWindow(partner, look);
+  RunWindowCommand(partner, kPreviousWorkspace);
+  WaitForShown(browser(), work_);
+  browser()->GetWindow()->Activate();
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsGlass(browser()); }));
+  const SkBitmap before = CaptureWindow(browser());
+
+  MoveFingers(browser(), -SidebarWidth(browser()) * 0.4f);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  const SkBitmap held = CaptureWindow(browser());
+  SaveBitmap(held, "swipe-held-glass");
+  const gfx::Rect card = Card(browser());
+  for (const gfx::Point& margin :
+       {gfx::Point(card.right() + 4, card.CenterPoint().y()),
+        gfx::Point(card.CenterPoint().x(), card.y() - 4),
+        gfx::Point(card.CenterPoint().x(), card.bottom() + 4),
+        gfx::Point(card.x() / 2, card.bottom() + 4)}) {
+    const SkColor was = At(browser(), before, margin.x(), margin.y());
+    const SkColor is = At(browser(), held, margin.x(), margin.y());
+    EXPECT_NEAR(SkColorGetA(was), WindowCover(look.transparency) * 255, 2);
+    EXPECT_NEAR(SkColorGetA(is), SkColorGetA(was), 2) << margin.ToString();
+    EXPECT_LT(Difference(is, was), 16)
+        << margin.ToString() << ": " << std::hex << is << " was " << was;
+  }
+  Lift(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
 
 // The phases AppKit gives a real trackpad's NSEvents.
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
