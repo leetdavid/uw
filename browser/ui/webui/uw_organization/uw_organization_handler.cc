@@ -8,6 +8,8 @@
 #include <string>
 #include <utility>
 
+#include "base/functional/bind.h"
+#include "base/task/thread_pool.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -23,6 +25,8 @@
 #include "uw/browser/ui/glass/glass_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
+#include "uw/browser/uw_command/command_channel.h"
+#include "uw/browser/uw_command/command_install.h"
 #include "uw/components/tab_organization/placement.h"
 
 namespace uw {
@@ -132,6 +136,16 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
       {"uwOrganizationResume", IDS_UW_PAUSE_RESUME},
+      {"uwCommandTitle", IDS_UW_SETTINGS_COMMAND_TITLE},
+      {"uwCommandRow", IDS_UW_SETTINGS_COMMAND_ROW},
+      {"uwCommandDescription", IDS_UW_SETTINGS_COMMAND_DESCRIPTION},
+      {"uwCommandNote", IDS_UW_SETTINGS_COMMAND_NOTE},
+      {"uwCommandInstall", IDS_UW_SETTINGS_COMMAND_INSTALL},
+      {"uwCommandUninstall", IDS_UW_SETTINGS_COMMAND_UNINSTALL},
+      {"uwCommandInstalledAt", IDS_UW_SETTINGS_COMMAND_INSTALLED_AT},
+      {"uwCommandTry", IDS_UW_SETTINGS_COMMAND_TRY},
+      {"uwCommandCancelled", IDS_UW_SETTINGS_COMMAND_CANCELLED},
+      {"uwCommandFailed", IDS_UW_SETTINGS_COMMAND_FAILED},
   };
   data_source->AddLocalizedStrings(kLocalizedStrings);
 }
@@ -266,6 +280,70 @@ void UwOrganizationHandler::SetMiniPlayer(mojom::MiniPlayerSwitch which,
                                           SetMiniPlayerCallback callback) {
   g_browser_process->local_state()->SetBoolean(MiniPlayerPref(which), on);
   std::move(callback).Run();
+}
+
+namespace {
+
+mojom::CommandStatePtr CommandStateOf(mojom::CommandProblem problem,
+                                      bool installed) {
+  return mojom::CommandState::New(installed, CommandLink().value(), problem);
+}
+
+mojom::CommandProblem ProblemOf(CommandInstall result) {
+  switch (result) {
+    case CommandInstall::kDone:
+      return mojom::CommandProblem::kNone;
+    case CommandInstall::kCancelled:
+      return mojom::CommandProblem::kCancelled;
+    case CommandInstall::kFailed:
+      return mojom::CommandProblem::kFailed;
+  }
+}
+
+// Links or unlinks the command off the UI thread, since macOS's password
+// prompt waits for the user, then opens or closes the channel to match.
+void ChangeCommand(base::OnceCallback<CommandInstall()> change,
+                   base::OnceCallback<void(mojom::CommandStatePtr)> done) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()},
+      base::BindOnce(
+          [](base::OnceCallback<CommandInstall()> change) {
+            const CommandInstall result = std::move(change).Run();
+            return std::make_pair(result, CommandInstalled());
+          },
+          std::move(change)),
+      base::BindOnce(
+          [](base::OnceCallback<void(mojom::CommandStatePtr)> done,
+             std::pair<CommandInstall, bool> outcome) {
+            if (outcome.second) {
+              CommandChannel::Get().Start();
+            } else {
+              CommandChannel::Get().Close();
+            }
+            std::move(done).Run(
+                CommandStateOf(ProblemOf(outcome.first), outcome.second));
+          },
+          std::move(done)));
+}
+
+}  // namespace
+
+void UwOrganizationHandler::GetCommand(GetCommandCallback callback) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock()}, base::BindOnce(&CommandInstalled),
+      base::BindOnce(&CommandStateOf, mojom::CommandProblem::kNone)
+          .Then(std::move(callback)));
+}
+
+void UwOrganizationHandler::InstallCommand(InstallCommandCallback callback) {
+  ChangeCommand(base::BindOnce(&LinkCommand, CommandLink(), CommandBinary()),
+                std::move(callback));
+}
+
+void UwOrganizationHandler::UninstallCommand(
+    UninstallCommandCallback callback) {
+  ChangeCommand(base::BindOnce(&UnlinkCommand, CommandLink()),
+                std::move(callback));
 }
 
 }  // namespace uw

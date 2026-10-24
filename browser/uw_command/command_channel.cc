@@ -6,7 +6,6 @@
 #include <optional>
 #include <utility>
 
-#include "base/apple/bundle_locations.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/no_destructor.h"
@@ -42,6 +41,9 @@ CommandChannel::CommandChannel() = default;
 CommandChannel::~CommandChannel() = default;
 
 void CommandChannel::Start() {
+  if (open()) {
+    return;
+  }
   base::FilePath user_data;
   if (!base::PathService::Get(chrome::DIR_USER_DATA, &user_data)) {
     return;
@@ -51,9 +53,7 @@ void CommandChannel::Start() {
       FROM_HERE, {base::MayBlock()},
       base::BindOnce(
           [](const base::FilePath& socket) {
-            return LinksInto(base::FilePath(kCommandLink),
-                             base::apple::OuterBundlePath()) &&
-                   ClearSocket(socket);
+            return CommandInstalled() && ClearSocket(socket);
           },
           socket),
       base::BindOnce(

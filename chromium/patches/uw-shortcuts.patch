@@ -1,7 +1,7 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -4030,6 +4030,42 @@
+@@ -4030,6 +4030,72 @@
        <message name="IDS_UW_SETTINGS_SIDEBAR_EDGE_SUBLABEL" desc="Sub-label of the appearance setting that shows the hidden sidebar over the page when the pointer rests at the window's left edge.">
          While the sidebar is hidden, rest the pointer at the window's left edge to show it over the page
        </message>
@@ -40,6 +40,36 @@ diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
 +      </message>
 +      <message name="IDS_UW_SETTINGS_SHORTCUTS_CLEAR_LABEL" desc="Accessible label of the button that removes a command's keyboard shortcut.">
 +        Remove the key of <ph name="COMMAND">$1<ex>Keep Here</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_TITLE" desc="Heading of the section on Settings, System, for the uw command, a program the user runs in a terminal. uw is the product name and stays lowercase.">
++        uw command
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_ROW" desc="Title of the row that installs the uw command.">
++        Use uw from a terminal
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_DESCRIPTION" desc="Second line of the row that installs the uw command. The placeholders are commands, shown in a monospace font, that stay as they are.">
++        Type <ph name="CHAT">$1<ex>uw chat</ex></ph> to start a chat, <ph name="MCP">$2<ex>uw mcp add</ex></ph> to add a connector, or <ph name="SETTINGS">$3<ex>uw settings</ex></ph> to change a setting. Scripts and agents such as Claude Code can run it too.
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_NOTE" desc="Note under the row that installs the uw command, about what installing does.">
++        Installing adds uw to <ph name="FOLDER">$1<ex>/usr/local/bin</ex></ph>, which asks for your Mac's password once. Until then, uw doesn't listen for the command, and nothing else on this Mac can start chats through it.
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_INSTALL" desc="Button that installs the uw command.">
++        Install uw command
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_UNINSTALL" desc="Button that removes the uw command.">
++        Uninstall
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_INSTALLED_AT" desc="Shown before the path where the uw command is installed.">
++        Installed at
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_TRY" desc="Shown before an example command once the uw command is installed.">
++        Try it:
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_CANCELLED" desc="Shown when the user closed macOS's password prompt, so the uw command wasn't installed.">
++        Not installed: macOS needs your password to add uw to <ph name="FOLDER">$1<ex>/usr/local/bin</ex></ph>.
++      </message>
++      <message name="IDS_UW_SETTINGS_COMMAND_FAILED" desc="Shown when installing or removing the uw command failed.">
++        uw couldn't change <ph name="LINK">$1<ex>/usr/local/bin/uw</ex></ph>.
 +      </message>
      </if>
      <if expr="not is_chromeos">

@@ -28,7 +28,7 @@ class CommandChannel {
   CommandChannel& operator=(const CommandChannel&) = delete;
   ~CommandChannel();
 
-  // Opens the channel once uw starts, if the command is installed.
+  // Opens the channel if the command is installed and it isn't open yet.
   void Start();
   // Opens it at `socket` at once.
   void OpenForTesting(const base::FilePath& socket);

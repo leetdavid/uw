@@ -53,6 +53,9 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetMiniPlayer(mojom::MiniPlayerSwitch which,
                      bool on,
                      SetMiniPlayerCallback callback) override;
+  void GetCommand(GetCommandCallback callback) override;
+  void InstallCommand(InstallCommandCallback callback) override;
+  void UninstallCommand(UninstallCommandCallback callback) override;
 
  private:
   // The codes the last exchange rates cover, or none before the first.

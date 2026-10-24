@@ -669,7 +669,7 @@ const TEST_SUITES = {
     "AgentCheckBrowserTest.*", "AgentLanguageCheckBrowserTest.*", "AgentTerminalBrowserTest.*", "CommandBarForATaskBrowserTest.*",
     "MouseActionsBrowserTest.*", "PageColorsBrowserTest.*", "ThemePickerBrowserTest.*", "UndoShortcutBrowserTest.*",
     "UwChatDarkModeBrowserTest.*", "UwChatSensitiveSiteBrowserTest.*", "UwChatTerminalBrowserTest.*", "WorkspaceSwipeBrowserTest.*",
-    "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*",
+    "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*", "UwCommandSectionBrowserTest.*",
   ],
 } as const;
 

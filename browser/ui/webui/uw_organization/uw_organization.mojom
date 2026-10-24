@@ -71,6 +71,22 @@ struct PauseResult {
   int32 pause_mode;
 };
 
+// Why installing or uninstalling the uw command didn't finish.
+enum CommandProblem {
+  kNone,
+  // The user closed macOS's password prompt.
+  kCancelled,
+  kFailed,
+};
+
+// The uw command's section on Settings, System. See docs/plans/uw-command.md.
+struct CommandState {
+  bool installed;
+  // Where the command is linked: /usr/local/bin/uw.
+  string link;
+  CommandProblem problem;
+};
+
 // Profile-scoped backend for the uw page of chrome://settings.
 interface OrganizationHandler {
   GetState() => (State state);
@@ -92,4 +108,9 @@ interface OrganizationHandler {
   SetMouseAction(MouseAction action, bool on) => ();
   // For all of uw. A mini player that shows moves at once.
   SetMiniPlayer(MiniPlayerSwitch which, bool on) => ();
+  // For all of uw. Installing links the command, through macOS's password
+  // prompt when needed, and opens uw's channel for it; uninstalling closes it.
+  GetCommand() => (CommandState state);
+  InstallCommand() => (CommandState state);
+  UninstallCommand() => (CommandState state);
 };

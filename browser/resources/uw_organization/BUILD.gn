@@ -15,6 +15,8 @@ build_webui("build") {
   grd_resource_path_prefix = "uw/uw_organization"
 
   ts_files = [
+    "uw_command_section.html.ts",
+    "uw_command_section.ts",
     "uw_organization_browser_proxy.ts",
     "uw_organization_page.html.ts",
     "uw_organization_page.ts",

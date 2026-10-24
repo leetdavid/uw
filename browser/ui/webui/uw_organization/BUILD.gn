@@ -31,6 +31,7 @@ source_set("uw_organization_handler") {
     "//uw/browser/ui/glass:prefs",
     "//uw/browser/ui/views/mini_player:prefs",
     "//uw/browser/ui/webui/uw_command_bar",
+    "//uw/browser/uw_command",
     "//uw/components/tab_organization",
   ]
 }
@@ -38,7 +39,10 @@ source_set("uw_organization_handler") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "uw_organization_page_browsertest.cc" ]
+  sources = [
+    "uw_command_section_browsertest.cc",
+    "uw_organization_page_browsertest.cc",
+  ]
   deps = [
     "//base",
     "//base/test:test_support",
@@ -58,6 +62,7 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/views/mini_player:prefs",
     "//uw/browser/ui/views/theme_picker",
+    "//uw/browser/uw_command",
     "//uw/components/ai_providers",
   ]
 }

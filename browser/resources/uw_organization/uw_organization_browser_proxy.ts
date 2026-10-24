@@ -4,10 +4,13 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {MiniPlayerSwitch, MouseAction, PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
+import type {CommandState, MiniPlayerSwitch, MouseAction, PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
+  getCommand(): Promise<CommandState>;
+  installCommand(): Promise<CommandState>;
+  uninstallCommand(): Promise<CommandState>;
   getState(): Promise<State>;
   setEnabled(on: boolean): Promise<State>;
   setPause(mode: number): Promise<PauseResult>;
@@ -64,6 +67,18 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setMiniPlayer(which: MiniPlayerSwitch, on: boolean) {
     await this.handler.setMiniPlayer(which, on);
+  }
+
+  getCommand() {
+    return this.handler.getCommand().then(response => response.state);
+  }
+
+  installCommand() {
+    return this.handler.installCommand().then(response => response.state);
+  }
+
+  uninstallCommand() {
+    return this.handler.uninstallCommand().then(response => response.state);
   }
 
   static getInstance(): UwOrganizationBrowserProxy {
