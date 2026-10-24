@@ -1,6 +1,6 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, is drawn and waits for the user's sign-off. Nothing is built.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn the same day and waits for the user's sign-off. Nothing is built.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
@@ -68,13 +68,19 @@ Three switches on uw's settings page, all on by default:
 
 ## Design
 
-To be drawn for sign-off, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar:
+Drawn on 2026-10-24 for sign-off, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar. The numbers are in the canvas's `uw-mini-player` guide.
 
 - "Mini player: the sidebar": a docked mini player under the pointer, with its controls, in light mode.
-- "Mini player: floating": the floating mini player over another app.
-- "Mini player: every state": at rest and under the pointer, holding for 2×, the stack at rest and fanned out, a tall video, Glass at both ends, dark mode, document picture in picture's frame, and the three settings.
+- "Mini player: floating": the floating mini player over another app, with Glass on.
+- "Mini player: every state": at rest and under the pointer with Glass at both ends, holding for 2×, black dark mode, the stack at rest and fanned out, a tall video, the activity card above it, a skip ad button, floating at rest, a call, document picture in picture's frame, and the settings.
 
-The design proposes the docked size, the height cap for tall videos, the flat controls at the Glass slider's left end, and the 2× label.
+uw's proposals in the frames:
+
+- Docked, it is 232px wide with 10px corners, 6px above the foot, and never taller than it is wide. A 9:16 video is 232px tall and 131px wide, centered.
+- At Glass's left end each control is a black circle at 40%. Over video the glass stays dark, so the white icons read over any frame.
+- Holding for 300 ms without moving starts 2×. The other controls go, and a "2×" pill shows at the top.
+- The activity card shows above the mini player, so the video never moves.
+- Fanned out, each paused video is a row with a still, its title, and where it stopped.
 
 ## How it is built
 
