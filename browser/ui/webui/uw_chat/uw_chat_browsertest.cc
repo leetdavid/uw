@@ -253,8 +253,8 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
                                   200)});
   }
 
-  // The middle of `element`, a script expression for an element of the
-  // chat's page, on the screen. The page's pixels need not be the screen's
+  // The middle of `element`, a script expression for an element or a range of
+  // the chat's page, on the screen. The page's pixels need not be the screen's
   // points, so they are scaled by the page's width on the screen.
   static gfx::Point CenterOf(content::WebContents* chat,
                              const std::string& element) {
@@ -2072,7 +2072,10 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
 
   Click(CenterOf(chat, "document.getElementById('usage')"));
   ASSERT_EQ(Until(chat, "!!document.getElementById('usage-card')"), true);
-  Click(CenterOf(chat, "document.querySelector('main main')"));
+  // On the first answer's words, which the card never covers.
+  Click(CenterOf(chat,
+                 "(text => (text.selectNodeContents(document.querySelector("
+                 "    '.answer p').firstChild), text))(new Range())"));
   EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
 }
 
