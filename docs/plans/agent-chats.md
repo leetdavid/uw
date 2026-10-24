@@ -139,7 +139,7 @@ How the chat is built:
 
 ## New tab page
 
-T49, proposed on 2026-10-24. The user chose to build it after a UI review that day. Drawn in the frame "New tab: Search or Ask". Implementability 6/10: the page reuses the chat page's composer, and the risk is in Chromium's many special cases for its own new tab page.
+T49, proposed on 2026-10-24 and not built. The user first chose to build it after a UI review that day, then left it in the backlog: Cmd+T opens the command bar, which already opens an address, searches, and asks in a new chat, so this page would only show for a blank tab. Chromium's new tab page stays, with "Customize uw". The proposal below is kept for a later decision. Drawn in the frame "New tab: Search or Ask". Implementability 6/10: the page reuses the chat page's composer, and the risk is in Chromium's many special cases for its own new tab page.
 
 - Every tab that would show Chromium's new tab page shows `uw://newtab` instead: "New blank tab" in the command bar, Cmd+T with the command bar off, and the first tab of a new window or workspace. Chromium's page, with its Google logo, shortcuts, and "Customize uw" button, no longer shows. The patch points `NewTabURLDetails::ForProfile` at it, and the page counts as a new tab page wherever Chromium checks, so the address bar stays empty and the box takes the focus.
 - The page is uw's logo, one box, and a Search | Ask switch, centered, as drawn. It follows light and dark mode. Its tab reads "New Tab".
