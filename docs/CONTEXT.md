@@ -290,5 +290,9 @@ _Avoid_: interrupt, inject.
 **Outside agent**:
 An AI agent running outside uw, such as Claude Code or Codex, that the user lets work in uw's tabs.
 
+**`uw` command**:
+What the user types in a terminal, or a script or outside agent runs, to start chats, manage connectors, and change settings in uw. It works only once the user installs it.
+_Avoid_: CLI, command-line tool, terminal app.
+
 **Site customization**:
 A user-requested change to a website's appearance or behavior.
