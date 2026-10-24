@@ -45,8 +45,9 @@ void ApplyThemeOfWindow(BrowserWindowInterface* window,
 // of the window that shows it, as a tab or in a bubble or panel such as an
 // extension's popup, per docs/plans/themes.md#page-mode. Nothing while it
 // follows the window: under a page mode of Window, for uw's and Chromium's own
-// pages outside uw's tab pages, and in a private window, whose pages follow
-// macOS. Chromium asks it for each page's prefers-color-scheme.
+// pages other than uw's tab pages and the command bar, and in a private
+// window, whose pages follow macOS. Chromium asks it for each page's
+// prefers-color-scheme.
 std::optional<bool> PageModeIsDark(content::WebContents* page);
 
 // The page card's color behind `page` before it paints, while page mode tells

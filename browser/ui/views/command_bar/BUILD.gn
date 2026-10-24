@@ -62,5 +62,7 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
     "//uw/browser/ui/webui/uw_command_bar",
+    "//uw/browser/workspaces",
+    "//uw/components/look",
   ]
 }

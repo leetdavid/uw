@@ -17,6 +17,7 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_controller.h"
@@ -41,10 +42,12 @@ namespace {
 // Set while uw saves a theme, whose writes to Chromium's settings are its own.
 bool g_saving = false;
 
-// The hosts of uw's own tab pages, which follow page mode: chrome://ai,
-// chrome://chat, and chrome://terminal. Their targets depend on this one, so
-// their host constants are out of reach.
-constexpr std::string_view kUwTabPages[] = {"ai", "chat", "terminal"};
+// The hosts of uw's own pages that follow page mode: its tab pages,
+// chrome://ai, chrome://chat, and chrome://terminal, and the command bar,
+// which opens over the page. Their targets depend on this one, so their host
+// constants are out of reach.
+constexpr std::string_view kUwPagesOnPageMode[] = {"ai", "chat", "terminal",
+                                                   "uw-command-bar.top-chrome"};
 
 // The theme of each profile as uw last saw it, by the profile's folder.
 std::map<base::FilePath, Theme>& SeenThemes() {
@@ -88,12 +91,16 @@ const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   return shown ? WorkspaceList::Get().Find(shown->workspace()) : nullptr;
 }
 
-// The window that shows `page`: the window of its tab, or the window under
-// the bubble or panel that holds it, such as an extension's popup.
+// The window that shows `page`: the window of its tab, the window a panel of
+// uw's such as the command bar belongs to, or the window under the bubble or
+// panel that holds it, such as an extension's popup.
 BrowserWindowInterface* WindowShowing(content::WebContents* page) {
   if (tabs::TabInterface* tab =
           tabs::TabInterface::MaybeGetFromContents(page)) {
     return tab->GetBrowserWindowInterface();
+  }
+  if (BrowserWindowInterface* window = webui::GetBrowserWindowInterface(page)) {
+    return window;
   }
   for (views::Widget* widget =
            views::Widget::GetTopLevelWidgetForNativeView(page->GetNativeView());
@@ -236,7 +243,7 @@ std::optional<bool> PageModeIsDark(content::WebContents* page) {
       page->GetController().GetVisibleEntry();
   const GURL url = entry ? entry->GetURL() : GURL();
   const bool uw_page = url.SchemeIs(content::kChromeUIScheme) &&
-                       std::ranges::contains(kUwTabPages, url.host());
+                       std::ranges::contains(kUwPagesOnPageMode, url.host());
   if (content::HasWebUIScheme(url) && !uw_page) {
     return std::nullopt;
   }

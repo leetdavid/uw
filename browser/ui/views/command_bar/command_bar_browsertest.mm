@@ -22,6 +22,7 @@
 #include "base/strings/sys_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
+#include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
@@ -50,6 +51,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/color/color_provider_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/switches.h"
@@ -61,6 +63,8 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
+#include "uw/browser/workspaces/workspace_theme.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -227,6 +231,24 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdTOpensItWithoutATab) {
 
   EXPECT_TRUE(bar()->IsShowing());
   EXPECT_EQ(tabs, browser()->tab_strip_model()->count());
+}
+
+// It opens over the page, so it takes the page mode, per T198.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesThePageMode) {
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  ASSERT_TRUE(bar()->IsShowing());
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(bar()->page(),
+                           "matchMedia('(prefers-color-scheme: dark)').matches")
+        .ExtractBool();
+  }));
+  EXPECT_EQ(bar()->page()->GetColorMode(),
+            ui::ColorProviderKey::ColorMode::kLight);
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TurnedOffCmdTOpensATab) {
