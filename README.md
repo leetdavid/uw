@@ -45,6 +45,7 @@ uw looks and works like Arc, built on Chromium.
 - Workspaces keep work and personal browsing apart. Switch from the foot of the sidebar, or swipe.
 - Pinned tabs sit as tiles at the top of the sidebar, shared by every window.
 - Dark mode is true black.
+- On macOS 26 and later, two theme sliders bring in Liquid Glass. Transparency lets the desktop show through the window. Glass turns pinned tabs and the sidebar's buttons to glass, and frosts menus and cards.
 
 ![uw in dark mode. Four pinned tabs sit as tiles above two tasks, and the switcher at the foot of the sidebar shows three workspaces.](docs/assets/screenshots/workspaces.png)
 
@@ -54,7 +55,7 @@ uw looks and works like Arc, built on Chromium.
 | --- | --- |
 | Automatic tab organization with Jev | Built, not yet verified |
 | Bring-your-own-key providers | Built, not yet verified |
-| Vertical tabs, themes, pinned tabs, and workspaces | Built, not yet verified |
+| Vertical tabs, themes with glass, pinned tabs, and workspaces | Built, not yet verified |
 | Agent chats, a terminal tab, and a command bar | In progress |
 
 The [board](docs/plans/roadmap.md#board) tracks each piece, and [Try the current build](docs/try-uw.md) lists what to test and the known gaps. [Verification status](#verification-status) records what has been built and tested. The [product docs](docs/README.md) describe where uw is going.
@@ -162,7 +163,7 @@ For current manual test scenarios and known limits, see [Try the current build](
 - `ai-organization.patch` registers the automatic organization, pin, workspace, and shared provider preferences.
 - `uw-settings-page.patch` adds the uw features page and its strings to Chromium's settings. It renames "You and Google" to "You and uw", hides Chrome's own AI page, whose features need Google's models, and shows the settings title without Chromium's logo.
 - `uw-scheme-alias.patch` gives every [uw page](docs/CONTEXT.md#language) a `uw://` address. A `uw://` address opens its `chrome://` page, typed in the address bar or opened by the browser. The address bar shows and copies a `chrome://` address as `uw://`. A web page cannot open them, as with `chrome://`.
-- `uw-look.patch` adds the window tint: it hooks uw's colors and gradient into Chromium's frame painting and turns the transparent glass frame off by default.
+- `uw-look.patch` adds the window's look. It hooks uw's tint, gradient, and page colors into Chromium's frame and toolbar painting. On macOS 26 and later it runs Chromium's Liquid Glass frame across the whole window under uw's Transparency setting, whatever Chromium's `GlassFrame` feature says. While Glass is on, it frosts the ⋮ menu, its submenus, and the address bar's suggestion list.
 - `uw-workspaces.patch` brings each window back in its workspace after a restart or Cmd+Shift+T, and keeps a window that shows another workspace hidden until it is switched to. It gives the tab strip a slot for the workspace's name under the pins, hides the profile button, removes the Profiles menu, and never shows the profile picker at launch. See [ADR 0009](docs/adr/0009-switching-workspace-swaps-the-window.md).
 - `uw-trials.patch` turns on the Chromium trials uw's look is built on, which the build otherwise leaves off: Chrome's 2026 refresh (`GlowUp`: simplified menus, rounded icons, refreshed task colors, toolbar, and settings pages), the compositor loading spinner, and the sidebar's expand on hover. A `--disable-features` switch still turns any of them off. Check this list when updating Chromium: a trial that ships turns on by itself, and a new one uw needs has to be added here.
 
@@ -220,6 +221,14 @@ A real-window test on a web page needs three things, all shown in `UwChatBrowser
 - Pass the browser's window as the last argument of `ui_controls::SendMouseMoveNotifyWhenDone`, or the page never sees the pointer.
 - Focus the page with `WebContents::Focus()` before sending keys.
 - Expect a smaller window: the VM's screen is 1024 by 768, and only headless screenshots set the window to 1280 by 800.
+
+Glass needs a real window too, since macOS draws it behind a window on the screen. `GlassBrowserTest.MANUAL_*` save how macOS shows the window at three Transparency and Glass settings, in dark mode, and behind a second window. They also save the ⋮ menu, one of its submenus, the new button's menu, and the address bar's suggestion list, frosted over the window:
+
+```sh
+UW_SCREENSHOT_DIR=/tmp/glass pnpm run window-tests --gtest_filter='GlassBrowserTest.MANUAL_*'
+```
+
+macOS gives no picture of a menu's or a popup's window on its own, so those tests capture the browser window with its child windows. In the VM, what lies behind a see-through window reads as about rgb(32, 31, 32), so a pixel can be checked against the share of the glass that the theme covers.
 
 ### Set up the VM once
 
@@ -316,6 +325,8 @@ On 2026-09-24, the customized application built and passed the headless smoke te
 On 2026-10-11, the [tab tree](docs/plans/native-tab-tree.md) and the [organizer](docs/plans/automatic-organization.md) were rebuilt on native tab groups. The app built on the same host and passed the headless smoke test. The focused Chromium suites pass: `PageTreeTest.*`, `AiProtocolTest.*`, `TintTest.*`, `VerticalTabStripPrefsTest.*`, and `VerticalTabStripStateControllerTest.*` in `unit_tests`, and `TabOrganizationControllerBrowserTest.*`, `AutomaticOrganizerBrowserTest.*`, `UwOrganizationPageBrowserTest.*`, `WindowScreenshotBrowserTest.*`, and `TintBrowserTest.*` in `browser_tests`. The organizer and settings tests use a local test server.
 
 On 2026-10-12, TypeSafe's live API answered the validation request that uw sends for Jev, sent by hand, in the shape uw expects. Its model list uses `models[].name`, which uw now reads. A DeepSeek chat model validated from the settings page in a real window. With Jev deciding, the same model then failed validation as the namer: it thinks before it answers, and the naming request allowed 32 tokens. Chat requests now allow 4096. That fix has not been rechecked against DeepSeek. The built app's "Test connection" passed against the live Jev API in 0.4 seconds, run headless with a throwaway profile, and showed each provider's own message for a wrong key. Filing tabs with a live provider has not been checked.
+
+On 2026-10-24, [glass](docs/plans/themes.md#glass) built on the same host. The theme, workspace, pin, and settings suites in `browser_tests` pass, 140 tests with `GlassBrowserTest.*` among them, and so do the theme tests in `unit_tests`. In the VM, `GlassBrowserTest.MANUAL_*` passed. Their screenshots showed the desktop through the window at the shares the plan sets, read from the pixels, and showed the menus and the suggestion list frosted. Not yet checked: the look by eye on a real desktop, and the power that see-through windows behind the front one cost.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 
