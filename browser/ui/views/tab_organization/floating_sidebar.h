@@ -74,9 +74,9 @@ class FloatingSidebar : public ui::AcceleratorTarget,
   // window buttons.
   void Layout();
 
-  // Hides macOS's window buttons while the sidebar is hidden, and shows them
-  // again with it.
-  void UpdateWindowButtons();
+  // Hides macOS's window buttons while the sidebar is hidden or `moving` to
+  // hide or show, and shows them again once it is shown.
+  void UpdateWindowButtons(bool moving);
 
   // Where the card is in the sidebar. While the sidebar is hidden and the card
   // is out, it lies left of the window.

@@ -190,9 +190,9 @@ void FloatingSidebar::Layout() {
                 window_buttons_->GetPreferredSize()));
 }
 
-void FloatingSidebar::UpdateWindowButtons() {
+void FloatingSidebar::UpdateWindowButtons(bool moving) {
   if (views::Widget* widget = region_->GetWidget()) {
-    SetWindowButtonsHidden(widget, Hidden());
+    SetWindowButtonsHidden(widget, Hidden() || moving);
   }
 }
 

@@ -38,10 +38,10 @@ diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state_controller_unittest
    EXPECT_FALSE(controller()->ShouldDisplayVerticalTabs());
    EXPECT_FALSE(controller()->IsCollapsed());
 diff --git a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
-index 41b80c71f317ac260bbebec024aca8e7f25face5..477be0f1473f51c1339dc128f383de8118f31dc8 100644
+index 41b80c71f317ac260bbebec024aca8e7f25face5..ead373f7cb54ccb1670177008cf8336a349d961b 100644
 --- a/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
 +++ b/chrome/browser/resources/settings/appearance_page/appearance_page.html.ts
-@@ -162,17 +162,6 @@ export function getHtml(this: SettingsAppearancePageElement) {
+@@ -162,24 +162,14 @@ export function getHtml(this: SettingsAppearancePageElement) {
  
  
      ${this.showVerticalTabsEnabled_ ? html`
@@ -59,6 +59,15 @@ index 41b80c71f317ac260bbebec024aca8e7f25face5..477be0f1473f51c1339dc128f383de81
        <div class="list-frame indented-toggles"
            ?hidden="${!this.verticalTabsEnabledPref_?.value}">
          ${this.showVerticalTabsExpandOnHoverSetting_() ? html`
+           <settings-toggle-button
+               id="showVerticalTabsExpandOnHover"
+               pref-key="vertical_tabs.expand_on_hover"
+-              label="$i18n{showVerticalTabsExpandOnHover}">
++              label="$i18n{showVerticalTabsExpandOnHover}"
++              sub-label="$i18n{showVerticalTabsExpandOnHoverSublabel}">
+           </settings-toggle-button>
+         ` : ''}
+ 
 diff --git a/chrome/browser/ui/tabs/features.cc b/chrome/browser/ui/tabs/features.cc
 index 9f151cf8e346533f5528b7d60e9c8f04d93b2988..6f0eb4cec07de8144d4e4cfd02101978effc2d32 100644
 --- a/chrome/browser/ui/tabs/features.cc

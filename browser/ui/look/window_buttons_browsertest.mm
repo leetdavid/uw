@@ -7,9 +7,11 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "content/public/test/browser_test.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -90,8 +92,13 @@ IN_PROC_BROWSER_TEST_F(WindowButtonsBrowserTest,
     EXPECT_TRUE([window standardWindowButton:kind].hidden);
   }
 
+  // They come back once the sidebar has slid all the way in.
   sidebar->RequestCollapse(false);
-  ASSERT_TRUE(base::test::RunUntil([&] { return !sidebar->IsCollapsed(); }));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !sidebar->IsCollapsed() &&
+           !BrowserAnimationController::From(browser())->IsAnimating(
+               TabStripAnimations::kVerticalTabStrip);
+  }));
   for (NSWindowButton kind : kinds) {
     EXPECT_FALSE([window standardWindowButton:kind].hidden);
   }

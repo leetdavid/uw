@@ -359,6 +359,23 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   CheckTheFloatingSidebar("sidebar-floating-dark");
 }
 
+// While the sidebar hides, it slides out at its full width, so its rows never
+// squeeze.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       HidingSlidesTheSidebarAtFullWidth) {
+  StageSidebar();
+  VerticalTabStripRegionView* sidebar = Sidebar();
+  const int width = sidebar->uncollapsed_width();
+  tabs::VerticalTabStripStateController* state =
+      tabs::VerticalTabStripStateController::From(browser());
+  state->RequestCollapse(true);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return SidebarAnimating() && sidebar->x() < 0; }));
+  EXPECT_EQ(sidebar->width(), width);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return state->IsCollapsed() && !SidebarAnimating(); }));
+}
+
 // Esc sends the card away, though something keeps it in, until the pointer
 // leaves the sidebar.
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, EscSendsTheCardAway) {

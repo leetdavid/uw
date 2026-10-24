@@ -12,6 +12,7 @@ The user asked on 2026-10-24 for Arc's floating sidebar in place of the narrow s
 
 - Cmd+S hides and shows the sidebar, as in Arc. The View menu says "Hide Sidebar" or "Show Sidebar". Chromium's Cmd+Shift+L for it goes, and Save Page As keeps no key; it stays in the File menu.
 - A hidden sidebar takes no width. The page card fills the window with its 8px inset on every side.
+- Hiding and showing slide the sidebar out and in at its full width while the page widens or narrows beside it, so its rows never squeeze. macOS's window buttons go as it starts to hide and come back once it is all the way in. Added on 2026-10-25, after the user saw the rows squeeze and the buttons linger during the change.
 - The window's close, minimize, and zoom buttons hide with the sidebar. The toolbar's empty space still drags the window, as it does today.
 - Each window remembers its own state, and a restart brings it back. A new window starts the way the last window was used. These are Chromium's rules for its collapsed sidebar.
 - Full screen keeps the window's state. A hidden sidebar comes in floating at the screen's left edge.

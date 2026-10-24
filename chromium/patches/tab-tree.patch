@@ -1200,7 +1200,7 @@ index afa40bfc3acb801c9745a05c5abdc72b685b6448..f70a5201e91ee080e085a7f776d270ce
  
    EnsureFocusOrder(target_index);
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc258dd71150 100644
+index ab919030ae2fbd70240f192e1a7060776530523a..010e796cd8cdcb2b907f6618585d767dba7f1027 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -67,6 +67,9 @@
@@ -1239,7 +1239,15 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
    if (base::FeatureList::IsEnabled(features::kTabGroupsFocusing)) {
      focus_swipe_controller_ =
          std::make_unique<VerticalTabStripFocusSwipeController>(this);
-@@ -279,14 +294,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
+@@ -246,6 +261,7 @@ void VerticalTabStripRegionView::OnAnimationProgressed(
+       if (motion == TabStripAnimations::kCollapse) {
+         update_state_controller_collapsed_callback_.Run(true);
+       }
++      uw_floating_sidebar_->UpdateWindowButtons(/*moving=*/false);
+       InvalidateLayout();
+       break;
+     }
+@@ -279,14 +295,18 @@ bool VerticalTabStripRegionView::IsPositionInWindowCaption(
      return false;
    }
  
@@ -1260,15 +1268,15 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
      gfx::Point point_in_child = point;
      views::View::ConvertPointToTarget(this, bottom_button_container_,
                                        &point_in_child);
-@@ -351,6 +370,7 @@ bool VerticalTabStripRegionView::WillWrapDueToOverflow(
+@@ -351,6 +371,7 @@ bool VerticalTabStripRegionView::WillWrapDueToOverflow(
  
  void VerticalTabStripRegionView::AddedToWidget() {
    BaseTabStripRegionView::AddedToWidget();
-+  uw_floating_sidebar_->UpdateWindowButtons();
++  uw_floating_sidebar_->UpdateWindowButtons(IsAnimatingSize());
    paint_as_active_subscription_ =
        GetWidget()->RegisterPaintAsActiveChangedCallback(base::BindRepeating(
            [](VerticalTabStripRegionView* view) {
-@@ -371,6 +391,12 @@ void VerticalTabStripRegionView::RemovedFromWidget() {
+@@ -371,6 +392,12 @@ void VerticalTabStripRegionView::RemovedFromWidget() {
  }
  
  void VerticalTabStripRegionView::Layout(PassKey) {
@@ -1281,7 +1289,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
    LayoutSuperclass<views::AccessiblePaneView>(this);
  
    // Manually position the resize area as it overlaps views handled by the flex
-@@ -385,6 +411,7 @@ void VerticalTabStripRegionView::Layout(PassKey) {
+@@ -385,6 +412,7 @@ void VerticalTabStripRegionView::Layout(PassKey) {
    if (drop_arrow()) {
      drop_arrow()->SetIndex(drop_arrow()->index());
    }
@@ -1289,7 +1297,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
  }
  
  views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
-@@ -399,7 +426,7 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+@@ -399,7 +427,7 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
  gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
    auto min_size = BaseTabStripRegionView::GetMinimumSize();
    min_size.set_width((state_controller_->IsCollapsed() || IsAnimatingSize())
@@ -1298,7 +1306,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
                           : kUncollapsedMinWidth);
    return min_size;
  }
-@@ -411,12 +438,12 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
+@@ -411,12 +439,12 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
        BrowserAnimationController::From(browser_view()->browser());
    const auto motion =
        controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
@@ -1314,12 +1322,12 @@ index ab919030ae2fbd70240f192e1a7060776530523a..50325dac40a84b0d829f18585937bc25
                   (motion == TabStripAnimations::kExpand
                        ? std::floor<double>
                        : std::ceil<double>)(expand_amount * expand_percent));
-@@ -783,6 +810,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+@@ -783,6 +811,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
    if (tab_strip_view()) {
      tab_strip_view()->SetCollapsedState(collapsed);
    }
 +  if (uw_floating_sidebar_) {
-+    uw_floating_sidebar_->UpdateWindowButtons();
++    uw_floating_sidebar_->UpdateWindowButtons(IsAnimatingSize());
 +  }
  
    if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||

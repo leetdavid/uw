@@ -502,7 +502,7 @@ index fc817a0be4151d4d401b068657bd624613e93c82..04e0763b2ddc0a31d16fc0bd77afae79
      "//chrome/browser/search_engines",
      "//chrome/browser/serial",
 diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-index 4a53cfbc0ecc60b14902fdd344c851a2da932a3f..ca68b6ac22d198c01af5704ffa9802e28e0c13a9 100644
+index 4a53cfbc0ecc60b14902fdd344c851a2da932a3f..8e0581066c709b1200bfe1dff1ea586d0d9aee15 100644
 --- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 @@ -155,6 +155,10 @@
@@ -516,7 +516,17 @@ index 4a53cfbc0ecc60b14902fdd344c851a2da932a3f..ca68b6ac22d198c01af5704ffa9802e2
  #if BUILDFLAG(IS_LINUX)
  #include "ui/display/screen.h"
  #endif
-@@ -4563,6 +4567,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
+@@ -605,6 +609,9 @@ void AddAppearanceStrings(content::WebUIDataSource* html_source,
+       {"tabStripPosition", IDS_SETTINGS_TAB_STRIP_POSITION},
+       {"showVerticalTabsExpandOnHover",
+        IDS_SETTINGS_VERTICAL_TABS_EXPAND_ON_HOVER},
++      // uw: what the switch does to a hidden sidebar.
++      {"showVerticalTabsExpandOnHoverSublabel",
++       IDS_UW_SETTINGS_SIDEBAR_EDGE_SUBLABEL},
+       {"allowSplitViewDragAndDrop",
+        IDS_SETTINGS_ALLOW_SPLIT_VIEW_DRAG_AND_DROP},
+       {"showTabGroupsInBookmarksBar",
+@@ -4563,6 +4570,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
    AddDefaultBrowserStrings(html_source);
    AddImportDataStrings(html_source);
    AddSystemStrings(html_source);
