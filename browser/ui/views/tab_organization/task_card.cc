@@ -64,6 +64,9 @@ class TaskCardBubble : public views::BubbleDialogDelegate,
   // views::WidgetObserver:
   void OnWidgetDestroyed(views::Widget* widget) override {
     observation_.Reset();
+    // The row's window outlives the card, and would pass its theme changes
+    // on to the gone card until this deletes.
+    SetAnchorView(nullptr);
     base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE, this);
   }
 

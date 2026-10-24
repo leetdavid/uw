@@ -72,6 +72,7 @@ source_set("browser_tests") {
     "//ui/events",
     "//ui/gfx",
     "//ui/views",
+    "//ui/views:test_support",
     "//url",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/views/pins",

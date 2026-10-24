@@ -345,7 +345,7 @@ index 7b00df716ccbf2adc37f38fd2c71f9bdc1997c29..45ad069d886ebfc17d5b65a061629282
      <div slot="view" id="reset">
        <template is="dom-if" if="[[renderPlugin_(
 diff --git a/chrome/browser/resources/settings/settings_menu/settings_menu.html b/chrome/browser/resources/settings/settings_menu/settings_menu.html
-index efde1c73dfca6509223b6a626ab426faeed9af76..4ab916bd61e71c73b4bef4d9e925ab6960fd0a22 100644
+index efde1c73dfca6509223b6a626ab426faeed9af76..cc63eddb6584067787cf36dfce238222bbb52796 100644
 --- a/chrome/browser/resources/settings/settings_menu/settings_menu.html
 +++ b/chrome/browser/resources/settings/settings_menu/settings_menu.html
 @@ -17,7 +17,8 @@
@@ -377,7 +377,7 @@ index efde1c73dfca6509223b6a626ab426faeed9af76..4ab916bd61e71c73b4bef4d9e925ab69
 +        <a role="menuitem" id="uwOrganization" href="/uwOrganization"
 +            class="cr-nav-menu-item"
 +            hidden="[[!pageVisibility_.uwOrganization]]">
-+          <cr-icon icon="settings:dashboard"></cr-icon>
++          <cr-icon icon="settings20:dashboard"></cr-icon>
 +          $i18n{uwOrganizationPageTitle}
 +          <cr-ripple></cr-ripple>
 +        </a>

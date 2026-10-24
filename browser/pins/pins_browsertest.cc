@@ -21,12 +21,14 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/tabs/public/tab_interface.h"
@@ -40,6 +42,7 @@
 #include "ui/events/event.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/views/controls/textfield/textfield.h"
+#include "ui/views/test/widget_test.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
@@ -484,6 +487,25 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, EditHomeUrlSavesAndLoads) {
   EXPECT_EQ(PinSync::PinFor(pin)->home, inbox);
   EXPECT_TRUE(content::WaitForLoadStop(pin->GetContents()));
   EXPECT_EQ(pin->GetContents()->GetLastCommittedURL(), inbox);
+}
+
+// The window can change its theme after the home card closed and before the
+// card deletes itself, as when the new home page first paints. The change must
+// not reach the gone card.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       AThemeChangeAfterTheHomeCardClosedIsSafe) {
+  tabs::TabInterface* pin = Pin(browser(), GURL(kIssues));
+  base::RunLoop().RunUntilIdle();
+  views::Widget* card = HomeUrlCard::Show(pin, TileOf(pin));
+  ASSERT_TRUE(card);
+  views::test::WidgetDestroyedWaiter destroyed(card);
+  card->widget_delegate()->AsDialogDelegate()->CancelDialog();
+  destroyed.Wait();
+
+  BrowserView::GetBrowserViewForBrowser(browser())
+      ->browser_widget()
+      ->UserChangedTheme(BrowserThemeChangeType::kWebAppTheme);
+  base::RunLoop().RunUntilIdle();
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APinsMenuHasItsRowsAndNoCloseTab) {

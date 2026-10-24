@@ -39,7 +39,9 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/os_crypt/common/os_crypt_switches.h"
 #include "components/prefs/pref_service.h"
@@ -2112,6 +2114,21 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   Browse(link, "hotels");
   ASSERT_TRUE(SettleAfter(1));
   EXPECT_EQ(link->GetGroup(), task);
+}
+
+// The window can change its theme after a task card closed and before the card
+// deletes itself. The change must not reach the gone card.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       AThemeChangeAfterATaskCardClosedIsSafe) {
+  const auto [ungrouped, task] = OneTask();
+  std::unique_ptr<views::Widget> card = OpenCardOf(task);
+  ASSERT_TRUE(card);
+  card.reset();
+
+  BrowserView::GetBrowserViewForBrowser(browser())
+      ->browser_widget()
+      ->UserChangedTheme(BrowserThemeChangeType::kWebAppTheme);
+  base::RunLoop().RunUntilIdle();
 }
 
 // Name Task on a task's card asks the language model for a name from the
