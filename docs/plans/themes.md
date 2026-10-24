@@ -173,7 +173,8 @@ The numbers are in the `uw-themes` guide, section "Glass". The frames are on the
 Stages:
 
 1. T174: the glass frames, signed off by the user.
-2. T175: glass built.
+2. T175: glass built, but for the pin tiles, which keep drawn glass until T176.
+3. T176: real glass on each pin tile, prototyped first.
 
 Acceptance checks:
 
