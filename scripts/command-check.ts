@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { layoutAt, REPO } from "./chromium.ts";
+import { COMMAND_CHECK_TEST, layoutAt, REPO } from "./chromium.ts";
 
 type Model = {
   format: "chat" | "decisions" | "systemone";
@@ -54,7 +54,7 @@ function readEnv(): Map<string, string> {
 function measure(name: string, model: Model, key: string, tests: string): Result[] {
   const results = join(mkdtempSync(join(tmpdir(), "uw-command-check-")), "results.jsonl");
   const run = spawnSync(tests, [
-    "--run-manual", "--gtest_filter=CommandCheckBrowserTest.MANUAL_JudgesTheExamples",
+    "--run-manual", `--gtest_filter=${COMMAND_CHECK_TEST}`,
     "--test-launcher-timeout=1800000", "--test-launcher-retry-limit=0",
   ], {
     encoding: "utf8", maxBuffer: 64 * 1024 * 1024,

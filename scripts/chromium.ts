@@ -26,6 +26,7 @@ const ROOT_PREFIX = "UW_CHECKOUT_ROOT=";
 const OUTPUT = "out/uw";
 export const GIB = 1024 ** 3;
 export const WINDOW_VM = "uw-window-tests";
+export const COMMAND_CHECK_TEST = "CommandCheckBrowserTest.MANUAL_JudgesTheExamples";
 const GUEST_SHARES = "/Volumes/My Shared Files";
 const GUEST_CRASH_REPORTS = "find ~/Library/Logs/DiagnosticReports -name 'browser_tests-*.ips'";
 
@@ -498,18 +499,36 @@ export class Chromium {
   windowTests(args: readonly string[]): void {
     const tests = join(this.layout.source, OUTPUT, "browser_tests");
     if (!existsSync(tests)) throw new BuildError(`${tests} is missing. Build browser_tests first.`);
+    const filtered = args.some((arg) => arg.startsWith("--gtest_filter"));
+    const run = filtered ? args : [`--gtest_filter=${this.uwWindowTests().join(":")}`, ...args];
     this.requireWindowVm();
     const release = this.holdWindowVm();
     const results = mkdtempSync(join(tmpdir(), "uw-window-tests-"));
     try {
       this.runtime.log(`Starting the ${WINDOW_VM} VM`);
       this.startWindowVm(results);
-      try { this.runInWindowVm(args); } finally { this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 }); }
+      try { this.runInWindowVm(run); } finally { this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 }); }
     } finally {
       release();
       if (readdirSync(results).length) this.runtime.log(`Crash reports from the VM: ${results}`);
       else rmSync(results, { recursive: true, force: true });
     }
+  }
+
+  private uwWindowTests(): string[] {
+    const root = join(this.layout.source, "uw");
+    const names: string[] = [];
+    for (const folder of ["browser", "components"].map((name) => join(root, name)).filter(existsSync)) {
+      for (const file of readdirSync(folder, { recursive: true, encoding: "utf8" })) {
+        if (!/_browsertest\.(cc|mm)$/.test(file)) continue;
+        const text = readFileSync(join(folder, file), "utf8");
+        for (const [, suite, test] of text.matchAll(/IN_PROC_BROWSER_TEST_F\(\s*(\w+),\s*(MANUAL_\w+)\s*\)/g)) {
+          if (`${suite}.${test}` !== COMMAND_CHECK_TEST) names.push(`${suite}.${test}`);
+        }
+      }
+    }
+    if (!names.length) throw new BuildError(`No uw MANUAL_ tests under ${root}. Run pnpm run prepare:chromium to link uw's source.`);
+    return names.sort();
   }
 
   private windowKey(): string {
@@ -609,11 +628,10 @@ function quote(value: string): string {
 }
 
 function windowTestCommand(args: readonly string[], screenshots: boolean): string {
-  const filter = args.some((arg) => arg.startsWith("--gtest_filter")) ? [] : ["--gtest_filter=*.MANUAL_*"];
   return [
     `cd ${quote(`${GUEST_SHARES}/src`)} &&`,
     ...(screenshots ? [`UW_SCREENSHOT_DIR=${quote(`${GUEST_SHARES}/shots`)}`] : []),
-    `./${OUTPUT}/browser_tests`, "--run-manual", "--headful-mode", ...[...filter, ...args].map(quote),
+    `./${OUTPUT}/browser_tests`, "--run-manual", "--headful-mode", ...args.map(quote),
   ].join(" ");
 }
 
@@ -671,7 +689,7 @@ function help(command?: keyof typeof descriptions): string {
     "  --checkout-dir PATH  Dedicated root; defaults to UW_CHROMIUM_ROOT or .chromium/\n" +
     (takesJobs(command) ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
     (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
-    (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs *.MANUAL_*\n" : "") +
+    (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs uw's MANUAL_ tests\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
     (command === "window-tests"

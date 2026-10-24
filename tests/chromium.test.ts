@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import {
-  BuildError, CHROMIUM_URL, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, REPO,
+  BuildError, CHROMIUM_URL, COMMAND_CHECK_TEST, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, REPO,
   SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot,
 } from "../scripts/chromium.ts";
 import type { CommandOptions, Pins, Runtime } from "../scripts/chromium.ts";
@@ -260,6 +260,20 @@ function windowFixture(t: TestContext): Fixture {
   const tests = join(f.layout.source, "out/uw/browser_tests");
   mkdirSync(dirname(tests), { recursive: true });
   writeFileSync(tests, "browser_tests fixture");
+  const [suite, check] = COMMAND_CHECK_TEST.split(".");
+  const sources = {
+    "browser/chat/chat_browsertest.cc":
+      "IN_PROC_BROWSER_TEST_F(ChatBrowserTest, MANUAL_Hovers) {}\n" +
+      "IN_PROC_BROWSER_TEST_F(ChatBrowserTest,\n                       MANUAL_ClicksOutside) {}\n" +
+      "IN_PROC_BROWSER_TEST_F(ChatBrowserTest, Headless) {}\n",
+    "components/swipe/swipe_browsertest.mm": "IN_PROC_BROWSER_TEST_F(SwipeBrowserTest, MANUAL_Swipes) {}\n",
+    "browser/agent/command_check_browsertest.cc": `IN_PROC_BROWSER_TEST_F(${suite}, ${check}) {}\n`,
+    "browser/chat/chat_unittest.cc": "IN_PROC_BROWSER_TEST_F(NotABrowserTest, MANUAL_Skipped) {}\n",
+  };
+  for (const [path, text] of Object.entries(sources)) {
+    mkdirSync(dirname(join(f.layout.source, "uw", path)), { recursive: true });
+    writeFileSync(join(f.layout.source, "uw", path), text);
+  }
   const home = temporary(t);
   mkdirSync(join(home, ".ssh"));
   writeFileSync(join(home, ".ssh", WINDOW_VM), "key fixture");
@@ -276,7 +290,8 @@ test("window tests run browser_tests in the VM and always stop it", (t) => {
   f.browser.windowTests([]);
   assert.deepEqual(f.started[0]!.slice(0, 4), ["tart", "run", WINDOW_VM, "--no-graphics"]);
   assert.ok(f.started[0]!.includes(`--dir=src:${f.layout.source}:ro`));
-  assert.match(windowTestRun(f), /browser_tests --run-manual --headful-mode '--gtest_filter=\*\.MANUAL_\*'$/);
+  assert.match(windowTestRun(f), new RegExp("browser_tests --run-manual --headful-mode " +
+    "'--gtest_filter=ChatBrowserTest\\.MANUAL_ClicksOutside:ChatBrowserTest\\.MANUAL_Hovers:SwipeBrowserTest\\.MANUAL_Swipes'$"));
   const guestCommands = f.calls.filter(({ command }) => command[0] === "ssh").map(({ command }) => command);
   assert.match(guestCommands[0]!.at(-1)!, /who \| grep -q '\^admin  \*console'/);
   for (const command of guestCommands) assert.deepEqual(command.slice(1, 3), ["-b", "192.168.64.1"]);
@@ -288,6 +303,15 @@ test("window tests run browser_tests in the VM and always stop it", (t) => {
   assert.throws(() => f.browser.windowTests(["--gtest_filter=A.MANUAL_B", "--gtest_repeat=100"]), /browser_tests failed/);
   assert.match(windowTestRun(f), /--headful-mode '--gtest_filter=A\.MANUAL_B' '--gtest_repeat=100'$/);
   assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
+});
+
+test("window tests without uw's tests stop before starting the VM", (t) => {
+  const f = windowFixture(t);
+  rmSync(join(f.layout.source, "uw"), { recursive: true });
+  assert.throws(() => f.browser.windowTests([]), /No uw MANUAL_ tests under .+\/src\/uw/);
+  assert.equal(f.started.length, 0);
+  f.browser.windowTests(["--gtest_filter=A.MANUAL_B"]);
+  assert.match(windowTestRun(f), /--headful-mode '--gtest_filter=A\.MANUAL_B'$/);
 });
 
 test("window tests refuse a VM on another macOS build", (t) => {

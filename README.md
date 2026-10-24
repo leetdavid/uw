@@ -213,7 +213,7 @@ pnpm run window-tests
 pnpm run window-tests --gtest_filter='CommandBarBrowserTest.MANUAL_*' --gtest_repeat=100
 ```
 
-Build `browser_tests` first. The command starts the `uw-window-tests` VM, runs the tests in it against your `.chromium/src`, and stops the VM. A second run waits for the first. Options other than `--checkout-dir` go to `browser_tests`; without a `--gtest_filter`, it runs every `MANUAL_` test, Chromium's own included. Many of Chromium's need the internet, a camera, or a second display, which the VM lacks, so they fail. With `UW_SCREENSHOT_DIR` set, screenshots land in that folder. If a test crashes, the output names a folder holding its crash report.
+Build `browser_tests` first. The command starts the `uw-window-tests` VM, runs the tests in it against your `.chromium/src`, and stops the VM. A second run waits for the first. Options other than `--checkout-dir` go to `browser_tests`; without a `--gtest_filter`, it runs uw's own `MANUAL_` tests from `browser/` and `components/`. It leaves out Chromium's, which mostly need the internet, a camera, or a second display that the VM lacks, and the command check, which `pnpm run command-check` runs against a live model. With `UW_SCREENSHOT_DIR` set, screenshots land in that folder. If a test crashes, the output names a folder holding its crash report.
 
 A real-window test on a web page needs three things, all shown in `UwChatBrowserTest.MANUAL_TheUsageCardWorksWithARealMouse`:
 
