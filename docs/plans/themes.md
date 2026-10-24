@@ -75,7 +75,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Page mode
 
-Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24, and T102 built it the same day. Nobody has used it in a real window yet.
+Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24, and T102 built it the same day. The user approved the build that day. Nobody has used it in a real window yet.
 
 Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a part of the theme, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
 
