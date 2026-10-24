@@ -169,7 +169,7 @@ Glass, the window's elements:
 - It works whatever the Transparency. Over a solid sidebar, the elements show the sidebar's color through them, as macOS's glass controls show what is behind them in the window. Agreed on 2026-10-24: no holes cut through the sidebar under the pin tiles.
 - Agreed on 2026-10-24, "add the glass effect to any other leftover interfaces": the workspace switcher's current workspace and the Scratchpad's Tidy and Clear under the pointer are glass pills, and the activity card above the foot is a glass card, its color at 85% under the lit edge. The tab and pin menus are macOS's own, which macOS draws as Liquid Glass already.
 - uw's menus and cards, the command bar, the theme picker, and the "Watch this page" card are frosted glass while Glass is off its left end, as macOS's menus are. The picker frosts as the slider moves. They use macOS's heavier regular glass under their own color at about 85%, so their text always keeps 4.5:1. The cards include the sidebar's, such as the rename card.
-- Agreed on 2026-10-24, "go as your recommendation": the new button's menu, the new workspace card's profile list, and the ⋮ menu with its submenus are frosted the same way, in Chromium's menu color at 85%. The find bar, hover cards, and Chromium's other menus and popups stay solid.
+- Agreed on 2026-10-24, "go as your recommendation": the new button's menu, the new workspace card's profile list, and the ⋮ menu with its submenus are frosted the same way, in Chromium's menu color at 85%. Then, "i want it anyway, to unify the visual language": the address bar's suggestion list too, which shows while the command bar is off. Its glass leaves out the address it opens around, so typed text stays sharp. The find bar, hover cards, and Chromium's other menus and popups stay solid.
 - Reduce transparency in macOS makes the elements flat too.
 - Real glass on each pin tile, which bends what is behind it, is T176, prototyped first. If a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
 
@@ -187,6 +187,7 @@ How it is built, for T175:
 - `BrowserFrameViewMac` paints the theme at its cover around the page card. The toolbar and the bookmarks bar paint the page color at the toolbar's cover. Over glass the top container paints nothing behind them, and the toolbar's top corners have no fill of their own.
 - `PaintGlassTabFill` draws pin tiles and the active tab as lit glass, and `browser/ui/glass/glass_background` the foot's buttons, the switcher, Tidy and Clear, and the activity card. Tiles have no drop shadow, since a tab cannot paint outside itself.
 - A card's bubble gets macOS's regular glass behind it, an `NSGlassEffectView` inside its shadow, and its color at 85%: `FrostOverGlass` for uw's own cards, and `FrostPageBubble` for the bubbles that hold a web page, whose page draws its own see-through color while the window's glass is on.
+- `RoundedOmniboxResultsFrame::UpdateFrost`, in `uw-look`, frosts the suggestion list each time it shows. The list's page draws no color of its own; the frame behind it paints the list's color. `SetFrostedGlass` cuts the address out of the glass with a mask.
 - `FrostOpenMenu` frosts a menu just after it opens. A hook that `uw-look` adds to Chromium's `MenuHost` frosts each of its submenus before it shows.
 
 Stages:
@@ -205,7 +206,7 @@ Acceptance checks:
 6. Two uw windows side by side are both see-through. The one not active is more frosted. With the switch for windows behind off, it is solid.
 7. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. Reduce transparency also makes the elements flat. For the first two, the picker says why.
 8. Two workspaces keep their own Transparency and Glass.
-9. With Glass off its left end, a task's menu, the new button's menu, the profile list, the ⋮ menu and its submenus, the command bar, the picker, and the "Watch this page" card show what is behind them frosted, and their text keeps 4.5:1. The switcher's current workspace, Tidy and Clear under the pointer, and the activity card are lit glass.
+9. With Glass off its left end, a task's menu, the new button's menu, the profile list, the ⋮ menu and its submenus, the address bar's suggestion list, the command bar, the picker, and the "Watch this page" card show what is behind them frosted, and their text keeps 4.5:1. The switcher's current workspace, Tidy and Clear under the pointer, and the activity card are lit glass.
 10. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions

@@ -4,12 +4,16 @@
 #include "uw/browser/ui/glass/glass.h"
 
 #import <AppKit/AppKit.h>
+#import <QuartzCore/QuartzCore.h>
 
 #include <algorithm>
+#include <map>
+#include <optional>
 #include <utility>
 
 #include "base/functional/bind.h"
 #include "base/mac/mac_util.h"
+#include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
@@ -34,14 +38,56 @@
 #include "uw/browser/ui/look/menu_card.h"
 
 // A glass view that leaves clicks to the views over it, as Chromium's window
-// glass does.
+// glass does, with a hole near its top that it keeps as it resizes.
 API_AVAILABLE(macos(26.0))
 @interface UwFrostedGlassView : NSGlassEffectView
+@property(nonatomic) std::optional<uw::GlassHole> hole;
 @end
 
-@implementation UwFrostedGlassView
+@implementation UwFrostedGlassView {
+  std::optional<uw::GlassHole> _hole;
+}
+
 - (NSView*)hitTest:(NSPoint)point {
   return nil;
+}
+
+- (std::optional<uw::GlassHole>)hole {
+  return _hole;
+}
+
+- (void)setHole:(std::optional<uw::GlassHole>)hole {
+  _hole = hole;
+  [self cutHole];
+}
+
+- (void)setFrameSize:(NSSize)size {
+  [super setFrameSize:size];
+  [self cutHole];
+}
+
+// Masks the hole out of the glass, so what is under it stays sharp.
+- (void)cutHole {
+  if (!_hole) {
+    self.layer.mask = nil;
+    return;
+  }
+  const CGRect glass = self.bounds;
+  const CGRect hole = CGRectMake(
+      _hole->sides, CGRectGetHeight(glass) - _hole->top - _hole->height,
+      std::max<CGFloat>(0, CGRectGetWidth(glass) - 2 * _hole->sides),
+      _hole->height);
+  const CGFloat radius = std::min<CGFloat>(
+      _hole->radius, std::min(CGRectGetWidth(hole), CGRectGetHeight(hole)) / 2);
+  CGMutablePathRef path = CGPathCreateMutable();
+  CGPathAddRect(path, nullptr, glass);
+  CGPathAddRoundedRect(path, nullptr, hole, radius, radius);
+  CAShapeLayer* mask = [CAShapeLayer layer];
+  mask.fillRule = kCAFillRuleEvenOdd;
+  mask.frame = glass;
+  mask.path = path;
+  CGPathRelease(path);
+  self.layer.mask = mask;
 }
 @end
 
@@ -49,23 +95,49 @@ namespace uw {
 namespace {
 
 // Keeps frosted glass behind a card's widget, inside the card's shadow, until
-// the widget goes, and then deletes itself.
+// the widget goes or the glass is taken away, and then deletes itself.
 class FrostedGlass : public views::WidgetObserver {
  public:
-  FrostedGlass(views::Widget* widget, const gfx::Insets& insets, int radius)
-      : insets_(insets) {
+  // The glass behind `widget`, or null.
+  static FrostedGlass* Of(views::Widget* widget) {
+    const auto found = All().find(widget);
+    return found == All().end() ? nullptr : found->second;
+  }
+
+  explicit FrostedGlass(views::Widget* widget) : widget_(widget) {
+    All()[widget] = this;
     observation_.Observe(widget);
     if (@available(macOS 26.0, *)) {
-      NSView* content =
-          widget->GetNativeWindow().GetNativeNSWindow().contentView;
       UwFrostedGlassView* glass =
           [[UwFrostedGlassView alloc] initWithFrame:NSZeroRect];
+      glass.wantsLayer = YES;
       glass.style = NSGlassEffectViewStyleRegular;
-      glass.cornerRadius = radius;
-      [content addSubview:glass positioned:NSWindowBelow relativeTo:nil];
+      glass.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+      [widget->GetNativeWindow().GetNativeNSWindow().contentView
+          addSubview:glass
+          positioned:NSWindowBelow
+          relativeTo:nil];
       glass_ = glass;
-      Place();
     }
+  }
+
+  void Set(const gfx::Insets& insets,
+           int corner_radius,
+           const std::optional<GlassHole>& hole) {
+    insets_ = insets;
+    Place();
+    if (@available(macOS 26.0, *)) {
+      UwFrostedGlassView* glass = static_cast<UwFrostedGlassView*>(glass_);
+      glass.cornerRadius = corner_radius;
+      glass.hole = hole;
+    }
+  }
+
+  void Remove() {
+    observation_.Reset();
+    All().erase(widget_);
+    [glass_ removeFromSuperview];
+    delete this;
   }
 
   // views::WidgetObserver:
@@ -74,13 +146,14 @@ class FrostedGlass : public views::WidgetObserver {
     Place();
   }
 
-  void OnWidgetDestroying(views::Widget* widget) override {
-    observation_.Reset();
-    [glass_ removeFromSuperview];
-    delete this;
-  }
+  void OnWidgetDestroying(views::Widget* widget) override { Remove(); }
 
  private:
+  static std::map<views::Widget*, FrostedGlass*>& All() {
+    static base::NoDestructor<std::map<views::Widget*, FrostedGlass*>> all;
+    return *all;
+  }
+
   void Place() {
     NSView* content = glass_.superview;
     if (!content) {
@@ -93,7 +166,8 @@ class FrostedGlass : public views::WidgetObserver {
                    std::max<CGFloat>(0, NSHeight(bounds) - insets_.height()));
   }
 
-  const gfx::Insets insets_;
+  const raw_ptr<views::Widget> widget_;
+  gfx::Insets insets_;
   NSView* __strong glass_;
   base::ScopedObservation<views::Widget, views::WidgetObserver> observation_{
       this};
@@ -196,7 +270,25 @@ base::CallbackListSubscription OnGlassRulesChanged(
 void AddFrostedGlass(views::Widget* widget,
                      const gfx::Insets& insets,
                      int corner_radius) {
-  new FrostedGlass(widget, insets, corner_radius);
+  SetFrostedGlass(widget, true, insets, corner_radius, std::nullopt);
+}
+
+void SetFrostedGlass(views::Widget* widget,
+                     bool on,
+                     const gfx::Insets& insets,
+                     int corner_radius,
+                     const std::optional<GlassHole>& hole) {
+  FrostedGlass* glass = FrostedGlass::Of(widget);
+  if (!on) {
+    if (glass) {
+      glass->Remove();
+    }
+    return;
+  }
+  if (!glass) {
+    glass = new FrostedGlass(widget);
+  }
+  glass->Set(insets, corner_radius, hole);
 }
 
 void FrostPageBubble(views::Widget* widget, content::WebContents* contents) {

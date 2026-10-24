@@ -56,6 +56,8 @@ void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
       ui::SetAlpha(kColorMenuCardBackground, kMenuCardOverGlass);
   mixer[kColorMenuGlass] =
       ui::SetAlpha(ui::kColorMenuBackground, kMenuCardOverGlass);
+  mixer[kColorOmniboxResultsGlass] =
+      ui::SetAlpha(kColorOmniboxResultsBackground, kMenuCardOverGlass);
 }
 
 // Custom themes bring their own frame and tab colors.

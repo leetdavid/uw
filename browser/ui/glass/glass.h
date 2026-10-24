@@ -5,6 +5,7 @@
 #define UW_BROWSER_UI_GLASS_GLASS_H_
 
 #include <cstddef>
+#include <optional>
 
 #include "base/callback_list.h"
 #include "base/functional/callback.h"
@@ -75,6 +76,25 @@ float ToolbarCoverOfWindow(BrowserWindowInterface* window, SkColor color);
 void AddFrostedGlass(views::Widget* widget,
                      const gfx::Insets& insets,
                      int corner_radius);
+
+// A hole near the top of frosted glass, for what shows through it from the
+// window below: `top` down from the glass's top edge, `sides` in from its
+// left and right edges, `height` tall, with corners of `radius`.
+struct GlassHole {
+  int top = 0;
+  int sides = 0;
+  int height = 0;
+  int radius = 0;
+};
+
+// Puts frosted glass behind `widget` as AddFrostedGlass() does, with `hole`
+// cut out of it, while `on`, and takes it away when not. For a widget that
+// shows many times.
+void SetFrostedGlass(views::Widget* widget,
+                     bool on,
+                     const gfx::Insets& insets,
+                     int corner_radius,
+                     const std::optional<GlassHole>& hole);
 
 // Puts frosted glass behind a web page's bubble `widget`, whose page in
 // `contents` then draws its own color, see-through while glass is on.

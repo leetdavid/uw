@@ -13,15 +13,29 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/omnibox/omnibox_controller.h"
+#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_presenter_base.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_view_webui.h"
+#include "chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/test/base/ui_test_utils.h"
+#include "components/omnibox/browser/autocomplete_controller.h"
+#include "components/omnibox/browser/autocomplete_input.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
 #include "skia/ext/skia_utils_mac.h"
+#include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/base/test/ui_controls.h"
@@ -79,18 +93,29 @@ class GlassBrowserTest : public headless::HeadlessModeBrowserTest {
     return nullptr;
   }
 
-  // Whether macOS's glass lies behind everything `widget` draws.
-  static bool HasGlassBehind(views::Widget* widget) {
+  // macOS's glass behind everything `widget` draws, or nil.
+  static NSView* GlassBehind(views::Widget* widget) {
     NSView* back = widget->GetNativeWindow()
                        .GetNativeNSWindow()
                        .contentView.subviews.firstObject;
-    return [back isKindOfClass:NSClassFromString(@"NSGlassEffectView")];
+    return [back isKindOfClass:NSClassFromString(@"NSGlassEffectView")] ? back
+                                                                        : nil;
   }
 
-  // Saves the window of `browser` with the menus open over it, as macOS
-  // shows them. A menu's window is a child of the browser's, and macOS offers
-  // no picture of it alone.
-  static void SaveWindowWithMenus(Browser* browser, const std::string& name) {
+  // The address bar's suggestion list.
+  OmniboxPopupPresenterBase* Suggestions() {
+    return static_cast<OmniboxPopupViewWebUI*>(
+               BrowserView::GetBrowserViewForBrowser(browser())
+                   ->toolbar()
+                   ->location_bar_view()
+                   ->GetOmniboxPopupView())
+        ->presenter();
+  }
+
+  // Saves the window of `browser` with the menus and popups open over it, as
+  // macOS shows them. Their windows are children of the browser's, and macOS
+  // offers no picture of one alone.
+  static void SaveWindowWithPopups(Browser* browser, const std::string& name) {
     if (@available(macOS 14.4, *)) {
       // A menu's window shows before its first frame has drawn.
       base::RunLoop drawn;
@@ -227,9 +252,35 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
         ui::mojom::MenuSourceType::kNone);
     FrostOpenMenu(browser());
     ASSERT_TRUE(OpenMenu());
-    EXPECT_EQ(HasGlassBehind(OpenMenu()->GetSubmenu()->GetWidget()), glass > 0);
+    EXPECT_EQ(!!GlassBehind(OpenMenu()->GetSubmenu()->GetWidget()), glass > 0);
     menu.Cancel();
     ASSERT_TRUE(base::test::RunUntil([] { return !OpenMenu(); }));
+  }
+}
+
+// The address bar's suggestion list frosts like a menu, leaving the address it
+// opens around sharp, and is solid again once the elements are flat.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
+                       TheSuggestionListIsFrostedWhileTheElementsAreGlass) {
+  if (!MacCanShowGlass()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  OmniboxPopupPresenterBase* suggestions = Suggestions();
+  for (const int glass : {60, 0}) {
+    SetLook(0, glass);
+    suggestions->Show();
+    views::Widget* list = suggestions->get_widget_for_testing();
+    ASSERT_TRUE(list);
+    NSView* back = GlassBehind(list);
+    EXPECT_EQ(!!back, glass > 0);
+    EXPECT_EQ(!!back.layer.mask, glass > 0);
+    // The list grows as suggestions come in, and the glass with it.
+    const CGFloat glass_height = NSHeight(back.frame);
+    gfx::Rect taller = list->GetWindowBoundsInScreen();
+    taller.set_height(taller.height() + 100);
+    list->SetBounds(taller);
+    EXPECT_EQ(NSHeight(back.frame) - glass_height, back ? 100 : 0);
+    suggestions->Hide();
   }
 }
 
@@ -284,8 +335,8 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_MenusAsMacOSShowsThem) {
   }));
   views::MenuItemView* menu = OpenMenu();
   views::Widget* menu_window = menu->GetSubmenu()->GetWidget();
-  EXPECT_TRUE(HasGlassBehind(menu_window));
-  SaveWindowWithMenus(browser(), "glass-menu");
+  EXPECT_TRUE(GlassBehind(menu_window));
+  SaveWindowWithPopups(browser(), "glass-menu");
 
   views::MenuItemView* parent = nullptr;
   for (views::MenuItemView* item : menu->GetSubmenu()->GetMenuItems()) {
@@ -304,8 +355,8 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_MenusAsMacOSShowsThem) {
   moved.Run();
   ASSERT_TRUE(base::test::RunUntil([&] { return parent->SubmenuIsShowing(); }));
   views::Widget* submenu_window = parent->GetSubmenu()->GetWidget();
-  EXPECT_TRUE(HasGlassBehind(submenu_window));
-  SaveWindowWithMenus(browser(), "glass-submenu");
+  EXPECT_TRUE(GlassBehind(submenu_window));
+  SaveWindowWithPopups(browser(), "glass-submenu");
 
   // The new button's menu opens over the sidebar.
   views::MenuController::GetActiveInstance()->Cancel(
@@ -320,8 +371,47 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_MenusAsMacOSShowsThem) {
     return OpenMenu() && OpenMenu()->GetSubmenu()->GetWidget() &&
            OpenMenu()->GetSubmenu()->GetWidget()->IsVisible();
   }));
-  EXPECT_TRUE(HasGlassBehind(OpenMenu()->GetSubmenu()->GetWidget()));
-  SaveWindowWithMenus(browser(), "glass-new-button-menu");
+  EXPECT_TRUE(GlassBehind(OpenMenu()->GetSubmenu()->GetWidget()));
+  SaveWindowWithPopups(browser(), "glass-new-button-menu");
+}
+
+// Real windows only. Saves the address bar's suggestion list over a red page
+// as macOS shows it, frosted around the sharp address.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_SuggestionsAsMacOSShowsThem) {
+  if (!MacCanShowGlass()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  browser()->GetWindow()->Activate();
+  ASSERT_TRUE(
+      content::ExecJs(browser()->tab_strip_model()->GetActiveWebContents(),
+                      "document.body.style.background = '#c62828'"));
+  SetLook(kFullTransparency / 2, 60);
+  LocationBarView* address = BrowserView::GetBrowserViewForBrowser(browser())
+                                 ->toolbar()
+                                 ->location_bar_view();
+  OmniboxController* omnibox = address->GetOmniboxController();
+  omnibox->edit_model()->SetUserText(u"uw glass");
+  AutocompleteInput input(
+      u"uw glass", metrics::OmniboxEventProto::BLANK,
+      ChromeAutocompleteSchemeClassifier(browser()->GetProfile()));
+  input.set_omit_asynchronous_matches(true);
+  omnibox->autocomplete_controller()->Start(input);
+  views::Widget* list = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    list = Suggestions()->get_widget_for_testing();
+    return list && list->IsVisible() &&
+           list->GetWindowBoundsInScreen().height() >
+               address->GetBoundsInScreen().height() * 3;
+  }));
+  // The list opens around the address, as Chromium's own test expects.
+  EXPECT_EQ(
+      list->GetWindowBoundsInScreen().y(),
+      address->GetBoundsInScreen().y() -
+          RoundedOmniboxResultsFrame::GetLocationBarAlignmentInsets().top() -
+          RoundedOmniboxResultsFrame::GetShadowInsets().top());
+  EXPECT_TRUE(GlassBehind(list));
+  SaveNativeWindowScreenshot(browser(), "glass-suggestions-window");
+  SaveWindowWithPopups(browser(), "glass-suggestions");
 }
 
 }  // namespace

@@ -9,7 +9,10 @@ source_set("glass") {
   ]
   if (is_mac) {
     sources += [ "glass_mac.mm" ]
-    frameworks = [ "AppKit.framework" ]
+    frameworks = [
+      "AppKit.framework",
+      "QuartzCore.framework",
+    ]
   }
   public_deps = [
     "//base",
@@ -54,10 +57,12 @@ source_set("browser_tests") {
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
     "//chrome/test:test_support",
+    "//components/omnibox/browser",
     "//components/prefs",
     "//content/test:test_support",
     "//skia",
     "//testing/gtest",
+    "//third_party/metrics_proto",
     "//ui/base",
     "//ui/base:test_support",
     "//ui/compositor",

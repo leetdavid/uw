@@ -26,6 +26,8 @@ inline constexpr ui::ColorId kColorMenuCardAccent = kChromeColorsEnd + 24;
 inline constexpr ui::ColorId kColorMenuCardGlass = kChromeColorsEnd + 25;
 // Chromium's menu color at 85%, for its menus that uw frosts.
 inline constexpr ui::ColorId kColorMenuGlass = kChromeColorsEnd + 26;
+// The address bar's suggestion list color at 85%, while uw frosts it.
+inline constexpr ui::ColorId kColorOmniboxResultsGlass = kChromeColorsEnd + 27;
 
 inline constexpr int kMenuCardWidth = 264;
 inline constexpr int kMenuCardRadius = 14;
