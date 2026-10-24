@@ -62,6 +62,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Workspaces plan](plans/workspaces.md): Arc-style workspaces you swipe between, several to a profile, and pinned tabs shared by every window of a profile.
 - [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, black dark mode, a page mode apart from the window's, a toolbar in each page's color, and proposed glass.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
+- [Hidden sidebar plan](plans/hidden-sidebar.md): Cmd+S hides the sidebar, and it floats in over the page at the window's left edge, as in Arc.
 - [Sidebar menus plan](plans/sidebar-menus.md): the task menu and the Organize menu as uw cards, and naming a task on its row.
 - [Scratchpad buttons plan](plans/scratchpad-buttons.md): Tidy files the Scratchpad's tabs into tasks with one request, and Clear closes them, as in Arc.
 - [Command bar plan](plans/command-bar.md): one panel on Cmd+T and Cmd+L for commands, tasks, tabs, and the web, ranked by use, that can also send the typed text to a chat or a terminal.

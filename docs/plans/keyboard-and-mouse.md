@@ -34,6 +34,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Confirm the organizer's suggestion | Ctrl+Cmd+Return | button on the activity card |
 | Undo tab organization | Option+Cmd+Z | exists |
 | Focus the sidebar | Ctrl+Cmd+L | new |
+| Hide or show the sidebar | Cmd+S | changes. Was Chromium's Cmd+Shift+L. Save Page As loses Cmd+S. See [Hidden sidebar](hidden-sidebar.md). |
 | Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
 | New terminal | Ctrl+Shift+\` | new |
 | Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |

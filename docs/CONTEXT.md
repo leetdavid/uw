@@ -43,6 +43,14 @@ _Avoid_: Glass, translucency, opacity, vibrancy.
 A theme setting, from flat to clear, that turns the window's pin tiles, active tab, and buttons into lit glass, as macOS's Liquid Glass does its controls. It is apart from transparency.
 _Avoid_: Transparency, blur.
 
+**Hidden sidebar**:
+A sidebar the user has hidden, as Arc's Hide Sidebar does. It takes no width, and the page fills the window.
+_Avoid_: Collapsed sidebar, narrow sidebar.
+
+**Floating sidebar**:
+A hidden sidebar shown over the page for a moment, as in Arc. The page stays where it is underneath.
+_Avoid_: Peek, overlay, expanded sidebar.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
