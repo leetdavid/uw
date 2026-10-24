@@ -22,7 +22,7 @@
     "window-tests": "node scripts/chromium.ts window-tests",
     "command-check": "node scripts/command-check.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --harmony-temporal --test --test-isolation=none tests/*.test.ts",
+    "test": "node --harmony-temporal --test --test-isolation=none tests/*.test.ts command/tests/*.test.ts",
     "check": "pnpm run typecheck && pnpm test"
   },
   "devDependencies": {
