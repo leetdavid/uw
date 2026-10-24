@@ -570,7 +570,7 @@ export class Chromium {
     if (this.windowVmState() === "running") this.capture(["tart", "stop", WINDOW_VM], { timeout: 120_000 });
     const screenshots = this.runtime.env.UW_SCREENSHOT_DIR;
     this.runtime.start([
-      "tart", "run", WINDOW_VM, "--no-graphics", `--dir=src:${this.layout.source}:ro`, `--dir=results:${results}`,
+      "tart", "run", WINDOW_VM, "--no-graphics", "--no-audio", `--dir=src:${this.layout.source}:ro`, `--dir=results:${results}`,
       ...(screenshots ? [`--dir=shots:${resolve(screenshots)}`] : []),
     ]);
   }

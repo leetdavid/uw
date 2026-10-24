@@ -288,7 +288,8 @@ function windowTestRun(f: Fixture): string {
 test("window tests run browser_tests in the VM and always stop it", (t) => {
   const f = windowFixture(t);
   f.browser.windowTests([]);
-  assert.deepEqual(f.started[0]!.slice(0, 4), ["tart", "run", WINDOW_VM, "--no-graphics"]);
+  // The VM's sound never reaches the Mac's speakers.
+  assert.deepEqual(f.started[0]!.slice(0, 5), ["tart", "run", WINDOW_VM, "--no-graphics", "--no-audio"]);
   assert.ok(f.started[0]!.includes(`--dir=src:${f.layout.source}:ro`));
   assert.match(windowTestRun(f), new RegExp("browser_tests --run-manual --headful-mode " +
     "'--gtest_filter=ChatBrowserTest\\.MANUAL_ClicksOutside:ChatBrowserTest\\.MANUAL_Hovers:SwipeBrowserTest\\.MANUAL_Swipes'$"));
