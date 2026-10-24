@@ -33,6 +33,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
@@ -51,10 +52,13 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/color/color_provider_key.h"
+#include "ui/compositor/layer.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/native_theme/native_theme.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -185,6 +189,12 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
 
   static content::WebContents* PageOf(BrowserWindowInterface* window) {
     return window->GetActiveTabInterface()->GetContents();
+  }
+
+  static bool IsDark(content::WebContents* page) {
+    return content::EvalJs(page,
+                           "matchMedia('(prefers-color-scheme: dark)').matches")
+        .ExtractBool();
   }
 
   static void Load(BrowserWindowInterface* window, const GURL& url) {
@@ -345,6 +355,116 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   // A new workspace starts on a suggested theme no workspace uses.
   EXPECT_EQ(NewWorkspaceTheme(wine).colors, suggested[0]);
   EXPECT_EQ(NewWorkspaceTheme(wine).mode, ThemeMode::kDark);
+}
+
+// Per docs/plans/themes.md#page-mode.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       PagesTakeThePageModeAndChromiumsPagesTheWindow) {
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  Load(browser(), GURL(kForm));
+  EXPECT_TRUE(IsDark(PageOf(browser())));
+  EXPECT_EQ(PageOf(browser())->GetColorMode(),
+            ui::ColorProviderKey::ColorMode::kLight);
+  AddTab(browser(), GURL("chrome://chat"));
+  content::WebContents* chat = PageOf(browser());
+  EXPECT_TRUE(IsDark(chat));
+  SaveWindowScreenshot(browser()->GetBrowserForMigrationOnly(),
+                       "page-mode-light-window-dark-pages");
+  AddTab(browser(), GURL(kNotes));
+  EXPECT_FALSE(IsDark(PageOf(browser())));
+
+  theme.mode = ThemeMode::kDark;
+  theme.page_mode = PageMode::kLight;
+  SetThemeOfWindow(browser(), theme);
+  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(PageOf(browser())); }));
+  Load(browser(), GURL(kForm));
+  EXPECT_FALSE(IsDark(PageOf(browser())));
+  EXPECT_FALSE(IsDark(chat));
+
+  // Private windows follow macOS, as in Chromium.
+  Browser* incognito = CreateIncognitoBrowser();
+  ASSERT_TRUE(content::NavigateToURL(PageOf(incognito), GURL(kForm)));
+  EXPECT_EQ(IsDark(PageOf(incognito)),
+            ui::NativeTheme::GetInstanceForWeb()->preferred_color_scheme() ==
+                ui::NativeTheme::PreferredColorScheme::kDark);
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesKeepTwoPageModes) {
+  const std::string reading = AddWorkspace("Reading", profile());
+  Theme dark_pages;
+  dark_pages.mode = ThemeMode::kLight;
+  dark_pages.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), dark_pages);
+  Load(browser(), GURL(kForm));
+  EXPECT_EQ(NewWorkspaceTheme(dark_pages).page_mode, PageMode::kDark);
+
+  RunWindowCommand(browser(), kGoToWorkspace1 + 1);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(partner);
+  Theme light_pages = dark_pages;
+  light_pages.page_mode = PageMode::kLight;
+  SetThemeOfWindow(partner, light_pages);
+  Load(partner, GURL(kForm));
+
+  EXPECT_TRUE(IsDark(PageOf(browser())));
+  EXPECT_FALSE(IsDark(PageOf(partner)));
+  EXPECT_EQ(ThemeOfWindow(browser()).page_mode, PageMode::kDark);
+  EXPECT_EQ(ThemeOfWindow(partner).page_mode, PageMode::kLight);
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, OpenPagesTakeANewPageModeAtOnce) {
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  SetThemeOfWindow(browser(), theme);
+  Load(browser(), GURL(kForm));
+  AddTab(browser(), GURL(kGreen));
+  content::WebContents* behind = TabOf(browser(), GURL(kForm));
+  ASSERT_TRUE(behind);
+  EXPECT_FALSE(IsDark(PageOf(browser())));
+
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(PageOf(browser())); }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(behind); }));
+  EXPECT_EQ(ThemeOfWindow(browser()).page_mode, PageMode::kDark);
+
+  theme.page_mode = PageMode::kWindow;
+  SetThemeOfWindow(browser(), theme);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(PageOf(browser())); }));
+}
+
+// Before a page paints, the card behind it is black or white by page mode.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       TheCardBehindAPageTakesThePageMode) {
+  const auto card = [&] {
+    return BrowserView::GetBrowserViewForBrowser(browser())
+        ->contents_web_view()
+        ->layer()
+        ->AsSolidColor()
+        ->GetTargetColor()
+        .toSkColor();
+  };
+  Theme theme;
+  theme.mode = ThemeMode::kLight;
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  Load(browser(), GURL(kForm));
+  EXPECT_EQ(card(), kBlackCard);
+  Load(browser(), GURL(kNotes));
+  EXPECT_NE(card(), kBlackCard);
+
+  theme.mode = ThemeMode::kDark;
+  theme.page_mode = PageMode::kLight;
+  SetThemeOfWindow(browser(), theme);
+  Load(browser(), GURL(kForm));
+  EXPECT_EQ(card(), SK_ColorWHITE);
+
+  theme.page_mode = PageMode::kWindow;
+  SetThemeOfWindow(browser(), theme);
+  EXPECT_NE(card(), SK_ColorWHITE);
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, SwitchingSwapsTheWindowInPlace) {

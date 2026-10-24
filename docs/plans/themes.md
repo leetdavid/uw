@@ -75,7 +75,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Page mode
 
-Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24. Being built in T102.
+Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24, and T102 built it the same day. Nobody has used it in a real window yet.
 
 Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a part of the theme, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
 
@@ -86,7 +86,7 @@ Implementability: **7/10**. Chromium decides in one place whether a page is told
 - The page's scrollbar follows the toolbar, as in Chromium, and the toolbar takes the [page color](#page-colors). A site with no dark look of its own keeps a light scrollbar. Agreed on 2026-10-24; this replaced "the scrollbar follows page mode".
 - Open pages change as soon as the setting does.
 - The control is a "Pages" row in the picker, under the window's Auto, Light, and Dark.
-- It belongs to the theme, so each [workspace](workspaces.md) has its own, as its window mode is. Agreed on 2026-10-24; it was per profile. It does not sync. Incognito pages keep following macOS, as Chromium does.
+- It belongs to the theme, so each [workspace](workspaces.md) has its own, as its window mode is, and a new workspace starts on the page mode of the one it was made from. Agreed on 2026-10-24; it was per profile. It does not sync. Incognito pages keep following macOS, as Chromium does.
 - No per-site exceptions for now.
 
 Stages:
@@ -103,6 +103,13 @@ Acceptance checks:
 5. Changing the row changes open pages without a reload.
 6. Two workspaces keep two page modes. Incognito pages follow macOS.
 7. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
+How it is built, for T102:
+
+- The theme keeps `page_mode`, in each workspace's theme and in `uw.theme.page_mode` for windows without a workspace.
+- `PageModeIsDark` in `browser/workspaces/workspace_theme.h` decides for each tab from its window's theme and its address. `uw-scheme-alias` asks it in `GetPreferredColorScheme`, and `uw-look` asks `EmptyPageColor` in `ContentsWebView` for the card, also after each navigation.
+- A change redraws the workspace's windows, which makes Chromium tell each open page again.
+- `WorkspacesBrowserTest.PagesTakeThePageModeAndChromiumsPagesTheWindow`, `TwoWorkspacesKeepTwoPageModes`, `OpenPagesTakeANewPageModeAtOnce`, and `TheCardBehindAPageTakesThePageMode` cover checks 2 to 6, and `ThemePickerBrowserTest.ThePagesRowSetsThePageMode` the row.
 
 ## Page colors
 

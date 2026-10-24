@@ -26,6 +26,7 @@ inline constexpr char kThemeTransparencyPref[] = "uw.theme.transparency";
 inline constexpr char kThemeGlassPref[] = "uw.theme.glass";
 inline constexpr char kThemeColorsInDarkModePref[] =
     "uw.theme.colors_in_dark_mode";
+inline constexpr char kThemePageModePref[] = "uw.theme.page_mode";
 
 void RegisterThemeProfilePrefs(PrefRegistrySimple* registry);
 

@@ -1369,3 +1369,67 @@ index 55872a3b6bded9337e845ab94db0ff93573e127f..71c078fa392831e5c8f901ee5aed6ebd
    --color-searchbox-results-button-selected-hover: var(--color-omnibox-results-button-ink-drop-row-selected);
    --color-searchbox-results-dim-selected: var(--color-omnibox-results-text-dimmed-selected);
    --color-searchbox-results-foreground-dimmed: var(--color-omnibox-results-text-dimmed);
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
+index c49d4c8b7e7211ca456572510cf958b04b0020d3..8b6b35f7940f40f64e1e088a7680831be9259bf8 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.cc
++++ b/chrome/browser/ui/views/frame/contents_web_view.cc
+@@ -11,6 +11,7 @@
+ #include "chrome/browser/ui/views/status_bubble_views.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
++#include "content/public/browser/navigation_handle.h"
+ #include "content/public/browser/render_widget_host_view.h"
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/blink/public/common/input/web_input_event.h"
+@@ -21,6 +22,7 @@
+ #include "ui/compositor/layer_tree_owner.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/workspaces/workspace_theme.h"
+ 
+ #if defined(USE_AURA)
+ #include "ui/aura/window.h"
+@@ -169,6 +171,14 @@ void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
+   }
+ }
+ 
++void ContentsWebView::DidFinishNavigation(
++    content::NavigationHandle* navigation) {
++  if (navigation->IsInPrimaryMainFrame() && navigation->HasCommitted() &&
++      GetWidget()) {
++    UpdateBackgroundColor();
++  }
++}
++
+ #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
+   // If the user interacts with the web contents, ensure it is activated.
+@@ -186,9 +196,14 @@ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
+ #endif
+ 
+ void ContentsWebView::UpdateBackgroundColor() {
+-  const SkColor color = GetColorProvider()->GetColor(
++  SkColor color = GetColorProvider()->GetColor(
+       is_letterboxing() ? kColorWebContentsBackgroundLetterboxing
+                         : kColorWebContentsBackground);
++  // Before a page paints, the card takes the color of uw's page mode.
++  if (const std::optional<SkColor> empty = uw::EmptyPageColor(web_contents());
++      empty && !is_letterboxing()) {
++    color = *empty;
++  }
+   // `color` must be opaque, see RenderWidgetHostView::SetBackgroundColor() for
+   // details.
+   // TODO(crbug.com/456309057): Update this to be a CHECK.
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.h b/chrome/browser/ui/views/frame/contents_web_view.h
+index dba4f324e7e9d3a8c60a5b0e807912b7051d03fb..de02729b59aefd1792497032ece1d2283f611518 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.h
++++ b/chrome/browser/ui/views/frame/contents_web_view.h
+@@ -71,6 +71,8 @@ class ContentsWebView : public views::WebView,
+ #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+   void DidGetUserInteraction(const blink::WebInputEvent& event) override;
+ #endif
++  // uw's page mode can give the next page another empty color.
++  void DidFinishNavigation(content::NavigationHandle* navigation) override;
+ 
+   // ui::View overrides:
+   std::unique_ptr<ui::Layer> RecreateLayer() override;

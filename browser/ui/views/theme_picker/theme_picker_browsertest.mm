@@ -31,6 +31,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "testing/gtest_mac.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/color/color_id.h"
@@ -276,6 +277,27 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheModeButtonsSetTheMode) {
     return themes()->GetBrowserColorScheme() ==
            ThemeService::BrowserColorScheme::kSystem;
   }));
+}
+
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
+  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
+  content::WebContents* page = Open();
+  EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
+                                          "'pages-window').getAttribute("
+                                          "'aria-pressed')"));
+  EXPECT_EQ(
+      l10n_util::GetStringUTF8(IDS_UW_THEME_PAGES_SAME_AS_WINDOW),
+      content::EvalJs(page, "document.getElementById('pages-window').title"));
+
+  ASSERT_TRUE(
+      content::ExecJs(page, "document.getElementById('pages-dark').click();"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return Saved().page_mode == PageMode::kDark; }));
+  EXPECT_EQ(themes()->GetBrowserColorScheme(),
+            ThemeService::BrowserColorScheme::kLight);
+  EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
+                                          "'pages-dark').getAttribute("
+                                          "'aria-pressed')"));
 }
 
 // A real window can close a bubble as soon as it shows, which a headless one

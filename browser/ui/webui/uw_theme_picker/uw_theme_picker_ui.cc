@@ -37,6 +37,9 @@ constexpr webui::LocalizedString kStrings[] = {
     {"modeAuto", IDS_UW_THEME_MODE_AUTO},
     {"modeLight", IDS_UW_THEME_MODE_LIGHT},
     {"modeDark", IDS_UW_THEME_MODE_DARK},
+    {"pages", IDS_UW_THEME_PAGES},
+    {"pagesWindow", IDS_UW_THEME_PAGES_WINDOW},
+    {"pagesSameAsWindow", IDS_UW_THEME_PAGES_SAME_AS_WINDOW},
     {"colorField", IDS_UW_THEME_COLOR_FIELD},
     {"addColor", IDS_UW_THEME_ADD_COLOR},
     {"suggested", IDS_UW_THEME_SUGGESTED},
@@ -72,6 +75,28 @@ ThemeMode ThemeModeOf(mojom::ColorMode mode) {
       return ThemeMode::kLight;
     case mojom::ColorMode::kDark:
       return ThemeMode::kDark;
+  }
+}
+
+PageMode PageModeOf(mojom::PageMode mode) {
+  switch (mode) {
+    case mojom::PageMode::kWindow:
+      return PageMode::kWindow;
+    case mojom::PageMode::kLight:
+      return PageMode::kLight;
+    case mojom::PageMode::kDark:
+      return PageMode::kDark;
+  }
+}
+
+mojom::PageMode ToMojo(PageMode mode) {
+  switch (mode) {
+    case PageMode::kWindow:
+      return mojom::PageMode::kWindow;
+    case PageMode::kLight:
+      return mojom::PageMode::kLight;
+    case PageMode::kDark:
+      return mojom::PageMode::kDark;
   }
 }
 
@@ -121,7 +146,8 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
       suggested.push_back(ToMojo(colors));
     }
     std::move(callback).Run(
-        std::move(state), ModeOf(theme.mode), std::move(suggested),
+        std::move(state), ModeOf(theme.mode), ToMojo(theme.page_mode),
+        std::move(suggested),
         GlassSlidersFor(WithIntensity(theme.colors[0], theme.intensity),
                         theme.mode));
   }
@@ -162,6 +188,16 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
     }
     Theme theme = ThemeOfWindow(window);
     theme.mode = ThemeModeOf(mode);
+    SetThemeOfWindow(window, theme);
+  }
+
+  void SetPageMode(mojom::PageMode mode) override {
+    BrowserWindowInterface* window = Window();
+    if (!window) {
+      return;
+    }
+    Theme theme = ThemeOfWindow(window);
+    theme.page_mode = PageModeOf(mode);
     SetThemeOfWindow(window, theme);
   }
 

@@ -56,13 +56,15 @@ diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources
        <message name="IDS_UW_OUTDENT_BRANCH_MAC" desc="In Title Case: Moves the selected tab up one nesting level.">Move Up One Level</message>
        <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+index 4df973b6628747b7688e41a0f650f7816902458b..542d521ecc50f924e68515959e21095f13651f3b 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -886,6 +886,7 @@ source_set("core") {
+@@ -886,6 +886,8 @@ source_set("core") {
    deps = [
      "//uw/browser/tab_organization",
      "//uw/browser/ui:ui",
 +    "//uw/browser/shortcuts",
++    "//uw/browser/workspaces",
      ":active_use_util",
      ":after_startup_task_utils",
      ":bad_message",

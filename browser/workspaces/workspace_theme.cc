@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -16,20 +17,34 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/browser_context.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/web_contents.h"
+#include "content/public/common/url_constants.h"
+#include "content/public/common/url_utils.h"
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/widget/widget.h"
+#include "url/gurl.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/look/theme_prefs.h"
+#include "uw/components/look/tint.h"
 
 namespace uw {
 namespace {
 
 // Set while uw saves a theme, whose writes to Chromium's settings are its own.
 bool g_saving = false;
+
+// The hosts of uw's own tab pages, which follow page mode: chrome://ai,
+// chrome://chat, and chrome://terminal. Their targets depend on this one, so
+// their host constants are out of reach.
+constexpr std::string_view kUwTabPages[] = {"ai", "chat", "terminal"};
 
 // The theme of each profile as uw last saw it, by the profile's folder.
 std::map<base::FilePath, Theme>& SeenThemes() {
@@ -125,6 +140,7 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
 Theme NewWorkspaceTheme(const Theme& like) {
   Theme theme;
   theme.mode = like.mode;
+  theme.page_mode = like.page_mode;
   const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
   theme.colors = suggested.front();
   for (const std::vector<SkColor>& colors : suggested) {
@@ -179,6 +195,42 @@ void ApplyThemeOfWindow(BrowserWindowInterface* window,
   key.user_color = WithIntensity(theme.colors[0], theme.intensity);
   key.scheme_variant = ui::ColorProviderKey::SchemeVariant::kTonalSpot;
   key.user_color_source = black ? Source::kGrayscale : Source::kAccent;
+}
+
+std::optional<bool> PageModeIsDark(content::WebContents* page) {
+  if (!page || page->GetBrowserContext()->IsOffTheRecord()) {
+    return std::nullopt;
+  }
+  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(page);
+  BrowserWindowInterface* window =
+      tab ? tab->GetBrowserWindowInterface() : nullptr;
+  if (!window) {
+    return std::nullopt;
+  }
+  const content::NavigationEntry* entry =
+      page->GetController().GetVisibleEntry();
+  const GURL url = entry ? entry->GetURL() : GURL();
+  const bool uw_page = url.SchemeIs(content::kChromeUIScheme) &&
+                       std::ranges::contains(kUwTabPages, url.host());
+  if (content::HasWebUIScheme(url) && !uw_page) {
+    return std::nullopt;
+  }
+  switch (ThemeOfWindow(window).page_mode) {
+    case PageMode::kWindow:
+      return std::nullopt;
+    case PageMode::kLight:
+      return false;
+    case PageMode::kDark:
+      return true;
+  }
+}
+
+std::optional<SkColor> EmptyPageColor(content::WebContents* page) {
+  const std::optional<bool> dark = PageModeIsDark(page);
+  if (!dark) {
+    return std::nullopt;
+  }
+  return *dark ? kBlackCard : SK_ColorWHITE;
 }
 
 void FollowChromiumTheme(BrowserWindowInterface* window) {

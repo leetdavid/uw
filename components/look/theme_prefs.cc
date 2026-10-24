@@ -20,9 +20,27 @@ void RegisterThemeProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(kThemeTransparencyPref, 0);
   registry->RegisterIntegerPref(kThemeGlassPref, 0);
   registry->RegisterBooleanPref(kThemeColorsInDarkModePref, false);
+  registry->RegisterStringPref(kThemePageModePref, "window");
 }
 
 namespace {
+
+std::string_view PageModeName(PageMode mode) {
+  switch (mode) {
+    case PageMode::kWindow:
+      return "window";
+    case PageMode::kLight:
+      return "light";
+    case PageMode::kDark:
+      return "dark";
+  }
+}
+
+PageMode PageModeNamed(std::string_view name) {
+  return name == "light"  ? PageMode::kLight
+         : name == "dark" ? PageMode::kDark
+                          : PageMode::kWindow;
+}
 
 // The theme as saved, with no saved colors as none.
 Theme SavedTheme(const PrefService& prefs) {
@@ -38,6 +56,7 @@ Theme SavedTheme(const PrefService& prefs) {
   theme.transparency = prefs.GetInteger(kThemeTransparencyPref);
   theme.glass = prefs.GetInteger(kThemeGlassPref);
   theme.colors_in_dark_mode = prefs.GetBoolean(kThemeColorsInDarkModePref);
+  theme.page_mode = PageModeNamed(prefs.GetString(kThemePageModePref));
   return theme;
 }
 
@@ -71,7 +90,8 @@ base::DictValue ThemeToValue(const Theme& theme) {
       .Set("transparency", theme.transparency)
       .Set("glass", theme.glass)
       .Set("colors_in_dark_mode", theme.colors_in_dark_mode)
-      .Set("mode", mode);
+      .Set("mode", mode)
+      .Set("page_mode", PageModeName(theme.page_mode));
 }
 
 std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
@@ -98,6 +118,9 @@ std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
                : *mode == "light" ? ThemeMode::kLight
                : *mode == "dark"  ? ThemeMode::kDark
                                   : ThemeMode::kAuto;
+  if (const std::string* page_mode = value.FindString("page_mode")) {
+    theme.page_mode = PageModeNamed(*page_mode);
+  }
   return theme;
 }
 
@@ -112,6 +135,7 @@ void WriteTheme(PrefService& prefs, const Theme& theme) {
   prefs.SetInteger(kThemeTransparencyPref, theme.transparency);
   prefs.SetInteger(kThemeGlassPref, theme.glass);
   prefs.SetBoolean(kThemeColorsInDarkModePref, theme.colors_in_dark_mode);
+  prefs.SetString(kThemePageModePref, PageModeName(theme.page_mode));
 }
 
 }  // namespace uw

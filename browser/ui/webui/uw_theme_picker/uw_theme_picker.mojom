@@ -10,6 +10,13 @@ enum ColorMode {
   kDark,
 };
 
+// What pages in tabs are told: the window's mode, Light, or Dark.
+enum PageMode {
+  kWindow,
+  kLight,
+  kDark,
+};
+
 // The profile's theme, as the picker shows it.
 struct Theme {
   // One to three colors as 0xAARRGGBB, in the order they were added.
@@ -48,10 +55,10 @@ interface ThemePickerHandlerFactory {
 
 // Browser side. Only the theme picker page can reach it.
 interface ThemePickerHandler {
-  // The theme, the color mode, the suggested themes, each one to three
-  // colors, and the glass sliders.
-  GetState() => (Theme theme, ColorMode mode, array<array<uint32>> suggested,
-                 GlassSliders glass);
+  // The theme, the color mode, the page mode, the suggested themes, each one
+  // to three colors, and the glass sliders.
+  GetState() => (Theme theme, ColorMode mode, PageMode page_mode,
+                 array<array<uint32>> suggested, GlassSliders glass);
 
   // The glass sliders for `theme` in `mode`, whose colors move the tick.
   GetGlassSliders(Theme theme, ColorMode mode) => (GlassSliders glass);
@@ -60,6 +67,9 @@ interface ThemePickerHandler {
   SetTheme(Theme theme);
 
   SetMode(ColorMode mode);
+
+  // Open pages change at once.
+  SetPageMode(PageMode mode);
 
   // The page has drawn and can be shown.
   ShowUI();

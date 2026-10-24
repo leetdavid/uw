@@ -117,6 +117,7 @@ TEST_F(ThemePrefsTest, ASavedThemeComesBackWhole) {
   theme.transparency = 70;
   theme.glass = 20;
   theme.colors_in_dark_mode = true;
+  theme.page_mode = PageMode::kDark;
   WriteTheme(prefs_, theme);
   EXPECT_EQ(ReadTheme(prefs_, WithIntensity(kButter, 60)), theme);
 }
@@ -156,6 +157,7 @@ TEST_F(ThemePrefsTest, AWorkspaceKeepsEveryPartOfItsTheme) {
   theme.glass = 90;
   theme.colors_in_dark_mode = true;
   theme.mode = ThemeMode::kDark;
+  theme.page_mode = PageMode::kLight;
   EXPECT_EQ(ThemeFromValue(ThemeToValue(theme)), theme);
   EXPECT_FALSE(ThemeFromValue(base::DictValue()));
 }

@@ -116,10 +116,44 @@
         justify-content: center;
       }
 
-      #modes button[aria-pressed='true'] {
+      #modes button[aria-pressed='true'],
+      #pages button[aria-pressed='true'] {
         background: var(--chosen);
         box-shadow: 0 1px 2px rgb(30 27 46 / 14%);
         color: var(--text);
+      }
+
+      #mode-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #pages {
+        background: var(--well);
+        border-radius: 9px;
+        display: grid;
+        flex: 1;
+        gap: 3px;
+        grid-template-columns: 1.2fr 1fr 1fr;
+        padding: 3px;
+      }
+
+      #pages button {
+        align-items: center;
+        border-radius: 7px;
+        color: var(--text2);
+        display: flex;
+        font-size: 11.5px;
+        font-weight: 500;
+        gap: 5px;
+        height: 22px;
+        justify-content: center;
+      }
+
+      #pages svg {
+        height: 13px;
+        width: 13px;
       }
 
       #field {
@@ -187,7 +221,8 @@
         gap: 10px;
       }
 
-      .row label {
+      .row label,
+      #pages-label {
         width: 78px;
       }
 
@@ -297,19 +332,38 @@
     </style>
   </head>
   <body>
-    <div id="modes" role="group">
-      <button id="auto" aria-pressed="false">
-        <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
-        <span></span>
-      </button>
-      <button id="light" aria-pressed="false">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        <span></span>
-      </button>
-      <button id="dark" aria-pressed="false">
-        <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-        <span></span>
-      </button>
+    <div id="mode-group">
+      <div id="modes" role="group">
+        <button id="auto" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
+          <span></span>
+        </button>
+        <button id="light" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <span></span>
+        </button>
+        <button id="dark" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <span></span>
+        </button>
+      </div>
+      <div class="row">
+        <span id="pages-label"></span>
+        <div id="pages" role="group" aria-labelledby="pages-label">
+          <button id="pages-window" aria-pressed="false">
+            <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4M2 8h20M6 4v4"/></svg>
+            <span></span>
+          </button>
+          <button id="pages-light" aria-pressed="false">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <span></span>
+          </button>
+          <button id="pages-dark" aria-pressed="false">
+            <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            <span></span>
+          </button>
+        </div>
+      </div>
     </div>
     <div id="field" role="group">
       <button id="add">

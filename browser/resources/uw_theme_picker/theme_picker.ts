@@ -6,7 +6,7 @@ import '/strings.m.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 
 import type {GlassSliders, Theme} from './uw_theme_picker.mojom-webui.js';
-import {ColorMode, GlassPause, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
+import {ColorMode, GlassPause, PageMode, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
 
 const MAX_COLORS = 3;
 // The field is pale at the top and full from 52% of its height down.
@@ -45,6 +45,16 @@ const modes = new Map<ColorMode, HTMLButtonElement>([
   [ColorMode.kAuto, document.querySelector<HTMLButtonElement>('#auto')!],
   [ColorMode.kLight, document.querySelector<HTMLButtonElement>('#light')!],
   [ColorMode.kDark, document.querySelector<HTMLButtonElement>('#dark')!],
+]);
+const pagesWindow =
+    document.querySelector<HTMLButtonElement>('#pages-window')!;
+const pageModes = new Map<PageMode, HTMLButtonElement>([
+  [PageMode.kWindow, pagesWindow],
+  [
+    PageMode.kLight,
+    document.querySelector<HTMLButtonElement>('#pages-light')!,
+  ],
+  [PageMode.kDark, document.querySelector<HTMLButtonElement>('#pages-dark')!],
 ]);
 
 let theme: Theme;
@@ -299,6 +309,31 @@ for (const [mode, button] of modes) {
   });
 }
 
+function showPageMode(mode: PageMode) {
+  for (const [value, button] of pageModes) {
+    button.setAttribute('aria-pressed', String(value === mode));
+  }
+}
+
+const pageModeNames = new Map<PageMode, string>([
+  [PageMode.kWindow, 'pagesWindow'],
+  [PageMode.kLight, 'modeLight'],
+  [PageMode.kDark, 'modeDark'],
+]);
+for (const [mode, button] of pageModes) {
+  button.querySelector('span')!.textContent =
+      loadTimeData.getString(pageModeNames.get(mode)!);
+  button.addEventListener('click', () => {
+    showPageMode(mode);
+    handler.setPageMode(mode);
+  });
+}
+document.querySelector('#pages-label')!.textContent =
+    loadTimeData.getString('pages');
+pagesWindow.title = loadTimeData.getString('pagesSameAsWindow');
+pagesWindow.setAttribute(
+    'aria-label', loadTimeData.getString('pagesSameAsWindow'));
+
 field.setAttribute('aria-label', loadTimeData.getString('colorField'));
 add.title = loadTimeData.getString('addColor');
 add.setAttribute('aria-label', loadTimeData.getString('addColor'));
@@ -317,7 +352,7 @@ transparencyTick.setAttribute(
 document.querySelector('label[for=colors-in-dark-mode]')!.textContent =
     loadTimeData.getString('colorsInDarkMode');
 
-const {theme: saved, mode, suggested, glass: sliders} =
+const {theme: saved, mode, pageMode, suggested, glass: sliders} =
     await handler.getState();
 theme = saved;
 currentMode = mode;
@@ -339,5 +374,6 @@ suggestedRow.replaceChildren(...suggestions.map((colors, i) => {
   return button;
 }));
 showMode(mode);
+showPageMode(pageMode);
 draw();
 handler.showUI();
