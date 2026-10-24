@@ -1911,6 +1911,54 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, APastedImageGoesWithTheMessage) {
       true);
 }
 
+// The header's indicator says how full the context is and what the chat has
+// cost, once the chat has answered, and its card says why.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
+  UseAgentModel();
+  catalog_ = base::StrCat(
+      {R"({"testlab": {"api": ")", embedded_test_server()->GetURL("/v1").spec(),
+       R"(", "models": {"test-agent": {"tool_call": true,)"
+       R"( "cost": {"input": 3, "output": 15, "cache_read": 0.3},)"
+       R"( "limit": {"context": 200000, "output": 16000}}}}})"});
+  model_.ListModels({"test-agent"});
+  base::test::TestFuture<const ModelCatalog*> catalog;
+  CatalogStore::For(browser()->GetProfile())->Get(catalog.GetCallback());
+  ASSERT_TRUE(catalog.Get());
+  model_.Script(
+      {ScriptedModel::WithUsage(ScriptedModel::Answer("Hello."), 20000, 100),
+       ScriptedModel::WithUsage(ScriptedModel::Answer("Again."), 41000, 200)});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(content::EvalJs(chat, "!document.getElementById('usage')"), true);
+
+  Ask(chat, "Hi");
+  Ask(chat, "Once more");
+
+  // 20k and 41k tokens in at $3, and 300 out at $15, per million.
+  EXPECT_EQ(Until(chat, "document.getElementById('usage')?.textContent ==="
+                        "    '41k·$0.19' && document.getElementById('usage')"
+                        "    .textContent"),
+            "41k·$0.19");
+  ASSERT_TRUE(content::ExecJs(chat, "document.getElementById('usage').click()"));
+  const std::string card =
+      Until(chat, "document.getElementById('usage-card')?.textContent")
+          .ExtractString();
+  EXPECT_THAT(card, testing::HasSubstr("41k of 184k tokens"));
+  EXPECT_THAT(card, testing::HasSubstr(
+                        "test-agent holds 184k tokens, less than where uw "
+                        "makes room."));
+  EXPECT_THAT(card, testing::HasSubstr("Fresh input61k$0.18"));
+  EXPECT_THAT(card, testing::HasSubstr("$3 in · $15 out per 1M"));
+  EXPECT_EQ(content::EvalJs(chat, "document.querySelectorAll("
+                                  "    '#usage-card [data-bar]').length"),
+            2);
+  SaveWindowScreenshot(browser(), "usage-card");
+  // A click outside closes it.
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.body.dispatchEvent(new PointerEvent('pointerdown',"
+            "    {bubbles: true}))"));
+  EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
+}
+
 // A model the catalog lists without image input makes the composer say so,
 // and the message waits.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModelThatCannotSeeImagesWaits) {

@@ -275,6 +275,7 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
     record.model = model_.connection.model;
     record.usage = *usage;
     record.cost = CostOf(*usage, model_.price);
+    record.price = model_.price;
     record.parts = context_->last_parts();
     record.max_length = static_cast<int64_t>(MaxRequestLength());
     record.input_limit = model_.input_limit;
@@ -453,6 +454,7 @@ void AgentLoop::OnCheck(std::optional<CommandCheckAnswer> answer) {
     record.model = check->client->model();
     record.usage = *check->client->usage();
     record.cost = CostOf(record.usage, check->client->price());
+    record.price = check->client->price();
     context_->AddUsage(std::move(record));
   }
   if (check->client) {

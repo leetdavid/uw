@@ -131,11 +131,13 @@ import {
   type ChatModel,
   type ChatPrompt,
   type ChatSummary,
+  type ChatUsage,
   type ScheduleState,
   type SkillProposal,
   type Step,
   type TriggerState,
 } from "@/chat-api";
+import { UsageIndicator } from "./usage";
 
 // Fluid's .typeset styles an answer by its plain elements, and Streamdown's
 // own classes would win over it, so prose renders bare. Code blocks keep
@@ -1467,6 +1469,7 @@ function Chat() {
   const [approval, setApproval] = useState<Approval | null>(null);
   // The chat's schedule, and the schedule card while it is open.
   const [schedule, setSchedule] = useState<ScheduleState | null>(null);
+  const [usage, setUsage] = useState<ChatUsage | null>(null);
   const [card, setCard] = useState<ScheduleState | null>(null);
   const [chartOpen, setChartOpen] = useState(false);
   // A program in the agent's terminal tab that waits for the user's password.
@@ -1544,6 +1547,7 @@ function Chat() {
         setModel(picked),
       ),
       chatPage.onMode.addListener((picked: ApprovalMode) => setMode(picked)),
+      chatPage.onUsage.addListener((counted: ChatUsage) => setUsage(counted)),
       chatPage.onSchedule.addListener((state: ScheduleState | null) =>
         setSchedule(state),
       ),
@@ -2028,6 +2032,7 @@ function Chat() {
               </Button>
             )
           )}
+          <UsageIndicator usage={usage} />
         </header>
         {schedule && (
           <div className="px-7 pt-2">

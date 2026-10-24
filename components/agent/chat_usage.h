@@ -48,6 +48,8 @@ struct UsageRecord {
   ModelUsage usage;
   // Nothing when the model has no price.
   std::optional<double> cost;
+  // The price it was charged at, when the catalog knew one.
+  std::optional<ModelPrice> price;
 
   // For the agent's requests: the request's characters by part, the most
   // characters uw let it reach, the model's own input limit in tokens (0 when
@@ -73,6 +75,60 @@ struct UsageTotal {
   bool priced = true;
 };
 UsageTotal TotalOf(const std::vector<UsageRecord>& records);
+
+// What the chat's context and cost indicator and its card show. See
+// docs/plans/context-and-cost.md.
+struct UsageSummary {
+  UsageSummary();
+  UsageSummary(const UsageSummary&);
+  UsageSummary& operator=(const UsageSummary&);
+  ~UsageSummary();
+
+  struct Spent {
+    int64_t tokens = 0;
+    double cost = 0;
+  };
+  struct Message {
+    // The user's message, counting from 1.
+    int message = 0;
+    double cost = 0;
+    int requests = 0;
+  };
+
+  // The agent's latest request: its input tokens, the limit it fills
+  // toward, whether that limit is the model's own rather than where uw makes
+  // room, and what filled it, in tokens.
+  int64_t tokens = 0;
+  int64_t limit = 0;
+  bool model_limit = false;
+  RequestParts parts;
+  // Each of the agent's requests: its input tokens and its limit. The
+  // requests uw made room before, counting from 1.
+  std::vector<int64_t> per_request;
+  std::vector<int64_t> limits;
+  std::vector<int> made_room;
+
+  // What the agent's requests spent, by kind of token.
+  Spent fresh;
+  Spent cache_read;
+  Spent cache_write;
+  Spent output;
+  int agent_requests = 0;
+  Spent checks;
+  int check_count = 0;
+  Spent runs;
+  int run_count = 0;
+  double total = 0;
+  // Every request had a price, or a cost of its provider's.
+  bool priced = true;
+  // The kinds' costs add up to the total: no request's cost came without a
+  // price to split it by.
+  bool split = true;
+  double cache_saved = 0;
+  std::vector<Message> messages;
+};
+UsageSummary Summarize(const std::vector<UsageRecord>& records,
+                       const std::vector<UsageTotal>& runs);
 
 }  // namespace uw
 

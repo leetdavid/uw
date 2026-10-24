@@ -120,6 +120,8 @@ class UwChatHandler : public mojom::ChatHandler,
   // Tells the page about the chat's schedule and how it stands, and shows a
   // step its run waits on.
   void SendSchedule();
+  // Tells the page what the context holds and what the chat has cost.
+  void SendUsage();
   // While the chat shows and its run waits for approval, brings the tab the
   // run waits in next to the chat.
   void BringWaitingTab();
@@ -159,6 +161,8 @@ class UwChatHandler : public mojom::ChatHandler,
   mojom::StepPtr LineFor(const base::DictValue& entry) const;
   void Log(base::DictValue entry);
   void Save();
+  // The agent's context changed: saves the chat and tells the page.
+  void OnContextChanged();
   // Tells the chat list how this chat stands.
   void UpdateIndex();
   // Sends the chat's notification saying `what` happened, with `text`,

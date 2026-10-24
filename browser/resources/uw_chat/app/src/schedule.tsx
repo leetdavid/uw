@@ -37,6 +37,7 @@ import {
   type TriggerState,
 } from "./chat-api";
 import { valueText } from "./chart";
+import { costText } from "./usage";
 import { ModeChip } from "./mode-chip";
 import { EffortChip, ModelChip } from "./providers/model-chip";
 import type { ModelList, Provider } from "./providers/providers-api";
@@ -306,6 +307,18 @@ export function isQuietRun(line: Step): boolean {
   );
 }
 
+// What a run cost, muted at the end of its line, when uw counted it.
+function RunCost({ cost }: { cost: number | null }) {
+  if (cost === null) {
+    return null;
+  }
+  return (
+    <span data-run-cost className="w-[52px] shrink-0 text-right text-[12.5px] tabular-nums text-muted-foreground">
+      {costText(cost)}
+    </span>
+  );
+}
+
 function QuietLine({ line, inner }: { line: Step; inner?: boolean }) {
   const run = line.run!;
   return (
@@ -325,6 +338,7 @@ function QuietLine({ line, inner }: { line: Step; inner?: boolean }) {
           {valueText(run.values[0])}
         </span>
       )}
+      <RunCost cost={run.cost} />
     </div>
   );
 }
@@ -340,6 +354,8 @@ export function QuietRuns({ runs }: { runs: Step[] }) {
   const Chevron = open ? ChevronDown : ChevronRight;
   const from = first.values[0] ? valueText(first.values[0]) : "";
   const to = last.values[0] ? valueText(last.values[0]) : "";
+  const costs = runs.flatMap((line) => (line.run!.cost === null ? [] : [line.run!.cost]));
+  const cost = costs.length ? costs.reduce((sum, each) => sum + each, 0) : null;
   return (
     <div
       className="quiet-runs flex flex-col"
@@ -362,6 +378,7 @@ export function QuietRuns({ runs }: { runs: Step[] }) {
             {from === to || !to ? from : `${from} to ${to}`}
           </span>
         )}
+        <RunCost cost={cost} />
       </button>
       {open && runs.map((line, at) => <QuietLine key={at} line={line} inner />)}
     </div>
@@ -409,6 +426,7 @@ export function RunMessage({ line }: { line: Step }) {
     >
       {icon}
       <span className="min-w-0 flex-1 truncate">{text}</span>
+      <RunCost cost={run.cost} />
     </div>
   );
   if (run.end === RunEnd.kStopped) {
@@ -482,6 +500,9 @@ export function RunMessage({ line }: { line: Step }) {
             {run.what}
           </span>
         )}
+        <span className="ml-auto">
+          <RunCost cost={run.cost} />
+        </span>
       </div>
       <p className="mt-1">{line.text}</p>
       {run.values.length > 0 && (

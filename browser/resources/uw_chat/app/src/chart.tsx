@@ -159,7 +159,7 @@ function pointText(series: Series, point: Point): string {
   return `${at} · ${point.line.text} · ${value}`;
 }
 
-function useWidth<T extends HTMLElement>() {
+export function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -177,7 +177,7 @@ function useWidth<T extends HTMLElement>() {
 
 // The pointer's run on a chart, which the tooltip reads and the arrow keys
 // move.
-function useHovered(count: number, onPick?: (point: number) => void) {
+export function useHovered(count: number, onPick?: (point: number) => void) {
   const [hovered, setHovered] = useState<number | null>(null);
   useEffect(() => {
     if (hovered !== null && hovered >= count) {
@@ -202,7 +202,7 @@ function useHovered(count: number, onPick?: (point: number) => void) {
 }
 
 // The run nearest `x` among `xs`.
-function nearest(xs: number[], x: number): number {
+export function nearest(xs: number[], x: number): number {
   let best = 0;
   xs.forEach((each, at) => {
     if (Math.abs(each - x) < Math.abs(xs[best]! - x)) {
@@ -212,7 +212,7 @@ function nearest(xs: number[], x: number): number {
   return best;
 }
 
-function Tooltip({ x, width, text }: { x: number; width: number; text: string }) {
+export function Tooltip({ x, width, text }: { x: number; width: number; text: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [own, setOwn] = useState(0);
   useLayoutEffect(() => setOwn(ref.current?.offsetWidth ?? 0), [text]);

@@ -158,6 +158,9 @@ struct RunLine {
   bool paused;
   // The command of the trigger whose wake started it, or empty.
   string trigger;
+  // What its model requests cost, in dollars, when uw counted it and its
+  // model had a price.
+  double? cost;
 };
 
 // One step of the agent's work.
@@ -371,6 +374,71 @@ struct AgentTab {
   string screen;
 };
 
+// One message of the user's in the cost chart.
+struct MessageCost {
+  // The message's start.
+  string text;
+  double cost;
+  int32 requests;
+};
+
+// What the chat's context and cost indicator and its card show, in tokens
+// and dollars. See docs/plans/context-and-cost.md.
+struct ChatUsage {
+  // Some request of the agent's was counted. A chat that answered without
+  // one has a provider that sends no usage.
+  bool counted;
+  bool answered;
+  // The latest request, the limit it fills toward and whether that is the
+  // model's own, and what filled it.
+  double tokens;
+  double limit;
+  bool model_limit;
+  double instructions;
+  double conversation;
+  double results;
+  double images;
+  // Each request's tokens and limit, and the requests uw made room before,
+  // counting from 1.
+  array<double> per_request;
+  array<double> limits;
+  array<int32> made_room;
+  // Tokens and dollars by kind.
+  double fresh;
+  double fresh_cost;
+  double cache_read;
+  double cache_read_cost;
+  double cache_write;
+  double cache_write_cost;
+  double output;
+  double output_cost;
+  int32 agent_requests;
+  double checks;
+  double checks_cost;
+  int32 check_count;
+  double runs;
+  double runs_cost;
+  int32 run_count;
+  double total;
+  // Every request had a price; the kinds' dollars add up to the total.
+  bool priced;
+  bool split;
+  double cache_saved;
+  array<MessageCost> messages;
+  // Saved before uw counted, and when it began to, in milliseconds since
+  // the Unix epoch.
+  bool partial;
+  double counted_since;
+  // The model the chat runs on, its provider, and its price per million
+  // input and output tokens, when it has one.
+  string model;
+  string provider;
+  bool on_this_mac;
+  bool has_price;
+  double input_price;
+  double output_price;
+};
+
 interface ChatPage {
   // The chat is ready: its id for the page's address, its title, and every
   // line it holds so far.
@@ -411,6 +479,8 @@ interface ChatPage {
   // The agent filled in the schedule card. The page opens it with `state`,
   // and nothing is saved until the user saves it.
   OnScheduleCard(ScheduleState state);
+  // What the chat's context holds and what it has cost, after each request.
+  OnUsage(ChatUsage usage);
 };
 
 // The watch card, under the eye in the address bar: the page of the tab it

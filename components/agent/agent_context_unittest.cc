@@ -94,6 +94,72 @@ TEST_F(AgentContextTest, ARequestSaysWhatFillsItAndWhenItMadeRoom) {
   EXPECT_LT(context_.last_parts().results, 20000);
 }
 
+TEST(ChatUsageTest, TheSummarySaysWhatFillsTheContextAndWhatItCost) {
+  const ModelPrice sonnet{.input = 3,
+                          .output = 15,
+                          .cache_read = 0.3,
+                          .cache_write = 3.75};
+  const auto agent = [&](int message, int64_t input, int64_t read,
+                         int64_t written, int64_t output, bool made_room) {
+    UsageRecord record;
+    record.model = "claude-sonnet-4-5";
+    record.usage = {.input = input,
+                    .cache_read = read,
+                    .cache_write = written,
+                    .output = output};
+    record.price = sonnet;
+    record.cost = CostOf(record.usage, sonnet);
+    // 4 characters a token.
+    record.parts = {.instructions = input,
+                    .conversation = input,
+                    .results = input * 2};
+    record.max_length = 400000;
+    record.made_room = made_room;
+    record.message = message;
+    return record;
+  };
+  UsageRecord check;
+  check.kind = UsageRecord::Kind::kCommandCheck;
+  check.usage = {.input = 300, .output = 5};
+  std::vector<UsageRecord> records = {
+      agent(1, 10000, 0, 9000, 100, false), check,
+      agent(1, 12000, 9000, 2000, 200, false),
+      agent(2, 60000, 11000, 0, 300, true)};
+  UsageTotal run;
+  run.usage = {.input = 500, .output = 20};
+  run.cost = 0.5;
+
+  const UsageSummary summary = Summarize(records, {run});
+  EXPECT_EQ(summary.tokens, 60000);
+  EXPECT_EQ(summary.limit, 100000);
+  EXPECT_FALSE(summary.model_limit);
+  EXPECT_EQ(summary.parts.results, 30000);
+  EXPECT_EQ(summary.per_request, (std::vector<int64_t>{10000, 12000, 60000}));
+  EXPECT_EQ(summary.made_room, (std::vector<int>{3}));
+  EXPECT_EQ(summary.agent_requests, 3);
+  EXPECT_EQ(summary.cache_read.tokens, 20000);
+  EXPECT_EQ(summary.cache_write.tokens, 11000);
+  EXPECT_EQ(summary.fresh.tokens, 1000 + 1000 + 49000);
+  EXPECT_DOUBLE_EQ(summary.cache_read.cost, 20000 * 0.3 / 1e6);
+  EXPECT_EQ(summary.check_count, 1);
+  EXPECT_EQ(summary.checks.tokens, 305);
+  EXPECT_FALSE(summary.priced);
+  EXPECT_TRUE(summary.split);
+  EXPECT_EQ(summary.run_count, 1);
+  EXPECT_DOUBLE_EQ(summary.total, *records[0].cost + *records[2].cost +
+                                      *records[3].cost + 0.5);
+  EXPECT_DOUBLE_EQ(summary.cache_saved,
+                   (20000 * (3 - 0.3) - 11000 * (3.75 - 3)) / 1e6);
+  ASSERT_EQ(summary.messages.size(), 2u);
+  EXPECT_EQ(summary.messages[0].requests, 2);
+  EXPECT_DOUBLE_EQ(summary.messages[1].cost, *records[3].cost);
+
+  // A small model's own limit comes first.
+  records[3].input_limit = 32000;
+  EXPECT_EQ(Summarize(records, {}).limit, 32000);
+  EXPECT_TRUE(Summarize(records, {}).model_limit);
+}
+
 TEST_F(AgentContextTest, UsageIsKeptWithTheChat) {
   context_.AddUser("Book a tour");
   UsageRecord record;
@@ -101,6 +167,7 @@ TEST_F(AgentContextTest, UsageIsKeptWithTheChat) {
   record.model = "claude-sonnet-4-5";
   record.usage = {.input = 1200, .cache_read = 1000, .output = 80};
   record.cost = 0.01;
+  record.price = ModelPrice{.input = 3, .output = 15, .cache_read = 0.3};
   record.parts = {.instructions = 3, .conversation = 4, .results = 5};
   record.max_length = 400000;
   record.input_limit = 184000;

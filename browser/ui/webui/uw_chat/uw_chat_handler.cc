@@ -830,6 +830,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
   page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
+  SendUsage();
   UpdateScheduledRuns();
   SendSchedule();
   OnChatsChanged();
@@ -860,7 +861,8 @@ bool UwChatHandler::Start() {
       *tab, std::move(*model),
       base::BindRepeating(&UwChatHandler::OnStep, base::Unretained(this)),
       std::move(saved_context_),
-      base::BindRepeating(&UwChatHandler::Save, base::Unretained(this)));
+      base::BindRepeating(&UwChatHandler::OnContextChanged,
+                          base::Unretained(this)));
   agent_->SetSkillSaver(base::BindRepeating(&UwChatHandler::AskToSaveSkill,
                                             base::Unretained(this)));
   agent_->SetScheduleCard(base::BindRepeating(&UwChatHandler::OpenScheduleCard,
@@ -1019,6 +1021,7 @@ void UwChatHandler::OnModelChanged() {
   }
   Save();
   page_->OnModel(PageModel(model_));
+  SendUsage();
 }
 
 const base::DictValue* UwChatHandler::LastLine() const {
@@ -1107,6 +1110,104 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
 
 void UwChatHandler::Log(base::DictValue entry) {
   log_.Append(std::move(entry));
+}
+
+void UwChatHandler::OnContextChanged() {
+  Save();
+  SendUsage();
+}
+
+void UwChatHandler::SendUsage() {
+  const AgentContext* context =
+      agent_ ? &agent_->context() : saved_context_.get();
+  static const base::NoDestructor<std::vector<UsageRecord>> none;
+  const std::vector<UsageRecord>& records = context ? context->usage() : *none;
+  std::vector<UsageTotal> runs;
+  std::vector<std::string> messages;
+  bool answered = false;
+  for (const base::Value& entry : log_) {
+    const base::DictValue* line = entry.GetIfDict();
+    const std::string* kind = line ? line->FindString("kind") : nullptr;
+    if (!kind) {
+      continue;
+    }
+    answered |= *kind == "answer";
+    if (*kind == "user") {
+      const std::string* text = line->FindString("text");
+      messages.push_back(text ? *text : std::string());
+    }
+    const base::DictValue* usage =
+        *kind == "run" ? line->FindDict("usage") : nullptr;
+    if (std::optional<ModelUsage> read =
+            usage ? UsageFromValue(*usage) : std::nullopt) {
+      runs.push_back({.usage = *read,
+                      .cost = usage->FindDouble("cost").value_or(0),
+                      .priced = usage->FindBool("priced").value_or(false)});
+    }
+  }
+  const UsageSummary summary = Summarize(records, runs);
+  auto usage = mojom::ChatUsage::New();
+  usage->counted = summary.agent_requests > 0;
+  usage->answered = answered || !runs.empty();
+  usage->tokens = summary.tokens;
+  usage->limit = summary.limit;
+  usage->model_limit = summary.model_limit;
+  usage->instructions = summary.parts.instructions;
+  usage->conversation = summary.parts.conversation;
+  usage->results = summary.parts.results;
+  usage->images = summary.parts.images;
+  for (size_t i = 0; i < summary.per_request.size(); ++i) {
+    usage->per_request.push_back(summary.per_request[i]);
+    usage->limits.push_back(summary.limits[i]);
+  }
+  usage->made_room = summary.made_room;
+  usage->fresh = summary.fresh.tokens;
+  usage->fresh_cost = summary.fresh.cost;
+  usage->cache_read = summary.cache_read.tokens;
+  usage->cache_read_cost = summary.cache_read.cost;
+  usage->cache_write = summary.cache_write.tokens;
+  usage->cache_write_cost = summary.cache_write.cost;
+  usage->output = summary.output.tokens;
+  usage->output_cost = summary.output.cost;
+  usage->agent_requests = summary.agent_requests;
+  usage->checks = summary.checks.tokens;
+  usage->checks_cost = summary.checks.cost;
+  usage->check_count = summary.check_count;
+  usage->runs = summary.runs.tokens;
+  usage->runs_cost = summary.runs.cost;
+  usage->run_count = summary.run_count;
+  usage->total = summary.total;
+  usage->priced = summary.priced;
+  usage->split = summary.split;
+  usage->cache_saved = summary.cache_saved;
+  for (const UsageSummary::Message& message : summary.messages) {
+    const size_t at = static_cast<size_t>(message.message) - 1;
+    usage->messages.push_back(mojom::MessageCost::New(
+        message.message > 0 && at < messages.size() ? messages[at]
+                                                    : std::string(),
+        message.cost, message.requests));
+  }
+  usage->partial = context && context->usage_partial();
+  usage->counted_since =
+      records.empty() ? 0
+                      : records.front().time.InMillisecondsFSinceUnixEpoch();
+  Profile* profile =
+      Profile::FromBrowserContext(contents_->GetBrowserContext());
+  if (model_) {
+    usage->model = model_->model;
+    if (const std::optional<Provider> provider =
+            FindProvider(*profile->GetPrefs(), model_->provider_id)) {
+      usage->provider = provider->name;
+      usage->on_this_mac = provider->preset == ProviderPreset::kOllama;
+    }
+    if (const std::optional<AgentModel> model = AgentModelNow();
+        model && model->price) {
+      usage->has_price = true;
+      usage->input_price = model->price->input;
+      usage->output_price = model->price->output;
+    }
+  }
+  page_->OnUsage(std::move(usage));
 }
 
 void UwChatHandler::Save() {
@@ -1575,6 +1676,7 @@ void UwChatHandler::AddRunLines(base::ListValue lines) {
     }
   }
   Save();
+  SendUsage();
   UpdateScheduledRuns();
 }
 

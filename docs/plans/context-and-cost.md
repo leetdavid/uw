@@ -1,6 +1,6 @@
 # Context and cost
 
-Status: agreed on 2026-10-24. T170 and T172 were built on 2026-10-24; see [Built](#built). T171, the indicator and card, is not built. The stages are T169 to T172 on the [board](roadmap.md#board).
+Status: agreed on 2026-10-24, and built the same day: T170 to T172. See [Built](#built). The stages are T169 to T172 on the [board](roadmap.md#board).
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). The hard parts:
 
@@ -65,12 +65,16 @@ T170 and T172, built on 2026-10-24:
 - `components/agent/chat_usage.h` is one request's record. `AgentContext` keeps the chat's records with the chat, splits each request's characters into its parts, and notes when it made room. `AgentLoop` records each answer and each command check; a run's total goes on its line.
 - A request stays under the model's input limit at 3 characters a token, or under 400,000 characters, whichever is less.
 
+T171, built on 2026-10-24: `Summarize` in `components/agent/chat_usage.h` turns the records and the runs into what the card shows, and the chat page gets it as `OnUsage` after each request. Each record keeps the price it was charged at, for the split by kind and what the cache saved. The page is `src/usage.tsx`; its charts use the parts of T151's charts. Each run's line ends with its cost.
+
 Where the build differs:
 
 - Prices tiered above a context size, as some models have, are left out: uw's requests stay well below them.
 - A command check through the decision model counts its tokens only when its answer carries chat-completions usage, and has no price.
+- uw's limit in tokens is its 400,000 characters at the latest request's own tokens per character.
+- The model line shows no provider icon, and the card says "Earlier requests aren't in these numbers" without the date the chat began, which uw does not keep.
 
-Tests: `UsageTest.*`, `CatalogTest.PricesAndInputLimitsComeFromTheCatalog`, and `AgentContextTest.*` in unit_tests; `AgentLoopBrowserTest.EachRequestCountsWhatItUsedAndCost`, `AgentLoopBrowserTest.ASmallModelsRequestsStayUnderItsLimit`, `AgentCheckBrowserTest.ACheckCountsOnItsOwn`, `ChatRunBrowserTest.ARunSaysWhatItsRequestsCost`, and `ScheduledChatsBrowserTest.ASavedScheduleRunsAtOnceAndTellsWhatItFound` in browser_tests.
+Tests: `UsageTest.*`, `ChatUsageTest.*`, `CatalogTest.PricesAndInputLimitsComeFromTheCatalog`, and `AgentContextTest.*` in unit_tests; `AgentLoopBrowserTest.EachRequestCountsWhatItUsedAndCost`, `AgentLoopBrowserTest.ASmallModelsRequestsStayUnderItsLimit`, `AgentCheckBrowserTest.ACheckCountsOnItsOwn`, `ChatRunBrowserTest.ARunSaysWhatItsRequestsCost`, and `ScheduledChatsBrowserTest.ASavedScheduleRunsAtOnceAndTellsWhatItFound`, and `UwChatBrowserTest.TheIndicatorShowsContextAndCost` in browser_tests.
 
 ## Stages
 

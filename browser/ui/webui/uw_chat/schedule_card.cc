@@ -149,6 +149,13 @@ mojom::RunLinePtr RunLineFrom(const base::DictValue& line) {
   if (const std::string* what = line.FindString("what")) {
     run->what = *what;
   }
+  // A run uw counted shows its cost, unless its model had no price.
+  if (const base::DictValue* usage = line.FindDict("usage")) {
+    const double cost = usage->FindDouble("cost").value_or(0);
+    if (cost > 0 || usage->FindBool("priced").value_or(false)) {
+      run->cost = cost;
+    }
+  }
   if (const base::ListValue* values = line.FindList("values")) {
     for (const base::Value& saved : *values) {
       const std::optional<TrackedValue> value =
