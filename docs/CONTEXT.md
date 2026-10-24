@@ -36,7 +36,7 @@ The color a page paints behind its content. The toolbar above the page and the b
 _Avoid_: Theme color, site color, tint.
 
 **Glass**:
-A theme option that lets the desktop behind uw's window show through, blurred: through the sidebar and the edges around the page under the theme, and through the toolbar under the page color. The page stays solid; it does not scroll under the toolbar.
+A theme setting, from solid to clear, that lets the desktop behind uw's window show through, blurred: through the sidebar and the edges around the page under the theme, and through the toolbar under the page color. The page stays solid; it does not scroll under the toolbar.
 _Avoid_: Transparency, translucency, vibrancy, blur.
 
 **Pinned tab**:

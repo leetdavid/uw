@@ -155,12 +155,13 @@ Implementability: **5/10**. Chromium already draws a Liquid Glass frame on macOS
 
 Proposed:
 
-- A "Glass" switch in the theme picker, under the hairline, above "Theme colors in dark mode". Off by default. It belongs to the theme, so each workspace has its own.
-- With it on, the frame, the sidebar, and the strip around the page card show the desktop through macOS's glass, blurred. The theme covers the glass at 60% on a theme with near-black text. It covers it at 75% on a theme with white text, in black dark mode, and with theme colors in dark mode. Text keeps a 4.5:1 contrast ratio over any desktop.
+- Agreed on 2026-10-24: a "Glass" slider in the theme picker, under Grain, like the Liquid Glass slider in macOS's settings. At the left end the window is solid, as today; that is the default. It belongs to the theme, so each workspace has its own.
+- Moving it right lets the desktop show through the frame, the sidebar, and the strip around the page card, blurred by macOS's glass. The theme covers the glass from 100% at the left end down to 20% at the right end, Clear.
+- Agreed on 2026-10-24: text keeps a 4.5:1 contrast ratio over any desktop while the theme covers the glass at 60% or more, or 75% on a theme with white text. Clearer than that, the user picks clear over readable, as macOS allows. This is the one exception to the [readable tints](arc-style-look.md#scope) rule.
 - Pin tiles, the active tab, the sidebar foot's buttons, and the window's edge get a lit top edge and a soft shadow, as glass does.
-- Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass at the same 60% or 75%, so a red page gives a red glass toolbar and the terminal's stays nearly black. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
+- Agreed on 2026-10-24: the toolbar and the bookmarks bar are glass too. The page color covers the glass as much as the theme does, so a red page gives a red glass toolbar and the terminal's stays dark. The page still starts below the toolbar and does not scroll under it, as in Safari; Blink cannot lay a desktop page out under the toolbar.
 - The page, menus, the picker, and the command bar stay solid. Grain still lies on the theme.
-- The window is solid, as with Glass off, behind another uw window, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium gives glass to the window in front only. While glass is paused, the picker says why under the switch.
+- The window is solid, as with Glass off, behind another uw window, in full screen, with Energy Saver on, with Reduce transparency on in macOS, and under a Chrome Web Store theme. Chromium gives glass to the window in front only. While glass is paused, the picker says why under the slider.
 - Before macOS 26 the picker has no Glass row.
 
 The numbers are in the `uw-themes` guide, section "Glass". The frames are on the canvas's "Themes" page: "Glass: light", "Glass: dark", and "Glass: every state".
@@ -172,9 +173,9 @@ Stages:
 
 Acceptance checks:
 
-1. With Glass off, the window looks as it does today.
-2. With Glass on, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
-3. Text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode and on a theme with white text.
+1. With the slider at the left end, the window looks as it does today.
+2. With the slider moved right, in the front window on macOS 26 or later, the desktop shows through the sidebar, the toolbar, and around the page, blurred. The page stays solid.
+3. With the theme covering the glass at 60%, or 75% on a theme with white text, text on the sidebar and the toolbar keeps 4.5:1 over a white and a black desktop, in light and dark mode. At the right end, the theme covers it at 20%.
 4. Clicking another uw window moves the glass to it, and the window behind turns solid.
 5. Energy Saver, Reduce transparency, full screen, and a Chrome Web Store theme each make the window solid. For the first two, the picker says why.
 6. Two workspaces keep their own Glass setting.
@@ -184,6 +185,5 @@ Acceptance checks:
 
 Glass, until the user answers:
 
-- A switch, or a slider for how clear the glass is?
 - Glass for each workspace's theme, or one setting for all of uw?
 - Glass on the front window only, as Chromium does, or on every window?
