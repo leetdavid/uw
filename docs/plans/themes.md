@@ -11,7 +11,7 @@ The look of the window is in the [Arc-style look plan](arc-style-look.md). This 
 - A profile has one theme, shared by all its windows. Each profile can look different. Changed on 2026-10-21: each [workspace](workspaces.md) has its own theme, T131.
 - The picker opens over the window, beside the sidebar, from "Theme…" in the menu of empty sidebar space and from View → Theme… in the menu bar. The window changes as the user picks. The "Window tint" section of uw's settings page becomes one row that opens the picker.
 - The picker has, from the top:
-  - Light, Dark, and Auto. Auto follows macOS. This is Chromium's own color mode setting, which web pages and uw's pages already follow.
+  - Light, Dark, and Auto. Auto follows macOS. Since T201 this sets the theme alone, and [page mode](#page-mode) sets everything else.
   - Suggested themes.
   - A color field with up to three dots to drag. One dot gives today's gradient, from that color to its neighbor on the color wheel. Two or three dots give a gradient through those colors.
   - An intensity slider, for saturation.
@@ -79,16 +79,17 @@ Status: scope agreed with the user on 2026-10-16. The design, T101, was signed o
 
 Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a part of the theme, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
 
-- Page mode is Same as window, Light, or Dark. Same as window is the default, so nothing changes until the user picks.
-- It covers websites and uw's own tab pages: the chat page, the providers page, and the terminal. Chromium's own pages, such as Settings, History, and the new tab page, follow the window mode, since their colors come from the window.
-- It covers extensions' pages wherever they show: their popups, side panels, and tabs.
-- It covers the command bar and the address bar's suggestion list, which open over the page. Agreed on 2026-10-24, T198: "i am saying that it should be in dark mode, but it is currently in light mode for some reason", and T199: "the address bar is not fixed yet". uw's other panels, such as this picker, and Chromium's follow the window. Agreed on 2026-10-24, T191: "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode".
+- Page mode is Theme, Light, or Dark. Theme, the default, is the theme's own light or dark, so nothing changes until the user picks. Its tooltip and VoiceOver label say "Same as the theme". It read "Window" until T201.
+- It covers everything outside the sidebar: websites, extensions' pages wherever they show (their popups, side panels, and tabs), uw's tab pages, Chromium's pages such as Settings, History, and the new tab page, Chromium's menus, bubbles, and dialogs, the side panel, the find bar, infobars, the toolbar until its page reports a color, and uw's panels over the page: the command bar, the address bar's suggestion list, and the "Watch this page" card.
+- The theme covers the sidebar, the edge around the page card, and the menus and cards that open from the sidebar: the task menu, Organize, the new button's menu, the rename and new workspace cards, this picker, and macOS's tab and pin menus.
+- Dark pages use [black dark mode](#agreed-scope): neutral Chromium colors and uw's blacks, whatever "Theme colors in dark mode" says, since that switch is the theme's. Light pages use Chromium's light colors tinted by the theme, as a light window did.
+- Agreed step by step: T191 on 2026-10-24, "the extensions are in light mode when the theme is light, but pages are dark. they should follow the pages mode"; T198, of the command bar, "i am saying that it should be in dark mode, but it is currently in light mode for some reason"; T199, "the address bar is not fixed yet"; and T201 on 2026-10-25, in a grilling session, after "the dark mode of chromium needs to be separated out from the sidebar's theming" and "the cleaner implementation would be to completely separate the sidebar theming from the chromium theming".
 - Pages are only told the mode (`prefers-color-scheme`). A site with no dark look of its own stays light. Chromium's auto-dark is not used.
 - The card's empty color, shown before a page paints and behind a page with no background, follows page mode: `#0A0A0A` for dark pages and white for light ones.
 - The page's scrollbar follows the toolbar, as in Chromium, and the toolbar takes the [page color](#page-colors). A site with no dark look of its own keeps a light scrollbar. Agreed on 2026-10-24; this replaced "the scrollbar follows page mode".
 - Open pages change as soon as the setting does.
-- The control is a "Pages" row in the picker, under the window's Auto, Light, and Dark.
-- It belongs to the theme, so each [workspace](workspaces.md) has its own, as its window mode is, and a new workspace starts on the page mode of the one it was made from. Agreed on 2026-10-24; it was per profile. It does not sync. Incognito pages keep following macOS, as Chromium does.
+- The control is a "Pages" row in the picker, under the theme's Auto, Light, and Dark.
+- It belongs to the theme, so each [workspace](workspaces.md) has its own, as its window mode is, and a new workspace starts on the page mode of the one it was made from. Agreed on 2026-10-24; it was per profile. It does not sync. In private windows, pages and Chromium's menus and bubbles follow macOS, as Chromium's private pages do, and the sidebar shows the profile's latest theme.
 - No per-site exceptions for now.
 
 Stages:
@@ -112,6 +113,25 @@ How it is built, for T102:
 - `PageModeIsDark` in `browser/workspaces/workspace_theme.h` decides for each page from its window's theme and its address. A page outside a tab, such as an extension's popup, finds its window through the bubble or panel that holds it. `uw-scheme-alias` asks it in `GetPreferredColorScheme`, and `uw-look` asks `EmptyPageColor` in `ContentsWebView` for the card, also after each navigation.
 - A change redraws the workspace's windows, which makes Chromium tell each open page again.
 - `WorkspacesBrowserTest.PagesTakeThePageModeAndChromiumsPagesTheWindow`, `TwoWorkspacesKeepTwoPageModes`, `OpenPagesTakeANewPageModeAtOnce`, and `TheCardBehindAPageTakesThePageMode` cover checks 2 to 6, `AnExtensionsPopupTakesThePageMode` an extension's popup, and `ThemePickerBrowserTest.ThePagesRowSetsThePageMode` the row.
+
+### The theme apart from Chromium
+
+Status: agreed with the user on 2026-10-25 in a grilling session. The designs, T200, were pre-approved: "the designs are pre-approved, just start the implementation right after". Being built in T201.
+
+Implementability: **5/10**. Chromium works out every color of a window from one color key, which held the theme's light or dark. Page mode becomes the key's light or dark, and the theme's goes into a field of its own that only uw's sidebar colors read, per [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Every Chromium surface then follows page mode by itself. The risks are Chromium colors made for the tab strip that the sidebar uses, uw's sidebar menus and cards, which must ask for the theme's mode, macOS's own menus and window, and a first build that rebuilds nearly all of Chromium.
+
+Stages:
+
+1. T200: the two "Page mode" frames redrawn: the row's first choice reads "Theme", a light sidebar beside dark Settings and dark Chromium menus, and a dark sidebar beside light pages.
+2. T201: the split built. It replaces the per-surface hooks of T191, T198, and T199.
+
+Acceptance checks:
+
+1. With a light theme and Dark pages: websites, an extension's popup, Settings, the ⋮ menu, the extensions menu, the command bar, and the suggestion list are dark; the sidebar, the edge around the card, and the task menu stay light.
+2. With a dark theme and Light pages, the reverse, with the sidebar black or in its theme colors as the theme says.
+3. With Pages on Theme, every surface looks as it did before T201.
+4. Two workspaces keep their own theme and page mode. In a private window, pages and Chromium's menus follow macOS.
+5. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Page colors
 
