@@ -299,9 +299,20 @@ void PlaybackControls::UpdateButtons() {
 }
 
 void PlaybackControls::OnArt(const SkBitmap& art) {
+  // A site's artwork can come in another pixel order than the one views
+  // draw; it is copied into that one, as Chromium's media controls do.
+  const SkImageInfo info = art.info().makeColorType(kN32_SkColorType);
+  SkBitmap native;
   art_ =
-      art.isNull() ? gfx::ImageSkia() : gfx::ImageSkia::CreateFrom1xBitmap(art);
+      !art.isNull() && native.tryAllocPixels(info) &&
+              art.readPixels(info, native.getPixels(), native.rowBytes(), 0, 0)
+          ? gfx::ImageSkia::CreateFrom1xBitmap(native)
+          : gfx::ImageSkia();
   SchedulePaint();
+}
+
+void PlaybackControls::SetArtForTesting(const SkBitmap& art) {
+  OnArt(art);
 }
 
 void PlaybackControls::GoToTab() {

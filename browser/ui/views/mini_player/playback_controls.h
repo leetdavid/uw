@@ -59,6 +59,8 @@ class PlaybackControls : public views::Button,
   content::WebContents* tab() { return tab_.get(); }
   bool playing() const { return playing_; }
   views::ImageButton* play_pause() { return play_pause_; }
+  bool has_art() const { return !art_.isNull(); }
+  void SetArtForTesting(const SkBitmap& art);
 
   // views::Button:
   gfx::Size CalculatePreferredSize(

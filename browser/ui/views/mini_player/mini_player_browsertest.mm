@@ -581,6 +581,19 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(controls->GetVisible());
 }
 
+// A site's artwork can come in RGBA order; the row shows it, in the order
+// views draw.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ThePlaybackControlsTakeArtworkInAnyPixelOrder) {
+  PlaybackControls* controls = ControlsOf(browser());
+  SkBitmap art;
+  ASSERT_TRUE(art.tryAllocPixels(
+      SkImageInfo::Make(64, 64, kRGBA_8888_SkColorType, kPremul_SkAlphaType)));
+  art.eraseColor(SK_ColorRED);
+  controls->SetArtForTesting(art);
+  EXPECT_TRUE(controls->has_art());
+}
+
 // Sound in a mini player has the mini player's controls, so no row.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
                        SoundInAMiniPlayerGetsNoPlaybackControls) {
