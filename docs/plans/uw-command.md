@@ -26,7 +26,7 @@ The user asked on 2026-10-24 for a [`uw` command](../CONTEXT.md#language) that a
 
 Later: skills, providers, scheduled chats, and opening or reading tabs without the agent.
 
-In v2.2, `uw mcp serve` is the [tool server](agent-chats.md#releases) for outside agents, over the same channel: `claude mcp add uw -- uw mcp serve`. It offers the agent's tools only, never settings or connectors.
+In v2.2, `uw mcp serve` is the [tool server](#the-tool-server) for outside agents, over the same channel: `claude mcp add uw -- uw mcp serve`.
 
 ### Reaching uw
 
@@ -93,6 +93,17 @@ Not yet: images, the per-chat connector switches (every connector that is on is 
 - `uw settings list` shows each one's value and what it accepts, and says when several workspaces share it: `organizer.enabled: shared by Work and Side projects (same profile)`.
 - `set` checks a value as the settings page does.
 - Left out: Chromium's own preferences, and lists with pages of their own, such as providers, workspaces, and pins.
+
+### The tool server
+
+Agreed on 2026-10-25. `uw mcp serve` speaks MCP on stdin and stdout to an [outside agent](../CONTEXT.md#language) and reaches uw over the command's channel.
+
+- It offers the agent's page tools only: `open`, `navigate`, `read`, `click`, and `type`. Not the terminal tools, since an outside agent has its own shell, and never settings, connectors, or chats.
+- The tabs open out of sight in the run window, as a `uw chat` chat's do, and close when the client disconnects. A step that waits for approval brings its tab into the front window, unselected, as a scheduled chat's does.
+- Steps need approval as a chat's do, under the mode new chats start on. `--mode ask-first | auto | full-auto` picks one for that client, and `--workspace` picks the profile.
+- uw asks through MCP elicitation, so a client such as Claude Code shows uw's card as a dialog: Approve, Not this one, or a note. The model can't answer it.
+- A client without elicitation leaves the step waiting in uw. uw's notification asks, such as "Claude Code waits for your approval: Click "Cancel plan" on dropbox.com", with Approve and Not this one. Clicking it shows the tab.
+- A session is not a chat. Nothing is saved, and it is not in the Chats list.
 
 ### Not in this plan
 
@@ -174,7 +185,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 3. T194: `uw connectors` and `uw mcp`: add, list, remove, and sign-in.
 4. T195: printed chats: `uw chat -p`, `--json`, the exit codes, `uw approve`, `-c`, `-r`, `--mode`, `--model`, `--effort`, `--timeout`, piped text, and `uw chats`.
 5. T196: the terminal interface.
-6. T197: `uw mcp serve`, in v2.2 with outside agents.
+6. T197: `uw mcp serve`, the [tool server](#the-tool-server), in v2.2 with outside agents.
 
 ## Acceptance checks
 
@@ -187,6 +198,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 7. Piped text that tells the agent to do something else is not followed.
 8. The terminal interface matches the signed-off frames, steers, stops on Esc, and opens the chat in uw on Ctrl-O.
 9. `pnpm run check` and the focused tests pass. Browser tests stay headless.
+10. After `claude mcp add uw -- uw mcp serve`, Claude Code opens and reads a test site in uw with no tab in the user's windows. A click that changes something asks in Claude Code, and Not this one keeps it from happening. With a client that has no elicitation, uw's notification asks instead.
 
 ## Open questions
 
