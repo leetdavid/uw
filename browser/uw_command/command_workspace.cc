@@ -13,6 +13,9 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+#include "ui/base/base_window.h"
+#include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
@@ -78,6 +81,29 @@ void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded) {
             std::move(loaded).Run(profile, id);
           },
           std::move(workspace.id), std::move(loaded)));
+}
+
+BrowserWindowInterface* ShowFrontWindow(Profile* profile) {
+  BrowserWindowInterface* front = nullptr;
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [&](BrowserWindowInterface* window) {
+        if (window->GetProfile() == profile &&
+            window->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
+            !IsRunWindow(window) && !WorkspaceWindow::IsHidden(window)) {
+          front = window;
+          return false;
+        }
+        return true;
+      });
+  if (!front) {
+    front = CreateBrowserWindow(
+        BrowserWindowCreateParams(*profile, /*from_user_gesture=*/true));
+  }
+  if (front) {
+    front->GetWindow()->Show();
+    front->GetWindow()->Activate();
+  }
+  return front;
 }
 
 std::vector<std::string> WorkspaceNames(const Profile* profile) {

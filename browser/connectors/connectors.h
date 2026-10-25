@@ -115,6 +115,11 @@ class Connectors {
   // Adds what the user pasted, and starts it. Adds none when a name is
   // taken; the error says which.
   base::expected<void, std::string> Add(std::vector<ConnectorConfig> added);
+  // Adds what the user pasted, as Add does, once each web address of the old
+  // HTTP+SSE transport has been tried at /mcp. `done` gets why nothing was
+  // added, or an empty sentence.
+  using Added = base::OnceCallback<void(const std::string& error)>;
+  void AddPasted(std::vector<ConnectorConfig> added, Added done);
   void Remove(std::string_view name);
   void SetOn(std::string_view name, bool on);
   void SetToolOn(std::string_view name, std::string_view tool, bool on);
@@ -167,6 +172,14 @@ class Connectors {
   ~Connectors();
 
   Info* FindInfo(std::string_view name);
+  void AddAfterProbes(std::vector<ConnectorConfig> connectors,
+                      size_t next,
+                      Added done);
+  void OnProbed(std::vector<ConnectorConfig> connectors,
+                size_t index,
+                std::string address,
+                Added done,
+                bool answered);
   void OnEnvironment(std::optional<base::EnvironmentMap> environment);
   void OnRead(std::optional<base::DictValue> saved,
               std::map<std::string, base::DictValue> caches);

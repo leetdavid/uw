@@ -10,22 +10,31 @@ source_set("uw_command") {
     "command_install.mm",
     "command_socket.cc",
     "command_socket.h",
+    "connectors_command.cc",
     "command_workspace.cc",
     "command_workspace.h",
     "settings_command.cc",
   ]
   public_deps = [ "//base" ]
   deps = [
+    "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles:profile_manager",
     "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/browser_window:create_browser_window",
+    "//chrome/browser/ui/navigator",
     "//chrome/common:constants",
     "//components/prefs",
     "//components/version_info",
     "//content/public/browser",
     "//net",
+    "//ui/base",
+    "//url",
+    "//uw/browser/agent:run_window_mark",
+    "//uw/browser/connectors",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/workspaces",
+    "//uw/components/connectors",
     "//uw/components/look",
     "//uw/components/uw_command",
   ]
@@ -48,9 +57,13 @@ source_set("browser_tests") {
     "//components/version_info",
     "//content/public/browser",
     "//content/test:test_support",
+    "//net:test_support",
     "//testing/gtest",
+    "//uw/browser/ai_providers:test_support",
+    "//uw/browser/connectors",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/workspaces",
     "//uw/components/uw_command",
   ]
+  data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]
 }

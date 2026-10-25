@@ -777,43 +777,7 @@ void UwProvidersHandler::AddConnectors(const std::string& json,
     std::move(callback).Run(read.error());
     return;
   }
-  AddAfterProbes(std::move(read).value(), 0, std::move(callback));
-}
-
-void UwProvidersHandler::AddAfterProbes(std::vector<ConnectorConfig> connectors,
-                                        size_t next,
-                                        AddConnectorsCallback callback) {
-  for (size_t i = next; i < connectors.size(); ++i) {
-    if (std::optional<std::string> address =
-            connectors[i].remote() ? StreamableAddress(connectors[i].url)
-                                   : std::nullopt) {
-      const GURL url(*address);
-      Connectors::Get().Probe(
-          url, base::BindOnce(&UwProvidersHandler::OnProbed,
-                              weak_factory_.GetWeakPtr(), std::move(connectors),
-                              i, *address, std::move(callback)));
-      return;
-    }
-  }
-  base::expected<void, std::string> added =
-      Connectors::Get().Add(std::move(connectors));
-  std::move(callback).Run(added.has_value() ? std::string() : added.error());
-}
-
-void UwProvidersHandler::OnProbed(std::vector<ConnectorConfig> connectors,
-                                  size_t index,
-                                  std::string address,
-                                  AddConnectorsCallback callback,
-                                  bool answered) {
-  if (!answered) {
-    std::move(callback).Run(base::StrCat(
-        {connectors[index].name,
-         ": uw doesn't speak the old HTTP+SSE transport, and ", address,
-         " didn't answer. Use the server's Streamable HTTP address."}));
-    return;
-  }
-  connectors[index].url = std::move(address);
-  AddAfterProbes(std::move(connectors), index + 1, std::move(callback));
+  Connectors::Get().AddPasted(std::move(read).value(), std::move(callback));
 }
 
 void UwProvidersHandler::RemoveConnector(const std::string& name) {

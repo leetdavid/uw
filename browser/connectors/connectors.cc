@@ -420,6 +420,45 @@ base::expected<void, std::string> Connectors::Add(
   return base::ok();
 }
 
+void Connectors::AddPasted(std::vector<ConnectorConfig> added, Added done) {
+  AddAfterProbes(std::move(added), 0, std::move(done));
+}
+
+void Connectors::AddAfterProbes(std::vector<ConnectorConfig> connectors,
+                                size_t next,
+                                Added done) {
+  for (size_t i = next; i < connectors.size(); ++i) {
+    if (std::optional<std::string> address =
+            connectors[i].remote() ? StreamableAddress(connectors[i].url)
+                                   : std::nullopt) {
+      const GURL url(*address);
+      Probe(url, base::BindOnce(&Connectors::OnProbed,
+                                weak_factory_.GetWeakPtr(),
+                                std::move(connectors), i, *address,
+                                std::move(done)));
+      return;
+    }
+  }
+  base::expected<void, std::string> added = Add(std::move(connectors));
+  std::move(done).Run(added.has_value() ? std::string() : added.error());
+}
+
+void Connectors::OnProbed(std::vector<ConnectorConfig> connectors,
+                          size_t index,
+                          std::string address,
+                          Added done,
+                          bool answered) {
+  if (!answered) {
+    std::move(done).Run(base::StrCat(
+        {connectors[index].name,
+         ": uw doesn't speak the old HTTP+SSE transport, and ", address,
+         " didn't answer. Use the server's Streamable HTTP address."}));
+    return;
+  }
+  connectors[index].url = std::move(address);
+  AddAfterProbes(std::move(connectors), index + 1, std::move(done));
+}
+
 void Connectors::Remove(std::string_view name) {
   auto found = std::ranges::find(list_, name, [](const Info& info) {
     return std::string_view(info.config.name);

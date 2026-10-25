@@ -5,13 +5,17 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <memory>
 #include <string>
 
+#include "base/base_paths.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_file.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
+#include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
@@ -26,6 +30,12 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
+#include "net/http/http_status_code.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
+#include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -213,6 +223,131 @@ IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, AClosedChannelIsNotListening) {
       base::BindOnce(&Exchange, socket_, R"({"id":1,"method":"hello"})"),
       reply.GetCallback());
   EXPECT_EQ(reply.Get(), "not listening");
+}
+
+// Drives uw mcp's requests, with the connectors kept in a folder of the
+// test's own and their keys in memory.
+class UwCommandConnectorsBrowserTest : public UwCommandBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    UwCommandBrowserTest::SetUpOnMainThread();
+    keychain_ = std::make_unique<ScopedMemoryKeychain>();
+    base::ScopedAllowBlockingForTesting blocking;
+    ASSERT_TRUE(connectors_.CreateUniqueTempDir());
+    Connectors::SetUpForTesting(connectors_.GetPath(),
+                                base::FilePath("/bin/sh"));
+  }
+
+  void TearDownOnMainThread() override {
+    Connectors::SetUpForTesting(base::FilePath(), base::FilePath());
+    UwCommandBrowserTest::TearDownOnMainThread();
+  }
+
+  // The paste box's JSON for one connector.
+  static std::string Pasted(const std::string& name, base::DictValue server) {
+    base::DictValue servers;
+    servers.Set(name, std::move(server));
+    base::DictValue json;
+    json.Set("mcpServers", std::move(servers));
+    return base::WriteJson(json).value_or("");
+  }
+
+  // The fake MCP server, with a key.
+  static base::DictValue FakeServer() {
+    base::FilePath program;
+    base::PathService::Get(base::DIR_EXE, &program);
+    base::DictValue env;
+    env.Set("FILES_TOKEN", "sk-test");
+    base::DictValue server;
+    server.Set("command", program.AppendASCII("uw_fake_mcp_server").value());
+    server.Set("env", std::move(env));
+    return server;
+  }
+
+  base::DictValue AskWith(const std::string& method,
+                          const base::DictValue& params) {
+    return Ask(method, base::WriteJson(params).value_or("{}"));
+  }
+
+  base::ScopedTempDir connectors_;
+  std::unique_ptr<ScopedMemoryKeychain> keychain_;
+};
+
+IN_PROC_BROWSER_TEST_F(UwCommandConnectorsBrowserTest,
+                       AddListAndRemoveALocalConnector) {
+  base::DictValue add;
+  add.Set("json", Pasted("files", FakeServer()));
+  base::DictValue added = AskWith("connectors.add", add);
+  const base::ListValue* connectors =
+      added.FindListByDottedPath("result.connectors");
+  ASSERT_TRUE(connectors && connectors->size() == 1u) << added;
+  const base::DictValue& files = (*connectors)[0].GetDict();
+  EXPECT_EQ(*files.FindString("name"), "files");
+  EXPECT_EQ(*files.FindString("kind"), "local");
+  EXPECT_EQ(*files.FindString("state"), "ready");
+  EXPECT_GT(files.FindInt("tools").value_or(0), 0);
+  EXPECT_EQ(*files.FindList("secrets"), base::ListValue().Append("FILES_TOKEN"));
+
+  EXPECT_EQ(AskWith("connectors.add", add).FindIntByDottedPath("error.code"),
+            2);
+  base::DictValue listed = Ask("connectors.list");
+  EXPECT_EQ(listed.FindListByDottedPath("result.connectors")->size(), 1u);
+
+  base::DictValue named;
+  named.Set("name", "files");
+  base::DictValue removed = AskWith("connectors.remove", named);
+  EXPECT_EQ(*removed.FindStringByDottedPath("result.name"), "files");
+  base::DictValue after = Ask("connectors.list");
+  EXPECT_TRUE(after.FindListByDottedPath("result.connectors")->empty());
+  EXPECT_EQ(
+      AskWith("connectors.remove", named).FindIntByDottedPath("error.code"), 2);
+}
+
+IN_PROC_BROWSER_TEST_F(UwCommandConnectorsBrowserTest,
+                       OnlyAWebConnectorSignsIn) {
+  base::DictValue add;
+  add.Set("json", Pasted("files", FakeServer()));
+  AskWith("connectors.add", add);
+  base::DictValue named;
+  named.Set("name", "files");
+  base::DictValue refused = AskWith("connectors.signIn", named);
+  EXPECT_EQ(refused.FindIntByDottedPath("error.code"), 2);
+  EXPECT_EQ(*refused.FindStringByDottedPath("error.message"),
+            "files runs on this Mac and needs no sign-in.");
+}
+
+// A web connector that asks for a sign-in waits for one. A sign-in that
+// can't start says so, rather than leaving the command waiting.
+IN_PROC_BROWSER_TEST_F(UwCommandConnectorsBrowserTest,
+                       AWebConnectorWaitsForItsSignIn) {
+  net::EmbeddedTestServer server;
+  server.RegisterRequestHandler(base::BindRepeating(
+      [](const net::test_server::HttpRequest&)
+          -> std::unique_ptr<net::test_server::HttpResponse> {
+        auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+        response->set_code(net::HTTP_UNAUTHORIZED);
+        response->AddCustomHeader("WWW-Authenticate", "Bearer");
+        return response;
+      }));
+  ASSERT_TRUE(server.Start());
+  base::DictValue web;
+  web.Set("type", "http");
+  web.Set("url", server.GetURL("/mcp").spec());
+  base::DictValue add;
+  add.Set("json", Pasted("web", std::move(web)));
+  base::DictValue added = AskWith("connectors.add", add);
+  const base::ListValue* connectors =
+      added.FindListByDottedPath("result.connectors");
+  ASSERT_TRUE(connectors && connectors->size() == 1u) << added;
+  EXPECT_EQ(*(*connectors)[0].GetDict().FindString("state"), "needs-sign-in");
+
+  base::DictValue named;
+  named.Set("name", "web");
+  base::DictValue signed_in = AskWith("connectors.signIn", named);
+  EXPECT_EQ(signed_in.FindIntByDottedPath("error.code"), 1) << signed_in;
+  EXPECT_TRUE(base::StartsWith(
+      *signed_in.FindStringByDottedPath("error.message"),
+      "The sign-in to web didn't finish"));
 }
 
 }  // namespace

@@ -142,17 +142,6 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
 
   void ReplySkills(GetSkillsCallback callback, std::vector<Skill> skills);
 
-  // Adds `connectors` once each from `next` on whose address is of the old
-  // HTTP+SSE transport has been tried at /mcp.
-  void AddAfterProbes(std::vector<ConnectorConfig> connectors,
-                      size_t next,
-                      AddConnectorsCallback callback);
-  void OnProbed(std::vector<ConnectorConfig> connectors,
-                size_t index,
-                std::string address,
-                AddConnectorsCallback callback,
-                bool answered);
-
   const raw_ptr<Profile> profile_;
   const raw_ptr<content::WebContents> contents_;
   std::vector<WaitForConnectorChangeCallback> waiting_for_change_;

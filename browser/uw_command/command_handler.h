@@ -21,6 +21,10 @@ void HandleCommand(CommandRequest request, CommandReply reply);
 // uw settings: list, get, and set. See docs/plans/uw-command.md#settings.
 void RunSettingsCommand(CommandRequest request, CommandReply reply);
 
+// uw connectors, also uw mcp: list, add, remove, and sign in. See
+// docs/plans/uw-command.md#connectors.
+void RunConnectorsCommand(CommandRequest request, CommandReply reply);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_UW_COMMAND_COMMAND_HANDLER_H_

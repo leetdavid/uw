@@ -92,6 +92,10 @@ TEST(CommandSettingsTest, AWorkspaceSettingReadsAndChangesItsTheme) {
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.grain")), base::Value(40));
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.mode")),
             base::Value("auto"));
+  SetThemeSetting(theme, Setting("theme.page-mode"), base::Value("theme"));
+  EXPECT_EQ(theme.page_mode, PageMode::kTheme);
+  EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.page-mode")),
+            base::Value("theme"));
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.intensity")),
             base::Value(kFullIntensity));
 }

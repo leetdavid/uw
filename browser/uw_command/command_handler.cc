@@ -25,6 +25,10 @@ void HandleCommand(CommandRequest request, CommandReply reply) {
     RunSettingsCommand(std::move(request), std::move(reply));
     return;
   }
+  if (request.method.starts_with("connectors.")) {
+    RunConnectorsCommand(std::move(request), std::move(reply));
+    return;
+  }
   std::move(reply).Run(CommandError(
       request.id, kMethodNotFound,
       base::StrCat({"This uw can't answer ", request.method,

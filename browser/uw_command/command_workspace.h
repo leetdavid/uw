@@ -12,6 +12,7 @@
 #include "base/types/expected.h"
 #include "base/values.h"
 
+class BrowserWindowInterface;
 class Profile;
 
 namespace uw {
@@ -38,6 +39,10 @@ void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded);
 // The names of the workspaces on `profile`, or of every workspace when it is
 // null.
 std::vector<std::string> WorkspaceNames(const Profile* profile);
+
+// The front window of `profile`, or a new one, shown and brought forward, for
+// what the command opens in uw, such as a connector's sign-in.
+BrowserWindowInterface* ShowFrontWindow(Profile* profile);
 
 }  // namespace uw
 

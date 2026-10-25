@@ -30,7 +30,7 @@ constexpr Choice kApprovalModes[] = {
 constexpr Choice kThemeModes[] = {
     {"auto", "auto"}, {"light", "light"}, {"dark", "dark"}};
 constexpr Choice kPageModes[] = {
-    {"window", "window"}, {"light", "light"}, {"dark", "dark"}};
+    {"theme", "theme"}, {"light", "light"}, {"dark", "dark"}};
 
 constexpr CommandSetting Switch(std::string_view name,
                                 Scope scope,
@@ -128,7 +128,7 @@ std::string_view ModeName(ThemeMode mode) {
 std::string_view PageModeName(PageMode mode) {
   switch (mode) {
     case PageMode::kTheme:
-      return "window";
+      return "theme";
     case PageMode::kLight:
       return "light";
     case PageMode::kDark:
