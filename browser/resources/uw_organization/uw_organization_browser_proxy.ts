@@ -22,6 +22,7 @@ export interface UwOrganizationBrowserProxy {
   setMouseAction(action: MouseAction, on: boolean): Promise<void>;
   setMiniPlayerMode(mode: MiniPlayerMode): Promise<void>;
   setMiniPlayer(which: MiniPlayerSwitch, on: boolean): Promise<void>;
+  setSiteLive(site: string, live: boolean): Promise<void>;
 }
 
 export class UwOrganizationBrowserProxyImpl implements
@@ -68,6 +69,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setMiniPlayerMode(mode: MiniPlayerMode) {
     await this.handler.setMiniPlayerMode(mode);
+  }
+
+  async setSiteLive(site: string, live: boolean) {
+    await this.handler.setSiteLive(site, live);
   }
 
   async setMiniPlayer(which: MiniPlayerSwitch, on: boolean) {

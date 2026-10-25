@@ -10,6 +10,8 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/timer/timer.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "ui/gfx/geometry/size.h"
@@ -32,10 +34,13 @@ class MiniPlayerPlacement;
 // small browser window of its own. While the site asked for a small window
 // and the mini player docks, uw moves the live page out of that window into
 // the sidebar, under any mini player, and back into its window when it
-// floats. It is a live window: it keeps running beside a video.
+// floats. Beside a video it is a live window, which keeps running, unless the
+// user turned that off for its site: then it pauses and waits in the stack
+// like a video.
 class SiteWindow : public content::WebContentsDelegate,
                    public content::WebContentsObserver,
-                   public views::WidgetObserver {
+                   public views::WidgetObserver,
+                   public PictureInPictureWindowManager::Observer {
  public:
   // The biggest window, each way, a site may ask for and still dock.
   static constexpr int kMaxDockedSide = 480;
@@ -51,6 +56,12 @@ class SiteWindow : public content::WebContentsDelegate,
 
   // The tab that opened it.
   content::WebContents* opener() { return opener_; }
+  // The host of that tab, whose choice of Live it follows.
+  const std::string& site() const { return site_; }
+  // Whether it keeps running beside a video.
+  bool live() const;
+  // True while it waits in the stack, paused, under a video.
+  bool waiting() const { return waiting_; }
   // The site's page in it.
   content::WebContents* page() { return page_; }
   // Its own browser window, hidden while the page is docked.
@@ -86,6 +97,10 @@ class SiteWindow : public content::WebContentsDelegate,
   // views::WidgetObserver, on its own window:
   void OnWidgetDestroying(views::Widget* widget) override;
 
+  // PictureInPictureWindowManager::Observer:
+  void OnEnterPictureInPicture() override;
+  void OnExitPictureInPicture() override;
+
  private:
   friend class SiteWindowWatcher;
 
@@ -98,6 +113,14 @@ class SiteWindow : public content::WebContentsDelegate,
   void Float();
   // Takes the page out of the dock it is in.
   void Undock();
+  // True while a video plays above it in Chromium's eyes.
+  bool BesideAVideo();
+  // Pauses it into the stack, or closes it outside the sidebar, unless it is
+  // live.
+  void MeetVideo();
+  void Wait();
+  void Resume();
+  void OnLiveChanged();
   // True while it must float: too big, grown too big, or asking the user.
   bool MustFloat() const;
   bool AsksTheUser() const;
@@ -108,6 +131,12 @@ class SiteWindow : public content::WebContentsDelegate,
   const raw_ptr<content::WebContents> opener_;
   const raw_ptr<content::WebContents> page_;
   const raw_ptr<BrowserWindowInterface> window_;
+  const std::string site_;
+  bool waiting_ = false;
+  PrefChangeRegistrar prefs_;
+  base::ScopedObservation<PictureInPictureWindowManager,
+                          PictureInPictureWindowManager::Observer>
+      picture_in_picture_{this};
   gfx::Size asked_;
   // Set once the site grew it past the limit; it floats until it closes.
   bool grew_too_big_ = false;

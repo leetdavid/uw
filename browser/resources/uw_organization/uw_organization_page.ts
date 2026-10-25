@@ -312,6 +312,25 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
         'dock';
   }
 
+  // The sites with their own window, each with its Live switch.
+  protected liveSites_() {
+    return (this.state_?.liveSites ?? []).map((site, index) => ({
+                                                id: `liveSite${index}`,
+                                                site: site.site,
+                                                live: site.live,
+                                              }));
+  }
+
+  protected miniPlayerOff_(): boolean {
+    return this.state_?.miniPlayerMode === MiniPlayerMode.kOff;
+  }
+
+  protected async onLiveSiteChange_(e: CustomEvent<boolean>) {
+    const toggle = e.currentTarget as CrToggleElement;
+    await this.browserProxy_.setSiteLive(toggle.dataset['site'] ?? '', e.detail);
+    this.refresh_();
+  }
+
   // The two switches only matter while the mini player docks.
   protected miniPlayerDocks_(): boolean {
     return this.state_?.miniPlayerMode === MiniPlayerMode.kDock;

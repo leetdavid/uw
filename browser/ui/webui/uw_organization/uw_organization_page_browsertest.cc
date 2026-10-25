@@ -304,6 +304,28 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
       [&] { return MiniPlayerModeOf(local_state) == MiniPlayerMode::kOff; }));
 }
 
+// The sites that opened their own window show newest first, each with its
+// Live switch.
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheLiveListShowsSitesAndChangesThem) {
+  PrefService* local_state = g_browser_process->local_state();
+  NoteSiteWindow(local_state, "open.spotify.com");
+  NoteSiteWindow(local_state, "meet.google.com");
+  OpenPage();
+  ASSERT_EQ(true, Run("await until(() => part('liveSite1Toggle'));"
+                      "return part('liveSite0Label').textContent.trim() =="
+                      "    'meet.google.com';"));
+  ASSERT_EQ(true, Run("const toggle = part('liveSite1Toggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !IsSiteLive(local_state, "open.spotify.com"); }));
+  EXPECT_TRUE(IsSiteLive(local_state, "meet.google.com"));
+  SaveWindowScreenshot(browser(), "settings-live-windows");
+}
+
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                        TheDefaultCurrencyMenuSetsTheCommandBarsCurrency) {
   prefs()->SetDict(

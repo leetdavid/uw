@@ -131,6 +131,9 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMiniPlayerOff", IDS_UW_SETTINGS_MINI_PLAYER_OFF},
       {"uwMiniPlayerOffDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_OFF_DESCRIPTION},
+      {"uwMiniPlayerLive", IDS_UW_SETTINGS_MINI_PLAYER_LIVE},
+      {"uwMiniPlayerLiveDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_LIVE_DESCRIPTION},
       {"uwMiniPlayerOnTabSwitch", IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH},
       {"uwMiniPlayerOnTabSwitchDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH_DESCRIPTION},
@@ -224,6 +227,9 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
       local_state->GetBoolean(kMiniPlayerOnTabSwitchPref);
   state->mini_player_float_in_background =
       local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref);
+  for (const SiteWindowSite& site : SiteWindowSites(local_state)) {
+    state->live_sites.push_back(mojom::LiveSite::New(site.site, site.live));
+  }
   return state;
 }
 
@@ -285,6 +291,13 @@ void UwOrganizationHandler::SetMiniPlayerMode(
     SetMiniPlayerModeCallback callback) {
   g_browser_process->local_state()->SetInteger(kMiniPlayerModePref,
                                                static_cast<int>(mode));
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetSiteLive(const std::string& site,
+                                        bool live,
+                                        SetSiteLiveCallback callback) {
+  uw::SetSiteLive(g_browser_process->local_state(), site, live);
   std::move(callback).Run();
 }
 

@@ -229,6 +229,24 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           @change="${this.onMiniPlayerFloatChange_}">
       </cr-toggle>
     </div>
+    <div id="liveSitesHeading" class="uw-row"
+        ?hidden="${!this.liveSites_().length}">
+      <div class="uw-field">
+        ${this.i18n_('uwMiniPlayerLive')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwMiniPlayerLiveDescription')}
+        </div>
+      </div>
+    </div>
+    ${this.liveSites_().map(site => html`
+    <div class="uw-row">
+      <div id="${site.id}Label" class="uw-field">${site.site}</div>
+      <cr-toggle id="${site.id}Toggle" data-site="${site.site}"
+          aria-labelledby="${site.id}Label" ?checked="${site.live}"
+          ?disabled="${this.miniPlayerOff_()}"
+          @change="${this.onLiveSiteChange_}">
+      </cr-toggle>
+    </div>`)}
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwMouseTitle')}</h2>

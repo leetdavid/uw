@@ -9,6 +9,7 @@
 #include "base/no_destructor.h"
 #include "base/task/single_thread_task_runner.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -17,8 +18,13 @@
 #include "chrome/browser/ui/views/frame/browser_widget.h"  // nogncheck
 #include "chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.h"  // nogncheck
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/document_picture_in_picture_window_controller.h"
+#include "content/public/browser/favicon_status.h"
+#include "content/public/browser/media_session.h"
+#include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
@@ -38,9 +44,12 @@
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/mini_player/live_pill.h"
 #include "uw/browser/ui/views/mini_player/mini_player_controls.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
+#include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 
 namespace uw {
 namespace {
@@ -72,6 +81,8 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
         kMiniPlayerCloseIcon,
         l10n_util::GetStringUTF16(IDS_PICTURE_IN_PICTURE_CLOSE_CONTROL_TEXT),
         glass));
+    live_ = AddChildView(
+        LivePill::ForOpener(site_window->opener(), LivePill::Look::kOverPage));
     back_to_tab_ = AddChildView(std::make_unique<MiniPlayerButton>(
         base::BindRepeating(&SiteWindow::BackToTab,
                             base::Unretained(site_window)),
@@ -88,6 +99,7 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
   void Show(bool shown) {
     shown_ = shown;
     close_->SetVisible(shown);
+    live_->SetVisible(shown);
     back_to_tab_->SetVisible(shown && shows_back_to_tab_);
     for (MiniPlayerButton* button : {close_.get(), back_to_tab_.get()}) {
       button->UpdateGlass();
@@ -102,6 +114,10 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
     close_->SetBounds(kButtonInset, kButtonInset, kButton, kButton);
     back_to_tab_->SetBounds(width() - kButtonInset - kButton, kButtonInset,
                             kButton, kButton);
+    const gfx::Size live = live_->GetPreferredSize();
+    live_->SetBounds((width() - live.width()) / 2,
+                     kButtonInset + (kButton - live.height()) / 2, live.width(),
+                     live.height());
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
@@ -135,6 +151,7 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
   bool DoesIntersectRect(const views::View* target,
                          const gfx::Rect& rect) const override {
     return shown_ && (close_->bounds().Intersects(rect) ||
+                      live_->bounds().Intersects(rect) ||
                       (back_to_tab_->GetVisible() &&
                        back_to_tab_->bounds().Intersects(rect)));
   }
@@ -142,6 +159,7 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
  private:
   raw_ptr<MiniPlayerButton> close_ = nullptr;
   raw_ptr<MiniPlayerButton> back_to_tab_ = nullptr;
+  raw_ptr<LivePill> live_ = nullptr;
   bool shows_back_to_tab_ = true;
   bool shown_ = false;
 };
@@ -281,8 +299,17 @@ SiteWindow::SiteWindow(content::WebContents* opener,
       opener_(opener),
       page_(page),
       window_(window),
+      site_(opener->GetLastCommittedURL().host()),
       asked_(page->GetContainerBounds().size()) {
   own_window_observation_.Observe(own_widget());
+  picture_in_picture_.Observe(PictureInPictureWindowManager::GetInstance());
+  if (PrefService* local_state = g_browser_process->local_state()) {
+    NoteSiteWindow(local_state, site_);
+    prefs_.Init(local_state);
+    prefs_.Add(kMiniPlayerSiteWindowsPref,
+               base::BindRepeating(&SiteWindow::OnLiveChanged,
+                                   base::Unretained(this)));
+  }
   placement_ = std::make_unique<MiniPlayerPlacement>(
       own_widget(),
       base::BindRepeating(&SiteWindow::Place, base::Unretained(this)));
@@ -386,7 +413,7 @@ void SiteWindow::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void SiteWindow::Place(MiniPlayerDock* dock) {
-  if (own_window_gone_) {
+  if (own_window_gone_ || waiting_) {
     return;
   }
   if (MustFloat()) {
@@ -433,6 +460,92 @@ void SiteWindow::Place(MiniPlayerDock* dock) {
       },
       base::Unretained(this)));
   placement_->set_current(dock);
+}
+
+bool SiteWindow::live() const {
+  return IsSiteLive(g_browser_process->local_state(), site_);
+}
+
+void SiteWindow::OnEnterPictureInPicture() {
+  if (BesideAVideo()) {
+    MeetVideo();
+  }
+}
+
+void SiteWindow::OnExitPictureInPicture() {
+  // With the video gone it is the only one left: it plays again.
+  if (waiting_ && !BesideAVideo()) {
+    Resume();
+  }
+}
+
+bool SiteWindow::BesideAVideo() {
+  PictureInPictureWindowManager* manager =
+      PictureInPictureWindowManager::GetInstance();
+  return manager->kept_window_controller() &&
+         manager->kept_window_controller() == controller();
+}
+
+void SiteWindow::MeetVideo() {
+  if (waiting_ || live()) {
+    return;
+  }
+  // Outside the sidebar there is no stack: it closes and leaves its page
+  // paused, as a replaced video does.
+  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
+      MiniPlayerMode::kDock) {
+    Close();
+    return;
+  }
+  Wait();
+}
+
+void SiteWindow::Wait() {
+  waiting_ = true;
+  prompt_check_.Stop();
+  Undock();
+  if (!held_page_ && own_widget()) {
+    window_->GetWindow()->Hide();
+  }
+  content::MediaSession::Get(opener_)->Suspend(
+      content::MediaSession::SuspendType::kUI);
+  MiniPlayerStack::Entry entry;
+  entry.contents = opener_->GetWeakPtr();
+  entry.title = opener_->GetTitle();
+  if (content::NavigationEntry* page =
+          opener_->GetController().GetLastCommittedEntry()) {
+    entry.favicon = page->GetFavicon().image.AsImageSkia();
+  }
+  entry.still = entry.favicon;
+  entry.play_site_window =
+      base::BindRepeating(&SiteWindow::Resume, weak_factory_.GetWeakPtr());
+  entry.drop_site_window =
+      base::BindRepeating(&SiteWindow::Close, weak_factory_.GetWeakPtr());
+  MiniPlayerStack::Get().PushSiteWindow(std::move(entry));
+}
+
+void SiteWindow::Resume() {
+  if (!waiting_) {
+    return;
+  }
+  waiting_ = false;
+  MiniPlayerStack::Get().TakeSiteWindow(opener_);
+  content::MediaSession::Get(opener_)->Resume(
+      content::MediaSession::SuspendType::kUI);
+  if (!held_page_ && own_widget()) {
+    window_->GetWindow()->ShowInactive();
+  }
+  if (placement_) {
+    placement_->Update();
+  }
+}
+
+void SiteWindow::OnLiveChanged() {
+  if (waiting_ && live()) {
+    Resume();
+  } else if (BesideAVideo()) {
+    MeetVideo();
+  }
 }
 
 void SiteWindow::Undock() {

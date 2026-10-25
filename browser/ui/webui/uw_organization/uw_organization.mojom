@@ -50,6 +50,16 @@ struct State {
   MiniPlayerMode mini_player_mode;
   bool mini_player_on_tab_switch;
   bool mini_player_float_in_background;
+  // The sites that have opened their own picture-in-picture window, newest
+  // first.
+  array<LiveSite> live_sites;
+};
+
+// A site that has opened its own picture-in-picture window, and whether that
+// window keeps running beside a video.
+struct LiveSite {
+  string site;
+  bool live;
 };
 
 // The tab list's mouse actions that have a switch.
@@ -115,6 +125,7 @@ interface OrganizationHandler {
   // For all of uw. A mini player that shows moves at once.
   SetMiniPlayerMode(MiniPlayerMode mode) => ();
   SetMiniPlayer(MiniPlayerSwitch which, bool on) => ();
+  SetSiteLive(string site, bool live) => ();
   // For all of uw. Installing links the command, through macOS's password
   // prompt when needed, and opens uw's channel for it; uninstalling closes it.
   GetCommand() => (CommandState state);

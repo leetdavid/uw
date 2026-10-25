@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/navigation_controller.h"
@@ -53,34 +54,51 @@ void MiniPlayerStack::OnHidden(content::WebContents* contents,
 }
 
 void MiniPlayerStack::OnShown(content::WebContents* contents) {
-  std::erase_if(paused_, [contents](const Entry& entry) {
-    return !entry.contents || entry.contents.get() == contents;
+  std::vector<Entry> gone;
+  std::erase_if(paused_, [contents, &gone](const Entry& entry) {
+    if (entry.contents && entry.contents.get() != contents) {
+      return false;
+    }
+    gone.push_back(entry);
+    return true;
   });
   if (hidden_ && hidden_->contents && hidden_->contents.get() != contents) {
     content::MediaSession::Get(hidden_->contents.get())
         ->Suspend(content::MediaSession::SuspendType::kUI);
     paused_.insert(paused_.begin(), std::move(*hidden_));
-    if (paused_.size() > kMaxPaused) {
-      paused_.resize(kMaxPaused);
-    }
   }
   // The stack lives only in the sidebar. Without it the replaced video just
   // stays paused in its page.
-  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
-      MiniPlayerMode::kDock) {
-    paused_.clear();
+  const size_t kept = MiniPlayerModeOf(g_browser_process->local_state()) ==
+                              MiniPlayerMode::kDock
+                          ? kMaxPaused
+                          : 0;
+  while (paused_.size() > kept) {
+    gone.push_back(std::move(paused_.back()));
+    paused_.pop_back();
   }
   hidden_.reset();
   observers_.Notify();
+  for (const Entry& entry : gone) {
+    Dropped(entry);
+  }
 }
 
 void MiniPlayerStack::Play(size_t index) {
   if (index >= paused_.size()) {
     return;
   }
-  base::WeakPtr<content::WebContents> contents = paused_[index].contents;
+  const Entry entry = paused_[index];
   paused_.erase(paused_.begin() + index);
   observers_.Notify();
+  if (entry.play_site_window) {
+    // The video playing now goes under the site's window, paused.
+    PictureInPictureWindowManager::GetInstance()->ExitPictureInPicture();
+    KeepHidden();
+    entry.play_site_window.Run();
+    return;
+  }
+  base::WeakPtr<content::WebContents> contents = entry.contents;
   if (!contents) {
     return;
   }
@@ -91,16 +109,68 @@ void MiniPlayerStack::Play(size_t index) {
 
 void MiniPlayerStack::Drop(size_t index) {
   if (index < paused_.size()) {
+    const Entry entry = paused_[index];
     paused_.erase(paused_.begin() + index);
     observers_.Notify();
+    Dropped(entry);
   }
 }
 
 void MiniPlayerStack::Remove(content::WebContents* contents) {
+  std::vector<Entry> removed;
+  std::erase_if(paused_, [contents, &removed](const Entry& entry) {
+    if (entry.contents.get() != contents) {
+      return false;
+    }
+    removed.push_back(entry);
+    return true;
+  });
+  if (removed.empty()) {
+    return;
+  }
+  observers_.Notify();
+  for (const Entry& entry : removed) {
+    Dropped(entry);
+  }
+}
+
+void MiniPlayerStack::PushSiteWindow(Entry entry) {
+  paused_.insert(paused_.begin(), std::move(entry));
+  if (paused_.size() > kMaxPaused) {
+    Dropped(paused_.back());
+    paused_.resize(kMaxPaused);
+  }
+  observers_.Notify();
+}
+
+void MiniPlayerStack::TakeSiteWindow(content::WebContents* contents) {
   if (std::erase_if(paused_, [contents](const Entry& entry) {
-        return entry.contents.get() == contents;
+        return entry.play_site_window && entry.contents.get() == contents;
       })) {
     observers_.Notify();
+  }
+}
+
+void MiniPlayerStack::KeepHidden() {
+  if (!hidden_ || !hidden_->contents) {
+    hidden_.reset();
+    return;
+  }
+  content::MediaSession::Get(hidden_->contents.get())
+      ->Suspend(content::MediaSession::SuspendType::kUI);
+  paused_.insert(paused_.begin(), std::move(*hidden_));
+  hidden_.reset();
+  if (paused_.size() > kMaxPaused) {
+    Dropped(paused_.back());
+    paused_.resize(kMaxPaused);
+  }
+  observers_.Notify();
+}
+
+// static
+void MiniPlayerStack::Dropped(const Entry& entry) {
+  if (entry.drop_site_window) {
+    entry.drop_site_window.Run();
   }
 }
 

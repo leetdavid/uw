@@ -42,6 +42,10 @@ class MiniPlayerStack {
     gfx::ImageSkia still;
     gfx::ImageSkia favicon;
     base::TimeDelta paused_at;
+    // Set for a site's own window that is not live, which waits here like a
+    // paused video: plays it again, or closes it.
+    base::RepeatingClosure play_site_window;
+    base::RepeatingClosure drop_site_window;
   };
 
   // Two paused under the playing one: three in all.
@@ -70,6 +74,11 @@ class MiniPlayerStack {
   void Drop(size_t index);
   // Drops the video of `contents`, as when the user goes to its tab.
   void Remove(content::WebContents* contents);
+  // A site's window that is not live waits here, newest first.
+  void PushSiteWindow(Entry entry);
+  // Takes the site's window of `contents` out without closing it, as when it
+  // turns live again.
+  void TakeSiteWindow(content::WebContents* contents);
 
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
 
@@ -80,6 +89,11 @@ class MiniPlayerStack {
   ~MiniPlayerStack();
 
   void ForgetHidden();
+  // Keeps the video whose mini player just hid, paused, as when a site's
+  // window plays in its place.
+  void KeepHidden();
+  // Lets a dropped site's window go.
+  static void Dropped(const Entry& entry);
 
   std::optional<Entry> hidden_;
   std::vector<Entry> paused_;

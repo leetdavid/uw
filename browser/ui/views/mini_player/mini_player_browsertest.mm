@@ -57,6 +57,7 @@
 #include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
+#include "uw/browser/ui/views/mini_player/live_pill.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
@@ -141,19 +142,45 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
 
   static PrefService* LocalState() { return g_browser_process->local_state(); }
 
-  // The playback controls in the sidebar of `window`.
-  static PlaybackControls* ControlsOf(Browser* window) {
-    std::vector<views::View*> views = {
-        BrowserView::GetBrowserViewForBrowser(window)};
+  // The first view of class T in `root`.
+  template <typename T>
+  static T* Find(views::View* root) {
+    std::vector<views::View*> views = {root};
     while (!views.empty()) {
       views::View* view = views.back();
       views.pop_back();
-      if (auto* controls = views::AsViewClass<PlaybackControls>(view)) {
-        return controls;
+      if (auto* found = views::AsViewClass<T>(view)) {
+        return found;
       }
       std::ranges::copy(view->children(), std::back_inserter(views));
     }
     return nullptr;
+  }
+
+  // The playback controls in the sidebar of `window`.
+  static PlaybackControls* ControlsOf(Browser* window) {
+    return Find<PlaybackControls>(
+        BrowserView::GetBrowserViewForBrowser(window));
+  }
+
+  // Docks a site's window and then a video above it, in a tab of its own.
+  // Returns the site's window.
+  SiteWindow* SiteWindowUnderAVideo() {
+    SetAppActiveForTesting(true);
+    OpenSiteWindow(320, 200);
+    SiteWindow* site_window = SiteWindow::Current();
+    EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+    chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+    MiniPlayer* mini_player = OpenMiniPlayer();
+    EXPECT_TRUE(
+        base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+    return site_window;
+  }
+
+  static bool SiteWindowWaits() {
+    const std::vector<MiniPlayerStack::Entry>& paused =
+        MiniPlayerStack::Get().paused();
+    return paused.size() == 1 && !paused[0].play_site_window.is_null();
   }
 
   // Opens Chromium's document picture-in-picture test page in the tab in
@@ -688,6 +715,95 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ANewerSiteWindowTakesItsPlace) {
   EXPECT_TRUE(SiteWindowOpen(second));
   EXPECT_TRUE(
       base::test::RunUntil([&] { return SiteDocks(SiteWindow::Current()); }));
+}
+
+// A site's window that is not live pauses and waits in the stack under the
+// video; played again from its row, it comes back and the video waits.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ANonLiveSiteWindowWaitsInTheStack) {
+  SetAppActiveForTesting(true);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/document-pip.html")));
+  SetSiteLive(LocalState(), std::string(active()->GetLastCommittedURL().host()),
+              false);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  SiteWindow* site_window = SiteWindow::Current();
+  ASSERT_FALSE(site_window->live());
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  Play();
+  content::WebContents* video = video_;
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  EXPECT_TRUE(base::test::RunUntil([] { return SiteWindowWaits(); }));
+  EXPECT_TRUE(site_window->waiting());
+  EXPECT_FALSE(MiniPlayerDock::From(browser())->site_window());
+  EXPECT_TRUE(SiteWindowOpen(opener));
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  dock->OnMouseEntered(Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !dock->IsFanAnimating(); }));
+  SaveWindowScreenshot(browser(), "site_window_waiting");
+
+  MiniPlayerStack::Get().Play(0);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  EXPECT_FALSE(site_window->waiting());
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const std::vector<MiniPlayerStack::Entry>& paused =
+        MiniPlayerStack::Get().paused();
+    return paused.size() == 1 && paused[0].contents.get() == video;
+  }));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return content::EvalJs(video, "video.paused").ExtractBool(); }));
+}
+
+// The Live pill on the docked page turns the site's choice off, which sends
+// the window to the stack under the video, and on, which brings it back.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, TheLivePillTurnsLiveOffAndOn) {
+  SiteWindow* site_window = SiteWindowUnderAVideo();
+  ASSERT_TRUE(site_window->live());
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  dock->site_window()->OnMouseEntered(
+      Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  LivePill* pill = Find<LivePill>(dock->site_window());
+  ASSERT_TRUE(pill);
+  views::test::ButtonTestApi(pill).NotifyClick(
+      Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  EXPECT_FALSE(IsSiteLive(LocalState(), site_window->site()));
+  EXPECT_TRUE(base::test::RunUntil([] { return SiteWindowWaits(); }));
+
+  SetSiteLive(LocalState(), site_window->site(), true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  EXPECT_TRUE(MiniPlayerStack::Get().paused().empty());
+}
+
+// With the video closed, a site's window waiting under it plays again.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       AWaitingSiteWindowComesBackWhenTheVideoCloses) {
+  SiteWindow* site_window = SiteWindowUnderAVideo();
+  SetSiteLive(LocalState(), site_window->site(), false);
+  ASSERT_TRUE(base::test::RunUntil([] { return SiteWindowWaits(); }));
+  PictureInPictureWindowManager::GetInstance()->ExitPictureInPicture();
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  EXPECT_FALSE(site_window->waiting());
+}
+
+// Outside the sidebar there is no stack: a site's window that is not live
+// closes when a video comes.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithDontDockANonLiveSiteWindowCloses) {
+  SetMode(MiniPlayerMode::kDontDock);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/document-pip.html")));
+  SetSiteLive(LocalState(), std::string(active()->GetLastCommittedURL().host()),
+              false);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  OpenMiniPlayer();
+  EXPECT_TRUE(base::test::RunUntil([&] { return !SiteWindowOpen(opener); }));
+  EXPECT_TRUE(MiniPlayerStack::Get().paused().empty());
 }
 
 // Under the pointer the paused videos rise from behind the playing one into

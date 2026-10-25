@@ -52,6 +52,9 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
                       SetMouseActionCallback callback) override;
   void SetMiniPlayerMode(mojom::MiniPlayerMode mode,
                          SetMiniPlayerModeCallback callback) override;
+  void SetSiteLive(const std::string& site,
+                   bool live,
+                   SetSiteLiveCallback callback) override;
   void SetMiniPlayer(mojom::MiniPlayerSwitch which,
                      bool on,
                      SetMiniPlayerCallback callback) override;

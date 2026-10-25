@@ -65,7 +65,7 @@ index 41bf5932c399fc425e6b5669aed0de4025d6cee3..205a56cefbd8177026db6e866c4ef215
    // This is intentionally last.
    RegisterLocalStatePrefsForMigration(registry);
 diff --git a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
-index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c55bfa6007 100644
+index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4327a95c2 100644
 --- a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
 +++ b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
 @@ -22,6 +22,7 @@
@@ -76,7 +76,15 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c5
  #include "chrome/browser/ui/views/frame/top_container_view.h"
  #include "chrome/browser/ui/views/overlay/overlay_window_image_button.h"
  #include "chrome/browser/ui/views/page_info/page_info_bubble_specification.h"
-@@ -81,7 +82,8 @@ constexpr int kBackToTabImageSize = 16;
+@@ -60,6 +61,7 @@
+ #include "ui/views/widget/widget_delegate.h"
+ #include "ui/views/window/frame_background.h"
+ #include "ui/views/window/window_shape.h"
++#include "uw/browser/ui/views/mini_player/live_pill.h"  // nogncheck
+ 
+ #if BUILDFLAG(IS_WIN)
+ #include "ui/base/win/hwnd_metrics.h"
+@@ -81,7 +83,8 @@ constexpr int kBackToTabImageSize = 16;
  constexpr int kContentSettingIconSize = 16;
  
  // The height of the controls bar at the top of the window.
@@ -86,7 +94,25 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c5
  // The vertical margin for IconLabelBubbleView to have 24px height.
  constexpr int KIconViewVerticalMargin = 5;
  
-@@ -206,8 +208,9 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
+@@ -173,6 +176,17 @@ void DefinitelyExitPictureInPicture(
+           PictureInPictureBrowserFrameView::CloseReason::kBackToTabButton);
+       break;
+   }
++  // uw: a site's window kept beside a video closes alone; the video stays.
++  if (content::PictureInPictureWindowController* kept =
++          PictureInPictureWindowManager::GetInstance()
++              ->kept_window_controller()) {
++    if (behavior == PictureInPictureWindowManager::UiBehavior::
++                        kCloseWindowAndFocusOpener) {
++      kept->FocusInitiator();
++    }
++    kept->Close(/*should_pause_video=*/false);
++    return;
++  }
+   if (!PictureInPictureWindowManager::GetInstance()
+            ->ExitPictureInPictureViaWindowUi(behavior)) {
+     // If the picture-in-picture controller has been disconnected for
+@@ -206,8 +220,9 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
                     .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
                     .Build());
  
@@ -98,6 +124,41 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c5
  
    // Creates the window icon.
    const gfx::FontList& font_list = views::TypographyProvider::Get().GetFont(
+@@ -299,6 +314,10 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
+   // PictureInPictureWindowOptions. If the options don't exist (this can happen
+   // in some test situations), then default to displaying the back to tab
+   // button.
++  // uw: the Live toggle of a site's own window, before back to tab.
++  button_container_view_->AddChildView(
++      uw::LivePill::ForOpener(GetWebContents(), uw::LivePill::Look::kBar));
++
+   const std::optional<blink::mojom::PictureInPictureWindowOptions> pip_options =
+       browser_view->GetDocumentPictureInPictureOptions();
+   if (!pip_options.has_value() || !pip_options->disallow_return_to_opener) {
+@@ -677,7 +696,13 @@ PictureInPictureBrowserFrameView::GetNonDecoratedClientAreaBoundsInScreen()
+ 
+ content::WebContents* PictureInPictureBrowserFrameView::GetActiveWebContents()
+     const {
+-  return PictureInPictureWindowManager::GetInstance()->GetWebContents();
++  // uw: while a site's window is kept beside a video, this window is that
++  // site's.
++  PictureInPictureWindowManager* manager =
++      PictureInPictureWindowManager::GetInstance();
++  content::PictureInPictureWindowController* kept =
++      manager->kept_window_controller();
++  return kept ? kept->GetWebContents() : manager->GetWebContents();
+ }
+ 
+ bool PictureInPictureBrowserFrameView::GetURL(GURL* url) const {
+@@ -709,7 +734,7 @@ bool PictureInPictureBrowserFrameView::ShouldDisplayURL() const {
+ // LocationIconView::Delegate implementations:
+ 
+ content::WebContents* PictureInPictureBrowserFrameView::GetWebContents() {
+-  return PictureInPictureWindowManager::GetInstance()->GetWebContents();
++  return GetActiveWebContents();
+ }
+ 
+ bool PictureInPictureBrowserFrameView::IsEditingOrEmpty() const {
 diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
 index 92aca7476b3fae0e3302d71b71d12cff7450d89c..13303c399be7ed4a7a1756832492bdf4fb9b3f5d 100644
 --- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
@@ -130,7 +191,7 @@ index 72ad58b279814e1ca8d86a925e690bcf2a4f65d5..8d993a18786e3dcc84c3a22297098e7c
        content::WebContents* source,
        const input::NativeWebKeyboardEvent& event) override;
 diff --git a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
-index 10d227e113dd1f4d6b347c8f38419384154fd8d0..fe56dfd04720e313051575651c4c9fb955e0794e 100644
+index 10d227e113dd1f4d6b347c8f38419384154fd8d0..e7b7f387f603700446b1fc0c09500c28f55d0ffa 100644
 --- a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
 +++ b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
 @@ -4,6 +4,8 @@
@@ -171,7 +232,7 @@ index 10d227e113dd1f4d6b347c8f38419384154fd8d0..fe56dfd04720e313051575651c4c9fb9
  
      CreateWindowInternal(web_contents);
    }
-@@ -253,8 +267,19 @@ bool PictureInPictureWindowManager::ExitPictureInPictureViaWindowUi(
+@@ -253,8 +267,21 @@ bool PictureInPictureWindowManager::ExitPictureInPictureViaWindowUi(
  }
  
  bool PictureInPictureWindowManager::ExitPictureInPicture() {
@@ -182,16 +243,18 @@ index 10d227e113dd1f4d6b347c8f38419384154fd8d0..fe56dfd04720e313051575651c4c9fb9
 +    return true;
 +  }
    if (pip_window_controller_) {
-     CloseWindowInternal();
 +    // uw: with the video gone, the site's window kept beside it is the window
-+    // again.
-+    if (kept_window_controller_) {
-+      pip_window_controller_ = std::exchange(kept_window_controller_, nullptr);
++    // again, already as observers hear the video went.
++    content::PictureInPictureWindowController* kept =
++        std::exchange(kept_window_controller_, nullptr);
+     CloseWindowInternal();
++    if (kept) {
++      pip_window_controller_ = kept;
 +    }
      return true;
    }
  
-@@ -305,7 +330,10 @@ bool PictureInPictureWindowManager::IsChildWebContents(
+@@ -305,7 +332,10 @@ bool PictureInPictureWindowManager::IsChildWebContents(
      return false;
    }
  
@@ -203,7 +266,7 @@ index 10d227e113dd1f4d6b347c8f38419384154fd8d0..fe56dfd04720e313051575651c4c9fb9
  }
  
  // static
-@@ -689,6 +717,11 @@ void PictureInPictureWindowManager::DocumentWebContentsDestroyed() {
+@@ -689,6 +719,11 @@ void PictureInPictureWindowManager::DocumentWebContentsDestroyed() {
    // contents, so we only need to forget the controller here when user closes
    // the parent web contents with the PiP window open.
    document_web_contents_observer_.reset();

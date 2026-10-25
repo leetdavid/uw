@@ -7,6 +7,8 @@ source_set("mini_player") {
     "app_activity.h",
     "auto_mini_player.cc",
     "auto_mini_player.h",
+    "live_pill.cc",
+    "live_pill.h",
     "mini_player_controls.cc",
     "mini_player_controls.h",
     "mini_player_dock.cc",
@@ -51,6 +53,7 @@ source_set("mini_player") {
     "//mojo/public/cpp/bindings",
     "//services/media_session/public/mojom",
     "//third_party/blink/public/common",
+    "//ui/accessibility",
     "//ui/base",
     "//ui/base/unowned_user_data",
     "//ui/color",
@@ -79,7 +82,10 @@ source_set("prefs") {
     "mini_player_prefs.cc",
     "mini_player_prefs.h",
   ]
-  deps = [ "//components/prefs" ]
+  deps = [
+    "//base",
+    "//components/prefs",
+  ]
 }
 
 source_set("browser_tests") {

@@ -175,6 +175,15 @@ void StackRow::PaintButtonContents(gfx::Canvas* canvas) {
                          x, line);
     x += 12 + 5;
   }
+  // A site's own window has no place to stop at: it reads "Paused".
+  if (entry_.play_site_window) {
+    canvas->DrawStringRectWithFlags(
+        l10n_util::GetStringUTF16(IDS_UW_PLAYBACK_CONTROLS_PAUSED),
+        FontOfSize(11, gfx::Font::Weight::NORMAL), faint,
+        gfx::Rect(x, line - 1, right - x, 14),
+        gfx::Canvas::NO_SUBPIXEL_RENDERING);
+    return;
+  }
   canvas->DrawImageInt(gfx::CreateVectorIcon(kMiniPlayerPauseIcon, 10, faint),
                        x, line + 1);
   x += 10 + 3;
