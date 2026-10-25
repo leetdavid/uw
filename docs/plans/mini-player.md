@@ -127,7 +127,7 @@ The second round, T203, is on the same page and not signed off yet:
 
 uw's proposals in these frames:
 
-- The playback row is 44px, in the tint's fill, with art or the site's icon, the title, where it comes from, and play or pause. Previous and next show under the pointer when the site offers them. Clicking the art or title goes to the tab.
+- The playback row is 44px, in the tint's fill, with art or the site's icon, the title, where it comes from, and play or pause, with previous and next whenever the site offers them. The row looks the same under the pointer, so its buttons never move: on 2026-10-26 the user found previous and next appearing on hover "jarring" and asked for "the button should always show instead". Clicking the art or title goes to the tab.
 - The Live toggle is a pill reading "Live" at the top center of a docked site's window, between close and back to tab, and in the floating bar before them. Its dot is green when on and hollow when off.
 - The settings card lists the Live sites newest first.
 

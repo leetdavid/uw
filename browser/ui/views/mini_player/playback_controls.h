@@ -37,9 +37,8 @@ namespace uw {
 // docs/plans/mini-player.md: one row above the foot for the window's tab that
 // started playing sound last, while the user is on another tab. Its art,
 // title, and where the sound comes from, with play or pause, and previous and
-// next under the pointer when the site offers them. A click goes to the tab.
-// Sound in a mini player or a site's own window has its own controls, so it
-// gets no row.
+// next when the site offers them. A click goes to the tab. Sound in a mini
+// player or a site's own window has its own controls, so it gets no row.
 class PlaybackControls : public views::Button,
                          public TabStripModelObserver,
                          public PictureInPictureWindowManager::Observer,
@@ -58,7 +57,9 @@ class PlaybackControls : public views::Button,
   // The tab the row is for, shown or not.
   content::WebContents* tab() { return tab_.get(); }
   bool playing() const { return playing_; }
+  views::ImageButton* previous() { return previous_; }
   views::ImageButton* play_pause() { return play_pause_; }
+  views::ImageButton* next() { return next_; }
   bool has_art() const { return !art_.isNull(); }
   void SetArtForTesting(const SkBitmap& art);
 

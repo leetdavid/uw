@@ -604,6 +604,35 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_EQ(views::Button::STATE_HOVERED, controls->GetState());
 }
 
+// Previous and next show whenever the site offers them, under the pointer or
+// not, so the row never changes shape and pause never moves.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ThePlaybackControlsKeepTheirShapeUnderThePointer) {
+  LocalState()->SetBoolean(kMiniPlayerOnTabSwitchPref, false);
+  OpenPlayingVideo();
+  ASSERT_TRUE(content::ExecJs(
+      video_,
+      "navigator.mediaSession.setActionHandler('previoustrack', () => {});"
+      "navigator.mediaSession.setActionHandler('nexttrack', () => {});"));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  PlaybackControls* controls = ControlsOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return controls->GetVisible() && controls->next()->GetVisible();
+  }));
+  EXPECT_TRUE(controls->previous()->GetVisible());
+  EXPECT_EQ(views::Button::STATE_NORMAL, controls->GetState());
+  views::test::RunScheduledLayout(controls->GetWidget());
+  const gfx::Rect pause = controls->play_pause()->bounds();
+  gfx::Point point = controls->GetLocalBounds().CenterPoint();
+  views::View::ConvertPointToWidget(controls, &point);
+  ui::MouseEvent move(ui::EventType::kMouseMoved, point, point,
+                      base::TimeTicks::Now(), 0, 0);
+  controls->GetWidget()->OnMouseEvent(&move);
+  ASSERT_EQ(views::Button::STATE_HOVERED, controls->GetState());
+  views::test::RunScheduledLayout(controls->GetWidget());
+  EXPECT_EQ(pause, controls->play_pause()->bounds());
+}
+
 // A site's artwork can come in RGBA order; the row shows it, in the order
 // views draw.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,

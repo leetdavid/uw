@@ -150,7 +150,7 @@ While a uw window is in front with its sidebar showing, the video docks at the b
 
 On a site that opens its own small picture-in-picture window, such as a Google Meet call, the window docks at the bottom of the sidebar too, under any video, and keeps running when you put a video in picture in picture. Point at it for close, back to tab, and `Live`: click `Live` to turn it off for that site, and its window pauses and waits in the stack like a video whenever a video comes. The list under `Live windows` in the settings shows every site that has opened such a window. Switch to another app and it floats in its own window, with a bar in the color of the uw window it came from and the video just above it. A site that asks for a window bigger than 480 by 480 keeps floating.
 
-Play a video or a podcast, turn off `Open the mini player when you switch tabs` or choose `Don't dock`, and switch to another tab: a row above the sidebar's foot shows what is playing, with pause. Point at it for previous and next when the site offers them, and click its title to go back to the tab.
+Play a video or a podcast, turn off `Open the mini player when you switch tabs` or choose `Don't dock`, and switch to another tab: a row above the sidebar's foot shows what is playing, with pause, and previous and next when the site offers them. Click its title to go back to the tab.
 
 
 ### Hide the sidebar

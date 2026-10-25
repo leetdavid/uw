@@ -143,7 +143,7 @@ void PlaybackControls::OnThemeChanged() {
 
 void PlaybackControls::StateChanged(ButtonState old_state) {
   views::Button::StateChanged(old_state);
-  UpdateButtons();
+  SchedulePaint();
 }
 
 void PlaybackControls::OnTabStripModelChanged(
@@ -272,10 +272,9 @@ void PlaybackControls::UpdateVisibility() {
 }
 
 void PlaybackControls::UpdateButtons() {
-  const bool hovered =
-      GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
-  previous_->SetVisible(hovered && has_previous_);
-  next_->SetVisible(hovered && has_next_);
+  // Always the same buttons, so the row keeps its shape under the pointer.
+  previous_->SetVisible(has_previous_);
+  next_->SetVisible(has_next_);
   const std::u16string name = l10n_util::GetStringUTF16(
       playing_ ? IDS_PICTURE_IN_PICTURE_PAUSE_CONTROL_TEXT
                : IDS_PICTURE_IN_PICTURE_PLAY_CONTROL_TEXT);
