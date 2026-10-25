@@ -154,7 +154,7 @@ On a site that opens its own picture-in-picture window, such as a Google Meet ca
 
 Press Cmd+S, or choose View → Hide Sidebar.
 
-Expected result: the sidebar and the window's close, minimize, and zoom buttons go, and the page fills the window inside a thin edge of the theme. Rest the pointer on the window's left edge: after a moment the sidebar slides in over the page as a card, with the window buttons at its top left, and the page does not move. Picking a tab leaves the card in. Move the pointer onto the page, or press Esc, and the card slides away. Cmd+S, or View → Show Sidebar, shows the sidebar again. Save Page As has no key.
+Expected result: the sidebar and the window's close, minimize, and zoom buttons go, and the page fills the window inside a thin edge of the theme. Rest the pointer on the window's left edge: after a moment the sidebar slides in over the page as a card, with the window buttons at its top left, and the page does not move. Picking a tab leaves the card in. Move the pointer onto the page, or press Esc, and the card slides away. While the sidebar is hidden, the activity card shows alone over the page's bottom-left corner, with Undo. Cmd+S, or View → Show Sidebar, shows the sidebar again. Save Page As has no key.
 
 ### Terminal tabs
 
@@ -213,7 +213,6 @@ A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the 
 - The brief tint on a tab that was just moved.
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
-- The activity card while the sidebar is hidden. It shows on the floating sidebar only.
 - A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
 - The [uw command](plans/uw-command.md)'s chats, connectors, and terminal interface. Only `uw settings` works so far.
 - Verified extension compatibility or daily-use stability.

@@ -1,6 +1,6 @@
 # Hidden and floating sidebar
 
-Status: scope agreed on 2026-10-24. The design, T182, was signed off the same day, once the user chose window buttons drawn by uw. T183 was built on 2026-10-25 and is in review. The line under the setting waits for a build that adds strings, since a new string rebuilds most of Chromium.
+Status: scope agreed on 2026-10-24. The design, T182, was signed off the same day, once the user chose window buttons drawn by uw. T183 was built on 2026-10-25 and is in review; its real-window test passed in the VM the same day. T184 was built on 2026-10-25 and is in review.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's hover expansion already has the pause before it opens, the locks that keep it open during a menu or a rename, the link drag that opens it, a shadow, and a blurred backdrop. uw sets the hidden width to zero and draws the inset card and the slide. uw draws the floating card's window buttons itself, so nothing macOS draws has to move; matching macOS's look and behavior is bounded work. The risks: The window layout this changes is Chromium's newest and changes with each release. The activity card needs a place outside the sidebar. Only a real window can judge the feel.
 
@@ -43,7 +43,7 @@ Drawn on 2026-10-24 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 - "Floating sidebar: over the page": the card with its window buttons, the pointer on a row.
 - "Floating sidebar: every state": hidden in light and dark, the pointer at the edge, sliding in, in place in light and dark, with Transparency, the activity card alone in light and dark, the View menu, the setting, and uw's window buttons in each state.
 
-It slides in over 250 ms and out over 200 ms, the timing of Chromium's own hover animation, in place of the frames' 200 and 150 ms. The user chose window buttons drawn by uw over a fade-in of macOS's own, which cannot ride the slide. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface.
+It slides in over 250 ms and out over 200 ms, the timing of Chromium's own hover animation, in place of the frames' 200 and 150 ms. The user chose window buttons drawn by uw over a fade-in of macOS's own, which cannot ride the slide. In black dark mode the card has a 1px #262626 line and a deep shadow. The lone activity card sits 16px from the window's left and bottom edges, on the floating sidebar's surface. It is the foot's own card, which `FloatingSidebar` moves onto that surface while the sidebar is hidden and moves back when the card goes or the sidebar comes in.
 
 Chromium's collapsed state is the hidden state, and its hover animation slides the card in. While hidden, Chromium's sidebar is 8px wide at the window's left edge; while the card is out, it spans the edge and the card, so the pointer can rest on the edge. `FloatingSidebar` (`browser/ui/views/tab_organization/floating_sidebar.h`) lays the sidebar's rows out on the card, paints the card, and places its shadow and `FloatingWindowButtons`. The views Chromium drew compactly while collapsed, such as the top row and the pins, lay out as in the shown sidebar.
 
@@ -64,7 +64,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 5. Ctrl+Cmd+L and Ctrl+Cmd+R bring it in with focus in the right row.
 6. A link dragged to the left edge brings it in, and a drop on a row opens the link there.
 7. With Transparency above solid, the page shows blurred through the card.
-8. With the sidebar hidden, an automatic move shows the activity card alone at the page's bottom left, and its Undo works.
+8. With the sidebar hidden, an automatic move shows the activity card alone at the page's bottom left, and its Undo works. `AutomaticOrganizerBrowserTest.TheCardShowsAloneWhileTheSidebarIsHidden` checks it.
 9. With the setting off, the edge and drags do nothing, and Cmd+S and the row keys still work.
 10. A hidden window comes back hidden after a restart. A new window starts as the last window was used. Full screen keeps the state.
 11. No code path draws the narrow sidebar. Its screenshot test and doc lines are gone.

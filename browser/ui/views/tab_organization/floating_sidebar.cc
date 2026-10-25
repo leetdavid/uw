@@ -34,13 +34,17 @@
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_shadow.h"
 #include "ui/views/view_targeter.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/tint_painter.h"
 #include "uw/browser/ui/look/window_buttons.h"
+#include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/floating_window_buttons.h"
+#include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
@@ -55,6 +59,9 @@ constexpr SkAlpha kRingAlpha = 0x0F;
 // How much the page blurs under the card with Transparency, as the desktop
 // does under the shown sidebar.
 constexpr float kBlurSigma = 17.0f;
+// The activity card's corners, and how high it floats alone over the page.
+constexpr int kActivityCardRadius = 10;
+constexpr int kLoneCardElevation = 12;
 
 const ui::Accelerator& EscKey() {
   static const ui::Accelerator esc(ui::VKEY_ESCAPE, ui::EF_NONE);
@@ -63,14 +70,17 @@ const ui::Accelerator& EscKey() {
 
 }  // namespace
 
-// The card's surface: the window tint, as one sheet with the edge around the
-// page, in the page card's rounded corners.
+// A card's surface: the window tint, as one sheet with the edge around the
+// page, in rounded corners. A `see_through` card lets the page through as far
+// as Transparency says.
 class FloatingSidebar::Card : public views::View {
   METADATA_HEADER(Card, views::View)
 
  public:
-  explicit Card(BrowserView* browser_view) : browser_view_(browser_view) {
-    SetCanProcessEventsWithinSubtree(false);
+  Card(BrowserView* browser_view, int radius, bool see_through)
+      : browser_view_(browser_view),
+        radius_(radius),
+        see_through_(see_through) {
     SetProperty(views::kViewIgnoredByLayoutKey, true);
     SetVisible(false);
   }
@@ -86,14 +96,14 @@ class FloatingSidebar::Card : public views::View {
     {
       gfx::ScopedCanvas scoped_canvas(canvas);
       canvas->sk_canvas()->clipRRect(
-          SkRRect::MakeRectXY(gfx::RectFToSkRect(bounds), kPageCardRadius,
-                              kPageCardRadius),
+          SkRRect::MakeRectXY(gfx::RectFToSkRect(bounds), radius_, radius_),
           /*do_anti_alias=*/true);
       PaintTint(canvas, this, browser_view_,
                 colors->GetColor(GetWidget()->ShouldPaintAsActive()
                                      ? ui::kColorFrameActive
                                      : ui::kColorFrameInactive),
-                ThemeOfWindow(window), CoverOfWindow(window));
+                ThemeOfWindow(window),
+                see_through_ ? CoverOfWindow(window) : 1.0f);
     }
     SkColor ring = colors->GetColor(kColorPageCardEdge);
     if (SkColorGetA(ring) == SK_AlphaTRANSPARENT) {
@@ -107,11 +117,13 @@ class FloatingSidebar::Card : public views::View {
     flags.setColor(ring);
     gfx::RectF edge = bounds;
     edge.Inset(0.5f);
-    canvas->DrawRoundRect(edge, kPageCardRadius - 0.5f, flags);
+    canvas->DrawRoundRect(edge, radius_ - 0.5f, flags);
   }
 
  private:
   const raw_ptr<BrowserView> browser_view_;
+  const int radius_;
+  const bool see_through_;
 };
 
 BEGIN_METADATA(FloatingSidebar, Card)
@@ -127,11 +139,26 @@ bool IsSidebarHidden(BrowserWindowInterface* window) {
 FloatingSidebar::FloatingSidebar(VerticalTabStripRegionView* region,
                                  BrowserView* browser_view)
     : region_(region), browser_view_(browser_view) {
-  card_ = region_->AddChildViewAt(std::make_unique<Card>(browser_view), 0);
+  card_ = region_->AddChildViewAt(
+      std::make_unique<Card>(browser_view, kPageCardRadius,
+                             /*see_through=*/true),
+      0);
+  card_->SetCanProcessEventsWithinSubtree(false);
   window_buttons_ =
       region_->AddChildView(std::make_unique<FloatingWindowButtons>());
   window_buttons_->SetProperty(views::kViewIgnoredByLayoutKey, true);
   window_buttons_->SetVisible(false);
+  for (views::View* child : region_->children()) {
+    if (auto* bar = views::AsViewClass<OrganizeBar>(child)) {
+      bar_ = bar;
+    }
+  }
+  lone_ = region_->AddChildView(std::make_unique<Card>(
+      browser_view, kActivityCardRadius, /*see_through=*/false));
+  lone_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+  lone_->SetVisible(false);
+  lone_shadow_ = std::make_unique<views::ViewShadow>(lone_, kLoneCardElevation);
+  lone_shadow_->SetRoundedCornerRadius(kActivityCardRadius);
   region_->AddPreTargetHandler(this);
   region_->SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
 }
@@ -159,6 +186,7 @@ void FloatingSidebar::Layout() {
           ? gfx::Rect(region_->width() + kFloatingShadowRoom, region_->height())
           : gfx::Rect());
   const bool floating = hidden && Amount() > 0.0;
+  PlaceActivityCard(hidden && !floating);
   card_->SetVisible(floating);
   window_buttons_->SetVisible(floating);
   ListenForEsc(floating);
@@ -219,6 +247,9 @@ void FloatingSidebar::OnMouseEvent(ui::MouseEvent* event) {
 
 bool FloatingSidebar::DoesIntersectRect(const views::View* target,
                                         const gfx::Rect& rect) const {
+  if (lone_->GetVisible() && lone_->bounds().Intersects(rect)) {
+    return true;
+  }
   gfx::Rect area = target->GetLocalBounds();
   if (Hidden()) {
     area.set_width(std::max(kHiddenSidebarEdge, CardBounds().right()));
@@ -252,6 +283,30 @@ gfx::Rect FloatingSidebar::CardBounds() const {
       base::ClampRound((width + kHiddenSidebarEdge) * (1.0 - Amount()));
   return gfx::Rect(x, kHiddenSidebarEdge, width,
                    std::max(0, region_->height() - 2 * kHiddenSidebarEdge));
+}
+
+void FloatingSidebar::PlaceActivityCard(bool alone) {
+  ActivityCard* card = bar_ ? bar_->card() : nullptr;
+  if (!card) {
+    return;
+  }
+  alone = alone && card->GetVisible();
+  if (alone && card->parent() != lone_) {
+    lone_->AddChildView(card->parent()->RemoveChildViewT(card));
+  } else if (!alone && card->parent() == lone_) {
+    bar_->AddChildViewAt(lone_->RemoveChildViewT(card), 0);
+  }
+  lone_->SetVisible(alone);
+  if (!alone) {
+    return;
+  }
+  // As wide as in the bar, 16px from the window's left and bottom edges.
+  const int width = bar_->width();
+  const int height = card->GetHeightForWidth(width);
+  lone_->SetBoundsRect(gfx::Rect(
+      2 * kHiddenSidebarEdge,
+      region_->height() - 2 * kHiddenSidebarEdge - height, width, height));
+  card->SetBoundsRect(lone_->GetLocalBounds());
 }
 
 void FloatingSidebar::ListenForEsc(bool listen) {

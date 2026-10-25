@@ -27,11 +27,13 @@ class LayerSolidColor;
 
 namespace views {
 class FocusManager;
-}
+class ViewShadow;
+}  // namespace views
 
 namespace uw {
 
 class FloatingWindowButtons;
+class OrganizeBar;
 
 // What a hidden sidebar keeps of the window: the strip left of the page card.
 // The pointer resting there brings the floating sidebar in.
@@ -54,7 +56,9 @@ bool IsSidebarHidden(BrowserWindowInterface* window);
 // `region`, Chromium's sidebar, spans the edge and the card, and lays its rows
 // out on the card wherever the card is, so they keep their width all the way
 // in. The pointer finds the sidebar on the edge, and on the card while it is
-// out. Esc sends the card away until the pointer leaves the sidebar.
+// out. Esc sends the card away until the pointer leaves the sidebar. While the
+// card is out of the window, the activity card shows alone over the page's
+// bottom-left corner.
 class FloatingSidebar : public ui::AcceleratorTarget,
                         public ui::EventHandler,
                         public views::ViewTargeterDelegate,
@@ -105,6 +109,9 @@ class FloatingSidebar : public ui::AcceleratorTarget,
   // How far the card has slid in, from 0 to 1.
   double Amount() const;
   void ListenForEsc(bool listen);
+  // Takes the activity card out of the bar to the page's corner while it shows
+  // `alone`, and puts it back otherwise.
+  void PlaceActivityCard(bool alone);
   // With Transparency, blurs the page under the card.
   void UpdateBlur(const gfx::Rect& card, bool floating);
 
@@ -112,6 +119,10 @@ class FloatingSidebar : public ui::AcceleratorTarget,
   const raw_ptr<BrowserView> browser_view_;
   raw_ptr<Card> card_ = nullptr;
   raw_ptr<FloatingWindowButtons> window_buttons_ = nullptr;
+  raw_ptr<OrganizeBar> bar_ = nullptr;
+  // The activity card's surface while it shows alone.
+  raw_ptr<Card> lone_ = nullptr;
+  std::unique_ptr<views::ViewShadow> lone_shadow_;
   std::unique_ptr<ui::LayerSolidColor> blur_;
   raw_ptr<views::FocusManager> focus_manager_ = nullptr;
   std::unique_ptr<ExpandOnHoverLock> sent_away_;

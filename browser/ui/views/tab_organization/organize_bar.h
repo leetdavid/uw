@@ -68,6 +68,9 @@ class OrganizeBar : public views::FlexLayoutView,
 
   bool card_visible() const;
   const ActivityCard* card() const { return card_; }
+  // The hidden sidebar takes the card out to the page's corner while it shows
+  // alone, and puts it back first in the bar.
+  ActivityCard* card() { return card_; }
   NewButton* new_button() { return new_button_; }
   views::Button* organize_button();
   // Puts `middle`, such as the workspace switcher, between Organize and the

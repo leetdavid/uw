@@ -34,12 +34,13 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "components/content_extraction/content/browser/inner_text.h"
@@ -57,11 +58,13 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/label_button.h"
+#include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/button_test_api.h"
@@ -530,6 +533,51 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(link->GetGroup());
   EXPECT_EQ(controller()->DepthFor(link), 1);
   EXPECT_FALSE(bar()->card_visible());
+}
+
+// While the sidebar is hidden, the card shows alone over the page's
+// bottom-left corner, and its Undo works there.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheCardShowsAloneWhileTheSidebarIsHidden) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::VerticalTabStripStateController* sidebar =
+      tabs::VerticalTabStripStateController::From(browser());
+  sidebar->RequestCollapse(true);
+  ASSERT_TRUE(base::test::RunUntil([&] { return sidebar->IsCollapsed(); }));
+
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+  ASSERT_TRUE(bar()->card_visible());
+  ActivityCard* card = bar()->card();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return card->parent() != bar() && card->IsDrawn(); }));
+
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  const gfx::Rect alone =
+      views::View::ConvertRectToTarget(card->parent(), view, card->bounds());
+  EXPECT_EQ(alone.x(), 16);
+  EXPECT_EQ(alone.bottom(), view->height() - 16);
+  EXPECT_EQ(alone.width(), bar()->width());
+  SaveWindowScreenshot(browser(), "activity-card-alone");
+
+  views::MdTextButton* undo = nullptr;
+  std::vector<views::View*> left = {card};
+  while (!left.empty() && !undo) {
+    views::View* next = left.back();
+    left.pop_back();
+    undo = views::AsViewClass<views::MdTextButton>(next);
+    left.insert(left.end(), next->children().begin(), next->children().end());
+  }
+  ASSERT_TRUE(undo && undo->IsDrawn());
+  views::test::ButtonTestApi(undo).NotifyClick(
+      ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
+                     ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
+  EXPECT_FALSE(link->GetGroup());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !bar()->card_visible() && card->parent() == bar(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
