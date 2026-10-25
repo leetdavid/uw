@@ -75,6 +75,8 @@ StackRow::StackRow(const MiniPlayerStack::Entry& entry,
   drop_->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
   drop_->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
   drop_->SetVisible(false);
+  // The pointer on the row's × is still on the row.
+  SetNotifyEnterExitOnChild(true);
 }
 
 StackRow::~StackRow() = default;

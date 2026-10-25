@@ -581,6 +581,29 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(controls->GetVisible());
 }
 
+// The pointer moving from the row onto its pause button stays on the row, so
+// the row keeps its buttons instead of flickering.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ThePlaybackControlsStayUnderThePointerOnTheirButtons) {
+  LocalState()->SetBoolean(kMiniPlayerOnTabSwitchPref, false);
+  OpenPlayingVideo();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  PlaybackControls* controls = ControlsOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->GetVisible(); }));
+  views::test::RunScheduledLayout(controls->GetWidget());
+  const auto move_to = [&](views::View* view) {
+    gfx::Point point = view->GetLocalBounds().CenterPoint();
+    views::View::ConvertPointToWidget(view, &point);
+    ui::MouseEvent move(ui::EventType::kMouseMoved, point, point,
+                        base::TimeTicks::Now(), 0, 0);
+    controls->GetWidget()->OnMouseEvent(&move);
+  };
+  move_to(controls);
+  ASSERT_EQ(views::Button::STATE_HOVERED, controls->GetState());
+  move_to(controls->play_pause());
+  EXPECT_EQ(views::Button::STATE_HOVERED, controls->GetState());
+}
+
 // A site's artwork can come in RGBA order; the row shows it, in the order
 // views draw.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,

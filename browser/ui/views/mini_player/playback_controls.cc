@@ -69,6 +69,8 @@ PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
                                         base::Unretained(this))),
       window_(window) {
   SetVisible(false);
+  // The pointer on one of the row's buttons is still on the row.
+  SetNotifyEnterExitOnChild(true);
   SetProperty(views::kMarginsKey, gfx::Insets::TLBR(kTopGap, 0, 0, 0));
   SetTooltipText(l10n_util::GetStringUTF16(IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB));
   auto button = [this](views::Button::PressedCallback callback, int message) {
