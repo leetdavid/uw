@@ -1,24 +1,28 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review. A second round was agreed on 2026-10-25 in another grilling session: sites' own windows dock as [live windows](../CONTEXT.md#language), [playback controls](../CONTEXT.md#language) join the sidebar, and one choice replaces the first switch. Its stages, T203 to T208, have not started.
 
-Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
+Implementability: **4/10** for the first round, using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
-The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom of the sidebar, so they can browse other tabs while the video plays, and to float in their own window while uw is out of focus. They also asked for Arc's controls on hover, and for uw's own floating window to replace Chromium's, with rounded corners and glass. uw calls it the [mini player](../CONTEXT.md#language), as Arc does.
+**3/10** for the second round. Chromium keeps one picture-in-picture window at a time, and gives a site's own window a browser window of its own. Showing that page in the sidebar beside a video needs a deeper patch than anything in the first round, and a prototype, T204, must first show that the page keeps working there.
+
+The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom of the sidebar, so they can browse other tabs while the video plays, and to float in their own window while uw is out of focus. They also asked for Arc's controls on hover, and for uw's own floating window to replace Chromium's, with rounded corners and glass. uw calls it the [mini player](../CONTEXT.md#language), as Arc does. On 2026-10-25 they asked to see how a Google Meet call would look in the sidebar, and then for small sites' windows to dock too: "we may only want to support pips of a certain size (videos audios and other small pips)".
 
 ## Agreed scope
 
 ### Where it shows
 
-- Every request for picture in picture opens a mini player: the site's own button, an extension, and Picture in Picture in the video's right-click menu.
+- Every request for picture in picture opens a mini player, unless the [setting](#settings) says otherwise: the site's own button, an extension, and Picture in Picture in the video's right-click menu.
 - It docks at the bottom of the sidebar, above the foot, across the sidebar's width. The tab list ends above it.
+- From the top down, the bottom of the sidebar holds the activity card, the mini player and its stack, a [live window](#live-windows), the [playback controls](#playback-controls), and the foot, each 6px above the next.
+- When the window is too short for all of them, the tab list scrolls, as it does when it is long.
 - It docks in the sidebar of whichever uw window is in front, so it follows the user across windows and [workspace](../CONTEXT.md#language) switches.
 - It becomes a [floating mini player](../CONTEXT.md#language) when another app is active, when no uw window is showing, or when the front window's sidebar is [hidden](../CONTEXT.md#language) or in full screen. It stays floating while the [floating sidebar](../CONTEXT.md#language) shows.
 - It docks again when a uw window is active with its sidebar showing. Clicking or dragging the floating mini player does not count as coming back.
 
 ### Starting and ending
 
-- Switching away from a tab starts a mini player for its video when the video is playing, not muted, and large enough on the page, as Arc skips muted tabs. The video must be the page's only one, as for Chrome's media controls; a page with several players starts no mini player on its own.
+- With Dock chosen, switching away from a tab starts a mini player for its video when the video is playing, not muted, and large enough on the page, as Arc skips muted tabs. The video must be the page's only one, as for Chrome's media controls; a page with several players starts no mini player on its own.
 - uw does not ask the site for permission first, as Chromium does. The setting is the permission.
 - Selecting the video's tab puts a mini player that started this way back in its page.
 - A mini player the user started stays until it is closed, since the user was on its tab when they asked.
@@ -31,6 +35,8 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - Clicking a paused one plays it on top and pauses the one it replaces, which goes under it.
 - Each has its own close. Going to a paused video's tab takes it out of the stack.
 - Only the playing one floats. The paused ones come back when it docks again.
+- A live window never joins it.
+- The stack lives only in the sidebar. With Don't dock, or for a site's window too big to dock, a new picture in picture closes the old one and leaves it paused in its page, as Chromium does.
 
 ### Controls on hover
 
@@ -47,28 +53,58 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - The controls follow the theme's [Glass](themes.md#glass) slider: flat at its left end, lit glass as it moves right, like the foot's buttons. The floating mini player uses the slider of the last active window's workspace.
 - uw's floating mini player replaces Chromium's picture-in-picture window for every video.
 
-### Document picture in picture
+### Sites' own windows
 
-Some sites open a small window of their own page rather than a video, such as Google Meet calls and Spotify's web player. Those keep floating and never dock, but get the floating mini player's rounded Arc frame. The site draws its own controls.
+Some sites open a small window of their own page rather than a video, such as Google Meet calls and Spotify's web player.
+
+- One docks when the site asks for a window up to 480 × 480 px. A bigger one floats. Before shipping, the limit is checked against the sizes Meet and Spotify ask for, and raised to fit them if needed.
+- Docked, it is the sidebar's width and the shape the site asked for, never taller than it is wide. The site lays its page out at that width and draws its own controls.
+- Under the pointer, uw adds close and back to tab in the top corners, as on a video, a Live toggle, and no bar. Back to tab is hidden when the site asks for that.
+- Floating, it has the floating mini player's rounded frame and a 30px bar in the tint of the window it came from, with back to tab, close, and the Live toggle.
+- A site can resize its window only right after the user clicks or types in it. Within the limit, a docked one stays docked and takes the new shape. Past the limit it floats at the size asked for, and stays floating until it closes.
+- While Chromium's prompt for automatic picture in picture shows in it, it floats. It docks once the user answers.
+- Selecting its tab leaves it where it is, as with a video the user put in picture in picture. The site can still close it.
+- It floats and docks by the same rules as a video. With a video docked above it, both float: the site's window in the corner and the video just above it.
+
+### Live windows
+
+- Every site's own window is a [live window](../CONTEXT.md#language) by default: it never pauses and never joins the stack. Docked, it sits under the mini player, which docks above it.
+- One live window at a time. A newer site's window takes its place, and the older one goes back to its tab.
+- The user picks which sites' windows are live, on the settings page and with the Live toggle on the window. Both change the same saved choice for that site.
+- A site's window that is not live acts like a mini player: when another picture in picture comes, it pauses and joins the stack with a still.
+- Turning Live off while it is docked under a playing video pauses it and puts it in the stack under that video.
+
+### Playback controls
+
+- When a tab the user is not looking at plays sound, the sidebar shows [playback controls](../CONTEXT.md#language) for it just above the foot: play or pause, and next and previous when the site offers them. This holds whatever the setting.
+- One row, for the tab that started playing last. Paused sound keeps the row until another tab plays or the tab closes. The others stay in Chromium's media button in the toolbar.
+- Sound in a mini player or a live window shows no row, including the sound of the tab that opened a live window. Those have their own controls.
 
 ### Settings
 
-Three switches on uw's settings page, all on by default:
+The Mini player card on uw's settings page holds:
 
-1. "Show the mini player in the sidebar". Off, it always floats.
-2. "Open the mini player when you switch tabs".
-3. "Float the mini player when uw is in the background". Grayed out while the first is off.
+1. A choice, "Dock in the sidebar" by default:
+   - Dock in the sidebar: as above.
+   - Don't dock: nothing docks. Leaving a playing video's tab opens nothing, and the playback controls show for it. The site's picture-in-picture button and the menu still float a video. Sites' own windows float.
+   - Off: no picture in picture at all. Videos stay in their pages, and sites cannot open their own windows.
+2. "Open the mini player when you switch tabs", on by default. Grayed out unless Dock is chosen.
+3. "Float the mini player when uw is in the background", on by default. Grayed out unless Dock is chosen.
+4. Every site that has opened its own window, each with a Live switch, on by default.
+
+The choice replaces the switch "Show the mini player in the sidebar". Its off state, where every mini player floats, goes away. T203 settles the wording.
 
 ## Non-goals
 
-- Arc's audio controller at the bottom of the sidebar for tabs playing sound without video.
 - A per-site switch for automatic mini players.
 - A button to float a docked mini player by hand.
-- Docking document picture in picture.
+- Several live windows at once.
+- More than one row of playback controls.
+- A stack outside the sidebar.
 
 ## Design
 
-Drawn and signed off on 2026-10-24, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar. The numbers are in the canvas's `uw-mini-player` guide.
+The first round was drawn and signed off on 2026-10-24, T185, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Keyboard and mouse", beside the floating sidebar. The numbers are in the canvas's `uw-mini-player` guide.
 
 - "Mini player: the sidebar": a docked mini player under the pointer, with its controls, in light mode.
 - "Mini player: floating": the floating mini player over another app, with Glass on.
@@ -82,9 +118,17 @@ uw's proposals in the frames:
 - The activity card shows above the mini player, so the video never moves.
 - Fanned out, each paused video is a row with a still, its title, and where it stopped.
 
+The second round, T203, is on the same page and not signed off yet:
+
+- "Mini player: a Meet call in the sidebar": a Meet call docked under the pointer, in light mode.
+- "Sites' own windows in the sidebar: every state": a call at rest, a group call, an audio player, black dark mode under the pointer, the size rule, and a video or a stack above a call.
+- Still to draw: the playback controls, the Live toggle on a docked and a floating site's window, and the new settings card.
+
+Meet's and Spotify's layouts at 232px in these frames are guesses; each site draws its own.
+
 ## How it is built
 
-Proposed. Product code goes in `browser/ui/views/mini_player/`, per [Architecture](../architecture.md#code-organization).
+Product code goes in `browser/ui/views/mini_player/`, per [Architecture](../architecture.md#code-organization).
 
 - A patch makes `content::VideoOverlayWindow::Create` return uw's mini player in place of `VideoOverlayWindowViews`. It shows the surface Chromium hands it in a view, and moves that view between the front window's sidebar and uw's floating widget. The video keeps playing through the move, since the surface does not change.
 - The controls call the existing `VideoPictureInPictureWindowController` methods: play and pause, `SeekTo`, mute, back to tab, close.
@@ -92,6 +136,14 @@ Proposed. Product code goes in `browser/ui/views/mini_player/`, per [Architectur
 - The stack keeps, for each paused video, its tab and a still: the mini player copies its video every two seconds while it plays. Chromium hides the old mini player and shows the new one in one go, which tells a replaced video from a closed one.
 - 2× runs a short script in an isolated world in the video's frame that sets the picture-in-picture video's `playbackRate` and puts it back on release. Chromium has no browser-side call for playback speed.
 - Document picture in picture keeps Chromium's window, with macOS's own rounded corners and shadow and no lit edge. `uw-mini-player.patch` makes its bar 30px and paints it with the tint of the window the page came from. `ThemeOfWindow` finds that window through the tab that opened the picture in picture.
+
+Proposed for the second round:
+
+- Chromium keeps one picture-in-picture window at a time: `PictureInPictureWindowManager` closes the old window when a new one opens. A patch lets it keep a live window beside a video.
+- Chromium gives a site's own window a browser window of its own with one tab (`NEW_PICTURE_IN_PICTURE` in `browser_navigator.cc`). Docking keeps that window hidden and shows its page in the sidebar, as uw already moves a pinned tab's live page between windows. T204 checks that the page keeps acting as a picture-in-picture window there: its size, focus, and back to tab.
+- A video moved into a site's window keeps its player in the page that opened it (`ShouldReusePlayer` in Blink's `html_media_element.cc`), and Spotify plays from its main page. So pausing a site's window that is not live pauses the media session of the tab that opened it, as the stack pauses videos.
+- The playback controls read Chromium's media sessions, the data behind its media button. The row reuses that button's item view if it fits 232px, or draws its own from the same data.
+- Off refuses picture-in-picture requests where `PictureInPictureWindowManager` takes them.
 
 ## Stages
 
@@ -103,6 +155,12 @@ Each stage is a ticket on the [board](roadmap.md#board).
 4. T188: automatic mini players on a tab switch, back into the page on return, and their setting.
 5. T189: the stack.
 6. T190: document picture in picture's frame.
+7. T203: the second round's designs, signed off by the user.
+8. T204: a throwaway prototype of a site's page in the sidebar. Not merged.
+9. T205: the Dock, Don't dock, and Off choice.
+10. T206: the playback controls.
+11. T207: sites' own windows docked as live windows, beside a video.
+12. T208: Live per site, on the settings page and the window.
 
 ## Acceptance checks
 
@@ -112,10 +170,17 @@ Each stage is a ticket on the [board](roadmap.md#board).
 4. With another app active, it floats; coming back to uw docks it. With "Float the mini player when uw is in the background" off, it stays docked.
 5. Switching away from a tab with a playing, audible, visible video starts a mini player. A muted or paused video, or a small one, does not. Selecting the tab puts it back in the page.
 6. A second mini player pauses the first and stacks on it. Clicking the paused one swaps them. A fourth drops the oldest.
-7. With "Show the mini player in the sidebar" off, every mini player floats in uw's window.
+7. With Don't dock, leaving a playing video's tab opens nothing and the playback controls show it, and the site's picture-in-picture button floats it. With Off, no picture in picture opens, and a site cannot open its own window.
 8. The controls match the frames with Glass at both ends, in light and dark mode. Document picture in picture has the rounded frame.
 9. `pnpm run check` and the focused browser tests pass. Browser tests stay headless; checks that need another app in front or a real window run as `MANUAL_` tests in the window-tests VM.
+10. A Meet call docks at the bottom of the sidebar and keeps running while the user switches tabs. A video put in picture in picture docks above it, and neither pauses.
+11. With another app active, the call floats in the corner and the video just above it, and both dock again when uw comes back.
+12. A site's window bigger than 480 × 480 floats. One the site grows past that floats and stays floating.
+13. A second site's window takes the live window's place, and the first goes back to its tab.
+14. With Live off for a site, its window pauses and joins the stack when a video comes. Turning Live off on the window while a video plays above it puts it in the stack under the video.
+15. A background tab playing sound shows one row of playback controls above the foot, for the tab that started last, and its buttons play, pause, and skip. A video in a mini player and a live window's tab show none.
 
 ## Open questions
 
-None.
+- Whether a site's page keeps acting as a picture-in-picture window when shown in the sidebar. T204 decides; if it does not, the second round comes back for another look.
+- The sizes Meet and Spotify ask for, and how their pages lay out at 232px.

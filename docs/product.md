@@ -333,7 +333,7 @@ Agreed: every launch after a quit restores the last session without asking, as A
 
 ### Mini player
 
-Agreed on 2026-10-24: a picture-in-picture video becomes a [mini player](CONTEXT.md#language), as in Arc. It docks at the bottom of the sidebar, so the user can browse other tabs while it plays, and floats in its own window while uw is in the background. Switching away from a playing video starts one. The [mini player plan](plans/mini-player.md) has the details.
+Agreed on 2026-10-24: a picture-in-picture video becomes a [mini player](CONTEXT.md#language), as in Arc. It docks at the bottom of the sidebar, so the user can browse other tabs while it plays, and floats in its own window while uw is in the background. Switching away from a playing video starts one. Agreed on 2026-10-25: a small window a site opens itself, such as a Meet call, docks too, as a [live window](CONTEXT.md#language) that never pauses; [playback controls](CONTEXT.md#language) show for a background tab playing sound; and the user can choose not to dock, or to turn picture in picture off. The [mini player plan](plans/mini-player.md) has the details.
 
 ## AI connections
 
