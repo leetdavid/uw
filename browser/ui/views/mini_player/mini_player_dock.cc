@@ -14,6 +14,8 @@
 #include "third_party/skia/include/core/SkPath.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/layer.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/skia_conversions.h"
@@ -38,6 +40,9 @@ constexpr gfx::Size kDefaultShape(16, 9);
 constexpr int kPeek = 5;
 constexpr int kPeekInset = 6;
 constexpr int kRowGap = 6;
+// The rows slide up quickly and settle; they drop back a little faster.
+constexpr base::TimeDelta kFanIn = base::Milliseconds(220);
+constexpr base::TimeDelta kFanOut = base::Milliseconds(160);
 constexpr int kCornerRadius = 10;
 
 }  // namespace
@@ -99,26 +104,35 @@ void MiniPlayerDock::Layout(PassKey) {
   if (!player_) {
     return;
   }
-  // Fanned out, the newest paused video sits just above the playing one.
-  int y = 0;
-  for (auto it = rows_.rbegin(); it != rows_.rend(); ++it) {
-    (*it)->SetBounds(0, y, width(), StackRow::kHeight);
-    y += StackRow::kHeight + kRowGap;
-  }
-  gfx::Rect bounds(0, StackHeight(), width(), height() - StackHeight());
+  const int top = StackHeight();
+  gfx::Rect bounds(0, top, width(), height() - top);
   bounds.ClampToCenteredSize(PlayerSize(width()));
   player_->SetBoundsRect(bounds);
+  // Each paused video rises from where it peeks out behind the playing one to
+  // its row, the newest nearest, widening as it goes.
+  const double fan = fan_.GetCurrentValue();
+  for (size_t i = 0; i < rows_.size(); ++i) {
+    const int step = static_cast<int>(i) + 1;
+    const int y = gfx::Tween::IntValueBetween(
+        fan, top - kPeek * step, top - (StackRow::kHeight + kRowGap) * step);
+    const int inset = gfx::Tween::IntValueBetween(fan, kPeekInset * step, 0);
+    rows_[i]->SetBounds(inset, y, width() - 2 * inset, StackRow::kHeight);
+  }
 }
 
 void MiniPlayerDock::OnPaint(gfx::Canvas* canvas) {
   views::View::OnPaint(canvas);
-  if (!player_ || fanned_) {
+  const double fan = fan_.GetCurrentValue();
+  if (!player_ || fan >= 1) {
     return;
   }
   // The paused videos peek out above the playing one, the oldest farthest.
   const std::vector<MiniPlayerStack::Entry>& paused =
       MiniPlayerStack::Get().paused();
   const gfx::Rect front = player_->bounds();
+  // The peeks fade as the rows rise out of them.
+  gfx::ScopedCanvas faded(canvas);
+  canvas->SaveLayerAlpha(static_cast<uint8_t>(255 * (1 - fan)));
   for (size_t i = paused.size(); i-- > 0;) {
     const int step = static_cast<int>(i) + 1;
     gfx::Rect peek = front;
@@ -151,6 +165,14 @@ void MiniPlayerDock::OnMouseExited(const ui::MouseEvent& event) {
   SetFanned(false);
 }
 
+void MiniPlayerDock::AnimationProgressed(const gfx::Animation* animation) {
+  UpdateFan();
+}
+
+void MiniPlayerDock::AnimationEnded(const gfx::Animation* animation) {
+  UpdateFan();
+}
+
 gfx::Size MiniPlayerDock::PlayerSize(int width) const {
   const gfx::Size shape = player_ && !player_->natural_size().IsEmpty()
                               ? player_->natural_size()
@@ -172,7 +194,18 @@ int MiniPlayerDock::StackHeight() const {
     return 0;
   }
   const int paused = static_cast<int>(rows_.size());
-  return fanned_ ? paused * (StackRow::kHeight + kRowGap) : paused * kPeek;
+  return gfx::Tween::IntValueBetween(fan_.GetCurrentValue(), paused * kPeek,
+                                     paused * (StackRow::kHeight + kRowGap));
+}
+
+void MiniPlayerDock::UpdateFan() {
+  const double fan = fan_.GetCurrentValue();
+  for (raw_ptr<StackRow>& row : rows_) {
+    row->SetVisible(fan > 0);
+    row->layer()->SetOpacity(fan);
+  }
+  PreferredSizeChanged();
+  SchedulePaint();
 }
 
 void MiniPlayerDock::UpdateLook() {
@@ -197,21 +230,26 @@ void MiniPlayerDock::OnStackChanged() {
     const std::vector<MiniPlayerStack::Entry>& paused =
         MiniPlayerStack::Get().paused();
     for (size_t i = 0; i < paused.size(); ++i) {
-      auto* row = AddChildView(std::make_unique<StackRow>(
-          paused[i],
-          base::BindRepeating(&MiniPlayerStack::Play,
-                              base::Unretained(&MiniPlayerStack::Get()), i),
-          base::BindRepeating(&MiniPlayerStack::Drop,
-                              base::Unretained(&MiniPlayerStack::Get()), i)));
-      row->SetVisible(fanned_);
+      // Behind the playing video, so the rows rise out from under it.
+      auto* row = AddChildViewAt(
+          std::make_unique<StackRow>(
+              paused[i],
+              base::BindRepeating(&MiniPlayerStack::Play,
+                                  base::Unretained(&MiniPlayerStack::Get()), i),
+              base::BindRepeating(&MiniPlayerStack::Drop,
+                                  base::Unretained(&MiniPlayerStack::Get()),
+                                  i)),
+          0);
+      row->SetPaintToLayer();
+      row->layer()->SetFillsBoundsOpaquely(false);
       rows_.push_back(row);
     }
   }
   if (rows_.empty()) {
     fanned_ = false;
+    fan_.Reset(0);
   }
-  PreferredSizeChanged();
-  SchedulePaint();
+  UpdateFan();
 }
 
 void MiniPlayerDock::SetFanned(bool fanned) {
@@ -220,11 +258,18 @@ void MiniPlayerDock::SetFanned(bool fanned) {
     return;
   }
   fanned_ = fanned;
-  for (raw_ptr<StackRow>& row : rows_) {
-    row->SetVisible(fanned_);
+  if (gfx::Animation::PrefersReducedMotion()) {
+    fan_.Reset(fanned_ ? 1 : 0);
+    UpdateFan();
+    return;
   }
-  PreferredSizeChanged();
-  SchedulePaint();
+  fan_.SetSlideDuration(fanned_ ? kFanIn : kFanOut);
+  fan_.SetTweenType(fanned_ ? gfx::Tween::EASE_OUT : gfx::Tween::EASE_IN);
+  if (fanned_) {
+    fan_.Show();
+  } else {
+    fan_.Hide();
+  }
 }
 
 BEGIN_METADATA(MiniPlayerDock)

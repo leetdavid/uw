@@ -12,6 +12,8 @@
 #include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "ui/gfx/animation/animation_delegate.h"
+#include "ui/gfx/animation/slide_animation.h"
 #include "ui/views/view.h"
 
 class BrowserWindowInterface;
@@ -25,10 +27,10 @@ class StackRow;
 // The place at the bottom of a window's sidebar, above the foot, where the
 // mini player docks, per docs/plans/mini-player.md. It spans the sidebar and
 // takes the video's shape, never taller than it is wide. Paused videos of the
-// stack peek out above it, and fan out as rows under the pointer. Hidden while
-// empty. It also opens a mini player when the user leaves a tab whose video
-// plays.
-class MiniPlayerDock : public views::View {
+// stack peek out above it, and slide up into rows under the pointer. Hidden
+// while empty. It also opens a mini player when the user leaves a tab whose
+// video plays.
+class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(MiniPlayerDock, views::View)
 
  public:
@@ -56,8 +58,9 @@ class MiniPlayerDock : public views::View {
     on_destroying_ = std::move(on_destroying);
   }
 
-  // True while the paused videos show as rows.
+  // True while the paused videos show as rows, or slide up to them.
   bool fanned() const { return fanned_; }
+  bool IsFanAnimating() const { return fan_.is_animating(); }
   const std::vector<raw_ptr<StackRow>>& rows() const { return rows_; }
 
   // views::View:
@@ -69,12 +72,19 @@ class MiniPlayerDock : public views::View {
   void OnMouseEntered(const ui::MouseEvent& event) override;
   void OnMouseExited(const ui::MouseEvent& event) override;
 
+  // gfx::AnimationDelegate:
+  void AnimationProgressed(const gfx::Animation* animation) override;
+  void AnimationEnded(const gfx::Animation* animation) override;
+
  private:
   // Where the video goes in `width`: the dock's width, the video's shape, and
   // no taller than it is wide.
   gfx::Size PlayerSize(int width) const;
-  // The space above the video: peeks at rest, rows fanned out.
+  // The space above the video: peeks at rest, rows fanned out, and between
+  // the two while they slide.
   int StackHeight() const;
+  // Shows the rows as far along as the slide is.
+  void UpdateFan();
   void UpdateLook();
   void OnStackChanged();
   void SetFanned(bool fanned);
@@ -83,6 +93,8 @@ class MiniPlayerDock : public views::View {
   raw_ptr<MiniPlayerView> player_ = nullptr;
   std::vector<raw_ptr<StackRow>> rows_;
   bool fanned_ = false;
+  // From 0, the paused videos peeking, to 1, the rows fanned out.
+  gfx::SlideAnimation fan_{this};
   base::OnceClosure on_destroying_;
   std::unique_ptr<AutoMiniPlayer> auto_mini_player_;
   base::CallbackListSubscription stack_subscription_;

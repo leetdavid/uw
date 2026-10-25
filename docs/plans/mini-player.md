@@ -27,7 +27,7 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 ### The stack
 
 - A second mini player pauses the first and docks on top of it, as a [mini player stack](../CONTEXT.md#language). The stack holds up to three. A fourth drops the oldest.
-- The paused ones peek out a few pixels above the playing one. Hovering fans them out upward, each a still of its last frame with its site's icon and title.
+- The paused ones peek out a few pixels above the playing one. Hovering slides them up from behind it into rows, each a still of its last frame with its site's icon and title. When the pointer leaves, they slide back down. With reduced motion they move without sliding.
 - Clicking a paused one plays it on top and pauses the one it replaces, which goes under it.
 - Each has its own close. Going to a paused video's tab takes it out of the stack.
 - Only the playing one floats. The paused ones come back when it docks again.

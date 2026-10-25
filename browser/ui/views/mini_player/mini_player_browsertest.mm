@@ -35,9 +35,11 @@
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/animation/animation.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/test/button_test_api.h"
+#include "ui/views/test/views_test_utils.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
@@ -388,6 +390,7 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   dock->OnMouseEntered(Mouse(ui::EventType::kMouseEntered, gfx::Point()));
   ASSERT_TRUE(dock->fanned());
   ASSERT_EQ(1u, dock->rows().size());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !dock->IsFanAnimating(); }));
   SaveWindowScreenshot(browser(), "mini_player_stack_fanned");
   views::test::ButtonTestApi(dock->rows()[0].get())
       .NotifyClick(Mouse(ui::EventType::kMousePressed, gfx::Point()));
@@ -397,6 +400,38 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(content::EvalJs(first_video, "video.paused").ExtractBool());
   ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
   EXPECT_EQ(video_, MiniPlayerStack::Get().paused()[0].contents.get());
+}
+
+// Under the pointer the paused videos rise from behind the playing one into
+// rows; when it leaves they sink back to peeking.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, TheStackSlidesUpAndBackDown) {
+  SetAppActiveForTesting(true);
+  OpenMiniPlayer();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* second = OpenMiniPlayer();
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(second, browser()); }));
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return dock->rows().size() == 1; }));
+  views::View* row = dock->rows()[0];
+  EXPECT_FALSE(row->GetVisible());
+  // At rest the paused video peeks 5px above the playing one.
+  ASSERT_TRUE(base::test::RunUntil([&] { return dock->player()->y() == 5; }));
+
+  dock->OnMouseEntered(Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  EXPECT_TRUE(dock->IsFanAnimating() || gfx::Animation::PrefersReducedMotion());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !dock->IsFanAnimating(); }));
+  views::test::RunScheduledLayout(dock->GetWidget());
+  EXPECT_TRUE(row->GetVisible());
+  EXPECT_EQ(1.0f, row->layer()->opacity());
+  // The row sits 6px above the playing video, as wide as the dock.
+  EXPECT_EQ(dock->player()->y() - 6, row->bounds().bottom());
+  EXPECT_EQ(dock->width(), row->width());
+
+  dock->OnMouseExited(Mouse(ui::EventType::kMouseExited, gfx::Point()));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !dock->IsFanAnimating(); }));
+  views::test::RunScheduledLayout(dock->GetWidget());
+  EXPECT_FALSE(row->GetVisible());
+  EXPECT_EQ(5, dock->player()->y());
 }
 
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
