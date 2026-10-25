@@ -5,24 +5,38 @@
 #define UW_BROWSER_UI_VIEWS_MINI_PLAYER_MINI_PLAYER_PREFS_H_
 
 class PrefRegistrySimple;
+class PrefService;
 
 namespace uw {
 
-// The mini player's switches on uw's settings page, for all of uw, per the
-// "Settings" section of docs/plans/mini-player.md. All are on by default.
+// The mini player's settings on uw's settings page, for all of uw, per the
+// "Settings" section of docs/plans/mini-player.md.
 
-// "Show the mini player in the sidebar". Off, it always floats.
-inline constexpr char kMiniPlayerInSidebarPref[] = "uw.mini_player.in_sidebar";
+// "Picture in picture": where it goes. Stored as its number.
+enum class MiniPlayerMode {
+  // Docked in the sidebar, the default.
+  kDock = 0,
+  // Never docked. A video stays in its page when the user leaves its tab, and
+  // one the user puts in picture in picture floats.
+  kDontDock = 1,
+  // No picture in picture at all.
+  kOff = 2,
+  kMaxValue = kOff,
+};
+inline constexpr char kMiniPlayerModePref[] = "uw.mini_player.mode";
 
-// "Open the mini player when you switch tabs".
+// "Open the mini player when you switch tabs". On by default.
 inline constexpr char kMiniPlayerOnTabSwitchPref[] =
     "uw.mini_player.on_tab_switch";
 
-// "Float the mini player when uw is in the background".
+// "Float the mini player when uw is in the background". On by default.
 inline constexpr char kMiniPlayerFloatInBackgroundPref[] =
     "uw.mini_player.float_in_background";
 
 void RegisterMiniPlayerLocalStatePrefs(PrefRegistrySimple* registry);
+
+// The mode `local_state` holds, or Dock without one.
+MiniPlayerMode MiniPlayerModeOf(const PrefService* local_state);
 
 }  // namespace uw
 

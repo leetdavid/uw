@@ -198,6 +198,13 @@ void MiniPlayer::Close() {
 
 void MiniPlayer::ShowInactive() {
   shown_ = true;
+  // While picture in picture is blocked, as with the setting Off, Chromium
+  // closes it again at once. It counts as shown, so that Chromium can close
+  // it, but nothing shows.
+  if (PictureInPictureWindowManager::GetInstance()
+          ->IsPictureInPictureDisabled()) {
+    return;
+  }
   MiniPlayerStack::Get().OnShown(controller_->GetWebContents());
   view_->SetMuted(controller_->GetMuteStatus());
   view_->ShowControls(false);

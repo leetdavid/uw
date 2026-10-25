@@ -50,6 +50,8 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetMouseAction(mojom::MouseAction action,
                       bool on,
                       SetMouseActionCallback callback) override;
+  void SetMiniPlayerMode(mojom::MiniPlayerMode mode,
+                         SetMiniPlayerModeCallback callback) override;
   void SetMiniPlayer(mojom::MiniPlayerSwitch which,
                      bool on,
                      SetMiniPlayerCallback callback) override;

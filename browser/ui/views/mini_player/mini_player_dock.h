@@ -10,6 +10,7 @@
 #include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/gfx/animation/animation_delegate.h"
@@ -17,6 +18,7 @@
 #include "ui/views/view.h"
 
 class BrowserWindowInterface;
+class ScopedDisallowPictureInPicture;
 
 namespace uw {
 
@@ -29,7 +31,8 @@ class StackRow;
 // takes the video's shape, never taller than it is wide. Paused videos of the
 // stack peek out above it, and slide up into rows under the pointer. Hidden
 // while empty. It also opens a mini player when the user leaves a tab whose
-// video plays.
+// video plays, and keeps picture in picture from opening while the setting is
+// Off.
 class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(MiniPlayerDock, views::View)
 
@@ -88,6 +91,7 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   void UpdateLook();
   void OnStackChanged();
   void SetFanned(bool fanned);
+  void UpdateOff();
 
   const raw_ptr<BrowserWindowInterface> window_;
   raw_ptr<MiniPlayerView> player_ = nullptr;
@@ -97,6 +101,9 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   gfx::SlideAnimation fan_{this};
   base::OnceClosure on_destroying_;
   std::unique_ptr<AutoMiniPlayer> auto_mini_player_;
+  PrefChangeRegistrar prefs_;
+  // Chromium's own block on picture in picture, held while it is Off.
+  std::unique_ptr<ScopedDisallowPictureInPicture> off_;
   base::CallbackListSubscription stack_subscription_;
   ui::ScopedUnownedUserData<MiniPlayerDock> user_data_;
 };

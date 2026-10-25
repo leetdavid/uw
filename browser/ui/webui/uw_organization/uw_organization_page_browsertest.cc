@@ -266,9 +266,9 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
-                       TheMiniPlayerSwitchesStartOnAndTurnItsPlacesOff) {
+                       TheMiniPlayerStartsDockedAndItsSettingsChange) {
   PrefService* local_state = g_browser_process->local_state();
-  EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerInSidebarPref));
+  EXPECT_EQ(MiniPlayerMode::kDock, MiniPlayerModeOf(local_state));
   EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerOnTabSwitchPref));
   EXPECT_TRUE(local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref));
   OpenPage();
@@ -288,12 +288,20 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
     return !local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref);
   }));
   SaveWindowScreenshot(browser(), "settings-mini-player");
-  // With the mini player out of the sidebar, floating is all it does.
-  ASSERT_EQ(true, Run("part('miniPlayerInSidebarToggle').click();"
+  // The two switches only matter while it docks.
+  ASSERT_EQ(true, Run("part('miniPlayerMode')"
+                      "    .querySelector('[name=dontDock]').click();"
                       "await until(() =>"
+                      "    part('miniPlayerOnTabSwitchToggle').disabled &&"
                       "    part('miniPlayerFloatToggle').disabled);"
                       "return true;"));
-  EXPECT_FALSE(local_state->GetBoolean(kMiniPlayerInSidebarPref));
+  EXPECT_EQ(MiniPlayerMode::kDontDock, MiniPlayerModeOf(local_state));
+  SaveWindowScreenshot(browser(), "settings-mini-player-dont-dock");
+  ASSERT_EQ(true, Run("part('miniPlayerMode')"
+                      "    .querySelector('[name=off]').click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return MiniPlayerModeOf(local_state) == MiniPlayerMode::kOff; }));
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

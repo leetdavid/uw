@@ -20,7 +20,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,133 @@
+@@ -3904,6 +3904,169 @@
          System
        </message>
      </if>
@@ -129,11 +129,47 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
 +      <message name="IDS_UW_SETTINGS_MINI_PLAYER_TITLE" desc="Heading of the settings for the mini player: a video playing outside its page, docked at the bottom of the tab sidebar or floating in its own window.">
 +        Mini player
 +      </message>
-+      <message name="IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR" desc="Label of the switch that docks picture-in-picture videos at the bottom of the tab sidebar.">
-+        Show the mini player in the sidebar
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_MODE" desc="Label of the choice of where picture-in-picture videos and the small windows sites open go: docked in the tab sidebar, not docked, or off.">
++        Picture in picture
 +      </message>
-+      <message name="IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR_DESCRIPTION" desc="Second line of the switch that docks picture-in-picture videos in the tab sidebar.">
-+        Picture in picture docks at the bottom of the sidebar. Off, it floats.
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_DOCK" desc="Choice that docks picture-in-picture videos and sites' small windows at the bottom of the tab sidebar.">
++        Dock in the sidebar
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_DOCK_DESCRIPTION" desc="Second line of the choice that docks picture in picture in the tab sidebar.">
++        Videos and small windows that sites open dock at the bottom of the sidebar.
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_DONT_DOCK" desc="Choice that never docks picture in picture in the tab sidebar. Videos keep playing in their pages instead.">
++        Don't dock
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_DONT_DOCK_DESCRIPTION" desc="Second line of the choice that never docks picture in picture. The sidebar shows play and pause for a tab playing sound.">
++        Videos keep playing in their pages, with playback controls in the sidebar.
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_OFF" desc="Choice that turns picture in picture off.">
++        Off
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_OFF_DESCRIPTION" desc="Second line of the choice that turns picture in picture off, for videos and for the small windows that sites such as video calls open.">
++        No picture in picture. Sites can't open small windows of their own.
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_LIVE" desc="Heading of the list of sites whose small picture-in-picture windows, such as a video call, keep running when a video goes into picture in picture.">
++        Live windows
++      </message>
++      <message name="IDS_UW_SETTINGS_MINI_PLAYER_LIVE_DESCRIPTION" desc="Line under the Live windows heading. The stack is the pile of paused videos at the bottom of the tab sidebar.">
++        A site's own small window, such as a Meet call, keeps running when a video comes. Off, it pauses and waits in the stack like a video.
++      </message>
++      <message name="IDS_UW_MINI_PLAYER_LIVE" desc="Label of the toggle on a site's small picture-in-picture window, such as a video call, that keeps it running when a video goes into picture in picture.">
++        Live
++      </message>
++      <message name="IDS_UW_MINI_PLAYER_LIVE_ON_TOOLTIP" desc="Tooltip of the Live toggle while it is on.">
++        Live: keeps running when a video comes. Click to let it pause like a video.
++      </message>
++      <message name="IDS_UW_MINI_PLAYER_LIVE_OFF_TOOLTIP" desc="Tooltip of the Live toggle while it is off.">
++        Not live: pauses like a video when another one comes. Click to keep it running.
++      </message>
++      <message name="IDS_UW_PLAYBACK_CONTROLS_PAUSED" desc="Second line of the playback controls at the bottom of the tab sidebar while the tab's sound is paused.">
++        Paused
++      </message>
++      <message name="IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB" desc="Accessible name and tooltip of the playback controls' art and title, which go to the tab playing the sound.">
++        Go to tab
 +      </message>
 +      <message name="IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH" desc="Label of the switch that puts a playing video in the mini player when the user switches away from its tab.">
 +        Open the mini player when you switch tabs

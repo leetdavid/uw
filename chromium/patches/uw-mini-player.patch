@@ -98,3 +98,34 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c5
  
    // Creates the window icon.
    const gfx::FontList& font_list = views::TypographyProvider::Get().GetFont(
+diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
+index 92aca7476b3fae0e3302d71b71d12cff7450d89c..13303c399be7ed4a7a1756832492bdf4fb9b3f5d 100644
+--- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
++++ b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
+@@ -303,6 +303,12 @@ void BrowserWebContentsDelegate::ExitPictureInPicture() {
+   PictureInPictureWindowManager::GetInstance()->ExitPictureInPicture();
+ }
+ 
++bool BrowserWebContentsDelegate::IsDocumentPictureInPictureBlockedBySystem()
++    const {
++  return PictureInPictureWindowManager::GetInstance()
++      ->IsPictureInPictureDisabled();
++}
++
+ content::KeyboardEventProcessingResult
+ BrowserWebContentsDelegate::PreHandleKeyboardEvent(
+     content::WebContents* source,
+diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h
+index 72ad58b279814e1ca8d86a925e690bcf2a4f65d5..8d993a18786e3dcc84c3a22297098e7c09482b4b 100644
+--- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h
++++ b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h
+@@ -54,6 +54,9 @@ class BrowserWebContentsDelegate : public content::WebContentsDelegate {
+   content::PictureInPictureResult EnterPictureInPicture(
+       content::WebContents* web_contents) override;
+   void ExitPictureInPicture() override;
++  // uw: while picture in picture is blocked, as with uw's setting Off, a site
++  // cannot open its own window either.
++  bool IsDocumentPictureInPictureBlockedBySystem() const override;
+   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
+       content::WebContents* source,
+       const input::NativeWebKeyboardEvent& event) override;

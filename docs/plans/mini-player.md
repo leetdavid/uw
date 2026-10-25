@@ -1,6 +1,6 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review. A second round was agreed on 2026-10-25 in another grilling session: sites' own windows dock as [live windows](../CONTEXT.md#language), [playback controls](../CONTEXT.md#language) join the sidebar, and one choice replaces the first switch. Its stages, T203 to T208, have not started.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review. A second round was agreed on 2026-10-25 in another grilling session: sites' own windows dock as [live windows](../CONTEXT.md#language), [playback controls](../CONTEXT.md#language) join the sidebar, and one choice replaces the first switch. The design, T203, was signed off the same day. T204's prototype showed a site's page can move into the sidebar, so T207 goes ahead as planned. T205, the Dock, Don't dock, and Off choice, and T206, the playback controls, were built the same day and are in review.
 
 Implementability: **4/10** for the first round, using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
@@ -146,10 +146,10 @@ Product code goes in `browser/ui/views/mini_player/`, per [Architecture](../arch
 Proposed for the second round:
 
 - Chromium keeps one picture-in-picture window at a time: `PictureInPictureWindowManager` closes the old window when a new one opens. A patch lets it keep a live window beside a video.
-- Chromium gives a site's own window a browser window of its own with one tab (`NEW_PICTURE_IN_PICTURE` in `browser_navigator.cc`). Docking keeps that window hidden and shows its page in the sidebar, as uw already moves a pinned tab's live page between windows. T204 checks that the page keeps acting as a picture-in-picture window there: its size, focus, and back to tab.
+- Chromium gives a site's own window a browser window of its own with one tab (`NEW_PICTURE_IN_PICTURE` in `browser_navigator.cc`). Docking keeps that window hidden and shows its page in the sidebar, as uw already moves a pinned tab's live page between windows. T204's prototype, a throwaway browser test, did this with `TabStripModel::DiscardWebContents` and a `views::WebView` at 232 × 196 on 2026-10-25. The page took the view's size and heard a resize, stayed the site's picture-in-picture window, took typing, went back to its own window at its own size, and closed through back to tab as Chromium does. Closed while out of its window, the page asks its delegate to close it, which is then uw, and destroying it ends the window for the site. Not tried: uw's buttons drawn over the page.
 - A video moved into a site's window keeps its player in the page that opened it (`ShouldReusePlayer` in Blink's `html_media_element.cc`), and Spotify plays from its main page. So pausing a site's window that is not live pauses the media session of the tab that opened it, as the stack pauses videos.
-- The playback controls read Chromium's media sessions, the data behind its media button. The row reuses that button's item view if it fits 232px, or draws its own from the same data.
-- Off refuses picture-in-picture requests where `PictureInPictureWindowManager` takes them.
+- The playback controls follow the window's tab that last gained audio focus, from Chromium's audio focus manager, and read that tab's media session for its title, artwork, state, and actions, the data behind Chromium's media button. The row draws itself, as the stack's rows do. Each window's row is for that window's own tabs.
+- Off holds Chromium's own `ScopedDisallowPictureInPicture` in every window, as a file dialog does, which closes a video's picture in picture at once. `uw-mini-player.patch` makes the browser answer content's `IsDocumentPictureInPictureBlockedBySystem` with that block, so a site's request for its own window is refused.
 
 ## Stages
 
@@ -188,5 +188,4 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Open questions
 
-- Whether a site's page keeps acting as a picture-in-picture window when shown in the sidebar. T204 decides; if it does not, the second round comes back for another look.
 - The sizes Meet and Spotify ask for, and how their pages lay out at 232px.

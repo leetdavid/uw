@@ -19,7 +19,8 @@ namespace uw {
 // Opens a mini player when the user switches away from a tab whose video is
 // playing, audible, and big enough on the page, and puts the video back in
 // its page when they come back to that tab, per "Starting and ending" in
-// docs/plans/mini-player.md. A mini player the user opened stays.
+// docs/plans/mini-player.md, while the mini player docks. A mini player the
+// user opened stays.
 class AutoMiniPlayer : public TabStripModelObserver {
  public:
   explicit AutoMiniPlayer(BrowserWindowInterface* window);

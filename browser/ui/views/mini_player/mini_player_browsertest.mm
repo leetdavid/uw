@@ -5,7 +5,10 @@
 
 #import <Cocoa/Cocoa.h>
 
+#include <algorithm>
+#include <iterator>
 #include <string>
+#include <vector>
 
 #include "base/command_line.h"
 #include "base/memory/raw_ptr.h"
@@ -14,6 +17,7 @@
 #include "base/test/run_until.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -57,6 +61,7 @@
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
+#include "uw/browser/ui/views/mini_player/playback_controls.h"
 #include "uw/browser/ui/views/mini_player/stack_row.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/look/theme.h"
@@ -133,6 +138,25 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   static PrefService* LocalState() { return g_browser_process->local_state(); }
+
+  // The playback controls in the sidebar of `window`.
+  static PlaybackControls* ControlsOf(Browser* window) {
+    std::vector<views::View*> views = {
+        BrowserView::GetBrowserViewForBrowser(window)};
+    while (!views.empty()) {
+      views::View* view = views.back();
+      views.pop_back();
+      if (auto* controls = views::AsViewClass<PlaybackControls>(view)) {
+        return controls;
+      }
+      std::ranges::copy(view->children(), std::back_inserter(views));
+    }
+    return nullptr;
+  }
+
+  static void SetMode(MiniPlayerMode mode) {
+    LocalState()->SetInteger(kMiniPlayerModePref, static_cast<int>(mode));
+  }
 
   // Opens Chromium's picture-in-picture test page and plays its video with
   // sound, in the tab in front.
@@ -261,17 +285,67 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_TRUE(DocksIn(mini_player, browser()));
 }
 
-IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
-                       WithTheSidebarSwitchOffItAlwaysFloats) {
-  LocalState()->SetBoolean(kMiniPlayerInSidebarPref, false);
+// With Don't dock, a video the user puts in picture in picture floats.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, WithDontDockItFloats) {
+  SetMode(MiniPlayerMode::kDontDock);
   SetAppActiveForTesting(true);
   MiniPlayer* mini_player = OpenMiniPlayer();
   Settle();
   EXPECT_TRUE(Floats(mini_player));
-  // Turning it on docks the video at once.
-  LocalState()->SetBoolean(kMiniPlayerInSidebarPref, true);
+  // Choosing Dock docks the video at once.
+  SetMode(MiniPlayerMode::kDock);
   EXPECT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithDontDockLeavingAPlayingTabOpensNothing) {
+  SetMode(MiniPlayerMode::kDontDock);
+  OpenPlayingVideo();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  Settle();
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+  EXPECT_FALSE(Bool("video.paused"));
+}
+
+// The stack lives only in the sidebar: without it, a second video leaves the
+// first paused in its page.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       WithDontDockASecondVideoLeavesTheFirstInItsPage) {
+  SetMode(MiniPlayerMode::kDontDock);
+  OpenMiniPlayer();
+  Play();
+  content::WebContents* first_video = video_;
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  OpenMiniPlayer();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(first_video, "video.paused").ExtractBool();
+  }));
+  EXPECT_TRUE(MiniPlayerStack::Get().paused().empty());
+}
+
+// With Off, nothing opens: not a video, nor a site's own window.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, WithOffNoPictureInPictureOpens) {
+  SetMode(MiniPlayerMode::kOff);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/window-size.html")));
+  video_ = active();
+  ASSERT_TRUE(content::ExecJs(
+      video_, "enterPictureInPicture().then(() => 0, () => 0)"));
+  Settle();
+  EXPECT_FALSE(Bool("!!document.pictureInPictureElement"));
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/document-pip.html")));
+  const std::string open_window =
+      "createDocumentPipWindow({width: 320, height: 200})"
+      "    .then(() => 'opened', () => 'refused')";
+  EXPECT_EQ("refused", content::EvalJs(active(), open_window));
+  // Choosing Dock again lets it open.
+  SetMode(MiniPlayerMode::kDock);
+  EXPECT_EQ("opened", content::EvalJs(active(), open_window));
 }
 
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, HidingTheSidebarFloatsIt) {
@@ -408,6 +482,55 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(content::EvalJs(first_video, "video.paused").ExtractBool());
   ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
   EXPECT_EQ(video_, MiniPlayerStack::Get().paused()[0].contents.get());
+}
+
+// A tab playing sound gets one row of playback controls while the user is on
+// another tab. The row pauses and plays it, and a click goes to the tab.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ATabPlayingSoundGetsPlaybackControlsElsewhere) {
+  LocalState()->SetBoolean(kMiniPlayerOnTabSwitchPref, false);
+  OpenPlayingVideo();
+  PlaybackControls* controls = ControlsOf(browser());
+  ASSERT_TRUE(controls);
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->tab() == video_; }));
+  EXPECT_FALSE(controls->GetVisible());
+
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->GetVisible(); }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->playing(); }));
+  SaveWindowScreenshot(browser(), "playback_controls");
+  views::test::ButtonTestApi(controls->play_pause())
+      .NotifyClick(Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  EXPECT_TRUE(base::test::RunUntil([&] { return Bool("video.paused"); }));
+  // Paused sound keeps its row.
+  EXPECT_TRUE(base::test::RunUntil([&] { return !controls->playing(); }));
+  EXPECT_TRUE(controls->GetVisible());
+  SaveWindowScreenshot(browser(), "playback_controls_paused");
+  views::test::ButtonTestApi(controls->play_pause())
+      .NotifyClick(Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !Bool("video.paused"); }));
+
+  views::test::ButtonTestApi(controls).NotifyClick(
+      Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  EXPECT_EQ(video_, active());
+  EXPECT_FALSE(controls->GetVisible());
+}
+
+// Sound in a mini player has the mini player's controls, so no row.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       SoundInAMiniPlayerGetsNoPlaybackControls) {
+  OpenPlayingVideo();
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return Bool("isInPictureInPicture()"); }));
+  Settle();
+  EXPECT_FALSE(ControlsOf(browser())->GetVisible());
+  // Closing the mini player leaves the video in its page: playing there, it
+  // gets the row.
+  PictureInPictureWindowManager::GetInstance()->ExitPictureInPicture();
+  ASSERT_TRUE(content::ExecJs(video_, "video.play()"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return ControlsOf(browser())->GetVisible(); }));
 }
 
 // Under the pointer the paused videos rise from behind the playing one into

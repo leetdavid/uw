@@ -33,7 +33,7 @@ MiniPlayerPlacement::MiniPlayerPlacement(views::Widget* floating_window,
   if (PrefService* local_state = g_browser_process->local_state()) {
     prefs_.Init(local_state);
     for (const char* pref :
-         {kMiniPlayerInSidebarPref, kMiniPlayerFloatInBackgroundPref}) {
+         {kMiniPlayerModePref, kMiniPlayerFloatInBackgroundPref}) {
       prefs_.Add(pref, base::BindRepeating(&MiniPlayerPlacement::Update,
                                            base::Unretained(this)));
     }
@@ -94,8 +94,8 @@ MiniPlayerDock* MiniPlayerPlacement::Choose() {
       GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser();
   MiniPlayerDock* dock = MiniPlayerDock::From(front);
   Watch(front, dock);
-  if (!local_state || !local_state->GetBoolean(kMiniPlayerInSidebarPref) ||
-      !dock || !dock->GetWidget()) {
+  if (MiniPlayerModeOf(local_state) != MiniPlayerMode::kDock || !dock ||
+      !dock->GetWidget()) {
     return nullptr;
   }
   views::Widget* window = dock->GetWidget();

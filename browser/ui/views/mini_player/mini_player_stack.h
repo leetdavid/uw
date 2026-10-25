@@ -25,6 +25,8 @@ namespace uw {
 // docs/plans/mini-player.md. Chromium shows one picture in picture at a time,
 // so a new one hides the old one at once; the old video pauses and waits here,
 // newest first, until the user plays it again, drops it, or goes to its tab.
+// The stack lives only in the sidebar: unless the mini player docks, the old
+// video pauses and is forgotten.
 class MiniPlayerStack {
  public:
   // A paused video.

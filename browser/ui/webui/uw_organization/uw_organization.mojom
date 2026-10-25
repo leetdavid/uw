@@ -46,8 +46,8 @@ struct State {
   bool task_row_new_tab;
   bool double_click_opens_tab;
   bool middle_click_closes_task;
-  // The mini player's switches, for all of uw.
-  bool mini_player_in_sidebar;
+  // The mini player's settings, for all of uw.
+  MiniPlayerMode mini_player_mode;
   bool mini_player_on_tab_switch;
   bool mini_player_float_in_background;
 };
@@ -60,9 +60,15 @@ enum MouseAction {
   kMiddleClickClosesTask,
 };
 
+// Where picture in picture goes, uw::MiniPlayerMode.
+enum MiniPlayerMode {
+  kDock,
+  kDontDock,
+  kOff,
+};
+
 // The mini player's switches.
 enum MiniPlayerSwitch {
-  kInSidebar,
   kOnTabSwitch,
   kFloatInBackground,
 };
@@ -107,6 +113,7 @@ interface OrganizationHandler {
   // Every window follows at once.
   SetMouseAction(MouseAction action, bool on) => ();
   // For all of uw. A mini player that shows moves at once.
+  SetMiniPlayerMode(MiniPlayerMode mode) => ();
   SetMiniPlayer(MiniPlayerSwitch which, bool on) => ();
   // For all of uw. Installing links the command, through macOS's password
   // prompt when needed, and opens uw's channel for it; uninstalling closes it.

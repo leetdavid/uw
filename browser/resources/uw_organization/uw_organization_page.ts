@@ -11,6 +11,8 @@
 
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
+import 'chrome://resources/cr_elements/cr_radio_button/cr_radio_button.js';
+import 'chrome://resources/cr_elements/cr_radio_group/cr_radio_group.js';
 import 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 import 'chrome://resources/cr_elements/cr_toggle/cr_toggle.js';
 
@@ -21,7 +23,7 @@ import {getCss as getMdSelectCss} from 'chrome://resources/cr_elements/md_select
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {MiniPlayerSwitch, MouseAction, Waiting} from './uw_organization.mojom-webui.js';
+import {MiniPlayerMode, MiniPlayerSwitch, MouseAction, Waiting} from './uw_organization.mojom-webui.js';
 import type {State, Thresholds} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
@@ -31,6 +33,28 @@ import {getHtml} from './uw_organization_page.html.js';
 const MIN_THRESHOLD = 0.5;
 const MAX_THRESHOLD = 0.95;
 const THRESHOLD_STEP = 0.05;
+
+// The choices of Picture in picture, by the radio button's name.
+const MINI_PLAYER_MODES = [
+  {
+    mode: MiniPlayerMode.kDock,
+    name: 'dock',
+    label: 'uwMiniPlayerDock',
+    description: 'uwMiniPlayerDockDescription',
+  },
+  {
+    mode: MiniPlayerMode.kDontDock,
+    name: 'dontDock',
+    label: 'uwMiniPlayerDontDock',
+    description: 'uwMiniPlayerDontDockDescription',
+  },
+  {
+    mode: MiniPlayerMode.kOff,
+    name: 'off',
+    label: 'uwMiniPlayerOff',
+    description: 'uwMiniPlayerOffDescription',
+  },
+];
 
 // One choice of the Default currency menu.
 interface CurrencyOption {
@@ -277,9 +301,29 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.refresh_();
   }
 
-  protected async onMiniPlayerInSidebarChange_(e: CustomEvent<boolean>) {
-    await this.browserProxy_.setMiniPlayer(
-        MiniPlayerSwitch.kInSidebar, e.detail);
+  protected miniPlayerModes_() {
+    return MINI_PLAYER_MODES;
+  }
+
+  protected miniPlayerModeName_(): string {
+    return MINI_PLAYER_MODES
+               .find(choice => choice.mode === this.state_?.miniPlayerMode)
+               ?.name ??
+        'dock';
+  }
+
+  // The two switches only matter while the mini player docks.
+  protected miniPlayerDocks_(): boolean {
+    return this.state_?.miniPlayerMode === MiniPlayerMode.kDock;
+  }
+
+  protected async onMiniPlayerModeSelectedChanged_(e: CustomEvent<{value: string}>) {
+    const choice =
+        MINI_PLAYER_MODES.find(choice => choice.name === e.detail.value);
+    if (!choice || !this.state_ || choice.mode === this.state_.miniPlayerMode) {
+      return;
+    }
+    await this.browserProxy_.setMiniPlayerMode(choice.mode);
     this.refresh_();
   }
 

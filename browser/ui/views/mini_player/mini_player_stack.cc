@@ -7,11 +7,13 @@
 
 #include "base/functional/bind.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chrome/browser/browser_process.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 
 namespace uw {
 
@@ -61,6 +63,12 @@ void MiniPlayerStack::OnShown(content::WebContents* contents) {
     if (paused_.size() > kMaxPaused) {
       paused_.resize(kMaxPaused);
     }
+  }
+  // The stack lives only in the sidebar. Without it the replaced video just
+  // stays paused in its page.
+  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
+      MiniPlayerMode::kDock) {
+    paused_.clear();
   }
   hidden_.reset();
   observers_.Notify();

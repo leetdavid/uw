@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {CommandState, MiniPlayerSwitch, MouseAction, PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
+import type {CommandState, MiniPlayerMode, MiniPlayerSwitch, MouseAction, PauseResult, State, Thresholds} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -20,6 +20,7 @@ export interface UwOrganizationBrowserProxy {
   setCommandBar(on: boolean): Promise<void>;
   setCurrency(code: string): Promise<void>;
   setMouseAction(action: MouseAction, on: boolean): Promise<void>;
+  setMiniPlayerMode(mode: MiniPlayerMode): Promise<void>;
   setMiniPlayer(which: MiniPlayerSwitch, on: boolean): Promise<void>;
 }
 
@@ -63,6 +64,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setMouseAction(action: MouseAction, on: boolean) {
     await this.handler.setMouseAction(action, on);
+  }
+
+  async setMiniPlayerMode(mode: MiniPlayerMode) {
+    await this.handler.setMiniPlayerMode(mode);
   }
 
   async setMiniPlayer(which: MiniPlayerSwitch, on: boolean) {

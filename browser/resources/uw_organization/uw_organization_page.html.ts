@@ -56,6 +56,12 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   .uw-slider cr-slider {
     flex: 1;
   }
+  .uw-choice {
+    --cr-radio-group-item-padding: 6px 0;
+    display: flex;
+    flex: 0 0 100%;
+    flex-direction: column;
+  }
   .uw-secondary,
   .uw-note {
     color: var(--cr-secondary-text-color);
@@ -180,18 +186,20 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwMiniPlayerTitle')}</h2>
-    <div class="uw-row">
-      <div id="miniPlayerInSidebarLabel" class="uw-field">
-        ${this.i18n_('uwMiniPlayerInSidebar')}
-        <div class="uw-secondary">
-          ${this.i18n_('uwMiniPlayerInSidebarDescription')}
-        </div>
+    <div class="uw-row uw-wrap">
+      <div id="miniPlayerModeLabel" class="uw-field">
+        ${this.i18n_('uwMiniPlayerMode')}
       </div>
-      <cr-toggle id="miniPlayerInSidebarToggle"
-          aria-labelledby="miniPlayerInSidebarLabel"
-          ?checked="${!!this.state_?.miniPlayerInSidebar}"
-          @change="${this.onMiniPlayerInSidebarChange_}">
-      </cr-toggle>
+      <cr-radio-group id="miniPlayerMode" class="uw-choice"
+          aria-labelledby="miniPlayerModeLabel"
+          .selected="${this.miniPlayerModeName_()}"
+          @selected-changed="${this.onMiniPlayerModeSelectedChanged_}">
+        ${this.miniPlayerModes_().map(mode => html`
+        <cr-radio-button name="${mode.name}"
+            label="${this.i18n_(mode.label)}">
+          <div class="uw-secondary">${this.i18n_(mode.description)}</div>
+        </cr-radio-button>`)}
+      </cr-radio-group>
     </div>
     <div class="uw-row">
       <div id="miniPlayerOnTabSwitchLabel" class="uw-field">
@@ -203,6 +211,7 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
       <cr-toggle id="miniPlayerOnTabSwitchToggle"
           aria-labelledby="miniPlayerOnTabSwitchLabel"
           ?checked="${!!this.state_?.miniPlayerOnTabSwitch}"
+          ?disabled="${!this.miniPlayerDocks_()}"
           @change="${this.onMiniPlayerOnTabSwitchChange_}">
       </cr-toggle>
     </div>
@@ -216,7 +225,7 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
       <cr-toggle id="miniPlayerFloatToggle"
           aria-labelledby="miniPlayerFloatLabel"
           ?checked="${!!this.state_?.miniPlayerFloatInBackground}"
-          ?disabled="${!this.state_?.miniPlayerInSidebar}"
+          ?disabled="${!this.miniPlayerDocks_()}"
           @change="${this.onMiniPlayerFloatChange_}">
       </cr-toggle>
     </div>

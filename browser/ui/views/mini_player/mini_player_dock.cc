@@ -9,6 +9,8 @@
 
 #include "base/functional/bind.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/picture_in_picture/scoped_disallow_picture_in_picture.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -22,6 +24,7 @@
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 #include "uw/browser/ui/views/mini_player/stack_row.h"
@@ -58,6 +61,13 @@ MiniPlayerDock::MiniPlayerDock(BrowserWindowInterface* window)
   SetProperty(views::kMarginsKey, gfx::Insets::TLBR(kTopGap, 0, 0, 0));
   stack_subscription_ = MiniPlayerStack::Get().Observe(base::BindRepeating(
       &MiniPlayerDock::OnStackChanged, base::Unretained(this)));
+  if (PrefService* local_state = g_browser_process->local_state()) {
+    prefs_.Init(local_state);
+    prefs_.Add(kMiniPlayerModePref,
+               base::BindRepeating(&MiniPlayerDock::UpdateOff,
+                                   base::Unretained(this)));
+  }
+  UpdateOff();
 }
 
 MiniPlayerDock::~MiniPlayerDock() {
@@ -206,6 +216,15 @@ void MiniPlayerDock::UpdateFan() {
   }
   PreferredSizeChanged();
   SchedulePaint();
+}
+
+void MiniPlayerDock::UpdateOff() {
+  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
+      MiniPlayerMode::kOff) {
+    off_.reset();
+  } else if (!off_) {
+    off_ = std::make_unique<ScopedDisallowPictureInPicture>();
+  }
 }
 
 void MiniPlayerDock::UpdateLook() {

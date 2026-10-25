@@ -24,8 +24,9 @@ class MiniPlayerDock;
 // Where the mini player goes, per "Where it shows" in
 // docs/plans/mini-player.md: docked in the sidebar of the uw window in front,
 // or floating in its own window while uw is in the background, no window shows,
-// or the front window's sidebar is hidden. It watches all of those and the
-// settings, and says again whenever one changes.
+// or the front window's sidebar is hidden, and always floating with Don't
+// dock chosen. It watches all of those and the settings, and says again
+// whenever one changes.
 class MiniPlayerPlacement : public BrowserCollectionObserver,
                             public views::WidgetObserver {
  public:

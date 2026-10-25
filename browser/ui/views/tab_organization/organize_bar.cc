@@ -37,6 +37,7 @@
 #include "uw/browser/ui/glass/glass_background.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
+#include "uw/browser/ui/views/mini_player/playback_controls.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
@@ -84,8 +85,10 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       base::BindRepeating(&OrganizeBar::TidyAgain, base::Unretained(this))));
   card_->Hide();
 
-  // The mini player docks between the card and the row.
+  // The mini player docks between the card and the row, the playback
+  // controls under it.
   AddChildView(std::make_unique<MiniPlayerDock>(window_));
+  AddChildView(std::make_unique<PlaybackControls>(window_));
 
   // Organize at the left, the new button at the right end.
   row_ = AddChildView(std::make_unique<views::FlexLayoutView>());

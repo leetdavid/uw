@@ -47,8 +47,6 @@ const char* MouseActionPref(mojom::MouseAction action) {
 
 const char* MiniPlayerPref(mojom::MiniPlayerSwitch which) {
   switch (which) {
-    case mojom::MiniPlayerSwitch::kInSidebar:
-      return kMiniPlayerInSidebarPref;
     case mojom::MiniPlayerSwitch::kOnTabSwitch:
       return kMiniPlayerOnTabSwitchPref;
     case mojom::MiniPlayerSwitch::kFloatInBackground:
@@ -123,9 +121,16 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMouseDoubleClick", IDS_UW_SETTINGS_MOUSE_DOUBLE_CLICK},
       {"uwMouseMiddleClick", IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK},
       {"uwMiniPlayerTitle", IDS_UW_SETTINGS_MINI_PLAYER_TITLE},
-      {"uwMiniPlayerInSidebar", IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR},
-      {"uwMiniPlayerInSidebarDescription",
-       IDS_UW_SETTINGS_MINI_PLAYER_IN_SIDEBAR_DESCRIPTION},
+      {"uwMiniPlayerMode", IDS_UW_SETTINGS_MINI_PLAYER_MODE},
+      {"uwMiniPlayerDock", IDS_UW_SETTINGS_MINI_PLAYER_DOCK},
+      {"uwMiniPlayerDockDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_DOCK_DESCRIPTION},
+      {"uwMiniPlayerDontDock", IDS_UW_SETTINGS_MINI_PLAYER_DONT_DOCK},
+      {"uwMiniPlayerDontDockDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_DONT_DOCK_DESCRIPTION},
+      {"uwMiniPlayerOff", IDS_UW_SETTINGS_MINI_PLAYER_OFF},
+      {"uwMiniPlayerOffDescription",
+       IDS_UW_SETTINGS_MINI_PLAYER_OFF_DESCRIPTION},
       {"uwMiniPlayerOnTabSwitch", IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH},
       {"uwMiniPlayerOnTabSwitchDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH_DESCRIPTION},
@@ -213,8 +218,8 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->middle_click_closes_task =
       prefs->GetBoolean(kMiddleClickClosesTaskPref);
   const PrefService* local_state = g_browser_process->local_state();
-  state->mini_player_in_sidebar =
-      local_state->GetBoolean(kMiniPlayerInSidebarPref);
+  state->mini_player_mode =
+      static_cast<mojom::MiniPlayerMode>(MiniPlayerModeOf(local_state));
   state->mini_player_on_tab_switch =
       local_state->GetBoolean(kMiniPlayerOnTabSwitchPref);
   state->mini_player_float_in_background =
@@ -272,6 +277,14 @@ void UwOrganizationHandler::SetMouseAction(mojom::MouseAction action,
                                            bool on,
                                            SetMouseActionCallback callback) {
   profile_->GetPrefs()->SetBoolean(MouseActionPref(action), on);
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetMiniPlayerMode(
+    mojom::MiniPlayerMode mode,
+    SetMiniPlayerModeCallback callback) {
+  g_browser_process->local_state()->SetInteger(kMiniPlayerModePref,
+                                               static_cast<int>(mode));
   std::move(callback).Run();
 }
 

@@ -86,7 +86,8 @@ void AutoMiniPlayer::OnTabStripModelChanged(
 
 void AutoMiniPlayer::MaybeOpen(content::WebContents* contents) {
   PrefService* local_state = g_browser_process->local_state();
-  if (!local_state || !local_state->GetBoolean(kMiniPlayerOnTabSwitchPref) ||
+  if (MiniPlayerModeOf(local_state) != MiniPlayerMode::kDock ||
+      !local_state->GetBoolean(kMiniPlayerOnTabSwitchPref) ||
       PictureInPictureWindowManager::GetInstance()->GetWebContents() ==
           contents ||
       !PlaysAudibleVideo(contents)) {
