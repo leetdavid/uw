@@ -63,6 +63,10 @@ _Avoid_: PiP window, pop-out.
 A site's own picture-in-picture window, such as a Meet call, that keeps running while videos come and go: it never pauses and never joins the mini player stack. Docked, it sits below any mini player. Every site's own window is live unless the user turns that off for its site; then it acts like a mini player, and pauses and joins the stack when another one comes.
 _Avoid_: Call window, live mini player, document PiP.
 
+**Playback controls**:
+Play, pause, and skip for a tab the user is not looking at that plays sound, shown at the bottom of the sidebar. Sound that is in a mini player or a live window has its own controls instead.
+_Avoid_: Media controls, now playing, audio bar.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
