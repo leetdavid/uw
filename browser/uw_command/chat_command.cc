@@ -310,6 +310,9 @@ UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
   if (const std::string* text = params.FindString("text")) {
     ask.text = *text;
   }
+  if (const std::string* material = params.FindString("material")) {
+    ask.material = *material;
+  }
   ask.mode = ModeFrom(params.FindString("mode"));
   if (const std::string* model = params.FindString("model")) {
     ask.model = *model;

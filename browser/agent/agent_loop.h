@@ -97,7 +97,11 @@ class AgentLoop {
   ~AgentLoop();
 
   // Sends the user's next message. Does nothing while the agent works.
-  void Send(std::string_view text, std::vector<std::string> images = {});
+  // `material` is text piped into the uw command with it; see
+  // AgentContext::AddMaterial.
+  void Send(std::string_view text,
+            std::vector<std::string> images = {},
+            std::string_view material = {});
   // Picks the chat up again after uw quit while the agent was working.
   void Resume();
   // Asks the model again after its request failed, with the chat as it is.

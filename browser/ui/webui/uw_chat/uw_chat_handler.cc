@@ -310,7 +310,7 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
     OnModelChanged();
   }
   if (ask.model.empty() || !model_) {
-    SendFromCommand(ask.text);
+    SendFromCommand(ask.text, std::move(ask.material));
     return;
   }
   // A model of the chat's provider, as the composer's model menu picks one.
@@ -319,7 +319,7 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
   const std::optional<Provider> provider =
       FindProvider(*profile->GetPrefs(), model_->provider_id);
   if (!provider) {
-    SendFromCommand(ask.text);
+    SendFromCommand(ask.text, std::move(ask.material));
     return;
   }
   CatalogStore::For(profile)->FormatOf(
@@ -333,12 +333,13 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
             self->model_ =
                 ModelChoice{provider_id, ask.model, format, ask.effort};
             self->OnModelChanged();
-            self->SendFromCommand(ask.text);
+            self->SendFromCommand(ask.text, std::move(ask.material));
           },
           weak_factory_.GetWeakPtr(), model_->provider_id, std::move(ask)));
 }
 
-void UwChatHandler::SendFromCommand(const std::string& text) {
+void UwChatHandler::SendFromCommand(const std::string& text,
+                                    std::string material) {
   if (text.empty()) {
     return;
   }
@@ -346,6 +347,7 @@ void UwChatHandler::SendFromCommand(const std::string& text) {
     Steer(text, {});
     return;
   }
+  material_ = std::move(material);
   auto line = mojom::Step::New();
   line->kind = mojom::StepKind::kUser;
   line->text = text;
@@ -591,7 +593,7 @@ void UwChatHandler::SendToAgent(const std::string& shown,
     step->result = "{}";
     ShowStep(std::move(step));
   }
-  agent_->Send(handed_over_ + sent, usable);
+  agent_->Send(handed_over_ + sent, usable, std::exchange(material_, ""));
   handed_over_.clear();
   Save();
 }

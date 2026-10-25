@@ -156,13 +156,18 @@ void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
   context_->SetSkills(list);
 }
 
-void AgentLoop::Send(std::string_view text, std::vector<std::string> images) {
+void AgentLoop::Send(std::string_view text,
+                     std::vector<std::string> images,
+                     std::string_view material) {
   if (working_) {
     return;
   }
   working_ = true;
   turns_ = 0;
   context_->AddUser(text, images);
+  if (!material.empty()) {
+    context_->AddMaterial(material);
+  }
   AskModel();
 }
 

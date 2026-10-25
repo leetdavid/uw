@@ -76,6 +76,8 @@ class UwChatHandler : public mojom::ChatHandler,
     ~CommandAsk();
 
     std::string text;
+    // Text piped in with it, which the agent takes as information.
+    std::string material;
     // Picked for this chat alone; the mode new chats start on stays.
     std::optional<ApprovalMode> mode;
     // A model of the chat's provider, and one of its effort levels.
@@ -208,7 +210,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void OnStep(const AgentLoop::Step& step);
   // Tells the page and the watchers about `step`.
   void ShowStep(mojom::StepPtr step);
-  void SendFromCommand(const std::string& text);
+  void SendFromCommand(const std::string& text, std::string material);
   bool Working() const;
   // One line of the saved log as the page shows it.
   mojom::StepPtr LineFor(const base::DictValue& entry) const;
@@ -342,6 +344,8 @@ class UwChatHandler : public mojom::ChatHandler,
   mojom::ApprovalPtr waiting_;
   // The uw command started this chat.
   bool from_terminal_ = false;
+  // Text piped into the command with the message on its way to the agent.
+  std::string material_;
   base::ObserverList<Watcher> watchers_;
   // The agent's terminal tab that waits for the user's password, or 0.
   int password_tab_ = 0;

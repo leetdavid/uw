@@ -39,6 +39,11 @@ class AgentContext {
   // A message with `images`, each a data: URL. They are numbered on from the
   // chat's earlier images.
   void AddUser(std::string_view text, const std::vector<std::string>& images);
+  // Text the user piped into the uw command with their message: information
+  // from outside uw, as page text is, never the user's instruction. It is a
+  // step of its own, so it shrinks as a result does and recall brings it back.
+  // See docs/plans/uw-command.md#chats.
+  void AddMaterial(std::string_view text);
   // Shows the model the images it recalled by `numbers`, in a message of
   // their own.
   void ShowImages(const std::vector<int>& numbers);
