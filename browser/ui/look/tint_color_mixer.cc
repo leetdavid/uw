@@ -148,6 +148,11 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
         kColorTabSearchButtonCRForegroundFrameInactive}) {
     mixer[foreground] = {text};
   }
+  // A site's own picture-in-picture window, such as a Meet call, wears the
+  // tint in its bar, per docs/plans/mini-player.md.
+  mixer[kColorPipWindowTopBarBackground] = {ui::kColorFrameActive};
+  mixer[kColorPipWindowForeground] = {text};
+  mixer[kColorPipWindowForegroundInactive] = {SkColorSetA(text, 0x8C)};
   mixer[kColorVerticalTabPinnedOutline] = {SK_ColorTRANSPARENT};
   mixer[kColorVerticalTabStripShadow] = {SK_ColorTRANSPARENT};
   const SkColor active_tab =

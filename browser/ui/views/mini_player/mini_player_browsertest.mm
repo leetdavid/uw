@@ -18,10 +18,16 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+#include "chrome/browser/ui/views/frame/browser_frame_view.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
+#include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/document_picture_in_picture_window_controller.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/video_picture_in_picture_window_controller.h"
@@ -31,6 +37,8 @@
 #include "media/base/media_switches.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
@@ -598,6 +606,40 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, TheMiniPlayerLooksLikeTheFrames) {
   SetThemeOfWindow(browser(), theme);
   view->ShowControls(true);
   SaveWidgetScreenshot(mini_player, "mini_player_glass");
+}
+
+// A site's own picture-in-picture window, such as a Meet call, floats with a
+// 30px bar in the tint of the window it came from.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ASitesOwnWindowWearsItsOpenersTint) {
+  Theme theme = ThemeOfWindow(browser());
+  theme.colors = {SkColorSetRGB(0x3E, 0x7C, 0x6B)};
+  SetThemeOfWindow(browser(), theme);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/document-pip.html")));
+  ASSERT_EQ(true, content::EvalJs(
+                      active(),
+                      "createDocumentPipWindow({width: 320, height: 200})"));
+  content::WebContents* page =
+      content::PictureInPictureWindowController::
+          GetOrCreateDocumentPictureInPictureController(active())
+              ->GetChildWebContents();
+  ASSERT_TRUE(page);
+  BrowserWindowInterface* window =
+      tabs::TabInterface::GetFromContents(page)->GetBrowserWindowInterface();
+  ASSERT_EQ(BrowserWindowInterface::TYPE_PICTURE_IN_PICTURE, window->GetType());
+  EXPECT_EQ(theme, ThemeOfWindow(window));
+
+  BrowserView* view = BrowserView::GetBrowserViewForNativeWindow(
+      window->GetWindow()->GetNativeWindow());
+  EXPECT_EQ(30, view->browser_widget()->GetFrameView()->GetTopInset(false));
+  EXPECT_EQ(
+      BrowserView::GetBrowserViewForBrowser(browser())
+          ->GetColorProvider()
+          ->GetColor(ui::kColorFrameActive),
+      view->GetColorProvider()->GetColor(kColorPipWindowTopBarBackground));
+  SaveWidgetScreenshot(view->GetWidget(), "document_pip");
 }
 
 // A real window, for pnpm run window-tests: a real pointer brings the

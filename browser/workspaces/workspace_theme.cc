@@ -12,6 +12,7 @@
 
 #include "base/auto_reset.h"
 #include "base/no_destructor.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
@@ -196,10 +197,24 @@ void Redraw(const std::string& workspace) {
       });
 }
 
+// A site's own picture-in-picture window, such as a Meet call, wears the
+// theme of the window it came from, per docs/plans/mini-player.md.
+BrowserWindowInterface* WindowOfTheme(BrowserWindowInterface* window) {
+  if (window->GetType() != BrowserWindowInterface::TYPE_PICTURE_IN_PICTURE) {
+    return window;
+  }
+  content::WebContents* opener =
+      PictureInPictureWindowManager::GetInstance()->GetWebContents();
+  tabs::TabInterface* tab =
+      opener ? tabs::TabInterface::MaybeGetFromContents(opener) : nullptr;
+  return tab ? tab->GetBrowserWindowInterface() : window;
+}
+
 }  // namespace
 
 Theme ThemeOfWindow(BrowserWindowInterface* window) {
-  const WorkspaceList::Workspace* workspace = WorkspaceOf(window);
+  const WorkspaceList::Workspace* workspace =
+      WorkspaceOf(WindowOfTheme(window));
   return workspace && workspace->theme ? *workspace->theme
                                        : ProfileTheme(window->GetProfile());
 }
@@ -252,7 +267,8 @@ Theme NewWorkspaceTheme(const Theme& like) {
 
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
                         ui::ColorProviderKey& key) {
-  const WorkspaceList::Workspace* workspace = WorkspaceOf(window);
+  const WorkspaceList::Workspace* workspace =
+      WorkspaceOf(WindowOfTheme(window));
   if (!workspace || !workspace->theme || key.custom_theme) {
     return;
   }

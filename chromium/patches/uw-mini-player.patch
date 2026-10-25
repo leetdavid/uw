@@ -64,3 +64,37 @@ index 41bf5932c399fc425e6b5669aed0de4025d6cee3..205a56cefbd8177026db6e866c4ef215
  
    // This is intentionally last.
    RegisterLocalStatePrefsForMigration(registry);
+diff --git a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
+index a40f9064b4cd44a43ab40d717b97445454af131a..420978da6f266bcfe721460a577869c55bfa6007 100644
+--- a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
++++ b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
+@@ -22,6 +22,7 @@
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/chrome_typography.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/themed_background.h"
+ #include "chrome/browser/ui/views/frame/top_container_view.h"
+ #include "chrome/browser/ui/views/overlay/overlay_window_image_button.h"
+ #include "chrome/browser/ui/views/page_info/page_info_bubble_specification.h"
+@@ -81,7 +82,8 @@ constexpr int kBackToTabImageSize = 16;
+ constexpr int kContentSettingIconSize = 16;
+ 
+ // The height of the controls bar at the top of the window.
+-constexpr int kTopControlsHeight = 34;
++// uw: the bar of uw's mini player.
++constexpr int kTopControlsHeight = 30;
+ // The vertical margin for IconLabelBubbleView to have 24px height.
+ constexpr int KIconViewVerticalMargin = 5;
+ 
+@@ -206,8 +208,9 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
+                    .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
+                    .Build());
+ 
+-  top_bar_container_view_->SetBackground(
+-      views::CreateSolidBackground(kColorPipWindowTopBarBackground));
++  // uw: the bar wears the tint of the window the page came from.
++  top_bar_container_view_->SetBackground(std::make_unique<ThemedBackground>(
++      browser_view, ThemedBackground::kFrameTheme));
+ 
+   // Creates the window icon.
+   const gfx::FontList& font_list = views::TypographyProvider::Get().GetFont(

@@ -28,6 +28,7 @@ source_set("workspaces") {
     "//uw/browser/ui/look",
     "//uw/components/look:prefs",
     "//chrome/browser/lifetime",
+    "//chrome/browser/picture_in_picture",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles:profile_manager",
     "//chrome/browser/sessions",
