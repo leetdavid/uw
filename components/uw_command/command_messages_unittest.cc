@@ -53,5 +53,15 @@ TEST(CommandMessagesTest, RepliesCarryTheRequestsId) {
             "theme.grain takes 0 to 100.");
 }
 
+TEST(CommandMessagesTest, ANotificationHasAMethodAndNoId) {
+  base::DictValue step;
+  step.Set("kind", "tool");
+  base::DictValue notification =
+      Read(CommandNotification("chat.step", base::Value(std::move(step))));
+  EXPECT_EQ(*notification.FindString("method"), "chat.step");
+  EXPECT_FALSE(notification.contains("id"));
+  EXPECT_EQ(*notification.FindStringByDottedPath("params.kind"), "tool");
+}
+
 }  // namespace
 }  // namespace uw

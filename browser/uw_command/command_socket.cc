@@ -57,8 +57,11 @@ struct CommandSocket::Connection {
   scoped_refptr<net::DrainableIOBuffer> writing;
 };
 
-CommandSocket::CommandSocket(const base::FilePath& path, Received received)
+CommandSocket::CommandSocket(const base::FilePath& path,
+                             Received received,
+                             Closed closed)
     : received_(std::move(received)),
+      closed_(std::move(closed)),
       server_(std::make_unique<net::UnixDomainServerSocket>(
           base::BindRepeating(&FromThisUser),
           /*use_abstract_namespace=*/false)) {
@@ -204,7 +207,9 @@ void CommandSocket::DidWrite(int connection, int result) {
 }
 
 void CommandSocket::Close(int connection) {
-  connections_.erase(connection);
+  if (connections_.erase(connection)) {
+    closed_.Run(connection);
+  }
 }
 
 }  // namespace uw

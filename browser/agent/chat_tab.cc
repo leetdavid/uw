@@ -86,11 +86,17 @@ void AskInNewChat(BrowserWindowInterface* window,
   if (!chat) {
     return;
   }
-  auto data = std::make_unique<StartData>();
-  data->start.text = text;
+  ChatStart start;
+  start.text = text;
   if (tab) {
-    data->start.tab = tab->GetHandle();
+    start.tab = tab->GetHandle();
   }
+  SetChatStart(chat, std::move(start));
+}
+
+void SetChatStart(content::WebContents* chat, ChatStart start) {
+  auto data = std::make_unique<StartData>();
+  data->start = std::move(start);
   chat->SetUserData(kStartKey, std::move(data));
 }
 

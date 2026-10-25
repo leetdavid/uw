@@ -276,6 +276,8 @@ struct ChatSummary {
   bool schedule_paused;
   // Whether a trigger of the chat runs.
   bool trigger;
+  // The uw command started it.
+  bool from_terminal;
 };
 
 // A step that waits for the user's approval: its tab and site, what it does,

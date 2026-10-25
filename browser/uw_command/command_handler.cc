@@ -13,7 +13,9 @@
 
 namespace uw {
 
-void HandleCommand(CommandRequest request, CommandReply reply) {
+void HandleCommand(CommandRequest request,
+                   CommandReply reply,
+                   base::WeakPtr<CommandConnection> connection) {
   if (request.method == "hello") {
     base::DictValue hello;
     hello.Set("version", version_info::GetVersionNumber());
@@ -27,6 +29,10 @@ void HandleCommand(CommandRequest request, CommandReply reply) {
   }
   if (request.method.starts_with("connectors.")) {
     RunConnectorsCommand(std::move(request), std::move(reply));
+    return;
+  }
+  if (request.method.starts_with("chats.")) {
+    RunChatCommand(std::move(request), std::move(reply), std::move(connection));
     return;
   }
   std::move(reply).Run(CommandError(

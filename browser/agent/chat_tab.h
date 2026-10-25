@@ -49,7 +49,12 @@ struct ChatStart {
   std::string text;
   // The tab handed to the agent as its tab 1.
   tabs::TabHandle tab;
+  // The uw command started it. See docs/plans/uw-command.md#chats.
+  bool from_terminal = false;
 };
+
+// Gives the chat `chat` will show what it starts with, for TakeChatStart.
+void SetChatStart(content::WebContents* chat, ChatStart start);
 
 // Opens a chat in front where a blank new tab would open, asks it `text`, and
 // hands it `tab`, the tab the user was on, as the agent's tab 1.

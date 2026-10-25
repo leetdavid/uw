@@ -7,16 +7,21 @@
 #include <string>
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/weak_ptr.h"
 
 namespace uw {
 
+class CommandConnection;
 struct CommandRequest;
 
 // Gets a reply line to send back.
 using CommandReply = base::OnceCallback<void(std::string line)>;
 
-// Answers one request from the uw command, on the UI thread.
-void HandleCommand(CommandRequest request, CommandReply reply);
+// Answers one request from the uw command, on the UI thread. A chat keeps
+// `connection` to send its steps on.
+void HandleCommand(CommandRequest request,
+                   CommandReply reply,
+                   base::WeakPtr<CommandConnection> connection);
 
 // uw settings: list, get, and set. See docs/plans/uw-command.md#settings.
 void RunSettingsCommand(CommandRequest request, CommandReply reply);
@@ -24,6 +29,12 @@ void RunSettingsCommand(CommandRequest request, CommandReply reply);
 // uw connectors, also uw mcp: list, add, remove, and sign in. See
 // docs/plans/uw-command.md#connectors.
 void RunConnectorsCommand(CommandRequest request, CommandReply reply);
+
+// uw chat, uw chats, and uw approve: start, pick up, answer, stop, and list
+// chats. See docs/plans/uw-command.md#chats.
+void RunChatCommand(CommandRequest request,
+                    CommandReply reply,
+                    base::WeakPtr<CommandConnection> connection);
 
 }  // namespace uw
 

@@ -2,6 +2,7 @@
 
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 import type { Channel } from "./channel.ts";
+import { APPROVE, CHAT, CHATS } from "./chat.ts";
 import { CONNECTORS } from "./connectors.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
 import { VERSION, reach, type Place, type Reach } from "./launch.ts";
@@ -14,8 +15,11 @@ Usage:
   uw <command> [options]
 
 Commands:
-  settings      List, read, and change uw's settings
+  chat          Ask uw's agent to do something, as in uw://chat
+  chats         List the chats of a workspace
+  approve       Answer the step a chat waits on
   connectors    Add, list, remove, and sign in to connectors (also: uw mcp)
+  settings      List, read, and change uw's settings
 
 Options:
   --workspace <name>  The workspace a command applies to. Default: the one used last.
@@ -26,8 +30,9 @@ Options:
 Exit codes: 0 done, 1 failed or stopped, 2 wrong usage, 3 needs you.
 
 Examples:
-  uw settings list
+  uw chat -p "Did my latest Vercel deploy succeed?"
   uw mcp add --transport http linear https://mcp.linear.app/mcp
+  uw settings list
 
 Run uw <command> --help for a command's options.
 `;
@@ -56,9 +61,15 @@ export interface Input {
   env: NodeJS.ProcessEnv;
   terminal: boolean;
   stdin: () => Promise<string>;
+  /** Reads a line the person types, with a terminal. */
+  ask?: (prompt: string) => Promise<string>;
+  /** Hears Ctrl-C. */
+  onInterrupt?: (stopped: () => void) => void;
 }
 
-const COMMANDS: Record<string, Command> = { settings: SETTINGS, connectors: CONNECTORS, mcp: CONNECTORS };
+const COMMANDS: Record<string, Command> = {
+  chat: CHAT, chats: CHATS, approve: APPROVE, settings: SETTINGS, connectors: CONNECTORS, mcp: CONNECTORS,
+};
 
 /** Parses a command's options, with --json and --help, which every command takes. */
 export function options<T extends ParseArgsOptionsConfig>(args: string[], own: T) {
@@ -92,7 +103,10 @@ export async function run(argv: string[], io: Run): Promise<number> {
     io.err(`uw has no command called ${name}.\nRun uw --help for the commands.\n`);
     return USAGE;
   }
-  const input: Input = { env: io.env ?? {}, terminal: io.terminal ?? false, stdin: io.stdin ?? (async () => "") };
+  const input: Input = {
+    env: io.env ?? {}, terminal: io.terminal ?? false, stdin: io.stdin ?? (async () => ""),
+    ...(io.ask ? { ask: io.ask } : {}), ...(io.onInterrupt ? { onInterrupt: io.onInterrupt } : {}),
+  };
   try {
     const plan = await command.plan(args, input);
     if (!plan) {

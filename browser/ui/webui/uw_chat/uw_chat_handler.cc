@@ -74,8 +74,9 @@ constexpr char kCutShort[] =
 
 // The chats open in a page, so that a second page for the same chat, such
 // as a duplicated tab, starts a chat of its own.
-std::set<std::string>& OpenChats() {
-  static base::NoDestructor<std::set<std::string>> open;
+std::map<std::string, UwChatHandler*, std::less<>>& OpenChats() {
+  static base::NoDestructor<std::map<std::string, UwChatHandler*, std::less<>>>
+      open;
   return *open;
 }
 
@@ -227,8 +228,12 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
   if (!ChatFile::IsChatId(id_) || OpenChats().contains(id_)) {
     id_ = ChatFile::NewChatId();
   }
-  OpenChats().insert(id_);
+  OpenChats().emplace(id_, this);
   start_ = TakeChatStart(contents_);
+  from_terminal_ = start_ && start_->from_terminal;
+  if (start_ && start_->text.empty()) {
+    start_.reset();
+  }
   Profile* profile =
       Profile::FromBrowserContext(contents_->GetBrowserContext());
   if (ChatIndex* index = ChatIndex::For(profile)) {
@@ -251,10 +256,108 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
 }
 
 UwChatHandler::~UwChatHandler() {
+  for (Watcher& watcher : watchers_) {
+    watcher.OnGone();
+  }
   OpenChats().erase(id_);
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->SetPage(id_, nullptr);
   }
+}
+
+UwChatHandler::CommandAsk::CommandAsk() = default;
+UwChatHandler::CommandAsk::CommandAsk(CommandAsk&&) = default;
+UwChatHandler::CommandAsk& UwChatHandler::CommandAsk::operator=(CommandAsk&&) =
+    default;
+UwChatHandler::CommandAsk::~CommandAsk() = default;
+
+// static
+UwChatHandler* UwChatHandler::ForChat(std::string_view id) {
+  auto found = OpenChats().find(id);
+  return found == OpenChats().end() ? nullptr : found->second;
+}
+
+// static
+std::vector<UwChatHandler*> UwChatHandler::Open() {
+  std::vector<UwChatHandler*> open;
+  for (const auto& [id, handler] : OpenChats()) {
+    open.push_back(handler);
+  }
+  return open;
+}
+
+void UwChatHandler::AddWatcher(Watcher* watcher) {
+  watchers_.AddObserver(watcher);
+}
+
+void UwChatHandler::RemoveWatcher(Watcher* watcher) {
+  watchers_.RemoveObserver(watcher);
+}
+
+void UwChatHandler::AskFromCommand(CommandAsk ask) {
+  if (!loaded_) {
+    return;
+  }
+  if (ask.mode) {
+    mode_ = *ask.mode;
+    if (agent_) {
+      agent_->SetMode(mode_);
+    }
+    page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
+  }
+  if (!ask.effort.empty() && model_ && ask.model.empty()) {
+    model_->effort = ask.effort;
+    OnModelChanged();
+  }
+  if (ask.model.empty() || !model_) {
+    SendFromCommand(ask.text);
+    return;
+  }
+  // A model of the chat's provider, as the composer's model menu picks one.
+  Profile* profile =
+      Profile::FromBrowserContext(contents_->GetBrowserContext());
+  const std::optional<Provider> provider =
+      FindProvider(*profile->GetPrefs(), model_->provider_id);
+  if (!provider) {
+    SendFromCommand(ask.text);
+    return;
+  }
+  CatalogStore::For(profile)->FormatOf(
+      *provider, ask.model,
+      base::BindOnce(
+          [](base::WeakPtr<UwChatHandler> self, std::string provider_id,
+             CommandAsk ask, std::optional<ProviderFormat> format) {
+            if (!self) {
+              return;
+            }
+            self->model_ =
+                ModelChoice{provider_id, ask.model, format, ask.effort};
+            self->OnModelChanged();
+            self->SendFromCommand(ask.text);
+          },
+          weak_factory_.GetWeakPtr(), model_->provider_id, std::move(ask)));
+}
+
+void UwChatHandler::SendFromCommand(const std::string& text) {
+  if (text.empty()) {
+    return;
+  }
+  if (Working()) {
+    Steer(text, {});
+    return;
+  }
+  auto line = mojom::Step::New();
+  line->kind = mojom::StepKind::kUser;
+  line->text = text;
+  ShowStep(std::move(line));
+  Send(text, {});
+}
+
+void UwChatHandler::ShowStep(mojom::StepPtr step) {
+  for (Watcher& watcher : watchers_) {
+    watcher.OnStep(*step);
+  }
+  page_->OnStep(std::move(step));
 }
 
 void UwChatHandler::Send(const std::string& text,
@@ -373,7 +476,7 @@ void UwChatHandler::OnPrompt(std::string shown,
     const std::string failure =
         base::StrCat({"The ", name, " prompt didn't come: ", answer.error()});
     Log(base::DictValue().Set("kind", "failed").Set("text", failure));
-    page_->OnStep(Failed(failure));
+    ShowStep(Failed(failure));
     Save();
     return;
   }
@@ -486,7 +589,7 @@ void UwChatHandler::SendToAgent(const std::string& shown,
     step->tool = std::string(started);
     step->args = Json(&args);
     step->result = "{}";
-    page_->OnStep(std::move(step));
+    ShowStep(std::move(step));
   }
   agent_->Send(handed_over_ + sent, usable);
   handed_over_.clear();
@@ -712,6 +815,10 @@ void UwChatHandler::AnswerApproval(mojom::ApprovalChoice choice,
     chats->AnswerApproval(id_, std::move(answer));
     return;
   }
+  waiting_.reset();
+  for (Watcher& watcher : watchers_) {
+    watcher.OnApproval(nullptr);
+  }
   std::move(approval_answer_).Run(std::move(answer));
   UpdateIndex();
 }
@@ -728,6 +835,7 @@ void UwChatHandler::OnChatsChanged() {
     chat->title = entry.title;
     chat->updated = entry.updated.InMillisecondsFSinceUnixEpoch();
     chat->state = StateFor(entry.state);
+    chat->from_terminal = entry.from_terminal;
     if (const ScheduledChats* schedules = schedules_observation_.GetSource()) {
       chat->trigger = schedules->TriggerOf(entry.id) != nullptr;
       if (const ScheduledChat* scheduled = schedules->Find(entry.id)) {
@@ -781,6 +889,8 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
     if (const std::string* mode = saved->FindString("mode")) {
       mode_ = ModeNamed(*mode);
     }
+    from_terminal_ =
+        from_terminal_ || saved->FindBool("from_terminal").value_or(false);
     if (const base::DictValue* context = saved->FindDict("context")) {
       saved_context_ = AgentContext::FromValue(*context);
       if (saved_context_) {
@@ -842,7 +952,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
 bool UwChatHandler::Start() {
   tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents_);
   if (!tab) {
-    page_->OnStep(Failed("A chat works only in a tab."));
+    ShowStep(Failed("A chat works only in a tab."));
     return false;
   }
   // A chat opened before any model was picked takes the agent model now.
@@ -854,7 +964,7 @@ bool UwChatHandler::Start() {
   }
   std::optional<AgentModel> model = AgentModelNow();
   if (!model) {
-    page_->OnStep(Failed("Pick a model on the AI page first."));
+    ShowStep(Failed("Pick a model on the AI page first."));
     return false;
   }
   agent_ = std::make_unique<AgentLoop>(
@@ -926,7 +1036,8 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
       break;
   }
   if (step.kind != AgentLoop::Step::Kind::kTool) {
-    unread_ = contents_->GetVisibility() != content::Visibility::VISIBLE;
+    unread_ = watchers_.empty() &&
+              contents_->GetVisibility() != content::Visibility::VISIBLE;
     if (step.kind != AgentLoop::Step::Kind::kStoppedByUser) {
       Notify(step.kind == AgentLoop::Step::Kind::kAnswer ? "Answered"
                                                          : "Didn't finish",
@@ -942,7 +1053,7 @@ void UwChatHandler::OnStep(const AgentLoop::Step& step) {
   sent->args = Json(&step.args);
   sent->result = Json(&step.result);
   sent->text = step.text;
-  page_->OnStep(std::move(sent));
+  ShowStep(std::move(sent));
 }
 
 std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
@@ -1207,6 +1318,9 @@ void UwChatHandler::SendUsage() {
       usage->output_price = model->price->output;
     }
   }
+  for (Watcher& watcher : watchers_) {
+    watcher.OnUsage(*usage);
+  }
   page_->OnUsage(std::move(usage));
 }
 
@@ -1248,6 +1362,9 @@ void UwChatHandler::Save() {
     saved.Set("model", ModelValue(*model_));
   }
   saved.Set("mode", NameOf(mode_));
+  if (from_terminal_) {
+    saved.Set("from_terminal", true);
+  }
   file_->Save(saved);
   UpdateIndex();
 }
@@ -1434,10 +1551,14 @@ void UwChatHandler::AskApproval(
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",
                              base::NumberToString(approval.tab), "?"}));
-  page_->OnApproval(
-      PageApproval(approval, /*can_always_allow=*/
-                   !Profile::FromBrowserContext(contents_->GetBrowserContext())
-                        ->IsOffTheRecord()));
+  waiting_ = PageApproval(
+      approval, /*can_always_allow=*/
+      !Profile::FromBrowserContext(contents_->GetBrowserContext())
+           ->IsOffTheRecord());
+  for (Watcher& watcher : watchers_) {
+    watcher.OnApproval(waiting_.get());
+  }
+  page_->OnApproval(waiting_.Clone());
   UpdateIndex();
 }
 
@@ -1469,6 +1590,9 @@ void UwChatHandler::OnSkillWritten(bool written) {
 }
 
 void UwChatHandler::Notify(const std::string& what, const std::string& text) {
+  if (!watchers_.empty()) {
+    return;
+  }
   tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents_);
   if (tab && contents_->GetVisibility() == content::Visibility::VISIBLE &&
       tab->GetBrowserWindowInterface()->GetWindow()->IsActive()) {
@@ -1495,7 +1619,7 @@ void UwChatHandler::UpdateIndex() {
   } else if (unread_) {
     state = ChatIndex::State::kUnread;
   }
-  index->Update({id_, title_, updated_, state});
+  index->Update({id_, title_, updated_, state, from_terminal_});
 }
 
 void UwChatHandler::NewSchedule(NewScheduleCallback callback) {
@@ -1597,7 +1721,7 @@ bool UwChatHandler::Wake(base::DictValue line, const std::string& message) {
   if (!loaded_ || preparing_ || (!agent_ && !Start())) {
     return false;
   }
-  page_->OnStep(LineFor(line));
+  ShowStep(LineFor(line));
   Log(std::move(line));
   Save();
   agent_->Steer(message);
@@ -1671,7 +1795,7 @@ void UwChatHandler::AddRunLines(base::ListValue lines) {
   }
   for (base::Value& line : lines) {
     if (line.is_dict()) {
-      page_->OnStep(LineFor(line.GetDict()));
+      ShowStep(LineFor(line.GetDict()));
       Log(std::move(line).TakeDict());
     }
   }

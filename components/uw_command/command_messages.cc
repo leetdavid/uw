@@ -60,4 +60,12 @@ std::string CommandError(const base::Value& id,
   return Line(id, "error", base::Value(std::move(error)));
 }
 
+std::string CommandNotification(std::string_view method, base::Value params) {
+  base::DictValue notification;
+  notification.Set("jsonrpc", "2.0");
+  notification.Set("method", method);
+  notification.Set("params", std::move(params));
+  return base::WriteJson(notification).value_or("") + "\n";
+}
+
 }  // namespace uw

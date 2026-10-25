@@ -867,6 +867,15 @@ function ChatList({
                       {chat.title || "New chat"}
                     </span>
                     <span className="text-muted-foreground tabular-nums group-hover/menu-item:opacity-0">
+                      {chat.fromTerminal && (
+                        <span
+                          title="From terminal"
+                          data-from-terminal
+                          className="mr-1 inline-flex align-[-2px]"
+                        >
+                          <TerminalIcon className="size-3.5" />
+                        </span>
+                      )}
                       {onlyScheduled
                         ? chat.schedulePaused
                           ? "Paused"
@@ -1623,6 +1632,13 @@ function Chat() {
       chatPage.onStep.addListener((step: Step) => {
         if (step.kind === StepKind.kTriggerStopped) {
           setLines((before) => [...before, step]);
+          return;
+        }
+        // A message the uw command sent, which puts the agent to work.
+        if (step.kind === StepKind.kUser) {
+          setLines((before) => [...before, step]);
+          setWorking(true);
+          setSince(Date.now());
           return;
         }
         // A trigger woke the agent, which goes to work.

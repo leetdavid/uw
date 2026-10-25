@@ -5,10 +5,15 @@ import { createInterface } from "node:readline";
 import { CommandError, FAILED, exitFor } from "./errors.ts";
 
 interface Reply {
-  id: number;
+  id?: number;
   result?: unknown;
   error?: { code: number; message: string };
+  // A notification, which uw sends while a chat runs.
+  method?: string;
+  params?: Record<string, unknown>;
 }
+
+export type Notified = (method: string, params: Record<string, unknown>) => void;
 
 interface Waiting {
   resolve: (result: unknown) => void;
@@ -19,12 +24,17 @@ export class Channel {
   readonly #socket: Socket;
   readonly #waiting = new Map<number, Waiting>();
   #next = 1;
+  #notified: Notified = () => {};
+  #closed: () => void = () => {};
 
   private constructor(socket: Socket) {
     this.#socket = socket;
     createInterface({ input: socket }).on("line", (line) => this.#receive(line));
     socket.on("error", () => this.#fail("The connection to uw broke."));
-    socket.on("close", () => this.#fail("uw closed the connection."));
+    socket.on("close", () => {
+      this.#fail("uw closed the connection.");
+      this.#closed();
+    });
   }
 
   static open(path: string): Promise<Channel> {
@@ -45,6 +55,16 @@ export class Channel {
     return reply;
   }
 
+  /** Hears uw's notifications, such as a chat's steps. */
+  onNotification(notified: Notified): void {
+    this.#notified = notified;
+  }
+
+  /** Hears when uw closes the connection, as when it quits. */
+  onClose(closed: () => void): void {
+    this.#closed = closed;
+  }
+
   close(): void {
     this.#socket.end();
   }
@@ -55,6 +75,10 @@ export class Channel {
       reply = JSON.parse(line) as Reply;
     } catch {
       this.#fail("uw sent a message the command can't read.");
+      return;
+    }
+    if (reply.id === undefined) {
+      if (reply.method) this.#notified(reply.method, reply.params ?? {});
       return;
     }
     const waiting = this.#waiting.get(reply.id);

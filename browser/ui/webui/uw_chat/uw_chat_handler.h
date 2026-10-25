@@ -13,6 +13,8 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/observer_list.h"
+#include "base/observer_list_types.h"
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -53,6 +55,39 @@ class UwChatHandler : public mojom::ChatHandler,
                       public ScheduledChats::Page,
                       public content::WebContentsObserver {
  public:
+  // What the uw command sees of a chat it started or picked up again. While
+  // one watches, uw sends none of the chat's notifications. See
+  // docs/plans/uw-command.md#chats.
+  class Watcher : public base::CheckedObserver {
+   public:
+    virtual void OnStep(const mojom::Step& step) = 0;
+    // A step waits for approval, or, with null, nothing waits any more.
+    virtual void OnApproval(const mojom::Approval* approval) = 0;
+    virtual void OnUsage(const mojom::ChatUsage& usage) = 0;
+    // The chat's tab closed.
+    virtual void OnGone() = 0;
+  };
+
+  // What the uw command asks a chat.
+  struct CommandAsk {
+    CommandAsk();
+    CommandAsk(CommandAsk&&);
+    CommandAsk& operator=(CommandAsk&&);
+    ~CommandAsk();
+
+    std::string text;
+    // Picked for this chat alone; the mode new chats start on stays.
+    std::optional<ApprovalMode> mode;
+    // A model of the chat's provider, and one of its effort levels.
+    std::string model;
+    std::string effort;
+  };
+
+  // The handler of the chat `id` an open tab shows, or null.
+  static UwChatHandler* ForChat(std::string_view id);
+  // The chats open tabs show.
+  static std::vector<UwChatHandler*> Open();
+
   UwChatHandler(content::WebContents* contents,
                 mojo::PendingRemote<mojom::ChatPage> page,
                 mojo::PendingReceiver<mojom::ChatHandler> receiver);
@@ -94,6 +129,21 @@ class UwChatHandler : public mojom::ChatHandler,
   void StopRun() override;
   void StopTrigger() override;
   void PauseAllSchedules(bool paused) override;
+
+  const std::string& id() const { return id_; }
+  bool loaded() const { return loaded_; }
+  bool working() const { return Working(); }
+  // The step that waits for approval, or null.
+  const mojom::Approval* waiting() const { return waiting_.get(); }
+  // The chat's last line that is not a model switch, as the chat file keeps
+  // it, such as {"kind": "answer", "text": ...}.
+  const base::DictValue* last_line() const { return LastLine(); }
+  content::WebContents* contents() { return contents_; }
+  void AddWatcher(Watcher* watcher);
+  void RemoveWatcher(Watcher* watcher);
+  // Sends `ask` once its mode and model are set, or steers the agent at work
+  // with it.
+  void AskFromCommand(CommandAsk ask);
 
   // ScheduledChats::Observer:
   void OnScheduleChanged(const std::string& chat_id) override;
@@ -156,6 +206,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // The last line of the log that is not a model switch.
   const base::DictValue* LastLine() const;
   void OnStep(const AgentLoop::Step& step);
+  // Tells the page and the watchers about `step`.
+  void ShowStep(mojom::StepPtr step);
+  void SendFromCommand(const std::string& text);
   bool Working() const;
   // One line of the saved log as the page shows it.
   mojom::StepPtr LineFor(const base::DictValue& entry) const;
@@ -284,8 +337,12 @@ class UwChatHandler : public mojom::ChatHandler,
   // The skill the agent asked to save, and its answer.
   base::DictValue proposed_skill_;
   base::OnceCallback<void(base::DictValue)> skill_answer_;
-  // The answer to the step that waits for the user's approval.
+  // The answer to the step that waits for the user's approval, and the step.
   base::OnceCallback<void(AgentLoop::ApprovalAnswer)> approval_answer_;
+  mojom::ApprovalPtr waiting_;
+  // The uw command started this chat.
+  bool from_terminal_ = false;
+  base::ObserverList<Watcher> watchers_;
   // The agent's terminal tab that waits for the user's password, or 0.
   int password_tab_ = 0;
   // Lines of the chat's runs that came before the chat was read, and whether

@@ -26,8 +26,10 @@ class CommandSocket {
   // A line without its newline, and the number of the connection it came on.
   using Received =
       base::RepeatingCallback<void(int connection, std::string line)>;
+  // A connection closed: the command ended or went away.
+  using Closed = base::RepeatingCallback<void(int connection)>;
 
-  CommandSocket(const base::FilePath& path, Received received);
+  CommandSocket(const base::FilePath& path, Received received, Closed closed);
   CommandSocket(const CommandSocket&) = delete;
   CommandSocket& operator=(const CommandSocket&) = delete;
   ~CommandSocket();
@@ -51,6 +53,7 @@ class CommandSocket {
   void Close(int connection);
 
   const Received received_;
+  const Closed closed_;
   std::unique_ptr<net::UnixDomainServerSocket> server_;
   std::unique_ptr<net::StreamSocket> accepted_;
   std::map<int, std::unique_ptr<Connection>> connections_;

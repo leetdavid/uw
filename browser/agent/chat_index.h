@@ -37,6 +37,8 @@ class ChatIndex : public base::SupportsUserData::Data {
     std::string title;
     base::Time updated;
     State state = State::kDone;
+    // The uw command started it.
+    bool from_terminal = false;
   };
 
   class Observer : public base::CheckedObserver {

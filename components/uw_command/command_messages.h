@@ -41,6 +41,9 @@ std::string CommandError(const base::Value& id,
                          int code,
                          std::string_view message);
 
+// A notification uw sends without being asked, such as a chat's next step.
+std::string CommandNotification(std::string_view method, base::Value params);
+
 }  // namespace uw
 
 #endif  // UW_COMPONENTS_UW_COMMAND_COMMAND_MESSAGES_H_

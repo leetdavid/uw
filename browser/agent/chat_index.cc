@@ -74,6 +74,7 @@ std::optional<ChatIndex::Entry> EntryFromChat(const base::FilePath& path) {
       chat->FindBool("running").value_or(false) || (kind && *kind == "stopped")
           ? ChatIndex::State::kStopped
           : ChatIndex::State::kDone;
+  entry.from_terminal = chat->FindBool("from_terminal").value_or(false);
   return entry;
 }
 
@@ -95,7 +96,8 @@ std::vector<ChatIndex::Entry> Load(const base::FilePath& folder) {
       std::optional<base::Time> updated =
           chat ? base::ValueToTime(chat->Find("updated")) : std::nullopt;
       if (id && ChatFile::IsChatId(*id) && title && state && updated) {
-        entries.push_back({*id, *title, *updated, StateFrom(*state)});
+        entries.push_back({*id, *title, *updated, StateFrom(*state),
+                           chat->FindBool("from_terminal").value_or(false)});
       }
     }
     return entries;
@@ -193,11 +195,15 @@ void ChatIndex::Save() {
   if (loaded_) {
     base::ListValue chats;
     for (const Entry& entry : Entries()) {
-      chats.Append(base::DictValue()
-                       .Set("id", entry.id)
-                       .Set("title", entry.title)
-                       .Set("updated", base::TimeToValue(entry.updated))
-                       .Set("state", NameOf(entry.state)));
+      base::DictValue chat = base::DictValue()
+                                 .Set("id", entry.id)
+                                 .Set("title", entry.title)
+                                 .Set("updated", base::TimeToValue(entry.updated))
+                                 .Set("state", NameOf(entry.state));
+      if (entry.from_terminal) {
+        chat.Set("from_terminal", true);
+      }
+      chats.Append(std::move(chat));
     }
     if (std::optional<std::string> json =
             base::WriteJson(base::DictValue().Set("chats", std::move(chats)))) {
