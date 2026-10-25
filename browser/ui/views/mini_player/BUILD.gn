@@ -21,6 +21,8 @@ source_set("mini_player") {
     "playback_controls.h",
     "playback_speed.cc",
     "playback_speed.h",
+    "site_window.cc",
+    "site_window.h",
     "stack_row.cc",
     "stack_row.h",
   ]
@@ -48,6 +50,7 @@ source_set("mini_player") {
     "//components/vector_icons",
     "//mojo/public/cpp/bindings",
     "//services/media_session/public/mojom",
+    "//third_party/blink/public/common",
     "//ui/base",
     "//ui/base/unowned_user_data",
     "//ui/color",
@@ -55,6 +58,7 @@ source_set("mini_player") {
     "//ui/compositor",
     "//ui/display",
     "//ui/gfx/animation",
+    "//ui/views/controls/webview",
     "//uw/browser/ui/glass",
     "//uw/browser/ui/vector_icons",
   ]

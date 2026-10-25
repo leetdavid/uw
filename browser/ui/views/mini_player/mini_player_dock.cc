@@ -27,6 +27,7 @@
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
+#include "uw/browser/ui/views/mini_player/site_window.h"
 #include "uw/browser/ui/views/mini_player/stack_row.h"
 
 namespace uw {
@@ -48,6 +49,20 @@ constexpr base::TimeDelta kFanIn = base::Milliseconds(220);
 constexpr base::TimeDelta kFanOut = base::Milliseconds(160);
 constexpr int kCornerRadius = 10;
 
+// `shape` in `width`: as wide as the dock, and no taller than it is wide. A
+// tall one is as tall as the dock is wide, and narrower.
+gfx::Size FitShape(gfx::Size shape, int width) {
+  int height =
+      std::round(static_cast<double>(width) * shape.height() / shape.width());
+  if (height <= width) {
+    return gfx::Size(width, height);
+  }
+  height = width;
+  return gfx::Size(
+      std::round(static_cast<double>(height) * shape.width() / shape.height()),
+      height);
+}
+
 }  // namespace
 
 DEFINE_USER_DATA(MiniPlayerDock);
@@ -68,11 +83,15 @@ MiniPlayerDock::MiniPlayerDock(BrowserWindowInterface* window)
                                    base::Unretained(this)));
   }
   UpdateOff();
+  SiteWindow::Watch();
 }
 
 MiniPlayerDock::~MiniPlayerDock() {
   if (player_ && on_destroying_) {
     std::move(on_destroying_).Run();
+  }
+  if (site_window_ && on_site_window_destroying_) {
+    std::move(on_site_window_destroying_).Run();
   }
 }
 
@@ -93,9 +112,33 @@ std::unique_ptr<MiniPlayerView> MiniPlayerDock::Release() {
   MiniPlayerView* player = player_;
   player_ = nullptr;
   on_destroying_.Reset();
-  SetVisible(false);
+  SetVisible(site_window_ != nullptr);
   OnStackChanged();
+  PreferredSizeChanged();
   return RemoveChildViewT(player);
+}
+
+views::View* MiniPlayerDock::TakeSiteWindow(std::unique_ptr<views::View> page,
+                                            gfx::Size shape) {
+  site_window_ = AddChildView(std::move(page));
+  site_window_shape_ = shape;
+  SetVisible(true);
+  PreferredSizeChanged();
+  return site_window_;
+}
+
+std::unique_ptr<views::View> MiniPlayerDock::ReleaseSiteWindow() {
+  views::View* page = site_window_;
+  site_window_ = nullptr;
+  on_site_window_destroying_.Reset();
+  SetVisible(player_ != nullptr);
+  PreferredSizeChanged();
+  return page ? RemoveChildViewT(page) : nullptr;
+}
+
+void MiniPlayerDock::SetSiteWindowShape(gfx::Size shape) {
+  site_window_shape_ = shape;
+  PreferredSizeChanged();
 }
 
 void MiniPlayerDock::UpdateShape() {
@@ -107,15 +150,27 @@ gfx::Size MiniPlayerDock::CalculatePreferredSize(
   const int available = available_size.width().is_bounded()
                             ? available_size.width().value()
                             : width();
-  return gfx::Size(available, StackHeight() + PlayerSize(available).height());
+  const int site_window = SiteWindowSize(available).height();
+  return gfx::Size(available, StackHeight() + PlayerSize(available).height() +
+                                  (player_ && site_window ? kTopGap : 0) +
+                                  site_window);
 }
 
 void MiniPlayerDock::Layout(PassKey) {
+  // A site's page sits at the bottom, under any video.
+  const gfx::Size site_window = SiteWindowSize(width());
+  if (site_window_) {
+    gfx::Rect bounds(0, height() - site_window.height(), width(),
+                     site_window.height());
+    bounds.ClampToCenteredSize(site_window);
+    site_window_->SetBoundsRect(bounds);
+  }
   if (!player_) {
     return;
   }
   const int top = StackHeight();
-  gfx::Rect bounds(0, top, width(), height() - top);
+  const int player_height = PlayerSize(width()).height();
+  gfx::Rect bounds(0, top, width(), player_height);
   bounds.ClampToCenteredSize(PlayerSize(width()));
   player_->SetBoundsRect(bounds);
   // Each paused video rises from where it peeks out behind the playing one to
@@ -184,19 +239,19 @@ void MiniPlayerDock::AnimationEnded(const gfx::Animation* animation) {
 }
 
 gfx::Size MiniPlayerDock::PlayerSize(int width) const {
-  const gfx::Size shape = player_ && !player_->natural_size().IsEmpty()
-                              ? player_->natural_size()
-                              : kDefaultShape;
-  int height =
-      std::round(static_cast<double>(width) * shape.height() / shape.width());
-  if (height <= width) {
-    return gfx::Size(width, height);
+  if (!player_) {
+    return gfx::Size();
   }
-  // A tall video is as tall as the dock is wide, and narrower.
-  height = width;
-  return gfx::Size(
-      std::round(static_cast<double>(height) * shape.width() / shape.height()),
-      height);
+  return FitShape(player_->natural_size().IsEmpty() ? kDefaultShape
+                                                    : player_->natural_size(),
+                  width);
+}
+
+gfx::Size MiniPlayerDock::SiteWindowSize(int width) const {
+  if (!site_window_ || site_window_shape_.IsEmpty()) {
+    return gfx::Size();
+  }
+  return FitShape(site_window_shape_, width);
 }
 
 int MiniPlayerDock::StackHeight() const {

@@ -42,6 +42,9 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
 
   // Says where the mini player goes now.
   void Update();
+  // Says it for a window that just opened and took the focus as it did, which
+  // is not the user coming back to it.
+  void UpdateNew();
   // Says it a moment from now, once a burst of changes, such as a workspace
   // switch hiding one window and showing another, has settled.
   void ScheduleUpdate();
@@ -62,7 +65,7 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
   void OnWidgetDestroying(views::Widget* widget) override;
 
  private:
-  MiniPlayerDock* Choose();
+  MiniPlayerDock* Choose(bool just_opened = false);
   // Follows the sidebar and the window of `front`.
   void Watch(BrowserWindowInterface* front, MiniPlayerDock* dock);
 

@@ -28,7 +28,8 @@ class StackRow;
 
 // The place at the bottom of a window's sidebar, above the foot, where the
 // mini player docks, per docs/plans/mini-player.md. It spans the sidebar and
-// takes the video's shape, never taller than it is wide. Paused videos of the
+// takes the video's shape, never taller than it is wide. A site's own window,
+// a live window, docks under the video in the same way. Paused videos of the
 // stack peek out above it, and slide up into rows under the pointer. Hidden
 // while empty. It also opens a mini player when the user leaves a tab whose
 // video plays, and keeps picture in picture from opening while the setting is
@@ -55,6 +56,19 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   MiniPlayerView* player() { return player_; }
   // Fits the dock to the video's shape again.
   void UpdateShape();
+
+  // Docks a site's own page here, under any video, in `shape`, the size the
+  // site asked for.
+  views::View* TakeSiteWindow(std::unique_ptr<views::View> page,
+                              gfx::Size shape);
+  // Gives back the site's page docked here.
+  std::unique_ptr<views::View> ReleaseSiteWindow();
+  views::View* site_window() { return site_window_; }
+  void SetSiteWindowShape(gfx::Size shape);
+  // Called when the dock goes, with its window, while a site's page is docked.
+  void set_on_site_window_destroying(base::OnceClosure on_destroying) {
+    on_site_window_destroying_ = std::move(on_destroying);
+  }
   // Called when the dock goes, with its window, while a player is docked. The
   // player's owner releases it then.
   void set_on_destroying(base::OnceClosure on_destroying) {
@@ -83,6 +97,7 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   // Where the video goes in `width`: the dock's width, the video's shape, and
   // no taller than it is wide.
   gfx::Size PlayerSize(int width) const;
+  gfx::Size SiteWindowSize(int width) const;
   // The space above the video: peeks at rest, rows fanned out, and between
   // the two while they slide.
   int StackHeight() const;
@@ -100,6 +115,9 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   // From 0, the paused videos peeking, to 1, the rows fanned out.
   gfx::SlideAnimation fan_{this};
   base::OnceClosure on_destroying_;
+  raw_ptr<views::View> site_window_ = nullptr;
+  gfx::Size site_window_shape_;
+  base::OnceClosure on_site_window_destroying_;
   std::unique_ptr<AutoMiniPlayer> auto_mini_player_;
   PrefChangeRegistrar prefs_;
   // Chromium's own block on picture in picture, held while it is Off.

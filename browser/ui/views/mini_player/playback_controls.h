@@ -38,7 +38,8 @@ namespace uw {
 // started playing sound last, while the user is on another tab. Its art,
 // title, and where the sound comes from, with play or pause, and previous and
 // next under the pointer when the site offers them. A click goes to the tab.
-// Sound in a mini player has its own controls, so it gets no row.
+// Sound in a mini player or a site's own window has its own controls, so it
+// gets no row.
 class PlaybackControls : public views::Button,
                          public TabStripModelObserver,
                          public PictureInPictureWindowManager::Observer,

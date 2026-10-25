@@ -20,6 +20,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
@@ -203,8 +204,14 @@ BrowserWindowInterface* WindowOfTheme(BrowserWindowInterface* window) {
   if (window->GetType() != BrowserWindowInterface::TYPE_PICTURE_IN_PICTURE) {
     return window;
   }
+  // A video's picture in picture is no browser window, so while a site's
+  // window is kept beside one, this is that site's window.
+  PictureInPictureWindowManager* manager =
+      PictureInPictureWindowManager::GetInstance();
+  content::PictureInPictureWindowController* kept =
+      manager->kept_window_controller();
   content::WebContents* opener =
-      PictureInPictureWindowManager::GetInstance()->GetWebContents();
+      kept ? kept->GetWebContents() : manager->GetWebContents();
   tabs::TabInterface* tab =
       opener ? tabs::TabInterface::MaybeGetFromContents(opener) : nullptr;
   return tab ? tab->GetBrowserWindowInterface() : window;

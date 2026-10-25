@@ -28,6 +28,7 @@
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
+#include "uw/browser/ui/views/mini_player/site_window.h"
 
 #if BUILDFLAG(IS_MAC)
 #include "uw/browser/ui/views/mini_player/floating_native_widget_mac.h"
@@ -41,6 +42,8 @@ constexpr gfx::Size kMinimumSize(284, 160);
 
 // The edge that resizes the window.
 constexpr int kResizeBorder = 6;
+// Between a floating video and a site's window floating under it.
+constexpr int kFloatGap = 8;
 
 // Where the user last left the floating mini player, for the next one.
 std::optional<gfx::Rect>& LastBounds() {
@@ -468,6 +471,18 @@ gfx::Rect MiniPlayer::CalculateBounds() {
     bounds.set_y(center.y() < work_area.CenterPoint().y()
                      ? last->y()
                      : last->bottom() - size.height());
+  }
+  // A site's window floating in the same place keeps it, and the video
+  // floats just above it.
+  if (SiteWindow* site_window = SiteWindow::Current();
+      site_window && !site_window->dock() && site_window->own_widget() &&
+      site_window->own_widget()->IsVisible()) {
+    const gfx::Rect taken =
+        site_window->own_widget()->GetWindowBoundsInScreen();
+    if (taken.Intersects(bounds)) {
+      bounds.set_origin(gfx::Point(taken.right() - bounds.width(),
+                                   taken.y() - kFloatGap - bounds.height()));
+    }
   }
   bounds.AdjustToFit(work_area);
   return bounds;

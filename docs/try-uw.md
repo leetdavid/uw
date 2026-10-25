@@ -148,9 +148,10 @@ Expected result: the video plays in a small window with rounded corners in the b
 
 While a uw window is in front with its sidebar showing, the video docks at the bottom of the sidebar instead, above the foot, and keeps playing as you switch tabs. Click another uw window and it moves there. Switch to another app, or hide the sidebar with Cmd+S, and it floats in the corner of the screen; come back to uw and it docks again. Put a second video in picture in picture while one is docked: the first pauses and peeks out above the new one. Point at the docked player and the paused one slides up as a row with its still, title, and where it stopped; click it to play it again, or its × to drop it. Play a video with sound and switch to another tab: it opens in the mini player by itself, and switching back puts it in its page again. A muted or small video stays in its page. Under `Mini player` at `uw://settings/uwOrganization`, `Open the mini player when you switch tabs` turns that off, and `Float the mini player when uw is in the background` off keeps it docked while another app is in front. Under `Picture in picture`, `Don't dock` keeps a video you leave playing in its page, and one you put in picture in picture floats. `Off` turns picture in picture off: a site's picture-in-picture button does nothing.
 
+On a site that opens its own small picture-in-picture window, such as a Google Meet call, the window docks at the bottom of the sidebar too, under any video, and keeps running when you put a video in picture in picture. Point at it for close and back to tab. Switch to another app and it floats in its own window, with a bar in the color of the uw window it came from and the video just above it. A site that asks for a window bigger than 480 by 480 keeps floating.
+
 Play a video or a podcast, turn off `Open the mini player when you switch tabs` or choose `Don't dock`, and switch to another tab: a row above the sidebar's foot shows what is playing, with pause. Point at it for previous and next when the site offers them, and click its title to go back to the tab.
 
-On a site that opens its own picture-in-picture window, such as a Google Meet call, that window floats with a bar in the color of the uw window it came from.
 
 ### Hide the sidebar
 

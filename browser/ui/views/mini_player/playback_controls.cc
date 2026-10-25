@@ -19,6 +19,7 @@
 #include "content/public/browser/media_session_service.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -245,10 +246,16 @@ void PlaybackControls::Follow(content::WebContents* contents) {
 
 void PlaybackControls::UpdateVisibility() {
   content::WebContents* contents = tab_.get();
+  PictureInPictureWindowManager* manager =
+      PictureInPictureWindowManager::GetInstance();
+  content::PictureInPictureWindowController* kept =
+      manager->kept_window_controller();
+  // A tab whose site's window is kept beside a video has its window's own
+  // controls too.
   const bool in_mini_player =
       contents &&
-      (PictureInPictureWindowManager::GetInstance()->GetWebContents() ==
-           contents ||
+      (manager->GetWebContents() == contents ||
+       (kept && kept->GetWebContents() == contents) ||
        std::ranges::any_of(MiniPlayerStack::Get().paused(),
                            [contents](const MiniPlayerStack::Entry& entry) {
                              return entry.contents.get() == contents;

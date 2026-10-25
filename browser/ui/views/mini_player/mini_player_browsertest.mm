@@ -6,6 +6,7 @@
 #import <Cocoa/Cocoa.h>
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -62,6 +63,7 @@
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
 #include "uw/browser/ui/views/mini_player/playback_controls.h"
+#include "uw/browser/ui/views/mini_player/site_window.h"
 #include "uw/browser/ui/views/mini_player/stack_row.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/look/theme.h"
@@ -152,6 +154,42 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
       std::ranges::copy(view->children(), std::back_inserter(views));
     }
     return nullptr;
+  }
+
+  // Opens Chromium's document picture-in-picture test page in the tab in
+  // front, and from it a site's own window of `width` by `height`. Returns
+  // the tab.
+  content::WebContents* OpenSiteWindow(int width, int height) {
+    EXPECT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), embedded_test_server()->GetURL(
+                       "/media/picture-in-picture/document-pip.html")));
+    content::WebContents* opener = active();
+    EXPECT_EQ(true,
+              content::EvalJs(opener, content::JsReplace(
+                                          "createDocumentPipWindow({width: $1, "
+                                          "height: $2})",
+                                          width, height)));
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return SiteWindow::Current() && SiteWindow::Current()->opener() == opener;
+    }));
+    return opener;
+  }
+
+  static int SiteWidth(content::WebContents* opener) {
+    return content::EvalJs(opener, "pipWindow.innerWidth").ExtractInt();
+  }
+
+  static bool SiteWindowOpen(content::WebContents* opener) {
+    return content::EvalJs(opener, "documentPictureInPicture.window !== null")
+        .ExtractBool();
+  }
+
+  bool SiteDocks(SiteWindow* site_window) {
+    return site_window->dock() == MiniPlayerDock::From(browser());
+  }
+
+  static bool SiteFloats(SiteWindow* site_window) {
+    return !site_window->dock() && site_window->own_widget()->IsVisible();
   }
 
   static void SetMode(MiniPlayerMode mode) {
@@ -531,6 +569,125 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   ASSERT_TRUE(content::ExecJs(video_, "video.play()"));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return ControlsOf(browser())->GetVisible(); }));
+}
+
+// A site's own small window, such as a call, docks at the bottom of the
+// sidebar at its width, and floats in its own window behind another app.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ASmallSiteWindowDocks) {
+  SetAppActiveForTesting(true);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  SiteWindow* site_window = SiteWindow::Current();
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  EXPECT_FALSE(site_window->own_widget()->IsVisible());
+  // As wide as the dock, in the shape the site asked for.
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  views::test::RunScheduledLayout(dock->GetWidget());
+  const int width = dock->width();
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteWidth(opener) == width; }));
+  EXPECT_EQ(static_cast<int>(std::lround(width * 200.0 / 320)),
+            content::EvalJs(opener, "pipWindow.innerHeight"));
+  SaveWindowScreenshot(browser(), "site_window_docked");
+
+  SetAppActiveForTesting(false);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteFloats(site_window); }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteWidth(opener) > width; }));
+  EXPECT_TRUE(SiteWindowOpen(opener));
+  SetAppActiveForTesting(true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ABigSiteWindowFloats) {
+  SetAppActiveForTesting(true);
+  OpenSiteWindow(600, 300);
+  Settle();
+  EXPECT_TRUE(SiteFloats(SiteWindow::Current()));
+}
+
+// A video docks above a site's window, which is live and keeps running.
+// Behind another app both float, the video just above.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, AVideoDocksAboveASiteWindow) {
+  SetAppActiveForTesting(true);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  SiteWindow* site_window = SiteWindow::Current();
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  EXPECT_TRUE(SiteWindowOpen(opener));
+  EXPECT_EQ(site_window, SiteWindow::Current());
+  EXPECT_TRUE(SiteDocks(site_window));
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  views::test::RunScheduledLayout(dock->GetWidget());
+  EXPECT_LT(dock->player()->bounds().bottom(), dock->site_window()->y());
+  SaveWindowScreenshot(browser(), "site_window_under_video");
+  dock->site_window()->OnMouseEntered(
+      Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  SaveWindowScreenshot(browser(), "site_window_controls");
+
+  SetAppActiveForTesting(false);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return Floats(mini_player) && SiteFloats(site_window); }));
+  EXPECT_LE(mini_player->GetWindowBoundsInScreen().bottom(),
+            site_window->own_widget()->GetWindowBoundsInScreen().y());
+
+  // Closing the video leaves the site's window.
+  PictureInPictureWindowManager::GetInstance()->ExitPictureInPicture();
+  Settle();
+  EXPECT_TRUE(SiteWindowOpen(opener));
+  EXPECT_EQ(site_window, SiteWindow::Current());
+}
+
+// A site may grow its window only after a click in it; past the limit it
+// floats, and keeps floating.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ASiteWindowGrownTooBigFloatsForGood) {
+  SetAppActiveForTesting(true);
+  OpenSiteWindow(320, 200);
+  SiteWindow* site_window = SiteWindow::Current();
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  ASSERT_TRUE(content::ExecJs(site_window->page(), "resizeTo(700, 520)"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteFloats(site_window); }));
+  SetAppActiveForTesting(false);
+  Settle();
+  SetAppActiveForTesting(true);
+  Settle();
+  EXPECT_TRUE(SiteFloats(site_window));
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ClosingADockedSiteWindow) {
+  SetAppActiveForTesting(true);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return SiteDocks(SiteWindow::Current()); }));
+  SiteWindow::Current()->Close();
+  EXPECT_TRUE(base::test::RunUntil([&] { return !SiteWindowOpen(opener); }));
+  EXPECT_TRUE(base::test::RunUntil([] { return !SiteWindow::Current(); }));
+  EXPECT_FALSE(MiniPlayerDock::From(browser())->GetVisible());
+}
+
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ASiteClosingItsDockedWindow) {
+  SetAppActiveForTesting(true);
+  content::WebContents* opener = OpenSiteWindow(320, 200);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return SiteDocks(SiteWindow::Current()); }));
+  ASSERT_TRUE(content::ExecJs(opener, "pipWindow.close()"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !SiteWindowOpen(opener); }));
+  EXPECT_TRUE(base::test::RunUntil([] { return !SiteWindow::Current(); }));
+}
+
+// One site's window at a time: a newer one takes its place.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ANewerSiteWindowTakesItsPlace) {
+  SetAppActiveForTesting(true);
+  content::WebContents* first = OpenSiteWindow(320, 200);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return SiteDocks(SiteWindow::Current()); }));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  content::WebContents* second = OpenSiteWindow(320, 240);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !SiteWindowOpen(first); }));
+  EXPECT_TRUE(SiteWindowOpen(second));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return SiteDocks(SiteWindow::Current()); }));
 }
 
 // Under the pointer the paused videos rise from behind the playing one into

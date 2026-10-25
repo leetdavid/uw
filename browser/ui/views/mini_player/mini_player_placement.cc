@@ -47,6 +47,11 @@ void MiniPlayerPlacement::Update() {
   place_.Run(Choose());
 }
 
+void MiniPlayerPlacement::UpdateNew() {
+  settle_.Stop();
+  place_.Run(Choose(/*just_opened=*/true));
+}
+
 void MiniPlayerPlacement::ScheduleUpdate() {
   settle_.Start(
       FROM_HERE, kSettle,
@@ -88,10 +93,20 @@ void MiniPlayerPlacement::OnWidgetDestroying(views::Widget* widget) {
   ScheduleUpdate();
 }
 
-MiniPlayerDock* MiniPlayerPlacement::Choose() {
+MiniPlayerDock* MiniPlayerPlacement::Choose(bool just_opened) {
   PrefService* local_state = g_browser_process->local_state();
-  BrowserWindowInterface* front =
-      GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser();
+  // A site's own picture-in-picture window is a browser window too, with no
+  // sidebar: the front window is the last active normal one.
+  BrowserWindowInterface* front = nullptr;
+  GlobalBrowserCollection::GetInstance()->ForEach(
+      [&front](BrowserWindowInterface* window) {
+        if (window->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
+          return true;
+        }
+        front = window;
+        return false;
+      },
+      BrowserCollection::Order::kActivation);
   MiniPlayerDock* dock = MiniPlayerDock::From(front);
   Watch(front, dock);
   if (MiniPlayerModeOf(local_state) != MiniPlayerMode::kDock || !dock ||
@@ -110,7 +125,8 @@ MiniPlayerDock* MiniPlayerPlacement::Choose() {
   if (IsAppActive()) {
     // A click on the floating mini player brings uw to the front, but it is
     // not coming back to a window.
-    return !current_ && floating_window_->IsActive() ? nullptr : dock;
+    return !current_ && !just_opened && floating_window_->IsActive() ? nullptr
+                                                                     : dock;
   }
   return local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref) ? nullptr
                                                                    : dock;

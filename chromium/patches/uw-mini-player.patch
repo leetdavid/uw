@@ -129,3 +129,119 @@ index 72ad58b279814e1ca8d86a925e690bcf2a4f65d5..8d993a18786e3dcc84c3a22297098e7c
    content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
        content::WebContents* source,
        const input::NativeWebKeyboardEvent& event) override;
+diff --git a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
+index 10d227e113dd1f4d6b347c8f38419384154fd8d0..fe56dfd04720e313051575651c4c9fb955e0794e 100644
+--- a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
++++ b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+ 
++#include <utility>
++
+ #include "base/memory/raw_ptr.h"
+ #include "base/numerics/safe_conversions.h"
+ #include "chrome/browser/picture_in_picture/picture_in_picture_bounds_cache.h"
+@@ -172,6 +174,12 @@ void PictureInPictureWindowManager::EnterPictureInPictureWithController(
+ void PictureInPictureWindowManager::EnterDocumentPictureInPicture(
+     content::WebContents* parent_web_contents,
+     content::WebContents* child_web_contents) {
++  // uw: a newer site's window takes the place of one kept beside a video.
++  if (kept_window_controller_) {
++    std::exchange(kept_window_controller_, nullptr)
++        ->Close(/*should_pause_video=*/false);
++  }
++
+   // If there was already a controller, close the existing window before
+   // creating the next one. This needs to happen before creating the new
+   // controller so that its precondition (no child_web_contents_) remains
+@@ -205,8 +213,14 @@ PictureInPictureWindowManager::EnterVideoPictureInPicture(
+       !pip_window_controller_->GetWebContents()->HasPictureInPictureVideo()) {
+     // If there was already a video PiP controller, close the existing window
+     // before creating the next one.
+-    if (pip_window_controller_)
++    // uw: a site's own window stays open beside the video instead.
++    if (pip_window_controller_ &&
++        pip_window_controller_->GetChildWebContents() &&
++        !kept_window_controller_) {
++      kept_window_controller_ = std::exchange(pip_window_controller_, nullptr);
++    } else if (pip_window_controller_) {
+       CloseWindowInternal();
++    }
+ 
+     CreateWindowInternal(web_contents);
+   }
+@@ -253,8 +267,19 @@ bool PictureInPictureWindowManager::ExitPictureInPictureViaWindowUi(
+ }
+ 
+ bool PictureInPictureWindowManager::ExitPictureInPicture() {
++  // uw: the site's window kept beside a video closed; the video stays.
++  if (kept_window_controller_ &&
++      !kept_window_controller_->GetChildWebContents()) {
++    kept_window_controller_ = nullptr;
++    return true;
++  }
+   if (pip_window_controller_) {
+     CloseWindowInternal();
++    // uw: with the video gone, the site's window kept beside it is the window
++    // again.
++    if (kept_window_controller_) {
++      pip_window_controller_ = std::exchange(kept_window_controller_, nullptr);
++    }
+     return true;
+   }
+ 
+@@ -305,7 +330,10 @@ bool PictureInPictureWindowManager::IsChildWebContents(
+     return false;
+   }
+ 
+-  return instance->GetChildWebContents() == wc;
++  // uw: or the child of the site's window kept beside a video.
++  return instance->GetChildWebContents() == wc ||
++         (instance->kept_window_controller_ &&
++          instance->kept_window_controller_->GetChildWebContents() == wc);
+ }
+ 
+ // static
+@@ -689,6 +717,11 @@ void PictureInPictureWindowManager::DocumentWebContentsDestroyed() {
+   // contents, so we only need to forget the controller here when user closes
+   // the parent web contents with the PiP window open.
+   document_web_contents_observer_.reset();
++  // uw: the opener of the site's window kept beside a video went.
++  if (kept_window_controller_) {
++    kept_window_controller_ = nullptr;
++    return;
++  }
+   if (pip_window_controller_)
+     pip_window_controller_ = nullptr;
+ }
+diff --git a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.h b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.h
+index f4ebbefe2590a610e3c505dfc78ce0c409731d40..78ca0b22440fcde59cd79e33f9cbd02613499268 100644
+--- a/chrome/browser/picture_in_picture/picture_in_picture_window_manager.h
++++ b/chrome/browser/picture_in_picture/picture_in_picture_window_manager.h
+@@ -66,6 +66,14 @@ class PictureInPictureWindowManager {
+   // Returns the singleton instance.
+   static PictureInPictureWindowManager* GetInstance();
+ 
++  // uw: a site's own window kept open beside a video that opened after it,
++  // per uw's docs/plans/mini-player.md. While it is kept, the video is the
++  // window the rest of this class speaks of; when the video closes, the site's
++  // window is that window again. Null otherwise.
++  content::PictureInPictureWindowController* kept_window_controller() const {
++    return kept_window_controller_;
++  }
++
+   PictureInPictureWindowManager(const PictureInPictureWindowManager&) = delete;
+   PictureInPictureWindowManager& operator=(
+       const PictureInPictureWindowManager&) = delete;
+@@ -412,6 +420,10 @@ class PictureInPictureWindowManager {
+   // Pointer to the currently shown picture-in-picture window, if any.
+   raw_ptr<PictureInPictureWindow> picture_in_picture_window_ = nullptr;
+ 
++  // uw: see kept_window_controller().
++  raw_ptr<content::PictureInPictureWindowController, DanglingUntriaged>
++      kept_window_controller_ = nullptr;
++
+   std::unique_ptr<PictureInPictureWindowManagerUmaHelper> uma_helper_;
+ 
+   // The standalone Document PiP host for the current window, if the
