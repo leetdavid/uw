@@ -22,6 +22,7 @@ void run(process.argv.slice(2), {
     }
   },
   onInterrupt: (stopped) => process.once("SIGINT", stopped),
+  ...(process.stdin.isTTY && process.stdout.isTTY ? { screen: { stdin: process.stdin, stdout: process.stdout } } : {}),
 }).then((exit) => {
   process.exitCode = exit;
 });

@@ -3,7 +3,13 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "@types/react": "19.3.0",
     "esbuild": "0.28.2",
     "postject": "1.0.0-alpha.6"
+  },
+  "dependencies": {
+    "ink": "8.0.0",
+    "marked": "18.1.1",
+    "react": "19.3.0"
   }
 }

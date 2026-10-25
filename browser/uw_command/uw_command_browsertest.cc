@@ -5,6 +5,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -20,6 +21,7 @@
 #include "base/json/json_writer.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/test/run_until.h"
@@ -30,6 +32,7 @@
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -39,16 +42,17 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
-#include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
-#include "uw/components/ai_providers/providers.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_theme.h"
+#include "uw/components/ai_providers/providers.h"
 #include "uw/components/uw_command/command_settings.h"
 
 namespace uw {
@@ -80,11 +84,14 @@ std::string Exchange(const base::FilePath& socket, const std::string& line) {
 }
 
 // Sends `first` on a new connection and reads lines until the chat ends,
-// answering an approval with `approve` when one waits, its "CHAT" replaced
-// with the chat's id from uw's first reply. The lines read, one per element.
+// answering an approval with `approve` when one waits. Each of `next` is
+// sent when the chat ends, as the terminal interface sends the next message,
+// and the chat must end once more. Each "CHAT" is replaced with the chat's id
+// from uw's first reply. The lines read, one per element.
 std::vector<std::string> Converse(const base::FilePath& socket,
                                   const std::string& first,
-                                  const std::string& approve) {
+                                  const std::string& approve,
+                                  std::vector<std::string> next = {}) {
   base::ScopedFD fd(::socket(AF_UNIX, SOCK_STREAM, 0));
   sockaddr_un address = {.sun_family = AF_UNIX};
   base::strlcpy(address.sun_path, socket.value().c_str(),
@@ -97,6 +104,16 @@ std::vector<std::string> Converse(const base::FilePath& socket,
       !base::WriteFileDescriptor(fd.get(), first + "\n")) {
     return lines;
   }
+  // Sends `sent` with the chat's id for each "CHAT".
+  auto send = [&](std::string sent) {
+    std::optional<base::DictValue> reply =
+        base::JSONReader::ReadDict(lines.front(), base::JSON_PARSE_RFC);
+    const std::string* chat =
+        reply ? reply->FindStringByDottedPath("result.chat") : nullptr;
+    base::ReplaceSubstringsAfterOffset(&sent, 0, "CHAT",
+                                       chat ? *chat : std::string());
+    base::WriteFileDescriptor(fd.get(), sent + "\n");
+  };
   std::string line;
   char byte;
   while (read(fd.get(), &byte, 1) == 1) {
@@ -106,22 +123,27 @@ std::vector<std::string> Converse(const base::FilePath& socket,
     }
     lines.push_back(std::exchange(line, std::string()));
     if (lines.back().find("\"chat.end\"") != std::string::npos) {
-      break;
+      if (next.empty()) {
+        break;
+      }
+      send(next.front());
+      next.erase(next.begin());
     }
     if (!approve.empty() &&
         lines.back().find("\"chat.approval\"") != std::string::npos &&
         lines.back().find("\"approval\":null") == std::string::npos) {
-      std::optional<base::DictValue> reply =
-          base::JSONReader::ReadDict(lines.front(), base::JSON_PARSE_RFC);
-      const std::string* chat =
-          reply ? reply->FindStringByDottedPath("result.chat") : nullptr;
-      std::string answer = approve;
-      base::ReplaceFirstSubstringAfterOffset(&answer, 0, "CHAT",
-                                             chat ? *chat : std::string());
-      base::WriteFileDescriptor(fd.get(), answer + "\n");
+      send(approve);
     }
   }
   return lines;
+}
+
+// The notifications `method` of `lines`.
+size_t Count(const std::vector<std::string>& lines, std::string_view method) {
+  return std::ranges::count_if(lines, [&](const std::string& line) {
+    return line.find(base::StrCat({"\"method\":\"", method, "\""})) !=
+           std::string::npos;
+  });
 }
 
 // The line of `lines` that is the notification `method` with `text`, as JSON,
@@ -453,14 +475,36 @@ class UwCommandChatBrowserTest : public UwCommandConnectorsBrowserTest {
   }
 
   std::vector<std::string> Chat(const base::DictValue& start,
-                                const std::string& approve = {}) {
+                                const std::string& approve = {},
+                                std::vector<std::string> next = {}) {
     base::test::TestFuture<std::vector<std::string>> lines;
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {base::MayBlock()},
         base::BindOnce(&Converse, socket_, Request("chats.start", start),
-                       approve),
+                       approve, std::move(next)),
         lines.GetCallback());
     return lines.Get();
+  }
+
+  static std::string ChatOf(const std::vector<std::string>& lines) {
+    std::optional<base::DictValue> reply =
+        lines.empty()
+            ? std::nullopt
+            : base::JSONReader::ReadDict(lines[0], base::JSON_PARSE_RFC);
+    const std::string* chat =
+        reply ? reply->FindStringByDottedPath("result.chat") : nullptr;
+    return chat ? *chat : std::string();
+  }
+
+  // Whether a tab of the user's window shows the chat `id`.
+  bool Shown(const std::string& id) {
+    TabStripModel* tabs = browser()->tab_strip_model();
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetURL() == ChatUrl(id)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   ScriptedModel model_{*embedded_test_server()};
@@ -481,11 +525,11 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
   EXPECT_EQ(*end.FindStringByDottedPath("params.status"), "answered");
   EXPECT_EQ(*end.FindStringByDottedPath("params.text"), "Hello from uw.");
 
-  // No tab of the user's window shows it, and no notification told of it.
-  for (int i = 0; i < browser()->tab_strip_model()->count(); ++i) {
-    EXPECT_NE(browser()->tab_strip_model()->GetWebContentsAt(i)->GetURL(),
-              ChatUrl(chat));
-  }
+  // No tab of the user's window shows it, no notification told of it, and
+  // its tab closes once it ends.
+  EXPECT_FALSE(Shown(chat));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !UwChatHandler::ForChat(chat); }));
   EXPECT_TRUE(notifications_
                   ->GetDisplayedNotificationsForType(
                       NotificationHandler::Type::UW_CHAT)
@@ -552,11 +596,107 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
       base::JSONReader::ReadDict(started.Get(), base::JSON_PARSE_RFC);
   ASSERT_TRUE(reply) << started.Get();
   const std::string chat = *reply->FindStringByDottedPath("result.chat");
-  ASSERT_TRUE(base::test::RunUntil([&] {
-    UwChatHandler* handler = UwChatHandler::ForChat(chat);
-    return handler && !handler->working() && handler->last_line() &&
-           *handler->last_line()->FindString("kind") == "stopped_by_user";
-  }));
+  // The chat stops, its tab closes, and the stop is saved.
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return !UwChatHandler::ForChat(chat); }));
+  ChatFile file(profile()->GetPath(), chat);
+  base::test::TestFuture<std::optional<base::DictValue>> saved;
+  file.Load(saved.GetCallback());
+  const base::ListValue* log =
+      saved.Get() ? saved.Get()->FindList("log") : nullptr;
+  ASSERT_TRUE(log && !log->empty());
+  EXPECT_EQ(*log->back().GetDict().FindString("kind"), "stopped_by_user");
+}
+
+// The terminal interface keeps the chat after an answer, sends the next
+// message, and shows the chat's model, mode, and workspace. The chat's tab
+// closes once the command goes.
+IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
+                       TheTerminalInterfaceKeepsTheChatForTheNextMessage) {
+  model_.Script({ScriptedModel::Answer("First answer."),
+                 ScriptedModel::Answer("Second answer.")});
+  std::vector<std::string> lines =
+      Chat(base::DictValue()
+               .Set("text", "One")
+               .Set("mode", "ask-first")
+               .Set("stay", true),
+           {},
+           {Request("chats.send",
+                    base::DictValue().Set("chat", "CHAT").Set("text", "Two"))});
+  const std::string chat = ChatOf(lines);
+  ASSERT_FALSE(chat.empty());
+  std::optional<base::DictValue> reply =
+      base::JSONReader::ReadDict(lines[0], base::JSON_PARSE_RFC);
+  EXPECT_FALSE(reply->FindStringByDottedPath("result.workspace")->empty());
+  base::DictValue status = Find(lines, "chat.status", "ask-first");
+  EXPECT_EQ(*status.FindStringByDottedPath("params.model"), "test-agent");
+  EXPECT_EQ(Count(lines, "chat.end"), 2u);
+  EXPECT_FALSE(Find(lines, "chat.step", "\"text\":\"Two\"").empty());
+  EXPECT_FALSE(Find(lines, "chat.end", "Second answer.").empty());
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !UwChatHandler::ForChat(chat); }));
+}
+
+// Ctrl-O moves the chat from out of sight into the user's window, where it
+// works on and stays after the command goes.
+IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest, CtrlOShowsTheChatInUw) {
+  model_.Script({ScriptedModel::Answer("First answer."),
+                 ScriptedModel::Answer("Second answer.")});
+  std::vector<std::string> lines = Chat(
+      base::DictValue().Set("text", "One").Set("stay", true), {},
+      {Request("chats.open", base::DictValue().Set("chat", "CHAT")) + "\n" +
+       Request("chats.send",
+               base::DictValue().Set("chat", "CHAT").Set("text", "Two"))});
+  const std::string chat = ChatOf(lines);
+  ASSERT_FALSE(chat.empty());
+  EXPECT_FALSE(Find(lines, "chat.end", "Second answer.").empty());
+  EXPECT_TRUE(Shown(chat));
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveWebContents()->GetURL(),
+            ChatUrl(chat));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(UwChatHandler::ForChat(chat));
+}
+
+// The / menu offers a connector's prompts, and picking one sends it with its
+// arguments.
+IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
+                       TheTerminalInterfaceSendsAConnectorsPrompt) {
+  base::DictValue add;
+  add.Set("json", Pasted("notes", FakeServer()));
+  AskWith("connectors.add", add);
+  model_.Script(
+      {ScriptedModel::Answer("Hi."), ScriptedModel::Answer("Hello, Ada.")});
+  std::vector<std::string> lines = Chat(
+      base::DictValue().Set("text", "Hi").Set("stay", true), {},
+      {Request("chats.menu", base::DictValue().Set("chat", "CHAT")) + "\n" +
+       Request("chats.prompt",
+               base::DictValue()
+                   .Set("chat", "CHAT")
+                   .Set("connector", "notes")
+                   .Set("prompt", "greet")
+                   .Set("values", base::DictValue().Set("name", "Ada")))});
+  ASSERT_FALSE(ChatOf(lines).empty());
+  bool listed = false;
+  for (const std::string& line : lines) {
+    std::optional<base::DictValue> parsed =
+        base::JSONReader::ReadDict(line, base::JSON_PARSE_RFC);
+    const base::ListValue* prompts =
+        parsed ? parsed->FindListByDottedPath("result.prompts") : nullptr;
+    if (prompts && parsed->FindListByDottedPath("result.skills")) {
+      ASSERT_EQ(prompts->size(), 1u) << line;
+      const base::DictValue& greet = (*prompts)[0].GetDict();
+      EXPECT_EQ(*greet.FindString("connector"), "notes");
+      EXPECT_EQ(*greet.FindString("name"), "greet");
+      listed = true;
+    }
+  }
+  EXPECT_TRUE(listed);
+  EXPECT_FALSE(Find(lines, "chat.step", "\"text\":\"/notes:greet\\nname: Ada\"")
+                   .empty());
+  EXPECT_FALSE(Find(lines, "chat.end", "Hello, Ada.").empty());
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_NE(requests[1].find("Say hello to Ada"), std::string::npos);
 }
 
 }  // namespace

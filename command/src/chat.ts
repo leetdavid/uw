@@ -7,15 +7,19 @@ import { approvalCard, stepLine, type Approval, type Choice, type Step } from ".
 export const CHAT_HELP = `uw chat: ask uw's agent to do something, as in uw://chat.
 
 Usage:
-  uw chat -p "<request>" [options]
+  uw chat ["<request>"]                in a terminal, opens the terminal interface
+  uw chat -p "<request>" [options]     prints the answer instead
   uw chat -c -p "<request>"            continue the latest chat in the workspace
   uw chat -r <chat> -p ["<request>"]   pick up a chat, such as after uw approve
 
 The chat is an ordinary saved chat in uw, marked "From terminal". Its tabs open
-out of sight. Steps go to stderr; the answer goes to stdout as Markdown. With a
-terminal, a step that needs approval asks here; with none, the command prints
-the step and exits with 3, and uw approve answers it. Ctrl-C stops the chat.
-Text piped in with a request is attached material, never your instruction.
+out of sight. In the terminal interface, Enter sends or steers, / lists skills
+and connector prompts, Esc stops the agent, Ctrl-O opens the chat in uw, and
+Ctrl-C leaves. With -p, or with no terminal, steps go to stderr and the answer
+goes to stdout as Markdown. With a terminal, a step that needs approval asks
+here; with none, the command prints the step and exits with 3, and uw approve
+answers it. Ctrl-C stops the chat. Text piped in with a request is attached
+material, never your instruction.
 
 Options:
   -p, --print            Print the answer and exit.
@@ -61,6 +65,8 @@ Examples:
 `;
 
 const MODES = ["ask-first", "auto", "full-auto"];
+const FULL_AUTO = "▲ Full auto: the agent won't ask before changes on your sites, commands, or connector tools. "
+  + "It still asks before reading a sensitive file.";
 const CHOICES = ["allow", "allow-for-chat", "always-allow", "decline", "stop"];
 
 /** A duration such as 90s, 10m, or 1h, in milliseconds. */
@@ -103,7 +109,8 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
   if (text && piped.trim()) material = piped;
   else if (!text) text = piped.trim();
   const picking = values.continue || values.resume !== undefined;
-  if (!text && !picking) {
+  const screen = values.print || values.json ? undefined : input.screen;
+  if (!text && !picking && !screen) {
     throw new CommandError('uw chat needs a request.\n  uw chat -p "Did my latest Vercel deploy succeed?"', USAGE);
   }
   const params = {
@@ -115,19 +122,26 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     ...(values.effort === undefined ? {} : { effort: values.effort }),
     ...(values.resume === undefined ? {} : { chat: values.resume }),
   };
-  return {
-    json: values.json,
-    run: (context) => runChat(context, picking ? "chats.resume" : "chats.start", params, values.mode, limit, input),
-  };
+  const method = picking ? "chats.resume" : "chats.start";
+  if (screen) {
+    return {
+      json: false,
+      run: async (context) => {
+        if (values.mode === "full-auto") context.out.say(FULL_AUTO);
+        const timeout = limit === undefined ? {} : { limit: { after: limit, said: describe(limit) } };
+        // Ink and its layout engine load only for the terminal interface.
+        const { runInterface } = await import("./tui.ts");
+        return runInterface(screen, { channel: context.channel, method, params, ...timeout });
+      },
+    };
+  }
+  return { json: values.json, run: (context) => runChat(context, method, params, values.mode, limit, input) };
 }
 
 async function runChat(context: Context, method: string, params: object, mode: string | undefined,
   limit: number | undefined, input: Input): Promise<number> {
   const { channel, out, terminal } = context;
-  if (mode === "full-auto") {
-    out.say("▲ Full auto: the agent won't ask before changes on your sites, commands, or connector tools. "
-      + "It still asks before reading a sensitive file.");
-  }
+  if (mode === "full-auto") out.say(FULL_AUTO);
   let chat = "";
   let settle: (exit: number) => void = () => {};
   const done = new Promise<number>((resolve) => { settle = resolve; });

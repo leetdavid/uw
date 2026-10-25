@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 import { afterEach, beforeEach, test } from "node:test";
 import { run, type Run } from "../src/cli.ts";
 import { NOT_INSTALLED, SOCKET, place, type Place } from "../src/launch.ts";
+import { FakeScreen, KEY, settle } from "./screen.ts";
 
 interface Notification { method: string; params: Record<string, unknown> }
 type Handler = (method: string, params: Record<string, unknown>) => {
@@ -318,6 +319,22 @@ test("--json prints one result object at the end", async () => {
   await chatUw([end("answered", "Yes.")]);
   const { out } = await uw(["chat", "-p", "--json", "Did it work?"]);
   assert.deepEqual(JSON.parse(out), { chat: CHAT_ID, status: "answered", answer: "Yes.", waiting: null, cost: 0.01 });
+});
+
+test("in a terminal, chat opens the terminal interface, which needs no request; -p prints", async () => {
+  await chatUw([end("answered", "**Yes**, it went out at 14:02.")]);
+  const terminal = new FakeScreen();
+  const running = uw(["chat"], { terminal: true, screen: terminal.screen });
+  await settle(300);
+  terminal.type(KEY.ctrlC);
+  const { exit, out } = await running;
+  assert.equal(exit, 0);
+  assert.equal(out, "");
+  assert.deepEqual(requests.find((request) => request.method === "chats.start")?.params, { stay: true });
+  assert.match(terminal.all(), /Yes, it went out at 14:02\./);
+
+  const printed = await uw(["chat", "-p", "Did it work?"], { terminal: true, screen: new FakeScreen().screen });
+  assert.equal(printed.out, "**Yes**, it went out at 14:02.\n");
 });
 
 test("with no terminal, a step that needs approval exits with 3 and leaves the chat waiting", async () => {

@@ -208,6 +208,8 @@ Expected result: the row says `Installed at /usr/local/bin/uw`, with `Uninstall`
 
 `uw chat -p "What's the newest post on Hacker News?"` runs uw's agent out of sight: its steps print as it works, and its answer prints at the end. The chat shows in uw's chat list with a terminal icon. Try `--mode ask-first`: a step that needs approval asks in the terminal, and typing `1` approves it. Pipe it into `cat` (`uw chat -p "…" | cat`) and the same step makes the command exit with 3 and print `uw approve <id> allow`; run that, then `uw chat -r <id> -p` to carry on. Ctrl-C stops the chat. `uw chats` lists the workspace's chats.
 
+`uw chat` alone opens the terminal interface. Type a request and press Enter: the steps tick off as the agent works, and the answer is drawn as Markdown. Press Enter while it works to steer it, and Esc to stop it. Type `/` for skills and connector prompts. A step that needs approval shows a card: press a number, or type what to do instead and press Enter. Ctrl-O moves the chat and its tabs into your front uw window. Ctrl-C leaves and prints how to carry on.
+
 A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the command there: `UW_USER_DATA_DIR="$HOME/Library/Application Support/uw-dev" uw settings list`.
 
 ## Not available yet
@@ -218,7 +220,6 @@ A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the 
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
 - A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
-- The [uw command](plans/uw-command.md)'s terminal interface: `uw chat` prints as `uw chat -p` does for now.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem

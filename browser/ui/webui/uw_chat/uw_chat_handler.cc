@@ -304,6 +304,7 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
       agent_->SetMode(mode_);
     }
     page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
+    TellSettings();
   }
   if (!ask.effort.empty() && model_ && ask.model.empty()) {
     model_->effort = ask.effort;
@@ -343,16 +344,42 @@ void UwChatHandler::SendFromCommand(const std::string& text,
   if (text.empty()) {
     return;
   }
+  auto line = mojom::Step::New();
+  line->kind = mojom::StepKind::kUser;
+  line->text = text;
+  ShowStep(std::move(line));
   if (Working()) {
     Steer(text, {});
     return;
   }
   material_ = std::move(material);
+  Send(text, {});
+}
+
+void UwChatHandler::PromptFromCommand(
+    const std::string& connector,
+    const std::string& prompt,
+    const base::flat_map<std::string, std::string>& values) {
+  if (!loaded_ || Working()) {
+    return;
+  }
+  std::vector<std::string> shown = {
+      base::StrCat({"/", connector, ":", prompt})};
+  for (const auto& [name, value] : values) {
+    shown.push_back(base::StrCat({name, ": ", value}));
+  }
+  const std::string text = base::JoinString(shown, "\n");
   auto line = mojom::Step::New();
   line->kind = mojom::StepKind::kUser;
   line->text = text;
   ShowStep(std::move(line));
-  Send(text, {});
+  SendPrompt(connector, prompt, values, text);
+}
+
+void UwChatHandler::TellSettings() {
+  for (Watcher& watcher : watchers_) {
+    watcher.OnSettings();
+  }
 }
 
 void UwChatHandler::ShowStep(mojom::StepPtr step) {
@@ -963,6 +990,7 @@ bool UwChatHandler::Start() {
         AgentChoice(*Profile::FromBrowserContext(contents_->GetBrowserContext())
                          ->GetPrefs());
     page_->OnModel(PageModel(model_));
+    TellSettings();
   }
   std::optional<AgentModel> model = AgentModelNow();
   if (!model) {
@@ -1113,6 +1141,7 @@ void UwChatHandler::SetMode(mojom::ApprovalMode mode) {
   }
   Save();
   page_->OnMode(mode);
+  TellSettings();
 }
 
 // Switches in a row make one line, as the page shows them.
@@ -1134,6 +1163,7 @@ void UwChatHandler::OnModelChanged() {
   }
   Save();
   page_->OnModel(PageModel(model_));
+  TellSettings();
   SendUsage();
 }
 
@@ -1499,6 +1529,12 @@ void UwChatHandler::OnSkillsLoaded(base::OnceClosure done,
   }
 }
 
+std::vector<Skill> UwChatHandler::UserSkills() const {
+  std::vector<Skill> skills = EnabledSkills();
+  std::erase_if(skills, [](const Skill& skill) { return !skill.for_user; });
+  return skills;
+}
+
 std::vector<Skill> UwChatHandler::EnabledSkills() const {
   const base::ListValue& off =
       Profile::FromBrowserContext(contents_->GetBrowserContext())
@@ -1553,10 +1589,10 @@ void UwChatHandler::AskApproval(
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",
                              base::NumberToString(approval.tab), "?"}));
-  waiting_ = PageApproval(
-      approval, /*can_always_allow=*/
-      !Profile::FromBrowserContext(contents_->GetBrowserContext())
-           ->IsOffTheRecord());
+  waiting_ =
+      PageApproval(approval, /*can_always_allow=*/
+                   !Profile::FromBrowserContext(contents_->GetBrowserContext())
+                        ->IsOffTheRecord());
   for (Watcher& watcher : watchers_) {
     watcher.OnApproval(waiting_.get());
   }

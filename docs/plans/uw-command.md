@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, T195 was built the same day, and T196 is in progress.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, and T195 and T196 were built the same day.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -138,7 +138,22 @@ T194 and T195 were built on 2026-10-25:
 - Piped text goes to the agent through `AgentContext::AddMaterial`: a step of its own, after the user's message, marked as information. The command check never sees it.
 - `--model` picks a model of the chat's provider. A chat id can be shortened to its first characters.
 
-Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*` and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
+T196 was built on 2026-10-25:
+
+- `uw chat` with a terminal opens the interface in `command/src/tui.ts`, drawn with Ink. Each line goes into the scrollback once it is done; the composer, an approval card, and the status line stay under them.
+- The interface asks uw with `stay`, so the command stays attached after each answer. uw sends `chat.status` with the model, effort, approval mode, and cost, and answers `chats.send` (the next message, or a steer), `chats.menu`, `chats.prompt`, and `chats.open`.
+- Ctrl-O moves the chat's tab, and the tabs its agent opened, from the run window to the end of the front window, and selects the chat. Every normal window now has the eye's page action, the run window too. Before, a run's tab that moved to another window crashed uw once selected, which a scheduled chat's waiting tab could also do.
+- A chat's tabs close when it ends, unless it was opened in uw. T195 left them in the run window.
+- Ink needs an ES module, so the program bundles one and a small CommonJS starter imports it from the single executable's assets. Ink loads only for the interface. The program starts in about 70 ms.
+
+Where T196 differs from the design:
+
+- uw's chat page learns of a step once it is done, so one spinner line, "Working…", stands for the step under way.
+- A connector's prompt takes its arguments as words after its name, the last taking the rest, as Claude Code passes an MCP prompt's: `/linear:triage Web`.
+- On a narrow terminal, the status line leaves out the keys.
+- Ctrl-C leaves the interface. While the agent works, it stops the chat first.
+
+Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*` and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`, the interface's among them on a fake terminal. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
 
 ## How it is built
 

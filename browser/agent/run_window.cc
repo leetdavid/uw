@@ -75,6 +75,28 @@ BrowserWindowInterface* MakeRunWindow(Profile* profile) {
   return window;
 }
 
+// `run_tab` and every tab opened from it, or from those, in their order in
+// its window.
+std::vector<tabs::TabInterface*> RunTabs(tabs::TabInterface& run_tab) {
+  TabStripModel* tabs = run_tab.GetBrowserWindowInterface()->GetTabStripModel();
+  std::set<const tabs::TabInterface*> run = {&run_tab};
+  for (size_t before = 0; before != run.size();) {
+    before = run.size();
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (run.contains(tabs->GetOpenerOfTabAt(i))) {
+        run.insert(tabs->GetTabAtIndex(i));
+      }
+    }
+  }
+  std::vector<tabs::TabInterface*> ordered;
+  for (int i = 0; i < tabs->count(); ++i) {
+    if (run.contains(tabs->GetTabAtIndex(i))) {
+      ordered.push_back(tabs->GetTabAtIndex(i));
+    }
+  }
+  return ordered;
+}
+
 }  // namespace
 
 tabs::TabInterface* OpenRunTab(Profile* profile) {
@@ -97,20 +119,9 @@ tabs::TabInterface* OpenRunTab(Profile* profile) {
 
 void CloseRunTabs(tabs::TabInterface& run_tab) {
   TabStripModel* tabs = run_tab.GetBrowserWindowInterface()->GetTabStripModel();
-  std::set<const tabs::TabInterface*> run = {&run_tab};
-  for (size_t before = 0; before != run.size();) {
-    before = run.size();
-    for (int i = 0; i < tabs->count(); ++i) {
-      if (run.contains(tabs->GetOpenerOfTabAt(i))) {
-        run.insert(tabs->GetTabAtIndex(i));
-      }
-    }
-  }
   std::vector<content::WebContents*> closing;
-  for (int i = 0; i < tabs->count(); ++i) {
-    if (run.contains(tabs->GetTabAtIndex(i))) {
-      closing.push_back(tabs->GetWebContentsAt(i));
-    }
+  for (tabs::TabInterface* tab : RunTabs(run_tab)) {
+    closing.push_back(tab->GetContents());
   }
   // Nobody sees these tabs, so a page's "Leave site?" question would never be
   // answered: they go without running unload handlers.
@@ -131,6 +142,21 @@ void BringRunTab(tabs::TabInterface& tab, tabs::TabInterface& next_to) {
       target->GetIndexOfTab(&next_to) + 1,
       source->DetachTabAtForInsertion(source->GetIndexOfTab(&tab)),
       AddTabTypes::ADD_NONE);
+}
+
+void MoveRunTabs(tabs::TabInterface& run_tab, BrowserWindowInterface& to) {
+  BrowserWindowInterface* from = run_tab.GetBrowserWindowInterface();
+  if (!from || from == &to || !IsRunWindow(from)) {
+    return;
+  }
+  TabStripModel* source = from->GetTabStripModel();
+  TabStripModel* target = to.GetTabStripModel();
+  for (tabs::TabInterface* tab : RunTabs(run_tab)) {
+    target->InsertDetachedTabAt(
+        target->count(),
+        source->DetachTabAtForInsertion(source->GetIndexOfTab(tab)),
+        AddTabTypes::ADD_NONE);
+  }
 }
 
 }  // namespace uw

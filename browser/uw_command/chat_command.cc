@@ -6,10 +6,11 @@
 #include <utility>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/memory/raw_ptr.h"
 #include "base/json/json_reader.h"
+#include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
@@ -17,19 +18,27 @@
 #include "base/timer/timer.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/referrer.h"
+#include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/run_window.h"
+#include "uw/browser/agent/run_window_mark.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/uw_command/command_handler.h"
 #include "uw/browser/uw_command/command_workspace.h"
+#include "uw/browser/workspaces/workspace_list.h"
+#include "uw/components/agent/skills.h"
+#include "uw/components/connectors/mcp.h"
 #include "uw/components/uw_command/command_messages.h"
 
 namespace uw {
@@ -65,6 +74,17 @@ std::string_view KindName(mojom::StepKind kind) {
       return "wake";
     case mojom::StepKind::kTriggerStopped:
       return "trigger-stopped";
+  }
+}
+
+std::string_view ModeName(ApprovalMode mode) {
+  switch (mode) {
+    case ApprovalMode::kAskFirst:
+      return "ask-first";
+    case ApprovalMode::kAuto:
+      return "auto";
+    case ApprovalMode::kFullAuto:
+      return "full-auto";
   }
 }
 
@@ -110,15 +130,19 @@ void Forget(ChatSession* session);
 // A chat the command started or picked up again. Its steps and approvals go
 // to the command while it is attached. Ctrl-C, or the command going away,
 // stops the chat, unless the command let go of it first, as when it leaves
-// a step waiting for you. See docs/plans/uw-command.md#chats.
+// a step waiting for you. Once the chat ends, its tabs close, unless the user
+// opened it in uw. See docs/plans/uw-command.md#chats.
 class ChatSession : public UwChatHandler::Watcher {
  public:
+  // With `stay`, as for the terminal interface, the command stays after an
+  // answer, for the next message, until it goes.
   ChatSession(UwChatHandler* handler,
-              base::WeakPtr<CommandConnection> connection)
-      : handler_(handler), connection_(std::move(connection)) {
+              base::WeakPtr<CommandConnection> connection,
+              bool stay)
+      : handler_(handler), connection_(std::move(connection)), stay_(stay) {
     handler_->AddWatcher(this);
-    closed_ = connection_->OnClose(base::BindOnce(
-        &ChatSession::OnCommandGone, weak_factory_.GetWeakPtr()));
+    closed_ = connection_->OnClose(base::BindOnce(&ChatSession::OnCommandGone,
+                                                  weak_factory_.GetWeakPtr()));
   }
 
   ~ChatSession() override {
@@ -149,6 +173,9 @@ class ChatSession : public UwChatHandler::Watcher {
       OnApproval(waiting);
     } else if (!handler_->working()) {
       const base::DictValue* last = handler_->last_line();
+      if (!last && stay_) {
+        return;
+      }
       const std::string* kind = last ? last->FindString("kind") : nullptr;
       const std::string* text = last ? last->FindString("text") : nullptr;
       last_kind_ = kind && *kind == "answer"   ? mojom::StepKind::kAnswer
@@ -161,6 +188,9 @@ class ChatSession : public UwChatHandler::Watcher {
 
   // UwChatHandler::Watcher:
   void OnStep(const mojom::Step& step) override {
+    if (step.kind == mojom::StepKind::kUser) {
+      ended_ = false;
+    }
     base::DictValue sent;
     sent.Set("kind", KindName(step.kind));
     sent.Set("tool", step.tool);
@@ -176,8 +206,8 @@ class ChatSession : public UwChatHandler::Watcher {
       last_text_ = step.text;
       // The agent stops working once its step has been told.
       base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-          FROM_HERE, base::BindOnce(&ChatSession::EndIfIdle,
-                                    weak_factory_.GetWeakPtr()));
+          FROM_HERE,
+          base::BindOnce(&ChatSession::EndIfIdle, weak_factory_.GetWeakPtr()));
     }
   }
 
@@ -191,13 +221,31 @@ class ChatSession : public UwChatHandler::Watcher {
     if (usage.priced) {
       cost_ = usage.total;
     }
+    SendStatus();
   }
+
+  void OnSettings() override { SendStatus(); }
 
   void OnGone() override {
     handler_->RemoveWatcher(this);
     handler_ = nullptr;
     last_kind_ = mojom::StepKind::kStopped;
     End();
+  }
+
+  // Tells the command the chat's model, effort, approval mode, and cost,
+  // for the terminal interface's status line.
+  void SendStatus() {
+    if (!handler_) {
+      return;
+    }
+    const std::optional<ModelChoice>& model = handler_->model();
+    base::DictValue status;
+    status.Set("model", model ? model->model : std::string());
+    status.Set("effort", model ? model->effort : std::string());
+    status.Set("mode", ModeName(handler_->mode()));
+    status.Set("cost", cost_ ? base::Value(*cost_) : base::Value());
+    Notify("chat.status", base::Value(std::move(status)));
   }
 
  private:
@@ -230,15 +278,38 @@ class ChatSession : public UwChatHandler::Watcher {
     ended.Set("text", last_text_);
     ended.Set("cost", cost_ ? base::Value(*cost_) : base::Value());
     Notify("chat.end", base::Value(std::move(ended)));
+    if (stay_ && !gone_) {
+      return;
+    }
+    CloseOutOfSight();
     Detach();
   }
 
-  // Ctrl-C, a closed terminal, or a killed caller stops the chat.
+  // Ctrl-C, a closed terminal, or a killed caller stops the chat. The
+  // session ends with the step that says it stopped.
   void OnCommandGone() {
+    gone_ = true;
     if (handler_ && handler_->working()) {
       handler_->Stop();
+      return;
     }
+    CloseOutOfSight();
     Detach();
+  }
+
+  // Closes the chat's tab, and the tabs its agent opened, while they are out
+  // of sight in the run window.
+  void CloseOutOfSight() {
+    tabs::TabInterface* tab =
+        handler_
+            ? tabs::TabInterface::MaybeGetFromContents(handler_->contents())
+            : nullptr;
+    if (!tab || !IsRunWindow(tab->GetBrowserWindowInterface())) {
+      return;
+    }
+    handler_->RemoveWatcher(this);
+    handler_ = nullptr;
+    CloseRunTabs(*tab);
   }
 
   raw_ptr<UwChatHandler> handler_;
@@ -248,7 +319,10 @@ class ChatSession : public UwChatHandler::Watcher {
   std::optional<mojom::StepKind> last_kind_;
   std::string last_text_;
   std::optional<double> cost_;
+  const bool stay_;
   bool ended_ = false;
+  // The command went away, so nothing is told any more.
+  bool gone_ = false;
   base::WeakPtrFactory<ChatSession> weak_factory_{this};
 };
 
@@ -286,9 +360,9 @@ bool OpenOutOfSight(Profile* profile, const std::string& id, bool started) {
     start.from_terminal = true;
     SetChatStart(tab->GetContents(), std::move(start));
   }
-  tab->GetContents()->GetController().LoadURL(
-      ChatUrl(id), content::Referrer(), ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
-      std::string());
+  tab->GetContents()->GetController().LoadURL(ChatUrl(id), content::Referrer(),
+                                              ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
+                                              std::string());
   return true;
 }
 
@@ -324,23 +398,28 @@ UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
 }
 
 // Attaches the command to `handler`, asks it what `params` says, and replies
-// with the chat's id; its steps follow as notifications.
+// with the chat's id and the name of its workspace; its steps follow as
+// notifications.
 void Attach(base::Value id,
             base::DictValue params,
             CommandReply reply,
             base::WeakPtr<CommandConnection> connection,
+            std::string workspace,
             UwChatHandler* handler) {
   if (!handler || !connection) {
     std::move(reply).Run(
         CommandError(id, kCommandFailed, "uw couldn't open the chat."));
     return;
   }
-  auto session = std::make_unique<ChatSession>(handler, connection);
+  auto session = std::make_unique<ChatSession>(
+      handler, connection, params.FindBool("stay").value_or(false));
   ChatSession* attached = session.get();
   Sessions().push_back(std::move(session));
   base::DictValue result;
   result.Set("chat", handler->id());
+  result.Set("workspace", std::move(workspace));
   std::move(reply).Run(CommandResult(id, base::Value(std::move(result))));
+  attached->SendStatus();
   UwChatHandler::CommandAsk ask = AskFrom(params);
   if (ask.text.empty()) {
     attached->Catch();
@@ -378,6 +457,66 @@ std::optional<std::string> SavedChat(const ChatIndex& index,
   return found;
 }
 
+// Shows the chat in uw, with the tabs its agent opened, for Ctrl-O in the
+// terminal interface. A chat out of sight moves to the front window.
+bool ShowChat(UwChatHandler& handler) {
+  tabs::TabInterface* tab =
+      tabs::TabInterface::MaybeGetFromContents(handler.contents());
+  BrowserWindowInterface* window =
+      tab ? tab->GetBrowserWindowInterface() : nullptr;
+  if (window && IsRunWindow(window)) {
+    window = ShowFrontWindow(
+        Profile::FromBrowserContext(handler.contents()->GetBrowserContext()));
+    if (window) {
+      MoveRunTabs(*tab, *window);
+    }
+  }
+  if (!window) {
+    return false;
+  }
+  TabStripModel* tabs = window->GetTabStripModel();
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(tab));
+  window->GetWindow()->Show();
+  window->GetWindow()->Activate();
+  return true;
+}
+
+// What the terminal interface's / menu offers: the skills the user may start,
+// then the prompts of the connectors that are on.
+base::DictValue Menu(const UwChatHandler& handler) {
+  base::ListValue skills;
+  for (const Skill& skill : handler.UserSkills()) {
+    skills.Append(base::DictValue()
+                      .Set("name", skill.name)
+                      .Set("description", skill.description)
+                      .Set("onlyYou", !skill.for_agent)
+                      .Set("hint", skill.argument_hint));
+  }
+  base::ListValue prompts;
+  for (const Connectors::Info& info : Connectors::Get().list()) {
+    if (!info.on) {
+      continue;
+    }
+    for (const mcp::Prompt& prompt : info.prompts) {
+      base::ListValue arguments;
+      for (const mcp::Prompt::Argument& argument : prompt.arguments) {
+        arguments.Append(base::DictValue()
+                             .Set("name", argument.name)
+                             .Set("description", argument.description)
+                             .Set("required", argument.required));
+      }
+      prompts.Append(base::DictValue()
+                         .Set("connector", info.config.name)
+                         .Set("name", prompt.name)
+                         .Set("description", prompt.description)
+                         .Set("arguments", std::move(arguments)));
+    }
+  }
+  return base::DictValue()
+      .Set("skills", std::move(skills))
+      .Set("prompts", std::move(prompts));
+}
+
 std::string_view StateName(ChatIndex::State state) {
   switch (state) {
     case ChatIndex::State::kDone:
@@ -396,22 +535,24 @@ std::string_view StateName(ChatIndex::State state) {
 void Start(CommandRequest request,
            CommandReply reply,
            base::WeakPtr<CommandConnection> connection,
-           Profile* profile) {
+           Profile* profile,
+           std::string workspace) {
   const std::string id = ChatFile::NewChatId();
   if (!OpenOutOfSight(profile, id, /*started=*/true)) {
-    std::move(reply).Run(CommandError(request.id, kCommandFailed,
-                                      "uw couldn't open a chat."));
+    std::move(reply).Run(
+        CommandError(request.id, kCommandFailed, "uw couldn't open a chat."));
     return;
   }
   WhenOpen(id, base::BindOnce(&Attach, request.id.Clone(),
                               std::move(request.params), std::move(reply),
-                              std::move(connection)));
+                              std::move(connection), std::move(workspace)));
 }
 
 void Resume(CommandRequest request,
             CommandReply reply,
             base::WeakPtr<CommandConnection> connection,
-            Profile* profile) {
+            Profile* profile,
+            std::string workspace) {
   ChatIndex* index = profile ? ChatIndex::For(profile) : nullptr;
   const std::string* asked = request.params.FindString("chat");
   std::optional<std::string> id;
@@ -429,13 +570,13 @@ void Resume(CommandRequest request,
   }
   if (!UwChatHandler::ForChat(*id) &&
       !OpenOutOfSight(profile, *id, /*started=*/false)) {
-    std::move(reply).Run(CommandError(request.id, kCommandFailed,
-                                      "uw couldn't open the chat."));
+    std::move(reply).Run(
+        CommandError(request.id, kCommandFailed, "uw couldn't open the chat."));
     return;
   }
   WhenOpen(*id, base::BindOnce(&Attach, request.id.Clone(),
                                std::move(request.params), std::move(reply),
-                               std::move(connection)));
+                               std::move(connection), std::move(workspace)));
 }
 
 void List(CommandRequest request, CommandReply reply, Profile* profile) {
@@ -443,43 +584,45 @@ void List(CommandRequest request, CommandReply reply, Profile* profile) {
   base::ListValue chats;
   for (const ChatIndex::Entry& entry :
        index ? index->Entries() : std::vector<ChatIndex::Entry>()) {
-    chats.Append(base::DictValue()
-                     .Set("id", entry.id)
-                     .Set("title", entry.title)
-                     .Set("state", StateName(entry.state))
-                     .Set("fromTerminal", entry.from_terminal)
-                     .Set("updated", entry.updated.InMillisecondsFSinceUnixEpoch()));
+    chats.Append(
+        base::DictValue()
+            .Set("id", entry.id)
+            .Set("title", entry.title)
+            .Set("state", StateName(entry.state))
+            .Set("fromTerminal", entry.from_terminal)
+            .Set("updated", entry.updated.InMillisecondsFSinceUnixEpoch()));
   }
   base::DictValue result;
   result.Set("chats", std::move(chats));
-  std::move(reply).Run(CommandResult(request.id, base::Value(std::move(result))));
+  std::move(reply).Run(
+      CommandResult(request.id, base::Value(std::move(result))));
 }
 
 // Requests about a chat an open tab shows: answering what waits, stopping,
-// steering, and letting go.
+// sending a message, letting go, and, for the terminal interface, the / menu,
+// a connector's prompt, and showing the chat in uw.
 void AboutOpenChat(CommandRequest request, CommandReply reply) {
   const std::string* asked = request.params.FindString("chat");
   UwChatHandler* handler = asked ? OpenChat(*asked) : nullptr;
   if (!handler) {
-    std::move(reply).Run(CommandError(
-        request.id, kCommandUsage,
-        base::StrCat({"No chat called ", asked ? *asked : "",
-                      " is open in uw.\n  uw chats"})));
+    std::move(reply).Run(
+        CommandError(request.id, kCommandUsage,
+                     base::StrCat({"No chat called ", asked ? *asked : "",
+                                   " is open in uw.\n  uw chats"})));
     return;
   }
   const std::string& method = request.method;
   base::DictValue result;
   result.Set("chat", handler->id());
   if (method == "chats.waiting") {
-    result.Set("waiting", handler->waiting()
-                              ? Described(*handler->waiting())
-                              : base::Value());
+    result.Set("waiting", handler->waiting() ? Described(*handler->waiting())
+                                             : base::Value());
   } else if (method == "chats.approve") {
     if (!handler->waiting()) {
-      std::move(reply).Run(CommandError(
-          request.id, kCommandUsage,
-          base::StrCat({"Nothing in ", handler->id().substr(0, 8),
-                        " waits for approval."})));
+      std::move(reply).Run(
+          CommandError(request.id, kCommandUsage,
+                       base::StrCat({"Nothing in ", handler->id().substr(0, 8),
+                                     " waits for approval."})));
       return;
     }
     const std::string* choice = request.params.FindString("choice");
@@ -497,11 +640,39 @@ void AboutOpenChat(CommandRequest request, CommandReply reply) {
     handler->AnswerApproval(picked, note ? *note : std::string());
   } else if (method == "chats.stop") {
     handler->Stop();
-  } else if (method == "chats.steer") {
+  } else if (method == "chats.send") {
+    // The next message, or, while the agent works, one that steers it.
     const std::string* text = request.params.FindString("text");
     UwChatHandler::CommandAsk ask;
     ask.text = text ? *text : std::string();
     handler->AskFromCommand(std::move(ask));
+  } else if (method == "chats.menu") {
+    result.Merge(Menu(*handler));
+  } else if (method == "chats.prompt") {
+    const std::string* connector = request.params.FindString("connector");
+    const std::string* prompt = request.params.FindString("prompt");
+    if (!connector || !prompt || handler->working()) {
+      std::move(reply).Run(CommandError(
+          request.id, kCommandUsage,
+          handler->working() ? "Send a prompt once the agent answers."
+                             : "chats.prompt takes a connector and a prompt."));
+      return;
+    }
+    base::flat_map<std::string, std::string> values;
+    if (const base::DictValue* given = request.params.FindDict("values")) {
+      for (const auto [name, value] : *given) {
+        if (value.is_string()) {
+          values[name] = value.GetString();
+        }
+      }
+    }
+    handler->PromptFromCommand(*connector, *prompt, values);
+  } else if (method == "chats.open") {
+    if (!ShowChat(*handler)) {
+      std::move(reply).Run(CommandError(request.id, kCommandFailed,
+                                        "uw couldn't show the chat."));
+      return;
+    }
   } else if (method == "chats.detach") {
     for (const std::unique_ptr<ChatSession>& session : Sessions()) {
       if (session->chat() == handler->id()) {
@@ -510,13 +681,14 @@ void AboutOpenChat(CommandRequest request, CommandReply reply) {
       }
     }
   } else {
-    std::move(reply).Run(CommandError(
-        request.id, kMethodNotFound,
-        base::StrCat({"This uw can't answer ", method,
-                      ". Update uw, then try again."})));
+    std::move(reply).Run(
+        CommandError(request.id, kMethodNotFound,
+                     base::StrCat({"This uw can't answer ", method,
+                                   ". Update uw, then try again."})));
     return;
   }
-  std::move(reply).Run(CommandResult(request.id, base::Value(std::move(result))));
+  std::move(reply).Run(
+      CommandResult(request.id, base::Value(std::move(result))));
 }
 
 }  // namespace
@@ -542,10 +714,14 @@ void RunChatCommand(CommandRequest request,
       base::BindOnce(
           [](CommandRequest request, CommandReply reply,
              base::WeakPtr<CommandConnection> connection, Profile* profile,
-             const std::string&) {
+             const std::string& id) {
+            const WorkspaceList::Workspace* workspace =
+                WorkspaceList::Get().Find(id);
+            std::string name = workspace ? workspace->name : std::string();
             if (!profile) {
-              std::move(reply).Run(CommandError(
-                  request.id, kCommandFailed, "uw couldn't open that workspace."));
+              std::move(reply).Run(
+                  CommandError(request.id, kCommandFailed,
+                               "uw couldn't open that workspace."));
             } else if (request.method == "chats.list") {
               List(std::move(request), std::move(reply), profile);
             } else if (!connection) {
@@ -553,10 +729,10 @@ void RunChatCommand(CommandRequest request,
                                                 "The command went away."));
             } else if (request.method == "chats.start") {
               Start(std::move(request), std::move(reply), std::move(connection),
-                    profile);
+                    profile, std::move(name));
             } else {
               Resume(std::move(request), std::move(reply),
-                     std::move(connection), profile);
+                     std::move(connection), profile, std::move(name));
             }
           },
           std::move(request), std::move(reply), std::move(connection)));

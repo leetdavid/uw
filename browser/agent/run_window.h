@@ -4,6 +4,7 @@
 #ifndef UW_BROWSER_AGENT_RUN_WINDOW_H_
 #define UW_BROWSER_AGENT_RUN_WINDOW_H_
 
+class BrowserWindowInterface;
 class Profile;
 
 namespace tabs {
@@ -27,6 +28,11 @@ void CloseRunTabs(tabs::TabInterface& run_tab);
 // just after it, without selecting it, so the user sees what a waiting step
 // asks about. It stays there after the run ends.
 void BringRunTab(tabs::TabInterface& tab, tabs::TabInterface& next_to);
+
+// Moves `run_tab` and every tab opened from it, or from those, from the run
+// window to the end of `to`, in order, for a chat the user opens in uw. They
+// stay there after the run ends.
+void MoveRunTabs(tabs::TabInterface& run_tab, BrowserWindowInterface& to);
 
 }  // namespace uw
 

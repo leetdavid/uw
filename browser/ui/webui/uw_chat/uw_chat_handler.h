@@ -64,6 +64,8 @@ class UwChatHandler : public mojom::ChatHandler,
     // A step waits for approval, or, with null, nothing waits any more.
     virtual void OnApproval(const mojom::Approval* approval) = 0;
     virtual void OnUsage(const mojom::ChatUsage& usage) = 0;
+    // The chat's model, effort, or approval mode changed.
+    virtual void OnSettings() = 0;
     // The chat's tab closed.
     virtual void OnGone() = 0;
   };
@@ -141,11 +143,21 @@ class UwChatHandler : public mojom::ChatHandler,
   // it, such as {"kind": "answer", "text": ...}.
   const base::DictValue* last_line() const { return LastLine(); }
   content::WebContents* contents() { return contents_; }
+  const std::optional<ModelChoice>& model() const { return model_; }
+  ApprovalMode mode() const { return mode_; }
+  // The skills the user may start by typing / and a name.
+  std::vector<Skill> UserSkills() const;
   void AddWatcher(Watcher* watcher);
   void RemoveWatcher(Watcher* watcher);
   // Sends `ask` once its mode and model are set, or steers the agent at work
   // with it.
   void AskFromCommand(CommandAsk ask);
+  // Sends a connector's prompt with `values` as its arguments, as picking it
+  // in the / menu does.
+  void PromptFromCommand(
+      const std::string& connector,
+      const std::string& prompt,
+      const base::flat_map<std::string, std::string>& values);
 
   // ScheduledChats::Observer:
   void OnScheduleChanged(const std::string& chat_id) override;
@@ -238,6 +250,8 @@ class UwChatHandler : public mojom::ChatHandler,
   void LoadSkills(base::OnceClosure done);
   void OnSkillsLoaded(base::OnceClosure done, std::vector<Skill> skills);
   std::vector<Skill> EnabledSkills() const;
+  // Tells the watchers that the model, effort, or approval mode changed.
+  void TellSettings();
   // The skill `text` starts with as "/name", if the user may start one by
   // that name, and what they typed after it.
   std::optional<std::pair<Skill, std::string>> UserSkill(

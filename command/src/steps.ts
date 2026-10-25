@@ -25,10 +25,23 @@ export interface Approval {
   file: string;
 }
 
-/** A choice of an approval card: what the command sends, and what it says. */
+/** A choice of an approval card: what the command sends, what it says, and how long it lasts. */
 export interface Choice {
   choice: "allow" | "allow-for-chat" | "always-allow" | "decline" | "stop";
   title: string;
+  lasts?: string;
+}
+
+/** An approval card in parts, as the chat page draws it, and its choices, numbered from 1. */
+export interface Card {
+  label: string;
+  question: string;
+  /** The command, keys, or a tool's arguments. */
+  detail: string[];
+  reason: string;
+  choices: Choice[];
+  /** The parts as printed lines. */
+  lines: string[];
 }
 
 /** A page's address as a step names it: its site and path, without the scheme or a closing slash. */
@@ -57,52 +70,67 @@ function firstLine(text: string): string {
   return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 }
 
-/** One tool step in plain words. */
-export function stepLine(step: Step): string {
+/** One tool step in plain words, and where it happened, such as "tab 1". */
+export interface Described {
+  what: string;
+  where: string;
+  /** False when the step failed or the user declined it. */
+  done: boolean;
+}
+
+export function describeStep(step: Step): Described {
   const { args, result } = step;
+  const did = (what: string, where = ""): Described => ({ what, where, done: true });
   const tab = (value: unknown) => `tab ${String(value)}`;
   const error = typeof result.error === "string" ? result.error : "";
   const called = connectorTool(step.tool);
   if (error.startsWith("The user did not approve")) {
-    if (called) return `Didn't run ${called.tool} in ${called.connector}`;
-    return step.tool === "run" ? `Didn't run ${String(args.command)}` : `Didn't send ${keysSent(args)}`;
+    const what = called
+      ? `Didn't run ${called.tool} in ${called.connector}`
+      : step.tool === "run" ? `Didn't run ${String(args.command)}` : `Didn't send ${keysSent(args)}`;
+    return { what, where: "", done: false };
   }
-  if (error) return `${step.tool}: ${error}`;
+  if (error) return { what: `${step.tool}: ${error}`, where: "", done: false };
   const element = String(result.element ?? `element ${String(args.element)}`);
   switch (step.tool) {
-    case "open": return `Opened ${shortAddress(args.url)} in ${tab(result.tab)}`;
-    case "navigate": return `Went to ${shortAddress(args.url)} in ${tab(args.tab)}`;
-    case "read": return `Read ${String(result.title || shortAddress(result.url))} in ${tab(args.tab)}`;
-    case "click": return `Clicked ${element} in ${tab(args.tab)}`;
-    case "type": return `Typed into ${element} in ${tab(args.tab)}`;
+    case "open": return did(`Opened ${shortAddress(args.url)}`, tab(result.tab));
+    case "navigate": return did(`Went to ${shortAddress(args.url)}`, tab(args.tab));
+    case "read": return did(`Read ${String(result.title || shortAddress(result.url))}`, tab(args.tab));
+    case "click": return did(`Clicked ${element}`, tab(args.tab));
+    case "type": return did(`Typed into ${element}`, tab(args.tab));
     case "run":
       return result.running
-        ? `Running ${String(args.command)} in ${tab(result.tab)} · ${String(result.waited)}`
-        : `Ran ${String(args.command)} in ${tab(result.tab)}`;
-    case "screen": return `Read ${String(result.title || result.folder)} in ${tab(args.tab)}`;
-    case "keys": return `Sent ${keysSent(args)} in ${tab(args.tab)}`;
-    case "recall": return `Looked again at ${String((result.result as { title?: string } | undefined)?.title || `step ${String(args.step)}`)}`;
-    case "skill": return args.file ? `Read ${String(args.file)} of the ${String(args.name)} skill` : `Used the ${String(args.name)} skill`;
-    case "schedule": return "Filled in the schedule card";
-    case "trigger": return `Left ${String(args.command)} running as a trigger`;
-    case "stop_trigger": return "Stopped the trigger";
-    case "save_skill": return `${result.saved ? "Saved" : "Did not save"} the ${String(args.name)} skill`;
+        ? did(`Running ${String(args.command)}`, `${tab(result.tab)} · ${String(result.waited)}`)
+        : did(`Ran ${String(args.command)}`, tab(result.tab));
+    case "screen": return did(`Read ${String(result.title || result.folder)}`, tab(args.tab));
+    case "keys": return did(`Sent ${keysSent(args)}`, tab(args.tab));
+    case "recall": return did(`Looked again at ${String((result.result as { title?: string } | undefined)?.title || `step ${String(args.step)}`)}`);
+    case "skill": return did(args.file ? `Read ${String(args.file)} of the ${String(args.name)} skill` : `Used the ${String(args.name)} skill`);
+    case "schedule": return did("Filled in the schedule card");
+    case "trigger": return did(`Left ${String(args.command)} running as a trigger`);
+    case "stop_trigger": return did("Stopped the trigger");
+    case "save_skill": return did(`${result.saved ? "Saved" : "Did not save"} the ${String(args.name)} skill`);
     case "connector": {
       const tools = Array.isArray(result.tools) ? result.tools.length : 0;
-      return `Loaded ${String(result.connector)} · ${tools} tool${tools === 1 ? "" : "s"}`;
+      return did(`Loaded ${String(result.connector)} · ${tools} tool${tools === 1 ? "" : "s"}`, "connector");
     }
-    case "prompt": return `Used the ${String(args.name)} prompt`;
+    case "prompt": return did(`Used the ${String(args.name)} prompt`, "connector");
     default: {
-      if (!called) return step.tool;
+      if (!called) return did(step.tool);
       const images = typeof result.images === "number" ? `${result.images} image${result.images === 1 ? "" : "s"}` : "";
       const said = [firstLine(String(result.text ?? "")), images].filter(Boolean);
-      return [`Used ${called.connector} · ${called.tool}`, ...said].join(" · ");
+      return did([`Used ${called.connector} · ${called.tool}`, ...said].join(" · "), "connector");
     }
   }
 }
 
-/** An approval card's lines, and the choices it offers, numbered from 1. */
-export function approvalCard(approval: Approval): { lines: string[]; choices: Choice[] } {
+/** One tool step in plain words, with the tab it happened in. */
+export function stepLine(step: Step): string {
+  const { what, where } = describeStep(step);
+  return where.startsWith("tab ") ? `${what} in ${where}` : what;
+}
+
+export function approvalCard(approval: Approval): Card {
   const connector = Boolean(approval.connector);
   const terminal = Boolean(approval.folder);
   const label = connector
@@ -122,12 +150,13 @@ export function approvalCard(approval: Approval): { lines: string[]; choices: Ch
     : terminal
       ? [approval.command ? `  % ${approval.command}` : `  ${keysSent({ text: approval.text, keys: approval.keys })}`]
       : [];
-  const reason = approval.reason ? [approval.reason] : [];
   const choices: Choice[] = connector
     ? [
       { choice: "allow", title: "Allow once" },
-      { choice: "allow-for-chat", title: "Allow for this chat" },
-      ...(approval.canAlwaysAllow ? [{ choice: "always-allow" as const, title: "Always allow" }] : []),
+      { choice: "allow-for-chat", title: "Allow for this chat", lasts: "until this chat ends" },
+      ...(approval.canAlwaysAllow
+        ? [{ choice: "always-allow" as const, title: "Always allow", lasts: "in every chat, until you take it back" }]
+        : []),
       { choice: "decline", title: "Not this one" },
       { choice: "stop", title: "Stop the chat" },
     ]
@@ -136,5 +165,6 @@ export function approvalCard(approval: Approval): { lines: string[]; choices: Ch
       { choice: "decline", title: "Not this one" },
       { choice: "stop", title: "Stop the chat" },
     ];
-  return { lines: [label, question, ...detail, ...reason], choices };
+  const reason = approval.reason;
+  return { label, question, detail, reason, choices, lines: [label, question, ...detail, ...(reason ? [reason] : [])] };
 }

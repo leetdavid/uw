@@ -8,6 +8,7 @@ import { CommandError, DONE, USAGE } from "./errors.ts";
 import { VERSION, reach, type Place, type Reach } from "./launch.ts";
 import { output, type Output, type Streams } from "./output.ts";
 import { SETTINGS } from "./settings.ts";
+import type { Screen } from "./tui.ts";
 
 export const HELP = `uw: run uw's agent, manage its connectors, and change uw's settings from a terminal.
 
@@ -65,6 +66,8 @@ export interface Input {
   ask?: (prompt: string) => Promise<string>;
   /** Hears Ctrl-C. */
   onInterrupt?: (stopped: () => void) => void;
+  /** The terminal's screen, for the terminal interface; absent when output goes elsewhere. */
+  screen?: Screen;
 }
 
 const COMMANDS: Record<string, Command> = {
@@ -106,6 +109,7 @@ export async function run(argv: string[], io: Run): Promise<number> {
   const input: Input = {
     env: io.env ?? {}, terminal: io.terminal ?? false, stdin: io.stdin ?? (async () => ""),
     ...(io.ask ? { ask: io.ask } : {}), ...(io.onInterrupt ? { onInterrupt: io.onInterrupt } : {}),
+    ...(io.screen ? { screen: io.screen } : {}),
   };
   try {
     const plan = await command.plan(args, input);
