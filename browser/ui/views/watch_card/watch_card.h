@@ -46,6 +46,11 @@ class WatchCard : public TabStripModelObserver,
 
   static WatchCard* From(BrowserWindowInterface* window);
 
+  // Adds the eye's action to `window`. The run window has it too, though it
+  // has no card, so that a tab keeps its page actions when it moves between
+  // windows.
+  static void AddAction(BrowserWindowInterface* window);
+
   // Opens the card under the eye for the selected tab's page. False when the
   // window has no card or the page cannot be watched.
   static bool Open(BrowserWindowInterface* window);

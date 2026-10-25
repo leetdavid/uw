@@ -40,6 +40,16 @@ DEFINE_USER_DATA(WatchCard);
 
 WatchCard::WatchCard(BrowserWindowInterface* window)
     : window_(window), user_data_(window->GetUnownedUserDataHost(), *this) {
+  window->GetTabStripModel()->AddObserver(this);
+  if (ScheduledChats* chats = ScheduledChats::For(window->GetProfile())) {
+    chats_observation_.Observe(chats);
+  }
+}
+
+WatchCard::~WatchCard() = default;
+
+// static
+void WatchCard::AddAction(BrowserWindowInterface* window) {
   const std::u16string name = l10n_util::GetStringUTF16(IDS_UW_WATCH_THIS_PAGE);
   BrowserActions::From(window)->root_action_item()->AddChild(
       actions::ActionItem::Builder(
@@ -53,13 +63,7 @@ WatchCard::WatchCard(BrowserWindowInterface* window)
           .SetImage(ui::ImageModel::FromVectorIcon(
               vector_icons::kVisibilityIcon, ui::kColorIcon))
           .Build());
-  window->GetTabStripModel()->AddObserver(this);
-  if (ScheduledChats* chats = ScheduledChats::For(window->GetProfile())) {
-    chats_observation_.Observe(chats);
-  }
 }
-
-WatchCard::~WatchCard() = default;
 
 WatchCard* WatchCard::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;

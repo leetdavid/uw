@@ -595,7 +595,7 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..2d398abf14cd37736cb72e69ea2c11dd
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8162618523ed6161ebcc50ceea47e6f0081155f0 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec79d62c34 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 @@ -4,8 +4,21 @@
@@ -620,12 +620,17 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..8162618523ed6161ebcc50ceea47e6f0
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +34,52 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +34,57 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
 -  // Embedder implementation goes here.
 +  if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL) {
++    // The eye's action is in the run window too, so a run's tab can move to
++    // a window the user sees.
++    if (!browser->GetProfile()->IsOffTheRecord()) {
++      uw::WatchCard::AddAction(browser);
++    }
 +    // The run window is never shown, so it gets none of these.
 +    if (!uw::IsMakingRunWindow()) {
 +      tab_organization_ =
