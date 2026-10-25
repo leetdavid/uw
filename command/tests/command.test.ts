@@ -164,3 +164,115 @@ test("the command finds its app from its own place in the bundle", () => {
   assert.equal(place({ UW_USER_DATA_DIR: where.userData }, binary).userData, where.userData);
   assert.equal(place({}, process.execPath).app, undefined);
 });
+
+const LINEAR = {
+  name: "linear", kind: "web", address: "https://mcp.linear.app/mcp", state: "needs-sign-in",
+  error: "", tools: 0, secrets: [],
+};
+const FILES = {
+  name: "files", kind: "local", address: "npx -y @acme/files-mcp", state: "ready", error: "", tools: 6,
+  secrets: ["FILES_TOKEN"],
+};
+
+function connectorsUw(): Promise<void> {
+  return fakeUw((method, params) => {
+    if (method === "connectors.add") {
+      const pasted = JSON.parse(params.json as string) as { mcpServers: Record<string, { type?: string }> };
+      const [name] = Object.keys(pasted.mcpServers);
+      return { result: { connectors: [name === "linear" ? LINEAR : { ...FILES, name }] } };
+    }
+    if (method === "connectors.signIn") return { result: { connectors: [{ ...LINEAR, state: "ready", tools: 41 }] } };
+    if (method === "connectors.list") return { result: { connectors: [LINEAR, FILES] } };
+    if (method === "connectors.remove" && params.name === "linear") return { result: { name: "linear" } };
+    if (method === "connectors.remove") return { error: { code: 2, message: `No connector is called ${params.name}.` } };
+    return { error: { code: -32601, message: `uw has no method ${method}.` } };
+  });
+}
+
+function pasted(index = -1) {
+  const add = requests.filter((request) => request.method === "connectors.add").at(index);
+  return JSON.parse(add?.params.json as string) as { mcpServers: Record<string, Record<string, unknown>> };
+}
+
+test("claude mcp add's arguments add a web connector, and with no terminal its sign-in waits for you", async () => {
+  await connectorsUw();
+  const { exit, out, err } = await uw(["mcp", "add", "--transport", "http", "linear", "https://mcp.linear.app/mcp",
+    "-H", "Authorization: Bearer abc", "--scope", "user"]);
+  assert.equal(exit, 3);
+  assert.deepEqual(pasted().mcpServers.linear,
+    { type: "http", url: "https://mcp.linear.app/mcp", headers: { Authorization: "Bearer abc" } });
+  assert.equal(out, "Added linear (web).\n");
+  assert.equal(err, "linear needs a sign-in: run uw mcp sign-in linear\n");
+});
+
+test("in a terminal, add goes straight to the sign-in", async () => {
+  await connectorsUw();
+  const { exit, out, err } = await uw(["mcp", "add", "-t", "http", "linear", "https://mcp.linear.app/mcp"], { terminal: true });
+  assert.equal(exit, 0);
+  assert.equal(requests.at(-1)?.method, "connectors.signIn");
+  assert.equal(out, "Added linear (web).\nSigned in to linear · 41 tools\n");
+  assert.equal(err, "Signing in. Finish in the tab that opened in uw.\n");
+});
+
+test("a local connector reads -e KEY from the environment, and its key goes to Keychain", async () => {
+  await connectorsUw();
+  const { exit, out } = await uw(["connectors", "add", "files", "-e", "FILES_TOKEN", "--", "npx", "-y", "@acme/files-mcp"],
+    { env: { FILES_TOKEN: "sk-test" } });
+  assert.equal(exit, 0);
+  assert.deepEqual(pasted().mcpServers.files, { command: "npx", args: ["-y", "@acme/files-mcp"], env: { FILES_TOKEN: "sk-test" } });
+  assert.equal(out, "Added files (this Mac). FILES_TOKEN went to Keychain. · 6 tools\n");
+});
+
+test("-e KEY=value works, with a warning about shell history", async () => {
+  await connectorsUw();
+  const { exit, err } = await uw(["mcp", "add", "stripe", "-e", "STRIPE_KEY=sk_live_1", "--", "npx", "-y", "@stripe/mcp"]);
+  assert.equal(exit, 0);
+  assert.deepEqual(pasted().mcpServers.stripe?.env, { STRIPE_KEY: "sk_live_1" });
+  assert.match(err, /STRIPE_KEY's value is now in your shell history\. Next time, pass -e STRIPE_KEY/);
+});
+
+test("mistakes in add are wrong usage, before uw is reached", async () => {
+  assert.match((await uw(["mcp", "add", "files", "-e", "MISSING", "--", "npx"], { env: {} })).err,
+    /MISSING isn't set in this shell/);
+  assert.equal((await uw(["mcp", "add", "-t", "ws", "x", "wss://x"])).exit, 2);
+  assert.equal((await uw(["mcp", "add", "-t", "http", "x", "https://x", "-H", "NoColon"])).exit, 2);
+  assert.equal((await uw(["mcp", "add", "linear"])).exit, 2);
+  assert.equal((await uw(["mcp"])).exit, 2);
+  assert.equal((await uw(["mcp", "nope"])).exit, 2);
+  assert.deepEqual(requests, []);
+});
+
+test("add-json takes the paste box's JSON on stdin, or one server with its name", async () => {
+  await connectorsUw();
+  const json = '{"mcpServers": {"exa": {"type": "http", "url": "https://mcp.exa.ai/mcp"}}}';
+  assert.equal((await uw(["mcp", "add-json"], { stdin: async () => json })).exit, 0);
+  assert.equal(requests.at(-1)?.params.json, json);
+  assert.equal((await uw(["mcp", "add-json", "exa", '{"type": "http", "url": "https://mcp.exa.ai/mcp"}'])).exit, 0);
+  assert.deepEqual(pasted().mcpServers.exa, { type: "http", url: "https://mcp.exa.ai/mcp" });
+  assert.equal((await uw(["mcp", "add-json", "exa", "{nope"])).exit, 2);
+});
+
+test("list shows each connector's state, and what to do about a sign-in", async () => {
+  await connectorsUw();
+  assert.equal((await uw(["mcp", "list"])).out, [
+    "linear  Web       Sign in  run uw mcp sign-in linear",
+    "files   This Mac  Running  6 tools",
+    "",
+  ].join("\n"));
+  assert.deepEqual(JSON.parse((await uw(["mcp", "list", "--json"])).out).connectors[1], FILES);
+});
+
+test("remove says what went, and an unknown name is wrong usage", async () => {
+  await connectorsUw();
+  assert.equal((await uw(["mcp", "remove", "linear"])).out, "Removed linear.\n");
+  const missing = await uw(["mcp", "remove", "nope"]);
+  assert.equal(missing.exit, 2);
+  assert.equal(missing.err, "No connector is called nope.\n");
+});
+
+test("mcp's help has its examples", async () => {
+  const help = await uw(["mcp", "--help"]);
+  assert.equal(help.exit, 0);
+  assert.match(help.out, /Examples:\n {2}uw mcp add --transport http linear https:\/\/mcp\.linear\.app\/mcp/);
+  assert.equal((await uw(["mcp", "add", "--help"])).out, help.out);
+});

@@ -21,7 +21,7 @@ The user asked on 2026-10-24 for a [`uw` command](../CONTEXT.md#language) that a
 | `uw chat` | Starts or resumes a chat. |
 | `uw chats` | Lists chats, newest first, with each one's id, title, state, and where it started. |
 | `uw approve` | Answers the step a chat waits on. |
-| `uw connectors`, also `uw mcp` | `add`, `list`, `remove`, and `sign-in`. |
+| `uw connectors`, also `uw mcp` | `add`, `add-json`, `list`, `remove`, and `sign-in`. |
 | `uw settings` | `list`, `get`, and `set`. |
 
 Later: skills, providers, scheduled chats, and opening or reading tabs without the agent.
@@ -81,7 +81,7 @@ Not yet: images, the per-chat connector switches (every connector that is on is 
 
 - `uw connectors add` takes the arguments of Claude Code's `claude mcp add`, so a README's line works with `claude` swapped for `uw`: `uw mcp add --transport http linear https://mcp.linear.app/mcp`, `uw mcp add files -- npx -y @x/files-mcp`, `-e KEY=value`, and `-H "Header: value"`.
 - `-e KEY` with no value reads `KEY` from the caller's environment, as `docker run -e` does. `-e KEY=value` works with a warning, since the value stays in shell history.
-- `uw connectors add --json '…'`, or the JSON on stdin, takes what the paste box takes.
+- `uw mcp add-json '…'`, or the JSON on stdin, takes what the paste box takes. `uw mcp add-json <name> '…'` takes one server, as `claude mcp add-json` does. Changed on 2026-10-25 from `add --json`, since `--json` asks every command for JSON output.
 - Both follow the paste box's rules in the [connectors plan](connectors.md#connectors) and [connect dialog plan](connect-dialog.md#fixes): keys go to Keychain, and `npx mcp-remote <url>` becomes a web connector.
 - `uw connectors sign-in <name>` opens the sign-in page in a tab of the user's front uw window, opening a window if needed, and brings uw forward. It waits, then prints `Signed in to linear.` or the error.
 - In a terminal, `add` goes straight to sign-in for a connector that needs one. With no terminal, `add` saves the connector, prints `linear needs a sign-in: run uw connectors sign-in linear`, and exits with 3.

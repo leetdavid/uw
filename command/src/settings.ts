@@ -1,7 +1,7 @@
 /** uw settings: list, read, and change uw's own settings. */
 
-import { CommandError, USAGE } from "./errors.ts";
-import type { Call } from "./call.ts";
+import { options, type Command, type Plan } from "./cli.ts";
+import { CommandError, DONE, USAGE } from "./errors.ts";
 
 export const SETTINGS_HELP = `uw settings: list, read, and change uw's own settings.
 
@@ -27,18 +27,30 @@ export interface Setting {
   appliesTo: string[];
 }
 
+export const SETTINGS: Command = { help: SETTINGS_HELP, plan: async (args) => settingsPlan(args) };
+
 /** Checks the arguments before uw is reached, so wrong usage never starts uw. */
-export function settingsCall(args: string[], workspace: string | undefined): Call {
-  const [verb, name, value, ...extra] = args;
-  const where = workspace === undefined ? {} : { workspace };
+function settingsPlan(args: string[]): Plan | null {
+  const { values, positionals } = options(args, { workspace: { type: "string" } });
+  if (values.help) return null;
+  const [verb, name, value, ...extra] = positionals;
+  const where = values.workspace === undefined ? {} : { workspace: values.workspace };
+  const request = (method: string, params: object, describe: (result: unknown) => string): Plan => ({
+    json: values.json,
+    run: async ({ channel, out }) => {
+      const result = await channel.request(method, params);
+      out.data(result, () => describe(result));
+      return DONE;
+    },
+  });
   if (verb === "list" && name === undefined) {
-    return { method: "settings.list", params: where, describe: (result) => table((result as { settings: Setting[] }).settings) };
+    return request("settings.list", where, (result) => table((result as { settings: Setting[] }).settings));
   }
   if (verb === "get" && name !== undefined && value === undefined) {
-    return { method: "settings.get", params: { ...where, name }, describe: (result) => `${(result as Setting).value}\n` };
+    return request("settings.get", { ...where, name }, (result) => `${(result as Setting).value}\n`);
   }
   if (verb === "set" && name !== undefined && value !== undefined && extra.length === 0) {
-    return { method: "settings.set", params: { ...where, name, value }, describe: (result) => changed(result as Setting) };
+    return request("settings.set", { ...where, name, value }, (result) => changed(result as Setting));
   }
   throw new CommandError(misuse(verb), USAGE);
 }
