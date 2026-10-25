@@ -59,6 +59,10 @@ _Avoid_: Queue, deck.
 A mini player in its own window over other apps, shown while uw is in the background or the sidebar is hidden.
 _Avoid_: PiP window, pop-out.
 
+**Live window**:
+A site's own picture-in-picture window, such as a Meet call, that keeps running while videos come and go: it never pauses and never joins the mini player stack. Docked, it sits below any mini player. Every site's own window is live unless the user turns that off for its site.
+_Avoid_: Call window, live mini player, document PiP.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
