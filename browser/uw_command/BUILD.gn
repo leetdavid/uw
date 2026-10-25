@@ -15,6 +15,7 @@ source_set("uw_command") {
     "command_workspace.cc",
     "command_workspace.h",
     "settings_command.cc",
+    "tools_command.cc",
   ]
   public_deps = [ "//base" ]
   deps = [
@@ -34,6 +35,8 @@ source_set("uw_command") {
     "//net",
     "//ui/base",
     "//url",
+    "//uw/browser/agent",
+    "//uw/browser/agent:chat_notification",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/agent:chats",
     "//uw/browser/agent:run_window",
@@ -67,11 +70,16 @@ source_set("browser_tests") {
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
+    "//testing/gmock",
     "//testing/gtest",
+    "//ui/message_center/public/cpp",
+    "//chrome/browser/actor",
     "//chrome/browser/notifications:test_support",
+    "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/agent:chats",
+    "//uw/browser/agent:run_window_mark",
     "//uw/browser/agent:test_support",
     "//uw/browser/ai_providers:test_support",
     "//uw/browser/ui/webui/uw_chat",

@@ -210,6 +210,8 @@ Expected result: the row says `Installed at /usr/local/bin/uw`, with `Uninstall`
 
 `uw chat` alone opens the terminal interface. Type a request and press Enter: the steps tick off as the agent works, and the answer is drawn as Markdown. Press Enter while it works to steer it, and Esc to stop it. Type `/` for skills and connector prompts. A step that needs approval shows a card: press a number, or type what to do instead and press Enter. Ctrl-O moves the chat and its tabs into your front uw window. Ctrl-C leaves and prints how to carry on.
 
+`claude mcp add uw -- uw mcp serve` gives Claude Code uw's page tools. Ask Claude Code to open and read a page: its tab opens out of sight, and none shows in your windows. Ask it to fill in and send a form: Claude Code shows uw's question, and the tab waits, unselected, at the end of your front window. Not this one, with a note, keeps the step from happening and tells the agent why. Add `--mode ask-first` to be asked before every click and typing. A client that can't ask, such as Claude's desktop app today, gets uw's notification with Approve and Not this one instead.
+
 A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the command there: `UW_USER_DATA_DIR="$HOME/Library/Application Support/uw-dev" uw settings list`.
 
 ## Not available yet

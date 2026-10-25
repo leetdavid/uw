@@ -40,6 +40,9 @@ void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded);
 // null.
 std::vector<std::string> WorkspaceNames(const Profile* profile);
 
+// The front window of `profile` that the user sees, or null.
+BrowserWindowInterface* FrontWindow(Profile* profile);
+
 // The front window of `profile`, or a new one, shown and brought forward, for
 // what the command opens in uw, such as a connector's sign-in.
 BrowserWindowInterface* ShowFrontWindow(Profile* profile);

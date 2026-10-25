@@ -36,6 +36,12 @@ void RunChatCommand(CommandRequest request,
                     CommandReply reply,
                     base::WeakPtr<CommandConnection> connection);
 
+// uw mcp serve: the page tools an outside agent uses, out of sight, with the
+// user's approval. See docs/plans/uw-command.md#the-tool-server.
+void RunToolsCommand(CommandRequest request,
+                     CommandReply reply,
+                     base::WeakPtr<CommandConnection> connection);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_UW_COMMAND_COMMAND_HANDLER_H_

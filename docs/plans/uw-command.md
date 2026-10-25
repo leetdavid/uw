@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, and T195 and T196 were built the same day.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, and T195, T196, and T197 were built the same day.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -164,7 +164,19 @@ Where T196 differs from the design:
 - On a narrow terminal, the status line leaves out the keys.
 - Ctrl-C leaves the interface. While the agent works, it stops the chat first.
 
-Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*` and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`, the interface's among them on a fake terminal. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
+T197 was built on 2026-10-25:
+
+- `uw mcp serve` is `command/src/serve.ts`, on the MCP TypeScript SDK, `@modelcontextprotocol/server`. It serves the 2025 protocol and the 2026-07-28 one, where a call that needs an answer goes back to the client, which asks its user and makes the call again.
+- uw answers `tools.list`, `tools.start`, `tools.call`, and `tools.answer` in `browser/uw_command/tools_command.cc`. Each connection gets a session that runs `AgentTools` under a tab of its own in the run window, one step at a time, and decides approvals as a chat's agent loop does.
+- A step that waits for the client is held until the client calls again. If another call comes first, the held step is declined.
+- A client that can't ask gets the chat notification with Approve and Not this one (`AskAboutStep` in `browser/agent/chat_notification.h`). Clicking the notification itself shows the tab and asks again.
+- The MCP server loads only for `uw mcp serve`. The bundle grew to about 0.9 MB, and the program starts in about 100 ms.
+
+Where T197 differs from the plan:
+
+- The tools' descriptions are the chat agent's, so `open` still says it opens a tab under "this chat".
+
+Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*`, `UwCommandToolsBrowserTest.*`, and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`, the interface's among them on a fake terminal. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
 
 ## How it is built
 

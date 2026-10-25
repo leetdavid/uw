@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 
+#include "base/functional/callback.h"
 #include "chrome/browser/notifications/notification_handler.h"
 
 class Profile;
@@ -23,7 +24,22 @@ void NotifyAboutChat(Profile* profile,
                      const std::string& what,
                      const std::string& text);
 
-// Brings uw forward on the chat whose notification was clicked.
+// Asks the user to approve an outside agent's step from a notification, with
+// Approve and Not this one: `title`, such as "claude-code waits for your
+// approval", and the `step`. `answered` hears true or false from a button,
+// or nothing from a click on the notification itself. See
+// docs/plans/uw-command.md#the-tool-server.
+using StepAnswered = base::RepeatingCallback<void(std::optional<bool>)>;
+void AskAboutStep(Profile* profile,
+                  const std::string& id,
+                  const std::string& title,
+                  const std::string& step,
+                  StepAnswered answered);
+// Takes back the notification `id`, if it still shows.
+void CloseStepNotification(Profile* profile, const std::string& id);
+
+// Brings uw forward on the chat whose notification was clicked, or answers
+// a step's.
 class ChatNotificationHandler : public NotificationHandler {
  public:
   void OnClick(Profile* profile,

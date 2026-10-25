@@ -23,27 +23,34 @@
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
+#include "net/dns/mock_host_resolver.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "testing/gmock/include/gmock/gmock.h"
+#include "ui/message_center/public/cpp/notification.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/connectors/connectors.h"
@@ -144,6 +151,53 @@ size_t Count(const std::vector<std::string>& lines, std::string_view method) {
     return line.find(base::StrCat({"\"method\":\"", method, "\""})) !=
            std::string::npos;
   });
+}
+
+// A request line for `method` with `params`.
+std::string Request(std::string_view method, const base::DictValue& params) {
+  return base::WriteJson(base::DictValue()
+                             .Set("jsonrpc", "2.0")
+                             .Set("id", 1)
+                             .Set("method", method)
+                             .Set("params", params.Clone()))
+      .value_or("");
+}
+
+// Sends each of `requests` on one connection, the next once uw has replied
+// to the one before, with "STEP" replaced by the step the reply before waits
+// on. uw's replies, one for each request.
+std::vector<std::string> Talk(const base::FilePath& socket,
+                              const std::vector<std::string>& requests) {
+  base::ScopedFD fd(::socket(AF_UNIX, SOCK_STREAM, 0));
+  sockaddr_un address = {.sun_family = AF_UNIX};
+  base::strlcpy(address.sun_path, socket.value().c_str(),
+                sizeof(address.sun_path));
+  timeval timeout = {.tv_sec = 30};
+  setsockopt(fd.get(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  std::vector<std::string> replies;
+  if (connect(fd.get(), reinterpret_cast<sockaddr*>(&address),
+              sizeof(address)) != 0) {
+    return replies;
+  }
+  std::string step;
+  for (std::string request : requests) {
+    base::ReplaceSubstringsAfterOffset(&request, 0, "STEP", step);
+    if (!base::WriteFileDescriptor(fd.get(), request + "\n")) {
+      break;
+    }
+    std::string line;
+    char byte;
+    while (read(fd.get(), &byte, 1) == 1 && byte != '\n') {
+      line += byte;
+    }
+    replies.push_back(line);
+    std::optional<base::DictValue> reply =
+        base::JSONReader::ReadDict(line, base::JSON_PARSE_RFC);
+    const std::string* waits =
+        reply ? reply->FindStringByDottedPath("result.waiting.step") : nullptr;
+    step = waits ? *waits : std::string();
+  }
+  return replies;
 }
 
 // The line of `lines` that is the notification `method` with `text`, as JSON,
@@ -464,16 +518,6 @@ class UwCommandChatBrowserTest : public UwCommandConnectorsBrowserTest {
     UwCommandConnectorsBrowserTest::TearDownOnMainThread();
   }
 
-  static std::string Request(std::string_view method,
-                             const base::DictValue& params) {
-    return base::WriteJson(base::DictValue()
-                               .Set("jsonrpc", "2.0")
-                               .Set("id", 1)
-                               .Set("method", method)
-                               .Set("params", params.Clone()))
-        .value_or("");
-  }
-
   std::vector<std::string> Chat(const base::DictValue& start,
                                 const std::string& approve = {},
                                 std::vector<std::string> next = {}) {
@@ -697,6 +741,226 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
   const std::vector<std::string> requests = model_.Requests();
   ASSERT_EQ(requests.size(), 2u);
   EXPECT_NE(requests[1].find("Say hello to Ada"), std::string::npos);
+}
+
+constexpr char kArticle[] = R"(<!doctype html>
+<title>Lisbon guide</title>
+<h1>Three days in Lisbon</h1>
+<p>Start in Alfama, early.</p>)";
+
+constexpr char kForm[] = R"(<!doctype html>
+<title>Book a tour</title>
+<label for="name">Your name</label>
+<input id="name" name="name">
+<button>Send</button>)";
+
+std::unique_ptr<net::test_server::HttpResponse> ServeShop(
+    const net::test_server::HttpRequest& request) {
+  auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+  response->set_content_type("text/html");
+  if (request.relative_url == "/article") {
+    response->set_content(kArticle);
+  } else if (request.relative_url == "/form") {
+    response->set_content(kForm);
+  } else {
+    return nullptr;
+  }
+  return response;
+}
+
+// An outside agent's tools through uw mcp serve's requests, on https pages,
+// as the engine acts only there.
+class UwCommandToolsBrowserTest : public UwCommandBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    UwCommandBrowserTest::SetUpOnMainThread();
+    host_resolver()->AddRule("shop.test", "127.0.0.1");
+    embedded_https_test_server().SetCertHostnames({"shop.test"});
+    embedded_https_test_server().RegisterRequestHandler(
+        base::BindRepeating(&ServeShop));
+    ASSERT_TRUE(embedded_https_test_server().Start());
+    notifications_ =
+        std::make_unique<NotificationDisplayServiceTester>(profile());
+  }
+
+  void TearDownOnMainThread() override {
+    CommandChannel::Get().Close();
+    // Each task's engine holds the profile, which must outlive it.
+    actor::ActorKeyedService::Get(profile())->ResetForTesting();
+    notifications_.reset();
+    UwCommandBrowserTest::TearDownOnMainThread();
+  }
+
+  std::string Url(std::string_view path) {
+    return embedded_https_test_server().GetURL("shop.test", path).spec();
+  }
+
+  static std::string Start() {
+    return Request(
+        "tools.start",
+        base::DictValue().Set("client", "test-agent").Set("mode", "auto"));
+  }
+
+  static std::string Call(std::string_view tool,
+                          base::DictValue args,
+                          bool asks = true) {
+    return Request("tools.call", base::DictValue()
+                                     .Set("tool", tool)
+                                     .Set("args", std::move(args))
+                                     .Set("asks", asks));
+  }
+
+  static std::string Answer(std::string_view choice, std::string_view note) {
+    return Request("tools.answer", base::DictValue()
+                                       .Set("step", "STEP")
+                                       .Set("choice", choice)
+                                       .Set("note", note));
+  }
+
+  // Sends `requests` in the background, for the caller to wait on.
+  void TalkLater(std::vector<std::string> requests,
+                 base::OnceCallback<void(std::vector<std::string>)> replied) {
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock()},
+        base::BindOnce(&Talk, socket_, std::move(requests)),
+        std::move(replied));
+  }
+
+  std::vector<base::DictValue> Replies(std::vector<std::string> requests) {
+    base::test::TestFuture<std::vector<std::string>> replies;
+    TalkLater(std::move(requests), replies.GetCallback());
+    std::vector<base::DictValue> parsed;
+    for (const std::string& line : replies.Get()) {
+      std::optional<base::DictValue> reply =
+          base::JSONReader::ReadDict(line, base::JSON_PARSE_RFC);
+      EXPECT_TRUE(reply) << line;
+      parsed.push_back(reply ? std::move(*reply) : base::DictValue());
+    }
+    return parsed;
+  }
+
+  // Whether a tab of the user's window shows `url`.
+  bool Shown(const std::string& url) {
+    TabStripModel* tabs = browser()->tab_strip_model();
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetLastCommittedURL().spec() == url) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool RunWindowOpen() {
+    bool open = false;
+    GlobalBrowserCollection::GetInstance()->ForEach(
+        [&](BrowserWindowInterface* window) {
+          open = open || IsRunWindow(window);
+          return true;
+        });
+    return open;
+  }
+
+  std::unique_ptr<NotificationDisplayServiceTester> notifications_;
+};
+
+IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
+                       AnOutsideAgentReadsAPageOutOfSight) {
+  std::vector<base::DictValue> replies = Replies(
+      {Request("tools.list", base::DictValue()), Start(),
+       Call("open", base::DictValue().Set("url", Url("/article"))),
+       Call("read", base::DictValue().Set("tab", 1))});
+  ASSERT_EQ(replies.size(), 4u);
+  const base::ListValue* tools =
+      replies[0].FindListByDottedPath("result.tools");
+  ASSERT_TRUE(tools) << replies[0];
+  std::vector<std::string> names;
+  for (const base::Value& tool : *tools) {
+    names.push_back(*tool.GetDict().FindString("name"));
+    EXPECT_TRUE(tool.GetDict().FindDict("inputSchema"));
+  }
+  EXPECT_EQ(names, (std::vector<std::string>{"open", "navigate", "read",
+                                             "click", "type"}));
+  EXPECT_TRUE(replies[1].FindStringByDottedPath("result.workspace"))
+      << replies[1];
+  EXPECT_EQ(replies[2].FindIntByDottedPath("result.result.tab"), 1)
+      << replies[2];
+  EXPECT_EQ(*replies[3].FindStringByDottedPath("result.result.title"),
+            "Lisbon guide");
+  EXPECT_FALSE(Shown(Url("/article")));
+  // The tabs close once the command goes.
+  EXPECT_TRUE(base::test::RunUntil([] { return !RunWindowOpen(); }));
+}
+
+// A step that changes something asks the client, and waits in the user's
+// window, unselected, for the answer.
+IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
+                       AStepThatChangesSomethingAsksTheClient) {
+  tabs::TabInterface* active = browser()->tab_strip_model()->GetActiveTab();
+  const auto typing = [] {
+    return base::DictValue()
+        .Set("tab", 1)
+        .Set("element", 1)
+        .Set("text", "Ada")
+        .Set("changes", true);
+  };
+  std::vector<base::DictValue> replies = Replies(
+      {Start(), Call("open", base::DictValue().Set("url", Url("/form"))),
+       Call("read", base::DictValue().Set("tab", 1)), Call("type", typing()),
+       Answer("decline", "Use my full name"), Call("type", typing()),
+       Answer("allow", "")});
+  ASSERT_EQ(replies.size(), 7u);
+  const base::DictValue* waiting =
+      replies[3].FindDictByDottedPath("result.waiting.approval");
+  ASSERT_TRUE(waiting) << replies[3];
+  EXPECT_EQ(*waiting->FindString("site"), "shop.test");
+  EXPECT_EQ(waiting->FindInt("tab"), 1);
+  EXPECT_EQ(*replies[4].FindStringByDottedPath("result.result.error"),
+            "The user did not approve this step, so it did not happen.");
+  EXPECT_EQ(*replies[4].FindStringByDottedPath("result.result.user_said"),
+            "Use my full name");
+  EXPECT_TRUE(replies[5].FindDictByDottedPath("result.waiting"));
+  EXPECT_FALSE(replies[6].FindStringByDottedPath("result.result.error"))
+      << replies[6];
+  // The page the step waited on stays in the user's window.
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(Shown(Url("/form")));
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveTab(), active);
+}
+
+// A client that can't ask leaves the step to uw's notification.
+IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
+                       AClientThatCantAskLeavesItToTheNotification) {
+  base::test::TestFuture<std::vector<std::string>> replies;
+  TalkLater({Start(), Call("open", base::DictValue().Set("url", Url("/form"))),
+             Call("read", base::DictValue().Set("tab", 1)),
+             Call("type",
+                  base::DictValue()
+                      .Set("tab", 1)
+                      .Set("element", 1)
+                      .Set("text", "Ada")
+                      .Set("changes", true),
+                  /*asks=*/false)},
+            replies.GetCallback());
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return notifications_
+               ->GetDisplayedNotificationsForType(
+                   NotificationHandler::Type::UW_CHAT)
+               .size() == 1u;
+  }));
+  const message_center::Notification asked =
+      notifications_
+          ->GetDisplayedNotificationsForType(NotificationHandler::Type::UW_CHAT)
+          .front();
+  EXPECT_EQ(asked.title(), u"test-agent waits for your approval");
+  EXPECT_THAT(base::UTF16ToUTF8(asked.message()),
+              ::testing::HasSubstr(" on shop.test"));
+  ASSERT_EQ(asked.buttons().size(), 2u);
+  notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT, asked.id(),
+                                /*action_index=*/0,
+                                /*reply=*/std::nullopt);
+  ASSERT_EQ(replies.Get().size(), 4u);
+  EXPECT_EQ(replies.Get()[3].find("error"), std::string::npos)
+      << replies.Get()[3];
 }
 
 }  // namespace

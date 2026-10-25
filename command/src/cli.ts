@@ -1,5 +1,6 @@
 /** Reads the command line, runs one command, and returns its exit code. */
 
+import type { Readable, Writable } from "node:stream";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 import type { Channel } from "./channel.ts";
 import { APPROVE, CHAT, CHATS } from "./chat.ts";
@@ -20,6 +21,7 @@ Commands:
   chats         List the chats of a workspace
   approve       Answer the step a chat waits on
   connectors    Add, list, remove, and sign in to connectors (also: uw mcp)
+  mcp serve     Give an outside agent, such as Claude Code, uw's page tools
   settings      List, read, and change uw's settings
 
 Options:
@@ -33,6 +35,7 @@ Exit codes: 0 done, 1 failed or stopped, 2 wrong usage, 3 needs you.
 Examples:
   uw chat -p "Did my latest Vercel deploy succeed?"
   uw mcp add --transport http linear https://mcp.linear.app/mcp
+  claude mcp add uw -- uw mcp serve
   uw settings list
 
 Run uw <command> --help for a command's options.
@@ -68,6 +71,8 @@ export interface Input {
   onInterrupt?: (stopped: () => void) => void;
   /** The terminal's screen, for the terminal interface; absent when output goes elsewhere. */
   screen?: Screen;
+  /** stdin and stdout as streams, for uw mcp serve's MCP. */
+  pipes?: { stdin: NodeJS.ReadableStream & Readable; stdout: NodeJS.WritableStream & Writable };
 }
 
 const COMMANDS: Record<string, Command> = {
@@ -109,7 +114,7 @@ export async function run(argv: string[], io: Run): Promise<number> {
   const input: Input = {
     env: io.env ?? {}, terminal: io.terminal ?? false, stdin: io.stdin ?? (async () => ""),
     ...(io.ask ? { ask: io.ask } : {}), ...(io.onInterrupt ? { onInterrupt: io.onInterrupt } : {}),
-    ...(io.screen ? { screen: io.screen } : {}),
+    ...(io.screen ? { screen: io.screen } : {}), ...(io.pipes ? { pipes: io.pipes } : {}),
   };
   try {
     const plan = await command.plan(args, input);

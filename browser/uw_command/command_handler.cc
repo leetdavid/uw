@@ -35,6 +35,11 @@ void HandleCommand(CommandRequest request,
     RunChatCommand(std::move(request), std::move(reply), std::move(connection));
     return;
   }
+  if (request.method.starts_with("tools.")) {
+    RunToolsCommand(std::move(request), std::move(reply),
+                    std::move(connection));
+    return;
+  }
   std::move(reply).Run(CommandError(
       request.id, kMethodNotFound,
       base::StrCat({"This uw can't answer ", request.method,

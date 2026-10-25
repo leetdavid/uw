@@ -83,7 +83,7 @@ void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded) {
           std::move(workspace.id), std::move(loaded)));
 }
 
-BrowserWindowInterface* ShowFrontWindow(Profile* profile) {
+BrowserWindowInterface* FrontWindow(Profile* profile) {
   BrowserWindowInterface* front = nullptr;
   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
       [&](BrowserWindowInterface* window) {
@@ -95,6 +95,11 @@ BrowserWindowInterface* ShowFrontWindow(Profile* profile) {
         }
         return true;
       });
+  return front;
+}
+
+BrowserWindowInterface* ShowFrontWindow(Profile* profile) {
+  BrowserWindowInterface* front = FrontWindow(profile);
   if (!front) {
     front = CreateBrowserWindow(
         BrowserWindowCreateParams(*profile, /*from_user_gesture=*/true));

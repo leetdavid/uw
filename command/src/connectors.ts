@@ -14,6 +14,7 @@ Usage:
   uw mcp list [--json]
   uw mcp remove <name>
   uw mcp sign-in <name> [--workspace <name>]
+  uw mcp serve [--mode <mode>] [--workspace <name>]
 
 add takes the arguments of Claude Code's claude mcp add, so a README's line
 works with claude swapped for uw. -e KEY with no value reads KEY from your
@@ -22,12 +23,19 @@ environment, so the key stays out of your shell history. Keys go to Keychain.
 asks for a sign-in opens its sign-in page in uw; with no terminal, add leaves
 the sign-in to uw mcp sign-in and exits with 3.
 
+serve gives an outside agent, such as Claude Code, uw's page tools: open,
+navigate, read, click, and type, over MCP on stdin and stdout. Its tabs open
+out of sight and close when it disconnects. A step that needs approval asks in
+the agent's client, or in uw's notification when the client can't ask. --mode
+is ask-first, auto, or full-auto; the default is the mode new chats start on.
+
 Examples:
   uw mcp add --transport http linear https://mcp.linear.app/mcp
   uw mcp add files -e FILES_TOKEN -- npx -y @acme/files-mcp
   uw mcp add-json '{"mcpServers": {"exa": {"type": "http", "url": "https://mcp.exa.ai/mcp"}}}'
   uw mcp sign-in linear
   uw mcp list --json
+  claude mcp add uw -- uw mcp serve --mode ask-first
 `;
 
 export interface Connector {
@@ -49,11 +57,13 @@ export const CONNECTORS: Command = { help: CONNECTORS_HELP, plan: connectorsPlan
 async function connectorsPlan(args: string[], input: Input): Promise<Plan | null> {
   const [verb, ...rest] = args;
   if (verb === undefined || verb === "--help" || verb === "-h") {
-    if (verb === undefined) throw new CommandError("uw mcp needs add, add-json, list, remove, or sign-in.\n  uw mcp list\nRun uw mcp --help for more.", USAGE);
+    if (verb === undefined) throw new CommandError("uw mcp needs add, add-json, list, remove, sign-in, or serve.\n  uw mcp list\nRun uw mcp --help for more.", USAGE);
     return null;
   }
   if (verb === "add") return addPlan(rest, input);
   if (verb === "add-json") return addJsonPlan(rest, input);
+  // The MCP server loads only for serve.
+  if (verb === "serve") return (await import("./serve.ts")).servePlan(rest, input);
   const { values, positionals } = options(rest, { workspace: { type: "string" } });
   if (values.help) return null;
   const [name, ...extra] = positionals;

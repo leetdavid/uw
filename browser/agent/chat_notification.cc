@@ -3,9 +3,11 @@
 
 #include "uw/browser/agent/chat_notification.h"
 
+#include <map>
 #include <utility>
 #include <vector>
 
+#include "base/no_destructor.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -25,6 +27,12 @@ namespace {
 
 // Enough for the lines macOS shows; it cuts the rest itself.
 constexpr size_t kMaxTextLength = 200;
+
+// Who hears the answer to each step's notification, by its id.
+std::map<std::string, StepAnswered>& StepsAsked() {
+  static base::NoDestructor<std::map<std::string, StepAnswered>> asked;
+  return *asked;
+}
 
 }  // namespace
 
@@ -52,6 +60,34 @@ void NotifyAboutChat(Profile* profile,
       NotificationHandler::Type::UW_CHAT, notification, /*metadata=*/nullptr);
 }
 
+void AskAboutStep(Profile* profile,
+                  const std::string& id,
+                  const std::string& title,
+                  const std::string& step,
+                  StepAnswered answered) {
+  message_center::RichNotificationData data;
+  data.buttons.emplace_back(u"Approve");
+  data.buttons.emplace_back(u"Not this one");
+  message_center::Notification notification(
+      message_center::NOTIFICATION_TYPE_SIMPLE, id, base::UTF8ToUTF16(title),
+      gfx::TruncateString(base::UTF8ToUTF16(step), kMaxTextLength,
+                          gfx::WORD_BREAK),
+      ui::ImageModel(), u"uw", ChatUrl(),
+      message_center::NotifierId(message_center::NotifierType::SYSTEM_COMPONENT,
+                                 "uw_chat"),
+      data, /*delegate=*/nullptr);
+  StepsAsked()[id] = std::move(answered);
+  NotificationDisplayServiceFactory::GetForProfile(profile)->Display(
+      NotificationHandler::Type::UW_CHAT, notification, /*metadata=*/nullptr);
+}
+
+void CloseStepNotification(Profile* profile, const std::string& id) {
+  if (StepsAsked().erase(id)) {
+    NotificationDisplayServiceFactory::GetForProfile(profile)->Close(
+        NotificationHandler::Type::UW_CHAT, id);
+  }
+}
+
 void ChatNotificationHandler::OnClick(
     Profile* profile,
     const GURL& origin,
@@ -59,6 +95,15 @@ void ChatNotificationHandler::OnClick(
     const std::optional<int>& action_index,
     const std::optional<std::u16string>& reply,
     base::OnceClosure completed_closure) {
+  if (auto asked = StepsAsked().find(notification_id);
+      asked != StepsAsked().end()) {
+    StepAnswered answered = std::move(asked->second);
+    CloseStepNotification(profile, notification_id);
+    answered.Run(action_index ? std::optional<bool>(*action_index == 0)
+                              : std::nullopt);
+    std::move(completed_closure).Run();
+    return;
+  }
   const std::vector<tabs::TabInterface*> showing =
       TabsShowingChat(profile, origin.path().substr(1));
   if (!showing.empty()) {

@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, test } from "node:test";
 import { run, type Run } from "../src/cli.ts";
 import { NOT_INSTALLED, SOCKET, place, type Place } from "../src/launch.ts";
@@ -411,4 +412,91 @@ test("chats lists the workspace's chats, and approve shows and answers what wait
   assert.equal(answered.out, "Declined. Carry on with: uw chat -r 3f9c2e18 -p\n");
   assert.deepEqual(requests.at(-1)?.params, { chat: "3f9c2e18", choice: "decline", note: "Not today" });
   assert.equal((await uw(["approve", "3f9c2e18", "maybe"])).exit, 2);
+});
+
+const READ = { name: "read", description: "Reads one of your tabs.", inputSchema: { type: "object", properties: { tab: { type: "integer" } }, required: ["tab"] } };
+const TYPE = { name: "type", description: "Types into a field.", inputSchema: { type: "object", properties: { tab: { type: "integer" }, element: { type: "integer" }, text: { type: "string" } }, required: ["tab", "element", "text"] } };
+const PAGE = { ...SAVE, tab: 1, site: "shop.test", action: 'Type "Ada" into "Your name"', reason: "Auto asks before a change.", connector: "", tool: "", arguments: {}, canAlwaysAllow: false };
+
+function toolsUw(): Promise<void> {
+  return fakeUw((method, params) => {
+    if (method === "tools.list") return { result: { tools: [READ, TYPE] } };
+    if (method === "tools.start") return { result: { workspace: "Work" } };
+    if (method === "tools.call" && params.tool === "read") return { result: { result: { title: "Lisbon guide", text: "Start in Alfama." } } };
+    if (method === "tools.call") return { result: { waiting: { step: "s1", approval: PAGE } } };
+    if (method === "tools.answer" && params.choice === "allow") return { result: { result: {} } };
+    if (method === "tools.answer") {
+      return { result: { result: { error: "The user did not approve this step, so it did not happen.", user_said: params.note } } };
+    }
+    return { error: { code: -32601, message: `uw has no method ${method}.` } };
+  });
+}
+
+/** An MCP client on uw mcp serve's stdin and stdout, speaking the 2025 protocol. */
+function mcpClient() {
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const heard: Record<string, unknown>[] = [];
+  const waiting: ((message: Record<string, unknown>) => void)[] = [];
+  createInterface({ input: stdout }).on("line", (line) => {
+    const message = JSON.parse(line) as Record<string, unknown>;
+    const next = waiting.shift();
+    if (next) next(message);
+    else heard.push(message);
+  });
+  return {
+    pipes: { stdin, stdout },
+    send: (message: object) => stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`),
+    next: (): Promise<Record<string, unknown>> =>
+      heard.length ? Promise.resolve(heard.shift()!) : new Promise((resolve) => waiting.push(resolve)),
+    end: () => stdin.end(),
+  };
+}
+
+async function initialize(client: ReturnType<typeof mcpClient>, capabilities: object) {
+  client.send({ id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities, clientInfo: { name: "test-client", version: "1" } } });
+  await client.next();
+  client.send({ method: "notifications/initialized" });
+}
+
+test("mcp serve gives a client uw's page tools, and asks its user before a change", async () => {
+  await toolsUw();
+  const client = mcpClient();
+  const serving = uw(["mcp", "serve", "--mode", "ask-first"], { pipes: client.pipes });
+  await initialize(client, { elicitation: {} });
+  client.send({ id: 2, method: "tools/list" });
+  const listed = await client.next() as { result: { tools: { name: string; inputSchema: object }[] } };
+  assert.deepEqual(listed.result.tools.map((tool) => tool.name), ["read", "type"]);
+
+  client.send({ id: 3, method: "tools/call", params: { name: "read", arguments: { tab: 1 } } });
+  const read = await client.next() as { result: { content: { text: string }[]; isError?: boolean } };
+  assert.deepEqual(JSON.parse(read.result.content[0]!.text), { title: "Lisbon guide", text: "Start in Alfama." });
+  assert.deepEqual(requests.find((request) => request.method === "tools.start")?.params, { mode: "ask-first", client: "test-client" });
+  assert.deepEqual(requests.at(-1), { method: "tools.call", params: { tool: "read", args: { tab: 1 }, asks: true } });
+
+  client.send({ id: 4, method: "tools/call", params: { name: "type", arguments: { tab: 1, element: 1, text: "Ada" } } });
+  const asked = await client.next() as { id: number; method: string; params: { message: string } };
+  assert.equal(asked.method, "elicitation/create");
+  assert.equal(asked.params.message, 'uw · shop.test · tab 1\nType "Ada" into "Your name"?\nAuto asks before a change.');
+  client.send({ id: asked.id, result: { action: "accept", content: { choice: "Not this one", note: "Use my full name" } } });
+  const typed = await client.next() as { result: { content: { text: string }[]; isError?: boolean } };
+  assert.equal(typed.result.isError, true);
+  assert.equal(typed.result.content[0]!.text, "The user did not approve this step, so it did not happen. The user said: Use my full name");
+  assert.deepEqual(requests.at(-1), { method: "tools.answer", params: { step: "s1", choice: "decline", note: "Use my full name" } });
+
+  client.end();
+  assert.equal((await serving).exit, 0);
+});
+
+test("mcp serve leaves a step to uw's notification when the client can't ask", async () => {
+  await toolsUw();
+  const client = mcpClient();
+  const serving = uw(["mcp", "serve"], { pipes: client.pipes });
+  await initialize(client, {});
+  client.send({ id: 2, method: "tools/call", params: { name: "read", arguments: { tab: 1 } } });
+  await client.next();
+  assert.deepEqual(requests.at(-1), { method: "tools.call", params: { tool: "read", args: { tab: 1 }, asks: false } });
+  client.end();
+  assert.equal((await serving).exit, 0);
+  assert.equal((await uw(["mcp", "serve", "--mode", "sometimes"])).exit, 2);
 });
