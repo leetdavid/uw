@@ -122,7 +122,13 @@ The second round, T203, is on the same page and not signed off yet:
 
 - "Mini player: a Meet call in the sidebar": a Meet call docked under the pointer, in light mode.
 - "Sites' own windows in the sidebar: every state": a call at rest, a group call, an audio player, black dark mode under the pointer, the size rule, and a video or a stack above a call.
-- Still to draw: the playback controls, the Live toggle on a docked and a floating site's window, and the new settings card.
+- "Mini player second round: every state": the playback controls at rest, under the pointer, paused, in black dark mode, and with Don't dock; everything docked at once; the Live pill on and off; a site's window that is not live in the stack; the Live pill on a floating site's window; and the settings card with Dock and with Don't dock chosen.
+
+uw's proposals in these frames:
+
+- The playback row is 44px, in the tint's fill, with art or the site's icon, the title, where it comes from, and play or pause. Previous and next show under the pointer when the site offers them. Clicking the art or title goes to the tab.
+- The Live toggle is a pill reading "Live" at the top center of a docked site's window, between close and back to tab, and in the floating bar before them. Its dot is green when on and hollow when off.
+- The settings card lists the Live sites newest first.
 
 Meet's and Spotify's layouts at 232px in these frames are guesses; each site draws its own.
 
