@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built on 2026-10-25 and waits for the user's check.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, and T195 is in progress.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
