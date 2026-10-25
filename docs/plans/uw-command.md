@@ -1,6 +1,6 @@
 # The uw command
 
-Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, and T195 is in progress.
+Status: scope agreed on 2026-10-24 in a grilling session. T192, the design, was drawn and signed off the same day. T193 was built and checked by the user on 2026-10-25. T194 waits for a live sign-in, T195 was built the same day, and T196 is in progress.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The agent, connectors, runs out of sight, and approvals already exist, and the command reuses them. The new parts are a channel between the command and uw, a Node program built, signed, and shipped inside uw.app ([ADR 0016](../adr/0016-the-uw-command-is-typescript-with-ink.md)), a terminal interface that has to keep up with the chat page, and approvals answered from a second place. Linking `/usr/local/bin/uw` needs macOS's admin prompt.
 
@@ -129,6 +129,14 @@ Where the build differs from the design:
 
 - The uw command's rows are the first rows of the System card, under a "uw command" heading, not a box of their own. A Chromium settings section draws one card.
 - A currency must be one uw has exchange rates for, as on the settings page.
+
+T194 and T195 were built on 2026-10-25:
+
+- `uw mcp` goes through `Connectors::AddPasted`, which the AI page's paste box uses too, so both follow the same rules.
+- A chat from the command is a real `uw://chat` page in the profile's run window, opened with `SetChatStart` and its "From terminal" mark. The command watches it through `UwChatHandler::Watcher`, which sees what the page sees: steps, approvals, and cost. While one watches, the chat sends no notifications.
+- The channel sends a chat's steps as JSON-RPC notifications: `chat.step`, `chat.approval`, and `chat.end`. A connection that closes stops a chat at work, unless the command let go first with `chats.detach`.
+- Piped text goes to the agent through `AgentContext::AddMaterial`: a step of its own, after the user's message, marked as information. The command check never sees it.
+- `--model` picks a model of the chat's provider. A chat id can be shortened to its first characters.
 
 Tests: `CommandSettingsTest.*` and `CommandMessagesTest.*` in unit_tests, `UwCommandBrowserTest.*` and `UwCommandSectionBrowserTest.*` in browser_tests, and `command/tests` in `pnpm test`. The tests install into a folder of their own; installing into `/usr/local/bin` with the password prompt is for the user to check.
 
