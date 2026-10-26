@@ -916,6 +916,54 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePageItselfNeverScrolls) {
                 "        ? 'scrolled' : 'at the top'))))"));
 }
 
+// The list keeps up with what grows after a line is drawn, such as a
+// command's output, but leaves a user who scrolled up where they are until
+// they send a message.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       TheListFollowsWhatGrowsUntilTheUserScrollsUp) {
+  UseAgentModel();
+  std::string answer;
+  for (int line = 0; line < 80; ++line) {
+    answer += "Line " + base::NumberToString(line) + "\n\n";
+  }
+  model_.Script(
+      {ScriptedModel::Answer(answer), ScriptedModel::Answer("Done.")});
+  content::WebContents* chat = OpenChat();
+  Ask(chat, "Write a long answer");
+  const std::string list = "document.querySelector('.answer').closest('main')";
+  const std::string grow = list +
+                           ".firstElementChild.append(Object.assign("
+                           "    document.createElement('div'),"
+                           "    {style: 'height: 600px'}))";
+  const std::string gap =
+      "(list => list.scrollHeight - list.clientHeight -"
+      "    list.scrollTop)(" +
+      list + ")";
+  const auto at_the_bottom = [&] {
+    return base::test::RunUntil(
+        [&] { return content::EvalJs(chat, gap).ExtractDouble() <= 2; });
+  };
+
+  ASSERT_TRUE(content::ExecJs(chat, grow));
+  EXPECT_TRUE(at_the_bottom());
+
+  ASSERT_TRUE(content::ExecJs(
+      chat,
+      "(list => {"
+      "  list.dispatchEvent(new WheelEvent('wheel', {deltaY: -100}));"
+      "  list.scrollTop = 0;"
+      "})(" +
+          list + ")"));
+  ASSERT_TRUE(content::ExecJs(chat, grow));
+  EXPECT_EQ(0, content::EvalJs(chat,
+                               "new Promise(resolve => setTimeout(() =>"
+                               "    requestAnimationFrame(() => resolve(" +
+                                   list + ".scrollTop)), 100))"));
+
+  Ask(chat, "Thanks");
+  EXPECT_TRUE(at_the_bottom());
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
   UseAgentModel();
   model_.Script({ScriptedModel::Answer(

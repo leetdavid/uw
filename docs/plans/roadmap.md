@@ -232,6 +232,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T220 | H.264 and AAC through macOS | todo | 4/10 | Play H.264 through VideoToolbox and AAC through AudioToolbox, and ship neither FFmpeg's decoders for them nor OpenH264, per [Codecs](distribution.md#codecs). x.com's videos must still play. |
 | T221 | Report an issue | in review | 9/10 | Help → "Report an issue" opens a new GitHub issue with the uw, Chromium, and macOS versions filled in. |
 | T222 | uwbrowser.com | todo | 8/10 | The one-page site, designed on the Doop canvas first, then Next.js in `site/` on Vercel with PostHog, per [Website content](distribution.md#website-content). |
+| T224 | The chat follows what the agent adds | in review | 8/10 | Seen by the user on 2026-10-26 with a picture of a running chat whose last command was cut off at the composer: "i can't always see the entire chat message." The list scrolled only when a line was added, so a command's output, late code highlighting, or a card that grew afterwards stayed below the fold. The list now keeps its newest line in view, per the [agent chats plan](agent-chats.md#agreed-scope), with `use-stick-to-bottom`. Done when `UwChatBrowserTest.TheListFollowsWhatGrowsUntilTheUserScrollsUp` passes. Built on 2026-10-26; it passes, and so do the other `UwChatBrowserTest` tests. |
 
 ## 1. Choose the browser foundation
 

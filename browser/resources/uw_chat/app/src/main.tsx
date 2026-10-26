@@ -13,6 +13,7 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
+import { useStickToBottom } from "use-stick-to-bottom";
 import {
   Brain,
   Columns2,
@@ -1606,7 +1607,8 @@ function Chat() {
   const promptItem = pickedPrompt(draft, menuItems);
   const composerBox = useRef<HTMLDivElement>(null);
   const [suggestions, setSuggestions] = useState(EXAMPLES);
-  const list = useRef<HTMLElement>(null);
+  // The list follows what the agent adds unless the user scrolled up to read.
+  const list = useStickToBottom({ initial: "instant", resize: "instant" });
 
   // Keeps the header's minutes current while the agent works.
   useEffect(() => {
@@ -1805,13 +1807,6 @@ function Chat() {
     });
   };
 
-  useEffect(() => {
-    // Only the list scrolls; scrollIntoView would scroll the page as well.
-    if (list.current) {
-      list.current.scrollTop = list.current.scrollHeight;
-    }
-  }, [lines, working]);
-
   const chosen = providers?.find(
     (provider) => provider.id === model?.providerId,
   );
@@ -1853,6 +1848,7 @@ function Chat() {
     }
     setWorking(true);
     setSince(Date.now());
+    list.scrollToBottom();
     const images = await Promise.all(attached.map(imageData));
     // The first message names the tab.
     if (message && !lines.some((line) => line.kind === StepKind.kUser)) {
@@ -1892,6 +1888,7 @@ function Chat() {
     if ((!message && !attached.length) || cannotSee(attached)) {
       return;
     }
+    list.scrollToBottom();
     const images = await Promise.all(attached.map(imageData));
     setLines((before) => [...before, userLine(message, images)]);
     chatHandler.steer(message, images);
@@ -2183,8 +2180,14 @@ function Chat() {
           </p>
         </div>
       )}
-      <main ref={list} className={cn("flex-1 overflow-y-auto", !title && "hidden")}>
-        <div className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5">
+      <main
+        ref={list.scrollRef}
+        className={cn("flex-1 overflow-y-auto", !title && "hidden")}
+      >
+        <div
+          ref={list.contentRef}
+          className="mx-auto flex max-w-[720px] flex-col gap-4 px-7 py-5"
+        >
           {groups.map((run, index) =>
             isQuietRun(run[0]!) ? (
               <QuietRuns key={index} runs={run} />

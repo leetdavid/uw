@@ -54,6 +54,10 @@ Added on 2026-10-20, with Claude Code's auto mode as the model:
 - Agreed on 2026-10-22: the agent can leave a command running as a [trigger](../CONTEXT.md#language) that wakes the chat when it ends or prints a line, per [Scheduled chats](../product.md#scheduled-chats).
 - A chat's tab row in the sidebar ends with the chat's state, as the chat page's list shows it: a spinner while the agent works, an amber dot while a step or a password waits for the user, a pause sign once it stopped early, and a dot for an answer not yet seen. Asked for with T124's sign-off.
 
+Added on 2026-10-26:
+
+- The chat's list keeps its newest line in view as anything in it grows: a new step, a command's output, a card. Scrolling up stops this so the user can read; scrolling back to the bottom, or sending a message, starts it again.
+
 ## Releases
 
 | Release | Contents |
