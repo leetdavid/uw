@@ -1,13 +1,19 @@
 "use client";
 
-import Image, { type StaticImageData } from "next/image";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  startTransition,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { Sidebar, type SidebarState } from "./sidebar";
 
 export interface Stop {
   title: ReactNode;
   label: string;
   text: string;
-  image: StaticImageData;
+  sidebar: SidebarState;
   alt: string;
 }
 
@@ -20,7 +26,8 @@ export function ScrollDemo({ stops }: { stops: Stop[] }) {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            setActive(Number((entry.target as HTMLElement).dataset.index));
+            const index = Number((entry.target as HTMLElement).dataset.index);
+            startTransition(() => setActive(index));
           }
         }
       },
@@ -76,15 +83,11 @@ export function ScrollDemo({ stops }: { stops: Stop[] }) {
             </ol>
           </div>
           <div className="sb">
-            {stops.map((stop, index) => (
-              <Image
-                key={stop.label}
-                src={stop.image}
-                alt={stop.alt}
-                className={index === active ? "on" : undefined}
-                sizes="340px"
-              />
-            ))}
+            <Sidebar
+              state={stops[active].sidebar}
+              label={stops[active].alt}
+              animate
+            />
           </div>
         </div>
       </div>
@@ -98,7 +101,9 @@ export function ScrollDemo({ stops }: { stops: Stop[] }) {
               <h3 className="serif">{stop.title}</h3>
               <p>{stop.text}</p>
             </div>
-            <Image src={stop.image} alt={stop.alt} sizes="220px" />
+            <div className="sb">
+              <Sidebar state={stop.sidebar} label={stop.alt} />
+            </div>
           </div>
         ))}
       </div>

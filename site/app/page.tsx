@@ -1,15 +1,82 @@
 import Image from "next/image";
 import poster from "@/assets/poster.png";
-import stop1 from "@/assets/stop-1.png";
-import stop2 from "@/assets/stop-2.png";
-import stop3 from "@/assets/stop-3.png";
-import stop4 from "@/assets/stop-4.png";
 import tram from "@/assets/tram.jpg";
+import { Favicon, Folder } from "./icons";
 import { ScrollDemo, type Stop } from "./scroll-demo";
+import type { Notice, Tab, Task } from "./sidebar";
 
 const DOWNLOAD =
   "https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg";
 const REPO = "https://github.com/leetdavid/uw";
+
+const cadence = { letter: "C", background: "#111" };
+
+const tab = {
+  guide: {
+    id: "guide",
+    title: "Four days in Lisbon",
+    icon: { site: "lonelyplanet.com" },
+  },
+  checklist: {
+    id: "checklist",
+    title: "Launch checklist",
+    icon: { site: "notion.so" },
+  },
+  flight: {
+    id: "flight",
+    title: "SFO to Lisbon, May 14",
+    icon: { site: "kayak.com" },
+  },
+  strada: { id: "strada", title: "Strada AL, gravel", icon: cadence },
+  size: { id: "size", title: "Find your size", icon: cadence, child: true },
+  run: { id: "run", title: "Run #4821 failed", icon: { site: "github.com" } },
+  flat: {
+    id: "flat",
+    title: "Sunlit flat with a balcony",
+    icon: { letter: "s", background: "#0F766E" },
+  },
+  nata: {
+    id: "nata",
+    title: "The best pastel de nata in Lisbon",
+    icon: { letter: "B", background: "#2A1A0E", color: "#F6A15A" },
+  },
+  news: {
+    id: "news",
+    title: "Hacker News",
+    icon: { site: "news.ycombinator.com" },
+  },
+} satisfies Record<string, Tab>;
+
+const trip: Task = {
+  id: "trip",
+  name: "Plan Lisbon trip",
+  color: "#1A73E8",
+  tabs: [tab.guide, tab.flight, tab.flat, tab.nata],
+};
+
+function launch(run: string): Task {
+  return {
+    id: "launch",
+    name: "Ship the launch",
+    color: "#188038",
+    tabs: [tab.checklist, { ...tab.run, title: `Run #4821 ${run}` }],
+  };
+}
+
+function bike(name: string, naming = false): Task {
+  return {
+    id: "bike",
+    name,
+    color: "#D01884",
+    naming,
+    tabs: [tab.strada, tab.size],
+  };
+}
+
+const moved: Notice = {
+  title: "Moved to Plan Lisbon trip",
+  detail: "The best pastel de nata in Lisbon",
+};
 
 const stops: Stop[] = [
   {
@@ -20,7 +87,21 @@ const stops: Stop[] = [
     ),
     label: "Go down every rabbit hole",
     text: "Flights, a flat, a launch, a bike you keep not buying. Open it all. Every new tab starts in the Scratchpad, as in any browser.",
-    image: stop1,
+    sidebar: {
+      tasks: [],
+      scratchpad: [
+        tab.guide,
+        tab.checklist,
+        tab.flight,
+        tab.strada,
+        tab.size,
+        tab.run,
+        tab.flat,
+        tab.nata,
+        tab.news,
+      ],
+      active: "flat",
+    },
     alt: "uw's sidebar with nine tabs from different kinds of work in the Scratchpad",
   },
   {
@@ -31,7 +112,12 @@ const stops: Stop[] = [
     ),
     label: "Watch it sort itself",
     text: "Every tab lands in the task it belongs to, the moment you open it. No folders to make, nothing to drag, and Undo is always one click away.",
-    image: stop2,
+    sidebar: {
+      tasks: [trip, launch("failed")],
+      scratchpad: [tab.strada, tab.size, tab.news],
+      active: "nata",
+      notice: moved,
+    },
     alt: "The tabs filed into Plan Lisbon trip and Ship the launch, with a card that says Moved to Plan Lisbon trip and offers Undo",
   },
   {
@@ -42,7 +128,16 @@ const stops: Stop[] = [
     ),
     label: "New idea? New task.",
     text: "Start something new and uw gives it a home of its own, named once it has read the pages. A name you type is never replaced.",
-    image: stop3,
+    sidebar: {
+      tasks: [trip, launch("failed"), bike("New task", true)],
+      scratchpad: [tab.news],
+      active: "strada",
+      notice: {
+        title: "Naming the task",
+        detail: "Asking Llama 3.2",
+        busy: true,
+      },
+    },
     alt: "Two bike pages forming a new task while uw names it",
   },
   {
@@ -53,7 +148,12 @@ const stops: Stop[] = [
     ),
     label: "Change your mind? One click.",
     text: "Every move uw makes can be undone. Put a tab somewhere yourself, and Keep Here holds it there.",
-    image: stop4,
+    sidebar: {
+      tasks: [trip, launch("passed"), bike("Buy a road bike")],
+      scratchpad: [tab.news],
+      active: "nata",
+      notice: moved,
+    },
     alt: "Three tasks in a calm sidebar, with Undo on the last move",
   },
 ];
@@ -73,27 +173,6 @@ function DownloadIcon() {
       <path d="m7 10 5 5 5-5" />
       <path d="M5 20h14" />
     </svg>
-  );
-}
-
-function Folder({ color }: { color: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={`color-mix(in srgb, ${color} 24%, transparent)`}
-      stroke={color}
-      strokeWidth="1.75"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-    </svg>
-  );
-}
-
-function Favicon({ domain, size = 17 }: { domain: string; size?: number }) {
-  return (
-    <Image src={`/icons/${domain}.png`} alt="" width={size} height={size} />
   );
 }
 
@@ -710,7 +789,7 @@ export default function Home() {
         </div>
       </div>
 
-      <section className="close">
+      <section className="closing">
         <Image src="/logo.svg" alt="uw logo" width={96} height={96} />
         <h2 className="serif">
           Your tabs have been

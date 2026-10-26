@@ -381,11 +381,8 @@ em {
 }
 
 .sb {
-  position: absolute;
-  right: 10%;
-  top: 3%;
-  bottom: 3%;
-  aspect-ratio: 503 / 1598;
+  container-type: size;
+  aspect-ratio: 252 / 800;
   border-radius: 26px;
   overflow: hidden;
   box-shadow:
@@ -393,17 +390,282 @@ em {
     0 40px 90px rgba(40, 30, 90, 0.25);
 }
 
-.sb img {
+.pin .sb {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  transition: opacity 0.5s ease;
+  right: 10%;
+  top: 3%;
+  bottom: 3%;
 }
 
-.sb img.on {
-  opacity: 1;
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root) {
+  display: none;
+}
+
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(*) {
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* The demo sidebar: drawn 252 by 800, with --px scaling it to its box */
+
+.side {
+  --px: calc(100cqh / 800);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+  height: 100%;
+  padding: calc(10 * var(--px));
+  background: linear-gradient(160deg, var(--tint1), var(--tint2));
+  font:
+    calc(13 * var(--px)) / 1.35 -apple-system,
+    var(--font-sans),
+    sans-serif;
+}
+
+.side svg {
+  width: calc(16 * var(--px));
+  height: calc(16 * var(--px));
+  flex: none;
+}
+
+.side .top {
+  display: flex;
+  align-items: center;
+  height: calc(30 * var(--px));
+  padding-left: calc(6 * var(--px));
+  color: rgba(30, 27, 46, 0.75);
+}
+
+.side .lights {
+  display: flex;
+  gap: calc(8 * var(--px));
+  margin-right: auto;
+}
+
+.side .lights i {
+  width: calc(12 * var(--px));
+  height: calc(12 * var(--px));
+}
+
+.side .favs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: calc(6 * var(--px));
+  padding: calc(8 * var(--px)) 0 calc(6 * var(--px));
+}
+
+.side .favs div {
+  display: grid;
+  place-items: center;
+  height: calc(44 * var(--px));
+  border-radius: calc(12 * var(--px));
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.side .favs img {
+  width: calc(18 * var(--px));
+  height: calc(18 * var(--px));
+  border-radius: calc(4 * var(--px));
+}
+
+.side .task,
+.side .tab {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--px));
+  height: calc(34 * var(--px));
+  padding: 0 calc(10 * var(--px));
+  border-radius: calc(10 * var(--px));
+}
+
+.side .task span,
+.side .tab span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side .task {
+  margin-top: calc(4 * var(--px));
+  font-weight: 600;
+}
+
+.side .in {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--px));
+  margin-left: calc(18 * var(--px));
+}
+
+.side .tab.child {
+  margin-left: calc(16 * var(--px));
+}
+
+.side .tab.on {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(30, 27, 46, 0.14);
+  font-weight: 500;
+}
+
+.side .tab img,
+.side .badge {
+  width: calc(16 * var(--px));
+  height: calc(16 * var(--px));
+  border-radius: calc(4 * var(--px));
+  flex: none;
+}
+
+.side .badge {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 700 calc(9 * var(--px)) / 1 var(--font-sans);
+  font-style: normal;
+}
+
+.side .tab .close {
+  width: calc(14 * var(--px));
+  height: calc(14 * var(--px));
+  color: rgba(30, 27, 46, 0.55);
+}
+
+.side .label {
+  padding: calc(10 * var(--px)) calc(10 * var(--px)) calc(4 * var(--px));
+  font-size: calc(11 * var(--px));
+  font-weight: 600;
+  color: rgba(30, 27, 46, 0.58);
+}
+
+.side .spin {
+  width: calc(13 * var(--px));
+  height: calc(13 * var(--px));
+  flex: none;
+  border: calc(2 * var(--px)) solid rgba(30, 27, 46, 0.14);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+.side .notice {
+  position: absolute;
+  left: calc(10 * var(--px));
+  right: calc(10 * var(--px));
+  bottom: calc(48 * var(--px));
+  display: flex;
+  flex-direction: column;
+  gap: calc(4 * var(--px));
+  padding: calc(10 * var(--px));
+  border-radius: calc(10 * var(--px));
+  background: rgba(255, 255, 255, 0.46);
+  font-size: calc(12 * var(--px));
+}
+
+.side .notice b {
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--px));
+  font-size: calc(13 * var(--px));
+  font-weight: 600;
+}
+
+.side .notice b svg {
+  width: calc(14 * var(--px));
+  height: calc(14 * var(--px));
+}
+
+.side .undo {
+  align-self: flex-end;
+  padding: calc(2 * var(--px)) calc(12 * var(--px));
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(30, 27, 46, 0.1);
+}
+
+.side .meter {
+  height: calc(4 * var(--px));
+  border-radius: calc(2 * var(--px));
+  background: rgba(30, 27, 46, 0.14);
+  overflow: hidden;
+}
+
+.side .meter i {
+  display: block;
+  width: 62%;
+  height: 100%;
+  background: var(--ink);
+}
+
+.side .foot {
+  position: absolute;
+  left: calc(10 * var(--px));
+  right: calc(10 * var(--px));
+  bottom: calc(12 * var(--px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.side .organize,
+.side .new {
+  display: flex;
+  align-items: center;
+  height: calc(28 * var(--px));
+  border-radius: calc(14 * var(--px));
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.side .organize {
+  justify-content: center;
+  width: calc(32 * var(--px));
+}
+
+.side .organize svg {
+  width: calc(15 * var(--px));
+  height: calc(15 * var(--px));
+}
+
+.side .new b {
+  display: grid;
+  place-items: center;
+  width: calc(30 * var(--px));
+  height: 100%;
+}
+
+.side .new b svg {
+  width: calc(14 * var(--px));
+  height: calc(14 * var(--px));
+}
+
+.side .new b:last-child {
+  width: calc(22 * var(--px));
+}
+
+.side .new b:last-child svg {
+  width: calc(11 * var(--px));
+}
+
+.side .new i {
+  width: 1px;
+  height: calc(14 * var(--px));
+  background: rgba(30, 27, 46, 0.09);
 }
 
 .still {
@@ -429,9 +691,8 @@ em {
     var(--dawn) center bottom / cover;
 }
 
-.still .card img {
+.still .sb {
   width: 220px;
-  height: auto;
   border-radius: 20px;
 }
 
@@ -1285,7 +1546,7 @@ em {
   margin-top: 6px;
 }
 
-.close {
+.closing {
   width: min(1180px, 100% - 40px);
   margin: 130px auto 0;
   border-radius: 36px;
@@ -1301,18 +1562,18 @@ em {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
-.close img {
+.closing img {
   margin: 0 auto;
 }
 
-.close h2 {
+.closing h2 {
   font-size: clamp(52px, 6.6vw, 84px);
   line-height: 0.98;
   letter-spacing: -0.015em;
   margin-top: 20px;
 }
 
-.close p {
+.closing p {
   font-size: 19px;
   color: var(--ink2);
   max-width: 560px;
