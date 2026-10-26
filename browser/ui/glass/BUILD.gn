@@ -90,6 +90,7 @@ source_set("browser_tests") {
     "//ui/menus",
     "//ui/views",
     "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/workspaces",
     "//uw/components/look",

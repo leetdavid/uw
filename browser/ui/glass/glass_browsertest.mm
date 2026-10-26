@@ -52,6 +52,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
 #include "uw/browser/ui/glass/glass_screenshot.h"
+#include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -390,6 +391,42 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_SuggestionsAsMacOSShowsThem) {
   EXPECT_TRUE(GlassBehind(list));
   SaveNativeWindowScreenshot(browser(), "glass-suggestions-window");
   SaveWindowWithPopups(browser(), "glass-suggestions");
+}
+
+// Real windows only. Saves the dark command bar, listing rows, over a red page
+// as macOS shows it, frosted, so its corners can be checked.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_TheCommandBarAsMacOSShowsIt) {
+  if (!MacCanShowGlass()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  browser()->GetWindow()->Activate();
+  ASSERT_TRUE(
+      content::ExecJs(browser()->tab_strip_model()->GetActiveWebContents(),
+                      "document.body.style.background = '#c62828'"));
+  Theme theme = ThemeOfWindow(browser());
+  theme.page_mode = PageMode::kDark;
+  SetThemeOfWindow(browser(), theme);
+  SetLook(kFullTransparency / 2, 60);
+  CommandBar* bar = CommandBar::From(browser());
+  ASSERT_TRUE(content::WaitForLoadStop(bar->page()));
+  ASSERT_TRUE(CommandBar::Open(browser()));
+  ASSERT_TRUE(base::test::RunUntil([&] { return bar->IsShowing(); }));
+  ASSERT_TRUE(content::ExecJs(bar->page(), R"(
+      const field = document.querySelector('#field');
+      field.value = 'about';
+      field.dispatchEvent(new Event('input'));
+  )"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(bar->page(),
+                           "document.querySelectorAll('#results li').length")
+               .ExtractInt() > 0;
+  }));
+  ASSERT_TRUE(content::EvalJs(bar->page(), R"(
+      new Promise(drawn => requestAnimationFrame(
+          () => requestAnimationFrame(() => drawn(true))))
+  )")
+                  .ExtractBool());
+  SaveWindowWithPopups(browser(), "glass-command-bar");
 }
 
 }  // namespace

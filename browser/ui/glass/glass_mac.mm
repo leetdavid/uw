@@ -38,7 +38,8 @@
 #include "uw/browser/ui/look/menu_card.h"
 
 // A glass view that leaves clicks to the views over it, as Chromium's window
-// glass does, with a hole near its top that it keeps as it resizes.
+// glass does, cut to its rounded shape, with a hole near its top that it keeps
+// as it resizes.
 API_AVAILABLE(macos(26.0))
 @interface UwFrostedGlassView : NSGlassEffectView
 @property(nonatomic) std::optional<uw::GlassHole> hole;
@@ -58,20 +59,42 @@ API_AVAILABLE(macos(26.0))
 
 - (void)setHole:(std::optional<uw::GlassHole>)hole {
   _hole = hole;
-  [self cutHole];
+  [self cut];
+}
+
+- (void)setCornerRadius:(CGFloat)cornerRadius {
+  [super setCornerRadius:cornerRadius];
+  [self cut];
 }
 
 - (void)setFrameSize:(NSSize)size {
   [super setFrameSize:size];
-  [self cutHole];
+  [self cut];
 }
 
-// Masks the hole out of the glass, so what is under it stays sharp.
-- (void)cutHole {
-  if (!_hole) {
-    self.layer.mask = nil;
-    return;
+// Masks the glass to its rounded shape, and the hole out of it, so what is
+// under the hole stays sharp. The glass's shadow falls outside that shape, and
+// its window ends at the glass's square edge, so unmasked the shadow showed in
+// the window's four corners.
+- (void)cut {
+  const CGRect glass = self.bounds;
+  const CGFloat corner = std::min<CGFloat>(
+      self.cornerRadius,
+      std::min(CGRectGetWidth(glass), CGRectGetHeight(glass)) / 2);
+  CGMutablePathRef path = CGPathCreateMutable();
+  CGPathAddRoundedRect(path, nullptr, glass, corner, corner);
+  if (_hole) {
+    [self addHole:path];
   }
+  CAShapeLayer* mask = [CAShapeLayer layer];
+  mask.fillRule = kCAFillRuleEvenOdd;
+  mask.frame = glass;
+  mask.path = path;
+  CGPathRelease(path);
+  self.layer.mask = mask;
+}
+
+- (void)addHole:(CGMutablePathRef)path {
   const CGRect glass = self.bounds;
   const CGRect hole = CGRectMake(
       _hole->sides, CGRectGetHeight(glass) - _hole->top - _hole->height,
@@ -79,15 +102,7 @@ API_AVAILABLE(macos(26.0))
       _hole->height);
   const CGFloat radius = std::min<CGFloat>(
       _hole->radius, std::min(CGRectGetWidth(hole), CGRectGetHeight(hole)) / 2);
-  CGMutablePathRef path = CGPathCreateMutable();
-  CGPathAddRect(path, nullptr, glass);
   CGPathAddRoundedRect(path, nullptr, hole, radius, radius);
-  CAShapeLayer* mask = [CAShapeLayer layer];
-  mask.fillRule = kCAFillRuleEvenOdd;
-  mask.frame = glass;
-  mask.path = path;
-  CGPathRelease(path);
-  self.layer.mask = mask;
 }
 @end
 
