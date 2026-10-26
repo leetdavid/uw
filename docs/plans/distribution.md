@@ -77,11 +77,17 @@ Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_l
 
 Agreed: one page that sells uw, in the `uw-arc-style` look. The approved design is frame `KvI1yY00T8` on the Doop canvas. It shows only uw's own interface, never real or made-up websites, and only features that are built.
 
-1. Hero: "ur web, ur way", one line on what uw is, and "Download for Mac" with "Apple silicon · macOS 13 or later". Below it sits the ad video; its poster image stands in until the video is made.
+1. Hero: "ur web, ur way", one line on what uw is, and "Download for Mac" with "Apple silicon · macOS 13 or later". Below it plays the ad, "Tabs, sorted" (frame `kSVeaeuYZm`): the full 28 s spot, built as animated HTML rather than a video file. It starts on its own and loops. It has no sound yet; an unmute button comes once the music exists. Where the storyboard shows the made-up food page (panels 5 and 7), the ad shows a stock photo of pastéis de nata instead, with no site name or page around it.
 2. How it works: a pinned scroll demo of a live sidebar. Over four stops its tabs move out of a messy Scratchpad into tasks, a new task forms and gets its name, and Undo appears. Phones and reduced-motion settings get four still cards instead.
 3. Features: the mini player docked in the sidebar, the command bar, workspaces and themes, the agent, watching a page, and the terminal.
 4. Four promises: built on Chromium, the user's own AI provider, problem reports only with consent, and Undo for every move.
 5. A closing section that says the preview is rough, with the download button and, beside it, the [Homebrew](#homebrew) command with a copy button. Then a footer linking releases, GitHub Issues, and the source.
+
+Motion: the dawn background behind the hero, the demo, and the closing panel moves slowly. Its hills drift at different speeds, the pink glow breathes, and the light along the ridge glints now and then. One cycle takes about a minute.
+
+Sections fade and rise in as they scroll into view. Each feature tile plays a short loop of its feature while on screen: the docked video plays, the command bar types and answers, the workspaces swipe, the agent's Yes gets tapped, the price chart draws and pings, and the terminal types. Buttons respond to hover.
+
+The ad has a pause button. With the system's "Reduce motion" setting on, the page holds still: the ad rests on its end card, the background and tiles stop, and the demo shows still cards. Animations stop while off screen. Each part is reviewed as a recording of the real site before it goes live: the ad, then the background, then the tiles.
 
 No email list, docs, or pricing yet.
 
