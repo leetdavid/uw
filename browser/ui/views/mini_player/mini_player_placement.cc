@@ -13,6 +13,7 @@
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"  // nogncheck
 #include "components/prefs/pref_service.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
+#include "uw/browser/ui/views/mini_player/dock_cover.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 
@@ -44,12 +45,18 @@ MiniPlayerPlacement::~MiniPlayerPlacement() = default;
 
 void MiniPlayerPlacement::Update() {
   settle_.Stop();
-  place_.Run(Choose());
+  Place(Choose());
 }
 
 void MiniPlayerPlacement::UpdateNew() {
   settle_.Stop();
-  place_.Run(Choose(/*just_opened=*/true));
+  Place(Choose(/*just_opened=*/true));
+}
+
+void MiniPlayerPlacement::Place(MiniPlayerDock* dock) {
+  placed_ = true;
+  floats_ = !dock;
+  place_.Run(dock);
 }
 
 void MiniPlayerPlacement::ScheduleUpdate() {
@@ -128,8 +135,17 @@ MiniPlayerDock* MiniPlayerPlacement::Choose(bool just_opened) {
     return !current_ && !just_opened && floating_window_->IsActive() ? nullptr
                                                                      : dock;
   }
-  return local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref) ? nullptr
-                                                                   : dock;
+  if (!local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref)) {
+    return dock;
+  }
+  // With another app in front, it floats only once that app's windows cover
+  // its dock, and then stays floating until uw comes back. One that opens now
+  // looks at once at where it would dock.
+  if (!placed_) {
+    return CoveredPart(window, dock->PlaceInScreen()) >= kHiddenPart ? nullptr
+                                                                     : dock;
+  }
+  return floats_ || dock->covered() ? nullptr : dock;
 }
 
 void MiniPlayerPlacement::Watch(BrowserWindowInterface* front,
@@ -140,8 +156,13 @@ void MiniPlayerPlacement::Watch(BrowserWindowInterface* front,
   watched_ = front;
   window_.Reset();
   collapse_ = {};
+  cover_ = {};
   if (dock && dock->GetWidget()) {
     window_.Observe(dock->GetWidget());
+  }
+  if (dock) {
+    cover_ = dock->ObserveCover(base::BindRepeating(
+        &MiniPlayerPlacement::ScheduleUpdate, base::Unretained(this)));
   }
   auto* sidebar =
       front ? tabs::VerticalTabStripStateController::From(front) : nullptr;

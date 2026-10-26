@@ -10,6 +10,8 @@
 #include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
@@ -33,7 +35,8 @@ class StackRow;
 // stack peek out above it, and slide up into rows under the pointer. Hidden
 // while empty. It also opens a mini player when the user leaves a tab whose
 // video plays, and keeps picture in picture from opening while the setting is
-// Off.
+// Off. With another app active, it watches whether that app's windows cover
+// what is docked, which then floats.
 class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   METADATA_HEADER(MiniPlayerDock, views::View)
 
@@ -75,6 +78,16 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
     on_destroying_ = std::move(on_destroying);
   }
 
+  // True once, with another app active, other apps' windows have covered half
+  // or more of what is docked here for about a second, until uw comes to the
+  // front again.
+  bool covered() const { return covered_; }
+  // Runs `callback` each time covered() changes.
+  base::CallbackListSubscription ObserveCover(base::RepeatingClosure callback);
+  // Where the mini player docks, in screen coordinates, even while nothing is
+  // docked: then the bottom of the sidebar, as tall as it is wide.
+  gfx::Rect PlaceInScreen() const;
+
   // True while the paused videos show as rows, or slide up to them.
   bool fanned() const { return fanned_; }
   bool IsFanAnimating() const { return fan_.is_animating(); }
@@ -107,6 +120,11 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   void OnStackChanged();
   void SetFanned(bool fanned);
   void UpdateOff();
+  // Checks twice a second whether what is docked is covered, while another
+  // app is active, something is docked, and floating when covered is on.
+  void UpdateCoverCheck();
+  void CheckCover();
+  void SetCovered(bool covered);
 
   const raw_ptr<BrowserWindowInterface> window_;
   raw_ptr<MiniPlayerView> player_ = nullptr;
@@ -123,6 +141,12 @@ class MiniPlayerDock : public views::View, public gfx::AnimationDelegate {
   // Chromium's own block on picture in picture, held while it is Off.
   std::unique_ptr<ScopedDisallowPictureInPicture> off_;
   base::CallbackListSubscription stack_subscription_;
+  bool covered_ = false;
+  // When the latest check found it covered, while it has stayed so.
+  base::TimeTicks covered_since_;
+  base::RepeatingTimer cover_check_;
+  base::RepeatingClosureList cover_callbacks_;
+  base::CallbackListSubscription app_activity_;
   ui::ScopedUnownedUserData<MiniPlayerDock> user_data_;
 };
 

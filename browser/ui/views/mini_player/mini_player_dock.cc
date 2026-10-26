@@ -13,6 +13,7 @@
 #include "chrome/browser/picture_in_picture/scoped_disallow_picture_in_picture.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "components/prefs/pref_service.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_provider.h"
@@ -23,7 +24,9 @@
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/views/view_class_properties.h"
+#include "uw/browser/ui/views/mini_player/app_activity.h"
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
+#include "uw/browser/ui/views/mini_player/dock_cover.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
@@ -49,6 +52,12 @@ constexpr int kRowGap = 6;
 constexpr base::TimeDelta kFanIn = base::Milliseconds(220);
 constexpr base::TimeDelta kFanOut = base::Milliseconds(160);
 constexpr int kCornerRadius = 10;
+// Other apps' windows give no notice when they move, so the dock looks again
+// this often while another app is active.
+constexpr base::TimeDelta kCoverCheck = base::Milliseconds(500);
+// How long it must stay covered before it floats, so that a window dragged
+// past or a passing popup does not float it.
+constexpr base::TimeDelta kCoverHold = base::Seconds(1);
 
 // `shape` in `width`: as wide as the dock, and no taller than it is wide. A
 // tall one is as tall as the dock is wide, and narrower.
@@ -82,7 +91,12 @@ MiniPlayerDock::MiniPlayerDock(BrowserWindowInterface* window)
     prefs_.Add(kMiniPlayerModePref,
                base::BindRepeating(&MiniPlayerDock::UpdateOff,
                                    base::Unretained(this)));
+    prefs_.Add(kMiniPlayerFloatInBackgroundPref,
+               base::BindRepeating(&MiniPlayerDock::UpdateCoverCheck,
+                                   base::Unretained(this)));
   }
+  app_activity_ = ObserveAppActivity(base::BindRepeating(
+      &MiniPlayerDock::UpdateCoverCheck, base::Unretained(this)));
   UpdateOff();
   SiteWindow::Watch();
 }
@@ -106,6 +120,7 @@ MiniPlayerView* MiniPlayerDock::Take(std::unique_ptr<MiniPlayerView> player) {
   UpdateLook();
   SetVisible(true);
   OnStackChanged();
+  UpdateCoverCheck();
   return player_;
 }
 
@@ -116,6 +131,7 @@ std::unique_ptr<MiniPlayerView> MiniPlayerDock::Release() {
   SetVisible(site_window_ != nullptr);
   OnStackChanged();
   PreferredSizeChanged();
+  UpdateCoverCheck();
   return RemoveChildViewT(player);
 }
 
@@ -125,6 +141,7 @@ views::View* MiniPlayerDock::TakeSiteWindow(std::unique_ptr<views::View> page,
   site_window_shape_ = shape;
   SetVisible(true);
   PreferredSizeChanged();
+  UpdateCoverCheck();
   return site_window_;
 }
 
@@ -134,6 +151,7 @@ std::unique_ptr<views::View> MiniPlayerDock::ReleaseSiteWindow() {
   on_site_window_destroying_.Reset();
   SetVisible(player_ != nullptr);
   PreferredSizeChanged();
+  UpdateCoverCheck();
   return page ? RemoveChildViewT(page) : nullptr;
 }
 
@@ -272,6 +290,65 @@ void MiniPlayerDock::UpdateFan() {
   }
   PreferredSizeChanged();
   SchedulePaint();
+}
+
+base::CallbackListSubscription MiniPlayerDock::ObserveCover(
+    base::RepeatingClosure callback) {
+  return cover_callbacks_.Add(std::move(callback));
+}
+
+gfx::Rect MiniPlayerDock::PlaceInScreen() const {
+  if (GetVisible() && !size().IsEmpty()) {
+    return GetBoundsInScreen();
+  }
+  if (!parent()) {
+    return gfx::Rect();
+  }
+  const gfx::Rect sidebar = parent()->GetBoundsInScreen();
+  return gfx::Rect(sidebar.x(), sidebar.bottom() - sidebar.width(),
+                   sidebar.width(), sidebar.width());
+}
+
+void MiniPlayerDock::UpdateCoverCheck() {
+  if (IsAppActive()) {
+    SetCovered(false);
+  }
+  PrefService* local_state = g_browser_process->local_state();
+  if (IsAppActive() || covered_ || (!player_ && !site_window_) ||
+      !local_state ||
+      !local_state->GetBoolean(kMiniPlayerFloatInBackgroundPref)) {
+    cover_check_.Stop();
+    covered_since_ = base::TimeTicks();
+    return;
+  }
+  if (!cover_check_.IsRunning()) {
+    cover_check_.Start(FROM_HERE, kCoverCheck,
+                       base::BindRepeating(&MiniPlayerDock::CheckCover,
+                                           base::Unretained(this)));
+  }
+}
+
+void MiniPlayerDock::CheckCover() {
+  if (CoveredPart(GetWidget(), GetBoundsInScreen()) < kHiddenPart) {
+    covered_since_ = base::TimeTicks();
+    return;
+  }
+  const base::TimeTicks now = base::TimeTicks::Now();
+  if (covered_since_.is_null()) {
+    covered_since_ = now;
+  } else if (now - covered_since_ >= kCoverHold) {
+    SetCovered(true);
+    UpdateCoverCheck();
+  }
+}
+
+void MiniPlayerDock::SetCovered(bool covered) {
+  if (covered == covered_) {
+    return;
+  }
+  covered_ = covered;
+  covered_since_ = base::TimeTicks();
+  cover_callbacks_.Notify();
 }
 
 void MiniPlayerDock::UpdateOff() {

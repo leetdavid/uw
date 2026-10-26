@@ -7,6 +7,7 @@ source_set("mini_player") {
     "app_activity.h",
     "auto_mini_player.cc",
     "auto_mini_player.h",
+    "dock_cover.h",
     "live_pill.cc",
     "live_pill.h",
     "mini_player_controls.cc",
@@ -68,11 +69,15 @@ source_set("mini_player") {
   if (is_mac) {
     sources += [
       "app_activity_mac.mm",
+      "dock_cover_mac.mm",
       "floating_native_widget_mac.h",
       "floating_native_widget_mac.mm",
     ]
     deps += [ "//components/remote_cocoa/common:mojo" ]
-    frameworks = [ "Cocoa.framework" ]
+    frameworks = [
+      "Cocoa.framework",
+      "CoreGraphics.framework",
+    ]
   }
 }
 

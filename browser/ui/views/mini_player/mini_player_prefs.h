@@ -32,7 +32,9 @@ inline constexpr char kMiniPlayerModePref[] = "uw.mini_player.mode";
 inline constexpr char kMiniPlayerOnTabSwitchPref[] =
     "uw.mini_player.on_tab_switch";
 
-// "Float the mini player when uw is in the background". On by default.
+// "Float the mini player when the sidebar is covered", by another app's
+// windows. On by default. Its key is from when it read "Float the mini player
+// when uw is in the background".
 inline constexpr char kMiniPlayerFloatInBackgroundPref[] =
     "uw.mini_player.float_in_background";
 

@@ -12,10 +12,15 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
+#include "base/process/launch.h"
+#include "base/process/process.h"
 #include "base/run_loop.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "base/threading/thread_restrictions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
@@ -57,6 +62,7 @@
 #include "uw/browser/ui/glass/glass_screenshot.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
+#include "uw/browser/ui/views/mini_player/dock_cover.h"
 #include "uw/browser/ui/views/mini_player/live_pill.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
@@ -89,12 +95,15 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     ASSERT_TRUE(embedded_test_server()->Start());
     // uw is rarely the app in front while tests run. Most tests here look at
-    // the floating mini player, which uw in the background shows.
+    // the floating mini player, which uw in the background shows while other
+    // apps cover it.
     SetAppActiveForTesting(false);
+    SetCoveredPartForTesting(1);
   }
 
   void TearDownOnMainThread() override {
     SetAppActiveForTesting(std::nullopt);
+    SetCoveredPartForTesting(std::nullopt);
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 
@@ -133,11 +142,46 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Lets the mini player's placement settle, for checks that it stayed.
-  void Settle() {
+  void Settle(base::TimeDelta delay = base::Milliseconds(400)) {
     base::RunLoop settled;
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-        FROM_HERE, settled.QuitClosure(), base::Milliseconds(400));
+        FROM_HERE, settled.QuitClosure(), delay);
     settled.Run();
+  }
+
+  // Longer than a docked mini player must stay covered before it floats.
+  static constexpr base::TimeDelta kPastTheHold = base::Milliseconds(1800);
+
+  // Shows a plain window of another app, osascript, over `area` of the
+  // screen, until the process ends.
+  static base::Process CoverWith(const gfx::Rect& area) {
+    // Cocoa's screen coordinates start at the bottom of the main screen.
+    const int bottom =
+        NSScreen.screens.firstObject.frame.size.height - area.bottom();
+    base::CommandLine command(base::FilePath("/usr/bin/osascript"));
+    for (const char* arg : {"-l", "JavaScript", "-e", R"(function run(argv) {
+          ObjC.import('Cocoa');
+          const [x, y, width, height] = argv.map(Number);
+          const app = $.NSApplication.sharedApplication;
+          app.setActivationPolicy(1);
+          const window =
+              $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer(
+                  $.NSMakeRect(x, y, width, height), 0, 2, false);
+          window.backgroundColor = $.NSColor.systemBlueColor;
+          window.orderFrontRegardless;
+          app.run;
+        })"}) {
+      command.AppendArg(arg);
+    }
+    for (int value : {area.x(), bottom, area.width(), area.height()}) {
+      command.AppendArg(base::NumberToString(value));
+    }
+    return base::LaunchProcess(command, base::LaunchOptions());
+  }
+
+  static void End(base::Process& process) {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    process.Terminate(0, /*wait=*/true);
   }
 
   static PrefService* LocalState() { return g_browser_process->local_state(); }
@@ -323,13 +367,16 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_TRUE(base::test::RunUntil([&] { return Bool("video.paused"); }));
 }
 
-IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
-                       ItFloatsWhileUwIsInTheBackground) {
+// With another app in front, it floats once that app's windows have covered
+// it for a second, per T214.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItFloatsOnceAnotherAppCoversIt) {
   SetAppActiveForTesting(true);
   MiniPlayer* mini_player = OpenMiniPlayer();
   ASSERT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
   SetAppActiveForTesting(false);
+  Settle();
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
   EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
   EXPECT_EQ(gfx::RoundedCornersF(12),
             mini_player->view()->layer()->rounded_corner_radii());
@@ -338,15 +385,42 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
 }
 
+// Beside another app, with less than half of it covered, it stays docked.
+// Once half is covered it floats, and it stays floating when uncovered, until
+// uw is in front again.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, BesideAnotherAppItStaysDocked) {
+  SetCoveredPartForTesting(0.4);
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  SetAppActiveForTesting(false);
+  Settle(kPastTheHold);
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+
+  SetCoveredPartForTesting(0.6);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  SetCoveredPartForTesting(0);
+  Settle(kPastTheHold);
+  EXPECT_TRUE(Floats(mini_player));
+
+  SetAppActiveForTesting(true);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  SetAppActiveForTesting(false);
+  Settle(kPastTheHold);
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+}
+
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
-                       WithFloatingInTheBackgroundOffItStaysDocked) {
+                       WithFloatingWhenCoveredOffItStaysDocked) {
   LocalState()->SetBoolean(kMiniPlayerFloatInBackgroundPref, false);
   SetAppActiveForTesting(true);
   MiniPlayer* mini_player = OpenMiniPlayer();
   ASSERT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
   SetAppActiveForTesting(false);
-  Settle();
+  Settle(kPastTheHold);
   EXPECT_TRUE(DocksIn(mini_player, browser()));
 }
 
@@ -1147,10 +1221,13 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
 }
 
 // A real window, for pnpm run window-tests: with uw in front the video docks
-// in the sidebar, behind another app it floats, and back in front it docks.
+// in the sidebar. Behind another app it stays docked while nothing covers it,
+// floats once another app's window does, and stays floating when that window
+// goes, per T214. Back in front it docks.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
-                       MANUAL_ItDocksInFrontAndFloatsBehindAnotherApp) {
+                       MANUAL_BehindAnotherAppItFloatsOnlyOnceCovered) {
   SetAppActiveForTesting(std::nullopt);
+  SetCoveredPartForTesting(std::nullopt);
   BringUwToFront();
   ASSERT_TRUE(base::test::RunUntil([] { return IsAppActive(); }));
   MiniPlayer* mini_player = OpenMiniPlayer();
@@ -1159,6 +1236,10 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
   SaveNativeWindowOverDesktop(browser()->GetWindow()->GetNativeWindow(),
                               "mini_player_docked_real");
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !dock->GetBoundsInScreen().IsEmpty(); }));
+  const gfx::Rect docked = dock->GetBoundsInScreen();
 
   NSRunningApplication* finder =
       [NSRunningApplication
@@ -1166,8 +1247,19 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
           .firstObject;
   ASSERT_TRUE(finder);
   [finder activateWithOptions:0];
+  ASSERT_TRUE(base::test::RunUntil([] { return !IsAppActive(); }));
+  EXPECT_EQ(0, CoveredPart(dock->GetWidget(), docked));
+  Settle(kPastTheHold);
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+
+  base::Process over = CoverWith(docked);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return CoveredPart(dock->GetWidget(), docked) > 0.9; }));
   EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
   EXPECT_FALSE(Bool("video.paused"));
+  End(over);
+  Settle(kPastTheHold);
+  EXPECT_TRUE(Floats(mini_player));
 
   BringUwToFront();
   EXPECT_TRUE(

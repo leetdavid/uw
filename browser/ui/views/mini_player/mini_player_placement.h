@@ -23,10 +23,10 @@ class MiniPlayerDock;
 
 // Where the mini player goes, per "Where it shows" in
 // docs/plans/mini-player.md: docked in the sidebar of the uw window in front,
-// or floating in its own window while uw is in the background, no window shows,
-// or the front window's sidebar is hidden, and always floating with Don't
-// dock chosen. It watches all of those and the settings, and says again
-// whenever one changes.
+// or floating in its own window while no window shows, the front window's
+// sidebar is hidden, or, with another app active, that app's windows cover
+// the dock, and always floating with Don't dock chosen. It watches all of
+// those and the settings, and says again whenever one changes.
 class MiniPlayerPlacement : public BrowserCollectionObserver,
                             public views::WidgetObserver {
  public:
@@ -66,6 +66,7 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
 
  private:
   MiniPlayerDock* Choose(bool just_opened = false);
+  void Place(MiniPlayerDock* dock);
   // Follows the sidebar and the window of `front`.
   void Watch(BrowserWindowInterface* front, MiniPlayerDock* dock);
 
@@ -73,9 +74,13 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
   const PlaceCallback place_;
   raw_ptr<MiniPlayerDock> current_ = nullptr;
   raw_ptr<BrowserWindowInterface> watched_ = nullptr;
+  // Whether it has been placed yet, and whether it floats there.
+  bool placed_ = false;
+  bool floats_ = false;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription app_activity_;
   base::CallbackListSubscription collapse_;
+  base::CallbackListSubscription cover_;
   base::ScopedObservation<BrowserCollection, BrowserCollectionObserver>
       browsers_{this};
   base::ScopedObservation<views::Widget, views::WidgetObserver> window_{this};
