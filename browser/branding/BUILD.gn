@@ -1,0 +1,34 @@
+# uw's own version in a release build. See docs/plans/distribution.md.
+
+assert(is_mac)
+
+source_set("release_version") {
+  sources = [
+    "release_version.h",
+    "release_version_mac.mm",
+  ]
+  deps = [
+    "//base",
+    "//base/version_info",
+  ]
+  frameworks = [ "Foundation.framework" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "release_version_browsertest.mm" ]
+  deps = [
+    ":release_version",
+    "//base",
+    "//base/test:test_support",
+    "//base/version_info",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui/webui/version",
+    "//chrome/test:test_support",
+    "//content/test:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+  ]
+  frameworks = [ "Foundation.framework" ]
+}

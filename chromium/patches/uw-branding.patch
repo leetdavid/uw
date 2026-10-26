@@ -168,6 +168,49 @@ diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRAN
 +PRODUCT_INSTALLER_SHORTNAME=uw Installer
  COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
 -MAC_BUNDLE_ID=org.chromium.Chromium
-+MAC_BUNDLE_ID=org.uw.browser
++MAC_BUNDLE_ID=com.uwbrowser.uw
  MAC_CREATOR_CODE=Cr24
  MAC_TEAM_ID=
+diff --git a/chrome/browser/ui/webui/version/BUILD.gn b/chrome/browser/ui/webui/version/BUILD.gn
+index 8c207f6..0cb5ea1 100644
+--- a/chrome/browser/ui/webui/version/BUILD.gn
++++ b/chrome/browser/ui/webui/version/BUILD.gn
+@@ -35,6 +35,7 @@ source_set("version") {
+   ]
+ 
+   if (is_mac) {
++    deps += [ "//uw/browser/branding:release_version" ]
+     if (use_lld) {
+       defines = [ "CHROMIUM_LINKER_NAME=\"lld\"" ]
+     } else if (use_mold) {
+diff --git a/chrome/browser/ui/webui/version/version_ui.cc b/chrome/browser/ui/webui/version/version_ui.cc
+index 4c523d4..c524fc1 100644
+--- a/chrome/browser/ui/webui/version/version_ui.cc
++++ b/chrome/browser/ui/webui/version/version_ui.cc
+@@ -61,6 +61,8 @@
+ 
+ #if BUILDFLAG(IS_MAC)
+ #include "base/mac/mac_util.h"
++#include "base/strings/strcat.h"
++#include "uw/browser/branding/release_version.h"
+ #endif
+ 
+ #if BUILDFLAG(IS_WIN)
+@@ -338,6 +340,17 @@ void VersionUI::AddVersionDetailStrings(content::WebUIDataSource* html_source) {
+ #if !BUILDFLAG(IS_ANDROID)
+ // static
+ std::u16string VersionUI::GetAnnotatedVersionStringForUi() {
++#if BUILDFLAG(IS_MAC)
++  if (std::optional<std::string> release = uw::ReleaseVersion()) {
++    return l10n_util::GetStringFUTF16(
++        IDS_SETTINGS_ABOUT_PAGE_BROWSER_VERSION, base::UTF8ToUTF16(*release),
++        std::u16string(),
++        base::StrCat({u"Chromium ",
++                      base::UTF8ToUTF16(version_info::GetVersionNumber())}),
++        base::UTF8ToUTF16(GetProductModifier()),
++        l10n_util::GetStringUTF16(VersionUI::VersionProcessorVariation()));
++  }
++#endif
+   return l10n_util::GetStringFUTF16(
+       IDS_SETTINGS_ABOUT_PAGE_BROWSER_VERSION,
+       base::UTF8ToUTF16(version_info::GetVersionNumber()),

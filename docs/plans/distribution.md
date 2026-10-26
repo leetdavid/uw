@@ -20,7 +20,7 @@ Agreed: previews are built on the owner's Mac in the `~/dev/uw-release` worktree
 
 ## Versions
 
-Agreed: uw has its own version, starting at 0.1.0 for the first public preview. Tags are `v0.1.0` and so on. The About page and release notes name the Chromium version it is built on, as in "uw 0.1.0 (Chromium 153.0.8010.53)". Only the app bundle's version keys change; the user agent and everything websites and extensions see keep Chromium's version.
+Agreed: uw has its own version, starting at 0.1.0 for the first public preview. Tags are `v0.1.0` and so on. `pnpm run release` writes the version into the app bundle's `Info.plist` before signing, as Chromium's own signing scripts change the plist for each channel. The About page then reads "Version 0.1.0 (Chromium 153.0.8010.53)", and the release notes name the Chromium version too. Daily builds carry Chromium's version and show it as before. The user agent and everything websites and extensions see keep Chromium's version.
 
 There is one channel. Each preview is a normal GitHub release rather than a prerelease, so `releases/latest/download/appcast.xml` always finds the newest feed. The release title says it is a preview.
 
@@ -107,7 +107,7 @@ Work, in order, with scores from the [roadmap convention](roadmap.md#implementab
 
 | Work | Score | Main consideration |
 | --- | --- | --- |
-| Bundle ID and uw version | 8/10 | `com.uwbrowser.uw`, uw's version in the bundle, and "uw 0.1.0 (Chromium …)" on the About page. The user agent keeps Chromium's version. |
+| Bundle ID and uw version | 8/10 | `com.uwbrowser.uw`, and "Version 0.1.0 (Chromium 153.0.8010.53)" on the About page once the release command writes the version. The user agent keeps Chromium's version. |
 | Release command | 6/10 | Wraps `sign_chrome.py`. The `uw` command's Node helper needs its own entitlements in Chromium's signing config, and notarizing a bundle this size is slow. |
 | Sparkle behind Chromium's relaunch button | 5/10 | A patch hands Sparkle's ready update to `UpgradeDetector`, and Chromium's relaunch has to finish Sparkle's install with tabs restored. |
 | Problem reports and consent | 5/10 | First-run Yes/No, one settings switch, Crashpad uploads to Sentry, symbols per release, and PostHog in uw's React pages. |
