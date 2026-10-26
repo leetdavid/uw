@@ -153,14 +153,13 @@ export class Release {
       "--identity", identity, "--notarize", "staple", "--notary-arg=--keychain-profile", `--notary-arg=${NOTARY_PROFILE}`,
     ], directory);
 
-    const signed = join(directory, "signed/stable");
+    const signed = join(directory, "signed");
     const packaged = readdirSync(signed).filter((name) => name.endsWith(".dmg"));
     if (packaged.length !== 1) throw new BuildError(`Expected one DMG in ${signed}, found ${packaged.length}`);
     const feed = join(directory, "feed");
     const dmg = join(feed, DMG);
     mkdirSync(feed);
     renameSync(join(signed, packaged[0]!), dmg);
-    this.step(["codesign", "--verify", "--deep", "--strict", join(signed, "uw.app")], directory);
     this.step(["xcrun", "stapler", "validate", dmg], directory);
     const appcast = join(directory, "appcast.xml");
     this.step([

@@ -39,8 +39,8 @@ function fixture(t: TestContext, { previous = "", pushed = true, subjects = [], 
     if (line.startsWith("shasum")) return `${checksum}  ${command.at(-1)}`;
     if (command[1]?.endsWith("sign_chrome.py")) {
       const output = command[command.indexOf("--output") + 1]!;
-      mkdirSync(join(output, "stable"), { recursive: true });
-      writeFileSync(join(output, "stable/uw-153.0.8010.53.dmg"), "dmg");
+      mkdirSync(output, { recursive: true });
+      writeFileSync(join(output, "uw-153.0.8010.53.dmg"), "dmg");
     }
     if (line.startsWith("gh release create")) return "https://github.com/leetdavid/uw/releases/tag/untagged-1";
     return "";
