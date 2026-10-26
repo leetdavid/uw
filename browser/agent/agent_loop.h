@@ -22,11 +22,14 @@
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
-#include "uw/browser/agent/command_check.h"
+#include "uw/browser/agent/quick_check.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/chat_usage.h"
+#include "uw/components/agent/command_check.h"
+#include "uw/components/agent/memory_tools.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/ai_providers/usage.h"
@@ -46,6 +49,11 @@ namespace uw {
 // asks, except before a command that may read a sensitive file, which every
 // mode asks about. See docs/plans/agent-chats.md.
 enum class ApprovalMode { kAskFirst, kAuto, kFullAuto };
+
+// What a chat does with its profile's agent memory: nothing, as a private
+// chat or a chat kept out of memory; recall only, as a scheduled run; or
+// recall and keep. See docs/plans/agent-memory.md.
+enum class MemoryUse { kOff, kRecall, kRecallAndKeep };
 
 // The model a chat talks to, and its key, which may be empty.
 struct AgentModel {
@@ -118,6 +126,11 @@ class AgentLoop {
   void SetModel(AgentModel model) { model_ = std::move(model); }
   // Asks for approval as `mode` says from the next step on. Auto until set.
   void SetMode(ApprovalMode mode) { mode_ = mode; }
+  // What the chat does with agent memory from the next message on. Off until
+  // set. While the profile's memory is paused, it does nothing.
+  void SetMemoryUse(MemoryUse use) { memory_use_ = use; }
+  // The chat's id, which each memory it keeps names as where it came from.
+  void SetChatId(std::string id) { chat_id_ = std::move(id); }
   // The skills the agent may load from now on: those of `skills` that are
   // not only for the user.
   void SetSkills(const std::vector<Skill>& skills);
@@ -189,6 +202,12 @@ class AgentLoop {
   AgentTools& tools() { return tools_; }
 
  private:
+  // Puts the memory the chat may use in the request, then asks the model.
+  void RecallThenAsk();
+  void OnMemoryLoaded();
+  // What the chat may do with memory now: nothing while the profile's memory
+  // is paused.
+  MemoryUse MemoryUseNow() const;
   void AskModel();
   void OnModel(RemoteModelClient::Outcome outcome);
   // The most characters a request may reach: kMaxRequestLength, or less for
@@ -206,15 +225,31 @@ class AgentLoop {
                          base::DictValue args,
                          base::expected<mcp::Content, std::string> answer);
   void CallTool(ModelTurn turn, size_t index, base::DictValue args);
+  void RunMemoryTool(ModelTurn turn, size_t index, base::DictValue args);
+  void OnMemoryCheck(std::optional<QuickCheck::Answer> answer);
+  void OnKept(ModelTurn turn,
+              size_t index,
+              base::DictValue args,
+              base::expected<Memory, std::string> kept);
+  void OnForgot(ModelTurn turn,
+                size_t index,
+                base::DictValue args,
+                std::optional<Memory> forgot);
+  void OnFound(ModelTurn turn,
+               size_t index,
+               base::DictValue args,
+               std::vector<Memory> found);
+  // Counts what a command or memory check used toward the chat's cost.
+  void RecordCheckUsage(const QuickCheck* check, UsageRecord::Kind kind);
   // Asks the command check about a terminal step that `approval` describes,
   // and runs it or asks the user, as its answer says.
   void CheckStep(ModelTurn turn,
                  size_t index,
                  base::DictValue args,
                  AgentTools::Approval approval);
-  void OnCheck(std::optional<CommandCheckAnswer> answer);
-  // Drops a check under way, after Stop or a steer, and leaves its step to
-  // RunCall.
+  void OnCheck(std::optional<QuickCheck::Answer> answer);
+  // Drops a command or memory check under way, after Stop or a steer, and
+  // leaves its step to RunCall.
   void EndCheck();
   void OnApproval(ModelTurn turn,
                   size_t index,
@@ -260,6 +295,10 @@ class AgentLoop {
   FillScheduleCard schedule_card_;
   Approve approve_;
   ApprovalMode mode_ = ApprovalMode::kAuto;
+  MemoryUse memory_use_ = MemoryUse::kOff;
+  // What the latest request offered the model of memory.
+  MemoryUse offered_memory_ = MemoryUse::kOff;
+  std::string chat_id_;
   // The user's no to the engine's question about a site, during the step
   // under way.
   std::optional<ApprovalAnswer> site_refused_;
@@ -270,10 +309,19 @@ class AgentLoop {
     size_t index = 0;
     base::DictValue args;
     AgentTools::Approval approval;
+    CommandCheckInput input;
     bool file_only = false;
-    std::unique_ptr<CommandCheck> client;
+    std::unique_ptr<QuickCheck> client;
   };
   std::unique_ptr<Check> check_;
+  // The memory check under way, and the remember call it is about.
+  struct MemoryCheck {
+    ModelTurn turn;
+    size_t index = 0;
+    base::DictValue args;
+    std::unique_ptr<QuickCheck> client;
+  };
+  std::unique_ptr<MemoryCheck> memory_check_;
   int turns_ = 0;
   bool working_ = false;
   // A model request is under way.

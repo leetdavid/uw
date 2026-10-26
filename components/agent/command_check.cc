@@ -14,6 +14,7 @@
 #include "base/strings/string_util.h"
 #include "base/values.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/check_questions.h"
 
 namespace uw {
 namespace {
@@ -41,8 +42,6 @@ constexpr char kSafe[] = "safe";
 constexpr char kOther[] = "other";
 constexpr char kNone[] = "none";
 
-using Options = std::vector<std::pair<std::string, std::string>>;
-
 constexpr char kDangerInstructions[] =
     "An AI agent wants to take this step in a terminal on the user's Mac. "
     "Decide what it could do, given what the user asked.";
@@ -57,7 +56,7 @@ constexpr char kNoneDescription[] =
     "No sensitive file. A program that loads its own settings does not "
     "count.";
 
-Options DangerOptions() {
+CheckOptions DangerOptions() {
   return {
       {kSafe,
        "Nothing hard to undo: it only reads, lists, searches, builds, tests, "
@@ -76,15 +75,6 @@ Options DangerOptions() {
        "other apps."},
       {"secrets", "It prints, copies, or sends passwords, keys, or tokens."},
   };
-}
-
-bool Valid(double probability) {
-  return probability >= 0.0 && probability <= 1.0;
-}
-
-bool IsOption(const Options& options, std::string_view value) {
-  return std::ranges::any_of(
-      options, [value](const auto& option) { return option.first == value; });
 }
 
 // The words of the step that could name a file, in order and once each.
@@ -123,8 +113,8 @@ std::string WordOf(std::string_view key,
   return words[number - 1];
 }
 
-Options FileOptions(const std::vector<std::string>& words) {
-  Options options;
+CheckOptions FileOptions(const std::vector<std::string>& words) {
+  CheckOptions options;
   for (size_t i = 0; i < words.size(); ++i) {
     options.emplace_back(WordKey(i), words[i]);
   }
@@ -133,14 +123,8 @@ Options FileOptions(const std::vector<std::string>& words) {
   return options;
 }
 
-struct Question {
-  const char* name;
-  std::string instructions;
-  Options options;
-};
-
-std::vector<Question> Questions(const CommandCheckInput& input) {
-  std::vector<Question> questions;
+std::vector<CheckQuestion> Questions(const CommandCheckInput& input) {
+  std::vector<CheckQuestion> questions;
   if (!input.file_only) {
     questions.push_back(
         {kDangerQuestion, kDangerInstructions, DangerOptions()});
@@ -256,95 +240,19 @@ std::optional<std::string> BuildChat(std::string_view model,
           .Set("max_tokens", kMaxChatAnswerTokens));
 }
 
-std::optional<std::string> BuildDecisions(std::string_view model,
-                                          const CommandCheckInput& input) {
-  base::ListValue questions;
-  for (const Question& question : Questions(input)) {
-    base::ListValue choices;
-    for (const auto& [value, description] : question.options) {
-      choices.Append(base::DictValue()
-                         .Set("value", value)
-                         .Set("description", description));
-    }
-    questions.Append(base::DictValue()
-                         .Set("type", "choice")
-                         .Set("name", question.name)
-                         .Set("instructions", question.instructions)
-                         .Set("choices", std::move(choices)));
-  }
-  return base::WriteJson(base::DictValue()
-                             .Set("model", model)
-                             .Set("input", DescribeInput(input))
-                             .Set("questions", std::move(questions)));
-}
-
-std::optional<std::string> BuildSystemOne(std::string_view model,
-                                          const CommandCheckInput& input) {
-  base::DictValue questions;
-  for (const Question& question : Questions(input)) {
-    base::DictValue criteria;
-    for (const auto& [key, description] : question.options) {
-      criteria.Set(key, description);
-    }
-    questions.Set(question.name, base::DictValue()
-                                     .Set("type", "choice")
-                                     .Set("instructions", question.instructions)
-                                     .Set("criteria", std::move(criteria)));
-  }
-  return base::WriteJson(base::DictValue()
-                             .Set("model", model)
-                             .Set("state", DescribeInput(input))
-                             .Set("questions", std::move(questions)));
-}
-
-// The probability `answer`'s table gives `option`. The Decisions API lists
-// them as {value, probability} pairs, System One as a dictionary.
-std::optional<double> Listed(const base::DictValue& answer,
-                             std::string_view option) {
-  if (const base::DictValue* table = answer.FindDict("probabilities")) {
-    return table->FindDouble(option);
-  }
-  if (const base::ListValue* pairs = answer.FindList("probabilities")) {
-    for (const base::Value& item : *pairs) {
-      const base::DictValue* pair = item.GetIfDict();
-      const std::string* value = pair ? pair->FindString("value") : nullptr;
-      if (value && *value == option) {
-        return pair->FindDouble("probability");
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-// The probability `answer` gives `option`: from its table when it lists one,
-// or else from its choice and confidence.
-std::optional<double> ProbabilityOf(const base::DictValue& answer,
-                                    std::string_view option) {
-  const std::optional<double> listed = Listed(answer, option);
-  if (listed) {
-    return Valid(*listed) ? listed : std::nullopt;
-  }
-  const std::string* choice = answer.FindString("choice");
-  const std::optional<double> confidence = answer.FindDouble("confidence");
-  if (!choice || !confidence || !Valid(*confidence)) {
-    return std::nullopt;
-  }
-  return *choice == option ? *confidence : 1.0 - *confidence;
-}
-
 // The answer's choice when it is one of `options` other than `except`, or else
 // the one its table finds likeliest. Empty when the table lists no other.
 std::string Leading(const base::DictValue& answer,
-                    const Options& options,
+                    const CheckOptions& options,
                     std::string_view except) {
   const std::string* choice = answer.FindString("choice");
-  if (choice && *choice != except && IsOption(options, *choice)) {
+  if (choice && *choice != except && IsCheckOption(options, *choice)) {
     return *choice;
   }
   std::string leading;
   double most = 0.0;
   for (const auto& [option, description] : options) {
-    const std::optional<double> probability = Listed(answer, option);
+    const std::optional<double> probability = ListedProbability(answer, option);
     if (option != except && probability && *probability > most) {
       most = *probability;
       leading = option;
@@ -353,20 +261,15 @@ std::string Leading(const base::DictValue& answer,
   return leading;
 }
 
-bool Chose(const base::DictValue* answer, const Options& options) {
-  const std::string* choice = answer ? answer->FindString("choice") : nullptr;
-  return choice && IsOption(options, *choice);
-}
-
 std::optional<CommandCheckAnswer> ReadDecision(const base::DictValue* danger,
                                                const base::DictValue* file,
                                                const CommandCheckInput& input) {
   const std::vector<std::string> words = StepWords(input.step);
-  const Options file_options = FileOptions(words);
-  if (!Chose(file, file_options)) {
+  const CheckOptions file_options = FileOptions(words);
+  if (!ChoseCheckOption(file, file_options)) {
     return std::nullopt;
   }
-  const std::optional<double> none = ProbabilityOf(*file, kNone);
+  const std::optional<double> none = ProbabilityOfOption(*file, kNone);
   if (!none) {
     return std::nullopt;
   }
@@ -376,11 +279,11 @@ std::optional<CommandCheckAnswer> ReadDecision(const base::DictValue* danger,
   if (input.file_only) {
     return answer;
   }
-  const Options danger_options = DangerOptions();
-  if (!Chose(danger, danger_options)) {
+  const CheckOptions danger_options = DangerOptions();
+  if (!ChoseCheckOption(danger, danger_options)) {
     return std::nullopt;
   }
-  const std::optional<double> safe = ProbabilityOf(*danger, kSafe);
+  const std::optional<double> safe = ProbabilityOfOption(*danger, kSafe);
   if (!safe) {
     return std::nullopt;
   }
@@ -389,35 +292,16 @@ std::optional<CommandCheckAnswer> ReadDecision(const base::DictValue* danger,
   return answer;
 }
 
-// The JSON object a language model answers with, alone or inside a Markdown
-// code fence.
-std::optional<base::DictValue> AnswerDict(std::string_view content) {
-  std::string_view text = base::TrimWhitespaceASCII(content, base::TRIM_ALL);
-  if (text.starts_with("```")) {
-    const size_t newline = text.find('\n');
-    if (newline == std::string_view::npos) {
-      return std::nullopt;
-    }
-    text = text.substr(newline + 1);
-    if (const size_t fence = text.rfind("```"); fence != std::string::npos) {
-      text = text.substr(0, fence);
-    }
-  }
-  return base::JSONReader::ReadDict(text, base::JSON_PARSE_RFC);
-}
-
 std::optional<CommandCheckAnswer> ReadChat(std::string_view body,
                                            const CommandCheckInput& input) {
-  const std::optional<ModelTurn> turn = ParseAgentResponse(body);
-  const std::optional<base::DictValue> json =
-      turn ? AnswerDict(turn->text) : std::nullopt;
+  const std::optional<base::DictValue> json = ReadCheckChatAnswer(body);
   if (!json) {
     return std::nullopt;
   }
   const std::string* file = json->FindString("file");
   const std::optional<double> file_confidence =
       json->FindDouble("file_confidence");
-  if (!file || !file_confidence || !Valid(*file_confidence)) {
+  if (!file || !file_confidence || !IsProbability(*file_confidence)) {
     return std::nullopt;
   }
   CommandCheckAnswer answer;
@@ -434,17 +318,14 @@ std::optional<CommandCheckAnswer> ReadChat(std::string_view body,
   }
   const std::string* danger = json->FindString("danger");
   const std::optional<double> confidence = json->FindDouble("confidence");
-  if (!danger || !confidence || !Valid(*confidence) ||
-      !IsOption(DangerOptions(), *danger)) {
+  if (!danger || !confidence || !IsProbability(*confidence) ||
+      !IsCheckOption(DangerOptions(), *danger)) {
     return std::nullopt;
   }
   answer.danger = *danger;
   answer.safe = *danger == kSafe ? *confidence : 1.0 - *confidence;
   if (const std::string* reason = json->FindString("reason")) {
-    std::string line;
-    base::ReplaceChars(base::TrimWhitespaceASCII(*reason, base::TRIM_ALL),
-                       "\r\n", " ", &line);
-    base::TruncateUTF8ToByteSize(line, kMaxReasonLength, &answer.reason);
+    answer.reason = OneLine(*reason, kMaxReasonLength);
   }
   return answer;
 }
@@ -484,8 +365,8 @@ std::optional<std::string> BuildCommandCheckRequestBody(
   if (format == DecisionFormat::kChat) {
     return BuildChat(model, input);
   }
-  return format == DecisionFormat::kDecisions ? BuildDecisions(model, input)
-                                              : BuildSystemOne(model, input);
+  return BuildCheckQuestionsBody(format, model, DescribeInput(input),
+                                 Questions(input));
 }
 
 std::optional<CommandCheckAnswer> ParseCommandCheckResponse(
@@ -500,27 +381,8 @@ std::optional<CommandCheckAnswer> ParseCommandCheckResponse(
   if (!response) {
     return std::nullopt;
   }
-  if (format == DecisionFormat::kSystemOne) {
-    const base::DictValue* answers = response->FindDict("answers");
-    return answers ? ReadDecision(answers->FindDict(kDangerQuestion),
-                                  answers->FindDict(kFileQuestion), input)
-                   : std::nullopt;
-  }
-  const base::ListValue* answers = response->FindList("answers");
-  if (!answers) {
-    return std::nullopt;
-  }
-  const auto find = [answers](std::string_view question) {
-    for (const base::Value& item : *answers) {
-      const base::DictValue* answer = item.GetIfDict();
-      const std::string* name = answer ? answer->FindString("name") : nullptr;
-      if (name && *name == question) {
-        return answer;
-      }
-    }
-    return static_cast<const base::DictValue*>(nullptr);
-  };
-  return ReadDecision(find(kDangerQuestion), find(kFileQuestion), input);
+  return ReadDecision(FindCheckAnswer(format, *response, kDangerQuestion),
+                      FindCheckAnswer(format, *response, kFileQuestion), input);
 }
 
 CommandCheckVerdict JudgeTerminalStep(

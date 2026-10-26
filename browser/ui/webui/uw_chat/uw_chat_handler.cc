@@ -1016,6 +1016,12 @@ bool UwChatHandler::Start() {
   agent_->SetApprover(
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
+  agent_->SetChatId(id_);
+  agent_->SetMemoryUse(
+      Profile::FromBrowserContext(contents_->GetBrowserContext())
+              ->IsOffTheRecord()
+          ? MemoryUse::kOff
+          : MemoryUse::kRecallAndKeep);
   UpdateScheduledRuns();
   for (const std::string& name : connectors_off_) {
     agent_->SetConnectorOn(name, false);

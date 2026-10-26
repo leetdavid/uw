@@ -28,6 +28,7 @@ void RegisterAiConnectionProfilePrefs(
                                kDefaultThresholds.new_name);
   registry->RegisterListPref(kAgentDisabledSkillsPref);
   registry->RegisterStringPref(kAgentApprovalModePref, "auto");
+  registry->RegisterBooleanPref(kAgentMemoryPref, true);
   registry->RegisterBooleanPref(kCommandBarEnabledPref, true);
   registry->RegisterBooleanPref(kRestoreAfterCrashPref, false);
   for (const char* mouse_action :

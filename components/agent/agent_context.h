@@ -71,6 +71,9 @@ class AgentContext {
   // Says what the chat's scheduled runs reported, one per line, in the
   // instructions, marked as coming from web pages. Empty for none.
   void SetScheduledRuns(std::string_view runs);
+  // Says `memory`, as MemoryInstructions() writes it, in the instructions.
+  // Empty when the chat uses no memory.
+  void SetMemory(std::string_view memory);
   // Tools every request offers beside uw's own: the connector tool and the
   // tools of each connector the model loaded.
   void SetExtraTools(base::ListValue tools);
@@ -102,6 +105,9 @@ class AgentContext {
   // such as `User: ...` and `Agent: run {"command":"ls"}`. Never a tool's
   // answer or an image.
   std::vector<std::string> UserAndActions(std::string_view call_id) const;
+  // What the memory check sees of the chat: the user's own messages, oldest
+  // first. Never piped text, a tool's answer, or an image.
+  std::vector<std::string> UserTexts() const;
 
   // The request for `model`. Above `max_length` characters, each image
   // counted as kImageLength, it shrinks the oldest results and images until
@@ -169,6 +175,7 @@ class AgentContext {
   std::string skills_;
   std::string connectors_;
   std::string scheduled_runs_;
+  std::string memory_;
   base::ListValue extra_tools_;
   std::set<std::string> loaded_connectors_;
   // "connector/tool".

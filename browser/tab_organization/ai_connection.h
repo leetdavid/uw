@@ -40,6 +40,10 @@ inline constexpr char kAgentDisabledSkillsPref[] = "uw.agent.disabled_skills";
 // The approval mode new chats start on: "ask_first", "auto", or "full_auto".
 inline constexpr char kAgentApprovalModePref[] = "uw.agent.approval_mode";
 
+// Whether chats recall and keep agent memory. Off pauses it and keeps every
+// memory. See docs/plans/agent-memory.md.
+inline constexpr char kAgentMemoryPref[] = "uw.agent.memory";
+
 // Whether Cmd+T opens the command bar instead of a blank tab.
 inline constexpr char kCommandBarEnabledPref[] = "uw.command_bar.enabled";
 

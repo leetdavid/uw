@@ -1,7 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/agent/command_check.h"
+#include "uw/browser/agent/quick_check.h"
 
 #include <memory>
 #include <optional>
@@ -25,6 +25,7 @@
 #include "net/dns/mock_host_resolver.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/components/agent/command_check.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -101,11 +102,17 @@ IN_PROC_BROWSER_TEST_F(CommandCheckBrowserTest, MANUAL_JudgesTheExamples) {
       std::optional<CommandCheckAnswer> answer;
       base::RunLoop loop;
       const base::TimeTicks start = base::TimeTicks::Now();
-      std::unique_ptr<CommandCheck> client = CommandCheck::Send(
-          *browser()->GetProfile(), chat, var("UW_CHECK_KEY"), input,
+      std::unique_ptr<QuickCheck> client = QuickCheck::Send(
+          *browser()->GetProfile(), chat, var("UW_CHECK_KEY"),
           base::BindLambdaForTesting(
-              [&](std::optional<CommandCheckAnswer> got) {
-                answer = std::move(got);
+              [&input](DecisionFormat format, std::string_view model) {
+                return BuildCommandCheckRequestBody(format, model, input);
+              }),
+          base::BindLambdaForTesting(
+              [&](std::optional<QuickCheck::Answer> got) {
+                answer = got ? ParseCommandCheckResponse(got->format, got->body,
+                                                         input)
+                             : std::nullopt;
                 loop.Quit();
               }));
       ASSERT_TRUE(client);

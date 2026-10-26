@@ -40,6 +40,8 @@ struct UsageRecord {
     kAgent,
     // The command check before one of its terminal commands.
     kCommandCheck,
+    // The memory check before it keeps a memory.
+    kMemoryCheck,
   };
 
   Kind kind = Kind::kAgent;
@@ -116,6 +118,8 @@ struct UsageSummary {
   int agent_requests = 0;
   Spent checks;
   int check_count = 0;
+  Spent memory_checks;
+  int memory_check_count = 0;
   Spent runs;
   int run_count = 0;
   double total = 0;

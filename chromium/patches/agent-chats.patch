@@ -76,3 +76,15 @@ index 93437bb2ae097d1b7f8f4beeea1e6d125c3b16c6..94911cda288b6ad74fad71de544d4065
    };
  
    virtual ~NotificationHandler();
+diff --git a/tools/metrics/histograms/metadata/sql/histograms.xml b/tools/metrics/histograms/metadata/sql/histograms.xml
+index 858751870a6ebfe439b47b3e80e66828d55aaa51..4b17e44059e639186d297b3e5fbe23b2b03a04b7 100644
+--- a/tools/metrics/histograms/metadata/sql/histograms.xml
++++ b/tools/metrics/histograms/metadata/sql/histograms.xml
+@@ -106,6 +106,7 @@ chromium-metrics-reviews@google.com.
+   <variant name="TrustTokens" summary="TrustTokens"/>
+   <variant name="UKMMetrics" summary="UKMMetrics"/>
+   <variant name="UserAnnotations" summary="UserAnnotations"/>
++  <variant name="UwMemory" summary="uw agent memory"/>
+   <variant name="Web" summary="Web"/>
+ </variants>
+ 

@@ -20,13 +20,18 @@
 #include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/storage_partition.h"
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
-#include "uw/browser/agent/command_check.h"
+#include "uw/browser/agent/memory_store.h"
+#include "uw/browser/agent/quick_check.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
+#include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/components/agent/check_questions.h"
+#include "uw/components/agent/memory_check.h"
 #include "uw/components/agent/run_report.h"
 #include "uw/components/agent/schedule_tool.h"
 
@@ -168,7 +173,38 @@ void AgentLoop::Send(std::string_view text,
   if (!material.empty()) {
     context_->AddMaterial(material);
   }
+  RecallThenAsk();
+}
+
+void AgentLoop::RecallThenAsk() {
+  MemoryStore* store = MemoryStore::For(profile_);
+  if (memory_use_ == MemoryUse::kOff || !store) {
+    OnMemoryLoaded();
+    return;
+  }
+  store->WhenLoaded(
+      base::BindOnce(&AgentLoop::OnMemoryLoaded, weak_factory_.GetWeakPtr()));
+}
+
+void AgentLoop::OnMemoryLoaded() {
+  offered_memory_ = MemoryUseNow();
+  if (offered_memory_ == MemoryUse::kOff) {
+    context_->SetMemory("");
+  } else {
+    context_->SetMemory(
+        MemoryInstructions(MemoryStore::For(profile_)->core(),
+                           offered_memory_ == MemoryUse::kRecallAndKeep));
+  }
+  UpdateConnectorTools();
   AskModel();
+}
+
+MemoryUse AgentLoop::MemoryUseNow() const {
+  if (memory_use_ == MemoryUse::kOff || !MemoryStore::For(profile_) ||
+      !profile_->GetPrefs()->GetBoolean(kAgentMemoryPref)) {
+    return MemoryUse::kOff;
+  }
+  return memory_use_;
 }
 
 void AgentLoop::Resume() {
@@ -345,6 +381,11 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     LoadSkill(std::move(turn), index, std::move(*args));
     return;
   }
+  if (call.name == kSearchMemoryTool || call.name == kRememberTool ||
+      call.name == kForgetTool) {
+    RunMemoryTool(std::move(turn), index, std::move(*args));
+    return;
+  }
   if (call.name == kReportTool && report_) {
     base::DictValue answer = report_.Run(*args);
     OnTool(std::move(turn), index, std::move(*args), std::move(answer));
@@ -433,9 +474,16 @@ void AgentLoop::CheckStep(ModelTurn turn,
   check_->index = index;
   check_->args = std::move(args);
   check_->approval = std::move(approval);
+  check_->input = input;
   check_->file_only = input.file_only;
-  check_->client = CommandCheck::Send(
-      *profile_, model_.connection, model_.api_key, input,
+  check_->client = QuickCheck::Send(
+      *profile_, model_.connection, model_.api_key,
+      base::BindRepeating(
+          [](const CommandCheckInput& input, DecisionFormat format,
+             std::string_view model) {
+            return BuildCommandCheckRequestBody(format, model, input);
+          },
+          std::move(input)),
       base::BindOnce(&AgentLoop::OnCheck, weak_factory_.GetWeakPtr()));
   if (!check_->client) {
     OnCheck(std::nullopt);
@@ -450,25 +498,34 @@ size_t AgentLoop::MaxRequestLength() const {
       kMaxRequestLength, model_.input_limit * kCharsPerToken));
 }
 
-void AgentLoop::OnCheck(std::optional<CommandCheckAnswer> answer) {
-  std::unique_ptr<Check> check = std::move(check_);
-  if (check->client && check->client->usage()) {
-    UsageRecord record;
-    record.kind = UsageRecord::Kind::kCommandCheck;
-    record.time = base::Time::Now();
-    record.model = check->client->model();
-    record.usage = *check->client->usage();
-    record.cost = CostOf(record.usage, check->client->price());
-    record.price = check->client->price();
-    context_->AddUsage(std::move(record));
+void AgentLoop::RecordCheckUsage(const QuickCheck* check,
+                                 UsageRecord::Kind kind) {
+  if (!check || !check->usage()) {
+    return;
   }
+  UsageRecord record;
+  record.kind = kind;
+  record.time = base::Time::Now();
+  record.model = check->model();
+  record.usage = *check->usage();
+  record.cost = CostOf(record.usage, check->price());
+  record.price = check->price();
+  context_->AddUsage(std::move(record));
+}
+
+void AgentLoop::OnCheck(std::optional<QuickCheck::Answer> answer) {
+  std::unique_ptr<Check> check = std::move(check_);
+  RecordCheckUsage(check->client.get(), UsageRecord::Kind::kCommandCheck);
   if (check->client) {
     // The client that answered may still be on the stack.
     base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
         FROM_HERE, std::move(check->client));
   }
   const CommandCheckVerdict verdict =
-      JudgeTerminalStep(answer, check->file_only, model_.connection.model);
+      JudgeTerminalStep(answer ? ParseCommandCheckResponse(
+                                     answer->format, answer->body, check->input)
+                               : std::nullopt,
+                        check->file_only, model_.connection.model);
   if (!verdict.ask) {
     CallTool(std::move(check->turn), check->index, std::move(check->args));
     return;
@@ -485,6 +542,11 @@ void AgentLoop::OnCheck(std::optional<CommandCheckAnswer> answer) {
 }
 
 void AgentLoop::EndCheck() {
+  if (memory_check_) {
+    std::unique_ptr<MemoryCheck> check = std::move(memory_check_);
+    RunCall(std::move(check->turn), check->index);
+    return;
+  }
   if (!check_) {
     return;
   }
@@ -615,6 +677,12 @@ void AgentLoop::UpdateConnectorTools() {
     tools.Append(TriggerToolSchema());
     tools.Append(StopTriggerToolSchema());
   }
+  if (offered_memory_ != MemoryUse::kOff) {
+    for (base::Value& tool :
+         MemoryToolSchemas(offered_memory_ == MemoryUse::kRecallAndKeep)) {
+      tools.Append(std::move(tool));
+    }
+  }
   if (!connectors_.empty()) {
     tools.Append(LoadConnectorToolSchema());
   }
@@ -744,6 +812,154 @@ void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {
                      std::move(file)),
       base::BindOnce(&AgentLoop::OnTool, weak_factory_.GetWeakPtr(),
                      std::move(turn), index, std::move(args)));
+}
+
+void AgentLoop::RunMemoryTool(ModelTurn turn,
+                              size_t index,
+                              base::DictValue args) {
+  const std::string name = turn.calls[index].name;
+  const MemoryUse use =
+      offered_memory_ == MemoryUse::kOff ? MemoryUse::kOff : MemoryUseNow();
+  MemoryStore* store = MemoryStore::For(profile_);
+  if (use == MemoryUse::kOff || !store) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("Memory is off for this chat."));
+    return;
+  }
+  if (name == kSearchMemoryTool) {
+    const std::string* text = args.FindString("words");
+    std::vector<std::string> words =
+        text ? MemorySearchWords(*text) : std::vector<std::string>();
+    if (words.empty()) {
+      OnTool(std::move(turn), index, std::move(args),
+             Error("Pass several words to look for."));
+      return;
+    }
+    base::DictValue asked = args.Clone();
+    store->Search(
+        std::move(words), kMaxFoundMemories,
+        base::BindOnce(&AgentLoop::OnFound, weak_factory_.GetWeakPtr(),
+                       std::move(turn), index, std::move(asked)));
+    return;
+  }
+  if (use != MemoryUse::kRecallAndKeep) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("This run cannot keep or forget memories."));
+    return;
+  }
+  if (name == kForgetTool) {
+    const std::optional<double> id = args.FindDouble("id");
+    if (!id) {
+      OnTool(std::move(turn), index, std::move(args),
+             Error("Pass the memory's id."));
+      return;
+    }
+    base::DictValue asked = args.Clone();
+    store->Forget(
+        static_cast<int64_t>(*id),
+        base::BindOnce(&AgentLoop::OnForgot, weak_factory_.GetWeakPtr(),
+                       std::move(turn), index, std::move(asked)));
+    return;
+  }
+  const std::string* text = args.FindString("memory");
+  const std::string memory =
+      text ? OneLine(*text, kMaxMemoryLength + 1) : std::string();
+  if (memory.empty() || memory.size() > kMaxMemoryLength) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("Pass the memory as one plain sentence of at most 300 "
+                 "characters."));
+    return;
+  }
+  MemoryCheckInput input;
+  input.user = context_->UserTexts();
+  input.memory = memory;
+  memory_check_ = std::make_unique<MemoryCheck>();
+  memory_check_->turn = std::move(turn);
+  memory_check_->index = index;
+  memory_check_->args = std::move(args);
+  memory_check_->client = QuickCheck::Send(
+      *profile_, model_.connection, model_.api_key,
+      base::BindRepeating(
+          [](const MemoryCheckInput& input, DecisionFormat format,
+             std::string_view model) {
+            return BuildMemoryCheckRequestBody(format, model, input);
+          },
+          std::move(input)),
+      base::BindOnce(&AgentLoop::OnMemoryCheck, weak_factory_.GetWeakPtr()));
+  if (!memory_check_->client) {
+    OnMemoryCheck(std::nullopt);
+  }
+}
+
+void AgentLoop::OnMemoryCheck(std::optional<QuickCheck::Answer> answer) {
+  std::unique_ptr<MemoryCheck> check = std::move(memory_check_);
+  RecordCheckUsage(check->client.get(), UsageRecord::Kind::kMemoryCheck);
+  if (check->client) {
+    // The client that answered may still be on the stack.
+    base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(check->client));
+  }
+  const MemoryCheckVerdict verdict = JudgeMemory(
+      answer ? ParseMemoryCheckResponse(answer->format, answer->body)
+             : std::nullopt);
+  MemoryStore* store = MemoryStore::For(profile_);
+  if (!verdict.keep || !store) {
+    OnTool(
+        std::move(check->turn), check->index, std::move(check->args),
+        Error(verdict.keep ? "Memory is off for this chat." : verdict.reason));
+    return;
+  }
+  const std::string text =
+      OneLine(*check->args.FindString("memory"), kMaxMemoryLength);
+  const bool core = check->args.FindBool("core").value_or(false);
+  const int64_t replaces =
+      static_cast<int64_t>(check->args.FindDouble("replaces").value_or(0));
+  store->Keep(text, core, chat_id_, replaces,
+              base::BindOnce(&AgentLoop::OnKept, weak_factory_.GetWeakPtr(),
+                             std::move(check->turn), check->index,
+                             std::move(check->args)));
+}
+
+void AgentLoop::OnKept(ModelTurn turn,
+                       size_t index,
+                       base::DictValue args,
+                       base::expected<Memory, std::string> kept) {
+  if (!kept.has_value()) {
+    OnTool(std::move(turn), index, std::move(args), Error(kept.error()));
+    return;
+  }
+  OnTool(std::move(turn), index, std::move(args),
+         base::DictValue().Set("kept",
+                               MemoryToValue(*kept).Set("core", kept->core)));
+}
+
+void AgentLoop::OnForgot(ModelTurn turn,
+                         size_t index,
+                         base::DictValue args,
+                         std::optional<Memory> forgot) {
+  if (!forgot) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("There is no memory by that id."));
+    return;
+  }
+  OnTool(std::move(turn), index, std::move(args),
+         base::DictValue().Set("forgot", MemoryToValue(*forgot)));
+}
+
+void AgentLoop::OnFound(ModelTurn turn,
+                        size_t index,
+                        base::DictValue args,
+                        std::vector<Memory> found) {
+  base::ListValue memories;
+  for (const Memory& memory : found) {
+    memories.Append(MemoryToValue(memory));
+  }
+  base::DictValue result;
+  result.Set("memories", std::move(memories));
+  if (found.empty()) {
+    result.Set("note", "Nothing matched. Try other words.");
+  }
+  OnTool(std::move(turn), index, std::move(args), std::move(result));
 }
 
 void AgentLoop::OnTool(ModelTurn turn,

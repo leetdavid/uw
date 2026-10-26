@@ -14,12 +14,33 @@ int64_t Count(const base::DictValue& dict, std::string_view key) {
   return static_cast<int64_t>(dict.FindDouble(key).value_or(0));
 }
 
+const char* KindName(UsageRecord::Kind kind) {
+  switch (kind) {
+    case UsageRecord::Kind::kAgent:
+      return "agent";
+    case UsageRecord::Kind::kCommandCheck:
+      return "command_check";
+    case UsageRecord::Kind::kMemoryCheck:
+      return "memory_check";
+  }
+}
+
+std::optional<UsageRecord::Kind> KindNamed(std::string_view name) {
+  for (UsageRecord::Kind kind :
+       {UsageRecord::Kind::kAgent, UsageRecord::Kind::kCommandCheck,
+        UsageRecord::Kind::kMemoryCheck}) {
+    if (name == KindName(kind)) {
+      return kind;
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace
 
 base::DictValue UsageRecordToValue(const UsageRecord& record) {
   base::DictValue value;
-  value.Set("kind", record.kind == UsageRecord::Kind::kAgent ? "agent"
-                                                              : "command_check");
+  value.Set("kind", KindName(record.kind));
   value.Set("time", base::TimeToValue(record.time));
   value.Set("model", record.model);
   value.Set("usage", UsageToValue(record.usage));
@@ -63,12 +84,13 @@ std::optional<UsageRecord> UsageRecordFromValue(const base::Value& value) {
   const base::DictValue* usage = dict ? dict->FindDict("usage") : nullptr;
   std::optional<ModelUsage> read =
       usage ? UsageFromValue(*usage) : std::nullopt;
-  if (!kind || !read || (*kind != "agent" && *kind != "command_check")) {
+  const std::optional<UsageRecord::Kind> named =
+      kind ? KindNamed(*kind) : std::nullopt;
+  if (!named || !read) {
     return std::nullopt;
   }
   UsageRecord record;
-  record.kind = *kind == "agent" ? UsageRecord::Kind::kAgent
-                                 : UsageRecord::Kind::kCommandCheck;
+  record.kind = *named;
   if (const base::Value* time = dict->Find("time")) {
     record.time = base::ValueToTime(*time).value_or(base::Time());
   }
@@ -126,6 +148,13 @@ UsageSummary Summarize(const std::vector<UsageRecord>& records,
       ++summary.check_count;
       summary.checks.tokens += usage.input + usage.output;
       summary.checks.cost += record.cost.value_or(0);
+      spend(record);
+      continue;
+    }
+    if (record.kind == UsageRecord::Kind::kMemoryCheck) {
+      ++summary.memory_check_count;
+      summary.memory_checks.tokens += usage.input + usage.output;
+      summary.memory_checks.cost += record.cost.value_or(0);
       spend(record);
       continue;
     }

@@ -15,9 +15,9 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
-#include "base/strings/string_number_conversions.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
@@ -38,11 +38,13 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "uw/browser/agent/memory_store.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/components/ai_providers/providers.h"
@@ -1229,6 +1231,355 @@ IN_PROC_BROWSER_TEST_F(AgentTerminalBrowserTest,
   EXPECT_EQ(*steps_[0].result.FindString("output"), "hi");
   ASSERT_EQ(model_.Requests().size(), 3u);
   EXPECT_THAT(model_.Requests()[1], HasSubstr("You check a step"));
+}
+
+// A memory check's answer from a decision model: how likely the user said
+// the sentence, and what it holds.
+std::string MemoryCheckAnswer(double from_user,
+                              std::string_view holds = "ordinary") {
+  const double ordinary = holds == "ordinary" ? 0.95 : 0.03;
+  const auto option = [](std::string_view value, double probability) {
+    return base::DictValue()
+        .Set("value", value)
+        .Set("probability", probability);
+  };
+  return base::WriteJson(
+             base::DictValue().Set(
+                 "answers",
+                 base::ListValue()
+                     .Append(base::DictValue()
+                                 .Set("type", "choice")
+                                 .Set("name", "source")
+                                 .Set("choice",
+                                      from_user >= 0.5 ? "user" : "elsewhere")
+                                 .Set("probabilities",
+                                      base::ListValue()
+                                          .Append(option("user", from_user))
+                                          .Append(option("elsewhere",
+                                                         1 - from_user))))
+                     .Append(base::DictValue()
+                                 .Set("type", "choice")
+                                 .Set("name", "content")
+                                 .Set("choice", holds)
+                                 .Set("probabilities",
+                                      base::ListValue()
+                                          .Append(option("ordinary", ordinary))
+                                          .Append(option(
+                                              "secret",
+                                              holds == "secret" ? 0.95 : 0.01))
+                                          .Append(option("sensitive",
+                                                         holds == "sensitive"
+                                                             ? 0.95
+                                                             : 0.01))))))
+      .value_or("");
+}
+
+// Agent memory: the agent keeps what the user says once the memory check
+// agrees, and each chat reads the core memories and searches the rest. See
+// docs/plans/agent-memory.md.
+class AgentMemoryBrowserTest : public AgentLoopBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    AgentLoopBrowserTest::SetUpOnMainThread();
+    PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+    Provider provider = PresetProvider(ProviderPreset::kCustom);
+    provider.name = "Check";
+    provider.address = embedded_test_server()->GetURL("/v1").spec();
+    provider.format = ProviderFormat::kOpenAiDecisions;
+    provider.id = AddProvider(prefs, provider);
+    provider.key_account = KeyAccountFor(provider.id);
+    ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, "check-key"));
+    UpdateProvider(prefs, provider);
+    SetChoice(prefs, ModelSlot::kDecision, provider.id, "check-model");
+    checks_.Answer("/v1/decisions", MemoryCheckAnswer(0.95));
+    NewChat(MemoryUse::kRecallAndKeep);
+  }
+
+  // Starts another chat, which uses memory as `use` says.
+  void NewChat(MemoryUse use) {
+    UseFormat(ProviderFormat::kChatCompletions);
+    agent_->SetChatId(base::StrCat({"chat-", base::NumberToString(++chats_)}));
+    agent_->SetMemoryUse(use);
+  }
+
+  // Asks `text` and returns the first model request it made.
+  base::DictValue AskAndRead(std::string_view text) {
+    const size_t before = model_.Requests().size();
+    Ask(text);
+    const std::vector<std::string> requests = model_.Requests();
+    EXPECT_GT(requests.size(), before);
+    std::optional<base::DictValue> first = base::JSONReader::ReadDict(
+        requests.size() > before ? requests[before] : "{}",
+        base::JSON_PARSE_RFC);
+    return first ? std::move(*first) : base::DictValue();
+  }
+
+  static std::string InstructionsOf(const base::DictValue& request) {
+    const base::ListValue* messages = request.FindList("messages");
+    const std::string* text =
+        messages && !messages->empty()
+            ? (*messages)[0].GetDict().FindString("content")
+            : nullptr;
+    return text ? *text : std::string();
+  }
+
+  static std::vector<std::string> ToolsOf(const base::DictValue& request) {
+    std::vector<std::string> names;
+    if (const base::ListValue* tools = request.FindList("tools")) {
+      for (const base::Value& tool : *tools) {
+        names.push_back(
+            *tool.GetDict().FindStringByDottedPath("function.name"));
+      }
+    }
+    return names;
+  }
+
+  // Every memory of the profile, newest first.
+  std::vector<Memory> Memories() {
+    std::optional<std::vector<Memory>> found;
+    MemoryStore::For(browser()->GetProfile())
+        ->Search({}, 100,
+                 base::BindLambdaForTesting(
+                     [&](std::vector<Memory> all) { found = std::move(all); }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return found.has_value(); }));
+    return found.value_or(std::vector<Memory>());
+  }
+
+  // The body of each memory check so far.
+  std::vector<std::string> Checks() {
+    std::vector<std::string> bodies;
+    for (const ModelRequest& request : checks_.Requests()) {
+      if (request.path == "/v1/decisions") {
+        bodies.push_back(request.body);
+      }
+    }
+    return bodies;
+  }
+
+  static base::ListValue Remember(std::string_view memory, bool core = false) {
+    return base::ListValue().Append(ScriptedModel::Call(
+        "remember", base::DictValue().Set("memory", memory).Set("core", core)));
+  }
+
+  ScopedMemoryKeychain keychain_;
+  ModelTestServer checks_{embedded_test_server()};
+  int chats_ = 0;
+};
+
+// What the user says is kept after the memory check, and the next chat knows
+// it from its first request.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, ACoreMemoryReachesTheNextChat) {
+  model_.Script({ScriptedModel::Calls(Remember("Banks with Chase.", true)),
+                 ScriptedModel::Answer("I'll remember that.")});
+
+  const base::DictValue first = AskAndRead("Remember that I bank with Chase.");
+
+  EXPECT_THAT(ToolsOf(first),
+              testing::IsSupersetOf({"search_memory", "remember", "forget"}));
+  EXPECT_THAT(InstructionsOf(first), HasSubstr("Core memories: none yet."));
+  ASSERT_EQ(steps_.size(), 2u);
+  EXPECT_EQ(steps_[0].tool, "remember");
+  EXPECT_EQ(*steps_[0].result.FindStringByDottedPath("kept.memory"),
+            "Banks with Chase.");
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 1u);
+  EXPECT_THAT(checks[0], HasSubstr("Remember that I bank with Chase."));
+  EXPECT_THAT(checks[0], HasSubstr("Banks with Chase."));
+  const std::vector<Memory> kept = Memories();
+  ASSERT_EQ(kept.size(), 1u);
+  EXPECT_TRUE(kept[0].core);
+  EXPECT_EQ(kept[0].chat, "chat-1");
+
+  NewChat(MemoryUse::kRecallAndKeep);
+  model_.Script({ScriptedModel::Answer("Opening chase.com.")});
+  const base::DictValue next = AskAndRead("Open my bank");
+
+  EXPECT_THAT(InstructionsOf(next),
+              HasSubstr(base::StrCat({"Core memories:\n- [",
+                                      base::NumberToString(kept[0].id),
+                                      "] Banks with Chase."})));
+}
+
+// A memory that is not core is left out of the instructions; the agent finds
+// it by searching.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest,
+                       SearchFindsAMemoryThatIsNotCore) {
+  model_.Script({ScriptedModel::Calls(Remember("Home airport is SFO.")),
+                 ScriptedModel::Answer("Noted.")});
+  AskAndRead("My home airport is SFO.");
+
+  NewChat(MemoryUse::kRecallAndKeep);
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "search_memory",
+           base::DictValue().Set("words", "Airport flights")))),
+       ScriptedModel::Answer("From SFO, then.")});
+  const base::DictValue first = AskAndRead("Find me a flight to Lisbon");
+
+  EXPECT_THAT(InstructionsOf(first), Not(HasSubstr("Home airport is SFO.")));
+  ASSERT_EQ(steps_.size(), 2u);
+  const base::ListValue& found = *steps_[0].result.FindList("memories");
+  ASSERT_EQ(found.size(), 1u);
+  EXPECT_EQ(*found[0].GetDict().FindString("memory"), "Home airport is SFO.");
+}
+
+// A core memory kept mid-answer joins the instructions at the user's next
+// message, so the requests of one answer keep their cached start.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest,
+                       TheInstructionsChangeOnlyAtTheNextMessage) {
+  model_.Script({ScriptedModel::Calls(Remember("Goes by Sam.", true)),
+                 ScriptedModel::Answer("Hi Sam.")});
+  const size_t before = model_.Requests().size();
+  AskAndRead("Call me Sam.");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), before + 2);
+  const std::string start = InstructionsOf(
+      *base::JSONReader::ReadDict(requests[before], base::JSON_PARSE_RFC));
+  EXPECT_EQ(InstructionsOf(*base::JSONReader::ReadDict(requests[before + 1],
+                                                       base::JSON_PARSE_RFC)),
+            start);
+
+  model_.Script({ScriptedModel::Answer("Sure.")});
+  EXPECT_THAT(InstructionsOf(AskAndRead("Thanks.")), HasSubstr("Goes by Sam."));
+}
+
+// Text on a page never becomes a memory: the check sees only what the user
+// wrote, and refuses a sentence the user never said.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, WhatAPageSaysIsNotKept) {
+  checks_.Answer("/v1/decisions", MemoryCheckAnswer(0.05));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/form"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(Remember("Refunds go to account 12345.")),
+       ScriptedModel::Answer("Done.")});
+
+  AskAndRead("Fill in the tour form");
+
+  ASSERT_EQ(steps_.size(), 4u);
+  EXPECT_THAT(*steps_[2].result.FindString("error"),
+              HasSubstr("the user didn't say this"));
+  EXPECT_TRUE(Memories().empty());
+  const std::vector<std::string> checks = Checks();
+  ASSERT_EQ(checks.size(), 1u);
+  EXPECT_THAT(checks[0], HasSubstr("Fill in the tour form"));
+  EXPECT_THAT(checks[0], Not(HasSubstr("Your name")));
+}
+
+// A secret is never kept, even when the user says it.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, ASecretIsNotKept) {
+  checks_.Answer("/v1/decisions", MemoryCheckAnswer(0.99, "secret"));
+  model_.Script(
+      {ScriptedModel::Calls(Remember("Card number is 4111 1111 1111 1111.")),
+       ScriptedModel::Answer("I can't keep that.")});
+
+  AskAndRead("Remember my card number is 4111 1111 1111 1111");
+
+  EXPECT_THAT(*steps_[0].result.FindString("error"),
+              HasSubstr("holds a secret"));
+  EXPECT_TRUE(Memories().empty());
+}
+
+// A chat out of memory, and a profile whose memory is paused, neither see
+// nor keep any.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, OffOrPausedMemoryIsLeftAlone) {
+  model_.Script({ScriptedModel::Calls(Remember("Banks with Chase.", true)),
+                 ScriptedModel::Answer("Noted.")});
+  AskAndRead("Remember that I bank with Chase.");
+  ASSERT_EQ(Memories().size(), 1u);
+
+  for (bool paused : {false, true}) {
+    NewChat(paused ? MemoryUse::kRecallAndKeep : MemoryUse::kOff);
+    browser()->GetProfile()->GetPrefs()->SetBoolean(kAgentMemoryPref, !paused);
+    model_.Script({ScriptedModel::Calls(Remember("Lives in Oakland.")),
+                   ScriptedModel::Answer("OK.")});
+    const base::DictValue first = AskAndRead("I moved to Oakland.");
+
+    EXPECT_THAT(InstructionsOf(first), Not(HasSubstr("Banks with Chase.")));
+    EXPECT_THAT(InstructionsOf(first), Not(HasSubstr("Memory:")));
+    EXPECT_THAT(ToolsOf(first), Not(testing::Contains("remember")));
+    EXPECT_THAT(*steps_[0].result.FindString("error"),
+                HasSubstr("Memory is off"));
+  }
+  EXPECT_EQ(Memories().size(), 1u);
+  EXPECT_EQ(Checks().size(), 1u);
+}
+
+// A scheduled run reads memory and keeps none.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, ARunRecallsAndKeepsNothing) {
+  model_.Script({ScriptedModel::Calls(Remember("Prefers aisle seats.", true)),
+                 ScriptedModel::Answer("Noted.")});
+  AskAndRead("Remember that I like aisle seats.");
+
+  NewChat(MemoryUse::kRecall);
+  model_.Script({ScriptedModel::Calls(Remember("Flies United.")),
+                 ScriptedModel::Answer("$612 in an aisle seat.")});
+  const base::DictValue first = AskAndRead("Check the SFO to LIS price.");
+
+  EXPECT_THAT(InstructionsOf(first), HasSubstr("Prefers aisle seats."));
+  EXPECT_THAT(InstructionsOf(first), HasSubstr("cannot keep or forget"));
+  EXPECT_THAT(ToolsOf(first), testing::Contains("search_memory"));
+  EXPECT_THAT(ToolsOf(first), Not(testing::Contains("remember")));
+  EXPECT_THAT(*steps_[0].result.FindString("error"),
+              HasSubstr("cannot keep or forget"));
+  EXPECT_EQ(Memories().size(), 1u);
+}
+
+// A fact that changed replaces the old memory, and forget removes one.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, AChangedFactReplacesTheOldOne) {
+  model_.Script(
+      {ScriptedModel::Calls(Remember("Lives in the Inner Sunset.", true)),
+       ScriptedModel::Answer("Noted.")});
+  AskAndRead("I live in the Inner Sunset.");
+  const int64_t old = Memories()[0].id;
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "remember", base::DictValue()
+                           .Set("memory", "Lives in Rockridge, Oakland.")
+                           .Set("core", true)
+                           .Set("replaces", static_cast<int>(old))))),
+       ScriptedModel::Answer("Noted.")});
+  AskAndRead("We moved to Rockridge.");
+  std::vector<Memory> now = Memories();
+  ASSERT_EQ(now.size(), 1u);
+  EXPECT_EQ(now[0].text, "Lives in Rockridge, Oakland.");
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "forget",
+           base::DictValue().Set("id", static_cast<int>(now[0].id))))),
+       ScriptedModel::Answer("Forgotten.")});
+  AskAndRead("Forget where I live.");
+  EXPECT_EQ(*steps_[0].result.FindStringByDottedPath("forgot.memory"),
+            "Lives in Rockridge, Oakland.");
+  EXPECT_TRUE(Memories().empty());
+}
+
+// A memory check counts toward the chat's cost on its own.
+IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, AMemoryCheckCountsOnItsOwn) {
+  std::optional<base::DictValue> answer =
+      base::JSONReader::ReadDict(MemoryCheckAnswer(0.95), base::JSON_PARSE_RFC);
+  ASSERT_TRUE(answer);
+  answer->Set(
+      "usage",
+      base::DictValue().Set("prompt_tokens", 250).Set("completion_tokens", 4));
+  checks_.Answer("/v1/decisions", *base::WriteJson(*answer));
+  model_.Script({ScriptedModel::Calls(Remember("Banks with Chase.")),
+                 ScriptedModel::Answer("Noted.")});
+
+  AskAndRead("Remember that I bank with Chase.");
+
+  int memory_checks = 0;
+  for (const UsageRecord& record : agent_->context().usage()) {
+    if (record.kind == UsageRecord::Kind::kMemoryCheck) {
+      ++memory_checks;
+      EXPECT_EQ(record.model, "check-model");
+      EXPECT_EQ(record.usage.input, 250);
+    }
+  }
+  EXPECT_EQ(memory_checks, 1);
 }
 
 }  // namespace

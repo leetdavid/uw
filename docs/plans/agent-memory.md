@@ -1,6 +1,6 @@
 # Agent memory
 
-Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. T209, the design, was drawn on 2026-10-26 and waits for the user's sign-off.
+Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. T209, the design, was signed off on 2026-10-26, with uw's proposed details. T80 was built the same day; see [Built](#built).
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). Each part follows one uw already has: the command check, a store per profile, the agent's tools, a `uw://ai` section, and a `uw` command handler. Chromium's `sql::Database` is well proven, though new to uw. The risk is judgment: what the agent keeps and makes core, and whether the memory check refuses a sentence a page talked the agent into. Like the command check, it needs a set of examples to measure against.
 
@@ -63,7 +63,7 @@ The user asked on 2026-10-26 for [agent memory](../CONTEXT.md#language) in `uw:/
 
 ## Proposed details
 
-uw's proposals, for the user to accept with the plan:
+uw's proposals, accepted with the plan on 2026-10-26:
 
 - At most 30 core memories. When there are 30, the agent must make one not core before it adds another.
 - A memory is at most 300 characters.
@@ -100,6 +100,20 @@ Proposed. Product code follows [Architecture](../architecture.md#code-organizati
 - The chat file records each answer's memory counts and whether the chat is out of memory.
 - The memory page is `src/providers/memory.tsx` in the chat page's app, on the `uw://ai` page's mojo handler.
 - `browser/uw_command/memory_command.cc` and `command/src/memory.ts` serve `uw memory`.
+
+## Built
+
+T80 was built on 2026-10-26:
+
+- `browser/agent/memory_store.h`: the profile's `uw_memory` database. The same sentence kept twice is kept once. Chromium opens only SQLite databases its metrics list names, so `agent-chats.patch` adds `UwMemory` to `tools/metrics/histograms/metadata/sql/histograms.xml`. The first build after that recompiles every Chromium file that uses SQLite.
+- `components/agent/memory_check.h`: the memory check asks two questions, whether the sentence comes from what the user wrote and whether it holds an ordinary fact, a secret, or a sensitive topic. A memory is kept when the check is at least 80% sure of both.
+- `components/agent/check_questions.h` holds what the command check and the memory check share, and `browser/agent/quick_check.h`, once the command check's `CommandCheck`, picks the model for both.
+- `components/agent/memory_tools.h`: the tools and what the instructions say. `AgentLoop::SetMemoryUse` sets what a chat does: a chat page recalls and keeps, a private chat neither, and a scheduled run recalls. `uw.agent.memory` pauses it.
+- A memory check's cost is its own kind in the chat's usage. The cost card shows it with T210.
+
+Not checked: a real model, which decides what to keep and what is core, and how well the memory check judges. Like the command check, it has no set of examples to measure against yet.
+
+Tests: `MemoryCheckTest.*` and `MemoryToolsTest.*` in unit_tests; `MemoryStoreBrowserTest.*` and `AgentMemoryBrowserTest.*` in browser_tests.
 
 ## Stages
 

@@ -1,7 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
-#include "uw/browser/agent/command_check.h"
+#include "uw/browser/agent/quick_check.h"
 
 #include <utility>
 
@@ -38,22 +38,19 @@ constexpr base::TimeDelta kThinkingTimeout = base::Seconds(90);
 }  // namespace
 
 // static
-std::unique_ptr<CommandCheck> CommandCheck::Send(
+std::unique_ptr<QuickCheck> QuickCheck::Send(
     Profile& profile,
     const AiConnectionConfig& chat_model,
     const std::string& chat_key,
-    const CommandCheckInput& input,
+    BuildBody build,
     Done done) {
   const PrefService* prefs = profile.GetPrefs();
-  auto check =
-      base::WrapUnique(new CommandCheck(profile, input, std::move(done)));
+  auto check = base::WrapUnique(new QuickCheck(profile, std::move(done)));
   const DecisionModelConfig decision = ReadDecisionModelConfig(prefs);
   const std::optional<std::string> decision_key =
       IsComplete(decision) ? KeyIn(decision.key_account) : std::nullopt;
   std::optional<std::string> body =
-      decision_key
-          ? BuildCommandCheckRequestBody(decision.format, decision.model, input)
-          : std::nullopt;
+      decision_key ? build.Run(decision.format, decision.model) : std::nullopt;
   if (body) {
     check->format_ = decision.format;
     check->model_name_ = decision.model;
@@ -71,8 +68,7 @@ std::unique_ptr<CommandCheck> CommandCheck::Send(
     language.effort.clear();
     key = chat_key;
   }
-  body = BuildCommandCheckRequestBody(DecisionFormat::kChat, language.model,
-                                      input);
+  body = build.Run(DecisionFormat::kChat, language.model);
   if (!body || language.endpoint.empty()) {
     return nullptr;
   }
@@ -84,17 +80,14 @@ std::unique_ptr<CommandCheck> CommandCheck::Send(
   return check;
 }
 
-CommandCheck::CommandCheck(Profile& profile,
-                           const CommandCheckInput& input,
-                           Done done)
+QuickCheck::QuickCheck(Profile& profile, Done done)
     : loader_(profile.GetDefaultStoragePartition()
                   ->GetURLLoaderFactoryForBrowserProcess()),
-      input_(input),
       done_(std::move(done)) {}
 
-CommandCheck::~CommandCheck() = default;
+QuickCheck::~QuickCheck() = default;
 
-void CommandCheck::SendLanguageCheck(const ModelCatalog* catalog) {
+void QuickCheck::SendLanguageCheck(const ModelCatalog* catalog) {
   Provider provider;
   provider.preset = language_.preset;
   provider.address = language_.endpoint;
@@ -117,20 +110,20 @@ void CommandCheck::SendLanguageCheck(const ModelCatalog* catalog) {
   SendToLanguageModel(model, *quiet, kProviderTimeout);
 }
 
-void CommandCheck::SendToLanguageModel(const AiConnectionConfig& model,
-                                       const std::string& body,
-                                       base::TimeDelta timeout) {
+void QuickCheck::SendToLanguageModel(const AiConnectionConfig& model,
+                                     const std::string& body,
+                                     base::TimeDelta timeout) {
   Start(
       RemoteModelClient::ForLanguageModel(loader_, model, key_, body, timeout));
 }
 
-void CommandCheck::Start(std::unique_ptr<RemoteModelClient> client) {
+void QuickCheck::Start(std::unique_ptr<RemoteModelClient> client) {
   client_ = std::move(client);
   client_->Send(
-      base::BindOnce(&CommandCheck::OnAnswer, weak_factory_.GetWeakPtr()));
+      base::BindOnce(&QuickCheck::OnAnswer, weak_factory_.GetWeakPtr()));
 }
 
-void CommandCheck::OnAnswer(RemoteModelClient::Outcome outcome) {
+void QuickCheck::OnAnswer(RemoteModelClient::Outcome outcome) {
   // A provider that rejects the switch is asked again without it, in what is
   // left of the time a thinking model gets.
   if (thinking_off_ && !outcome.ok && outcome.http_status >= 400 &&
@@ -146,9 +139,11 @@ void CommandCheck::OnAnswer(RemoteModelClient::Outcome outcome) {
   if (outcome.ok) {
     usage_ = UsageInAnswer(outcome.body);
   }
-  std::move(done_).Run(
-      outcome.ok ? ParseCommandCheckResponse(format_, outcome.body, input_)
-                 : std::nullopt);
+  if (!outcome.ok) {
+    std::move(done_).Run(std::nullopt);
+    return;
+  }
+  std::move(done_).Run(Answer{format_, std::move(outcome.body)});
 }
 
 }  // namespace uw

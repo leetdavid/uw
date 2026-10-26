@@ -58,6 +58,24 @@ std::string ImageLabel(int number) {
   return base::StrCat({"Image ", base::NumberToString(number), ":"});
 }
 
+// What the user wrote in `message`, or null when it is not one of their own
+// messages.
+const std::string* UserText(const base::DictValue& message) {
+  const std::string* role = message.FindString("role");
+  if (!role || *role != "user" || message.FindBool(kShownKey).value_or(false)) {
+    return nullptr;
+  }
+  const base::Value* content = message.Find("content");
+  const std::string* text = nullptr;
+  if (content && content->is_string()) {
+    text = &content->GetString();
+  } else if (content && content->is_list() && !content->GetList().empty() &&
+             content->GetList()[0].is_dict()) {
+    text = content->GetList()[0].GetDict().FindString("text");
+  }
+  return text && !text->ends_with(kToolImagesNote) ? text : nullptr;
+}
+
 }  // namespace
 
 AgentContext::AgentContext() {
@@ -358,6 +376,11 @@ void AgentContext::SetScheduledRuns(std::string_view runs) {
   UpdateInstructions();
 }
 
+void AgentContext::SetMemory(std::string_view memory) {
+  memory_ = std::string(memory);
+  UpdateInstructions();
+}
+
 void AgentContext::UpdateInstructions() {
   base::DictValue instructions = AgentInstructions();
   std::string content = *instructions.FindString("content");
@@ -366,6 +389,9 @@ void AgentContext::UpdateInstructions() {
   }
   if (!connectors_.empty()) {
     base::StrAppend(&content, {"\n\n", connectors_});
+  }
+  if (!memory_.empty()) {
+    base::StrAppend(&content, {"\n\nMemory:\n", memory_});
   }
   if (!scheduled_runs_.empty()) {
     base::StrAppend(
@@ -428,19 +454,8 @@ std::vector<std::string> AgentContext::UserAndActions(
   for (const base::Value& entry : messages_) {
     const base::DictValue& message = entry.GetDict();
     const std::string* role = message.FindString("role");
-    if (role && *role == "user" &&
-        !message.FindBool(kShownKey).value_or(false)) {
-      const base::Value* content = message.Find("content");
-      const std::string* text = nullptr;
-      if (content && content->is_string()) {
-        text = &content->GetString();
-      } else if (content && content->is_list() && !content->GetList().empty() &&
-                 content->GetList()[0].is_dict()) {
-        text = content->GetList()[0].GetDict().FindString("text");
-      }
-      if (text && !text->ends_with(kToolImagesNote)) {
-        lines.push_back(base::StrCat({"User: ", *text}));
-      }
+    if (const std::string* text = UserText(message)) {
+      lines.push_back(base::StrCat({"User: ", *text}));
     }
     const base::ListValue* calls = message.FindList("tool_calls");
     if (!role || *role != "assistant" || !calls) {
@@ -563,6 +578,16 @@ RequestParts AgentContext::PartsOf(const std::string& body) const {
                                parts.instructions - parts.results -
                                parts.images);
   return parts;
+}
+
+std::vector<std::string> AgentContext::UserTexts() const {
+  std::vector<std::string> texts;
+  for (const base::Value& message : messages_) {
+    if (const std::string* text = UserText(message.GetDict())) {
+      texts.push_back(*text);
+    }
+  }
+  return texts;
 }
 
 int AgentContext::UserMessages() const {

@@ -45,6 +45,7 @@ ChatRun::ChatRun(Profile* profile,
       *run_tab, std::move(model),
       base::BindRepeating(&ChatRun::OnStep, weak_factory_.GetWeakPtr()));
   loop_->SetMode(mode);
+  loop_->SetMemoryUse(MemoryUse::kRecall);
   // The loop is this run's own, so it never calls after the run ends.
   loop_->SetReport(
       base::BindRepeating(&ChatRun::OnReport, base::Unretained(this)));
