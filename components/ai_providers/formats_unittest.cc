@@ -430,5 +430,41 @@ TEST(FormatsTest, AnImageGoesInEachFormatsOwnParts) {
                  .FindList("content"));
 }
 
+TEST(FormatsTest, APdfGoesInEachFormatsOwnParts) {
+  constexpr char kPdf[] = R"({
+    "model": "a-model",
+    "messages": [
+      {"role": "user", "content": [
+        {"type": "text", "text": "Split the trip"},
+        {"type": "file", "file": {"filename": "TAP-booking.pdf",
+                                  "file_data": "data:application/pdf;base64,JVBERi0"}}]}
+    ]
+  })";
+
+  const base::DictValue anthropic =
+      Parsed(RequestIn(ProviderFormat::kAnthropicMessages, kPdf, kAddress));
+  EXPECT_EQ((*anthropic.FindList("messages"))[0], base::test::ParseJson(R"(
+    {"role": "user", "content": [
+      {"type": "text", "text": "Split the trip"},
+      {"type": "document", "title": "TAP-booking.pdf",
+       "source": {"type": "base64", "media_type": "application/pdf",
+                  "data": "JVBERi0"}}]}
+  )"));
+
+  const base::DictValue responses =
+      Parsed(RequestIn(ProviderFormat::kOpenAiResponses, kPdf, kAddress));
+  EXPECT_EQ((*responses.FindList("input"))[0], base::test::ParseJson(R"(
+    {"role": "user", "content": [
+      {"type": "input_text", "text": "Split the trip"},
+      {"type": "input_file", "filename": "TAP-booking.pdf",
+       "file_data": "data:application/pdf;base64,JVBERi0"}]}
+  )"));
+
+  const base::DictValue chat =
+      Parsed(RequestIn(ProviderFormat::kChatCompletions, kPdf, kAddress));
+  EXPECT_EQ(*chat.FindList("messages"),
+            *base::test::ParseJsonDict(kPdf).FindList("messages"));
+}
+
 }  // namespace
 }  // namespace uw

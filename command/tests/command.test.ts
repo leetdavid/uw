@@ -414,6 +414,20 @@ test("piped text with a request is attached material; alone, it is the request",
   assert.deepEqual(requests.at(-1)?.params, { text: "Check my deploy" });
 });
 
+test("--file attaches files by their full paths and says so; one it can't read is wrong usage", async () => {
+  await chatUw([end("answered", "Each of you owes €566.00.")]);
+  writeFileSync(join(dir, "budget.csv"), "Flat,980\n");
+  const { exit, err } = await uw(["chat", "-p", "--file", join(dir, "budget.csv"), "Split the trip"]);
+  assert.equal(exit, 0);
+  assert.deepEqual(requests.at(-1)?.params, { text: "Split the trip", files: [join(dir, "budget.csv")] });
+  assert.equal(err, "3f9c2e18\nAttached budget.csv\n");
+
+  const missing = await uw(["chat", "-p", "--file", join(dir, "budget.cvs"), "Split it"]);
+  assert.equal(missing.exit, 2);
+  assert.equal(missing.err, `uw: can't read ${join(dir, "budget.cvs")}: no such file\n`);
+  assert.equal((await uw(["chat", "-p", "--file", dir, "Split it"])).exit, 2);
+});
+
 test("a chat that fails or stops exits with 1", async () => {
   await chatUw([end("failed", "The model didn't answer.")]);
   const failed = await uw(["chat", "-p", "Try"]);

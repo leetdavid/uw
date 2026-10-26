@@ -2,15 +2,18 @@
 
 module uw.mojom;
 
+import "mojo/public/mojom/base/big_buffer.mojom";
+
 interface ChatHandlerFactory {
   CreateHandler(pending_remote<ChatPage> page,
                 pending_receiver<ChatHandler> handler);
 };
 
 interface ChatHandler {
-  // The user's next message, with up to 5 images as data: URLs. Ignored
-  // while the agent is working.
-  Send(string text, array<string> images);
+  // The user's next message, with the files they attached: up to 10, at
+  // most 5 of them images, each saved first with SaveFile. Ignored while the
+  // agent is working.
+  Send(string text, array<AttachedFile> files);
   // Picks up a chat that stopped before it finished.
   Resume();
   // Tries the failed request again: the message that could not be sent, or
@@ -48,7 +51,19 @@ interface ChatHandler {
   Stop();
   // A message while the agent works. It goes in after the step under way;
   // while a step waits for approval it declines that step, as its note.
-  Steer(string text, array<string> images);
+  Steer(string text, array<AttachedFile> files);
+  // Copies an attached file into the chat's folder a chunk at a time: an
+  // empty `saved` starts a copy of the file `name`, and each later chunk
+  // adds to the copy `saved`. Answers the copy's name in the folder, or
+  // nothing when it could not be written.
+  SaveFile(string name, array<uint8> chunk, string saved) => (string saved);
+  // The copy `saved` in the chat's folder, for the page to read: a PDF's
+  // first page, or a file the uw command attached. Nothing for a copy that
+  // is gone or larger than 256 MB.
+  ReadFile(string saved) => (mojo_base.mojom.BigBuffer? data);
+  // Opens the copy `saved` in a new tab when Chromium shows its kind, such
+  // as an image, a PDF, or text, or else shows it in Finder.
+  OpenFile(string saved);
   // The connectors that are on, and whether this chat uses each.
   GetConnectors() => (array<ChatConnector> connectors);
   // Turns a connector off or on for this chat from the next step.
@@ -65,6 +80,8 @@ interface ChatHandler {
   // Whether the chat's model sees images, which the page knows from the
   // model list.
   SetSeesImages(bool sees);
+  // Whether the chat's model reads a PDF whole, from the model list too.
+  SetReadsPdfs(bool reads);
   // What a new schedule card starts with: the chat's first message, daily at
   // 9:00 in the Mac's time zone, change alerts, the model last picked on a
   // schedule card or else the chat's, and the chat's approval mode.
@@ -166,6 +183,37 @@ struct RunLine {
 };
 
 // One step of the agent's work.
+// A file the user attached, as the page prepared it. Its copy is `saved`
+// in the chat's folder.
+struct AttachedFile {
+  string saved;
+  string name;
+  string type;
+  int64 size;
+  // For an image the model may see: the copy scaled as the page scales
+  // images, as a data: URL.
+  string image;
+  // For a PDF: the text of its first 100 pages, as pdf.js reads it, and how
+  // many pages it has. No pages when pdf.js could not open it.
+  string pdf_text;
+  int32 pdf_pages;
+};
+
+// A file a message carried, as the chat shows it.
+struct SentFile {
+  string saved;
+  string name;
+  string type;
+  int64 size;
+  // For an image: the copy the page scaled, as a data: URL, which the chat
+  // shows.
+  string image;
+  // What the model got short of the whole file: "read in part", "first 100
+  // pages read", or "no text". Empty when it read all of it, or only had
+  // its path.
+  string missed;
+};
+
 struct Step {
   StepKind kind;
   // For a tool: its name, and what it was asked and answered, as JSON.
@@ -176,8 +224,10 @@ struct Step {
   string text;
   // For kModel: the model the chat runs on from there.
   ChatModel? model;
-  // For kUser: the images the message carried, as data: URLs.
+  // For kUser: the images the message carried, as data: URLs, in chats
+  // from before files, and the files it carried.
   array<string> images;
+  array<SentFile> files;
   // For kRun: the run. `text` holds what it reported, or what went wrong.
   RunLine? run;
 };
@@ -471,6 +521,9 @@ interface ChatPage {
   // change.
   OnMemory(ChatMemory memory);
   OnStep(Step step);
+  // Prepares the files the uw command attached, already copied into the
+  // chat's folder, as the composer prepares the files the user adds.
+  PrepareFiles(array<SentFile> files) => (array<AttachedFile> files);
   // Every saved chat, newest first, whenever the list changes.
   OnChats(array<ChatSummary> chats);
   // The agent's tabs, the one it acted in last, and whether the chat sits

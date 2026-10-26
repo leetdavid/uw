@@ -23,17 +23,16 @@ import {
   Blocks,
   ChevronUp,
   Clock,
-  ImageIcon,
   Info,
   KeyRound,
   Link2,
+  Paperclip,
   Plus,
   Shield,
   SlidersHorizontal,
   Sparkles,
   Square,
   Terminal as TerminalIcon,
-  TriangleAlert,
   Trash2,
 } from "lucide-react";
 import { code } from "@streamdown/code";
@@ -113,7 +112,8 @@ import {
   SkippedLine,
   isQuietRun,
 } from "./schedule";
-import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
+import { FileCard } from "./file-card";
+import { MAX_FILES, attach, isImage, limit, prepareCopies } from "./files";
 import { BrainOff } from "./brain-off";
 import {
   ChatMemory,
@@ -146,6 +146,7 @@ import {
   type ChatUsage,
   type ScheduleState,
   type SkillProposal,
+  type SentFile,
   type Step,
   type TriggerState,
 } from "@/chat-api";
@@ -454,8 +455,9 @@ const TOOL_ICONS: Record<string, IconName> = {
   prompt: "message-circle",
 };
 
-// A message from the user, with its images as data: URLs.
-function userLine(text: string, images: string[]): Step {
+// A message from the user without files, which the page shows at once. The
+// browser shows one with files once it has read them.
+function userLine(text: string): Step {
   return {
     kind: StepKind.kUser,
     tool: "",
@@ -463,9 +465,44 @@ function userLine(text: string, images: string[]): Step {
     result: "",
     text,
     model: null,
-    images,
+    images: [],
+    files: [],
     run: null,
   };
+}
+
+// The files a sent message carried: images as tiles, any other file as a
+// card. A click opens the copy in a new tab, or in Finder.
+function SentFiles({ files }: { files: SentFile[] }) {
+  if (!files.length) {
+    return null;
+  }
+  return (
+    <div className="sent-files flex max-w-[440px] flex-wrap justify-end gap-2">
+      {files.map((file) =>
+        file.image ? (
+          <img
+            key={file.saved}
+            src={file.image}
+            alt={file.name}
+            title={file.name}
+            className="sent-image size-24 cursor-pointer rounded-xl object-cover ring-1 ring-border"
+            onClick={() => chatHandler.openFile(file.saved)}
+          />
+        ) : (
+          <FileCard
+            key={file.saved}
+            name={file.name}
+            type={file.type}
+            size={Number(file.size)}
+            missed={file.missed}
+            pdf={file.saved}
+            onOpen={() => chatHandler.openFile(file.saved)}
+          />
+        ),
+      )}
+    </div>
+  );
 }
 
 function isStep(line: Step): boolean {
@@ -642,7 +679,11 @@ function Line({
       return <ModelLine model={line.model} providers={providers} />;
     case StepKind.kUser:
       return (
-        <ChatMessage from="user" images={line.images}>
+        <ChatMessage
+          from="user"
+          images={line.images}
+          attachments={<SentFiles files={line.files} />}
+        >
           {line.text && <span className="mine">{line.text}</span>}
         </ChatMessage>
       );
@@ -1165,8 +1206,8 @@ function PlusMenu({
           <button
             type="button"
             id="plus"
-            aria-label="Add images or connectors"
-            title="Add images or connectors"
+            aria-label="Add files or connectors"
+            title="Add files or connectors"
             className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-muted-foreground hover:text-foreground"
           >
             <Plus aria-hidden className="size-4" />
@@ -1176,8 +1217,8 @@ function PlusMenu({
       <DropdownContent side="top" align="start" className="w-[200px]">
         <MenuItem
           index={0}
-          icon={ImageIcon}
-          label="Add images"
+          icon={Paperclip}
+          label="Add files"
           disabled={!canAttach}
           onSelect={onAttach}
         />
@@ -1579,6 +1620,8 @@ function Chat() {
   const [memory, setMemory] = useState(ChatMemory.kOn);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  // Why files were left out of the composer, until it changes.
+  const [leftOut, setLeftOut] = useState("");
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
     {},
@@ -1672,6 +1715,9 @@ function Chat() {
       chatPage.onRunning.addListener((tab: number, command: string) =>
         setRunning(tab ? { tab, command, since: Date.now() } : null),
       ),
+      chatPage.prepareFiles.addListener(async (copies: SentFile[]) => ({
+        files: await prepareCopies(copies),
+      })),
       chatPage.onStep.addListener((step: Step) => {
         if (step.kind === StepKind.kTriggerStopped) {
           setLines((before) => [...before, step]);
@@ -1767,6 +1813,7 @@ function Chat() {
       text: "",
       model: picked,
       images: [],
+      files: [],
       run: null,
     };
     setLines((before) =>
@@ -1831,8 +1878,21 @@ function Chat() {
     chatHandler.setSeesImages(chosenModel?.seesImages !== false);
   }, [chosenModel?.seesImages]);
 
+  // The browser sends a PDF whole to a model that reads PDFs.
+  useEffect(() => {
+    chatHandler.setReadsPdfs(chosenModel?.readsPdfs === true);
+  }, [chosenModel?.readsPdfs]);
+
+  // The images the model can't see go by their paths alone.
   const cannotSee = (attached: File[]) =>
-    attached.length > 0 && chosenModel?.seesImages === false;
+    attached.some((file) => isImage(file.type)) && chosenModel?.seesImages === false;
+
+  // Keeps the files a message may hold, and says what was left out.
+  const pick = (next: File[]) => {
+    const { kept, note } = limit(next);
+    setFiles(kept);
+    setLeftOut(note);
+  };
 
   const send = async (text: string, attached: File[] = []) => {
     const message = text.trim();
@@ -1841,7 +1901,6 @@ function Chat() {
       working ||
       !opened ||
       gone ||
-      cannotSee(attached) ||
       missingArgument(promptItem, promptValues)
     ) {
       return;
@@ -1849,7 +1908,6 @@ function Chat() {
     setWorking(true);
     setSince(Date.now());
     list.scrollToBottom();
-    const images = await Promise.all(attached.map(imageData));
     // The first message names the tab.
     if (message && !lines.some((line) => line.kind === StepKind.kUser)) {
       document.title = message;
@@ -1864,7 +1922,7 @@ function Chat() {
         `/${promptItem.command}`,
         ...Object.entries(values).map(([name, value]) => `${name}: ${value}`),
       ].join("\n");
-      setLines((before) => [...before, userLine(shown, [])]);
+      setLines((before) => [...before, userLine(shown)]);
       setDraft("");
       setPromptValues({});
       chatHandler.sendPrompt(
@@ -1875,23 +1933,37 @@ function Chat() {
       );
       return;
     }
-    setLines((before) => [...before, userLine(message, images)]);
+    const { attached: sent, failed } = await attach(attached);
+    setLeftOut(failed.length ? `Couldn't attach ${failed.join(", ")}.` : "");
+    if (!message && !sent.length) {
+      setWorking(false);
+      return;
+    }
+    if (!sent.length) {
+      setLines((before) => [...before, userLine(message)]);
+    }
     setDraft("");
     setFiles([]);
-    chatHandler.send(message, images);
+    chatHandler.send(message, sent);
   };
 
   // A message while the agent works: it goes in after the step under way, or
   // declines a step that waits for approval.
   const steer = async (text: string, attached: File[]) => {
     const message = text.trim();
-    if ((!message && !attached.length) || cannotSee(attached)) {
+    if (!message && !attached.length) {
       return;
     }
     list.scrollToBottom();
-    const images = await Promise.all(attached.map(imageData));
-    setLines((before) => [...before, userLine(message, images)]);
-    chatHandler.steer(message, images);
+    const { attached: sent, failed } = await attach(attached);
+    setLeftOut(failed.length ? `Couldn't attach ${failed.join(", ")}.` : "");
+    if (!message && !sent.length) {
+      return;
+    }
+    if (!sent.length) {
+      setLines((before) => [...before, userLine(message)]);
+    }
+    chatHandler.steer(message, sent);
   };
 
   // Sends what the command bar asked, as if typed, once the chat is open.
@@ -1913,6 +1985,7 @@ function Chat() {
         text: "",
         model: null,
         images: [],
+        files: [],
         run: null,
       },
     ]);
@@ -1990,18 +2063,20 @@ function Chat() {
       />
     </div>
   );
-  // Why the images cannot go yet, or that the limit is reached.
-  const notice = cannotSee(files) ? (
+  // What was left out of the composer, or that the model gets an image's
+  // path alone.
+  const notice = leftOut ? (
+    <p id="left-out" className="flex items-center gap-1.5 px-1 text-[12.5px] text-muted-foreground">
+      <Info aria-hidden className="size-3.5 shrink-0" />
+      {leftOut}
+    </p>
+  ) : cannotSee(files) ? (
     <p
       id="cannot-see-images"
-      className="flex items-center gap-1.5 px-1 text-[12.5px] text-warning"
+      className="flex items-center gap-1.5 px-1 text-[12.5px] text-muted-foreground"
     >
-      <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
-      {model?.model} can't see images. Pick a model that can.
-    </p>
-  ) : files.length >= MAX_IMAGES ? (
-    <p className="px-1 text-xs text-muted-foreground">
-      A message holds up to {MAX_IMAGES} images.
+      <Info aria-hidden className="size-3.5 shrink-0" />
+      {model?.model} can't see images; the agent gets the file only.
     </p>
   ) : null;
   const composer = (
@@ -2042,18 +2117,18 @@ function Chat() {
         suggestions={title ? undefined : suggestions.slice(1)}
         textareaProps={{ id: "message", "aria-label": "Message" }}
         files={files}
-        onFilesChange={setFiles}
-        accept={IMAGE_TYPES}
-        maxFiles={MAX_IMAGES}
+        onFilesChange={pick}
+        onFoldersLeftOut={() => setLeftOut("Folders can't be added. Zip it first.")}
+        accept=""
         filePreviewSize={64}
         notice={notice}
-        sendBlocked={cannotSee(files) || missingArgument(promptItem, promptValues)}
+        sendBlocked={missingArgument(promptItem, promptValues)}
         leftSlot={({ openFilePicker }) => (
           <div className="flex min-w-0 items-center gap-1.5">
             <PlusMenu
               connectors={connectors}
-              canAttach={files.length < MAX_IMAGES}
-              onAttach={() => openFilePicker(IMAGE_TYPES)}
+              canAttach={files.length < MAX_FILES}
+              onAttach={() => openFilePicker()}
               memory={memory}
               memoryLocked={Boolean(title)}
               onMemory={() => chatHandler.setMemoryOff(memory === ChatMemory.kOn)}

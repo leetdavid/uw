@@ -59,6 +59,9 @@ struct Model {
   // Whether it takes images, as the catalog or Ollama says. True when
   // neither knows.
   bool sees_images;
+  // Whether it reads a PDF whole, as the catalog says. False when it
+  // doesn't know.
+  bool reads_pdfs;
   // Named as its provider names them. Empty when it takes none.
   array<string> efforts;
   // The format requests to it go over.

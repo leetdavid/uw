@@ -28,6 +28,8 @@ app_files = [
   "icons/exa.svg",
   "inter-latin.woff2",
   "inter-latin-ext.woff2",
+  "pdf.js",
+  "pdf.worker.js",
 ]
 
 node("app") {

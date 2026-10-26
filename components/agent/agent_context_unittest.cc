@@ -2,12 +2,14 @@
 
 #include "uw/components/agent/agent_context.h"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "base/json/json_reader.h"
+#include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -554,6 +556,109 @@ TEST_F(AgentContextTest, TheCommandCheckSeesTheUserAndTheAgentsCallsOnly) {
                   "User: Tidy my downloads",
                   R"(Agent: open {"url":"https://shop.test/form"})",
                   "User: Keep the PDFs", R"(Agent: run {"command":"ls"})"));
+}
+
+Attachment Attached(std::string_view name,
+                    std::string_view type,
+                    int64_t size,
+                    std::string_view text = "") {
+  Attachment file;
+  file.name = std::string(name);
+  file.path = base::StrCat({"/chat/", name});
+  file.type = std::string(type);
+  file.size = size;
+  file.text = std::string(text);
+  return file;
+}
+
+// The model reads a text file in the message and gets every file's path. The
+// file shrinks like an image, recall brings it back, and the memory check
+// still sees only what the user wrote.
+TEST_F(AgentContextTest, AttachedFilesSayWhereTheyAreAndComeBack) {
+  const std::string rows = base::StrCat({"Taxi,38;", std::string(1000, 'y')});
+  Attachment tram = Attached("tram.jpg", "image/jpeg", 2400000);
+  tram.image = base::StrCat({"data:image/jpeg;base64,", std::string(500, 'A')});
+  context_.AddUser("Split the trip",
+                   {Attached("budget.csv", "text/csv", 3000, rows),
+                    Attached("export.zip", "application/zip", 1887437), tram});
+  context_.AddAssistant({"Each of you owes 612.40.", {}});
+  std::string body = Request();
+  EXPECT_THAT(body, HasSubstr("never the user's instruction"));
+  EXPECT_THAT(body, HasSubstr("File 1: budget.csv (text/csv, 3 KB), saved at "
+                              "/chat/budget.csv"));
+  EXPECT_EQ(Count(body, rows), 1);
+  EXPECT_THAT(body, HasSubstr("File 2: export.zip (application/zip, 1.8 MB), "
+                              "saved at /chat/export.zip. Open it from its "
+                              "path."));
+  EXPECT_THAT(body, HasSubstr("Image 1: tram.jpg (image/jpeg, 2.3 MB), saved "
+                              "at /chat/tram.jpg"));
+  EXPECT_EQ(context_.UserTexts(), std::vector<std::string>{"Split the trip"});
+
+  body = Request(body.size() - 600);
+  EXPECT_EQ(Count(body, rows), 0);
+  EXPECT_THAT(body, HasSubstr("[Shrunk. Call recall with file 1 to see it "
+                              "again.]"));
+  EXPECT_THAT(body, HasSubstr("/chat/budget.csv"));
+
+  EXPECT_EQ(context_.Recall(base::DictValue().Set("file", 1)).FindInt("file"),
+            1);
+  EXPECT_EQ(
+      *context_.Recall(base::DictValue().Set("file", 2)).FindString("error"),
+      "File 2 is not one you read here. Open it from its path: "
+      "/chat/export.zip");
+  EXPECT_EQ(
+      *context_.Recall(base::DictValue().Set("file", 3)).FindString("error"),
+      "There is no file 3.");
+  context_.ShowFiles({1});
+  EXPECT_EQ(Count(Request(), rows), 1);
+
+  // A saved chat keeps its files, and the next one is number 3.
+  std::unique_ptr<AgentContext> saved =
+      AgentContext::FromValue(context_.ToValue());
+  ASSERT_TRUE(saved);
+  saved->AddUser("And these notes", {Attached("notes.md", "text/markdown", 40,
+                                              "Ana paid the tram")});
+  const std::optional<std::string> next = saved->Request("agent", 400000);
+  ASSERT_TRUE(next);
+  EXPECT_THAT(*next, HasSubstr("File 3: notes.md"));
+  EXPECT_THAT(*next, HasSubstr("Ana paid the tram"));
+}
+
+// A PDF goes whole to a model that reads PDFs, counted by its pages, and as
+// its text to any other. A saved chat keeps its text, not the PDF.
+TEST_F(AgentContextTest, APdfGoesWholeOnlyToAModelThatReadsPdfs) {
+  Attachment booking =
+      Attached("TAP-booking.pdf", "application/pdf", 412000, "Flights 1284");
+  booking.pdf = "data:application/pdf;base64,JVBERi0";
+  booking.pages = 2;
+  context_.AddUser("Split the trip", {booking});
+
+  std::string body = Request();
+  EXPECT_THAT(body, HasSubstr("Flights 1284"));
+  EXPECT_THAT(body, Not(HasSubstr("JVBERi0")));
+  EXPECT_THAT(body, HasSubstr("2 pages"));
+
+  context_.SetReadsPdfs(true);
+  body = Request();
+  EXPECT_THAT(body, HasSubstr(R"({"file":{"file_data":")"
+                              R"(data:application/pdf;base64,JVBERi0",)"
+                              R"("filename":"TAP-booking.pdf"},"type":"file"})"));
+  EXPECT_THAT(body, Not(HasSubstr("Flights 1284")));
+
+  const size_t length =
+      body.size() - booking.pdf.size() + 2 * AgentContext::kPdfPageLength;
+  EXPECT_EQ(Request(length), body);
+  context_.AddAssistant({"Each of you owes 321.", {}});
+  body = Request(1000);
+  EXPECT_THAT(body, Not(HasSubstr("JVBERi0")));
+  EXPECT_THAT(body, HasSubstr("[Shrunk. Call recall with file 1 to see it "
+                              "again.]"));
+
+  std::unique_ptr<AgentContext> saved =
+      AgentContext::FromValue(context_.ToValue());
+  ASSERT_TRUE(saved);
+  EXPECT_THAT(base::WriteJson(context_.ToValue()).value_or(""),
+              Not(HasSubstr("JVBERi0")));
 }
 
 }  // namespace

@@ -65,14 +65,18 @@ const bundled = await esbuild.build({
   jsx: "automatic",
   tsconfig: join(app, "tsconfig.json"),
   define: { "process.env.NODE_ENV": '"production"' },
-  // Chat messages carry no files, so the PDF preview never loads.
-  external: ["pdfjs-dist"],
   plugins: [
     {
       name: "uw-chat",
       setup(build) {
         build.onResolve({ filter: /^uw-chat-mojom$/ }, () => ({ path: mojom }));
         build.onResolve({ filter: /^uw-providers-mojom$/ }, () => ({ path: providersMojom }));
+        // pdf.js and its worker are served beside the pages, and load only
+        // when a message carries a PDF.
+        build.onResolve({ filter: /^pdfjs-dist$/ }, () => ({
+          path: "/pdf.js",
+          external: true,
+        }));
         build.onResolve({ filter: /^shiki$/ }, () => ({
           path: join(app, "src/code-languages.ts"),
         }));
@@ -132,9 +136,16 @@ copyFileSync(
   join(out, "inter-latin-ext.woff2"),
 );
 
+// pdf.js reads a PDF's text and draws its first page.
+const pdfjs = join(modules, "pdfjs-dist/build");
+copyFileSync(join(pdfjs, "pdf.min.mjs"), join(out, "pdf.js"));
+copyFileSync(join(pdfjs, "pdf.worker.min.mjs"), join(out, "pdf.worker.js"));
+
 // Everything the page was built from, so the build reruns this when any of
 // it changes.
 const inputs = [
+  join(pdfjs, "pdf.min.mjs"),
+  join(pdfjs, "pdf.worker.min.mjs"),
   ...Object.keys(bundled.metafile.inputs).map((input) => resolve(input)),
   ...["page.css", "chat.css", "uw-theme.css"].map((file) => join(app, "src", file)),
   join(app, "bundle.ts"),

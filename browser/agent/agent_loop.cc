@@ -161,14 +161,14 @@ void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
 }
 
 void AgentLoop::Send(std::string_view text,
-                     std::vector<std::string> images,
+                     std::vector<Attachment> files,
                      std::string_view material) {
   if (working_) {
     return;
   }
   working_ = true;
   turns_ = 0;
-  context_->AddUser(text, images);
+  context_->AddUser(text, files);
   if (!material.empty()) {
     context_->AddMaterial(material);
   }
@@ -237,20 +237,20 @@ void AgentLoop::Stop() {
   EndCheck();
 }
 
-void AgentLoop::Steer(std::string_view text, std::vector<std::string> images) {
+void AgentLoop::Steer(std::string_view text, std::vector<Attachment> files) {
   if (!working_) {
-    Send(text, std::move(images));
+    Send(text, std::move(files));
     return;
   }
   turns_ = 0;
   if (asking_) {
     client_.reset();
     asking_ = false;
-    context_->AddUser(text, images);
+    context_->AddUser(text, files);
     AskModel();
     return;
   }
-  steer_ = Message{std::string(text), std::move(images)};
+  steer_ = Message{std::string(text), std::move(files)};
   // A command left running is the agent's to look at with the message.
   tools_.EndWait();
   EndCheck();
@@ -264,12 +264,15 @@ void AgentLoop::AskModel() {
   if (!recalled_images_.empty()) {
     context_->ShowImages(std::exchange(recalled_images_, {}));
   }
+  if (!recalled_files_.empty()) {
+    context_->ShowFiles(std::exchange(recalled_files_, {}));
+  }
   for (const auto& [tool, images] : std::exchange(tool_images_, {})) {
     context_->AddToolImages(tool, images);
   }
   if (steer_) {
     const Message steer = *std::exchange(steer_, std::nullopt);
-    context_->AddUser(steer.text, steer.images);
+    context_->AddUser(steer.text, steer.files);
   }
   if (++turns_ > kMaxTurns) {
     Finish(Failed(base::StrCat({"The agent stopped after ",
@@ -372,6 +375,9 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
         context_->RecallWithin(*args, MaxRequestLength());
     if (const std::optional<int> image = recalled.FindInt("image")) {
       recalled_images_.push_back(*image);
+    }
+    if (const std::optional<int> file = recalled.FindInt("file")) {
+      recalled_files_.push_back(*file);
     }
     OnTool(std::move(turn), index, std::move(*args), std::move(recalled));
     return;
@@ -993,6 +999,7 @@ void AgentLoop::Finish(Step step) {
   stopping_ = false;
   steer_.reset();
   recalled_images_.clear();
+  recalled_files_.clear();
   tool_images_.clear();
   working_ = false;
   on_step_.Run(step);

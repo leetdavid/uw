@@ -6,6 +6,8 @@ source_set("agent") {
     "agent_context.h",
     "agent_protocol.cc",
     "agent_protocol.h",
+    "attachment.cc",
+    "attachment.h",
     "chat_scheduler.cc",
     "chat_scheduler.h",
     "chat_usage.cc",

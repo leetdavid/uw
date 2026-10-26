@@ -104,11 +104,11 @@ class AgentLoop {
   AgentLoop& operator=(const AgentLoop&) = delete;
   ~AgentLoop();
 
-  // Sends the user's next message. Does nothing while the agent works.
-  // `material` is text piped into the uw command with it; see
-  // AgentContext::AddMaterial.
+  // Sends the user's next message, with the files they attached. Does
+  // nothing while the agent works. `material` is text piped into the uw
+  // command with it; see AgentContext::AddMaterial.
   void Send(std::string_view text,
-            std::vector<std::string> images = {},
+            std::vector<Attachment> files = {},
             std::string_view material = {});
   // Picks the chat up again after uw quit while the agent was working.
   void Resume();
@@ -120,7 +120,7 @@ class AgentLoop {
   // Puts the user's `text` in after the step under way, before the next model
   // request. A waiting model request is sent again with it. Sends it when
   // the agent is not working.
-  void Steer(std::string_view text, std::vector<std::string> images = {});
+  void Steer(std::string_view text, std::vector<Attachment> files = {});
   bool working() const { return working_; }
   // Talks to `model` from the next request on.
   void SetModel(AgentModel model) { model_ = std::move(model); }
@@ -147,6 +147,8 @@ class AgentLoop {
   // Whether the model sees images. A connector's images are left out for one
   // that does not.
   void SetSeesImages(bool sees) { sees_images_ = sees; }
+  // Whether the model reads a PDF whole; see AgentContext::SetReadsPdfs.
+  void SetReadsPdfs(bool reads) { context_->SetReadsPdfs(reads); }
   // Turns a connector off or on for this chat, which keeps it.
   void SetConnectorOn(std::string_view name, bool on) {
     context_->SetConnectorOn(name, on);
@@ -330,13 +332,14 @@ class AgentLoop {
   bool stopping_ = false;
   struct Message {
     std::string text;
-    // data: URLs.
-    std::vector<std::string> images;
+    std::vector<Attachment> files;
   };
   std::optional<Message> steer_;
   // Images the model recalled in its current answer, shown to it before it
   // is asked again.
   std::vector<int> recalled_images_;
+  // Files likewise.
+  std::vector<int> recalled_files_;
   base::WeakPtrFactory<AgentLoop> weak_factory_{this};
 };
 

@@ -152,7 +152,8 @@ mojom::ModelListPtr PageList(ModelListing listing) {
   for (ListedModel& model : listing.models) {
     list->models.push_back(mojom::Model::New(
         std::move(model.name), model.abilities.calls_tools,
-        model.abilities.sees_images, std::move(model.abilities.efforts),
+        model.abilities.sees_images, model.abilities.reads_pdfs,
+        std::move(model.abilities.efforts),
         static_cast<mojom::ProviderFormat>(model.format)));
   }
   return list;

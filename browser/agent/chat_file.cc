@@ -50,6 +50,12 @@ base::FilePath ChatFile::FolderFor(const base::FilePath& profile_path) {
 }
 
 // static
+base::FilePath ChatFile::FilesFolderFor(const base::FilePath& profile_path,
+                                        std::string_view id) {
+  return profile_path.DirName().AppendASCII("Chat files").AppendASCII(id);
+}
+
+// static
 const scoped_refptr<base::SequencedTaskRunner>& ChatFile::Sequence() {
   static base::NoDestructor<scoped_refptr<base::SequencedTaskRunner>> sequence(
       base::ThreadPool::CreateSequencedTaskRunner(

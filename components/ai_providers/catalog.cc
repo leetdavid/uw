@@ -85,6 +85,8 @@ base::DictValue Abilities(const base::DictValue& model) {
           .Set("tools", model.FindBool("tool_call").value_or(true))
           .Set("images",
                !inputs || std::ranges::contains(*inputs, base::Value("image")))
+          .Set("pdfs",
+               inputs && std::ranges::contains(*inputs, base::Value("pdf")))
           .Set("efforts", std::move(efforts))
           .Set("toggle", toggle);
   // Prices above a context size, as some models have, are left out: uw's
@@ -231,6 +233,7 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
   ModelAbilities abilities;
   abilities.calls_tools = known->FindBool("tools").value_or(true);
   abilities.sees_images = known->FindBool("images").value_or(true);
+  abilities.reads_pdfs = known->FindBool("pdfs").value_or(false);
   abilities.toggles_thinking = known->FindBool("toggle").value_or(false);
   if (const base::ListValue* efforts = known->FindList("efforts")) {
     for (const base::Value& effort : *efforts) {

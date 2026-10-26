@@ -27,6 +27,9 @@ UwChatUI::UwChatUI(content::WebUI* web_ui) : ui::MojoWebUIController(web_ui) {
   // through and refuses every other HTML string; see trusted-types.ts.
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  // pdf.js reads a PDF in its worker, which the page serves itself.
+  source->OverrideContentSecurityPolicy(
+      network::mojom::CSPDirectiveName::WorkerSrc, "worker-src 'self';");
   // Memory saver would end the chat with the page while the agent works.
   performance_manager::PageLiveStateDecorator::SetIsAutoDiscardable(contents,
                                                                     false);

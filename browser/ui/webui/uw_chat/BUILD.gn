@@ -4,6 +4,7 @@ import("//mojo/public/tools/bindings/mojom.gni")
 
 mojom("mojo_bindings") {
   sources = [ "uw_chat.mojom" ]
+  public_deps = [ "//mojo/public/mojom/base" ]
   webui_module_path = "/"
 }
 
@@ -46,6 +47,7 @@ source_set("uw_chat") {
     "//components/url_formatter",
     "//components/viz/common",
     "//content/public/common",
+    "//mojo/public/cpp/base",
     "//net",
     "//ui/base",
     "//ui/gfx",

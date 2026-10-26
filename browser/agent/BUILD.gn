@@ -7,6 +7,8 @@ source_set("agent") {
     "agent_terminal_tools.cc",
     "agent_tools.cc",
     "agent_tools.h",
+    "chat_files.cc",
+    "chat_files.h",
     "chat_suggestions.cc",
     "chat_suggestions.h",
     "quick_check.cc",

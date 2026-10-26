@@ -43,7 +43,11 @@ constexpr char kInstructions[] =
     "again. A recalled page is a copy from that step: read the tab again "
     "before you click or type. Images the user sends are numbered from 1. "
     "Once you answer, each shrinks to one line; call recall with its image "
-    "number to see it again.\n"
+    "number to see it again. Other files the user attaches are numbered from "
+    "1 apart from images, and each has a copy in this chat's folder at the "
+    "path its line gives. You read a text file or a PDF in the message; open "
+    "anything else, or the rest of a long file, from its path in your "
+    "terminal. Call recall with a file's number to read it again.\n"
     "Skills teach you how to do some kinds of requests. When a request "
     "matches a skill listed below, call skill with its name first and follow "
     "its instructions. A skill's scripts cannot run; read its other files "
@@ -201,11 +205,12 @@ base::ListValue AgentToolSchemas() {
       Names({"name", "description", "instructions"})));
   tools.Append(Tool(
       "recall",
-      "Shows the full result of an earlier step again, or an image the user "
-      "sent.",
+      "Shows the full result of an earlier step again, or an image or file "
+      "the user sent.",
       base::DictValue()
           .Set("step", Parameter("integer", "The step's number."))
-          .Set("image", Parameter("integer", "An image's number, instead.")),
+          .Set("image", Parameter("integer", "An image's number, instead."))
+          .Set("file", Parameter("integer", "A file's number, instead.")),
       base::ListValue()));
   return tools;
 }

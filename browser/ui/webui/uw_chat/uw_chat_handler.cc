@@ -2,6 +2,7 @@
 
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 
+#include <algorithm>
 #include <set>
 #include <string_view>
 #include <utility>
@@ -60,7 +61,12 @@
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/components/agent/agent_context.h"
+#include "uw/components/agent/attachment.h"
 #include "uw/components/agent/schedule_tool.h"
+#include "chrome/browser/platform_util.h"  // nogncheck
+#include "mojo/public/cpp/base/big_buffer.h"
+#include "net/base/filename_util.h"
+#include "net/base/mime_util.h"
 
 namespace uw {
 namespace {
@@ -113,35 +119,98 @@ bool IsModelLine(const base::Value& entry) {
   return kind && *kind == "model";
 }
 
-// The images a message may carry: up to 5 data: URLs of the types the page
-// sends, none larger than the page makes them. The rest are left out.
-std::vector<std::string> UsableImages(const std::vector<std::string>& images) {
-  constexpr size_t kMaxImages = 5;
+// A message holds up to 10 files, at most 5 of them images.
+constexpr size_t kMaxFiles = 10;
+constexpr size_t kMaxImages = 5;
+
+// Whether `image` is a data: URL of a kind the page makes, no larger than it
+// makes them.
+bool IsUsableImage(const std::string& image) {
   constexpr size_t kMaxImageLength = 8 * 1024 * 1024;
-  std::vector<std::string> usable;
-  for (const std::string& image : images) {
-    if (usable.size() < kMaxImages && image.size() <= kMaxImageLength &&
-        (image.starts_with("data:image/png;base64,") ||
-         image.starts_with("data:image/jpeg;base64,"))) {
-      usable.push_back(image);
-    }
-  }
-  return usable;
+  return image.size() <= kMaxImageLength &&
+         (image.starts_with("data:image/png;base64,") ||
+          image.starts_with("data:image/jpeg;base64,"));
 }
 
-// A message from the user as the chat file keeps it.
-base::DictValue UserLine(const std::string& text,
-                         const std::vector<std::string>& images) {
+// The images a connector's prompt answered with, as a message carries them.
+std::vector<Attachment> PromptImages(const std::vector<std::string>& images) {
+  std::vector<Attachment> files;
+  for (const std::string& image : images) {
+    if (files.size() < kMaxImages && IsUsableImage(image)) {
+      Attachment file;
+      file.image = image;
+      files.push_back(std::move(file));
+    }
+  }
+  return files;
+}
+
+// Whether the user attached any of `files`, rather than a prompt.
+bool Attached(const std::vector<Attachment>& files) {
+  return std::ranges::any_of(
+      files, [](const Attachment& file) { return !file.path.empty(); });
+}
+
+// What the model gets of `files`: an image it can't see goes by its path.
+std::vector<Attachment> ForModel(std::vector<Attachment> files,
+                                 bool sees_images) {
+  for (Attachment& file : files) {
+    if (!sees_images && !file.image.empty() && !file.path.empty()) {
+      file.image.clear();
+      file.note = "This model can't see images";
+    }
+  }
+  return files;
+}
+
+// A message from the user as the chat file keeps it: its text, and each
+// file the user attached with what the model missed of it.
+base::DictValue UserLine(const std::string& text, const ReadFiles& read) {
   base::DictValue line =
       base::DictValue().Set("kind", "user").Set("text", text);
-  if (!images.empty()) {
-    base::ListValue list;
-    for (const std::string& image : images) {
-      list.Append(image);
+  base::ListValue files;
+  for (size_t i = 0; i < read.files.size(); ++i) {
+    const Attachment& file = read.files[i];
+    if (file.path.empty()) {
+      continue;
     }
-    line.Set("images", std::move(list));
+    files.Append(
+        base::DictValue()
+            .Set("saved",
+                 base::FilePath::FromUTF8Unsafe(file.path).BaseName().AsUTF8Unsafe())
+            .Set("name", file.name)
+            .Set("type", file.type)
+            .Set("size", static_cast<double>(file.size))
+            .Set("image", file.image)
+            .Set("missed", i < read.missed.size() ? read.missed[i] : ""));
+  }
+  if (!files.empty()) {
+    line.Set("files", std::move(files));
   }
   return line;
+}
+
+// Copies the files the uw command attached into `folder`. A file that cannot
+// be copied is left out.
+std::vector<mojom::SentFilePtr> CopyCommandFiles(
+    const base::FilePath& folder,
+    const std::vector<base::FilePath>& files) {
+  std::vector<mojom::SentFilePtr> copied;
+  for (const base::FilePath& from : files) {
+    if (copied.size() == kMaxFiles) {
+      break;
+    }
+    const base::FilePath to = CopyInto(folder, from);
+    if (to.empty()) {
+      continue;
+    }
+    std::string type;
+    net::GetWellKnownMimeTypeFromFile(to, &type);
+    copied.push_back(mojom::SentFile::New(
+        to.BaseName().AsUTF8Unsafe(), from.BaseName().AsUTF8Unsafe(), type,
+        base::GetFileSize(to).value_or(0), std::string(), std::string()));
+  }
+  return copied;
 }
 
 mojom::StepPtr Failed(std::string text) {
@@ -221,7 +290,10 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
     : content::WebContentsObserver(contents),
       contents_(contents),
       page_(std::move(page)),
-      receiver_(this, std::move(receiver)) {
+      receiver_(this, std::move(receiver)),
+      files_sequence_(base::ThreadPool::CreateSequencedTaskRunner(
+          {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+           base::TaskShutdownBehavior::BLOCK_SHUTDOWN})) {
   const std::string_view path = contents_->GetLastCommittedURL().path();
   id_ = path.empty() ? std::string() : std::string(path.substr(1));
   if (!ChatFile::IsChatId(id_) || OpenChats().contains(id_)) {
@@ -264,6 +336,14 @@ UwChatHandler::~UwChatHandler() {
   OpenChats().erase(id_);
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->SetPage(id_, nullptr);
+  }
+  // A private chat ends with its page, and keeps none of its files.
+  if (Profile::FromBrowserContext(contents_->GetBrowserContext())
+          ->IsOffTheRecord()) {
+    files_sequence_->PostTask(
+        FROM_HERE,
+        base::BindOnce(base::IgnoreResult(&base::DeletePathRecursively),
+                       FilesFolder()));
   }
 }
 
@@ -316,7 +396,7 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
     OnModelChanged();
   }
   if (ask.model.empty() || !model_) {
-    SendFromCommand(ask.text, std::move(ask.material));
+    SendFromCommand(ask.text, std::move(ask.material), std::move(ask.files));
     return;
   }
   // A model of the chat's provider, as the composer's model menu picks one.
@@ -325,7 +405,7 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
   const std::optional<Provider> provider =
       FindProvider(*profile->GetPrefs(), model_->provider_id);
   if (!provider) {
-    SendFromCommand(ask.text, std::move(ask.material));
+    SendFromCommand(ask.text, std::move(ask.material), std::move(ask.files));
     return;
   }
   CatalogStore::For(profile)->FormatOf(
@@ -339,14 +419,24 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
             self->model_ =
                 ModelChoice{provider_id, ask.model, format, ask.effort};
             self->OnModelChanged();
-            self->SendFromCommand(ask.text, std::move(ask.material));
+            self->SendFromCommand(ask.text, std::move(ask.material),
+                                  std::move(ask.files));
           },
           weak_factory_.GetWeakPtr(), model_->provider_id, std::move(ask)));
 }
 
 void UwChatHandler::SendFromCommand(const std::string& text,
-                                    std::string material) {
+                                    std::string material,
+                                    std::vector<base::FilePath> files) {
   if (text.empty()) {
+    return;
+  }
+  if (!files.empty()) {
+    files_sequence_->PostTaskAndReplyWithResult(
+        FROM_HERE,
+        base::BindOnce(&CopyCommandFiles, FilesFolder(), std::move(files)),
+        base::BindOnce(&UwChatHandler::OnCommandFilesCopied,
+                       weak_factory_.GetWeakPtr(), text, std::move(material)));
     return;
   }
   auto line = mojom::Step::New();
@@ -358,7 +448,69 @@ void UwChatHandler::SendFromCommand(const std::string& text,
     return;
   }
   material_ = std::move(material);
-  Send(text, {});
+  SendAttached(text, {});
+}
+
+void UwChatHandler::OnCommandFilesCopied(
+    std::string text,
+    std::string material,
+    std::vector<mojom::SentFilePtr> copied) {
+  if (copied.empty()) {
+    SendFromCommand(text, std::move(material), {});
+    return;
+  }
+  page_->PrepareFiles(
+      std::move(copied),
+      base::BindOnce(&UwChatHandler::OnCommandFilesPrepared,
+                     weak_factory_.GetWeakPtr(), std::move(text),
+                     std::move(material)));
+}
+
+void UwChatHandler::OnCommandFilesPrepared(
+    std::string text,
+    std::string material,
+    std::vector<mojom::AttachedFilePtr> files) {
+  if (Working()) {
+    SteerAttached(text, AttachmentsFrom(files));
+    return;
+  }
+  material_ = std::move(material);
+  SendAttached(text, AttachmentsFrom(files));
+}
+
+base::FilePath UwChatHandler::FilesFolder() const {
+  return ChatFile::FilesFolderFor(
+      Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPath(),
+      id_);
+}
+
+std::vector<Attachment> UwChatHandler::AttachmentsFrom(
+    const std::vector<mojom::AttachedFilePtr>& files) const {
+  const base::FilePath folder = FilesFolder();
+  std::vector<Attachment> attached;
+  size_t images = 0;
+  for (const mojom::AttachedFilePtr& file : files) {
+    const base::FilePath path = CopyNamed(folder, file->saved);
+    if (path.empty()) {
+      continue;
+    }
+    if (attached.size() == kMaxFiles) {
+      break;
+    }
+    Attachment added;
+    added.name = file->name;
+    added.path = path.AsUTF8Unsafe();
+    added.type = file->type;
+    added.size = file->size;
+    if (images < kMaxImages && IsUsableImage(file->image)) {
+      added.image = file->image;
+      ++images;
+    }
+    added.text = file->pdf_text;
+    added.pages = file->pdf_pages;
+    attached.push_back(std::move(added));
+  }
+  return attached;
 }
 
 void UwChatHandler::PromptFromCommand(
@@ -395,16 +547,21 @@ void UwChatHandler::ShowStep(mojom::StepPtr step) {
 }
 
 void UwChatHandler::Send(const std::string& text,
-                         const std::vector<std::string>& images) {
+                         std::vector<mojom::AttachedFilePtr> files) {
+  SendAttached(text, AttachmentsFrom(files));
+}
+
+void UwChatHandler::SendAttached(const std::string& text,
+                                 std::vector<Attachment> files) {
   if (!loaded_ || Working() || preparing_) {
     return;
   }
   if (!skills_loaded_) {
-    waiting_message_ = Message{text, images};
+    waiting_message_ = Message{text, std::move(files)};
     return;
   }
   if (!agent_ && !Start()) {
-    unsent_ = Message{text, images};
+    unsent_ = Message{text, std::move(files)};
     return;
   }
   unsent_.reset();
@@ -427,11 +584,11 @@ void UwChatHandler::Send(const std::string& text,
             },
             started->first.file),
         base::BindOnce(&UwChatHandler::SendStartedSkill,
-                       weak_factory_.GetWeakPtr(), text, images,
+                       weak_factory_.GetWeakPtr(), text, std::move(files),
                        std::move(started->first), std::move(started->second)));
     return;
   }
-  SendToAgent(text, text, images);
+  SendToAgent(text, text, std::move(files));
 }
 
 std::optional<std::pair<Skill, std::string>> UwChatHandler::UserSkill(
@@ -454,7 +611,7 @@ std::optional<std::pair<Skill, std::string>> UwChatHandler::UserSkill(
 }
 
 void UwChatHandler::SendStartedSkill(std::string text,
-                                     std::vector<std::string> images,
+                                     std::vector<Attachment> files,
                                      Skill skill,
                                      std::string arguments,
                                      std::optional<std::string> file) {
@@ -463,12 +620,12 @@ void UwChatHandler::SendStartedSkill(std::string text,
     return;
   }
   if (!file) {
-    SendToAgent(text, text, images);
+    SendToAgent(text, text, std::move(files));
     return;
   }
   agent_->StartedSkill(skill);
   SendToAgent(text, StartedSkillMessage(SkillInstructions(*file), arguments),
-              images, "skill", skill.name);
+              std::move(files), "skill", skill.name);
 }
 
 void UwChatHandler::SendPrompt(
@@ -506,7 +663,7 @@ void UwChatHandler::OnPrompt(std::string shown,
     return;
   }
   if (!answer.has_value()) {
-    Log(UserLine(shown, {}));
+    Log(UserLine(shown, ReadFiles()));
     const std::string failure =
         base::StrCat({"The ", name, " prompt didn't come: ", answer.error()});
     Log(base::DictValue().Set("kind", "failed").Set("text", failure));
@@ -514,7 +671,8 @@ void UwChatHandler::OnPrompt(std::string shown,
     Save();
     return;
   }
-  SendToAgent(shown, answer->text, answer->images, "prompt", name);
+  SendToAgent(shown, answer->text, PromptImages(answer->images), "prompt",
+              name);
 }
 
 void UwChatHandler::GetConnectors(GetConnectorsCallback callback) {
@@ -577,6 +735,13 @@ void UwChatHandler::SetSeesImages(bool sees) {
   }
 }
 
+void UwChatHandler::SetReadsPdfs(bool reads) {
+  reads_pdfs_ = reads;
+  if (agent_) {
+    agent_->SetReadsPdfs(reads);
+  }
+}
+
 void UwChatHandler::OnConnectorsChanged() {
   UpdateConnectors();
   page_->OnConnectorsChanged();
@@ -605,16 +770,44 @@ void UwChatHandler::UpdateConnectors() {
   if (agent_) {
     agent_->SetConnectors(ChatConnectors());
     agent_->SetSeesImages(sees_images_);
+    agent_->SetReadsPdfs(reads_pdfs_);
   }
 }
 
 void UwChatHandler::SendToAgent(const std::string& shown,
                                 const std::string& sent,
-                                const std::vector<std::string>& images,
+                                std::vector<Attachment> files,
                                 std::string_view started,
                                 std::string_view name) {
-  const std::vector<std::string> usable = UsableImages(images);
-  Log(UserLine(shown, usable));
+  if (!Attached(files)) {
+    ReadFiles read;
+    read.missed.resize(files.size());
+    read.files = std::move(files);
+    SendRead(shown, sent, std::string(started), std::string(name),
+             std::move(read));
+    return;
+  }
+  preparing_ = true;
+  files_sequence_->PostTaskAndReplyWithResult(
+      FROM_HERE, base::BindOnce(&ReadForModel, std::move(files), reads_pdfs_),
+      base::BindOnce(&UwChatHandler::SendRead, weak_factory_.GetWeakPtr(),
+                     shown, sent, std::string(started), std::string(name)));
+}
+
+void UwChatHandler::SendRead(std::string shown,
+                             std::string sent,
+                             std::string started,
+                             std::string name,
+                             ReadFiles read) {
+  preparing_ = false;
+  if (!agent_) {
+    return;
+  }
+  base::DictValue line = UserLine(shown, read);
+  if (Attached(read.files)) {
+    ShowStep(LineFor(line));
+  }
+  Log(std::move(line));
   if (!started.empty()) {
     const base::DictValue args = base::DictValue().Set("name", name);
     Log(base::DictValue().Set("kind", started).Set("name", name));
@@ -625,7 +818,8 @@ void UwChatHandler::SendToAgent(const std::string& shown,
     step->result = "{}";
     ShowStep(std::move(step));
   }
-  agent_->Send(handed_over_ + sent, usable, std::exchange(material_, ""));
+  agent_->Send(handed_over_ + sent, ForModel(std::move(read.files), sees_images_),
+               std::exchange(material_, ""));
   handed_over_.clear();
   Save();
 }
@@ -642,19 +836,101 @@ void UwChatHandler::Stop() {
 
 // While a step waits for approval, the message declines it as its note.
 void UwChatHandler::Steer(const std::string& text,
-                          const std::vector<std::string>& images) {
+                          std::vector<mojom::AttachedFilePtr> files) {
+  SteerAttached(text, AttachmentsFrom(files));
+}
+
+void UwChatHandler::SteerAttached(const std::string& text,
+                                  std::vector<Attachment> files) {
   if (!Working()) {
-    Send(text, images);
+    SendAttached(text, std::move(files));
     return;
   }
-  const std::vector<std::string> usable = UsableImages(images);
-  Log(UserLine(text, usable));
+  if (files.empty()) {
+    SteerRead(text, ReadFiles());
+    return;
+  }
+  files_sequence_->PostTaskAndReplyWithResult(
+      FROM_HERE, base::BindOnce(&ReadForModel, std::move(files), reads_pdfs_),
+      base::BindOnce(&UwChatHandler::SteerRead, weak_factory_.GetWeakPtr(),
+                     text));
+}
+
+void UwChatHandler::SteerRead(std::string text, ReadFiles read) {
+  if (!agent_) {
+    return;
+  }
+  base::DictValue line = UserLine(text, read);
+  if (Attached(read.files)) {
+    ShowStep(LineFor(line));
+  }
+  Log(std::move(line));
   Save();
   if (approval_answer_) {
     AnswerApproval(mojom::ApprovalChoice::kDecline, text);
     return;
   }
-  agent_->Steer(text, usable);
+  agent_->Steer(text, ForModel(std::move(read.files), sees_images_));
+}
+
+void UwChatHandler::SaveFile(const std::string& name,
+                             const std::vector<uint8_t>& chunk,
+                             const std::string& saved,
+                             SaveFileCallback callback) {
+  files_sequence_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          [](const base::FilePath& folder, const std::string& name,
+             const std::vector<uint8_t>& chunk, const std::string& saved) {
+            const base::FilePath path = saved.empty()
+                                            ? StartCopy(folder, name)
+                                            : CopyNamed(folder, saved);
+            return !path.empty() && base::AppendToFile(path, chunk)
+                       ? path.BaseName().AsUTF8Unsafe()
+                       : std::string();
+          },
+          FilesFolder(), name, chunk, saved),
+      std::move(callback));
+}
+
+void UwChatHandler::ReadFile(const std::string& saved,
+                             ReadFileCallback callback) {
+  files_sequence_->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(
+          [](const base::FilePath& path) -> std::optional<mojo_base::BigBuffer> {
+            constexpr size_t kMaxRead = 256 * 1024 * 1024;
+            std::string data;
+            if (path.empty() ||
+                !base::ReadFileToStringWithMaxSize(path, &data, kMaxRead)) {
+              return std::nullopt;
+            }
+            return mojo_base::BigBuffer(base::as_byte_span(data));
+          },
+          CopyNamed(FilesFolder(), saved)),
+      std::move(callback));
+}
+
+void UwChatHandler::OpenFile(const std::string& saved) {
+  const base::FilePath path = CopyNamed(FilesFolder(), saved);
+  tabs::TabInterface* chat =
+      tabs::TabInterface::MaybeGetFromContents(contents_);
+  if (path.empty() || !chat) {
+    return;
+  }
+  std::string type;
+  net::GetWellKnownMimeTypeFromFile(path, &type);
+  if (!type.starts_with("image/") && type != "application/pdf" &&
+      !type.starts_with("text/") && type != "application/json") {
+    platform_util::ShowItemInFolder(
+        Profile::FromBrowserContext(contents_->GetBrowserContext()), path);
+    return;
+  }
+  NavigateParams params(chat->GetBrowserWindowInterface(),
+                        net::FilePathToFileURL(path),
+                        ui::PAGE_TRANSITION_LINK);
+  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&params);
 }
 
 void UwChatHandler::Resume() {
@@ -682,7 +958,7 @@ void UwChatHandler::TryAgain() {
     return;
   }
   if (std::optional<Message> message = std::exchange(unsent_, {})) {
-    Send(message->text, message->images);
+    SendAttached(message->text, std::move(message->files));
     return;
   }
   const base::DictValue* last = LastLine();
@@ -1262,6 +1538,22 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
         }
       }
     }
+    if (const base::ListValue* files = entry.FindList("files")) {
+      for (const base::Value& value : *files) {
+        const base::DictValue* file = value.GetIfDict();
+        if (!file) {
+          continue;
+        }
+        const auto field = [file](std::string_view key) {
+          const std::string* found = file->FindString(key);
+          return found ? *found : std::string();
+        };
+        line->files.push_back(mojom::SentFile::New(
+            field("saved"), field("name"), field("type"),
+            static_cast<int64_t>(file->FindDouble("size").value_or(0)),
+            field("image"), field("missed")));
+      }
+    }
   } else if (*kind == "answer") {
     line->kind = mojom::StepKind::kAnswer;
   } else if (*kind == "stopped_by_user") {
@@ -1571,7 +1863,7 @@ void UwChatHandler::OnSkillsLoaded(base::OnceClosure done,
   }
   std::move(done).Run();
   if (std::optional<Message> message = std::exchange(waiting_message_, {})) {
-    Send(message->text, message->images);
+    SendAttached(message->text, std::move(message->files));
   }
   if (std::exchange(waiting_resume_, false)) {
     Resume();

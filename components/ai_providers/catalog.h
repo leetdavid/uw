@@ -20,6 +20,9 @@ struct ModelAbilities {
   bool calls_tools = true;
   // Whether it takes images. A model the catalog does not know is taken to.
   bool sees_images = true;
+  // Whether it reads a PDF whole, pages and pictures, as the catalog says.
+  // One the catalog does not know gets a PDF's text instead.
+  bool reads_pdfs = false;
   // The effort levels the model takes, named as its provider names them.
   // Empty when it takes none.
   std::vector<std::string> efforts;

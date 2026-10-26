@@ -24,7 +24,11 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "base/files/file_path.h"
+#include "base/memory/scoped_refptr.h"
+#include "base/task/sequenced_task_runner.h"
 #include "uw/browser/agent/agent_loop.h"
+#include "uw/browser/agent/chat_files.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -80,6 +84,8 @@ class UwChatHandler : public mojom::ChatHandler,
     std::string text;
     // Text piped in with it, which the agent takes as information.
     std::string material;
+    // The files attached with --file.
+    std::vector<base::FilePath> files;
     // Picked for this chat alone; the mode new chats start on stays.
     std::optional<ApprovalMode> mode;
     // A model of the chat's provider, and one of its effort levels.
@@ -103,7 +109,7 @@ class UwChatHandler : public mojom::ChatHandler,
 
   // mojom::ChatHandler:
   void Send(const std::string& text,
-            const std::vector<std::string>& images) override;
+            std::vector<mojom::AttachedFilePtr> files) override;
   void Resume() override;
   void TryAgain() override;
   void OpenChat(const std::string& id) override;
@@ -128,6 +134,7 @@ class UwChatHandler : public mojom::ChatHandler,
                   const base::flat_map<std::string, std::string>& values,
                   const std::string& shown) override;
   void SetSeesImages(bool sees) override;
+  void SetReadsPdfs(bool reads) override;
   void NewSchedule(NewScheduleCallback callback) override;
   void SaveSchedule(mojom::ChatSchedulePtr schedule) override;
   void RemoveSchedule() override;
@@ -174,7 +181,13 @@ class UwChatHandler : public mojom::ChatHandler,
   void OnConnectorsChanged() override;
 
   void Steer(const std::string& text,
-             const std::vector<std::string>& images) override;
+             std::vector<mojom::AttachedFilePtr> files) override;
+  void SaveFile(const std::string& name,
+                const std::vector<uint8_t>& chunk,
+                const std::string& saved,
+                SaveFileCallback callback) override;
+  void ReadFile(const std::string& saved, ReadFileCallback callback) override;
+  void OpenFile(const std::string& saved) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
@@ -228,7 +241,25 @@ class UwChatHandler : public mojom::ChatHandler,
   void OnStep(const AgentLoop::Step& step);
   // Tells the page and the watchers about `step`.
   void ShowStep(mojom::StepPtr step);
-  void SendFromCommand(const std::string& text, std::string material);
+  void SendFromCommand(const std::string& text,
+                       std::string material,
+                       std::vector<base::FilePath> files);
+  // The command's files are in the chat's folder: the page prepares them.
+  void OnCommandFilesCopied(std::string text,
+                            std::string material,
+                            std::vector<mojom::SentFilePtr> copied);
+  void OnCommandFilesPrepared(std::string text,
+                              std::string material,
+                              std::vector<mojom::AttachedFilePtr> files);
+  // Where the chat keeps copies of its attached files.
+  base::FilePath FilesFolder() const;
+  // The page's attached files, as the agent takes them.
+  std::vector<Attachment> AttachmentsFrom(
+      const std::vector<mojom::AttachedFilePtr>& files) const;
+  void SendAttached(const std::string& text, std::vector<Attachment> files);
+  void SteerAttached(const std::string& text, std::vector<Attachment> files);
+  // Steers with `text` once what the model gets of its files is read.
+  void SteerRead(std::string text, ReadFiles read);
   bool Working() const;
   // One line of the saved log as the page shows it.
   mojom::StepPtr LineFor(const base::DictValue& entry) const;
@@ -270,18 +301,23 @@ class UwChatHandler : public mojom::ChatHandler,
                 base::expected<mcp::Content, std::string> answer);
   // Sends `text`, which started `skill`, once its SKILL.md has been read.
   void SendStartedSkill(std::string text,
-                        std::vector<std::string> images,
+                        std::vector<Attachment> files,
                         Skill skill,
                         std::string arguments,
                         std::optional<std::string> file);
-  // Sends a message the chat shows as `shown` and the model gets as `sent`.
-  // `started` is "skill" or "prompt" when the message started one, called
-  // `name`.
+  // Sends a message the chat shows as `shown` and the model gets as `sent`,
+  // once what the model gets of its files is read. `started` is "skill" or
+  // "prompt" when the message started one, called `name`.
   void SendToAgent(const std::string& shown,
                    const std::string& sent,
-                   const std::vector<std::string>& images,
+                   std::vector<Attachment> files,
                    std::string_view started = {},
                    std::string_view name = {});
+  void SendRead(std::string shown,
+                std::string sent,
+                std::string started,
+                std::string name,
+                ReadFiles read);
   // The agent's save_skill call: shows the page the skill, and answers once
   // the user does.
   void AskToSaveSkill(base::DictValue args,
@@ -342,12 +378,14 @@ class UwChatHandler : public mojom::ChatHandler,
   // The connectors this chat turned off, kept here before its agent starts.
   std::set<std::string> connectors_off_;
   bool sees_images_ = true;
+  bool reads_pdfs_ = false;
+  // Writes and reads the chat's attached files in order.
+  scoped_refptr<base::SequencedTaskRunner> files_sequence_;
   base::ScopedObservation<Connectors, Connectors::Observer>
       connectors_observation_{this};
   struct Message {
     std::string text;
-    // data: URLs.
-    std::vector<std::string> images;
+    std::vector<Attachment> files;
   };
   // What the user sent before the skills were read, to send once they are.
   std::optional<Message> waiting_message_;

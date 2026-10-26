@@ -3,26 +3,25 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { useShape } from "@/lib/shape-context";
+import { PDF_WORKER } from "@/trusted-types";
 
 // ─── Lazy pdfjs loader ────────────────────────────────────────────────────
-// Imports pdfjs-dist on first PDF, caches the module, and points the worker
-// at the matching CDN build. Consumers don't need bundler-side worker config.
+// Imports pdf.js on first PDF, which the bundle serves beside the page as
+// /pdf.js, caches the module, and points it at its worker there.
 type PdfjsModule = typeof import("pdfjs-dist");
 let pdfjsPromise: Promise<PdfjsModule> | null = null;
 
 async function loadPdfjs(): Promise<PdfjsModule> {
   if (!pdfjsPromise) {
     pdfjsPromise = import("pdfjs-dist").then((mod) => {
-      if (!mod.GlobalWorkerOptions.workerSrc) {
-        mod.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${mod.version}/build/pdf.worker.min.mjs`;
-      }
+      mod.GlobalWorkerOptions.workerSrc = PDF_WORKER;
       return mod;
     });
   }
   return pdfjsPromise;
 }
 
-async function renderPdfFirstPage(file: File, targetWidth: number): Promise<string> {
+async function renderPdfFirstPage(file: Blob, targetWidth: number): Promise<string> {
   const pdfjs = await loadPdfjs();
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument({ data: buffer }).promise;

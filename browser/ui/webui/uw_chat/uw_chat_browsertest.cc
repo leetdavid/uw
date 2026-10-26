@@ -2063,6 +2063,129 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, APastedImageGoesWithTheMessage) {
       true);
 }
 
+// Pastes budget.csv, a one-page TAP-booking.pdf that says "Flights 1284",
+// and export.zip into the composer.
+constexpr char kPasteFiles[] = R"(
+  (async () => {
+    const stream = 'BT /F1 12 Tf 10 50 Td (Flights 1284) Tj ET';
+    const pdf = [
+      '%PDF-1.4',
+      '1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj',
+      '2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj',
+      '3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 200 100]' +
+          ' /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj',
+      `4 0 obj <</Length ${stream.length}>> stream`, stream, 'endstream endobj',
+      '5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj',
+      'trailer <</Root 1 0 R>>',
+      '%%EOF',
+    ].join('\n');
+    const files = new DataTransfer();
+    files.items.add(new File(['Flat,980\n'], 'budget.csv', {type: 'text/csv'}));
+    files.items.add(
+        new File([pdf], 'TAP-booking.pdf', {type: 'application/pdf'}));
+    files.items.add(new File([new Uint8Array([80, 75, 3, 4, 0, 0, 0, 0])],
+                             'export.zip', {type: 'application/zip'}));
+    document.getElementById('message').dispatchEvent(
+        new ClipboardEvent('paste', {clipboardData: files, bubbles: true}));
+    await new Promise((resolve) => {
+      const check = () =>
+          document.querySelectorAll('[aria-label^="Remove "]').length === 3
+              ? resolve() : setTimeout(check, 20);
+      check();
+    });
+  })()
+)";
+
+// Attached files go to the model with the path of each copy in the chat's
+// folder: a text file and a PDF's text in the message, a zip by its path
+// alone. They show above the message, again when the chat opens again, and
+// their folder goes with the chat.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AttachedFilesGoWithTheMessage) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Each of you owes 566.")});
+  content::WebContents* chat = OpenChat();
+  // pdf.js runs under the page's script rules too.
+  content::WebContentsConsoleObserver console(chat);
+  console.SetFilter(base::BindRepeating(
+      [](const content::WebContentsConsoleObserver::Message& message) {
+        return message.log_level == blink::mojom::ConsoleMessageLevel::kError;
+      }));
+  ASSERT_TRUE(content::ExecJs(chat, kPasteFiles));
+  EXPECT_EQ(Ask(chat, "Split the trip"), "Each of you owes 566.");
+
+  const std::string id =
+      content::EvalJs(chat, "document.body.dataset.chatId").ExtractString();
+  const base::FilePath folder =
+      ChatFile::FilesFolderFor(browser()->GetProfile()->GetPath(), id);
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr(base::StrCat(
+                  {"File 1: budget.csv (text/csv, 9 bytes), saved at ",
+                   folder.AppendASCII("budget.csv").value()})));
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("Flat,980"));
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("File 2: TAP-booking.pdf (application/pdf, "));
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("1 page), saved at "));
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("Flights 1284"));
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr(base::StrCat(
+                  {"File 3: export.zip (application/zip, 8 bytes), saved at ",
+                   folder.AppendASCII("export.zip").value(),
+                   ". Open it from its path."})));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "[...document.querySelectorAll('.sent-files "
+                            ".file-card')].map(card => card.dataset.name)"
+                            ".join()"),
+            "budget.csv,TAP-booking.pdf,export.zip");
+  // The PDF's card shows its first page, drawn from its copy.
+  EXPECT_EQ(Until(chat,
+                  "!!document.querySelector("
+                  "    '.sent-files [data-name=\"TAP-booking.pdf\"] img')"),
+            true);
+  EXPECT_TRUE(console.messages().empty()) << console.GetMessageAt(0);
+  {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    std::string copy;
+    EXPECT_TRUE(
+        base::ReadFileToString(folder.AppendASCII("budget.csv"), &copy));
+    EXPECT_EQ(copy, "Flat,980\n");
+  }
+  SaveWindowScreenshot(browser(), "attached-files");
+
+  Reopen(chat);
+  EXPECT_EQ(Until(chat,
+                  "document.querySelectorAll('.sent-files .file-card')"
+                  "    .length === 3"),
+            true);
+
+  ChatIndex::For(browser()->GetProfile())->Delete(id);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    return !base::PathExists(folder);
+  }));
+}
+
+// A message holds 10 files, and the composer says what it left out.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AMessageHoldsTenFiles) {
+  UseAgentModel();
+  content::WebContents* chat = OpenChat();
+  ASSERT_TRUE(content::ExecJs(chat, R"(
+    const files = new DataTransfer();
+    for (let i = 1; i <= 11; i++) {
+      files.items.add(new File(['note'], `note${i}.txt`, {type: 'text/plain'}));
+    }
+    document.getElementById('message').dispatchEvent(
+        new ClipboardEvent('paste', {clipboardData: files, bubbles: true}));
+  )"));
+  EXPECT_EQ(Until(chat, "document.getElementById('left-out')?.textContent"),
+            "A message holds up to 10 files. 1 was left out.");
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelectorAll('[aria-label^=\"Remove \"]')"
+                      "    .length"),
+            10);
+}
+
 // The header's indicator says how full the context is and what the chat has
 // cost, once the chat has answered, and its card says why.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
@@ -2166,29 +2289,33 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
 }
 
-// A model the catalog lists without image input makes the composer say so,
-// and the message waits.
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModelThatCannotSeeImagesWaits) {
+// A model the catalog lists without image input gets an image by its path,
+// and the composer says so.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       AModelThatCannotSeeImagesGetsThePath) {
   UseAgentModel();
   catalog_ = base::StrCat({R"({"testlab": {"api": ")",
                            embedded_test_server()->GetURL("/v1").spec(),
                            R"(", "models": {"test-agent": {"tool_call": true,)"
                            R"( "modalities": {"input": ["text"]}}}}})"});
   model_.ListModels({"test-agent"});
-  model_.Script({ScriptedModel::Answer("Hello.")});
+  model_.Script({ScriptedModel::Answer("A black rectangle.")});
   content::WebContents* chat = OpenChat();
   ASSERT_TRUE(content::ExecJs(chat, kPasteImage));
 
   EXPECT_EQ(
       Until(chat, "document.getElementById('cannot-see-images')?.textContent"),
-      "test-agent can't see images. Pick a model that can.");
-  ASSERT_TRUE(content::ExecJs(chat, SendScript("What is this?")));
-  EXPECT_EQ(content::EvalJs(chat,
-                            "new Promise((resolve) => setTimeout(() =>"
-                            "    resolve(document.querySelectorAll('.mine')"
-                            "        .length), 300))"),
-            0);
-  EXPECT_TRUE(model_.Requests().empty());
+      "test-agent can't see images; the agent gets the file only.");
+  EXPECT_EQ(Ask(chat, "What is this?"), "A black rectangle.");
+  const std::vector<std::string> requests = model_.Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("File 1: sofa.png (image/png, "));
+  EXPECT_THAT(requests[0],
+              ::testing::HasSubstr("This model can't see images. Open it from "
+                                   "its path."));
+  EXPECT_THAT(requests[0],
+              ::testing::Not(::testing::HasSubstr("data:image/png")));
 }
 
 // A chat the user is not looking at says how it ended in a notification, and

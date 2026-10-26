@@ -163,6 +163,10 @@ void ChatIndex::Delete(std::string_view id) {
       FROM_HERE,
       base::BindOnce(base::IgnoreResult(&base::DeleteFile),
                      folder_.AppendASCII(base::StrCat({id, ".json"}))));
+  ChatFile::Sequence()->PostTask(
+      FROM_HERE,
+      base::BindOnce(base::IgnoreResult(&base::DeletePathRecursively),
+                     ChatFile::FilesFolderFor(folder_.DirName(), id)));
   Save();
 }
 

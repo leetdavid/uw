@@ -13,6 +13,7 @@
 
 #include "base/values.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/attachment.h"
 #include "uw/components/agent/chat_usage.h"
 
 namespace uw {
@@ -38,6 +39,12 @@ class AgentContext {
   // A message with `images`, each a data: URL. They are numbered on from the
   // chat's earlier images.
   void AddUser(std::string_view text, const std::vector<std::string>& images);
+  // A message with the files the user attached. Its images are numbered on
+  // from the chat's earlier images and its other files from its earlier
+  // files. A PDF goes whole to a model that reads PDFs and as its text to any
+  // other; see SetReadsPdfs().
+  void AddUser(std::string_view text,
+               const std::vector<Attachment>& attachments);
   // Text the user piped into the uw command with their message: information
   // from outside uw, as page text is, never the user's instruction. It is a
   // step of its own, so it shrinks as a result does and recall brings it back.
@@ -46,6 +53,12 @@ class AgentContext {
   // Shows the model the images it recalled by `numbers`, in a message of
   // their own.
   void ShowImages(const std::vector<int>& numbers);
+  // Shows the model the files it recalled by `numbers`, in a message of their
+  // own.
+  void ShowFiles(const std::vector<int>& numbers);
+  // Whether the chat's model reads a PDF whole. From the next request on,
+  // each PDF it may read goes as the PDF, or else as its text.
+  void SetReadsPdfs(bool reads) { reads_pdfs_ = reads; }
   void AddAssistant(const ModelTurn& turn);
   // Records what a tool answered to the call `call_id` and returns its step
   // number. A reading of a tab shortens the older readings of the same page in
@@ -54,7 +67,7 @@ class AgentContext {
                 std::string_view tool,
                 const base::DictValue& args,
                 const base::DictValue& result);
-  // The step or image `args` names, as the recall tool finds it.
+  // The step, image, or file `args` names, as the recall tool finds it.
   base::DictValue Recall(const base::DictValue& args) const;
   // What the recall tool answers to `args`: Recall(), unless it would take
   // the results since the user's latest message past half of `max_length`,
@@ -117,6 +130,9 @@ class AgentContext {
   // What an image counts for in a request's length: about as many tokens as
   // a screenshot costs.
   static constexpr size_t kImageLength = 6000;
+  // What each page of a PDF the model reads whole counts for: about as many
+  // tokens as its text and its picture cost.
+  static constexpr size_t kPdfPageLength = 12000;
 
   // The latest request Request() built: its characters by part, and whether
   // uw made room for it by shrinking earlier results or images.
@@ -151,6 +167,30 @@ class AgentContext {
     bool shortened = false;
   };
 
+  // An attached file other than an image the model sees. One the model reads
+  // has a text part at `part` of `message`; one it opens only by path has
+  // none and never shrinks.
+  struct File {
+    File();
+    File(const File&);
+    File(File&&);
+    File& operator=(const File&);
+    File& operator=(File&&);
+    ~File();
+
+    int number = 0;
+    std::string name;
+    std::string path;
+    std::string text;
+    // The PDF as a data: URL, which a saved chat leaves out.
+    std::string pdf;
+    int pages = 0;
+    size_t message = 0;
+    size_t part = 0;
+    bool read = false;
+    bool shortened = false;
+  };
+
   static bool CanShorten(const Result& result);
   // The instructions, with the skills and connectors.
   void UpdateInstructions();
@@ -159,16 +199,22 @@ class AgentContext {
   RequestParts PartsOf(const std::string& body) const;
   // Where the user's latest message sits in `messages_`.
   size_t ReplyStart() const;
-  // Shortens the oldest long result or image before `end`, or returns false
-  // when there is none.
+  // Shortens the oldest long result, image, or file before `end`, or returns
+  // false when there is none.
   bool ShortenOldestBefore(size_t end);
   void Shorten(Result& result);
   void Shorten(Image& image);
+  void Shorten(File& file);
+  // Whether `file` goes to the model as its PDF.
+  bool SendsPdf(const File& file) const;
+  // What `file` counts for in a request's length.
+  size_t LengthOf(const File& file) const;
   // Drops what the provider kept with the turns after `message`: a provider
   // that checks it against the conversation before it refuses it once that
   // has changed.
   void DropKeptAfter(size_t message);
   const Image* FindImage(int number) const;
+  const File* FindFile(int number) const;
 
   base::ListValue messages_;
   std::string skills_;
@@ -183,6 +229,9 @@ class AgentContext {
   std::vector<Result> results_;
   // A recalled image appears again under its own number.
   std::vector<Image> images_;
+  // A recalled file appears again under its own number too.
+  std::vector<File> files_;
+  bool reads_pdfs_ = false;
   RequestParts last_parts_;
   bool last_made_room_ = false;
   std::vector<UsageRecord> usage_;

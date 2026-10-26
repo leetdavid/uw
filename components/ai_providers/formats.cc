@@ -46,6 +46,11 @@ std::string_view ImageUrl(const base::DictValue& part) {
   return image ? StringOr(*image, "url") : "";
 }
 
+// A PDF part as chat completions sends it: the file's name and a data: URL.
+const base::DictValue* PdfOf(const base::DictValue& part) {
+  return StringOr(part, "type") == "file" ? part.FindDict("file") : nullptr;
+}
+
 // The kept parts of `message`, when `model` at `address` sent them in
 // `format`. Another model, even at the same provider, may refuse them.
 const base::ListValue* KeptParts(const base::DictValue& message,
@@ -168,6 +173,21 @@ base::DictValue AnthropicRequest(const base::DictValue& chat,
           blocks.Append(base::DictValue()
                             .Set("type", "text")
                             .Set("text", StringOr(*part, "text")));
+          continue;
+        }
+        if (const base::DictValue* pdf = PdfOf(*part)) {
+          const std::string_view data = StringOr(*pdf, "file_data");
+          const size_t comma = data.find(",");
+          if (comma != std::string_view::npos) {
+            blocks.Append(
+                base::DictValue()
+                    .Set("type", "document")
+                    .Set("title", StringOr(*pdf, "filename"))
+                    .Set("source", base::DictValue()
+                                       .Set("type", "base64")
+                                       .Set("media_type", "application/pdf")
+                                       .Set("data", data.substr(comma + 1))));
+          }
           continue;
         }
         // data:<media type>;base64,<data>
@@ -295,6 +315,11 @@ base::DictValue ResponsesRequest(const base::DictValue& chat,
           content.Append(base::DictValue()
                              .Set("type", "input_text")
                              .Set("text", StringOr(*part, "text")));
+        } else if (const base::DictValue* pdf = PdfOf(*part)) {
+          content.Append(base::DictValue()
+                             .Set("type", "input_file")
+                             .Set("filename", StringOr(*pdf, "filename"))
+                             .Set("file_data", StringOr(*pdf, "file_data")));
         } else {
           content.Append(base::DictValue()
                              .Set("type", "input_image")

@@ -28,6 +28,9 @@ import { surfaceClasses } from "@/lib/surface-classes";
 import { SurfaceProvider } from "@/lib/surface-context";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { FileThumbnail } from "@/components/ui/file-thumbnail";
+import { FileCard } from "@/file-card";
+import { isImage } from "@/files";
+import { Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
@@ -170,6 +173,8 @@ interface InputMessageProps
   accept?: string;
   /** Maximum number of files. Extra files are dropped when the limit is exceeded. */
   maxFiles?: number;
+  /** Called when a drop held folders, which are left out. */
+  onFoldersLeftOut?: () => void;
   /** Side of each preview tile in pixels. Defaults to 80. */
   filePreviewSize?: number;
   /** Extra props forwarded to the underlying textarea. */
@@ -253,7 +258,11 @@ function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) {
       // a preview tile doesn't look like it'll land in the textarea.
       className="relative shrink-0 cursor-default group/tile"
     >
-      <FileThumbnail file={file} size={size} radius={radius} />
+      {isImage(file.type) ? (
+        <FileThumbnail file={file} size={size} radius={radius} />
+      ) : (
+        <FileCard name={file.name} type={file.type} size={file.size} pdf={file} />
+      )}
       <Tooltip content="Remove" side="top">
         <button
           type="button"
@@ -266,7 +275,11 @@ function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) {
           // of theme — the close badge needs to read as a "delete affordance"
           // over arbitrary image/PDF content, so it sits at a fixed contrast
           // instead of flipping with the surrounding surface.
-          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-neutral-900 text-white opacity-0 group-hover/tile:opacity-100 transition-opacity duration-80 flex items-center justify-center cursor-pointer outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
+          className={cn(
+            "absolute w-5 h-5 rounded-full bg-neutral-900 text-white opacity-0 group-hover/tile:opacity-100 transition-opacity duration-80 flex items-center justify-center cursor-pointer outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
+            // A card's sits on its corner.
+            isImage(file.type) ? "top-1 right-1" : "-top-1.5 -right-1.5"
+          )}
         >
           <XIcon size={12} strokeWidth={2.5} />
         </button>
@@ -535,6 +548,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       onFilesChange,
       accept = DEFAULT_ACCEPT,
       maxFiles,
+      onFoldersLeftOut,
       filePreviewSize = 80,
       textareaProps,
       status,
@@ -566,6 +580,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [focusVisible, setFocusVisible] = useState(false);
     const [dragOver, setDragOver] = useState(false);
+    const [dragCount, setDragCount] = useState(0);
     const [hovered, setHovered] = useState(false);
 
     // Split out onFocus/onBlur so the rest-spread onto the textarea can't
@@ -1020,6 +1035,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
 
     const matchesAccept = useCallback(
       (file: File) =>
+        // An empty accept takes any file.
+        acceptTokens.length === 0 ||
         acceptTokens.some((token) => {
           if (token.endsWith("/*")) return file.type.startsWith(token.slice(0, -1));
           if (token.startsWith(".")) return file.name.toLowerCase().endsWith(token.toLowerCase());
@@ -1096,6 +1113,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         if (!Array.from(e.dataTransfer.types).includes("Files")) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
+        setDragCount(e.dataTransfer.items.length);
         setDragOver(true);
       },
       [supportsFiles, disabled]
@@ -1116,9 +1134,17 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         e.preventDefault();
         setDragOver(false);
         if (!supportsFiles || disabled) return;
-        addFiles(Array.from(e.dataTransfer.files));
+        // A dropped folder comes as a File too; only its entry tells.
+        const items = Array.from(e.dataTransfer.items).filter((item) => item.kind === "file");
+        const folders = items.filter((item) => item.webkitGetAsEntry()?.isDirectory);
+        const files = items
+          .filter((item) => !folders.includes(item))
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => file !== null);
+        addFiles(files);
+        if (folders.length) onFoldersLeftOut?.();
       },
-      [supportsFiles, disabled, addFiles]
+      [supportsFiles, disabled, addFiles, onFoldersLeftOut]
     );
 
     const handleFileInputChange = useCallback(
@@ -1142,7 +1168,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
           // border. State changes recolor that same 1px ring in place rather
           // than layering a second colored border beside it — so hover / focus
           // bump *contrast* without ever appearing to thicken the stroke.
-          "flex flex-col gap-1 p-2 transition-[box-shadow,color] duration-80",
+          "relative flex flex-col gap-1 p-2 transition-[box-shadow,color] duration-80",
           surfaceClasses(2, 2),
           shape.container,
           clickToFocus && !disabled && "cursor-text",
@@ -1155,6 +1181,12 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         {...props}
       >
         <SurfaceProvider value={2}>
+          {dragOver && supportsFiles && (
+            <div className="drop-zone pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] border-[1.5px] border-dashed border-[color:var(--focus-ring)] bg-background text-sm font-medium text-[color:var(--focus-ring)]">
+              <Paperclip className="size-4" />
+              Drop to add {dragCount} {dragCount === 1 ? "file" : "files"}
+            </div>
+          )}
           {supportsFiles && (
             <input
               ref={fileInputRef}

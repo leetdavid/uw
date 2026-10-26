@@ -16,6 +16,7 @@ import {
 import type {
   AgentTab,
   Approval,
+  AttachedFile,
   ChatConnector,
   ChatModel,
   ChatPrompt,
@@ -25,6 +26,7 @@ import type {
   MessageCost,
   RunLine,
   ScheduleState,
+  SentFile,
   SkillProposal,
   Step,
   TrackedValue,
@@ -44,6 +46,7 @@ export {
 export type {
   AgentTab,
   Approval,
+  AttachedFile,
   ChatConnector,
   ChatModel,
   ChatPrompt,
@@ -53,6 +56,7 @@ export type {
   MessageCost,
   RunLine,
   ScheduleState,
+  SentFile,
   SkillProposal,
   Step,
   TrackedValue,

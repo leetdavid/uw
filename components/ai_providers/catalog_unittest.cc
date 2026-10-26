@@ -20,7 +20,7 @@ using ::testing::IsEmpty;
 constexpr char kApiJson[] = R"({
   "openai": {"models": {
     "gpt-5": {"tool_call": true, "reasoning": true,
-              "modalities": {"input": ["text", "image"]},
+              "modalities": {"input": ["text", "image", "pdf"]},
               "reasoning_options": [{"type": "effort",
                                      "values": ["minimal", "low", "medium", "high"]}]},
     "gpt-4o": {"tool_call": true, "reasoning": false,
@@ -227,6 +227,22 @@ TEST(CatalogTest, TheCatalogSaysWhichModelsSeeImages) {
       catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-4o").sees_images);
   EXPECT_TRUE(catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-9-preview")
                   .sees_images);
+}
+
+// A model reads a PDF whole only when the catalog lists PDF input for it.
+TEST(CatalogTest, TheCatalogSaysWhichModelsReadPdfs) {
+  const std::optional<ModelCatalog> catalog =
+      ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  EXPECT_TRUE(
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-5").reads_pdfs);
+  EXPECT_FALSE(
+      catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-4o").reads_pdfs);
+  EXPECT_FALSE(
+      catalog->For(Custom("https://api.deepseek.com"), "deepseek-v4-pro")
+          .reads_pdfs);
+  EXPECT_FALSE(catalog->For(Preset(ProviderPreset::kOpenAi), "gpt-9-preview")
+                   .reads_pdfs);
 }
 
 TEST(CatalogTest, TheCatalogSaysWhichModelsCanStopThinking) {

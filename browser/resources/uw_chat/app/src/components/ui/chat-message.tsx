@@ -19,6 +19,9 @@ interface ChatMessageProps
   /** Images as URLs, such as data: URLs, shown as 112×84 tiles above the
    *  bubble. */
   images?: string[];
+  /** Anything else the message carried, such as file cards, shown above the
+   *  bubble after the images. */
+  attachments?: ReactNode;
   /** Side length of each attachment thumbnail in pixels. Defaults to 64. */
   thumbnailSize?: number;
   /** Timestamp shown in the hover-revealed meta row, before the actions.
@@ -42,7 +45,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, images, thumbnailSize = 64, time, actions, children, size, className, ...props },
+    { from, files, images, attachments, thumbnailSize = 64, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -101,6 +104,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
             ))}
           </div>
         )}
+        {attachments}
         {children != null && children !== "" && (
           <div
             className={cn(

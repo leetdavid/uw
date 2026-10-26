@@ -1,5 +1,7 @@
 /** uw chat, uw chats, and uw approve: run uw's agent from a terminal. */
 
+import { accessSync, constants, statSync } from "node:fs";
+import { basename, resolve } from "node:path";
 import { options, type Command, type Context, type Input, type Plan } from "./cli.ts";
 import { CommandError, DONE, FAILED, NEEDS_YOU, USAGE } from "./errors.ts";
 import {
@@ -21,7 +23,8 @@ Ctrl-C leaves. With -p, or with no terminal, steps go to stderr and the answer
 goes to stdout as Markdown. With a terminal, a step that needs approval asks
 here; with none, the command prints the step and exits with 3, and uw approve
 answers it. Ctrl-C stops the chat. Text piped in with a request is attached
-material, never your instruction.
+material, never your instruction. So is a file attached with --file: uw copies
+it into the chat's folder, as the composer does.
 
 Options:
   -p, --print            Print the answer and exit.
@@ -30,6 +33,7 @@ Options:
   --effort <level>       One of the model's effort levels.
   --timeout <duration>   Stop the chat after this long, such as 90s or 10m.
   --no-memory            Keep this chat out of agent memory: it recalls and keeps nothing.
+  --file <path>          Attach a file. Repeat it for more, up to 10.
   --workspace <name>     Where the chat runs. Default: the one used last.
   --json                 Print one result object at the end.
 
@@ -37,6 +41,7 @@ Examples:
   uw chat -p "Did my latest Vercel deploy succeed?"
   uw chat -p --mode full-auto "Close Linear issues in Web older than 90 days"
   cat notes.md | uw chat -p "File these as Linear issues"
+  uw chat -p --file TAP-booking.pdf --file budget.csv "Split the Lisbon trip four ways"
   uw chat -r 3f9c2e18 -p
 `;
 
@@ -71,6 +76,21 @@ const MODES = ["ask-first", "auto", "full-auto"];
 const FULL_AUTO = "▲ Full auto: the agent won't ask before changes on your sites, commands, or connector tools. "
   + "It still asks before reading a sensitive file.";
 const CHOICES = ["allow", "allow-for-chat", "always-allow", "decline", "stop"];
+const MAX_FILES = 10;
+
+/** The full path of a file to attach; wrong usage when it can't be read. */
+function attached(file: string): string {
+  const path = resolve(file);
+  let reason = "";
+  try {
+    if (statSync(path).isDirectory()) reason = "it's a folder; zip it first";
+    else accessSync(path, constants.R_OK);
+  } catch (error) {
+    reason = (error as NodeJS.ErrnoException).code === "ENOENT" ? "no such file" : "permission denied";
+  }
+  if (reason) throw new CommandError(`uw: can't read ${file}: ${reason}`, USAGE);
+  return path;
+}
 
 /** A duration such as 90s, 10m, or 1h, in milliseconds. */
 export function duration(text: string): number {
@@ -98,6 +118,7 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     timeout: { type: "string" },
     workspace: { type: "string" },
     "no-memory": { type: "boolean", default: false },
+    file: { type: "string", multiple: true },
   });
   if (values.help) return null;
   if (values.mode !== undefined && !MODES.includes(values.mode)) {
@@ -107,6 +128,8 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     throw new CommandError("uw chat takes -c or -r, not both.", USAGE);
   }
   const limit = values.timeout === undefined ? undefined : duration(values.timeout);
+  const files = (values.file ?? []).map(attached);
+  if (files.length > MAX_FILES) throw new CommandError(`uw chat takes up to ${MAX_FILES} files.`, USAGE);
   const piped = input.terminal ? "" : await input.stdin();
   let text = positionals.join(" ").trim();
   let material = "";
@@ -121,6 +144,7 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     ...(values.workspace === undefined ? {} : { workspace: values.workspace }),
     ...(text ? { text } : {}),
     ...(material ? { material } : {}),
+    ...(files.length ? { files } : {}),
     ...(values.mode === undefined ? {} : { mode: values.mode }),
     ...(values.model === undefined ? {} : { model: values.model }),
     ...(values.effort === undefined ? {} : { effort: values.effort }),
@@ -157,12 +181,14 @@ async function runChat(context: Context, method: string, params: object, mode: s
   let answering = false;
   let memory = NO_MEMORY;
   const memoryOff = "memory_off" in params;
+  const attachedNames = ((params as { files?: string[] }).files ?? []).map((file) => basename(file));
   // uw's reply and its first notifications can come together, so the chat's
   // id comes from whichever arrives first.
   const learn = (id: unknown) => {
     if (chat || typeof id !== "string") return;
     chat = id;
     out.say(memoryOff ? `${chat.slice(0, 8)} · Memory off` : chat.slice(0, 8));
+    if (attachedNames.length) out.say(`Attached ${attachedNames.join(", ")}`);
   };
   channel.onNotification((name, raw) => {
     learn(raw.chat);

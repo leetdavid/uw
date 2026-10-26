@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "base/containers/flat_map.h"
+#include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/json/json_reader.h"
@@ -385,6 +386,16 @@ UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
   }
   if (const std::string* material = params.FindString("material")) {
     ask.material = *material;
+  }
+  if (const base::ListValue* files = params.FindList("files")) {
+    for (const base::Value& file : *files) {
+      if (file.is_string()) {
+        const base::FilePath path = base::FilePath::FromUTF8Unsafe(file.GetString());
+        if (path.IsAbsolute()) {
+          ask.files.push_back(path);
+        }
+      }
+    }
   }
   ask.mode = ModeFrom(params.FindString("mode"));
   if (const std::string* model = params.FindString("model")) {
