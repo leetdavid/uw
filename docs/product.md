@@ -22,6 +22,8 @@ The [board](plans/roadmap.md#board) shows what is built for each.
 
 Agreed: build for the project owner's daily browsing first. A broader target audience remains undecided.
 
+Agreed on 2026-10-26: anyone may download uw as an early preview. It is marked as rough, may break, and comes with no support promise. The [distribution plan](plans/distribution.md) has the details.
+
 ## Minimum usable version
 
 Agreed: the first version targets macOS desktop. Chrome-like everyday browsing with vertical tabs is enough to start daily use. Other planned features can follow.
