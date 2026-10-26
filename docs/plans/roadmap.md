@@ -229,7 +229,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T218 | Sparkle behind Chromium's relaunch button | in progress | 5/10 | Sparkle checks daily and downloads in the background, then Chromium's "Relaunch to update" installs it with tabs restored, per [ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md). Needs T216. |
 | T219 | Problem reports and consent | todo | 5/10 | The first-run Yes/No and one settings switch; Crashpad uploads to Sentry; rage clicks, dead clicks, and JavaScript errors from uw's own pages to PostHog, per [Problem reports](distribution.md#problem-reports). |
 | T220 | H.264 and AAC through macOS | todo | 4/10 | Play H.264 through VideoToolbox and AAC through AudioToolbox, and ship neither FFmpeg's decoders for them nor OpenH264, per [Codecs](distribution.md#codecs). x.com's videos must still play. |
-| T221 | Report an issue | todo | 9/10 | Help → "Report an issue" opens a new GitHub issue with the uw, Chromium, and macOS versions filled in. |
+| T221 | Report an issue | in review | 9/10 | Help → "Report an issue" opens a new GitHub issue with the uw, Chromium, and macOS versions filled in. |
 | T222 | uwbrowser.com | todo | 8/10 | The one-page site, designed on the Doop canvas first, then Next.js in `site/` on Vercel with PostHog, per [Website content](distribution.md#website-content). |
 
 ## 1. Choose the browser foundation

@@ -32,7 +32,8 @@ enum WindowCommand {
   kWatchThisPage,
   kClearScratchpad,
   kTidyScratchpad,
-  kLastWindowCommand = kTidyScratchpad,
+  kReportIssue,
+  kLastWindowCommand = kReportIssue,
 };
 
 bool IsWindowCommand(int command);

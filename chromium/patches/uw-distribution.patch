@@ -1,3 +1,15 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index 1a7e62d..ad54f7d 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -325,6 +325,7 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_PAUSE_RESUME_MAC" desc="In Title Case: Resumes automatic organization.">Resume Automatic Organization</message>
+       <message name="IDS_UW_ORGANIZATION_SETTINGS_MAC" desc="In Title Case: Opens the tab organization settings page.">Tab Organization Settings…</message>
+       <message name="IDS_UW_KEYBOARD_SHORTCUTS_MAC" desc="In Title Case: Opens the settings section that lists every command of the menu bar with its keyboard shortcut.">Keyboard Shortcuts…</message>
++      <message name="IDS_UW_REPORT_ISSUE_MAC" desc="In Title Case: Opens a new GitHub issue for uw with the uw, Chromium, and macOS versions filled in.">Report an Issue…</message>
+       <message name="IDS_UW_NEST_BRANCH_MAC" desc="In Title Case: Makes the selected tab a child of the tab above it.">Nest Under Previous Tab</message>
+       <message name="IDS_UW_OUTDENT_BRANCH_MAC" desc="In Title Case: Moves the selected tab up one nesting level.">Move Up One Level</message>
+       <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 index 95cc823..5b06535 100644
 --- a/chrome/browser/BUILD.gn
@@ -71,6 +83,19 @@ index 544c458..7c8a822 100644
    // Set the flag to restore state after the restart.
    pref_service->SetBoolean(prefs::kRestartLastSessionOnShutdown, true);
    if (ignore_unload_handlers) {
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index f917e46..167d296 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -692,6 +692,8 @@ NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
+   std::vector<Item> items = {};
+   items.push_back(Item(IDS_UW_KEYBOARD_SHORTCUTS_MAC)
+                       .command_id(uw::kShowShortcutSettings));
++  items.push_back(
++      Item(IDS_UW_REPORT_ISSUE_MAC).command_id(uw::kReportIssue));
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   items.push_back(Item(IDS_FEEDBACK_MAC).command_id(IDC_FEEDBACK));
+   bool is_profile_loaded =
 diff --git a/chrome/browser/updater/BUILD.gn b/chrome/browser/updater/BUILD.gn
 index b9c442e..116014f 100644
 --- a/chrome/browser/updater/BUILD.gn

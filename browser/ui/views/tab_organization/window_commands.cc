@@ -21,6 +21,7 @@
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
+#include "uw/browser/branding/report_issue.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -200,6 +201,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kWatchThisPage:
       WatchCard::Open(window);
+      break;
+    case kReportIssue:
+      ShowSingletonTab(window, NewIssueUrl());
       break;
   }
 }

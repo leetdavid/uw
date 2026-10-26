@@ -14,21 +14,41 @@ source_set("release_version") {
   frameworks = [ "Foundation.framework" ]
 }
 
+source_set("report_issue") {
+  sources = [
+    "report_issue.cc",
+    "report_issue.h",
+  ]
+  deps = [
+    ":release_version",
+    "//base",
+    "//base/version_info",
+    "//url",
+  ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "release_version_browsertest.mm" ]
   deps = [
     ":release_version",
+    ":report_issue",
     "//base",
     "//base/test:test_support",
     "//base/version_info",
+    "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
     "//chrome/browser/ui/webui/version",
     "//chrome/test:test_support",
+    "//content/public/browser",
     "//content/test:test_support",
+    "//net",
     "//testing/gmock",
     "//testing/gtest",
+    "//url",
+    "//uw/browser/tab_organization",
   ]
   frameworks = [ "Foundation.framework" ]
 }
