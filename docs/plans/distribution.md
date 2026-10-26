@@ -42,7 +42,12 @@ Agreed for now: no license. The source is public to read, and all rights are res
 
 Agreed: before the first public preview, uw plays H.264 video and AAC audio through macOS's own decoders, VideoToolbox and AudioToolbox, as Firefox does, and stops shipping FFmpeg's H.264 and AAC decoders. Apple's license covers its decoders; FFmpeg's are covered by patent pools uw has no license from. Sites such as x.com must still play their videos.
 
-Found so far: Chromium's AudioToolbox decoder takes only xHE-AAC, AC-3, and E-AC-3, so plain AAC still goes to FFmpeg. WebRTC's H.264 (`rtc_use_h264`) builds OpenH264 from source, which Cisco's patent license does not cover. Both need work.
+Found so far, at Chromium 153 on 2026-10-27:
+
+- `ffmpeg_branding = "Chromium"` drops FFmpeg's H.264 and AAC decoders, their parsers, and the raw AAC demuxer. MP4 demuxing stays. A patch must delete the assert in `media/BUILD.gn` that forbids this with `proprietary_codecs`. Raw `.aac` files and ADTS radio streams played with `src=` stop working.
+- With `enable_ffmpeg_video_decoders = false`, H.264 plays only through VideoToolbox in the GPU process. Videos under 360 px tall, which FFmpeg decodes today, move to VideoToolbox too. With the GPU process off, H.264 does not play.
+- Chromium's AudioToolbox decoder takes only xHE-AAC, AC-3, and E-AC-3. Plain AAC needs its esds magic cookie, ADTS headers stripped, HE-AAC's rate and channel changes, and priming trimmed once.
+- `media_use_openh264 = false` turns off WebRTC's H.264 (`rtc_use_h264`), which builds OpenH264, a library Cisco's patent license does not cover. WebRTC still receives H.264 through VideoToolbox, but it sends H.264 only after a patch to `webrtc_util.cc`.
 
 ## Domain and bundle ID
 
@@ -68,6 +73,13 @@ With the user's consent, uw also sends problem reports:
 On first run uw asks "Send crash reports and problem reports to help fix uw?" with Yes and No and nothing pre-selected. One switch in settings changes the answer. Crash dumps can hold page contents, so they are sent only after a Yes.
 
 The website uses PostHog for visits and download clicks.
+
+Found so far, at Chromium 153 on 2026-10-27:
+
+- Crashpad runs in unbranded builds but has no upload address, and every launch turns uploads off (`ApplyMetricsReportingPolicy`). A patch gives `GetUploadUrl` Sentry's minidump address, reads the answer from the user data folder's "Consent To Send Stats" file, and stops the reset. Crashpad sends at most one report an hour unless started with `--no-rate-limit`.
+- Release symbols need `enable_dsyms = true` beside `symbol_level = 1`. The dSYMs may run to gigabytes.
+- The React pages are the chat page, `uw://ai`, and the watch card. Settings and the organizer page are Lit. Chromium gives WebUI pages that use Mojo no network access, so a page reports its problems over Mojo, and C++ sends them to PostHog.
+- Chromium's own consent switch and first-run dialog appear only in Google Chrome builds, so uw adds its own.
 
 ## Build flags
 
