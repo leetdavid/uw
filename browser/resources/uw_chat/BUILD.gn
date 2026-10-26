@@ -1,5 +1,6 @@
 # The uw://chat page, one chat with uw's agent, uw://ai, the AI page, and
-# the watch card under the eye in the address bar. All three are one React
+# the watch card under the eye in the address bar, and every uw page's
+# problems.js, which reports what goes wrong on the page. All three are one React
 # app in app/, built from Fluid Functionalism's parts. app/bundle.ts checks
 # its types, bundles it with Chromium's node, and puts the pages' files in
 # one folder; the bundle carries the pages' mojo bindings.
@@ -19,6 +20,7 @@ app_files = [
   "chat.js",
   "providers.js",
   "watch_card.js",
+  "problems.js",
   "chat.css",
   "icons/openai.svg",
   "icons/anthropic.svg",
@@ -52,6 +54,7 @@ node("app") {
     "//ui/webui/resources/mojo:build_ts",
     "//uw/browser/ui/webui/uw_chat:mojo_bindings_ts__generator",
     "//uw/browser/ui/webui/uw_providers:mojo_bindings_ts__generator",
+    "//uw/browser/problem_reports:mojo_bindings_ts__generator",
   ]
   args = [
     rebase_path("app/bundle.ts", root_build_dir),

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -12,6 +12,18 @@ export const DMG = "uw-macos-arm64.dmg";
 export const SPARKLE_VERSION = "2.10.1";
 export const SPARKLE_SHA256 = "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27";
 export const SPARKLE_PUBLIC_KEY = "tUSDZsx93uVKuL7o7d/RMObl4n5XFcTn/G5SHNENRZk=";
+export const SENTRY_CLI_VERSION = "3.8.2";
+export const SENTRY_CLI_SHA256 = "c80d92b6d34eb64fe7402f56cc7968fbb15aab1c763254ad428b55cc98ec7dcf";
+// Crash reports go to the Sentry project eslee/uw, and uw's pages report problems
+// to PostHog. Both addresses are public in every release. See
+// docs/plans/distribution.md, "Problem reports".
+export const SENTRY_ORG = "eslee";
+export const SENTRY_PROJECT = "uw";
+export const SENTRY_TOKEN_ITEM = "uw-sentry";
+export const CRASH_REPORT_URL =
+  "https://o4512323831070720.ingest.us.sentry.io/api/4512323876618240/minidump/?sentry_key=47ca5329021071c1a1fd038b8a1ec13e";
+export const POSTHOG_KEY = "";
+export const POSTHOG_HOST = "https://us.i.posthog.com";
 const REPOSITORY = "https://github.com/leetdavid/uw";
 export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
 const BRANCH = "origin/main";
@@ -95,6 +107,34 @@ export class Release {
     return directory;
   }
 
+  /** The token that uploads symbols, from the login keychain. */
+  sentryToken(): string {
+    let token = "";
+    try { token = this.capture(["security", "find-generic-password", "-s", SENTRY_TOKEN_ITEM, "-a", SENTRY_ORG, "-w"]); } catch {}
+    if (!token) {
+      throw new BuildError(`No Sentry token in the keychain. Add one with: security add-generic-password -s ${SENTRY_TOKEN_ITEM} -a ${SENTRY_ORG} -w`);
+    }
+    return token;
+  }
+
+  /** Downloads the pinned sentry-cli once and returns its path. */
+  sentryCli(): string {
+    const cli = join(this.options.worktree, ".chromium/releases", `sentry-cli-${SENTRY_CLI_VERSION}`);
+    if (existsSync(cli)) return cli;
+    const download = `${cli}.download`;
+    mkdirSync(join(this.options.worktree, ".chromium/releases"), { recursive: true });
+    this.capture(["curl", "-fsSL", "-o", download,
+      `https://github.com/getsentry/sentry-cli/releases/download/${SENTRY_CLI_VERSION}/sentry-cli-Darwin-arm64`],
+    REPO, NETWORK_TIMEOUT);
+    if (this.capture(["shasum", "-a", "256", download]).split(/\s/)[0] !== SENTRY_CLI_SHA256) {
+      rmSync(download, { force: true });
+      throw new BuildError(`sentry-cli ${SENTRY_CLI_VERSION} does not match its pinned checksum`);
+    }
+    chmodSync(download, 0o755);
+    renameSync(download, cli);
+    return cli;
+  }
+
   /** Builds, signs, and notarizes the release, then publishes it as a draft GitHub release. */
   publish(): string {
     const { version, worktree, jobs } = this.options;
@@ -111,15 +151,22 @@ export class Release {
     const identity = this.identity();
     this.capture(["xcrun", "notarytool", "history", "--keychain-profile", NOTARY_PROFILE], REPO, NETWORK_TIMEOUT);
     this.capture(["gh", "auth", "status"]);
+    if (!POSTHOG_KEY) throw new BuildError("POSTHOG_KEY in scripts/release.ts is empty");
+    const sentryToken = this.sentryToken();
+    const cli = this.sentryCli();
 
     if (this.capture(["git", "status", "--porcelain"], worktree)) throw new BuildError(`${worktree} has local changes`);
     this.step(["git", "checkout", "--detach", sha], worktree);
     this.step(["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"], worktree);
-    this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs)], worktree);
+    this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols"], worktree);
     this.step(["node", "scripts/chromium.ts", "smoke"], worktree);
     this.step([join(this.tools, "autoninja"), "-C", "out/uw", `-j${jobs}`, "chrome/installer/mac"], this.source);
 
     const output = join(this.source, "out/uw");
+    // Sentry reads a crash report with the dSYMs of exactly this build.
+    this.runtime.log(`[${output}] sentry-cli debug-files upload --type dsym`);
+    this.runtime.run([cli, "debug-files", "upload", "--org", SENTRY_ORG, "--project", SENTRY_PROJECT, "--type", "dsym",
+      "--wait", output], { cwd: output, env: { ...this.environment(), SENTRY_AUTH_TOKEN: sentryToken }, inherit: true });
     const directory = join(worktree, ".chromium/releases", version);
     const input = join(directory, "input");
     const app = join(input, "uw.app");
@@ -131,6 +178,8 @@ export class Release {
       ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],
       ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
       ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
+      ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", POSTHOG_KEY],
+      ["UWPostHogHost", "-string", POSTHOG_HOST],
     ] as const) {
       this.step(["plutil", "-replace", key, type, value, plist], directory);
     }

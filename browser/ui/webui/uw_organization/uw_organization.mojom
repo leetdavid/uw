@@ -102,6 +102,16 @@ struct CommandState {
   CommandProblem problem;
 };
 
+// Problem reports on Settings, Privacy and security. See
+// docs/plans/distribution.md, "Problem reports".
+struct ProblemReportsState {
+  // Only a release can send reports, so only a release shows the switch.
+  bool available;
+  bool send;
+  // A new GitHub issue with the versions filled in.
+  string new_issue_url;
+};
+
 // Profile-scoped backend for the uw page of chrome://settings.
 interface OrganizationHandler {
   GetState() => (State state);
@@ -130,4 +140,7 @@ interface OrganizationHandler {
   GetCommand() => (CommandState state);
   InstallCommand() => (CommandState state);
   UninstallCommand() => (CommandState state);
+  // For all of uw. The question at the foot of every sidebar goes away.
+  GetProblemReports() => (ProblemReportsState state);
+  SetProblemReports(bool send) => ();
 };

@@ -1,0 +1,75 @@
+# Crash and problem reports, sent only from releases and only after the user
+# said Yes. See docs/plans/distribution.md, "Problem reports".
+import("//mojo/public/tools/bindings/mojom.gni")
+
+assert(is_mac)
+
+mojom("mojo_bindings") {
+  sources = [ "problem_reporter.mojom" ]
+  webui_module_path = "/"
+}
+
+# Read by the crash reporter as Crashpad starts, so it depends on base alone.
+source_set("consent") {
+  sources = [
+    "answer_file.cc",
+    "answer_file.h",
+    "release_keys.h",
+    "release_keys_mac.mm",
+  ]
+  deps = [ "//base" ]
+  frameworks = [ "Foundation.framework" ]
+}
+
+source_set("problem_reports") {
+  sources = [
+    "problem_reporter.cc",
+    "problem_reporter.h",
+    "problem_reports.cc",
+    "problem_reports.h",
+  ]
+  public_deps = [
+    ":consent",
+    ":mojo_bindings",
+    "//base",
+    "//mojo/public/cpp/bindings",
+  ]
+  deps = [
+    "//base/version_info",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/common:constants",
+    "//components/crash/core/app",
+    "//content/public/browser",
+    "//net",
+    "//services/network/public/cpp",
+    "//third_party/re2",
+    "//url",
+    "//uw/browser/branding:release_version",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "problem_reports_browsertest.cc" ]
+  deps = [
+    ":problem_reports",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+    "//ui/events",
+    "//ui/views",
+    "//ui/views:test_support",
+    "//url",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/tab_organization",
+  ]
+}

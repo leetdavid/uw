@@ -15,6 +15,7 @@ source_set("uw_theme_picker") {
   public_deps = [
     ":mojo_bindings",
     "//base",
+    "//uw/browser/problem_reports",
     "//chrome/browser/ui/webui/top_chrome",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",

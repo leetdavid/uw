@@ -19,6 +19,7 @@ source_set("uw_command_bar") {
   public_deps = [
     ":mojo_bindings",
     "//base",
+    "//uw/browser/problem_reports",
     "//chrome/browser/ui/webui/top_chrome",
     "//components/omnibox/browser:mojo_bindings",
     "//content/public/browser",

@@ -59,6 +59,12 @@ void UwChatUI::BindInterface(
       std::move(receiver));
 }
 
+void UwChatUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProblemReporter> receiver) {
+  problem_reporter_ =
+      std::make_unique<ProblemReporter>(web_ui(), std::move(receiver));
+}
+
 WEB_UI_CONTROLLER_TYPE_IMPL(UwChatUI)
 
 }  // namespace uw

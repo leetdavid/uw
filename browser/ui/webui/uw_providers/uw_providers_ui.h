@@ -10,6 +10,7 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "ui/webui/mojo_web_ui_controller.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
+#include "uw/browser/problem_reports/problem_reporter.h"
 
 namespace uw {
 
@@ -34,9 +35,13 @@ class UwProvidersUI : public ui::MojoWebUIController {
   ~UwProvidersUI() override;
 
   void BindInterface(mojo::PendingReceiver<mojom::ProvidersHandler> receiver);
+  // uw: problems on the page go to PostHog, after a Yes. See
+  // uw/browser/problem_reports/problem_reports.h.
+  void BindInterface(mojo::PendingReceiver<mojom::ProblemReporter> receiver);
 
  private:
   std::unique_ptr<UwProvidersHandler> handler_;
+  std::unique_ptr<ProblemReporter> problem_reporter_;
 
   WEB_UI_CONTROLLER_TYPE_DECL();
 };

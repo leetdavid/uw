@@ -2,6 +2,8 @@
 
 #include "uw/browser/ui/webui/uw_terminal/uw_terminal_ui.h"
 
+#include "chrome/grit/uw_chat_resources.h"
+
 #include <utility>
 
 #include "chrome/grit/uw_terminal_resources.h"
@@ -23,6 +25,7 @@ UwTerminalUI::UwTerminalUI(content::WebUI* web_ui)
       contents->GetBrowserContext(), kTerminalHost);
   webui::SetupWebUIDataSource(source, kUwTerminalResources,
                               IDR_UW_TERMINAL_TERMINAL_HTML);
+  source->AddResourcePath("problems.js", IDR_UW_CHAT_PROBLEMS_JS);
   // ghostty-web is WebAssembly, which its script reads from a data: address.
   // Nothing else about the policy of a trusted page is loosened.
   source->OverrideContentSecurityPolicy(
@@ -51,6 +54,12 @@ void UwTerminalUI::CreateHandler(
     mojo::PendingReceiver<mojom::TerminalHandler> handler) {
   handler_ = std::make_unique<UwTerminalHandler>(
       web_ui()->GetWebContents(), std::move(page), std::move(handler));
+}
+
+void UwTerminalUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProblemReporter> receiver) {
+  problem_reporter_ =
+      std::make_unique<ProblemReporter>(web_ui(), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(UwTerminalUI)

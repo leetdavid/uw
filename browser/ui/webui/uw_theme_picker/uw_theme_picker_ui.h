@@ -12,6 +12,7 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
+#include "uw/browser/problem_reports/problem_reporter.h"
 
 namespace uw {
 
@@ -46,6 +47,9 @@ class UwThemePickerUI : public TopChromeWebUIController,
 
   void BindInterface(
       mojo::PendingReceiver<mojom::ThemePickerHandlerFactory> receiver);
+  // uw: problems on the page go to PostHog, after a Yes. See
+  // uw/browser/problem_reports/problem_reports.h.
+  void BindInterface(mojo::PendingReceiver<mojom::ProblemReporter> receiver);
 
  private:
   class Handler;
@@ -55,6 +59,7 @@ class UwThemePickerUI : public TopChromeWebUIController,
       mojo::PendingReceiver<mojom::ThemePickerHandler> handler) override;
 
   std::unique_ptr<Handler> handler_;
+  std::unique_ptr<ProblemReporter> problem_reporter_;
   mojo::Receiver<mojom::ThemePickerHandlerFactory> factory_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();

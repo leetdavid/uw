@@ -19,6 +19,8 @@
 #include "ui/base/webui/web_ui_util.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/branding/report_issue.h"
+#include "uw/browser/problem_reports/problem_reports.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
@@ -144,6 +146,14 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
       {"uwOrganizationResume", IDS_UW_PAUSE_RESUME},
       {"uwCommandTitle", IDS_UW_SETTINGS_COMMAND_TITLE},
+      {"uwProblemReportsTitle", IDS_UW_SETTINGS_PROBLEM_REPORTS_TITLE},
+      {"uwProblemReportsSend", IDS_UW_SETTINGS_PROBLEM_REPORTS_SEND},
+      {"uwProblemReportsSendNote", IDS_UW_SETTINGS_PROBLEM_REPORTS_SEND_NOTE},
+      {"uwProblemReportsCrashes", IDS_UW_SETTINGS_PROBLEM_REPORTS_CRASHES},
+      {"uwProblemReportsPages", IDS_UW_SETTINGS_PROBLEM_REPORTS_PAGES},
+      {"uwProblemReportsWebsites", IDS_UW_SETTINGS_PROBLEM_REPORTS_WEBSITES},
+      {"uwReportIssue", IDS_UW_SETTINGS_REPORT_ISSUE},
+      {"uwReportIssueNote", IDS_UW_SETTINGS_REPORT_ISSUE_NOTE},
       {"uwCommandRow", IDS_UW_SETTINGS_COMMAND_ROW},
       {"uwCommandDescription", IDS_UW_SETTINGS_COMMAND_DESCRIPTION},
       {"uwCommandNote", IDS_UW_SETTINGS_COMMAND_NOTE},
@@ -358,6 +368,20 @@ void UwOrganizationHandler::GetCommand(GetCommandCallback callback) {
       FROM_HERE, {base::MayBlock()}, base::BindOnce(&CommandInstalled),
       base::BindOnce(&CommandStateOf, mojom::CommandProblem::kNone)
           .Then(std::move(callback)));
+}
+
+void UwOrganizationHandler::GetProblemReports(
+    GetProblemReportsCallback callback) {
+  const ProblemReports& reports = ProblemReports::Get();
+  std::move(callback).Run(mojom::ProblemReportsState::New(
+      reports.available(), reports.sending(), NewIssueUrl().spec()));
+}
+
+void UwOrganizationHandler::SetProblemReports(
+    bool send,
+    SetProblemReportsCallback callback) {
+  ProblemReports::Get().Answer(send);
+  std::move(callback).Run();
 }
 
 void UwOrganizationHandler::InstallCommand(InstallCommandCallback callback) {

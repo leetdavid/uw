@@ -60,6 +60,9 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void GetCommand(GetCommandCallback callback) override;
   void InstallCommand(InstallCommandCallback callback) override;
   void UninstallCommand(UninstallCommandCallback callback) override;
+  void GetProblemReports(GetProblemReportsCallback callback) override;
+  void SetProblemReports(bool send,
+                         SetProblemReportsCallback callback) override;
 
  private:
   // The codes the last exchange rates cover, or none before the first.

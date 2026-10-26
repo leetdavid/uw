@@ -1,0 +1,41 @@
+// Copyright 2026 The uw Authors. All rights reserved.
+
+module uw.mojom;
+
+enum ProblemKind {
+  // Three clicks within a second, close together.
+  kRageClick,
+  // A click on a control after which nothing on the page changed.
+  kDeadClick,
+  // An error the page did not catch.
+  kError,
+};
+
+struct StackFrame {
+  string function;
+  string file;
+  uint32 line;
+  uint32 column;
+};
+
+// A problem on one of uw's own pages. It never carries what the page shows or
+// what the user typed.
+struct PageProblem {
+  ProblemKind kind;
+  // The clicked control, for rage and dead clicks: its tag, ARIA role, id,
+  // and aria-label.
+  string tag;
+  string role;
+  string element_id;
+  string label;
+  // For errors: the error's type, its message, and where it was thrown.
+  string error_type;
+  string message;
+  array<StackFrame> stack;
+};
+
+// Every uw page binds this. uw sends what it hears to PostHog only after the
+// user said Yes to "Help fix uw?".
+interface ProblemReporter {
+  Report(PageProblem problem);
+};

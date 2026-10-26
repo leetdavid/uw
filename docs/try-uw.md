@@ -229,6 +229,8 @@ A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the 
 
 ## Report a problem
 
+Help → Report an Issue… and Settings › Privacy and security › Report an issue open a new GitHub issue with uw's version filled in. A release also asks once, at the foot of the sidebar, whether it may send crash and problem reports; a build made from source never asks and sends nothing ([Problem reports](plans/distribution.md#problem-reports)).
+
 Include the version reported by `pnpm run smoke`, your macOS version, whether the profile was new or existing, the exact steps, the expected result, and the actual result. A screenshot or a short screen recording helps for layout, dragging, focus, and restoration problems.
 
 For a crash, also record the quit time, then attach the newest crash report:

@@ -7,7 +7,7 @@ import { test } from "node:test";
 import type { TestContext } from "node:test";
 import {
   BuildError, CHROMIUM_URL, COMMAND_CHECK_TEST, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, REPO,
-  SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot,
+  SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot, withSymbols,
 } from "../scripts/chromium.ts";
 import type { CommandOptions, Pins, Runtime } from "../scripts/chromium.ts";
 
@@ -396,6 +396,17 @@ test("build and smoke use an isolated profile and keep the sandbox enabled", (t)
   assert.equal(existsSync(profile), false);
   assert.ok(command.includes("--headless")); assert.ok(command.includes("--incognito"));
   assert.equal(command.includes("--no-sandbox"), false);
+});
+
+test("build --symbols keeps the symbols a release sends to Sentry", (t) => {
+  const f = new Fixture(t);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.build(2, true);
+  const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
+  const args = gen.find((arg) => arg.startsWith("--args="))!;
+  assert.match(args, /^symbol_level = 1\nenable_dsyms = true$/m);
+  assert.doesNotMatch(args, /symbol_level = 0/);
+  assert.throws(() => withSymbols("is_debug = false\n"), /symbol_level = 0/);
 });
 
 test("smoke requires the executed JavaScript result and cleans up on failure", (t) => {

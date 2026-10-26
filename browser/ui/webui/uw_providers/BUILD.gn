@@ -17,6 +17,7 @@ source_set("uw_providers") {
   public_deps = [
     ":mojo_bindings",
     "//base",
+    "//uw/browser/problem_reports",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",
     "//ui/webui",

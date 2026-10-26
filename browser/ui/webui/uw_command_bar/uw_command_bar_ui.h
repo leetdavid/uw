@@ -15,6 +15,7 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar.mojom.h"
+#include "uw/browser/problem_reports/problem_reporter.h"
 
 namespace content {
 class WebContents;
@@ -82,6 +83,9 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void BindInterface(
       mojo::PendingReceiver<searchbox::mojom::PageHandlerFactory> receiver);
   void BindInterface(mojo::PendingReceiver<mojom::CalculatorHandler> receiver);
+  // uw: problems on the page go to PostHog, after a Yes. See
+  // uw/browser/problem_reports/problem_reports.h.
+  void BindInterface(mojo::PendingReceiver<mojom::ProblemReporter> receiver);
 
  private:
   friend void ResetCommandBar(content::WebContents* page, bool shell);
@@ -99,6 +103,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void IsFrosted(IsFrostedCallback callback) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
+  std::unique_ptr<ProblemReporter> problem_reporter_;
   mojo::Receiver<searchbox::mojom::PageHandlerFactory> factory_{this};
   mojo::Receiver<mojom::CalculatorHandler> calculator_{this};
 

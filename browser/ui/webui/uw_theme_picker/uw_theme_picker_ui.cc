@@ -2,6 +2,8 @@
 
 #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
 
+#include "chrome/grit/uw_chat_resources.h"
+
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -243,6 +245,7 @@ UwThemePickerUI::UwThemePickerUI(content::WebUI* web_ui)
       Profile::FromWebUI(web_ui), kThemePickerHost);
   webui::SetupWebUIDataSource(source, kUwThemePickerResources,
                               IDR_UW_THEME_PICKER_THEME_PICKER_HTML);
+  source->AddResourcePath("problems.js", IDR_UW_CHAT_PROBLEMS_JS);
   source->AddLocalizedStrings(kStrings);
 }
 
@@ -258,6 +261,12 @@ void UwThemePickerUI::CreateHandler(
     mojo::PendingReceiver<mojom::ThemePickerHandler> handler) {
   handler_ = std::make_unique<Handler>(this, Profile::FromWebUI(web_ui()),
                                        std::move(handler));
+}
+
+void UwThemePickerUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProblemReporter> receiver) {
+  problem_reporter_ =
+      std::make_unique<ProblemReporter>(web_ui(), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(UwThemePickerUI)

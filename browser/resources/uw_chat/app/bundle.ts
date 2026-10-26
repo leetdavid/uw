@@ -27,6 +27,7 @@ const out = resolve(values.out);
 const gen = resolve(values.gen);
 const mojom = join(gen, "uw/browser/ui/webui/uw_chat/uw_chat.mojom-webui.ts");
 const providersMojom = join(gen, "uw/browser/ui/webui/uw_providers/uw_providers.mojom-webui.ts");
+const problemsMojom = join(gen, "uw/browser/problem_reports/problem_reporter.mojom-webui.ts");
 mkdirSync(out, { recursive: true });
 
 // The app's own settings, plus the generated bindings and the types of
@@ -41,10 +42,11 @@ writeFileSync(
         "@/*": [join(app, "src/*")],
         "uw-chat-mojom": [mojom],
         "uw-providers-mojom": [providersMojom],
+        "uw-problems-mojom": [problemsMojom],
         "//resources/*": [join(gen, "ui/webui/resources/tsc/*")],
       },
     },
-    include: [join(app, "src"), mojom, providersMojom],
+    include: [join(app, "src"), mojom, providersMojom, problemsMojom],
   }),
 );
 execFileSync(process.execPath, [join(modules, "typescript/bin/tsc"), "-p", tsconfig], {
@@ -56,6 +58,7 @@ const bundled = await esbuild.build({
     chat: join(app, "src/main.tsx"),
     providers: join(app, "src/providers/main.tsx"),
     watch_card: join(app, "src/watch-card/main.tsx"),
+    problems: join(app, "src/problems/main.ts"),
   },
   outdir: out,
   bundle: true,
@@ -71,6 +74,7 @@ const bundled = await esbuild.build({
       setup(build) {
         build.onResolve({ filter: /^uw-chat-mojom$/ }, () => ({ path: mojom }));
         build.onResolve({ filter: /^uw-providers-mojom$/ }, () => ({ path: providersMojom }));
+        build.onResolve({ filter: /^uw-problems-mojom$/ }, () => ({ path: problemsMojom }));
         // pdf.js and its worker are served beside the pages, and load only
         // when a message carries a PDF.
         build.onResolve({ filter: /^pdfjs-dist$/ }, () => ({

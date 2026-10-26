@@ -1,5 +1,5 @@
-# WebUI resources for uw's sections of chrome://settings: Tab organization
-# and Keyboard shortcuts.
+# WebUI resources for uw's sections of chrome://settings: Tab organization,
+# Keyboard shortcuts, the uw command, and Problem reports.
 # Built as its own target and mapped into the settings build via
 # ts_path_mappings, mirroring how settings_shared is consumed.
 import("//ui/webui/resources/tools/build_webui.gni")
@@ -20,6 +20,8 @@ build_webui("build") {
     "uw_organization_browser_proxy.ts",
     "uw_organization_page.html.ts",
     "uw_organization_page.ts",
+    "uw_problem_reports_section.html.ts",
+    "uw_problem_reports_section.ts",
     "uw_shortcuts_page.html.ts",
     "uw_shortcuts_page.ts",
   ]

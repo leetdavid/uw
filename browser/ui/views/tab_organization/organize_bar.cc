@@ -11,10 +11,12 @@
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -40,6 +42,7 @@
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
+#include "uw/browser/ui/views/tab_organization/problem_reports_card.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -87,6 +90,18 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       base::BindRepeating(&OrganizeBar::TidyAgain, base::Unretained(this))));
   card_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, kFootGap, 0));
   card_->Hide();
+
+  // A release asks once whether it may send problem reports, under the
+  // organizer's card so Undo stays in reach.
+  AddChildView(std::make_unique<ProblemReportsCard>(
+                   GlassOfWindow(window_),
+                   base::BindRepeating(
+                       [](BrowserWindowInterface* window) {
+                         chrome::ShowSettingsSubPage(window,
+                                                     chrome::kPrivacySubPage);
+                       },
+                       base::Unretained(window_))))
+      ->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, kFootGap, 0));
 
   // The mini player docks between the card and the row, the playback
   // controls under it.

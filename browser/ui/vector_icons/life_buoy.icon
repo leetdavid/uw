@@ -1,0 +1,14 @@
+// Copyright 2026 The uw Authors. All rights reserved.
+
+CANVAS_DIMENSIONS, 24,
+STROKE, 1.75f,
+CIRCLE, 12, 12, 10,
+CIRCLE, 12, 12, 4,
+MOVE_TO, 4.93f, 4.93f,
+R_LINE_TO, 4.24f, 4.24f,
+MOVE_TO, 14.83f, 9.17f,
+R_LINE_TO, 4.24f, -4.24f,
+MOVE_TO, 14.83f, 14.83f,
+R_LINE_TO, 4.24f, 4.24f,
+MOVE_TO, 9.17f, 14.83f,
+R_LINE_TO, -4.24f, 4.24f

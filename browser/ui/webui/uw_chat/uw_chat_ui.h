@@ -14,6 +14,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
+#include "uw/browser/problem_reports/problem_reporter.h"
 
 namespace uw {
 
@@ -38,6 +39,9 @@ class UwChatUI : public ui::MojoWebUIController,
   void BindInterface(mojo::PendingReceiver<mojom::ChatHandlerFactory> receiver);
   // The composer's model menu lists the providers and their models.
   void BindInterface(mojo::PendingReceiver<mojom::ProvidersHandler> receiver);
+  // uw: problems on the page go to PostHog, after a Yes. See
+  // uw/browser/problem_reports/problem_reports.h.
+  void BindInterface(mojo::PendingReceiver<mojom::ProblemReporter> receiver);
 
  private:
   // mojom::ChatHandlerFactory:
@@ -47,6 +51,7 @@ class UwChatUI : public ui::MojoWebUIController,
 
   std::unique_ptr<UwChatHandler> handler_;
   std::unique_ptr<UwProvidersHandler> providers_;
+  std::unique_ptr<ProblemReporter> problem_reporter_;
   mojo::Receiver<mojom::ChatHandlerFactory> factory_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();

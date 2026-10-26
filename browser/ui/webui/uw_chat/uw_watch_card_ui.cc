@@ -54,6 +54,12 @@ void UwWatchCardUI::CreateWatchCardHandler(
                                                   std::move(handler));
 }
 
+void UwWatchCardUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProblemReporter> receiver) {
+  problem_reporter_ =
+      std::make_unique<ProblemReporter>(web_ui(), std::move(receiver));
+}
+
 WEB_UI_CONTROLLER_TYPE_IMPL(UwWatchCardUI)
 
 }  // namespace uw

@@ -2,6 +2,8 @@
 
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 
+#include "chrome/grit/uw_chat_resources.h"
+
 #include <CoreFoundation/CoreFoundation.h>
 
 #include <memory>
@@ -103,6 +105,7 @@ UwCommandBarUI::UwCommandBarUI(content::WebUI* web_ui)
       content::WebUIDataSource::CreateAndAdd(profile, kCommandBarHost);
   webui::SetupWebUIDataSource(source, kUwCommandBarResources,
                               IDR_UW_COMMAND_BAR_COMMAND_BAR_HTML);
+  source->AddResourcePath("problems.js", IDR_UW_CHAT_PROBLEMS_JS);
   content::URLDataSource::Add(
       profile, std::make_unique<FaviconSource>(
                    profile, chrome::FaviconUrlFormat::kFavicon2));
@@ -164,6 +167,12 @@ void UwCommandBarUI::CreatePageHandler(
   handler_ = std::make_unique<UwCommandBarHandler>(
       std::move(handler), std::move(page), Profile::FromWebUI(web_ui()),
       web_ui()->GetWebContents(), GetSessionHandleCallback());
+}
+
+void UwCommandBarUI::BindInterface(
+    mojo::PendingReceiver<mojom::ProblemReporter> receiver) {
+  problem_reporter_ =
+      std::make_unique<ProblemReporter>(web_ui(), std::move(receiver));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(UwCommandBarUI)

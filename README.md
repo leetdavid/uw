@@ -311,6 +311,7 @@ Previews are built on the owner's Mac, as the [distribution plan](docs/plans/dis
 - A `notarytool` keychain profile named `uw-notary`, made with `xcrun notarytool store-credentials uw-notary`.
 - `gh` signed in to GitHub.
 - Sparkle's update-signing key in the login keychain, made once with Sparkle's `generate_keys`. Keep a backup: without it, installed copies can never update.
+- A Sentry organization token, for uploading symbols, in the login keychain: `security add-generic-password -s uw-sentry -a eslee -w`, which asks for the token.
 - A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
 
 Push `main`, then run:
@@ -319,7 +320,7 @@ Push `main`, then run:
 pnpm run release 0.1.0
 ```
 
-It checks out GitHub's `main` in the release worktree, builds and smoke-tests it, and writes the version and the update feed's address into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there.
+It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there.
 
 ## Website
 

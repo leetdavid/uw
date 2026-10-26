@@ -7,7 +7,8 @@ import type { TestContext } from "node:test";
 import { BuildError } from "../scripts/chromium.ts";
 import type { CommandOptions, Runtime } from "../scripts/chromium.ts";
 import {
-  DMG, FEED_URL, NOTARY_PROFILE, Release, SPARKLE_PUBLIC_KEY, SPARKLE_SHA256, TEAM_ID, draftNotes, newer,
+  CRASH_REPORT_URL, DMG, FEED_URL, NOTARY_PROFILE, POSTHOG_HOST, POSTHOG_KEY, Release, SENTRY_CLI_SHA256, SPARKLE_PUBLIC_KEY,
+  SPARKLE_SHA256, TEAM_ID, draftNotes, newer,
 } from "../scripts/release.ts";
 
 const SHA = "c".repeat(40);
@@ -18,9 +19,13 @@ interface Setup {
   pushed?: boolean;
   subjects?: string[];
   checksum?: string;
+  cliChecksum?: string;
+  token?: string;
 }
 
-function fixture(t: TestContext, { previous = "", pushed = true, subjects = [], checksum = SPARKLE_SHA256 }: Setup = {}) {
+function fixture(t: TestContext, {
+  previous = "", pushed = true, subjects = [], checksum = SPARKLE_SHA256, cliChecksum = SENTRY_CLI_SHA256, token = "sntrys_test",
+}: Setup = {}) {
   const worktree = mkdtempSync(join(tmpdir(), "uw-release-test-"));
   t.after(() => rmSync(worktree, { recursive: true, force: true }));
   mkdirSync(join(worktree, "chromium"), { recursive: true });
@@ -36,7 +41,12 @@ function fixture(t: TestContext, { previous = "", pushed = true, subjects = [], 
       return `  1) ${HASH} "Developer ID Application: Test Person (${TEAM_ID})"\n     1 valid identities found`;
     }
     if (line.startsWith("git log")) return subjects.join("\n");
-    if (line.startsWith("shasum")) return `${checksum}  ${command.at(-1)}`;
+    if (line.startsWith("security find-generic-password")) {
+      if (!token) throw new BuildError("not found");
+      return token;
+    }
+    if (command[0] === "curl") writeFileSync(command[command.indexOf("-o") + 1]!, "download");
+    if (line.startsWith("shasum")) return `${command.at(-1)!.includes("sentry-cli") ? cliChecksum : checksum}  ${command.at(-1)}`;
     if (command[1]?.endsWith("sign_chrome.py")) {
       const output = command[command.indexOf("--output") + 1]!;
       mkdirSync(output, { recursive: true });
@@ -69,17 +79,29 @@ test("draft notes list only feat and fix commits", () => {
 });
 
 test("a release is built in the worktree, signed, notarized, and drafted on GitHub", (t) => {
-  const { worktree, release, find } = fixture(t);
+  const { worktree, calls, release, find } = fixture(t);
 
   assert.equal(release().publish(), "https://github.com/leetdavid/uw/releases/tag/untagged-1");
 
   assert.deepEqual(find("git checkout"), [["git", "checkout", "--detach", SHA]]);
-  assert.deepEqual(find("node scripts/chromium.ts").map((command) => command[2]), ["build", "smoke"]);
+  assert.deepEqual(find("node scripts/chromium.ts").map((command) => command.slice(2)), [
+    ["build", "--jobs", "8", "--symbols"], ["smoke"],
+  ]);
   assert.deepEqual(find("plutil").map((command) => command.slice(2, 5)), [
     ["CFBundleShortVersionString", "-string", "0.1.0"], ["CFBundleVersion", "-string", "0.1.0"],
     ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
     ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
+    ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", POSTHOG_KEY],
+    ["UWPostHogHost", "-string", POSTHOG_HOST],
   ]);
+  const cli = join(worktree, ".chromium/releases/sentry-cli-3.8.2");
+  const upload = calls.find(({ command }) => command[0] === cli);
+  assert.ok(upload);
+  assert.deepEqual(upload.command.slice(1), [
+    "debug-files", "upload", "--org", "eslee", "--project", "uw", "--type", "dsym", "--wait",
+    join(worktree, ".chromium/src/out/uw"),
+  ]);
+  assert.equal(upload.options.env?.SENTRY_AUTH_TOKEN, "sntrys_test");
   const signing = find("codesign --force");
   const framework = (command: readonly string[]) => command.at(-1)!.split("Contents/Frameworks/")[1];
   assert.deepEqual(signing.slice(0, 3).map(framework), [
@@ -110,6 +132,21 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
   assert.ok(draft);
   assert.deepEqual(draft.slice(0, 7), ["gh", "release", "create", "v0.1.0", dmg, join(directory, "appcast.xml"), "--draft"]);
   assert.equal(draft[draft.indexOf("--target") + 1], SHA);
+});
+
+test("a release needs the Sentry token before it builds", (t) => {
+  const { release, find } = fixture(t, { token: "" });
+
+  assert.throws(() => release().publish(), /No Sentry token in the keychain/);
+  assert.deepEqual(find("node scripts/chromium.ts"), []);
+});
+
+test("a sentry-cli download that does not match its checksum is refused", (t) => {
+  const { worktree, release, find } = fixture(t, { cliChecksum: "0".repeat(64) });
+
+  assert.throws(() => release().publish(), /sentry-cli 3\.8\.2 does not match its pinned checksum/);
+  assert.equal(existsSync(join(worktree, ".chromium/releases/sentry-cli-3.8.2")), false);
+  assert.deepEqual(find("node scripts/chromium.ts"), []);
 });
 
 test("the notes list the changes since the previous release", (t) => {

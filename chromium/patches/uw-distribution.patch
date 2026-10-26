@@ -1,27 +1,178 @@
+diff --git a/chrome/app/chrome_crash_reporter_client.cc b/chrome/app/chrome_crash_reporter_client.cc
+index f0c0ff0871ee92a9ae7f4c634372cf0a550321d0..7e8713d6fe9da85fd58e9a8f6c35c4c8aa34cc6e 100644
+--- a/chrome/app/chrome_crash_reporter_client.cc
++++ b/chrome/app/chrome_crash_reporter_client.cc
+@@ -196,9 +196,14 @@ bool ChromeCrashReporterClient::GetCollectStatsConsent() {
+   return is_official_chrome_build;
+ #else   // !BUILDFLAG(IS_ANDROID)
+   if (!is_official_chrome_build) {
++#if BUILDFLAG(IS_MAC) && !defined(BUILDING_CHROME_RENDERER)
++    // uw: a release asks "Help fix uw?" and sends crash reports after a Yes.
++    return UwSendsCrashReports();
++#else
+     VLOG(1) << "GetCollectStatsConsent(): is_official_chrome_build is false "
+             << "so returning false";
+     return false;
++#endif
+   }
+   bool settings_consent = GoogleUpdateSettings::GetCollectStatsConsent();
+   VLOG(1) << "GetCollectStatsConsent(): settings_consent: " << settings_consent
+diff --git a/chrome/app/chrome_crash_reporter_client.h b/chrome/app/chrome_crash_reporter_client.h
+index e537e1864e42f57f0f412fafdaf4ccc3052a20ed..96babb832d0723d10c74416722eb330fffadc330 100644
+--- a/chrome/app/chrome_crash_reporter_client.h
++++ b/chrome/app/chrome_crash_reporter_client.h
+@@ -54,6 +54,9 @@ class ChromeCrashReporterClient : public crash_reporter::CrashReporterClient {
+ 
+ #if BUILDFLAG(IS_MAC)
+   bool ReportingIsEnforcedByPolicy(bool* breakpad_enabled) override;
++  // uw: a release sends crash dumps to Sentry. See
++  // uw/browser/problem_reports/release_keys.h.
++  std::string GetUploadUrl() override;
+ #endif
+ 
+ #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+@@ -65,6 +68,11 @@ class ChromeCrashReporterClient : public crash_reporter::CrashReporterClient {
+  private:
+   friend class base::NoDestructor<ChromeCrashReporterClient>;
+ 
++#if BUILDFLAG(IS_MAC)
++  // uw: true once the user said Yes to "Help fix uw?" in a release.
++  bool UwSendsCrashReports();
++#endif
++
+   ChromeCrashReporterClient();
+   ~ChromeCrashReporterClient() override;
+ };
+diff --git a/chrome/app/chrome_crash_reporter_client_mac.mm b/chrome/app/chrome_crash_reporter_client_mac.mm
+index fd615c86084730bee69c4db74e4ea52c02397e72..c2746392b7617f9852e601d476ef5a247d482069 100644
+--- a/chrome/app/chrome_crash_reporter_client_mac.mm
++++ b/chrome/app/chrome_crash_reporter_client_mac.mm
+@@ -14,6 +14,8 @@
+ #include "chrome/common/chrome_paths.h"
+ #include "components/policy/policy_constants.h"
+ #include "components/version_info/version_info.h"
++#include "uw/browser/problem_reports/answer_file.h"  // nogncheck
++#include "uw/browser/problem_reports/release_keys.h"  // nogncheck
+ 
+ bool ChromeCrashReporterClient::ReportingIsEnforcedByPolicy(
+     bool* breakpad_enabled) {
+@@ -30,6 +32,21 @@ bool ChromeCrashReporterClient::ReportingIsEnforcedByPolicy(
+   return false;
+ }
+ 
++std::string ChromeCrashReporterClient::GetUploadUrl() {
++  return uw::GetReleaseKeys().crash_url;
++}
++
++bool ChromeCrashReporterClient::UwSendsCrashReports() {
++  base::FilePath crash_dumps;
++  if (GetUploadUrl().empty() ||
++      !base::PathService::Get(chrome::DIR_CRASH_DUMPS, &crash_dumps)) {
++    return false;
++  }
++  std::optional<uw::ProblemReportsAnswer> answer =
++      uw::ReadProblemReportsAnswer(uw::ProblemReportsAnswerFile(crash_dumps));
++  return answer && answer->send;
++}
++
+ bool ChromeCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
+   // This mechanism dedicates a process to be crashpad_handler's own
+   // crashpad_handler. In Google Chrome, scale back on this in the more stable
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 1a7e62d..ad54f7d 100644
+index 1a7e62d3420e38d0659d526f3370be4120f642dd..cc6cd66c5a0a4b5f944da9df75698e45482ff73e 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -325,6 +325,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -325,6 +325,13 @@ are declared in tools/grit/grit_args.gni.
        <message name="IDS_UW_PAUSE_RESUME_MAC" desc="In Title Case: Resumes automatic organization.">Resume Automatic Organization</message>
        <message name="IDS_UW_ORGANIZATION_SETTINGS_MAC" desc="In Title Case: Opens the tab organization settings page.">Tab Organization Settings…</message>
        <message name="IDS_UW_KEYBOARD_SHORTCUTS_MAC" desc="In Title Case: Opens the settings section that lists every command of the menu bar with its keyboard shortcut.">Keyboard Shortcuts…</message>
 +      <message name="IDS_UW_REPORT_ISSUE_MAC" desc="In Title Case: Opens a new GitHub issue for uw with the uw, Chromium, and macOS versions filled in.">Report an Issue…</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_TITLE" desc="Title of the card at the foot of the tab sidebar that asks, once, whether uw may send crash and problem reports. uw is the product name and stays lowercase.">Help fix uw?</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_WHAT" desc="First paragraph of the card that asks whether uw may send crash and problem reports.">When uw crashes, or one of its own pages trips up, it can send a report so the bug gets fixed.</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_PRIVACY" desc="Second paragraph of the card that asks whether uw may send crash and problem reports.">Crash reports can hold parts of pages that were open. Nothing is sent unless you say yes.</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_SEND" desc="Button on the card: lets uw send crash and problem reports.">Send reports</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_DONT_SEND" desc="Button on the card: uw sends no crash or problem reports.">Don't send</message>
++      <message name="IDS_UW_PROBLEM_REPORTS_WHATS_SENT" desc="Link on the card that opens the settings switch and its description of what is sent.">What's sent</message>
        <message name="IDS_UW_NEST_BRANCH_MAC" desc="In Title Case: Makes the selected tab a child of the tab above it.">Nest Under Previous Tab</message>
        <message name="IDS_UW_OUTDENT_BRANCH_MAC" desc="In Title Case: Moves the selected tab up one nesting level.">Move Up One Level</message>
        <message name="IDS_UW_MOVE_BRANCH_UP_MAC" desc="In Title Case: Moves the selected tab, and the tabs nested under it, above the tab before it at the same level.">Move Branch Up</message>
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+index bef563309bcb72a9fa3de66abba70b4874240043..411d10ea859e52b061872dc4e2edbe412d9e986b 100644
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -4736,4 +4736,28 @@
+   <message name="IDS_SETTINGS_DICTATION_SHORTCUT_CLEAR_LABEL" translateable="false" desc="Accessibility label for the clear keyboard shortcut button icon.">
+     Clear keyboard shortcut
+   </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_TITLE" desc="Heading of the problem reports section on Settings, Privacy and security.">
++    Problem reports
++  </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_SEND" desc="Label of the switch that lets uw send crash and problem reports.">
++    Send crash and problem reports
++  </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_SEND_NOTE" desc="Under the switch that lets uw send crash and problem reports. uw is the product name and stays lowercase.">
++    Helps fix uw. Nothing is sent while this is off.
++  </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_CRASHES" desc="What is sent when uw crashes. Sentry is the name of a service.">
++    When uw crashes, a crash report goes to Sentry. It can hold parts of pages that were open.
++  </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_PAGES" desc="What is sent from uw's own pages. PostHog is the name of a service.">
++    Rage clicks, dead clicks, and JavaScript errors on uw's own pages go to PostHog. Typing is masked.
++  </message>
++  <message name="IDS_UW_SETTINGS_PROBLEM_REPORTS_WEBSITES" desc="Says that uw never watches the websites the user visits.">
++    Nothing from websites you visit is ever watched.
++  </message>
++  <message name="IDS_UW_SETTINGS_REPORT_ISSUE" desc="Link that opens a new GitHub issue for uw.">
++    Report an issue
++  </message>
++  <message name="IDS_UW_SETTINGS_REPORT_ISSUE_NOTE" desc="Under the link that opens a new GitHub issue for uw.">
++    Opens a new issue on GitHub with uw's version filled in.
++  </message>
+ </grit-part>
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index 95cc823..5b06535 100644
+index 95cc8233662075fdcd20394c2a232330f4591501..a98fdb4f2b00cfa32824a92fac8332ab896cd9d6 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -888,6 +888,7 @@ source_set("core") {
+@@ -888,6 +888,8 @@ source_set("core") {
      "//uw/browser/ui:ui",
      "//uw/browser/shortcuts",
      "//uw/browser/uw_command",
 +    "//uw/browser/update",
++    "//uw/browser/problem_reports",
      ":active_use_util",
      ":after_startup_task_utils",
      ":bad_message",
+diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+index 6946107eae3956929cf28ec25eb3e45b6406d08f..ca2ed5541532751b513a0f4bfd411728342377c0 100644
+--- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
++++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+@@ -237,6 +237,7 @@
+ #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
+ #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
+ #include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
++#include "uw/browser/problem_reports/problem_reporter.mojom.h"
+ #endif
+ 
+ namespace chrome::internal {
+@@ -391,6 +392,10 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+                                          uw::UwThemePickerUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::CalculatorHandler,
+                                          uw::UwCommandBarUI>(map);
++  RegisterWebUIControllerInterfaceBinder<
++      uw::mojom::ProblemReporter, uw::UwChatUI, uw::UwWatchCardUI,
++      uw::UwProvidersUI, uw::UwTerminalUI, uw::UwCommandBarUI,
++      uw::UwThemePickerUI>(map);
+ #endif
+ 
+ #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+@@ -711,6 +716,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+       .Add<signin::mojom::SigninPageHandlerFactory>()
+       .Add<uw::mojom::OrganizationHandler>()
+       .Add<uw::mojom::ShortcutsHandler>()
++      .Add<uw::mojom::ProblemReporter>()
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+       .Add<batch_upload_promo::mojom::PageHandlerFactory>()
+       .Add<customize_color_scheme_mode::mojom::
 diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
 index 4e62771..1d89df5 100644
 --- a/chrome/browser/chrome_browser_main_mac.mm
@@ -83,6 +234,73 @@ index 544c458..7c8a822 100644
    // Set the flag to restore state after the restart.
    pref_service->SetBoolean(prefs::kRestartLastSessionOnShutdown, true);
    if (ignore_unload_handlers) {
+diff --git a/chrome/browser/metrics/metrics_reporting_state.cc b/chrome/browser/metrics/metrics_reporting_state.cc
+index a69a9dba2b485976ff12aff032b77db221262bb0..9449110425c788f15f9189c9d5b2a8b455aa7ff9 100644
+--- a/chrome/browser/metrics/metrics_reporting_state.cc
++++ b/chrome/browser/metrics/metrics_reporting_state.cc
+@@ -201,11 +201,16 @@ void UpdateMetricsPrefsOnPermissionChange(
+ }
+ 
+ void ApplyMetricsReportingPolicy() {
++  // uw: crash uploads follow the answer to "Help fix uw?", not Chromium's
++  // metrics consent, which is always off in uw. See
++  // uw/browser/problem_reports/problem_reports.h.
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   GoogleUpdateSettings::CollectStatsConsentTaskRunner()->PostTask(
+       FROM_HERE,
+       base::BindOnce(
+           base::IgnoreResult(&GoogleUpdateSettings::SetCollectStatsConsent),
+           ChromeMetricsServiceAccessor::IsMetricsAndCrashReportingEnabled()));
++#endif
+ }
+ 
+ bool IsMetricsReportingPolicyManaged() {
+diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page.html b/chrome/browser/resources/settings/privacy_page/privacy_page.html
+index e7b77860d821689053997e054b74cedeb1f80369..1afccd8f8fe6408fa07cdfb6c68292cf24423a73 100644
+--- a/chrome/browser/resources/settings/privacy_page/privacy_page.html
++++ b/chrome/browser/resources/settings/privacy_page/privacy_page.html
+@@ -1,5 +1,7 @@
+   <style include="cr-shared-style cr-hidden-style settings-shared"></style>
+   <settings-section page-title="$i18n{privacyPageTitle}">
++    <!-- uw: whether uw sends crash and problem reports. -->
++    <settings-uw-problem-reports-section></settings-uw-problem-reports-section>
+     <template is="dom-if" if="[[showClearBrowsingDataDialog_]]" restamp>
+       <settings-clear-browsing-data-dialog prefs="{{prefs}}"
+           on-close="onCbdDialogClosed_"
+@@ -11,7 +13,7 @@
+           on-close="onPrivacyGuideDialogClosed_">
+       </settings-privacy-guide-dialog>
+     </template>
+-    <cr-link-row id="clearBrowsingData"
++    <cr-link-row id="clearBrowsingData" class="hr"
+         start-icon="cr:delete"
+         label="$i18n{clearBrowsingData}"
+         sub-label="$i18n{clearBrowsingDataDescription}"
+diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page.ts b/chrome/browser/resources/settings/privacy_page/privacy_page.ts
+index 22c524fdbab12842d33ee014507e9714270eb48e..efa8be0b73ba9d220dd10a7ffcc03fbe02dc031f 100644
+--- a/chrome/browser/resources/settings/privacy_page/privacy_page.ts
++++ b/chrome/browser/resources/settings/privacy_page/privacy_page.ts
+@@ -17,6 +17,7 @@ import '../privacy_icons.html.js';
+ import '../settings_page/settings_section.js';
+ import '../settings_shared.css.js';
+ import './privacy_guide/privacy_guide_dialog.js';
++import '/uw/uw_organization/uw_problem_reports_section.js';
+ 
+ import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
+ import type {CrLinkRowElement} from 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
+diff --git a/chrome/browser/resources/settings/settings.html b/chrome/browser/resources/settings/settings.html
+index ef213f2d51acb6272d3dbf4338dfb0c0f4aeadb1..a2e2c1367dfe0f6816e42f84b8c3297c97ba0ac0 100644
+--- a/chrome/browser/resources/settings/settings.html
++++ b/chrome/browser/resources/settings/settings.html
+@@ -34,6 +34,8 @@
+ <body>
+   <link rel="stylesheet" href="chrome://resources/css/text_defaults_md.css">
+   <script type="module" src="settings.js"></script>
++  <!-- uw: reports problems on the page, after a Yes. -->
++  <script type="module" src="problems.js"></script>
+   <settings-ui></settings-ui>
+ </body>
+ </html>
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
 index f917e46..167d296 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
@@ -96,6 +314,87 @@ index f917e46..167d296 100644
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
    items.push_back(Item(IDS_FEEDBACK_MAC).command_id(IDC_FEEDBACK));
    bool is_profile_loaded =
+diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
+index cb47063dbbfcb743a3defe714673f41ce775bbd7..1fc5f9f42a1c7877fd3e4908b5f3eb3c19b06316 100644
+--- a/chrome/browser/ui/webui/settings/BUILD.gn
++++ b/chrome/browser/ui/webui/settings/BUILD.gn
+@@ -242,6 +242,7 @@ source_set("impl") {
+     "//chrome/browser/resources/settings:resources_grit",
+     "//chrome/browser/resources/settings_shared:resources_grit",
+     "//uw/browser/resources/uw_organization:resources_grit",
++    "//uw/browser/resources/uw_chat:resources",
+     "//chrome/browser/safe_browsing",
+     "//chrome/browser/search_engines",
+     "//chrome/browser/serial",
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
+index e52c72abdf138b7c0f2dac069263ee53318a8fbe..9e5b60f205c8bdc49c44ab3dc65b26d7ac3f6ec4 100644
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -162,6 +162,10 @@
+ #include "chrome/grit/settings_shared_resources_map.h"
+ #endif
+ 
++#if !BUILDFLAG(IS_CHROMEOS)
++#include "chrome/grit/uw_chat_resources.h"
++#endif
++
+ #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(OPTIMIZE_WEBUI)
+ #include "chrome/grit/uw_organization_resources.h"
+ #include "chrome/grit/uw_organization_resources_map.h"
+@@ -483,6 +487,10 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
+ 
+   webui::SetupWebUIDataSource(html_source, kSettingsResources,
+                               IDR_SETTINGS_SETTINGS_HTML);
++#if !BUILDFLAG(IS_CHROMEOS)
++  // uw: the detector every uw page loads.
++  html_source->AddResourcePath("problems.js", IDR_UW_CHAT_PROBLEMS_JS);
++#endif
+ 
+ #if !BUILDFLAG(OPTIMIZE_WEBUI)
+   html_source->AddResourcePaths(kSettingsSharedResources);
+@@ -795,6 +803,12 @@ void SettingsUI::BindInterface(
+   shortcuts_handler_ =
+       std::make_unique<uw::UwShortcutsHandler>(std::move(receiver));
+ }
++
++void SettingsUI::BindInterface(
++    mojo::PendingReceiver<uw::mojom::ProblemReporter> receiver) {
++  problem_reporter_ =
++      std::make_unique<uw::ProblemReporter>(web_ui(), std::move(receiver));
++}
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+ void SettingsUI::BindInterface(
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.h b/chrome/browser/ui/webui/settings/settings_ui.h
+index 17afdbfedd73e26ea37423a6f365454a12202b66..6e2f28c3c92538e50183c286467715f1d2b7a1b2 100644
+--- a/chrome/browser/ui/webui/settings/settings_ui.h
++++ b/chrome/browser/ui/webui/settings/settings_ui.h
+@@ -26,6 +26,7 @@
+ #include "ui/webui/resources/cr_components/theme_color_picker/theme_color_picker.mojom.h"
+ #include "uw/browser/ui/webui/uw_organization/uw_organization.mojom.h"
+ #include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts.mojom.h"
++#include "uw/browser/problem_reports/problem_reporter.h"  // nogncheck
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ #include "ui/webui/resources/js/batch_upload_promo/batch_upload_promo.mojom.h"
+ 
+@@ -108,6 +109,9 @@ class SettingsUI
+   // Binds the Keyboard shortcuts section backend.
+   void BindInterface(
+       mojo::PendingReceiver<uw::mojom::ShortcutsHandler> pending_receiver);
++  // uw: problems on the page go to PostHog, after a Yes.
++  void BindInterface(
++      mojo::PendingReceiver<uw::mojom::ProblemReporter> pending_receiver);
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+@@ -163,6 +167,7 @@ class SettingsUI
+ 
+   std::unique_ptr<uw::UwOrganizationHandler> organization_handler_;
+   std::unique_ptr<uw::UwShortcutsHandler> shortcuts_handler_;
++  std::unique_ptr<uw::ProblemReporter> problem_reporter_;
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+   // batch_upload_promo::mojom::PageHandlerFactory:
 diff --git a/chrome/browser/updater/BUILD.gn b/chrome/browser/updater/BUILD.gn
 index b9c442e..116014f 100644
 --- a/chrome/browser/updater/BUILD.gn
@@ -137,4 +436,37 @@ index d449bc0..a9c3ed6 100644
 +#endif
    return version_info::GetVersion();
  }
+ 
+diff --git a/components/crash/core/app/crashpad_mac.mm b/components/crash/core/app/crashpad_mac.mm
+index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366ddedc9bcd33 100644
+--- a/components/crash/core/app/crashpad_mac.mm
++++ b/components/crash/core/app/crashpad_mac.mm
+@@ -82,6 +82,15 @@ std::map<std::string, std::string> GetProcessSimpleAnnotations() {
+               objectForInfoDictionaryKey:@"CFBundleShortVersionString"]);
+       process_annotations["ver"] = base::SysNSStringToUTF8(version);
+ 
++      // uw: Sentry files a crash under the release that sent it, such as
++      // uw@0.1.0.
++      NSString* release = base::apple::ObjCCast<NSString>([outer_bundle
++          objectForInfoDictionaryKey:@"CFBundleShortVersionString"]);
++      if (release) {
++        process_annotations["sentry[release]"] =
++            "uw@" + base::SysNSStringToUTF8(release);
++      }
++
+       process_annotations["plat"] = std::string("OS X");
+     }  // @autoreleasepool
+     return process_annotations;
+diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
+index 1ce535f4e6cad30605a64671044b2c42c8f6c3ea..b1782d82803bf29d7c082edf17c6a3242859b856 100644
+--- a/tools/gritsettings/resource_ids.spec
++++ b/tools/gritsettings/resource_ids.spec
+@@ -1790,7 +1790,7 @@
+   },
+ 
+   "<(SHARED_INTERMEDIATE_DIR)/uw/browser/resources/uw_organization/resources.grd": {
+-    "META": {"sizes": {"includes": [10],}},
++    "META": {"sizes": {"includes": [20],}},
+     "includes": [10240],
+   },
  

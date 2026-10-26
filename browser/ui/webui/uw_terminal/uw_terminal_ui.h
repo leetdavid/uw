@@ -13,6 +13,7 @@
 #include "ui/webui/mojo_web_ui_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
+#include "uw/browser/problem_reports/problem_reporter.h"
 
 namespace uw {
 
@@ -36,6 +37,9 @@ class UwTerminalUI : public ui::MojoWebUIController,
 
   void BindInterface(
       mojo::PendingReceiver<mojom::TerminalHandlerFactory> receiver);
+  // uw: problems on the page go to PostHog, after a Yes. See
+  // uw/browser/problem_reports/problem_reports.h.
+  void BindInterface(mojo::PendingReceiver<mojom::ProblemReporter> receiver);
 
  private:
   // mojom::TerminalHandlerFactory:
@@ -44,6 +48,7 @@ class UwTerminalUI : public ui::MojoWebUIController,
       mojo::PendingReceiver<mojom::TerminalHandler> handler) override;
 
   std::unique_ptr<UwTerminalHandler> handler_;
+  std::unique_ptr<ProblemReporter> problem_reporter_;
   mojo::Receiver<mojom::TerminalHandlerFactory> factory_{this};
 
   WEB_UI_CONTROLLER_TYPE_DECL();
