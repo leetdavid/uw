@@ -100,7 +100,7 @@ Added on 2026-10-22 for scheduled chats: "Watch this page: the card" and "Watch 
 
 Added on 2026-10-22 for T147: "Scheduled chat: the chat page" and "Scheduled chat: every state" draw a scheduled chat's page. The header has Chart, Edit, Pause, and Mute; a strip under the title gives the schedule and what is wrong; quiet runs fold into one line; change alerts and regular updates are full messages; and the Scheduled filter and both kinds of chart are shown. The user signed them off the same day; their rules are in `uw-scheduled-chats`.
 
-Added on 2026-10-26 for T226: "Files in a message: a chat (Fluid)" and "Files in a message: every state (Fluid)" draw attached files: "Add files" in the "+" menu, file cards beside image tiles in the composer and above a sent message, the drop target, the limits, the note for a model that can't see images, a file the model read only part of, the recall step, and `uw chat --file`. Their rules are in the canvas guide `uw-attached-files`. They are uw's proposals until the user signs off.
+Added on 2026-10-26 for T226: "Files in a message: a chat (Fluid)" and "Files in a message: every state (Fluid)" draw attached files: "Add files" in the "+" menu, file cards beside image tiles in the composer and above a sent message, the drop target, the limits, the note for a model that can't see images, a file the model read only part of, the recall step, and `uw chat --file`. Their rules are in the canvas guide `uw-attached-files`. The user signed them off the same day.
 
 How the chat is built:
 
