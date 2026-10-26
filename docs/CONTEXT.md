@@ -248,6 +248,14 @@ _Avoid_: Delegated browser task, agent task, run, job.
 **Private chat**:
 A chat started from a private window. Nothing from it is kept after the private windows close.
 
+**Attached material**:
+Information the user hands the agent with a message: an attached file, or text piped into the `uw` command. Like page text, it is never the user's instruction.
+_Avoid_: Context, input
+
+**Attached file**:
+A file the user adds to a chat message. uw keeps a copy in the chat's own folder, where the agent's terminal can open it, and the model also reads it when it can.
+_Avoid_: Attachment, upload, document
+
 **Agent memory**:
 What uw's agent keeps between chats: plain sentences about the user, one a memory, such as which bank they use. Each profile has its own. The agent keeps and forgets them as it works, without asking; the user rewords and forgets them.
 _Avoid_: Notes, knowledge base, context

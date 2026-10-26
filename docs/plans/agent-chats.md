@@ -57,6 +57,12 @@ Added on 2026-10-20, with Claude Code's auto mode as the model:
 Added on 2026-10-26:
 
 - The chat's list keeps its newest line in view as anything in it grows: a new step, a command's output, a card. Scrolling up stops this so the user can read; scrolling back to the bottom, or sending a message, starts it again.
+- A message can carry [attached files](../CONTEXT.md#language) of any kind, picked, dragged, or pasted like images. Not built yet (T225); [ADR 0020](../adr/0020-attached-files-are-copies-the-agent-reaches-by-path.md) records why it works this way.
+  - Up to 10 files a message, at most 5 of them images. uw saves each one whole, images at full size, in the chat's folder, `~/Library/Application Support/uw/Chat files/<chat>/`, and the message tells the agent each path. The folder goes when the chat is deleted, and a private chat's when the private windows close.
+  - The model also reads the contents, as [attached material](../CONTEXT.md#language): a text file up to 100,000 characters; a PDF up to 32 MB and 100 pages, as the PDF itself for a model the model catalog lists with PDF input and as its text for any other; and an image, scaled as above. Past those limits, the model gets the start and the path. A PDF without text says so. Other kinds, such as Word, Excel, or zip, reach the agent only by path.
+  - A model that can't see images still gets an attached image's path. The composer says `deepseek-v4-pro can't see images; the agent gets the file only.` and sending goes ahead. This replaces the wait above.
+  - Files are numbered in the chat from 1, as images are. Once the model answers, each shrinks to a line, `[Shrunk. Call recall with file 2 to see it again.]`, and keeps its path.
+  - The look is drawn on the canvas and approved before it is built: file tiles with name and type in the composer and above the sent message, a file the model read only part of, and the shrunk line.
 
 ## Releases
 

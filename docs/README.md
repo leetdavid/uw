@@ -44,6 +44,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [ADR 0013: each run of a scheduled chat is a subagent](adr/0013-each-run-of-a-scheduled-chat-is-a-subagent.md): why runs start fresh and add one message to one conversation.
 - [ADR 0016: the uw command is TypeScript with Ink](adr/0016-the-uw-command-is-typescript-with-ink.md): why the shipped command carries its own Node and a React terminal interface.
 - [ADR 0018: agent memory is a SQLite database per profile](adr/0018-agent-memory-is-a-sqlite-database-per-profile.md): why memory is searched instead of read whole, and why search is word matching.
+- [ADR 0020: attached files are copies the agent reaches by path](adr/0020-attached-files-are-copies-the-agent-reaches-by-path.md): why the model reads a file and the agent's terminal gets a copy too, and why the copies sit beside the profiles.
 
 ### AI providers
 
