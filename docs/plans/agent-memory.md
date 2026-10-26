@@ -115,6 +115,20 @@ Not checked: a real model, which decides what to keep and what is core, and how 
 
 Tests: `MemoryCheckTest.*` and `MemoryToolsTest.*` in unit_tests; `MemoryStoreBrowserTest.*` and `AgentMemoryBrowserTest.*` in browser_tests.
 
+T210 was built on 2026-10-26:
+
+- The chat page leaves the memory tools' steps out of its steps and shows them as counts under the answer, in `src/memory.tsx`. "Recalled" counts what the agent's searches found, not the core memories every request carries. A found memory names the chat it came from, which the search's answer gives for the page.
+- A remembered fact that replaced another answers with both, so "Forgot" can say what replaced it.
+- The composer's "+" menu has the Memory row, and the handler keeps a chat out of memory with `SetMemoryOff` until its first message. The chat file saves it. `OnMemory` tells the page whether memory is on, off, paused, or private, also when the pause changes.
+- The cost card has a "Memory checks" row.
+
+Where T210 differs from the design:
+
+- The Memory row in the "+" menu has a check, as the connectors' rows do, not a switch. Once locked it says "Locked", and its tooltip says why.
+- A scheduled run's line shows no "Recalled" count yet.
+
+Tests: `UwChatBrowserTest.MemoryShowsAsCountsUnderTheAnswer` and `UwChatBrowserTest.AChatKeptOutOfMemory`, which also save screenshots under `UW_SCREENSHOT_DIR`.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).

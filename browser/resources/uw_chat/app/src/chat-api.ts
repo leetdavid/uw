@@ -5,6 +5,7 @@ import {
   ApprovalMode,
   ChatHandlerFactory,
   ChatHandlerRemote,
+  ChatMemory,
   ChatPageCallbackRouter,
   ChatState,
   ChatConnectorState,
@@ -33,6 +34,7 @@ import type {
 export {
   ApprovalChoice,
   ApprovalMode,
+  ChatMemory,
   ChatState,
   ChatConnectorState,
   RunEnd,

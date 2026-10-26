@@ -46,8 +46,14 @@ class MemoryStore : public base::SupportsUserData::Data {
 
   // Keeps `text`, from the chat `chat`, in place of the memory `replaces`
   // when that is not 0. The same sentence again is kept once. `done` gets
-  // the memory kept, or what is wrong, as the agent is told.
-  using Kept = base::OnceCallback<void(base::expected<Memory, std::string>)>;
+  // the memory kept and the one it replaced, or what is wrong, as the agent
+  // is told.
+  struct KeepResult {
+    Memory kept;
+    std::optional<Memory> replaced;
+  };
+  using Kept =
+      base::OnceCallback<void(base::expected<KeepResult, std::string>)>;
   void Keep(std::string text,
             bool core,
             std::string chat,
@@ -65,9 +71,9 @@ class MemoryStore : public base::SupportsUserData::Data {
   class Backend;
 
   void OnLoaded(std::vector<Memory> core);
-  void OnKept(
-      Kept done,
-      std::pair<base::expected<Memory, std::string>, std::vector<Memory>> kept);
+  void OnKept(Kept done,
+              std::pair<base::expected<KeepResult, std::string>,
+                        std::vector<Memory>> kept);
   void OnForgot(Forgot done,
                 std::pair<std::optional<Memory>, std::vector<Memory>> forgot);
 

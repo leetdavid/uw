@@ -209,6 +209,15 @@ function CostSection({ usage }: { usage: ChatUsage }) {
                 },
               ]
             : []),
+          ...(usage.memoryCheckCount
+            ? [
+                {
+                  label: "Memory checks",
+                  amount: `${usage.memoryCheckCount} ${usage.memoryCheckCount === 1 ? "check" : "checks"}`,
+                  cost: usage.memoryChecksCost,
+                },
+              ]
+            : []),
         ]
           .filter((row) => ("tokens" in row ? row.tokens! > 0 : true))
           .sort((a, b) => (split ? b.cost - a.cost : (b.tokens ?? 0) - (a.tokens ?? 0)));

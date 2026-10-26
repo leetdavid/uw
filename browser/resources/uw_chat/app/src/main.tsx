@@ -14,6 +14,7 @@ import {
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import {
+  Brain,
   Columns2,
   Loader2,
   Pause,
@@ -112,6 +113,14 @@ import {
   isQuietRun,
 } from "./schedule";
 import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
+import {
+  BrainOff,
+  ChatMemory,
+  MemoryCounts,
+  MemoryMark,
+  MemoryOffChip,
+  splitMemory,
+} from "./memory";
 import { AI_SECTIONS, ProviderIcon } from "./providers/provider-parts";
 import {
   providersHandler,
@@ -1130,10 +1139,16 @@ function PlusMenu({
   connectors,
   canAttach,
   onAttach,
+  memory,
+  memoryLocked,
+  onMemory,
 }: {
   connectors: ChatConnector[];
   canAttach: boolean;
   onAttach: () => void;
+  memory: ChatMemory;
+  memoryLocked: boolean;
+  onMemory: () => void;
 }) {
   const NOTES: Partial<Record<ChatConnectorState, string>> = {
     [ChatConnectorState.kNeedsSignIn]: "Sign in",
@@ -1196,6 +1211,28 @@ function PlusMenu({
             />
           </DropdownSubContent>
         </DropdownSub>
+        {(memory === ChatMemory.kOn || memory === ChatMemory.kOff) && (
+          <>
+            <DropdownSeparator />
+            <MenuItem
+              index={2}
+              icon={memory === ChatMemory.kOn ? Brain : BrainOff}
+              label="Memory"
+              checked={memory === ChatMemory.kOn}
+              disabled={memoryLocked}
+              closeOnClick={false}
+              id="memory-switch"
+              title={
+                memoryLocked
+                  ? "Set before the first message. Start a new chat to change it."
+                  : "Recall and keep memories in this chat"
+              }
+              data-note={memoryLocked ? "Locked" : undefined}
+              className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+              onSelect={onMemory}
+            />
+          </>
+        )}
       </DropdownContent>
     </DropdownMenu>
   );
@@ -1536,6 +1573,7 @@ function Chat() {
   // provider's models once listed.
   const [model, setModel] = useState<ChatModel | null>(null);
   const [mode, setMode] = useState(ApprovalMode.kAuto);
+  const [memory, setMemory] = useState(ChatMemory.kOn);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [providers, setProviders] = useState<Provider[] | null>(null);
@@ -1599,6 +1637,7 @@ function Chat() {
         setModel(picked),
       ),
       chatPage.onMode.addListener((picked: ApprovalMode) => setMode(picked)),
+      chatPage.onMemory.addListener((now: ChatMemory) => setMemory(now)),
       chatPage.onUsage.addListener((counted: ChatUsage) => setUsage(counted)),
       chatPage.onSchedule.addListener((state: ScheduleState | null) =>
         setSchedule(state),
@@ -1889,7 +1928,8 @@ function Chat() {
     chatHandler.tryAgain();
   };
 
-  const groups = group(lines);
+  const { shown, events: memoryEvents } = splitMemory(lines);
+  const groups = group(shown);
   const runs = lines.filter((line) => line.kind === StepKind.kRun);
   // A model switch is never what the chat ends on.
   const lastGroup = groups.findLastIndex(
@@ -2015,7 +2055,13 @@ function Chat() {
               connectors={connectors}
               canAttach={files.length < MAX_IMAGES}
               onAttach={() => openFilePicker(IMAGE_TYPES)}
+              memory={memory}
+              memoryLocked={Boolean(title)}
+              onMemory={() => chatHandler.setMemoryOff(memory === ChatMemory.kOn)}
             />
+            {memory === ChatMemory.kOff && !title && (
+              <MemoryOffChip onUndo={() => chatHandler.setMemoryOff(false)} />
+            )}
             {chips}
           </div>
         )}
@@ -2046,6 +2092,7 @@ function Chat() {
           <h1 id="chat-title" className="truncate text-base font-semibold">
             {title}
           </h1>
+          <MemoryMark memory={memory} />
           {state && (
             <span
               id="chat-state"
@@ -2166,6 +2213,13 @@ function Chat() {
                   onContinue={resume}
                   onTryAgain={tryAgain}
                 />
+                {memoryEvents.has(run[0]!) && (
+                  <MemoryCounts
+                    events={memoryEvents.get(run[0]!)!}
+                    chatId={chatId}
+                    chats={chats}
+                  />
+                )}
               </Fragment>
             ),
           )}

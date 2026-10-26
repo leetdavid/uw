@@ -2820,5 +2820,93 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
       Until(chat, "!document.querySelector('#trigger-strip')").ExtractBool());
 }
 
+// What the agent kept and found in memory shows as counts under its answer,
+// not as steps, with a card of the memories. Without a decision or language
+// model, the chat's own model makes the memory check.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, MemoryShowsAsCountsUnderTheAnswer) {
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "remember", base::DictValue()
+                           .Set("memory", "Banks with Chase.")
+                           .Set("core", true)))),
+       ScriptedModel::Answer(
+           R"({"source": "user", "source_confidence": 0.95, )"
+           R"("content": "ordinary", "content_confidence": 0.95})"),
+       ScriptedModel::Answer("I'll remember that.")});
+  content::WebContents* first = OpenChat();
+
+  ASSERT_EQ(Ask(first, "Remember that I bank with Chase."),
+            "I'll remember that.");
+  EXPECT_TRUE(Steps(first).empty());
+  EXPECT_EQ(Lines(first, ".memory-count"),
+            std::vector<std::string>{"Saved 1 memory"});
+  ASSERT_TRUE(content::ExecJs(
+      first, "document.querySelector('.memory-count').focus();"));
+  EXPECT_EQ(Until(first,
+                  "document.querySelector('.memory-card')"
+                  "    ?.textContent")
+                .ExtractString(),
+            "Saved 1 memoryBanks with Chase.From this chatManage memory");
+  SaveWindowScreenshot(browser(), "memory-saved");
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "search_memory", base::DictValue().Set("words", "bank")))),
+       ScriptedModel::Answer("Chase it is.")});
+  content::WebContents* second = OpenChat();
+  ASSERT_EQ(Ask(second, "Open my bank"), "Chase it is.");
+  EXPECT_EQ(Lines(second, ".memory-count"),
+            std::vector<std::string>{"Recalled 1 memory"});
+  ASSERT_TRUE(content::ExecJs(
+      second, "document.querySelector('.memory-count').focus();"));
+  EXPECT_THAT(Until(second,
+                    "document.querySelector('.memory-card')"
+                    "    ?.textContent")
+                  .ExtractString(),
+              ::testing::HasSubstr("From “Remember that I bank with Chase.”"));
+  SaveWindowScreenshot(browser(), "memory-recalled");
+}
+
+// A chat kept out of memory before its first message sends no memory tools,
+// and says so by its title, also after it opens again.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatKeptOutOfMemory) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("Here are three.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(true, content::EvalJs(chat, R"((async () => {
+    const until = (probe) => new Promise((resolve) => {
+      const check = () => probe() ? resolve(probe()) : setTimeout(check, 20);
+      check();
+    });
+    document.getElementById('plus').dispatchEvent(new PointerEvent(
+        'pointerdown', {bubbles: true, button: 0, pointerType: 'mouse'}));
+    (await until(() => document.getElementById('memory-switch'))).click();
+    await until(() => document.getElementById('memory-off-chip'));
+    return true;
+  })())"));
+  SaveWindowScreenshot(browser(), "memory-off-chip");
+
+  ASSERT_EQ(Ask(chat, "Gift ideas for Ana"), "Here are three.");
+
+  EXPECT_THAT(model_.Requests().back(),
+              ::testing::Not(::testing::HasSubstr("search_memory")));
+  EXPECT_EQ(Until(chat,
+                  "document.getElementById('memory-off')"
+                  "    ?.getAttribute('aria-label')")
+                .ExtractString(),
+            "Memory is off for this chat");
+  SaveWindowScreenshot(browser(), "memory-off-title");
+  EXPECT_EQ(false, content::EvalJs(chat,
+                                   "!!document.getElementById("
+                                   "'memory-off-chip')"));
+  Reopen(chat);
+  EXPECT_EQ(Until(chat,
+                  "document.getElementById('memory-off')"
+                  "    ?.getAttribute('aria-label')")
+                .ExtractString(),
+            "Memory is off for this chat");
+}
+
 }  // namespace
 }  // namespace uw

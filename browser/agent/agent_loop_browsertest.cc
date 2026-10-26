@@ -1542,6 +1542,8 @@ IN_PROC_BROWSER_TEST_F(AgentMemoryBrowserTest, AChangedFactReplacesTheOldOne) {
                            .Set("replaces", static_cast<int>(old))))),
        ScriptedModel::Answer("Noted.")});
   AskAndRead("We moved to Rockridge.");
+  EXPECT_EQ(*steps_[0].result.FindStringByDottedPath("replaced.memory"),
+            "Lives in the Inner Sunset.");
   std::vector<Memory> now = Memories();
   ASSERT_EQ(now.size(), 1u);
   EXPECT_EQ(now[0].text, "Lives in Rockridge, Oakland.");

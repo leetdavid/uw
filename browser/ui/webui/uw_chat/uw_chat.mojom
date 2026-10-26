@@ -54,6 +54,9 @@ interface ChatHandler {
   GetConnectors() => (array<ChatConnector> connectors);
   // Turns a connector off or on for this chat from the next step.
   SetConnectorOn(string name, bool on);
+  // Keeps this chat out of agent memory, or lets it back in. Only before the
+  // chat's first message.
+  SetMemoryOff(bool off);
   // Sends a connector's prompt, with `values` for its arguments, as the
   // user's message. The chat shows it as `shown`.
   SendPrompt(string connector,
@@ -352,6 +355,18 @@ enum ApprovalMode {
   kFullAuto,
 };
 
+// What agent memory does in a chat. See docs/plans/agent-memory.md.
+enum ChatMemory {
+  // The chat recalls and keeps memories.
+  kOn,
+  // The user kept this chat out of memory before its first message.
+  kOff,
+  // The profile's memory is paused.
+  kPaused,
+  // A private chat neither recalls nor keeps.
+  kPrivate,
+};
+
 // A skill the agent wrote in a chat, waiting for the user to save it.
 struct SkillProposal {
   string name;
@@ -418,6 +433,9 @@ struct ChatUsage {
   double checks;
   double checks_cost;
   int32 check_count;
+  double memory_checks;
+  double memory_checks_cost;
+  int32 memory_check_count;
   double runs;
   double runs_cost;
   int32 run_count;
@@ -450,6 +468,9 @@ interface ChatPage {
   OnModel(ChatModel? model);
   // The chat's approval mode, after OnOpened and after every change.
   OnMode(ApprovalMode mode);
+  // What agent memory does in this chat, after OnOpened and after every
+  // change.
+  OnMemory(ChatMemory memory);
   OnStep(Step step);
   // Every saved chat, newest first, whenever the list changes.
   OnChats(array<ChatSummary> chats);

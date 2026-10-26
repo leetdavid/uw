@@ -920,17 +920,21 @@ void AgentLoop::OnMemoryCheck(std::optional<QuickCheck::Answer> answer) {
                              std::move(check->args)));
 }
 
-void AgentLoop::OnKept(ModelTurn turn,
-                       size_t index,
-                       base::DictValue args,
-                       base::expected<Memory, std::string> kept) {
+void AgentLoop::OnKept(
+    ModelTurn turn,
+    size_t index,
+    base::DictValue args,
+    base::expected<MemoryStore::KeepResult, std::string> kept) {
   if (!kept.has_value()) {
     OnTool(std::move(turn), index, std::move(args), Error(kept.error()));
     return;
   }
-  OnTool(std::move(turn), index, std::move(args),
-         base::DictValue().Set("kept",
-                               MemoryToValue(*kept).Set("core", kept->core)));
+  base::DictValue result;
+  result.Set("kept", MemoryToValue(kept->kept).Set("core", kept->kept.core));
+  if (kept->replaced) {
+    result.Set("replaced", MemoryToValue(*kept->replaced));
+  }
+  OnTool(std::move(turn), index, std::move(args), std::move(result));
 }
 
 void AgentLoop::OnForgot(ModelTurn turn,
@@ -951,8 +955,9 @@ void AgentLoop::OnFound(ModelTurn turn,
                         base::DictValue args,
                         std::vector<Memory> found) {
   base::ListValue memories;
+  // The chat each came from is for the chat page, which names it.
   for (const Memory& memory : found) {
-    memories.Append(MemoryToValue(memory));
+    memories.Append(MemoryToValue(memory).Set("chat", memory.chat));
   }
   base::DictValue result;
   result.Set("memories", std::move(memories));

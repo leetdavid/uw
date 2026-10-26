@@ -18,6 +18,7 @@
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -120,6 +121,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void Stop() override;
   void GetConnectors(GetConnectorsCallback callback) override;
   void SetConnectorOn(const std::string& name, bool on) override;
+  void SetMemoryOff(bool off) override;
   void SendPrompt(const std::string& connector,
                   const std::string& prompt,
                   const base::flat_map<std::string, std::string>& values,
@@ -186,6 +188,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void SendSchedule();
   // Tells the page what the context holds and what the chat has cost.
   void SendUsage();
+  // What memory does in this chat, as the page and the agent take it.
+  mojom::ChatMemory MemoryNow() const;
+  void SendMemory();
   // While the chat shows and its run waits for approval, brings the tab the
   // run waits in next to the chat.
   void BringWaitingTab();
@@ -300,6 +305,9 @@ class UwChatHandler : public mojom::ChatHandler,
   // The model the chat runs on. Nothing when no model is picked anywhere.
   std::optional<ModelChoice> model_;
   ApprovalMode mode_ = ApprovalMode::kAuto;
+  // The user kept this chat out of agent memory.
+  bool memory_off_ = false;
+  PrefChangeRegistrar prefs_;
   // What the page shows, in order. Steps are kept in the context.
   base::ListValue log_;
   // The saved conversation and the agent's tabs by number, by the tree's page

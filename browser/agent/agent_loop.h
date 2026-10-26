@@ -22,6 +22,7 @@
 #include "base/values.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/agent_tools.h"
+#include "uw/browser/agent/memory_store.h"
 #include "uw/browser/agent/quick_check.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
@@ -230,7 +231,7 @@ class AgentLoop {
   void OnKept(ModelTurn turn,
               size_t index,
               base::DictValue args,
-              base::expected<Memory, std::string> kept);
+              base::expected<MemoryStore::KeepResult, std::string> kept);
   void OnForgot(ModelTurn turn,
                 size_t index,
                 base::DictValue args,

@@ -39,7 +39,11 @@ class MemoryStoreBrowserTest : public headless::HeadlessModeBrowserTest {
     Store(profile).Keep(
         std::move(text), core, "chat-1", replaces,
         base::BindLambdaForTesting(
-            [&](base::expected<Memory, std::string> got) { kept = got; }));
+            [&](base::expected<MemoryStore::KeepResult, std::string> got) {
+              kept = got.transform([](const MemoryStore::KeepResult& result) {
+                return result.kept;
+              });
+            }));
     EXPECT_TRUE(base::test::RunUntil([&] { return kept.has_value(); }));
     return kept.value_or(base::unexpected("no answer"));
   }

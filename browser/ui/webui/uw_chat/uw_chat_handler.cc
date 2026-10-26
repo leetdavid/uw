@@ -243,6 +243,9 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
     schedules_observation_.Observe(chats);
     chats->SetPage(id_, this);
   }
+  prefs_.Init(profile->GetPrefs());
+  prefs_.Add(kAgentMemoryPref, base::BindRepeating(&UwChatHandler::SendMemory,
+                                                   base::Unretained(this)));
   LoadSkills(base::DoNothing());
   Connectors::Get().Start();
   connectors_observation_.Observe(&Connectors::Get());
@@ -920,6 +923,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
     }
     from_terminal_ =
         from_terminal_ || saved->FindBool("from_terminal").value_or(false);
+    memory_off_ = saved->FindBool("memory_off").value_or(false);
     if (const base::DictValue* context = saved->FindDict("context")) {
       saved_context_ = AgentContext::FromValue(*context);
       if (saved_context_) {
@@ -969,6 +973,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
   page_->OnMode(static_cast<mojom::ApprovalMode>(mode_));
+  SendMemory();
   SendUsage();
   UpdateScheduledRuns();
   SendSchedule();
@@ -1017,11 +1022,9 @@ bool UwChatHandler::Start() {
       base::BindRepeating(&UwChatHandler::AskApproval, base::Unretained(this)));
   agent_->SetMode(mode_);
   agent_->SetChatId(id_);
-  agent_->SetMemoryUse(
-      Profile::FromBrowserContext(contents_->GetBrowserContext())
-              ->IsOffTheRecord()
-          ? MemoryUse::kOff
-          : MemoryUse::kRecallAndKeep);
+  agent_->SetMemoryUse(MemoryNow() == mojom::ChatMemory::kPrivate || memory_off_
+                           ? MemoryUse::kOff
+                           : MemoryUse::kRecallAndKeep);
   UpdateScheduledRuns();
   for (const std::string& name : connectors_off_) {
     agent_->SetConnectorOn(name, false);
@@ -1128,6 +1131,38 @@ void UwChatHandler::SetEffort(const std::string& effort) {
   }
   model_->effort = effort;
   OnModelChanged();
+}
+
+void UwChatHandler::SetMemoryOff(bool off) {
+  if (!loaded_ || !title_.empty() ||
+      MemoryNow() == mojom::ChatMemory::kPrivate) {
+    return;
+  }
+  memory_off_ = off;
+  if (agent_) {
+    agent_->SetMemoryUse(off ? MemoryUse::kOff : MemoryUse::kRecallAndKeep);
+  }
+  SendMemory();
+}
+
+mojom::ChatMemory UwChatHandler::MemoryNow() const {
+  Profile* profile =
+      Profile::FromBrowserContext(contents_->GetBrowserContext());
+  if (profile->IsOffTheRecord()) {
+    return mojom::ChatMemory::kPrivate;
+  }
+  if (memory_off_) {
+    return mojom::ChatMemory::kOff;
+  }
+  return profile->GetPrefs()->GetBoolean(kAgentMemoryPref)
+             ? mojom::ChatMemory::kOn
+             : mojom::ChatMemory::kPaused;
+}
+
+void UwChatHandler::SendMemory() {
+  if (loaded_) {
+    page_->OnMemory(MemoryNow());
+  }
 }
 
 // On a new chat, before its first message, the pick is also the mode new
@@ -1322,6 +1357,9 @@ void UwChatHandler::SendUsage() {
   usage->checks = summary.checks.tokens;
   usage->checks_cost = summary.checks.cost;
   usage->check_count = summary.check_count;
+  usage->memory_checks = summary.memory_checks.tokens;
+  usage->memory_checks_cost = summary.memory_checks.cost;
+  usage->memory_check_count = summary.memory_check_count;
   usage->runs = summary.runs.tokens;
   usage->runs_cost = summary.runs.cost;
   usage->run_count = summary.run_count;
@@ -1400,6 +1438,9 @@ void UwChatHandler::Save() {
     saved.Set("model", ModelValue(*model_));
   }
   saved.Set("mode", NameOf(mode_));
+  if (memory_off_) {
+    saved.Set("memory_off", true);
+  }
   if (from_terminal_) {
     saved.Set("from_terminal", true);
   }

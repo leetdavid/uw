@@ -76,9 +76,9 @@ class MemoryStore::Backend {
     return core;
   }
 
-  std::pair<base::expected<Memory, std::string>, std::vector<Memory>>
+  std::pair<base::expected<KeepResult, std::string>, std::vector<Memory>>
   Keep(std::string text, bool core, std::string chat, int64_t replaces) {
-    base::expected<Memory, std::string> kept =
+    base::expected<KeepResult, std::string> kept =
         KeepNow(std::move(text), core, std::move(chat), replaces);
     return {std::move(kept), Core()};
   }
@@ -171,10 +171,10 @@ class MemoryStore::Backend {
     return statement.Step() ? static_cast<size_t>(statement.ColumnInt64(0)) : 0;
   }
 
-  base::expected<Memory, std::string> KeepNow(std::string text,
-                                              bool core,
-                                              std::string chat,
-                                              int64_t replaces) {
+  base::expected<KeepResult, std::string> KeepNow(std::string text,
+                                                  bool core,
+                                                  std::string chat,
+                                                  int64_t replaces) {
     text = OneLine(text, text.size());
     if (text.empty()) {
       return base::unexpected("A memory needs a sentence.");
@@ -241,7 +241,12 @@ class MemoryStore::Backend {
       return base::unexpected("Memory can't be changed right now.");
     }
     memory.id = same ? same->id : db_.GetLastInsertRowId();
-    return memory;
+    KeepResult result;
+    result.kept = std::move(memory);
+    if (old && old->id != result.kept.id) {
+      result.replaced = old;
+    }
+    return result;
   }
 
   const base::FilePath path_;
@@ -315,9 +320,9 @@ void MemoryStore::OnLoaded(std::vector<Memory> core) {
   }
 }
 
-void MemoryStore::OnKept(
-    Kept done,
-    std::pair<base::expected<Memory, std::string>, std::vector<Memory>> kept) {
+void MemoryStore::OnKept(Kept done,
+                         std::pair<base::expected<KeepResult, std::string>,
+                                   std::vector<Memory>> kept) {
   core_ = std::move(kept.second);
   std::move(done).Run(std::move(kept.first));
 }
