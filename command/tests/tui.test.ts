@@ -75,6 +75,20 @@ test("the interface shows the chat's steps, its answer as Markdown, and the stat
   assert.match(chat.all(), /Carry on with: uw chat -r 3f9c2e18/);
 });
 
+test("memory steps show as counts with the answer, and --no-memory marks the header", async () => {
+  const chat = await open({ text: "Find a table near home", memory_off: true });
+  await chat.step("user", "", {}, {}, "Find a table near home");
+  await chat.step("tool", "search_memory", { words: "home" }, { memories: [{ id: 4, memory: "Lives in the Inner Sunset." }] });
+  await chat.step("tool", "remember", { memory: "Partner is vegetarian." }, { kept: { id: 9, memory: "Partner is vegetarian.", core: false } });
+  assert.doesNotMatch(chat.all(), /search_memory|remember/);
+  await chat.notify("chat.end", { status: "answered", text: "Nopalito has a table.", cost: 0.01 });
+  const shown = chat.all();
+  assert.match(shown, /uw chat · Work · From terminal · Memory off/);
+  assert.match(shown, /Saved 1 memory\s+Recalled 1 memory\s+Nopalito has a table\./);
+  await chat.type(KEY.ctrlC);
+  await chat.app.waitUntilExit();
+});
+
 test("Enter sends the next message, or steers the agent at work, and Esc stops it", async () => {
   const chat = await open({});
   await chat.type("Check the previews too", KEY.enter);

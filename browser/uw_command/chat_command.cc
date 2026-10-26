@@ -394,6 +394,7 @@ UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
   if (const std::string* effort = params.FindString("effort")) {
     ask.effort = *effort;
   }
+  ask.memory_off = params.FindBool("memory_off").value_or(false);
   return ask;
 }
 

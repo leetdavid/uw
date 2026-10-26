@@ -36,6 +36,10 @@ void RunChatCommand(CommandRequest request,
                     CommandReply reply,
                     base::WeakPtr<CommandConnection> connection);
 
+// uw memory: list and forget agent memory. See
+// docs/plans/agent-memory.md#the-uw-command.
+void RunMemoryCommand(CommandRequest request, CommandReply reply);
+
 // uw mcp serve: the page tools an outside agent uses, out of sight, with the
 // user's approval. See docs/plans/uw-command.md#the-tool-server.
 void RunToolsCommand(CommandRequest request,

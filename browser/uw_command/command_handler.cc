@@ -35,6 +35,10 @@ void HandleCommand(CommandRequest request,
     RunChatCommand(std::move(request), std::move(reply), std::move(connection));
     return;
   }
+  if (request.method.starts_with("memory.")) {
+    RunMemoryCommand(std::move(request), std::move(reply));
+    return;
+  }
   if (request.method.starts_with("tools.")) {
     RunToolsCommand(std::move(request), std::move(reply),
                     std::move(connection));

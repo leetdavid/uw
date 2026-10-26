@@ -2,7 +2,9 @@
 
 import { options, type Command, type Context, type Input, type Plan } from "./cli.ts";
 import { CommandError, DONE, FAILED, NEEDS_YOU, USAGE } from "./errors.ts";
-import { approvalCard, stepLine, type Approval, type Choice, type Step } from "./steps.ts";
+import {
+  NO_MEMORY, approvalCard, countMemory, isMemoryStep, memoryLines, stepLine, type Approval, type Choice, type Step,
+} from "./steps.ts";
 
 export const CHAT_HELP = `uw chat: ask uw's agent to do something, as in uw://chat.
 
@@ -27,6 +29,7 @@ Options:
   --model <model>        A model of the chat's provider.
   --effort <level>       One of the model's effort levels.
   --timeout <duration>   Stop the chat after this long, such as 90s or 10m.
+  --no-memory            Keep this chat out of agent memory: it recalls and keeps nothing.
   --workspace <name>     Where the chat runs. Default: the one used last.
   --json                 Print one result object at the end.
 
@@ -94,6 +97,7 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     resume: { type: "string", short: "r" },
     timeout: { type: "string" },
     workspace: { type: "string" },
+    "no-memory": { type: "boolean", default: false },
   });
   if (values.help) return null;
   if (values.mode !== undefined && !MODES.includes(values.mode)) {
@@ -121,6 +125,7 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     ...(values.model === undefined ? {} : { model: values.model }),
     ...(values.effort === undefined ? {} : { effort: values.effort }),
     ...(values.resume === undefined ? {} : { chat: values.resume }),
+    ...(values["no-memory"] ? { memory_off: true } : {}),
   };
   const method = picking ? "chats.resume" : "chats.start";
   if (screen) {
@@ -150,18 +155,21 @@ async function runChat(context: Context, method: string, params: object, mode: s
     settle(exit);
   };
   let answering = false;
+  let memory = NO_MEMORY;
+  const memoryOff = "memory_off" in params;
   // uw's reply and its first notifications can come together, so the chat's
   // id comes from whichever arrives first.
   const learn = (id: unknown) => {
     if (chat || typeof id !== "string") return;
     chat = id;
-    out.say(chat.slice(0, 8));
+    out.say(memoryOff ? `${chat.slice(0, 8)} · Memory off` : chat.slice(0, 8));
   };
   channel.onNotification((name, raw) => {
     learn(raw.chat);
     if (name === "chat.step") {
       const step = raw as unknown as Step;
-      if (step.kind === "tool") out.say(stepLine(step));
+      if (isMemoryStep(step)) memory = countMemory(memory, step);
+      else if (step.kind === "tool") out.say(stepLine(step));
     } else if (name === "chat.approval") {
       const approval = (raw as { approval: Approval | null }).approval;
       if (!approval || answering) return;
@@ -178,6 +186,8 @@ async function runChat(context: Context, method: string, params: object, mode: s
       void ask(context, input, chat, approval).finally(() => { answering = false; });
     } else if (name === "chat.end") {
       const ended = raw as unknown as Ended;
+      memoryLines(memory).forEach((line) => out.say(line));
+      memory = NO_MEMORY;
       if (ended.status === "answered") {
         out.line(ended.text);
         finish(DONE, { status: "answered", answer: ended.text, waiting: null, cost: ended.cost });

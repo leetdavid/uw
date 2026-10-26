@@ -316,6 +316,44 @@ test("chat -p prints the steps on stderr and the answer on stdout", async () => 
   assert.equal(err, "3f9c2e18\nOpened vercel.com/deploys in tab 1\n");
 });
 
+test("chat -p counts the memory steps under the steps, and --no-memory keeps the chat out", async () => {
+  const remembered = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "remember", args: { memory: "Partner is vegetarian." }, result: { kept: { id: 9, memory: "Partner is vegetarian.", core: false } }, text: "" } };
+  const searched = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "search_memory", args: { words: "home" }, result: { memories: [{ id: 4, memory: "Lives in the Inner Sunset." }, { id: 5, memory: "Books on Resy." }] }, text: "" } };
+  await chatUw([OPENED, searched, remembered, end("answered", "Nopalito has a table.")]);
+  const { exit, out, err } = await uw(["chat", "-p", "--no-memory", "Find a table"]);
+  assert.equal(exit, 0);
+  assert.deepEqual(requests.at(-1), { method: "chats.start", params: { text: "Find a table", memory_off: true } });
+  assert.equal(out, "Nopalito has a table.\n");
+  assert.equal(err, "3f9c2e18 · Memory off\nOpened vercel.com/deploys in tab 1\nSaved 1 memory\nRecalled 2 memories\n");
+});
+
+test("memory lists the memories, says when memory is paused, and forgets one", async () => {
+  const memories = [
+    { id: 12, text: "Prefers window seats on long flights.", chat: CHAT_ID, chatTitle: "SFO to LIS flights", changed: Date.UTC(2026, 9, 26) },
+    { id: 7, text: "Has a dog, Miso.", chat: "gone", chatTitle: "", changed: Date.UTC(2026, 8, 14) },
+  ];
+  await fakeUw((method, params) => {
+    if (method === "memory.list") return { result: { memories: params.search ? [] : memories, total: 2, on: false, workspace: "Work" } };
+    if (method === "memory.forget" && params.id === 12) return { result: { forgot: { id: 12, text: memories[0]!.text } } };
+    if (method === "memory.forget") return { error: { code: 1, message: `There is no memory ${String(params.id)}.` } };
+    return { error: { code: -32601, message: `uw has no method ${method}.` } };
+  });
+  const listed = await uw(["memory", "list", "--workspace", "Work"]);
+  assert.equal(listed.exit, 0);
+  assert.deepEqual(requests.at(-1), { method: "memory.list", params: { workspace: "Work" } });
+  assert.equal(listed.err, "Memory is paused for Work: chats there recall and keep nothing.\n");
+  assert.match(listed.out, /^ID +Memory +From +Changed\n12 +Prefers window seats on long flights\. +SFO to LIS flights +Oct 26\n7 +Has a dog, Miso\. +a deleted chat +Sep 14\n$/);
+  const searched = await uw(["memory", "list", "--search", "passport"]);
+  assert.deepEqual(requests.at(-1), { method: "memory.list", params: { search: "passport" } });
+  assert.equal(searched.out, 'No memory mentions "passport".\n');
+  assert.deepEqual(await uw(["memory", "forget", "12"]), { exit: 0, out: "Forgot: Prefers window seats on long flights.\n", err: "" });
+  assert.equal((await uw(["memory", "forget", "13"])).exit, 1);
+  const wrong = await uw(["memory", "forget", "seats"]);
+  assert.equal(wrong.exit, 2);
+  assert.match(wrong.err, /uw memory forget 12/);
+  assert.equal(requests.filter((request) => request.method === "memory.forget").length, 2);
+});
+
 test("--json prints one result object at the end", async () => {
   await chatUw([end("answered", "Yes.")]);
   const { out } = await uw(["chat", "-p", "--json", "Did it work?"]);

@@ -22,9 +22,11 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
@@ -50,6 +52,7 @@
 #include "ui/message_center/public/cpp/notification.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/memory_store.h"
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
@@ -323,6 +326,42 @@ IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, ListGivesEverySettingUwKeeps) {
   }
 }
 
+// uw memory lists a workspace's memories and forgets one, and agent.memory
+// pauses memory. See docs/plans/agent-memory.md#the-uw-command.
+IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, MemoryListsAndForgets) {
+  bool kept = false;
+  MemoryStore::For(profile())->Keep(
+      "Banks with Chase.", false, "", 0,
+      base::BindLambdaForTesting(
+          [&](base::expected<MemoryStore::KeepResult, std::string> result) {
+            kept = result.has_value();
+          }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return kept; }));
+
+  base::DictValue listed = Ask("memory.list", R"({"workspace":"Work"})");
+  const base::ListValue* memories =
+      listed.FindListByDottedPath("result.memories");
+  ASSERT_TRUE(memories && memories->size() == 1u) << listed;
+  EXPECT_EQ(*(*memories)[0].GetDict().FindString("text"), "Banks with Chase.");
+  EXPECT_EQ(listed.FindDoubleByDottedPath("result.total"), 1);
+  EXPECT_EQ(listed.FindBoolByDottedPath("result.on"), true);
+  EXPECT_EQ(*listed.FindStringByDottedPath("result.workspace"), "Work");
+  const int id = static_cast<int>(*(*memories)[0].GetDict().FindDouble("id"));
+
+  Ask("settings.set", R"({"name":"agent.memory","value":"false"})");
+  EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(kAgentMemoryPref));
+  base::DictValue searched = Ask("memory.list", R"({"search":"passport"})");
+  EXPECT_EQ(searched.FindBoolByDottedPath("result.on"), false);
+  EXPECT_TRUE(searched.FindListByDottedPath("result.memories")->empty());
+
+  const std::string forget =
+      base::StrCat({R"({"id":)", base::NumberToString(id), "}"});
+  EXPECT_EQ(*Ask("memory.forget", forget)
+                 .FindStringByDottedPath("result.forgot.text"),
+            "Banks with Chase.");
+  EXPECT_EQ(Ask("memory.forget", forget).FindIntByDottedPath("error.code"), 1);
+}
+
 IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, MistakesAreWrongUsage) {
   base::DictValue refused = Ask(
       "settings.set", R"({"name":"theme.grain","value":"140"})");
@@ -584,6 +623,19 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,
   const base::DictValue& first = (*chats)[0].GetDict();
   EXPECT_EQ(*first.FindString("id"), chat);
   EXPECT_EQ(first.FindBool("fromTerminal"), true);
+}
+
+// --no-memory keeps a chat from the command out of agent memory.
+IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest, NoMemoryKeepsTheChatOut) {
+  model_.Script({ScriptedModel::Answer("Here are three.")});
+  std::vector<std::string> lines = Chat(base::DictValue()
+                                            .Set("text", "Gift ideas for Ana")
+                                            .Set("memory_off", true));
+  EXPECT_EQ(*Find(lines, "chat.end").FindStringByDottedPath("params.text"),
+            "Here are three.");
+  ASSERT_FALSE(model_.Requests().empty());
+  EXPECT_THAT(model_.Requests().back(),
+              ::testing::Not(::testing::HasSubstr("search_memory")));
 }
 
 IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest,

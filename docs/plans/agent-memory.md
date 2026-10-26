@@ -1,6 +1,6 @@
 # Agent memory
 
-Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. T209, the design, was signed off on 2026-10-26, with uw's proposed details. T80 was built the same day; see [Built](#built).
+Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. T209, the design, was signed off on 2026-10-26, with uw's proposed details. T80, T210, T211, and T212 were built the same day; see [Built](#built).
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). Each part follows one uw already has: the command check, a store per profile, the agent's tools, a `uw://ai` section, and a `uw` command handler. Chromium's `sql::Database` is well proven, though new to uw. The risk is judgment: what the agent keeps and makes core, and whether the memory check refuses a sentence a page talked the agent into. Like the command check, it needs a set of examples to measure against.
 
@@ -138,6 +138,15 @@ T211 was built on 2026-10-26:
 Where T211 differs from the design: a search lists the memories with the most matching words first, as the agent's search does, not the newest.
 
 Tests: `UwProvidersBrowserTest.TheMemoryPageChangesMemories` and `TheMemoryPagePausesAndListens`, and `UwChatBrowserTest.TheAiSettingsMenuOpensEachSection` with the Memory row.
+
+T212 was built on 2026-10-26:
+
+- `uw memory list` and `uw memory forget` are `command/src/memory.ts`, answered by `browser/uw_command/memory_command.cc` as `memory.list` and `memory.forget`. A memory's id is the number the list prints. A paused workspace's list starts with one line on stderr that says so.
+- `uw chat --no-memory` sends `memory_off` with `chats.start`, which keeps the new chat out of memory as the composer's switch does. The id line and the terminal interface's header say "Memory off".
+- `uw chat -p` and the terminal interface leave out the memory tools' steps and print the counts before the answer, as the chat page does.
+- `agent.memory` is in `uw settings`.
+
+Tests: `UwCommandBrowserTest.MemoryListsAndForgets` and `UwCommandChatBrowserTest.NoMemoryKeepsTheChatOut` in browser_tests, and the memory tests in `command/tests`.
 
 ## Stages
 

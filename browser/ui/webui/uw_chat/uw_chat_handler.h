@@ -86,6 +86,8 @@ class UwChatHandler : public mojom::ChatHandler,
     // A model of the chat's provider, and one of its effort levels.
     std::string model;
     std::string effort;
+    // Keeps a new chat out of agent memory, as --no-memory does.
+    bool memory_off = false;
   };
 
   // The handler of the chat `id` an open tab shows, or null.

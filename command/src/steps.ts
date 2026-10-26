@@ -124,6 +124,47 @@ export function describeStep(step: Step): Described {
   }
 }
 
+const MEMORY_TOOLS = new Set(["remember", "forget", "search_memory"]);
+
+/** A step of the memory tools, which shows only as counts once the agent answers. */
+export function isMemoryStep(step: Step): boolean {
+  return step.kind === "tool" && MEMORY_TOOLS.has(step.tool);
+}
+
+/** The memories the agent saved, forgot, and found before its answer, by id, as the chat page counts them. */
+export interface MemoryTally {
+  saved: number[];
+  forgot: number[];
+  recalled: number[];
+}
+
+export const NO_MEMORY: MemoryTally = { saved: [], forgot: [], recalled: [] };
+
+type Remembered = { id: number };
+
+export function countMemory(tally: MemoryTally, step: Step): MemoryTally {
+  const { result } = step;
+  const kept = result.kept as Remembered | undefined;
+  const replaced = result.replaced as Remembered | undefined;
+  const forgot = result.forgot as Remembered | undefined;
+  const found = Array.isArray(result.memories) ? (result.memories as Remembered[]) : [];
+  const saved = kept ? [...tally.saved, kept.id] : tally.saved;
+  return {
+    saved,
+    forgot: [...tally.forgot, ...[replaced, forgot].filter((memory) => memory).map((memory) => memory!.id)],
+    recalled: [...tally.recalled, ...found.map((memory) => memory.id)
+      .filter((id, at, ids) => ids.indexOf(id) === at && !saved.includes(id) && !tally.recalled.includes(id))],
+  };
+}
+
+/** "Saved 2 memories", "Forgot 1 memory", and "Recalled 3 memories", for the counts that are not 0. */
+export function memoryLines(tally: MemoryTally): string[] {
+  const line = (verb: string, ids: number[]) => `${verb} ${ids.length} ${ids.length === 1 ? "memory" : "memories"}`;
+  return [["Saved", tally.saved], ["Forgot", tally.forgot], ["Recalled", tally.recalled]]
+    .filter(([, ids]) => (ids as number[]).length > 0)
+    .map(([verb, ids]) => line(verb as string, ids as number[]));
+}
+
 /** One tool step in plain words, with the tab it happened in. */
 export function stepLine(step: Step): string {
   const { what, where } = describeStep(step);

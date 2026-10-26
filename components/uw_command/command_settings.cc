@@ -77,6 +77,7 @@ constexpr auto kSettings = std::to_array<CommandSetting>({
     Threshold("organizer.rename-threshold", "uw.organization.threshold.rename"),
     Choices("agent.approval-mode", Scope::kProfile, kApprovalModes,
             "uw.agent.approval_mode"),
+    Switch("agent.memory", Scope::kProfile, "uw.agent.memory"),
     Switch("command-bar.enabled", Scope::kProfile, "uw.command_bar.enabled"),
     {.name = "command-bar.currency",
      .scope = Scope::kProfile,

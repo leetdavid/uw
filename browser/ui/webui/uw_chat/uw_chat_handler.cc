@@ -301,6 +301,9 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
   if (!loaded_) {
     return;
   }
+  if (ask.memory_off) {
+    SetMemoryOff(true);
+  }
   if (ask.mode) {
     mode_ = *ask.mode;
     if (agent_) {

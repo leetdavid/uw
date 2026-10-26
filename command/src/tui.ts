@@ -9,7 +9,10 @@ import type { Channel } from "./channel.ts";
 import { CommandError, DONE, FAILED } from "./errors.ts";
 import { Markdown } from "./markdown.ts";
 import { COLOR } from "./palette.ts";
-import { approvalCard, describeStep, type Approval, type Choice, type Step } from "./steps.ts";
+import {
+  NO_MEMORY, approvalCard, countMemory, describeStep, isMemoryStep, memoryLines, type Approval, type Choice,
+  type MemoryTally, type Step,
+} from "./steps.ts";
 
 /** The terminal's screen, where the interface draws and reads keys. */
 export interface Screen {
@@ -41,7 +44,7 @@ export interface Status {
 }
 
 type Line =
-  | { kind: "header"; chat: string; workspace: string }
+  | { kind: "header"; chat: string; workspace: string; memoryOff: boolean }
   | { kind: "user"; text: string }
   | { kind: "step"; what: string; where: string; done: boolean }
   | { kind: "answer"; text: string }
@@ -54,20 +57,25 @@ export interface ChatState {
   working: boolean;
   waiting: Approval | null;
   status: Status | null;
+  /** What the agent did with memory since the person's message, shown as counts with its answer. */
+  memory: MemoryTally;
 }
 
 export type ChatEvent =
-  | { type: "started"; chat: string; workspace: string }
+  | { type: "started"; chat: string; workspace: string; memoryOff?: boolean }
   | { type: "notified"; method: string; params: Record<string, unknown> }
   | { type: "said"; text: string; color: string };
 
-export const START: ChatState = { lines: [], chat: "", workspace: "", working: false, waiting: null, status: null };
+export const START: ChatState = {
+  lines: [], chat: "", workspace: "", working: false, waiting: null, status: null, memory: NO_MEMORY,
+};
 
 /** The chat as uw's notifications change it. */
 export function reduce(state: ChatState, event: ChatEvent): ChatState {
   const add = (line: Line, change: Partial<ChatState> = {}): ChatState => ({ ...state, ...change, lines: [...state.lines, line] });
   if (event.type === "started") {
-    return add({ kind: "header", chat: event.chat, workspace: event.workspace }, { chat: event.chat, workspace: event.workspace });
+    return add({ kind: "header", chat: event.chat, workspace: event.workspace, memoryOff: Boolean(event.memoryOff) },
+      { chat: event.chat, workspace: event.workspace });
   }
   if (event.type === "said") return add({ kind: "said", text: event.text, color: event.color });
   const { method, params } = event;
@@ -75,17 +83,20 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
   if (method === "chat.approval") return { ...state, waiting: (params.approval as Approval | null) ?? null };
   if (method === "chat.step") {
     const step = params as unknown as Step;
-    if (step.kind === "user") return add({ kind: "user", text: step.text }, { working: true });
+    if (step.kind === "user") return add({ kind: "user", text: step.text }, { working: true, memory: NO_MEMORY });
+    if (isMemoryStep(step)) return { ...state, memory: countMemory(state.memory, step) };
     if (step.kind === "tool") return add({ kind: "step", ...describeStep(step) });
     return state;
   }
   if (method === "chat.end") {
     const ended = params as { status: string; text: string };
-    const idle = { working: false, waiting: null };
-    if (ended.status === "answered") return add({ kind: "answer", text: ended.text }, idle);
-    return add(ended.status === "failed"
-      ? { kind: "said", text: `Didn't finish: ${ended.text}`, color: COLOR.red }
-      : { kind: "said", text: "The chat stopped.", color: COLOR.dim }, idle);
+    const counted: Line[] = memoryLines(state.memory).map((text) => ({ kind: "said", text, color: COLOR.dim }));
+    const end: Line = ended.status === "answered"
+      ? { kind: "answer", text: ended.text }
+      : ended.status === "failed"
+        ? { kind: "said", text: `Didn't finish: ${ended.text}`, color: COLOR.red }
+        : { kind: "said", text: "The chat stopped.", color: COLOR.dim };
+    return { ...state, working: false, waiting: null, memory: NO_MEMORY, lines: [...state.lines, ...counted, end] };
   }
   return state;
 }
@@ -205,7 +216,7 @@ export function ChatApp({ channel, method, params, limit }: ChatProps): ReactNod
     channel.onClose(() => leave(FAILED, "uw closed the connection, so the chat stopped.", COLOR.red));
     channel.request(method, { ...params, stay: true }).then((reply) => {
       const { chat: id, workspace } = reply as { chat: string; workspace: string };
-      dispatch({ type: "started", chat: id, workspace });
+      dispatch({ type: "started", chat: id, workspace, memoryOff: "memory_off" in params });
       started = true;
       for (const event of early) dispatch(event);
       loadMenu(id);
@@ -329,7 +340,8 @@ function drawLine(line: Line, before: Line | undefined): ReactNode {
           h(Text, { color: COLOR.faint }, " · "),
           h(Text, { color: COLOR.text }, line.workspace),
           h(Text, { color: COLOR.faint }, " · "),
-          h(Text, { color: COLOR.dim }, "From terminal")),
+          h(Text, { color: COLOR.dim }, "From terminal"),
+          line.memoryOff ? h(Text, { color: COLOR.faint }, " · Memory off") : null),
         h(Text, { color: COLOR.faint }, line.chat.slice(0, 8)));
     case "user":
       return h(Box, { flexGrow: 1, marginTop: 1, backgroundColor: COLOR.fill, paddingX: 1 },

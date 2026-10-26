@@ -23,6 +23,7 @@ The user asked on 2026-10-24 for a [`uw` command](../CONTEXT.md#language) that a
 | `uw approve` | Answers the step a chat waits on. |
 | `uw connectors`, also `uw mcp` | `add`, `add-json`, `list`, `remove`, and `sign-in`. |
 | `uw settings` | `list`, `get`, and `set`. |
+| `uw memory` | `list` and `forget` agent memory; `uw chat --no-memory` keeps a chat out of it. See the [agent memory plan](agent-memory.md#the-uw-command). |
 
 Later: skills, providers, scheduled chats, and opening or reading tabs without the agent.
 

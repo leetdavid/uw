@@ -7,6 +7,7 @@ import { APPROVE, CHAT, CHATS } from "./chat.ts";
 import { CONNECTORS } from "./connectors.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
 import { VERSION, reach, type Place, type Reach } from "./launch.ts";
+import { MEMORY } from "./memory.ts";
 import { output, type Output, type Streams } from "./output.ts";
 import { SETTINGS } from "./settings.ts";
 import type { Screen } from "./tui.ts";
@@ -22,6 +23,7 @@ Commands:
   approve       Answer the step a chat waits on
   connectors    Add, list, remove, and sign in to connectors (also: uw mcp)
   mcp serve     Give an outside agent, such as Claude Code, uw's page tools
+  memory        List and forget what uw's agent remembers about you
   settings      List, read, and change uw's settings
 
 Options:
@@ -77,6 +79,7 @@ export interface Input {
 
 const COMMANDS: Record<string, Command> = {
   chat: CHAT, chats: CHATS, approve: APPROVE, settings: SETTINGS, connectors: CONNECTORS, mcp: CONNECTORS,
+  memory: MEMORY,
 };
 
 /** Parses a command's options, with --json and --help, which every command takes. */
