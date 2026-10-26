@@ -49,6 +49,12 @@ Found so far, at Chromium 153 on 2026-10-27:
 - Chromium's AudioToolbox decoder takes only xHE-AAC, AC-3, and E-AC-3. Plain AAC needs its esds magic cookie, ADTS headers stripped, HE-AAC's rate and channel changes, and priming trimmed once.
 - `media_use_openh264 = false` turns off WebRTC's H.264 (`rtc_use_h264`), which builds OpenH264, a library Cisco's patent license does not cover. WebRTC still receives H.264 through VideoToolbox, but it sends H.264 only after a patch to `webrtc_util.cc`.
 
+Decided on 2026-10-27:
+
+- Raw `.aac` files and ADTS streams keep playing. uw reads ADTS itself and hands the audio to AudioToolbox (T229).
+- WebRTC keeps sending H.264, through VideoToolbox's encoder.
+- When the GPU process is gone, H.264 plays through VideoToolbox's software decoder in another process (T230).
+
 ## Domain and bundle ID
 
 Agreed: the website is `uwbrowser.com`, registered through Vercel. The app's bundle ID changes from `org.uw.browser`, a domain uw does not own, to `com.uwbrowser.uw` before the first public preview. macOS keys permissions, preferences, and Sparkle's state on the bundle ID, so it must not change after people install uw.
@@ -81,9 +87,17 @@ Found so far, at Chromium 153 on 2026-10-27:
 - The React pages are the chat page, `uw://ai`, and the watch card. Settings and the organizer page are Lit. Chromium gives WebUI pages that use Mojo no network access, so a page reports its problems over Mojo, and C++ sends them to PostHog.
 - Chromium's own consent switch and first-run dialog appear only in Google Chrome builds, so uw adds its own.
 
+Decided on 2026-10-27:
+
+- All of uw's own pages report problems, React and Lit alike. A small detector in each page uses PostHog's definitions of rage and dead clicks and sends what it finds over Mojo. It sends an element's tag, role, and label, never its text.
+- PostHog tells installs apart by a random ID that uw makes on Yes and deletes on No.
+- The question and the switch follow the signed-off frames "Problem reports: asked on first run" and "Problem reports: the settings switch".
+- Crashes go to the Sentry project `eslee/uw` (US). `pnpm run release` writes its minidump address and the PostHog key into the bundle's `Info.plist`, as it does Sparkle's feed. Daily builds carry neither, never ask, and send nothing.
+- `pnpm run release` uploads the dSYMs with a Sentry token from the keychain item `uw-sentry`, and Sentry names each release `uw@<version>`.
+
 ## Build flags
 
-Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_level = 1` for crash reports, so what people download matches what the owner uses. An official build with link-time and profile-guided optimization may come later, once measured.
+Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_level = 1` and `enable_dsyms = true` for crash reports, so what people download matches what the owner uses. An official build with link-time and profile-guided optimization may come later, once measured.
 
 ## Website content
 
@@ -134,8 +148,10 @@ Work, in order, with scores from the [roadmap convention](roadmap.md#implementab
 | Bundle ID and uw version | 8/10 | `com.uwbrowser.uw`, and "Version 0.1.0 (Chromium 153.0.8010.53)" on the About page once the release command writes the version. The user agent keeps Chromium's version. |
 | Release command | 6/10 | Wraps `sign_chrome.py`. The `uw` command's Node helper needs its own entitlements in Chromium's signing config, and notarizing a bundle this size is slow. |
 | Sparkle behind Chromium's relaunch button | 5/10 | A patch hands Sparkle's ready update to `UpgradeDetector`, and Chromium's relaunch has to finish Sparkle's install with tabs restored. |
-| Problem reports and consent | 5/10 | First-run Yes/No, one settings switch, Crashpad uploads to Sentry, symbols per release, and PostHog in uw's React pages. |
+| Problem reports and consent | 5/10 | First-run Yes/No, one settings switch, Crashpad uploads to Sentry, symbols per release, and every uw page's problems sent to PostHog through uw. |
 | Codecs through macOS | 4/10 | Plain AAC through AudioToolbox, H.264 through VideoToolbox only, and WebRTC's H.264 without OpenH264. Several media paths, each checked on real sites. |
+| Raw AAC without FFmpeg | 5/10 | uw's own ADTS reader for `src=` playback, feeding AudioToolbox. |
+| H.264 without the GPU process | 3/10 | VideoToolbox's software decoder in another process, chosen only when the GPU process is gone. |
 | Report an issue | 9/10 | One Help-menu item. |
 | Website | 8/10 | Doop design first, then Next.js in `site/` on Vercel. |
 | Homebrew | 8/10 | A cask that always installs the latest release. It can't be tried end to end until 0.1.0 is published. |
