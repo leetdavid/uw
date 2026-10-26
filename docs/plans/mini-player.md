@@ -85,6 +85,7 @@ Some sites open a small window of their own page rather than a video, such as Go
 
 - When a tab the user is not looking at plays sound, the sidebar shows [playback controls](../CONTEXT.md#language) for it just above the foot: play or pause, and next and previous when the site offers them. This holds whatever the setting.
 - One row, for the tab that started playing last. Paused sound keeps the row until another tab plays or the tab closes. The others stay in Chromium's media button in the toolbar.
+- Under the pointer, a small round × on the row's top-left corner, over its art, dismisses it: it pauses the tab's sound and hides the row until that tab plays again or another tab starts playing. Nothing else in the row moves. Asked for on 2026-10-26: "while the pip is docked, i can't dismiss it"; the user chose the corner ×, and that it pauses the sound.
 - Sound in a mini player or a live window shows no row, including the sound of the tab that opened a live window. Those have their own controls.
 
 ### Settings
@@ -196,7 +197,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 12. A site's window bigger than 480 × 480 floats. One the site grows past that floats and stays floating.
 13. A second site's window takes the live window's place, and the first goes back to its tab.
 14. With Live off for a site, its window pauses and joins the stack when a video comes. Turning Live off on the window while a video plays above it puts it in the stack under the video.
-15. A background tab playing sound shows one row of playback controls above the foot, for the tab that started last, and its buttons play, pause, and skip. A video in a mini player and a live window's tab show none.
+15. A background tab playing sound shows one row of playback controls above the foot, for the tab that started last, and its buttons play, pause, and skip. A video in a mini player and a live window's tab show none. Its × pauses the sound and hides the row until the tab plays again.
 16. A floating video shows dock while the front window's sidebar shows, and none while it is hidden. Pressing it brings the window forward and docks the video and a floating call. A docked video's pop out floats it, and it stays floating after switching apps and back. A docked call's pop out floats the call alone, and its bar's dock docks it again.
 
 ## Open questions
