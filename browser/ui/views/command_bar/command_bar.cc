@@ -32,12 +32,12 @@
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/window_open_disposition.h"
-#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/webview/webview.h"
+#include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -59,10 +59,11 @@ constexpr base::TimeDelta kLongestHold = base::Seconds(1);
 }  // namespace
 
 // The command bar's page. Between the panel showing and its field taking
-// focus, the page drops keys, so the browser holds them and hands them over in
-// order once the field has focus. Until the page's first frame is on screen,
-// the browser also refuses keys for it, so a refused key stays held and is
-// tried again a frame later.
+// focus, the page drops keys, so the browser holds them, Escape too, and hands
+// them over in order once the field has focus. The page handles Escape itself:
+// it empties the field first, and closes the panel once the field is empty.
+// Until the page's first frame is on screen, the browser also refuses keys for
+// it, so a refused key stays held and is tried again a frame later.
 class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
                          public content::RenderWidgetHost::InputEventObserver,
                          public CommandBarActions {
@@ -70,7 +71,8 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
   Page(Profile* profile, CommandBar* bar)
       : WebUIContentsWrapperT(GURL(kCommandBarUrl),
                               profile,
-                              IDS_UW_COMMAND_BAR),
+                              IDS_UW_COMMAND_BAR,
+                              /*esc_closes_ui=*/false),
         bar_(bar) {
     SetCommandBarActions(web_contents(), this);
   }
@@ -88,8 +90,7 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
       content::WebContents* source,
       const input::NativeWebKeyboardEvent& event) override {
     if (holding_ && !sending_ &&
-        event.GetType() == input::NativeWebKeyboardEvent::Type::kRawKeyDown &&
-        event.windows_key_code != ui::VKEY_ESCAPE) {
+        event.GetType() == input::NativeWebKeyboardEvent::Type::kRawKeyDown) {
       held_.push_back(event);
       return content::KeyboardEventProcessingResult::HANDLED;
     }
@@ -220,7 +221,7 @@ bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
     return false;
   }
   bar->task_.reset();
-  StartShellCommand(bar->page());
+  ResetCommandBar(bar->page(), /*shell=*/true);
   bar->Show();
   return true;
 }
@@ -273,7 +274,8 @@ void CommandBar::Show() {
       card, contents_->GetWeakPtr(), anchor, views::BubbleBorder::TOP_CENTER,
       /*autosize=*/true);
   bubble_ = view->GetWeakPtr();
-  views::BubbleDialogDelegateView::CreateBubble(std::move(view));
+  panel_.Observe(
+      views::BubbleDialogDelegateView::CreateBubble(std::move(view)));
   // Chromium sizes the panel while its new window is still on the main screen,
   // by that screen's scale. With a Retina main screen and this window on a 1x
   // display, the panel came up at half size and stayed so, since the page,
@@ -289,6 +291,17 @@ void CommandBar::Show() {
   FrostPageBubble(bubble_->GetWidget(), page());
   contents_->HoldKeys();
   bubble_->ShowUI();
+}
+
+void CommandBar::OnWidgetClosing(views::Widget* widget) {
+  panel_.Reset();
+  if (widget->closed_reason() != views::Widget::ClosedReason::kLostFocus) {
+    ResetCommandBar(page(), /*shell=*/false);
+  }
+}
+
+void CommandBar::OnWidgetDestroying(views::Widget* widget) {
+  panel_.Reset();
 }
 
 void CommandBar::OpenPicked(const content::OpenURLParams& params) {

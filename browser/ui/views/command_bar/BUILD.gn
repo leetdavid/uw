@@ -9,6 +9,7 @@ source_set("command_bar") {
     "//components/prefs",
     "//components/tab_groups",
     "//ui/base/unowned_user_data",
+    "//ui/views",
   ]
   deps = [
     "//chrome:strings",
@@ -21,7 +22,6 @@ source_set("command_bar") {
     "//components/input",
     "//content/public/browser",
     "//ui/gfx",
-    "//ui/views",
     "//url",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/tab_organization",

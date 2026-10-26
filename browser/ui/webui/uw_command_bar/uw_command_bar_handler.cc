@@ -50,8 +50,8 @@ std::string Kind(const AutocompleteMatch& match,
 
 UwCommandBarHandler::~UwCommandBarHandler() = default;
 
-void UwCommandBarHandler::StartShellCommand() {
-  page()->SetInputText(">");
+void UwCommandBarHandler::Reset(bool shell) {
+  page()->SetInputText(shell ? ">" : "");
 }
 
 void UwCommandBarHandler::OpenAutocompleteMatch(

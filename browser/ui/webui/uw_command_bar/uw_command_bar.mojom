@@ -21,6 +21,8 @@ interface CalculatorHandler {
   GetClock() => (string time_zone, bool twenty_four_hour);
   // Copies an answer and closes the command bar.
   CopyAnswer(string text);
+  // Closes the command bar, as Escape on an empty field does.
+  Close();
   // Whether the bar is frosted glass this time it shows: its window's glass
   // is on.
   IsFrosted() => (bool frosted);

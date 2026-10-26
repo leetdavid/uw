@@ -10,9 +10,11 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "ui/views/widget/widget_observer.h"
 
 class BrowserWindowInterface;
 class WebUIBubbleDialogView;
@@ -29,15 +31,16 @@ namespace uw {
 inline constexpr int kShellCommandBarCommand = 56102;
 
 // The command bar of one window, a panel over the page card. While the
-// setting is on, its page stays loaded, so it shows at once.
-class CommandBar {
+// setting is on, its page stays loaded, so it shows at once. A click elsewhere
+// closes it and keeps what it showed for the next time it opens.
+class CommandBar : public views::WidgetObserver {
  public:
   DECLARE_USER_DATA(CommandBar);
 
   explicit CommandBar(BrowserWindowInterface* window);
   CommandBar(const CommandBar&) = delete;
   CommandBar& operator=(const CommandBar&) = delete;
-  ~CommandBar();
+  ~CommandBar() override;
 
   static CommandBar* From(BrowserWindowInterface* window);
   // Shows the command bar of `window`. False when the setting is off, and
@@ -57,6 +60,10 @@ class CommandBar {
  private:
   class Page;
 
+  // views::WidgetObserver:
+  void OnWidgetClosing(views::Widget* widget) override;
+  void OnWidgetDestroying(views::Widget* widget) override;
+
   void OnSettingChanged();
   void Show();
   // Opens a row picked in the command bar: in a new tab where Cmd+T's blank
@@ -75,6 +82,7 @@ class CommandBar {
   PrefChangeRegistrar setting_;
   std::unique_ptr<Page> contents_;
   base::WeakPtr<WebUIBubbleDialogView> bubble_;
+  base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};
   std::optional<tab_groups::TabGroupId> task_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;
 };

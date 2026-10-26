@@ -21,8 +21,9 @@ class UwCommandBarHandler : public RealboxHandler {
   UwCommandBarHandler& operator=(const UwCommandBarHandler&) = delete;
   ~UwCommandBarHandler() override;
 
-  // Readies the page for a shell command, as a typed ">" does.
-  void StartShellCommand();
+  // Empties the page, and readies it for a shell command when `shell`, as a
+  // typed ">" does.
+  void Reset(bool shell);
 
   // searchbox::mojom::PageHandler:
   void OpenAutocompleteMatch(uint8_t line,

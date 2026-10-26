@@ -487,8 +487,8 @@ field.addEventListener('keydown', event => {
   }
 });
 
-// Cmd+Shift+P opens the command bar ready for a shell command: the browser
-// sets the field to ">", as if typed.
+// The browser empties the field to forget what was typed, or sets it to ">",
+// as if typed, when Cmd+Shift+P opens the command bar for a shell command.
 router.setInputText.addListener((input: string) => {
   clear();
   setShell(input === '>');
@@ -500,9 +500,18 @@ async function refreshFrost() {
   document.body.classList.toggle('frosted', frosted);
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
+// Escape empties the command bar, and closes it once the field is empty. The
+// browser has the page forget its text whenever the panel closes for anything
+// but a click elsewhere.
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') {
+    return;
+  }
+  event.preventDefault();
+  if (field.value) {
     clear();
+  } else {
+    calculatorHandler.close();
   }
 });
 

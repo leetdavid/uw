@@ -83,12 +83,12 @@ void SetCommandBarFrosted(content::WebContents* page, bool frosted) {
   page->SetUserData(kFrostedKey, std::move(data));
 }
 
-void StartShellCommand(content::WebContents* page) {
+void ResetCommandBar(content::WebContents* page, bool shell) {
   content::WebUI* web_ui = page->GetWebUI();
   if (UwCommandBarUI* ui =
           web_ui ? web_ui->GetController()->GetAs<UwCommandBarUI>() : nullptr) {
     if (ui->handler_) {
-      ui->handler_->StartShellCommand();
+      ui->handler_->Reset(shell);
     }
   }
 }
@@ -142,6 +142,12 @@ void UwCommandBarUI::GetClock(GetClockCallback callback) {
 void UwCommandBarUI::CopyAnswer(const std::string& text) {
   ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste)
       .WriteText(base::UTF8ToUTF16(text));
+  if (embedder()) {
+    embedder()->CloseUI();
+  }
+}
+
+void UwCommandBarUI::Close() {
   if (embedder()) {
     embedder()->CloseUI();
   }

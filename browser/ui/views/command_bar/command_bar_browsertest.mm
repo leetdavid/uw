@@ -35,7 +35,6 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
-#include "components/tabs/public/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/search_test_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -43,6 +42,7 @@
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_data.h"
 #include "components/search_engines/template_url_service.h"
+#include "components/tabs/public/tab_group.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -115,14 +115,14 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
                                                                   text)));
   }
 
-  // A key as the field's own key handling sees it.
+  // A key as the page's own key handling sees it, pressed in the field.
   // `with` names a modifier, such as "metaKey", held with it.
   void PressInField(std::string_view key, std::string_view with = "") {
     ASSERT_TRUE(content::ExecJs(
         bar()->page(),
         content::JsReplace("document.querySelector('#field').dispatchEvent("
                            "new KeyboardEvent('keydown', {key: $1, [$2]: "
-                           "true}))",
+                           "true, bubbles: true}))",
                            key, with.empty() ? "none" : with)));
   }
 
@@ -178,6 +178,22 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
     return content::EvalJs(bar()->page(),
                            "[...document.querySelectorAll('#results .kind')]"
                            ".map(kind => kind.textContent).join(',')")
+        .ExtractString();
+  }
+
+  // Closes the panel as `reason` does: kLostFocus for a click elsewhere.
+  void CloseBar(views::Widget::ClosedReason reason) {
+    views::Widget::GetTopLevelWidgetForNativeView(
+        bar()->page()->GetNativeView())
+        ->CloseWithReason(reason);
+    ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  }
+
+  // The shell or site search chip's text, or "" when it is hidden.
+  std::string Chip() {
+    return content::EvalJs(bar()->page(),
+                           "(c => c.hidden ? '' : c.textContent)("
+                           "document.querySelector('#chip'))")
         .ExtractString();
   }
 
@@ -303,9 +319,88 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
         Eventually([&] { return Field() == word; }, base::Milliseconds(800)))
         << "The field holds: " << Field();
 
+    // The first Escape empties the field, and the second closes the panel.
+    Queue(ui::VKEY_ESCAPE, 0);
+    EXPECT_TRUE(Eventually([&] { return Field().empty(); }));
+    EXPECT_TRUE(bar()->IsShowing());
     Queue(ui::VKEY_ESCAPE, 0);
     ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
   }
+}
+
+// A click elsewhere closes it and keeps the text, caret, and card for the next
+// time it opens, from Cmd+T or a task's "+", per T213.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ALostFocusKeepsTheText) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("2*(3+4)");
+  ASSERT_TRUE(content::ExecJs(
+      bar()->page(),
+      "document.querySelector('#field').setSelectionRange(2, 2)"));
+  const std::string card = Card();
+  ASSERT_NE("", card);
+
+  CloseBar(views::Widget::ClosedReason::kLostFocus);
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  ASSERT_TRUE(bar()->IsShowing());
+  Wait(base::Milliseconds(200));
+  EXPECT_EQ("2*(3+4)|2-2", FieldAndSelection());
+  EXPECT_EQ(card, Card());
+
+  CloseBar(views::Widget::ClosedReason::kLostFocus);
+  ASSERT_TRUE(CommandBar::OpenForTask(browser(),
+                                      tab_groups::TabGroupId::GenerateNew()));
+  Wait(base::Milliseconds(200));
+  EXPECT_EQ("2*(3+4)|2-2", FieldAndSelection());
+}
+
+// Any other close forgets the text: here a copied answer, which closes it as a
+// picked row does.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, APickForgetsTheText) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("2*(3+4)");
+  PressInField("Enter");
+  ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  EXPECT_TRUE(Eventually([&] { return Field().empty() && Card().empty(); }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdShiftPStartsOverKeptText) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("git");
+  CloseBar(views::Widget::ClosedReason::kLostFocus);
+
+  Press(ui::VKEY_P, NSEventModifierFlagCommand | NSEventModifierFlagShift);
+
+  EXPECT_TRUE(Eventually([&] { return Chip() == ">" && Field().empty(); }));
+}
+
+// Escape empties the field, a shell chip too, and closes it once the field is
+// empty. The next time, it opens empty.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, EscapeEmptiesTheFieldFirst) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_P, NSEventModifierFlagCommand | NSEventModifierFlagShift);
+  ASSERT_TRUE(Eventually([&] { return Chip() == ">"; }));
+  Type("ls");
+
+  PressInField("Escape");
+  EXPECT_EQ("", Field());
+  EXPECT_EQ("", Chip());
+  Wait(base::Milliseconds(200));
+  EXPECT_TRUE(bar()->IsShowing());
+
+  Type("git");
+  CloseBar(views::Widget::ClosedReason::kLostFocus);
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  PressInField("Escape");
+  PressInField("Escape");
+  ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  EXPECT_TRUE(Eventually([&] { return Field().empty(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
@@ -556,9 +651,9 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TimeMathLeavesMathAlone) {
   Type("2026-12-25");
   EXPECT_TRUE(base::StartsWith(Card(), "Dec 25, 2026|Friday, Dec 25, 2026|"))
       << Card();
-  EXPECT_EQ("date", content::EvalJs(bar()->page(),
-                                    "document.querySelector('#answer')"
-                                    ".className"));
+  EXPECT_EQ("date",
+            content::EvalJs(bar()->page(), "document.querySelector('#answer')"
+                                           ".className"));
   Type("3/4");
   EXPECT_EQ("3 ÷ 4|0.75|Result", Card());
   Type("now in Narnia");
@@ -703,10 +798,9 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
   Type(">");
   Type("ls -la ~/dev");
   Wait(base::Milliseconds(300));
-  SaveWidgetScreenshot(
-      views::Widget::GetTopLevelWidgetForNativeView(
-          bar()->page()->GetNativeView()),
-      "command-bar-shell");
+  SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
+                           bar()->page()->GetNativeView()),
+                       "command-bar-shell");
 
   Type("");
   PressInField("Backspace");

@@ -46,9 +46,9 @@ void SetCommandBarActions(content::WebContents* page,
 // The actions of the command bar's page in `page`, or null.
 CommandBarActions* GetCommandBarActions(content::WebContents* page);
 
-// Readies the command bar's page in `page` for a shell command, as a typed
-// ">" does.
-void StartShellCommand(content::WebContents* page);
+// Empties the command bar's page in `page`, and readies it for a shell command
+// when `shell`, as a typed ">" does.
+void ResetCommandBar(content::WebContents* page, bool shell);
 
 // Whether the command bar's page in `page` shows as frosted glass.
 void SetCommandBarFrosted(content::WebContents* page, bool frosted);
@@ -85,7 +85,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void BindInterface(mojo::PendingReceiver<mojom::CalculatorHandler> receiver);
 
  private:
-  friend void StartShellCommand(content::WebContents* page);
+  friend void ResetCommandBar(content::WebContents* page, bool shell);
 
   // searchbox::mojom::PageHandlerFactory:
   void CreatePageHandler(
@@ -96,6 +96,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void GetCurrencies(GetCurrenciesCallback callback) override;
   void GetClock(GetClockCallback callback) override;
   void CopyAnswer(const std::string& text) override;
+  void Close() override;
   void IsFrosted(IsFrostedCallback callback) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
