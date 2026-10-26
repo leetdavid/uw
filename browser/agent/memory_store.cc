@@ -4,6 +4,7 @@
 #include "uw/browser/agent/memory_store.h"
 
 #include <memory>
+#include <tuple>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -12,6 +13,7 @@
 #include "base/strings/string_util.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+#include "base/types/expected_macros.h"
 #include "chrome/browser/profiles/profile.h"
 #include "sql/database.h"
 #include "sql/meta_table.h"
@@ -96,6 +98,29 @@ class MemoryStore::Backend {
     return {std::move(memory), Core()};
   }
 
+  size_t Count() {
+    if (!Ready()) {
+      return 0;
+    }
+    sql::Statement statement(
+        db_.GetCachedStatement(SQL_FROM_HERE, "SELECT COUNT(*) FROM memories"));
+    return statement.Step() ? static_cast<size_t>(statement.ColumnInt64(0)) : 0;
+  }
+
+  std::pair<base::expected<Memory, std::string>, std::vector<Memory>> Edit(
+      int64_t id,
+      std::string text) {
+    base::expected<Memory, std::string> edited = EditNow(id, std::move(text));
+    return {std::move(edited), Core()};
+  }
+
+  std::vector<Memory> ForgetAll() {
+    if (Ready()) {
+      std::ignore = db_.Execute("DELETE FROM memories");
+    }
+    return Core();
+  }
+
   std::vector<Memory> Search(std::vector<std::string> words, size_t limit) {
     std::vector<Memory> found;
     if (!Ready()) {
@@ -171,10 +196,8 @@ class MemoryStore::Backend {
     return statement.Step() ? static_cast<size_t>(statement.ColumnInt64(0)) : 0;
   }
 
-  base::expected<KeepResult, std::string> KeepNow(std::string text,
-                                                  bool core,
-                                                  std::string chat,
-                                                  int64_t replaces) {
+  // `text` on one line, or what is wrong with it as a memory.
+  static base::expected<std::string, std::string> Sentence(std::string text) {
     text = OneLine(text, text.size());
     if (text.empty()) {
       return base::unexpected("A memory needs a sentence.");
@@ -183,6 +206,38 @@ class MemoryStore::Backend {
       return base::unexpected(
           "A memory is one sentence of at most 300 characters.");
     }
+    return base::ok(std::move(text));
+  }
+
+  base::expected<Memory, std::string> EditNow(int64_t id, std::string text) {
+    ASSIGN_OR_RETURN(text, Sentence(std::move(text)));
+    std::optional<Memory> memory = Ready() ? Find(id) : std::nullopt;
+    if (!memory) {
+      return base::unexpected("That memory is gone.");
+    }
+    if (const std::optional<Memory> same = FindText(text);
+        same && same->id != id) {
+      return base::unexpected("Another memory says that already.");
+    }
+    memory->text = std::move(text);
+    memory->changed = base::Time::Now();
+    sql::Statement update(db_.GetCachedStatement(
+        SQL_FROM_HERE,
+        "UPDATE memories SET text = ?, changed = ? WHERE id = ?"));
+    update.BindString(0, memory->text);
+    update.BindTime(1, memory->changed);
+    update.BindInt64(2, id);
+    if (!update.Run()) {
+      return base::unexpected("Memory can't be changed right now.");
+    }
+    return *memory;
+  }
+
+  base::expected<KeepResult, std::string> KeepNow(std::string text,
+                                                  bool core,
+                                                  std::string chat,
+                                                  int64_t replaces) {
+    ASSIGN_OR_RETURN(text, Sentence(std::move(text)));
     if (!Ready()) {
       return base::unexpected("Memory can't be opened right now.");
     }
@@ -312,6 +367,31 @@ void MemoryStore::Search(std::vector<std::string> words,
       .Then(std::move(done));
 }
 
+void MemoryStore::Count(base::OnceCallback<void(size_t)> done) {
+  backend_.AsyncCall(&Backend::Count).Then(std::move(done));
+}
+
+void MemoryStore::Edit(int64_t id, std::string text, Edited done) {
+  backend_.AsyncCall(&Backend::Edit)
+      .WithArgs(id, std::move(text))
+      .Then(base::BindOnce(&MemoryStore::OnEdited, weak_factory_.GetWeakPtr(),
+                           std::move(done)));
+}
+
+void MemoryStore::ForgetAll(base::OnceClosure done) {
+  backend_.AsyncCall(&Backend::ForgetAll)
+      .Then(base::BindOnce(&MemoryStore::OnForgotAll,
+                           weak_factory_.GetWeakPtr(), std::move(done)));
+}
+
+void MemoryStore::AddObserver(Observer* observer) {
+  observers_.AddObserver(observer);
+}
+
+void MemoryStore::RemoveObserver(Observer* observer) {
+  observers_.RemoveObserver(observer);
+}
+
 void MemoryStore::OnLoaded(std::vector<Memory> core) {
   core_ = std::move(core);
   loaded_ = true;
@@ -323,15 +403,47 @@ void MemoryStore::OnLoaded(std::vector<Memory> core) {
 void MemoryStore::OnKept(Kept done,
                          std::pair<base::expected<KeepResult, std::string>,
                                    std::vector<Memory>> kept) {
+  const bool changed = kept.first.has_value();
   core_ = std::move(kept.second);
   std::move(done).Run(std::move(kept.first));
+  if (changed) {
+    Changed(core_);
+  }
 }
 
 void MemoryStore::OnForgot(
     Forgot done,
     std::pair<std::optional<Memory>, std::vector<Memory>> forgot) {
+  const bool changed = forgot.first.has_value();
   core_ = std::move(forgot.second);
   std::move(done).Run(std::move(forgot.first));
+  if (changed) {
+    Changed(core_);
+  }
+}
+
+void MemoryStore::OnEdited(Edited done,
+                           std::pair<base::expected<Memory, std::string>,
+                                     std::vector<Memory>> edited) {
+  const bool changed = edited.first.has_value();
+  core_ = std::move(edited.second);
+  std::move(done).Run(std::move(edited.first));
+  if (changed) {
+    Changed(core_);
+  }
+}
+
+void MemoryStore::OnForgotAll(base::OnceClosure done,
+                              std::vector<Memory> core) {
+  std::move(done).Run();
+  Changed(std::move(core));
+}
+
+void MemoryStore::Changed(std::vector<Memory> core) {
+  core_ = std::move(core);
+  for (Observer& observer : observers_) {
+    observer.OnMemoriesChanged();
+  }
 }
 
 }  // namespace uw

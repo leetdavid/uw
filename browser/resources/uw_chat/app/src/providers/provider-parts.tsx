@@ -1,5 +1,5 @@
 // Small parts every view of uw://ai/providers shares.
-import { Blocks, Link2, Plug, Sparkles, Split } from "lucide-react";
+import { Blocks, Brain, Link2, Plug, Sparkles, Split } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ModelSlot,
@@ -28,6 +28,7 @@ export const AI_SECTIONS = [
   { path: "providers", name: "Providers", icon: Plug },
   { path: "skills", name: "Skills", icon: Sparkles },
   { path: "connectors", name: "Connectors", icon: Blocks },
+  { path: "memory", name: "Memory", icon: Brain },
 ];
 
 export const PRESET_NAMES: Record<ProviderPreset, string> = {

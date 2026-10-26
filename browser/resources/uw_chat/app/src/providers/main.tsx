@@ -24,6 +24,7 @@ import { EffortChip, ModelChip } from "./model-chip";
 import { ProviderPage } from "./provider-page";
 import { ConnectorsSection } from "./connectors";
 import { SkillsSection } from "./skills";
+import { MemorySection } from "./memory";
 import {
   AI_SECTIONS,
   FORMAT_NAMES,
@@ -421,6 +422,7 @@ function AiPage() {
   const [data, setData] = useState<PageData | null>(null);
   const [skillsOn, setSkillsOn] = useState<number | null>(null);
   const [connectorsOn, setConnectorsOn] = useState<number | null>(null);
+  const [memories, setMemories] = useState<number | null>(null);
   // "/providers/<id>" opens one provider; "/" is the providers list.
   const [section = "providers", id = ""] = location.pathname
     .split("/")
@@ -487,6 +489,7 @@ function AiPage() {
       .then(({ connectors }) =>
         setConnectorsOn(connectors.filter((connector) => connector.on).length),
       );
+    providersHandler.getMemories("").then(({ total }) => setMemories(total));
   }, []);
 
   const provider =
@@ -507,6 +510,7 @@ function AiPage() {
           providers: data ? String(data.providers.length) : "",
           skills: skillsOn === null ? "" : `${skillsOn} on`,
           connectors: connectorsOn === null ? "" : `${connectorsOn} on`,
+          memory: memories === null ? "" : String(memories),
         }}
       />
       <main className="min-h-full overflow-auto pb-10 pt-[26px]">
@@ -515,6 +519,8 @@ function AiPage() {
             <SkillsSection onCount={setSkillsOn} />
           ) : section === "connectors" ? (
             <ConnectorsSection name={id} onCount={setConnectorsOn} />
+          ) : section === "memory" ? (
+            <MemorySection onCount={setMemories} />
           ) : (
             data &&
             (provider ? (

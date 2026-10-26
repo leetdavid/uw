@@ -129,6 +129,16 @@ Where T210 differs from the design:
 
 Tests: `UwChatBrowserTest.MemoryShowsAsCountsUnderTheAnswer` and `UwChatBrowserTest.AChatKeptOutOfMemory`, which also save screenshots under `UW_SCREENSHOT_DIR`.
 
+T211 was built on 2026-10-26:
+
+- `uw://ai/memory` is `src/providers/memory.tsx`, on the `uw://ai` page's handler: `GetMemories`, `EditMemory`, `ForgetMemory`, `ForgetAllMemories`, `SetMemoryOn`, and `OpenChat` for a memory's chat. `WaitForMemoryChange` answers when a chat keeps or forgets a memory, or memory is paused, so the open page follows.
+- The store got rewording, forgetting all, a count, and observers. It is a target of its own, `//uw/browser/agent:memory_store`, which the page and the uw command use.
+- The AI settings menu on the chat page has a Memory row with the count.
+
+Where T211 differs from the design: a search lists the memories with the most matching words first, as the agent's search does, not the newest.
+
+Tests: `UwProvidersBrowserTest.TheMemoryPageChangesMemories` and `TheMemoryPagePausesAndListens`, and `UwChatBrowserTest.TheAiSettingsMenuOpensEachSection` with the Memory row.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).

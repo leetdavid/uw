@@ -143,6 +143,18 @@ enum SkillSource {
   kChat,
 };
 
+// A memory, as uw://ai/memory lists it. See docs/plans/agent-memory.md.
+struct MemoryInfo {
+  int64 id;
+  string text;
+  // The chat it came from, and that chat's title, which is empty when the
+  // chat was deleted.
+  string chat;
+  string chat_title;
+  // When it last changed, in milliseconds since the Unix epoch.
+  double changed;
+};
+
 struct SkillInfo {
   string name;
   string description;
@@ -290,6 +302,24 @@ interface ProvidersHandler {
   // Goes to this window's chat tab the user was on last, or opens a new chat
   // when the window has none.
   ShowChat();
+  // Goes to the chat `id`'s tab, or opens the chat in a new tab.
+  OpenChat(string id);
+
+  // The memories that hold any word of `query`, the most matching first, or
+  // every memory, newest first, for an empty query; how many memories there
+  // are; and whether memory is on for the profile.
+  GetMemories(string query) => (array<MemoryInfo> memories,
+                                int32 total,
+                                bool on);
+  // Rewords a memory. An empty error means it worked.
+  EditMemory(int64 id, string text) => (string error);
+  ForgetMemory(int64 id) => ();
+  ForgetAllMemories() => ();
+  // Pauses agent memory for the profile, or turns it on again.
+  SetMemoryOn(bool on);
+  // Answers the next time a memory changes, or memory is paused or turned
+  // on.
+  WaitForMemoryChange() => ();
 
   // The problem, when there is one, is why programs on this Mac start
   // without the terminal's environment.

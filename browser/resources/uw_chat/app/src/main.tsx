@@ -113,8 +113,8 @@ import {
   isQuietRun,
 } from "./schedule";
 import { IMAGE_TYPES, MAX_IMAGES, imageData } from "./images";
+import { BrainOff } from "./brain-off";
 import {
-  BrainOff,
   ChatMemory,
   MemoryCounts,
   MemoryMark,
@@ -947,15 +947,17 @@ function ChatList({
 function AiSettingsMenu() {
   const [counts, setCounts] = useState<Record<string, string>>({});
   const count = async () => {
-    const [{ state }, { skills }, { connectors }] = await Promise.all([
+    const [{ state }, { skills }, { connectors }, { total }] = await Promise.all([
       providersHandler.getState(),
       providersHandler.getSkills(),
       providersHandler.getConnectors(),
+      providersHandler.getMemories(""),
     ]);
     setCounts({
       providers: String(state.providers.length),
       skills: `${skills.filter((skill) => skill.on).length} on`,
       connectors: `${connectors.filter((connector) => connector.on).length} on`,
+      memory: String(total),
     });
   };
   return (

@@ -24,9 +24,10 @@ import type {
   NewConnector,
   CatalogAnswer,
   CatalogEntry,
+  MemoryInfo,
 } from "uw-providers-mojom";
 
 export { CatalogSource, ConnectorState, ModelSlot, ProviderFormat, ProviderPreset, SkillSource, TestOutcome, UpgradeNotice };
-export type { Model, ModelChoice, ModelList, NewProvider, Provider, ProvidersState, ModelTestResult, SkillInfo, ConnectorInfo, NewConnector, CatalogAnswer, CatalogEntry };
+export type { Model, ModelChoice, ModelList, NewProvider, Provider, ProvidersState, ModelTestResult, SkillInfo, ConnectorInfo, NewConnector, CatalogAnswer, CatalogEntry, MemoryInfo };
 
 export const providersHandler = ProvidersHandler.getRemote();

@@ -3,6 +3,7 @@
 
 #include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
 
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -10,6 +11,7 @@
 
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
@@ -36,6 +38,8 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_file.h"
+#include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
@@ -207,6 +211,13 @@ UwProvidersHandler::UwProvidersHandler(
       lister_(profile) {
   connectors_observation_.Observe(&Connectors::Get());
   catalog_observation_.Observe(&ConnectorCatalogStore::Get());
+  if (MemoryStore* memory = MemoryStore::For(profile_)) {
+    memory_observation_.Observe(memory);
+  }
+  prefs_.Init(profile_->GetPrefs());
+  prefs_.Add(kAgentMemoryPref,
+             base::BindRepeating(&UwProvidersHandler::OnMemoriesChanged,
+                                 base::Unretained(this)));
 }
 
 UwProvidersHandler::~UwProvidersHandler() = default;
@@ -545,6 +556,129 @@ void UwProvidersHandler::ShowChat() {
     GoToTab(chat);
   } else {
     OpenChatTab(window);
+  }
+}
+
+void UwProvidersHandler::OpenChat(const std::string& id) {
+  if (!ChatFile::IsChatId(id)) {
+    return;
+  }
+  std::vector<tabs::TabInterface*> showing = TabsShowingChat(profile_, id);
+  if (!showing.empty()) {
+    GoToTab(showing[0]);
+    return;
+  }
+  tabs::TabInterface* tab =
+      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
+  if (!tab) {
+    return;
+  }
+  NavigateParams params(tab->GetBrowserWindowInterface(), ChatUrl(id),
+                        ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&params);
+}
+
+void UwProvidersHandler::GetMemories(const std::string& query,
+                                     GetMemoriesCallback callback) {
+  MemoryStore* memory = MemoryStore::For(profile_);
+  if (!memory) {
+    std::move(callback).Run({}, 0, false);
+    return;
+  }
+  // Every memory, as the page lists them all.
+  constexpr size_t kAll = 100000;
+  memory->Search(
+      MemorySearchWords(query), kAll,
+      base::BindOnce(
+          [](base::WeakPtr<UwProvidersHandler> handler, MemoryStore* memory,
+             GetMemoriesCallback callback, std::vector<Memory> found) {
+            if (!handler) {
+              return;
+            }
+            memory->Count(base::BindOnce(&UwProvidersHandler::ReplyMemories,
+                                         handler, std::move(callback),
+                                         std::move(found)));
+          },
+          weak_factory_.GetWeakPtr(), memory, std::move(callback)));
+}
+
+void UwProvidersHandler::ReplyMemories(GetMemoriesCallback callback,
+                                       std::vector<Memory> memories,
+                                       size_t total) {
+  std::map<std::string, std::string> titles;
+  if (ChatIndex* index = ChatIndex::For(profile_)) {
+    for (const ChatIndex::Entry& entry : index->Entries()) {
+      titles[entry.id] = entry.title;
+    }
+  }
+  std::vector<mojom::MemoryInfoPtr> listed;
+  for (Memory& memory : memories) {
+    auto info = mojom::MemoryInfo::New();
+    info->id = memory.id;
+    info->text = std::move(memory.text);
+    info->changed = memory.changed.InMillisecondsFSinceUnixEpoch();
+    if (auto title = titles.find(memory.chat); title != titles.end()) {
+      info->chat_title = title->second;
+    }
+    info->chat = std::move(memory.chat);
+    listed.push_back(std::move(info));
+  }
+  std::move(callback).Run(std::move(listed), static_cast<int32_t>(total),
+                          profile_->GetPrefs()->GetBoolean(kAgentMemoryPref));
+}
+
+void UwProvidersHandler::EditMemory(int64_t id,
+                                    const std::string& text,
+                                    EditMemoryCallback callback) {
+  MemoryStore* memory = MemoryStore::For(profile_);
+  if (!memory) {
+    std::move(callback).Run("This profile keeps no memories.");
+    return;
+  }
+  memory->Edit(id, text,
+               base::BindOnce(
+                   [](EditMemoryCallback callback,
+                      base::expected<Memory, std::string> edited) {
+                     std::move(callback).Run(
+                         edited.has_value() ? std::string() : edited.error());
+                   },
+                   std::move(callback)));
+}
+
+void UwProvidersHandler::ForgetMemory(int64_t id,
+                                      ForgetMemoryCallback callback) {
+  MemoryStore* memory = MemoryStore::For(profile_);
+  if (!memory) {
+    std::move(callback).Run();
+    return;
+  }
+  memory->Forget(id,
+                 base::IgnoreArgs<std::optional<Memory>>(std::move(callback)));
+}
+
+void UwProvidersHandler::ForgetAllMemories(ForgetAllMemoriesCallback callback) {
+  MemoryStore* memory = MemoryStore::For(profile_);
+  if (!memory) {
+    std::move(callback).Run();
+    return;
+  }
+  memory->ForgetAll(std::move(callback));
+}
+
+void UwProvidersHandler::SetMemoryOn(bool on) {
+  profile_->GetPrefs()->SetBoolean(kAgentMemoryPref, on);
+}
+
+void UwProvidersHandler::WaitForMemoryChange(
+    WaitForMemoryChangeCallback callback) {
+  waiting_for_memory_.push_back(std::move(callback));
+}
+
+void UwProvidersHandler::OnMemoriesChanged() {
+  for (WaitForMemoryChangeCallback& callback :
+       std::exchange(waiting_for_memory_, {})) {
+    std::move(callback).Run();
   }
 }
 

@@ -1392,11 +1392,13 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAiSettingsMenuOpensEachSection) {
                                                     section));
   };
 
-  const std::string counts = "Providers 1, Skills 1 on, Connectors 1 on";
+  const std::string counts =
+      "Providers 1, Skills 1 on, Connectors 1 on, Memory 0";
   EXPECT_EQ(menu(""), counts);
   SaveWindowScreenshot(browser(), "ai-settings");
 
-  for (const char* section : {"providers", "skills", "connectors"}) {
+  for (const char* section :
+       {"providers", "skills", "connectors", "memory"}) {
     tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
     EXPECT_EQ(menu(section), counts);
     const GURL address(base::StrCat({"chrome://ai/", section}));

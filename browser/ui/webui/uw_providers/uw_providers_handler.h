@@ -15,8 +15,10 @@
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "base/time/time.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
+#include "uw/browser/agent/memory_store.h"
 #include "uw/browser/ai_providers/model_lister.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/browser/connectors/connector_catalog_store.h"
@@ -38,7 +40,8 @@ namespace uw {
 // reach prefs, logs, or the page.
 class UwProvidersHandler : public mojom::ProvidersHandler,
                            public Connectors::Observer,
-                           public ConnectorCatalogStore::Observer {
+                           public ConnectorCatalogStore::Observer,
+                           public MemoryStore::Observer {
  public:
   // The request that tests a model, and how its answer is read.
   struct ModelTest;
@@ -82,6 +85,16 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void OpenSkillsFolder() override;
   void ShowAiPage(const std::string& section) override;
   void ShowChat() override;
+  void OpenChat(const std::string& id) override;
+  void GetMemories(const std::string& query,
+                   GetMemoriesCallback callback) override;
+  void EditMemory(int64_t id,
+                  const std::string& text,
+                  EditMemoryCallback callback) override;
+  void ForgetMemory(int64_t id, ForgetMemoryCallback callback) override;
+  void ForgetAllMemories(ForgetAllMemoriesCallback callback) override;
+  void SetMemoryOn(bool on) override;
+  void WaitForMemoryChange(WaitForMemoryChangeCallback callback) override;
   void GetConnectors(GetConnectorsCallback callback) override;
   void WaitForConnectorChange(WaitForConnectorChangeCallback callback) override;
   void ReadConnectors(const std::string& json,
@@ -114,6 +127,9 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   // ConnectorCatalogStore::Observer:
   void OnCatalogChanged() override;
 
+  // MemoryStore::Observer:
+  void OnMemoriesChanged() override;
+
  private:
   // A request the page waits on. Several model lists can be on their way at
   // once, one per provider.
@@ -141,10 +157,17 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
                        ModelListing listing);
 
   void ReplySkills(GetSkillsCallback callback, std::vector<Skill> skills);
+  void ReplyMemories(GetMemoriesCallback callback,
+                     std::vector<Memory> memories,
+                     size_t total);
 
   const raw_ptr<Profile> profile_;
   const raw_ptr<content::WebContents> contents_;
   std::vector<WaitForConnectorChangeCallback> waiting_for_change_;
+  std::vector<WaitForMemoryChangeCallback> waiting_for_memory_;
+  base::ScopedObservation<MemoryStore, MemoryStore::Observer>
+      memory_observation_{this};
+  PrefChangeRegistrar prefs_;
   base::ScopedObservation<Connectors, Connectors::Observer>
       connectors_observation_{this};
   base::ScopedObservation<ConnectorCatalogStore,

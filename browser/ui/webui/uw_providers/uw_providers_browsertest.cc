@@ -11,6 +11,8 @@
 #include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/browser_process.h"
@@ -33,6 +35,9 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_file.h"
+#include "uw/browser/agent/chat_index.h"
+#include "uw/browser/agent/memory_store.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
@@ -998,6 +1003,145 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsFolderOpens) {
     base::ScopedAllowBlockingForTesting allow_blocking;
     return base::DirectoryExists(UwSkills());
   }));
+}
+
+// Keeps `text` in the profile's memory, from the chat `chat`.
+void KeepMemory(Profile* profile, std::string text, std::string chat = {}) {
+  bool done = false;
+  MemoryStore::For(profile)->Keep(
+      std::move(text), false, std::move(chat), 0,
+      base::BindLambdaForTesting(
+          [&](base::expected<MemoryStore::KeepResult, std::string> kept) {
+            EXPECT_TRUE(kept.has_value());
+            done = true;
+          }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return done; }));
+}
+
+// Every memory of `profile`, newest first.
+std::vector<Memory> MemoriesOf(Profile* profile) {
+  std::optional<std::vector<Memory>> found;
+  MemoryStore::For(profile)->Search(
+      {}, 100, base::BindLambdaForTesting([&](std::vector<Memory> all) {
+        found = std::move(all);
+      }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return found.has_value(); }));
+  return found.value_or(std::vector<Memory>());
+}
+
+// uw://ai/memory lists the memories with the chat each came from, searches
+// them, rewords one, forgets one, and forgets them all.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheMemoryPageChangesMemories) {
+  Profile* profile = browser()->GetProfile();
+  ChatIndex* index = ChatIndex::For(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] { return index->loaded(); }));
+  ChatIndex::Entry bill;
+  bill.id = ChatFile::NewChatId();
+  bill.title = "Pay the PG&E bill";
+  bill.updated = base::Time::Now();
+  index->Update(bill);
+  KeepMemory(profile, "Banks with Chase.", bill.id);
+  KeepMemory(profile, "Home airport is SFO.", ChatFile::NewChatId());
+  KeepMemory(profile, "Prefers aisle seats on flights.");
+  const std::vector<Memory> kept = MemoriesOf(profile);
+  ASSERT_EQ(kept.size(), 3u);
+  const std::string aisle = base::NumberToString(kept[0].id);
+  const std::string chase = base::NumberToString(kept[2].id);
+
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/memory")));
+  EXPECT_EQ("3 memories",
+            Run("return await until(() => document.getElementById("
+                "    'memory-count')?.textContent);"));
+  EXPECT_EQ("3", Run("return await until(() => document.querySelector("
+                     "    '#section-memory span:last-child').textContent);"));
+  EXPECT_EQ(
+      "Prefers aisle seats on flights.|Home airport is SFO.|Banks with Chase.",
+      Run("return all('.memory-text').map((row) => row.textContent)"
+          "    .join('|');"));
+  EXPECT_THAT(
+      Run("return all('.memory-row').map((row) => row.textContent).join('|');")
+          .ExtractString(),
+      testing::AllOf(testing::HasSubstr("From Pay the PG&E bill"),
+                     testing::HasSubstr("From a deleted chat")));
+  SaveWindowScreenshot(browser(), "memory-page");
+
+  EXPECT_EQ("1 of 3", Run(R"(
+      const box = document.getElementById('memory-search');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+          .set.call(box, 'aisle');
+      box.dispatchEvent(new Event('input', {bubbles: true}));
+      return await until(() => all('.memory-row').length === 1 &&
+          [...document.querySelectorAll('span')].find((span) =>
+              span.textContent === '1 of 3')?.textContent);)"));
+  EXPECT_EQ("aisle", Run("return document.querySelector('.memory-text mark')"
+                         "    .textContent;"));
+  SaveWindowScreenshot(browser(), "memory-search");
+
+  EXPECT_EQ("Prefers window seats on long flights.",
+            Run(content::JsReplace(R"(
+      const search = document.getElementById('memory-search');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+          .set.call(search, '');
+      search.dispatchEvent(new Event('input', {bubbles: true}));
+      await until(() => all('.memory-row').length === 3);
+      document.querySelector('[data-reword="' + $1 + '"]').click();
+      const draft = await until(() => document.getElementById('memory-draft'));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+          .set.call(draft, 'Prefers window seats on long flights.');
+      draft.dispatchEvent(new Event('input', {bubbles: true}));
+      document.getElementById('save-memory').click();
+      return await until(() => !document.getElementById('memory-draft') &&
+          document.querySelector('.memory-text')?.textContent ===
+              'Prefers window seats on long flights.' &&
+          document.querySelector('.memory-text').textContent);)",
+                                   aisle)));
+  EXPECT_EQ(MemoriesOf(profile)[0].text,
+            "Prefers window seats on long flights.");
+
+  EXPECT_EQ("2 memories", Run(content::JsReplace(R"(
+      (await until(() => document.querySelector(
+          '[data-forget="' + $1 + '"]'))).click();
+      return await until(() => {
+        const count = document.getElementById('memory-count').textContent;
+        return count === '2 memories' && count;
+      });)",
+                                                 chase)));
+
+  EXPECT_EQ(true, Run(R"(
+      document.getElementById('forget-all-memories').click();
+      (await until(() => document.getElementById('confirm-forget-all')))
+          .click();
+      return Boolean(await until(() =>
+          document.getElementById('no-memories')));)"));
+  EXPECT_TRUE(MemoriesOf(profile).empty());
+}
+
+// The page pauses memory for the profile, and shows a memory a chat keeps
+// while it is open.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheMemoryPagePausesAndListens) {
+  Profile* profile = browser()->GetProfile();
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://ai/memory")));
+  ASSERT_EQ(true, Run("return Boolean(await until(() =>"
+                      "    document.getElementById('no-memories')));"));
+
+  EXPECT_THAT(Run("document.getElementById('use-memory').click();"
+                  "return await until(() => {"
+                  "  const note = document.getElementById('memory-use-note')"
+                  "      .textContent;"
+                  "  return note.startsWith('Paused') && note;"
+                  "});")
+                  .ExtractString(),
+              testing::HasSubstr("Nothing is recalled or kept"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !profile->GetPrefs()->GetBoolean(kAgentMemoryPref); }));
+
+  KeepMemory(profile, "Goes by Sam.");
+  EXPECT_EQ("Goes by Sam.", Run("return await until(() =>"
+                                "    document.querySelector('.memory-text')"
+                                "        ?.textContent);"));
+  SaveWindowScreenshot(browser(), "memory-paused");
 }
 
 }  // namespace

@@ -9,13 +9,12 @@ source_set("agent") {
     "agent_tools.h",
     "chat_suggestions.cc",
     "chat_suggestions.h",
-    "memory_store.cc",
-    "memory_store.h",
     "quick_check.cc",
     "quick_check.h",
   ]
   public_deps = [
     ":chats",
+    ":memory_store",
     "//base",
     "//components/actor/core:task_id",
     "//components/history/core/browser",
@@ -42,10 +41,26 @@ source_set("agent") {
     "//content/public/browser",
     "//net",
     "//services/network/public/cpp",
-    "//sql",
     "//ui/base",
     "//uw/browser/connectors",
     "//uw/browser/terminal",
+  ]
+}
+
+# A profile's agent memory, which chats, uw://ai/memory, and the uw command
+# read. See docs/plans/agent-memory.md.
+source_set("memory_store") {
+  sources = [
+    "memory_store.cc",
+    "memory_store.h",
+  ]
+  public_deps = [
+    "//base",
+    "//uw/components/agent",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//sql",
   ]
 }
 
