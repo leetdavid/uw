@@ -333,6 +333,14 @@ pnpm -F @uw/site build
 
 Its download buttons link to the latest release's `uw-macos-arm64.dmg`, so they work once a release is published. [Website content](docs/plans/distribution.md#website-content) lists what the page shows.
 
+The Vercel project `uw` in team `eslee` serves it at `uwbrowser.com`; `www` redirects there. Deploys are run by hand from the repo root. The build runs on this Mac with the pnpm lockfile, and Vercel receives only the output:
+
+```sh
+vercel link --yes --project uw --scope eslee   # once per checkout
+vercel build --prod --scope eslee
+vercel deploy --prebuilt --prod --scope eslee
+```
+
 ## CI
 
 - [`checks.yml`](.github/workflows/checks.yml) installs dependencies with pnpm, runs the tooling checks, and validates workflows on a GitHub-hosted runner.
