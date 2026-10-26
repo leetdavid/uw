@@ -4,4 +4,4 @@ On 2026-10-26 the user asked for "restart to update", as Chrome does. Chrome's b
 
 Considered options: Chromium Updater with uw branding (rejected: a separate updater app, launchd jobs, Keystone-style install packages, and an Omaha server to run); Sparkle with its own dialogs (rejected: an update prompt that does not look like the rest of the browser).
 
-Consequences: uw carries a patch that hands Sparkle's ready update to `UpgradeDetector` and lets Chromium's relaunch finish Sparkle's install. Every release needs a feed entry signed with an EdDSA key kept on the build Mac. Moving to another updater later means shipping one last Sparkle update that installs it.
+Consequences: uw carries a patch that reports a downloaded update to `UpgradeDetector` and makes Chromium's relaunch hand the install to Sparkle, which quits, installs, and starts the new uw; Chromium's restart flag restores the tabs. The release command adds Sparkle.framework to the app, so daily builds have no updater. Every release needs a feed entry signed with an EdDSA key kept on the build Mac. Moving to another updater later means shipping one last Sparkle update that installs it.

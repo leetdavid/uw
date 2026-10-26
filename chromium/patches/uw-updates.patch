@@ -1,0 +1,115 @@
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+index 95cc823..5b06535 100644
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -888,6 +888,7 @@ source_set("core") {
+     "//uw/browser/ui:ui",
+     "//uw/browser/shortcuts",
+     "//uw/browser/uw_command",
++    "//uw/browser/update",
+     ":active_use_util",
+     ":after_startup_task_utils",
+     ":bad_message",
+diff --git a/chrome/browser/chrome_browser_main_mac.mm b/chrome/browser/chrome_browser_main_mac.mm
+index 4e62771..1d89df5 100644
+--- a/chrome/browser/chrome_browser_main_mac.mm
++++ b/chrome/browser/chrome_browser_main_mac.mm
+@@ -51,6 +51,7 @@
+ #include "ui/views/cocoa/native_widget_mac_ns_window_host.h"
+ #include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/uw_command/command_channel.h"
++#include "uw/browser/update/sparkle_updater.h"
+ 
+ // ChromeBrowserMainPartsMac ---------------------------------------------------
+ 
+@@ -184,6 +185,7 @@ void ChromeBrowserMainPartsMac::PostProfileInit(Profile* profile,
+   ChromeBrowserMainPartsPosix::PostProfileInit(profile, is_initial_profile);
+   if (is_initial_profile) {
+     uw::CommandChannel::Get().Start();
++    uw::StartSparkleUpdater();
+   }
+ }
+ 
+diff --git a/chrome/browser/lifetime/BUILD.gn b/chrome/browser/lifetime/BUILD.gn
+index 93f3a17..ef1c5bc 100644
+--- a/chrome/browser/lifetime/BUILD.gn
++++ b/chrome/browser/lifetime/BUILD.gn
+@@ -112,6 +112,7 @@ source_set("impl") {
+       "//chrome/browser:app_controller_mac",
+       "//chrome/browser:chrome_browser_application_mac",
+       "//ui/views",
++      "//uw/browser/update:pending_update",
+     ]
+   }
+ 
+diff --git a/chrome/browser/lifetime/application_lifetime_desktop.cc b/chrome/browser/lifetime/application_lifetime_desktop.cc
+index 544c458..7c8a822 100644
+--- a/chrome/browser/lifetime/application_lifetime_desktop.cc
++++ b/chrome/browser/lifetime/application_lifetime_desktop.cc
+@@ -65,6 +65,10 @@
+ #include "base/win/win_util.h"
+ #endif  // BUILDFLAG(IS_WIN)
+ 
++#if BUILDFLAG(IS_MAC)
++#include "uw/browser/update/pending_update.h"
++#endif  // BUILDFLAG(IS_MAC)
++
+ #if BUILDFLAG(ENABLE_SESSION_SERVICE)
+ #include "chrome/browser/sessions/session_data_service.h"
+ #include "chrome/browser/sessions/session_data_service_factory.h"
+@@ -281,6 +285,13 @@ void AttemptRestartInternal(IgnoreUnloadHandlers ignore_unload_handlers,
+   content::GetUIThreadTaskRunner({})->PostTask(
+       FROM_HERE, base::BindOnce(&ExitIgnoreUnloadHandlers));
+ #else   // !BUILDFLAG(IS_CHROMEOS).
++#if BUILDFLAG(IS_MAC)
++  // uw: Sparkle quits, installs the downloaded update, and starts the new uw,
++  // which restores the session because kWasRestarted is set.
++  if (uw::InstallPendingUpdate()) {
++    return;
++  }
++#endif  // BUILDFLAG(IS_MAC)
+   // Set the flag to restore state after the restart.
+   pref_service->SetBoolean(prefs::kRestartLastSessionOnShutdown, true);
+   if (ignore_unload_handlers) {
+diff --git a/chrome/browser/updater/BUILD.gn b/chrome/browser/updater/BUILD.gn
+index b9c442e..116014f 100644
+--- a/chrome/browser/updater/BUILD.gn
++++ b/chrome/browser/updater/BUILD.gn
+@@ -95,6 +95,9 @@ source_set("updater") {
+   } else {
+     sources = [ "updater_no_updater.cc" ]
+     deps = [ "//components/version_info" ]
++    if (is_mac) {
++      deps += [ "//uw/browser/update:pending_update" ]
++    }
+   }
+ }
+ 
+diff --git a/chrome/browser/updater/updater_no_updater.cc b/chrome/browser/updater/updater_no_updater.cc
+index d449bc0..a9c3ed6 100644
+--- a/chrome/browser/updater/updater_no_updater.cc
++++ b/chrome/browser/updater/updater_no_updater.cc
+@@ -13,11 +13,23 @@
+ #include "base/task/task_traits.h"
+ #include "base/version.h"
+ #include "base/version_info/version_info.h"
++#include "build/build_config.h"
+ #include "chrome/updater/mojom/updater_service.mojom.h"
+ 
++#if BUILDFLAG(IS_MAC)
++#include "uw/browser/update/pending_update.h"
++#endif
++
+ namespace updater {
+ 
+ base::Version CurrentlyInstalledVersion() {
++#if BUILDFLAG(IS_MAC)
++  // uw: an update Sparkle has downloaded reads as an unknown installed
++  // version, which Chromium treats as an update waiting for a relaunch.
++  if (uw::HasPendingUpdate()) {
++    return base::Version();
++  }
++#endif
+   return version_info::GetVersion();
+ }
+ 

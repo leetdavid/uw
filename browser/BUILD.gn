@@ -9,6 +9,7 @@ group("browser_tests") {
     "uw_command:browser_tests",
     "workspaces:browser_tests",
     "tab_organization:browser_tests",
+    "update:browser_tests",
     "ui:browser_tests",
     "ui/glass:browser_tests",
     "ui/look:browser_tests",

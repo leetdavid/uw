@@ -6,7 +6,9 @@ import { test } from "node:test";
 import type { TestContext } from "node:test";
 import { BuildError } from "../scripts/chromium.ts";
 import type { CommandOptions, Runtime } from "../scripts/chromium.ts";
-import { DMG, NOTARY_PROFILE, Release, TEAM_ID, draftNotes, newer } from "../scripts/release.ts";
+import {
+  DMG, FEED_URL, NOTARY_PROFILE, Release, SPARKLE_PUBLIC_KEY, SPARKLE_SHA256, TEAM_ID, draftNotes, newer,
+} from "../scripts/release.ts";
 
 const SHA = "c".repeat(40);
 const HASH = "A".repeat(40);
@@ -15,9 +17,10 @@ interface Setup {
   previous?: string;
   pushed?: boolean;
   subjects?: string[];
+  checksum?: string;
 }
 
-function fixture(t: TestContext, { previous = "", pushed = true, subjects = [] }: Setup = {}) {
+function fixture(t: TestContext, { previous = "", pushed = true, subjects = [], checksum = SPARKLE_SHA256 }: Setup = {}) {
   const worktree = mkdtempSync(join(tmpdir(), "uw-release-test-"));
   t.after(() => rmSync(worktree, { recursive: true, force: true }));
   mkdirSync(join(worktree, "chromium"), { recursive: true });
@@ -33,6 +36,7 @@ function fixture(t: TestContext, { previous = "", pushed = true, subjects = [] }
       return `  1) ${HASH} "Developer ID Application: Test Person (${TEAM_ID})"\n     1 valid identities found`;
     }
     if (line.startsWith("git log")) return subjects.join("\n");
+    if (line.startsWith("shasum")) return `${checksum}  ${command.at(-1)}`;
     if (command[1]?.endsWith("sign_chrome.py")) {
       const output = command[command.indexOf("--output") + 1]!;
       mkdirSync(join(output, "stable"), { recursive: true });
@@ -73,8 +77,15 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
   assert.deepEqual(find("node scripts/chromium.ts").map((command) => command[2]), ["build", "smoke"]);
   assert.deepEqual(find("plutil").map((command) => command.slice(2, 5)), [
     ["CFBundleShortVersionString", "-string", "0.1.0"], ["CFBundleVersion", "-string", "0.1.0"],
+    ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
+    ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
   ]);
-  const [helper] = find("codesign --force");
+  const signing = find("codesign --force");
+  const framework = (command: readonly string[]) => command.at(-1)!.split("Contents/Frameworks/")[1];
+  assert.deepEqual(signing.slice(0, 3).map(framework), [
+    "Sparkle.framework/Versions/B/Autoupdate", "Sparkle.framework/Versions/B/Updater.app", "Sparkle.framework",
+  ]);
+  const helper = signing.find((command) => command.includes("--identifier"));
   assert.ok(helper);
   assert.equal(helper[helper.indexOf("--sign") + 1], HASH);
   assert.equal(helper[helper.indexOf("--entitlements") + 1], join(worktree, "command/entitlements.plist"));
@@ -86,11 +97,18 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
   ]);
 
   const directory = join(worktree, ".chromium/releases/0.1.0");
-  assert.ok(existsSync(join(directory, DMG)));
+  const dmg = join(directory, "feed", DMG);
+  assert.ok(existsSync(dmg));
+  const [appcast] = find(join(directory, "../sparkle-2.10.1/bin/generate_appcast"));
+  assert.ok(appcast);
+  assert.deepEqual(appcast.slice(1), [
+    "--download-url-prefix", "https://github.com/leetdavid/uw/releases/download/v0.1.0/",
+    "--maximum-deltas", "0", "-o", join(directory, "appcast.xml"), join(directory, "feed"),
+  ]);
   assert.match(readFileSync(join(directory, "notes.md"), "utf8"), /The first public preview\./);
   const [draft] = find("gh release create");
   assert.ok(draft);
-  assert.deepEqual(draft.slice(0, 6), ["gh", "release", "create", "v0.1.0", join(directory, DMG), "--draft"]);
+  assert.deepEqual(draft.slice(0, 7), ["gh", "release", "create", "v0.1.0", dmg, join(directory, "appcast.xml"), "--draft"]);
   assert.equal(draft[draft.indexOf("--target") + 1], SHA);
 });
 
@@ -101,6 +119,14 @@ test("the notes list the changes since the previous release", (t) => {
 
   assert.deepEqual(find("git log"), [["git", "log", "--format=%s", `v0.1.0..${SHA}`]]);
   assert.match(readFileSync(join(worktree, ".chromium/releases/0.1.1/notes.md"), "utf8"), /- fix\(tabs\): keep order/);
+});
+
+test("a Sparkle download that does not match its checksum is refused", (t) => {
+  const { release, find } = fixture(t, { checksum: "0".repeat(64) });
+
+  assert.throws(() => release().publish(), /Sparkle 2\.10\.1 does not match its pinned checksum/);
+  assert.deepEqual(find("tar"), []);
+  assert.deepEqual(find("python3"), []);
 });
 
 test("a commit that is not on GitHub's main is refused before building", (t) => {

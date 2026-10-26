@@ -12,7 +12,7 @@ Agreed: every preview is signed with a Developer ID and notarized by Apple, so i
 
 ## Updates
 
-Agreed: Sparkle 2 checks for, downloads, and verifies updates in the background. When one is ready, Chromium's own "Relaunch to update" chip and menu item appear, and relaunching installs it with the user's tabs restored. Sparkle's own windows never show. The feed, `appcast.xml`, is an asset of each GitHub release. See [ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md).
+Agreed: Sparkle 2 checks for, downloads, and verifies updates in the background. When one is ready, Chromium's own "Relaunch to update" chip and menu item appear, and relaunching installs it with the user's tabs restored. Sparkle's own windows never show. The feed, `appcast.xml`, is an asset of each GitHub release. Only releases carry Sparkle: `pnpm run release` adds the framework and the feed's address, so daily builds never check for updates. See [ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md).
 
 ## Release pipeline
 

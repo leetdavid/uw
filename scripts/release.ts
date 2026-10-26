@@ -9,6 +9,11 @@ import type { Runtime } from "./chromium.ts";
 export const TEAM_ID = "24MD6K3S56";
 export const NOTARY_PROFILE = "uw-notary";
 export const DMG = "uw-macos-arm64.dmg";
+export const SPARKLE_VERSION = "2.10.1";
+export const SPARKLE_SHA256 = "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27";
+export const SPARKLE_PUBLIC_KEY = "tUSDZsx93uVKuL7o7d/RMObl4n5XFcTn/G5SHNENRZk=";
+const REPOSITORY = "https://github.com/leetdavid/uw";
+export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
 const BRANCH = "origin/main";
 const NETWORK_TIMEOUT = 300_000;
 
@@ -73,6 +78,23 @@ export class Release {
     return hash;
   }
 
+  /** Downloads the pinned Sparkle release once and returns where it is unpacked. */
+  sparkle(): string {
+    const directory = join(this.options.worktree, ".chromium/releases", `sparkle-${SPARKLE_VERSION}`);
+    const archive = `${directory}.tar.xz`;
+    if (existsSync(join(directory, "Sparkle.framework"))) return directory;
+    this.capture(["curl", "-fsSL", "-o", archive,
+      `https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz`],
+    REPO, NETWORK_TIMEOUT);
+    if (this.capture(["shasum", "-a", "256", archive]).split(/\s/)[0] !== SPARKLE_SHA256) {
+      rmSync(archive, { force: true });
+      throw new BuildError(`Sparkle ${SPARKLE_VERSION} does not match its pinned checksum`);
+    }
+    mkdirSync(directory, { recursive: true });
+    this.capture(["tar", "-xJf", archive, "-C", directory]);
+    return directory;
+  }
+
   /** Builds, signs, and notarizes the release, then publishes it as a draft GitHub release. */
   publish(): string {
     const { version, worktree, jobs } = this.options;
@@ -104,8 +126,22 @@ export class Release {
     rmSync(directory, { recursive: true, force: true });
     mkdirSync(input, { recursive: true });
     this.step(["cp", "-cR", join(output, "uw.app"), join(output, "uw Packaging"), input], directory);
-    for (const key of ["CFBundleShortVersionString", "CFBundleVersion"]) {
-      this.step(["plutil", "-replace", key, "-string", version, join(app, "Contents/Info.plist")], directory);
+    const plist = join(app, "Contents/Info.plist");
+    for (const [key, type, value] of [
+      ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],
+      ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
+      ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
+    ] as const) {
+      this.step(["plutil", "-replace", key, type, value, plist], directory);
+    }
+
+    const sparkle = this.sparkle();
+    const framework = join(app, "Contents/Frameworks/Sparkle.framework");
+    this.step(["cp", "-cR", join(sparkle, "Sparkle.framework"), join(app, "Contents/Frameworks")], directory);
+    rmSync(join(framework, "Versions/B/XPCServices"), { recursive: true, force: true });
+    for (const part of ["Versions/B/Autoupdate", "Versions/B/Updater.app", ""]) {
+      this.step(["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", join(framework, part)],
+        directory);
     }
     this.step([
       "codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp",
@@ -120,17 +156,24 @@ export class Release {
     const signed = join(directory, "signed/stable");
     const packaged = readdirSync(signed).filter((name) => name.endsWith(".dmg"));
     if (packaged.length !== 1) throw new BuildError(`Expected one DMG in ${signed}, found ${packaged.length}`);
-    const dmg = join(directory, DMG);
+    const feed = join(directory, "feed");
+    const dmg = join(feed, DMG);
+    mkdirSync(feed);
     renameSync(join(signed, packaged[0]!), dmg);
     this.step(["codesign", "--verify", "--deep", "--strict", join(signed, "uw.app")], directory);
     this.step(["xcrun", "stapler", "validate", dmg], directory);
+    const appcast = join(directory, "appcast.xml");
+    this.step([
+      join(sparkle, "bin/generate_appcast"), "--download-url-prefix", `${REPOSITORY}/releases/download/${tag}/`,
+      "--maximum-deltas", "0", "-o", appcast, feed,
+    ], directory);
 
     const chromium = JSON.parse(readFileSync(join(worktree, "chromium/pins.json"), "utf8")).version as string;
     const subjects = previous ? this.capture(["git", "log", "--format=%s", `${previous}..${sha}`]).split("\n") : undefined;
     const notes = join(directory, "notes.md");
     writeFileSync(notes, draftNotes(version, chromium, subjects));
     const url = this.capture([
-      "gh", "release", "create", tag, dmg, "--draft", "--title", `uw ${version} preview`,
+      "gh", "release", "create", tag, dmg, appcast, "--draft", "--title", `uw ${version} preview`,
       "--notes-file", notes, "--target", sha,
     ], REPO, NETWORK_TIMEOUT);
     this.runtime.log(`Drafted ${url}\nReview the notes there, then publish the release.`);
