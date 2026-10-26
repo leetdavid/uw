@@ -18,6 +18,8 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Glossary](CONTEXT.md): product terminology.
 - [Roadmap](plans/roadmap.md): build order, completion criteria, implementability estimates, and the ticket board.
 - [Try the current build](try-uw.md): manual tests for the built app and its current limits.
+- [Distribution plan](plans/distribution.md): previews on GitHub, signing, updates, problem reports, and the website.
+- [ADR 0019: Sparkle updates uw behind Chromium's relaunch button](adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md): why updates use Sparkle and not Chromium Updater.
 
 ### Automatic tab organization
 
