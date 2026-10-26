@@ -46,8 +46,8 @@ using media_session::mojom::MediaPlaybackState;
 using media_session::mojom::MediaSessionAction;
 using media_session::mojom::MediaSessionImageType;
 
-// The gap to whatever is above: the mini player, or the tab list.
-constexpr int kTopGap = 6;
+// The gap to what is above, the mini player or the tab list, and to the foot.
+constexpr int kGapAround = 6;
 constexpr int kPadding = 6;
 constexpr int kArt = 32;
 constexpr int kArtRadius = 6;
@@ -71,7 +71,7 @@ PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
   SetVisible(false);
   // The pointer on one of the row's buttons is still on the row.
   SetNotifyEnterExitOnChild(true);
-  SetProperty(views::kMarginsKey, gfx::Insets::TLBR(kTopGap, 0, 0, 0));
+  SetProperty(views::kMarginsKey, gfx::Insets::VH(kGapAround, 0));
   SetTooltipText(l10n_util::GetStringUTF16(IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB));
   auto button = [this](views::Button::PressedCallback callback, int message) {
     auto* added =

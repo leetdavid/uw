@@ -33,8 +33,9 @@
 namespace uw {
 namespace {
 
-// The gap to the activity card above.
-constexpr int kTopGap = 6;
+// The gap to the activity card above and the playback controls or the foot
+// below, and between a video and a site's page.
+constexpr int kGap = 6;
 
 // A video before its size is known.
 constexpr gfx::Size kDefaultShape(16, 9);
@@ -73,7 +74,7 @@ MiniPlayerDock::MiniPlayerDock(BrowserWindowInterface* window)
       user_data_(window->GetUnownedUserDataHost(), *this) {
   SetVisible(false);
   SetNotifyEnterExitOnChild(true);
-  SetProperty(views::kMarginsKey, gfx::Insets::TLBR(kTopGap, 0, 0, 0));
+  SetProperty(views::kMarginsKey, gfx::Insets::VH(kGap, 0));
   stack_subscription_ = MiniPlayerStack::Get().Observe(base::BindRepeating(
       &MiniPlayerDock::OnStackChanged, base::Unretained(this)));
   if (PrefService* local_state = g_browser_process->local_state()) {
@@ -152,7 +153,7 @@ gfx::Size MiniPlayerDock::CalculatePreferredSize(
                             : width();
   const int site_window = SiteWindowSize(available).height();
   return gfx::Size(available, StackHeight() + PlayerSize(available).height() +
-                                  (player_ && site_window ? kTopGap : 0) +
+                                  (player_ && site_window ? kGap : 0) +
                                   site_window);
 }
 

@@ -563,6 +563,11 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
   ASSERT_TRUE(base::test::RunUntil([&] { return controls->GetVisible(); }));
   ASSERT_TRUE(base::test::RunUntil([&] { return controls->playing(); }));
+  // 6px above the foot, the row with Organize and the new button.
+  views::test::RunScheduledLayout(controls->GetWidget());
+  const auto& column = controls->parent()->children();
+  const views::View* foot = *std::next(std::ranges::find(column, controls));
+  EXPECT_EQ(6, foot->y() - controls->bounds().bottom());
   SaveWindowScreenshot(browser(), "playback_controls");
   views::test::ButtonTestApi(controls->play_pause())
       .NotifyClick(Mouse(ui::EventType::kMousePressed, gfx::Point()));

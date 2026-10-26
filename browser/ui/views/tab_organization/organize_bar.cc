@@ -69,6 +69,9 @@ constexpr int kFootGap = 6;
 OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
     : window_(window), theme_picker_(std::make_unique<ThemePicker>(window)) {
   SetOrientation(views::LayoutOrientation::kVertical);
+  // The card, the mini player, and the playback controls sit 6px apart and
+  // 6px above the row: touching margins share their space.
+  SetCollapseMargins(true);
   SetProperty(
       views::kMarginsKey,
       gfx::Insets::VH(kRowSpacing,
@@ -83,6 +86,7 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       base::BindRepeating(&OrganizeBar::AskForNameAgain,
                           base::Unretained(this)),
       base::BindRepeating(&OrganizeBar::TidyAgain, base::Unretained(this))));
+  card_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, kFootGap, 0));
   card_->Hide();
 
   // The mini player docks between the card and the row, the playback
