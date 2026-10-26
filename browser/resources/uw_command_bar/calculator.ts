@@ -254,6 +254,32 @@ const AMOUNT = '\\d[\\d,]*(?:\\.\\d+)?|\\.\\d+';
 const SYMBOL_FIRST = new RegExp(`(${SYMBOL_PATTERN})\\s*(${AMOUNT})`, 'g');
 const SYMBOL_AFTER = new RegExp(`(${AMOUNT})\\s*(${SYMBOL_PATTERN})`, 'g');
 
+// How many zeros each shorthand suffix adds: 180k is 180,000.
+const SCALES: Record<string, number> = {
+  k: 3,
+  m: 6,
+  b: 9,
+  bn: 9,
+  t: 12,
+  tn: 12,
+  thousand: 3,
+  million: 6,
+  billion: 9,
+  trillion: 12,
+};
+
+// The suffixes that are not units, so they work on any number. The others,
+// such as m for meters, work only on money.
+const FREE = new Set(['k', 'M', 'bn', 'tn']);
+
+const SHORTHAND = new RegExp(
+    '(?<![\\w.])(\\d+(?:\\.\\d+)?|\\.\\d+)' +
+        '(?:([kmbt]n?)|\\s+(thousand|million|billion|trillion))(?![a-z])',
+    'gi');
+const SYMBOL_BEFORE = new RegExp(`(?:${SYMBOL_PATTERN})\\s*$`);
+const CURRENCY_AFTER =
+    new RegExp(`^\\s*(?:${SYMBOL_PATTERN}|([a-z]{3})(?![a-z]))`, 'i');
+
 // Turns what was typed into what mathjs reads: currency symbols into codes,
 // "as" into "to", and × and ÷ into * and /.
 function normalize(text: string): string {
@@ -286,6 +312,8 @@ interface Reading {
   constants: number;
   // Each amount typed in a currency.
   amounts: Array<{value: number, code: string}>;
+  // Numbers typed in shorthand, which the sum shows in full.
+  shorthand: Set<number>;
   // Symbols that mathjs reads differently from what uw reads.
   replace: Map<MathNode, MathNode>;
 }
@@ -298,6 +326,7 @@ function emptyReading(): Reading {
     units: 0,
     constants: 0,
     amounts: [],
+    shorthand: new Set(),
     replace: new Map(),
   };
 }
@@ -337,11 +366,12 @@ export class Calculator {
     if (!/\d/.test(text)) {
       return null;
     }
-    const parsed = this.parse_(normalize(text));
+    const reading = emptyReading();
+    const parsed =
+        this.parse_(normalize(this.expandShorthand_(text, reading.shorthand)));
     if (!parsed) {
       return null;
     }
-    const reading = emptyReading();
     let target: MathNode|null = null;
     try {
       target = this.read_(parsed.node, reading);
@@ -423,6 +453,37 @@ export class Calculator {
     return {...answer, answer: spaced(answer.answer)};
   }
 
+  // Writes shorthand amounts in full, as 180000 for 180k, and adds each to
+  // `shorthand`.
+  private expandShorthand_(text: string, shorthand: Set<number>): string {
+    return text.replace(
+        SHORTHAND,
+        (match: string, amount: string, letter: string|undefined,
+         word: string|undefined, offset: number) => {
+          const zeros = SCALES[(letter ?? word ?? '').toLowerCase()];
+          if (zeros === undefined ||
+              (letter && !FREE.has(letter) &&
+               !this.isMoney_(text, offset, offset + match.length))) {
+            return match;
+          }
+          const value = Number(`${amount}e${zeros}`);
+          shorthand.add(value);
+          return String(value);
+        });
+  }
+
+  // Whether the amount from `start` to `end` has a currency symbol before or
+  // after it, or a currency code after it.
+  private isMoney_(text: string, start: number, end: number): boolean {
+    if (SYMBOL_BEFORE.test(text.slice(0, start))) {
+      return true;
+    }
+    const after = text.slice(end).match(CURRENCY_AFTER);
+    const code = after?.[1];
+    return !!after &&
+        (code === undefined || this.isCurrency_(code.toUpperCase()));
+  }
+
   // Parses the text, setting aside an unfinished end until what is left
   // parses. Unclosed brackets are closed.
   private parse_(text: string): {node: MathNode, aside: string}|null {
@@ -473,7 +534,12 @@ export class Calculator {
         if (typeof node.value !== 'number') {
           throw new Error('constant');
         }
-        reading.ink.push({text: String(node.value), kind: 'number'});
+        reading.ink.push({
+          text: reading.shorthand.has(node.value) ?
+              this.number_(node.value, 21) :
+              String(node.value),
+          kind: 'number',
+        });
         return;
       case 'SymbolNode':
         this.readSymbol_(node, reading);

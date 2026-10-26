@@ -118,3 +118,38 @@ test("unit names spelled out ignore case, and symbols keep it", () => {
   assert.equal(answer("2 Kilometers + 500 m"), "2.5 km");
   assert.equal(answer("1 MA * 1 h"), "1 MAh");
 });
+
+test("shorthand amounts read as thousands, millions, billions, and trillions", () => {
+  const result = calculator().calculate("180k usd to hkd");
+  assert.ok(result);
+  assert.equal(words(result.sum), "180,000 USD");
+  assert.equal(result.copy, "HK$1,400,000");
+  assert.equal(answer("$5K to usd"), "$5,000");
+  assert.equal(answer("180k$ to usd"), "$180,000");
+  assert.equal(answer("€1.5m to eur"), "€1,500,000");
+  assert.equal(answer("5m usd to usd"), "$5,000,000");
+  assert.equal(answer("HK$2bn to hkd"), "HK$2,000,000,000");
+  assert.equal(answer("2B hkd to hkd"), "HK$2,000,000,000");
+  assert.equal(answer("3tn usd to usd"), "$3,000,000,000,000");
+  assert.equal(answer("1.5 Million usd to usd"), "$1,500,000");
+});
+
+test("plain numbers take only the shorthand that is not a unit", () => {
+  const result = calculator().calculate("5k + 3k");
+  assert.equal(result && words(result.sum), "5,000 + 3,000");
+  assert.equal(result && words(result.answer), "8,000");
+  assert.equal(answer("1.5M * 2"), "3,000,000");
+  assert.equal(answer("2bn / 1000"), "2,000,000");
+  assert.equal(answer("1tn / 1bn"), "1,000");
+  assert.equal(answer("3 thousand + 200"), "3,200");
+  assert.equal(answer("max(1,5k)"), "5,000");
+  assert.equal(answer("5m"), "16.4 ft");
+  assert.equal(answer("2b + 2b"), "4 b");
+  assert.equal(answer("2B + 2B"), "4 B");
+  assert.equal(answer("3t + 1t"), "4 t");
+  assert.equal(answer("2T + 1T"), "3 T");
+  assert.equal(answer("5K + 1K"), "6 K");
+  for (const text of ["5k", "180 k usd", "10k steps", "5k run"]) {
+    assert.equal(calculator().calculate(text), null, text);
+  }
+});
