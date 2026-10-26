@@ -3,6 +3,7 @@
 
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -180,7 +181,25 @@ base::CallbackListSubscription MiniPlayerStack::Observe(
 }
 
 void MiniPlayerStack::ForgetHidden() {
-  hidden_.reset();
+  // Nothing showed in its place: the mini player was closed, or its tab was.
+  if (hidden_) {
+    hidden_.reset();
+    BringUpNewest();
+  }
+}
+
+void MiniPlayerStack::BringUpNewest() {
+  // A site's window waiting here plays again by itself.
+  auto newest = std::ranges::find_if(paused_, [](const Entry& entry) {
+    return entry.contents && !entry.play_site_window;
+  });
+  if (newest == paused_.end()) {
+    return;
+  }
+  base::WeakPtr<content::WebContents> contents = newest->contents;
+  paused_.erase(newest);
+  observers_.Notify();
+  content::MediaSession::Get(contents.get())->EnterPictureInPicture();
 }
 
 }  // namespace uw

@@ -38,6 +38,7 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - The paused ones peek out a few pixels above the playing one. Hovering slides them up from behind it into rows, each a still of its last frame with its site's icon and title. When the pointer leaves, they slide back down. With reduced motion they move without sliding.
 - Clicking a paused one plays it on top and pauses the one it replaces, which goes under it.
 - Each has its own close. Going to a paused video's tab takes it out of the stack.
+- Closing the playing one closes only it: the newest paused one comes up in its place, still paused. The same goes when it leaves any other way, as when its tab closes. Asked for on 2026-10-26: "closing one mini player should just close that one, not all docked pips". Staying paused is uw's choice.
 - Only the playing one floats. The paused ones come back when it docks again.
 - A live window never joins it.
 - The stack lives only in the sidebar. With Don't dock, or for a site's window too big to dock, a new picture in picture closes the old one and leaves it paused in its page, as Chromium does.
@@ -186,7 +187,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 3. Switching to another uw window or workspace moves it to that window's sidebar. Hiding the sidebar floats it, and showing the sidebar docks it.
 4. With another app active and the sidebar in view, it stays docked. Once that app's window covers half the docked video for a second, it floats, and it stays floating when the window moves away; coming back to uw docks it. A window covering less than half leaves it docked. With "Float the mini player when the sidebar is covered" off, it stays docked.
 5. Switching away from a tab with a playing, audible, visible video starts a mini player. A muted or paused video, or a small one, does not. Selecting the tab puts it back in the page.
-6. A second mini player pauses the first and stacks on it. Clicking the paused one swaps them. A fourth drops the oldest.
+6. A second mini player pauses the first and stacks on it. Clicking the paused one swaps them. A fourth drops the oldest. Closing the playing one brings the newest paused one up in its place, still paused.
 7. With Don't dock, leaving a playing video's tab opens nothing and the playback controls show it, and the site's picture-in-picture button floats it. With Off, no picture in picture opens, and a site cannot open its own window.
 8. The controls match the frames with Glass at both ends, in light and dark mode. Document picture in picture has the rounded frame.
 9. `pnpm run check` and the focused browser tests pass. Browser tests stay headless; checks that need another app in front or a real window run as `MANUAL_` tests in the window-tests VM.

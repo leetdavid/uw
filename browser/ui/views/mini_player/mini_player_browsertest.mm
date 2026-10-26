@@ -722,6 +722,34 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_EQ(video_, MiniPlayerStack::Get().paused()[0].contents.get());
 }
 
+// Closing the playing video closes only it: the newest paused one comes up in
+// its place, still paused.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ClosingThePlayingOneBringsUpTheNewestPaused) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* first = OpenMiniPlayer();
+  Play();
+  content::WebContents* first_video = video_;
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(first, browser()); }));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* second = OpenMiniPlayer();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(first_video, "video.paused").ExtractBool();
+  }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(second, browser()); }));
+  ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
+
+  second->view()->ShowControls(true);
+  Click(second, MiniPlayerView::kCloseButton);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(first_video, "isInPictureInPicture()").ExtractBool();
+  }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return DocksIn(first, browser()); }));
+  EXPECT_TRUE(content::EvalJs(first_video, "video.paused").ExtractBool());
+  EXPECT_TRUE(MiniPlayerStack::Get().paused().empty());
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+}
+
 // A tab playing sound gets one row of playback controls while the user is on
 // another tab. The row pauses and plays it, and a click goes to the tab.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,

@@ -89,6 +89,9 @@ class MiniPlayerStack {
   ~MiniPlayerStack();
 
   void ForgetHidden();
+  // Shows the newest paused video in the mini player, still paused, once the
+  // one that played above it has gone.
+  void BringUpNewest();
   // Keeps the video whose mini player just hid, paused, as when a site's
   // window plays in its place.
   void KeepHidden();
