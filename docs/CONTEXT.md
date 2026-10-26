@@ -56,7 +56,7 @@ Up to three mini players docked at the bottom of the sidebar. The top one plays;
 _Avoid_: Queue, deck.
 
 **Floating mini player**:
-A mini player in its own window over other apps, shown while uw is in the background or the sidebar is hidden.
+A mini player in its own window over other apps, shown while a docked one would be hidden: uw's window covered by another app's or not showing, or the sidebar hidden.
 _Avoid_: PiP window, pop-out.
 
 **Live window**:
