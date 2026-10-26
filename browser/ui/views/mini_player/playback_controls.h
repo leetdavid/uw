@@ -59,6 +59,8 @@ class PlaybackControls : public views::Button,
   views::ImageButton* previous() { return previous_; }
   views::ImageButton* play_pause() { return play_pause_; }
   views::ImageButton* next() { return next_; }
+  // The × on the row's corner, shown under the pointer.
+  views::ImageButton* dismiss() { return dismiss_; }
   bool has_art() const { return !art_.isNull(); }
   void SetArtForTesting(const SkBitmap& art);
 
@@ -112,6 +114,9 @@ class PlaybackControls : public views::Button,
   void OnArt(const SkBitmap& art);
   void GoToTab();
   void PlayOrPause();
+  // Pauses the tab's sound and hides the row until that tab plays again or
+  // another tab starts playing.
+  void Dismiss();
   SkColor TextColor() const;
 
   const raw_ptr<BrowserWindowInterface> window_;
@@ -119,12 +124,14 @@ class PlaybackControls : public views::Button,
   bool playing_ = false;
   bool has_previous_ = false;
   bool has_next_ = false;
+  bool dismissed_ = false;
   std::u16string title_;
   std::u16string source_;
   gfx::ImageSkia art_;
   raw_ptr<views::ImageButton> previous_ = nullptr;
   raw_ptr<views::ImageButton> play_pause_ = nullptr;
   raw_ptr<views::ImageButton> next_ = nullptr;
+  raw_ptr<views::ImageButton> dismiss_ = nullptr;
   mojo::Receiver<media_session::mojom::AudioFocusObserver> focus_{this};
   mojo::Receiver<media_session::mojom::MediaSessionObserver> session_{this};
   base::ScopedObservation<PictureInPictureWindowManager,

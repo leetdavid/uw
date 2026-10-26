@@ -24,6 +24,7 @@
 #include "third_party/skia/include/core/SkPath.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
@@ -32,6 +33,7 @@
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/view_class_properties.h"
@@ -54,6 +56,12 @@ constexpr int kRadius = 10;
 constexpr int kGap = 9;
 constexpr int kButton = 24;
 constexpr int kIcon = 13;
+// The × on the row's corner, over the art: dark in every mode, so its white
+// mark reads over any art.
+constexpr int kDismiss = 18;
+constexpr int kDismissIcon = 10;
+constexpr int kDismissInset = 1;
+constexpr SkColor kDismissFill = SkColorSetARGB(0xB8, 0x1E, 0x1B, 0x2E);
 
 gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
   const gfx::FontList& base = views::Label::GetDefaultFontList();
@@ -103,6 +111,16 @@ PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
                  },
                  base::Unretained(this)),
              IDS_PICTURE_IN_PICTURE_NEXT_TRACK_CONTROL_ACCESSIBLE_TEXT);
+  dismiss_ = button(
+      base::BindRepeating(&PlaybackControls::Dismiss, base::Unretained(this)),
+      IDS_PICTURE_IN_PICTURE_CLOSE_CONTROL_TEXT);
+  dismiss_->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(kMiniPlayerCloseIcon, SK_ColorWHITE,
+                                     kDismissIcon));
+  dismiss_->SetBackground(
+      views::CreateRoundedRectBackground(kDismissFill, kDismiss / 2));
+  dismiss_->SetVisible(false);
   UpdateButtons();
 
   window_->GetTabStripModel()->AddObserver(this);
@@ -133,6 +151,7 @@ void PlaybackControls::Layout(PassKey) {
       button->SetBounds(x, (height() - kButton) / 2, kButton, kButton);
     }
   }
+  dismiss_->SetBounds(kDismissInset, kDismissInset, kDismiss, kDismiss);
 }
 
 void PlaybackControls::OnThemeChanged() {
@@ -142,6 +161,8 @@ void PlaybackControls::OnThemeChanged() {
 
 void PlaybackControls::StateChanged(ButtonState old_state) {
   views::Button::StateChanged(old_state);
+  dismiss_->SetVisible(GetState() == STATE_HOVERED ||
+                       GetState() == STATE_PRESSED);
   SchedulePaint();
 }
 
@@ -184,8 +205,14 @@ void PlaybackControls::OnFocusGained(
 
 void PlaybackControls::MediaSessionInfoChanged(
     media_session::mojom::MediaSessionInfoPtr session_info) {
+  const bool was_playing = playing_;
   playing_ = session_info &&
              session_info->playback_state == MediaPlaybackState::kPlaying;
+  // A dismissed row comes back when its tab plays again.
+  if (playing_ && !was_playing && dismissed_) {
+    dismissed_ = false;
+    UpdateVisibility();
+  }
   UpdateButtons();
   SchedulePaint();
 }
@@ -234,6 +261,7 @@ void PlaybackControls::Follow(content::WebContents* contents) {
   }
   tab_ = contents->GetWeakPtr();
   playing_ = false;
+  dismissed_ = false;
   has_previous_ = false;
   has_next_ = false;
   art_ = gfx::ImageSkia();
@@ -262,12 +290,27 @@ void PlaybackControls::UpdateVisibility() {
                              return entry.contents.get() == contents;
                            }));
   const bool show =
-      contents && !in_mini_player &&
+      contents && !in_mini_player && !dismissed_ &&
       window_->GetTabStripModel()->GetActiveWebContents() != contents;
+  if (!show) {
+    dismiss_->SetVisible(false);
+  }
   if (show != GetVisible()) {
     SetVisible(show);
     PreferredSizeChanged();
   }
+}
+
+void PlaybackControls::Dismiss() {
+  if (!tab_) {
+    return;
+  }
+  if (playing_) {
+    content::MediaSession::Get(tab_.get())
+        ->Suspend(content::MediaSession::SuspendType::kUI);
+  }
+  dismissed_ = true;
+  UpdateVisibility();
 }
 
 void PlaybackControls::UpdateButtons() {

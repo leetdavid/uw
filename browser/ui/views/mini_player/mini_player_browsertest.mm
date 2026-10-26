@@ -783,6 +783,32 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_EQ(first_video, paused[1].contents.get());
 }
 
+// The row's × under the pointer pauses the tab's sound and hides the row,
+// which comes back when the tab plays again, per T223.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       DismissingThePlaybackRowPausesAndHidesIt) {
+  LocalState()->SetBoolean(kMiniPlayerOnTabSwitchPref, false);
+  OpenPlayingVideo();
+  PlaybackControls* controls = ControlsOf(browser());
+  ASSERT_TRUE(controls);
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->GetVisible(); }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return controls->playing(); }));
+  EXPECT_FALSE(controls->dismiss()->GetVisible());
+  controls->SetState(views::Button::STATE_HOVERED);
+  ASSERT_TRUE(controls->dismiss()->GetVisible());
+  SaveWindowScreenshot(browser(), "playback_controls_dismiss");
+
+  PressButton(controls->dismiss());
+  EXPECT_TRUE(base::test::RunUntil([&] { return Bool("video.paused"); }));
+  EXPECT_FALSE(controls->GetVisible());
+  Settle();
+  EXPECT_FALSE(controls->GetVisible());
+
+  Play();
+  EXPECT_TRUE(base::test::RunUntil([&] { return controls->GetVisible(); }));
+}
+
 // A tab playing sound gets one row of playback controls while the user is on
 // another tab. The row pauses and plays it, and a click goes to the tab.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
