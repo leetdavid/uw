@@ -1,5 +1,4 @@
-// Copyright 2026 The uw Authors
-// Use of this source code is governed by a BSD-style license.
+// Copyright 2026 The uw Authors. All rights reserved.
 
 // Non-macOS fallback for ApiKeyStore. The first release targets macOS
 // desktop with Keychain storage; other platforms keep keys in process memory

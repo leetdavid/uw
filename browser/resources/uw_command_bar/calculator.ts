@@ -1,5 +1,4 @@
-// Copyright 2026 The uw Authors
-// Use of this source code is governed by a BSD-style license.
+// Copyright 2026 The uw Authors. All rights reserved.
 
 // The command bar's calculator: mathjs works out math, units, and currencies,
 // and uw reads the typed text for it. The page passes in mathjs, which it

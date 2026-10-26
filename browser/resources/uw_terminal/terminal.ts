@@ -1,5 +1,4 @@
-// Copyright 2026 The uw Authors
-// Use of this source code is governed by a BSD-style license.
+// Copyright 2026 The uw Authors. All rights reserved.
 
 import {FitAddon, init, Terminal} from '/ghostty-web.js';
 import type {ITheme} from '/ghostty-web.js';

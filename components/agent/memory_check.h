@@ -1,5 +1,4 @@
-// Copyright 2026 The uw Authors
-// Use of this source code is governed by a BSD-style license.
+// Copyright 2026 The uw Authors. All rights reserved.
 
 #ifndef UW_COMPONENTS_AGENT_MEMORY_CHECK_H_
 #define UW_COMPONENTS_AGENT_MEMORY_CHECK_H_

@@ -385,3 +385,7 @@ Headless smoke testing does not establish that the native browser interface work
 - [Apple Silicon builds](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/docs/mac_arm64.md)
 - [SDK configuration for the pinned revision](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/build/config/mac/mac_sdk.gni)
 - [Apple linker support](https://chromium.googlesource.com/chromium/src/+/792bf6722e73a45aa9e47c163b9901bdc17f3230/docs/apple_platform_linkers.md)
+
+## License
+
+uw's own code has no license yet: all rights reserved. You may read it here, but not reuse it. Chromium's code keeps its BSD license, and `chrome://credits` in uw lists every third-party license. See [License](docs/plans/distribution.md#license).
