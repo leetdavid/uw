@@ -28,6 +28,12 @@ There is one channel. Each preview is a normal GitHub release rather than a prer
 
 Agreed: Apple silicon only, macOS 13 or later. Each release is one notarized DMG that opens to the usual drag-to-Applications window, and Sparkle installs updates from the same DMG. Intel Macs are not supported; a universal build would double the build time.
 
+## Homebrew
+
+Agreed on 2026-10-27: `brew install --cask leetdavid/uw/uw` installs uw. The cask lives in its own tap, [`leetdavid/homebrew-uw`](https://github.com/leetdavid/homebrew-uw), and points at the same latest-release DMG as the website, so no release has to change it. Sparkle updates uw after that, and `brew upgrade` leaves it alone. The full name in the command also makes Homebrew trust this one cask, which it requires for casks outside its own taps. The cask does not link the `uw` command; uw's settings install it ([uw command plan](uw-command.md)).
+
+Homebrew's own list, for `brew install --cask uw`, takes a cask that its owner submits only once the repository has 225 stars, 90 forks, or 90 watchers.
+
 ## License
 
 Agreed for now: no license. The source is public to read, and all rights are reserved, which keeps every way to make money open. The owner decides on a license once monetization is clearer. Chromium's own notices ship in every build at `chrome://credits`.
@@ -75,7 +81,7 @@ Agreed: one page that sells uw, in the `uw-arc-style` look. The approved design 
 2. How it works: a pinned scroll demo of a live sidebar. Over four stops its tabs move out of a messy Scratchpad into tasks, a new task forms and gets its name, and Undo appears. Phones and reduced-motion settings get four still cards instead.
 3. Features: the mini player docked in the sidebar, the command bar, workspaces and themes, the agent, watching a page, and the terminal.
 4. Four promises: built on Chromium, the user's own AI provider, problem reports only with consent, and Undo for every move.
-5. A closing download button that says the preview is rough, and a footer linking releases, GitHub Issues, and the source.
+5. A closing section that says the preview is rough, with the download button and, beside it, the [Homebrew](#homebrew) command with a copy button. Then a footer linking releases, GitHub Issues, and the source.
 
 No email list, docs, or pricing yet.
 
@@ -114,5 +120,6 @@ Work, in order, with scores from the [roadmap convention](roadmap.md#implementab
 | Codecs through macOS | 4/10 | Plain AAC through AudioToolbox, H.264 through VideoToolbox only, and WebRTC's H.264 without OpenH264. Several media paths, each checked on real sites. |
 | Report an issue | 9/10 | One Help-menu item. |
 | Website | 8/10 | Doop design first, then Next.js in `site/` on Vercel. |
+| Homebrew | 8/10 | A cask that always installs the latest release. It can't be tried end to end until 0.1.0 is published. |
 
 Overall: 5/10. The codec work and the Sparkle hand-off carry the most risk; the rest uses tools that already exist.

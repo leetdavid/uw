@@ -1,6 +1,7 @@
 import Image from "next/image";
 import poster from "@/assets/poster.png";
 import tram from "@/assets/tram.jpg";
+import { Brew } from "./brew";
 import { Favicon, Folder } from "./icons";
 import { ScrollDemo, type Stop } from "./scroll-demo";
 import type { Notice, Tab, Task } from "./sidebar";
@@ -802,10 +803,11 @@ export default function Home() {
         </p>
         <div className="actions">
           <Download />
-          <a className="src" href={REPO}>
-            Read the source &rarr;
-          </a>
+          <Brew />
         </div>
+        <a className="src" href={REPO}>
+          Read the source &rarr;
+        </a>
       </section>
 
       <footer>

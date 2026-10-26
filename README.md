@@ -65,7 +65,7 @@ The [board](docs/plans/roadmap.md#board) tracks each piece, and [Try the current
 
 ## Try a test build
 
-[Download uw 153.0.8010.53-1](https://github.com/leetdavid/uw/releases/download/153.0.8010.53-1/uw-153.0.8010.53-1-macos-arm64.zip) for Macs with Apple silicon on macOS 13 or later. [Releases](https://github.com/leetdavid/uw/releases) lists every build.
+[Download uw 153.0.8010.53-1](https://github.com/leetdavid/uw/releases/download/153.0.8010.53-1/uw-153.0.8010.53-1-macos-arm64.zip) for Macs with Apple silicon on macOS 13 or later. [Releases](https://github.com/leetdavid/uw/releases) lists every build. The first signed preview, v0.1.0, will also install with Homebrew: `brew install --cask leetdavid/uw/uw`.
 
 Test builds are not signed by Apple, so macOS blocks the first launch:
 
@@ -331,7 +331,7 @@ pnpm -F @uw/site lint
 pnpm -F @uw/site build
 ```
 
-Its download buttons link to the latest release's `uw-macos-arm64.dmg`, so they work once a release is published. [Website content](docs/plans/distribution.md#website-content) lists what the page shows.
+Its download buttons and Homebrew command use the latest release's `uw-macos-arm64.dmg`, so they work once a release is published. [Website content](docs/plans/distribution.md#website-content) lists what the page shows.
 
 The Vercel project `uw` in team `eslee` serves it at `uwbrowser.com`; `www` redirects there. Deploys are run by hand from the repo root. The build runs on this Mac with the pnpm lockfile, and Vercel receives only the output:
 
