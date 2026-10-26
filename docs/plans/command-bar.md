@@ -11,7 +11,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 ### Opening it
 
 - The [command bar](../CONTEXT.md#language) is a panel centered over the page card. The page dims a little behind it.
-- Cmd+T and File → New Tab open it to open a new page. Escape creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
+- Cmd+T and File → New Tab open it to open a new page. Escape on an empty field closes it and creates nothing. A page picked from it opens where a blank new tab opens today, below the current tab's branch.
 - "New child tab" and Ctrl+Cmd+T open it too. A page picked from it opens as the first child of that tab, per [New child tab](keyboard-and-mouse.md#new-child-tab). Agreed on 2026-10-15.
 - The "+" on a task's row opens it for that task, per [Mouse actions](keyboard-and-mouse.md#mouse-actions). A picked page, a Cmd+Return chat, and an Option+Return terminal each open at the end of the task, selected. A row for an open tab still switches to it. Agreed on 2026-10-21.
 - A "Command bar" section on uw's settings page has a switch, "Cmd+T opens the command bar". It is on by default and takes effect at once in every window. Off, Cmd+T and File → New Tab open a blank tab. Until T98 the command bar cannot open pages, and the section says so. Agreed on 2026-10-15.
@@ -21,6 +21,8 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 - Commands run on the tab that was selected when the command bar opened.
 - It opens at once and never loses a key. Every typed address goes through it, so a late or dropped key breaks the [primary design rule](../product.md#principles). Keys pressed between Cmd+T and the panel appearing land in its field, in order. Added on 2026-10-14.
 - A "New blank tab" command opens Chromium's new tab page.
+- A click elsewhere, or switching apps, closes it and keeps what it showed: the text, the caret, the rows, the selected row, and the calculator's card. Every way of opening it shows them again, except Cmd+Shift+P, which starts an empty `>`. Each window keeps its own, with no time limit, until it is used or Escaped. Opening a row, Cmd+Return, Option+Return, and copying an answer forget it. Agreed on 2026-10-26 at the user's request.
+- Escape with text in the field empties the command bar, its `>` or site search chip too. Escape on an empty field closes it. Agreed on 2026-10-26: before, Escape always closed it.
 
 ### What it finds
 
@@ -150,6 +152,7 @@ These examples are typed in Hong Kong at 6:24 PM on Tuesday, Oct 20, 2026:
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
 - What uw learns from picks, aliases, and the default currency are profile prefs. Recorded keys are the same in every profile. A history deletion clears what uw learned.
 - Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
+- The page handles Escape, so the browser holds it with the other keys typed right after Cmd+T, and the page asks the browser to close. When the panel closes for any reason but losing focus, the browser has the page forget its text through the same `SetInputText`.
 - Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed. The chat's agent adopts the selected tab as tab 1, as it adopts its own tabs after a restart.
 - Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
 - The math library is pinned to an exact version in `package.json`, like ghostty-web. mathjs 15.2.0, agreed on 2026-10-17. It has units and lets uw add each currency as a unit. The rates are fetched by the browser process: `ExchangeRates` downloads the bank's daily file, reads it with Chromium's data decoder, and keeps it in profile prefs. The page asks for them over `uw_command_bar.mojom`, which also copies an answer and closes the command bar.
@@ -158,7 +161,7 @@ These examples are typed in Hong Kong at 6:24 PM on Tuesday, Oct 20, 2026:
 
 ## Stages
 
-Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-16: T99, T82, and T81 moved ahead of T61 at the user's request, and T82 no longer waits for T54. Changed again the same day: the user put commands off, so T66 comes before T61. Changed on 2026-10-21: T143, time math, comes after T66 and before translation.
+Each stage is a ticket on the [board](roadmap.md#board), built in this order. Changed on 2026-10-16: T99, T82, and T81 moved ahead of T61 at the user's request, and T82 no longer waits for T54. Changed again the same day: the user put commands off, so T66 comes before T61. Changed on 2026-10-21: T143, time math, comes after T66 and before translation. Changed on 2026-10-26: T213 comes after T156.
 
 1. T60: spike. A preloaded top-chrome WebUI panel opens on Cmd+T without creating a tab, keeps every key typed right after Cmd+T, and lists suggestions from Chromium's searchbox handler.
 2. T98: the command bar opens what is picked, in the design's look, from Chromium's instant results. Added on 2026-10-16 so Cmd+T opens pages before T61.
@@ -168,13 +171,14 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 6. T66: math, units, currency, and the default currency setting.
 7. T143: time and time zones. Added on 2026-10-21.
 8. T156: the arrow keys put a row's text in the field, and filled text is muted. Added on 2026-10-22.
-9. T112: translation. Split from T66 on 2026-10-17.
-10. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
-11. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
-12. T62: Cmd+L and the address click open it.
-13. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
-14. T64: Cmd+Shift+A opens it narrowed to tabs.
-15. T65: aliases, and recording a key from the result menu into T122's key list.
+9. T213: the command bar keeps its text when it loses focus, and Escape empties the field first. Added on 2026-10-26.
+10. T112: translation. Split from T66 on 2026-10-17.
+11. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
+12. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
+13. T62: Cmd+L and the address click open it.
+14. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
+15. T64: Cmd+Shift+A opens it narrowed to tabs.
+16. T65: aliases, and recording a key from the result menu into T122's key list.
 
 ## Acceptance checks
 
@@ -195,6 +199,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, `1/2 cup to tsp` shows 25 tsp, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
 16. With the clock at 6:24 PM on Tuesday, Oct 20, 2026, in Hong Kong: `now + 100 minutes to UTC` shows 12:04 PM, `3pm London` shows 10:00 PM, `dec 25 - today` shows 66 days, `next friday` shows Friday, Oct 30, 2026, `1760000000 to date` shows Oct 9, 2025, 4:53:20 PM with Thursday, and `now to unix` shows 1792491840. `2026-12-25` shows a date, and `3/4` shows 0.75. `now`, `friday`, and `now in Narnia` show no card, and `feb 30` says it is not a date. With the Mac's 24-hour setting on, `3pm` shows 15:00. A card built on `now` shows the next minute without retyping.
 17. With a page visited by its address, typing the start of the address shows the rest muted after the caret. Backspace deletes a typed letter and the rest goes; → takes it. ↓ to another page's row puts its address in the field with the caret at the end, what was typed in full ink and the rest muted, and a long address shows its end. Backspace edits it, and all of it turns to full ink. ↑ back to the first row shows what was typed and its completion.
+18. With `git` typed and the caret after `g`, a click on the page closes the command bar, and Cmd+T shows `git` with the caret after `g` and the same rows; Ctrl+Cmd+T does too. Escape empties the field and leaves the panel open, and a second Escape closes it, so the next Cmd+T opens empty. After a pick, Cmd+Return, Option+Return, or a copied answer, the next Cmd+T opens empty. Cmd+Shift+P opens an empty `>` over kept text. Typing `a` and Escape right after Cmd+T, before the panel has drawn, leaves it open and empty.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
