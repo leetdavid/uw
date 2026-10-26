@@ -224,6 +224,13 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T195 | Printed chats from the uw command | in review | 5/10 | `uw chat -p`, `--json`, the exit codes, approvals asked in the terminal or answered with `uw approve`, `-c`, `-r`, `--mode`, `--model`, `--effort`, `--timeout`, piped text as attached material, and `uw chats`, per the [plan](uw-command.md#chats). Needs T193. Done when acceptance checks 4 to 7 pass. Built on 2026-10-25: a real chat page in the run window that the command watches; steps, approvals, and the end come as notifications; `uw approve`, `-r`, `-c`, `uw chats`; piped text as information through `AgentContext::AddMaterial`. Headless tests cover an answer, a connector approval, piped text, and the command going away. |
 | T196 | The uw command's terminal interface | in review | 5/10 | The Claude Code-like interface for `uw chat`: steps, Markdown answers, approval cards, steering, Esc, the `/` menu, the status line, and Ctrl-O, per the [plan](uw-command.md#the-terminal-interface). Needs T195. Done when acceptance check 8 passes. |
 | T197 | uw mcp serve | in review | 5/10 | The tool server for [outside agents](agent-chats.md#releases), `uw mcp serve`, over the `uw` command's channel: the agent's page tools out of sight, with approvals asked through MCP elicitation or uw's notification, per the [plan](uw-command.md#the-tool-server). Part of v2.2. Needs T193. Done when acceptance check 10 passes. |
+| T216 | Bundle ID and uw version | in progress | 8/10 | The bundle ID becomes `com.uwbrowser.uw`, the bundle carries uw's own version (0.1.0), and the About page reads "uw 0.1.0 (Chromium …)". The user agent keeps Chromium's version. Per the [distribution plan](distribution.md#versions). |
+| T217 | Release command | todo | 6/10 | `pnpm run release <sha>` builds and smoke-tests in `~/dev/uw-release`, signs and notarizes with Chromium's `sign_chrome.py`, makes `uw-macos-arm64.dmg`, uploads symbols to Sentry, signs the Sparkle feed entry, and publishes the GitHub release. It refuses to build with the org-only sign-in keys. Per the [plan](distribution.md#release-pipeline). Needs T216. |
+| T218 | Sparkle behind Chromium's relaunch button | todo | 5/10 | Sparkle checks daily and downloads in the background, then Chromium's "Relaunch to update" installs it with tabs restored, per [ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md). Needs T216. |
+| T219 | Problem reports and consent | todo | 5/10 | The first-run Yes/No and one settings switch; Crashpad uploads to Sentry; rage clicks, dead clicks, and JavaScript errors from uw's own pages to PostHog, per [Problem reports](distribution.md#problem-reports). |
+| T220 | H.264 and AAC through macOS | todo | 4/10 | Play H.264 through VideoToolbox and AAC through AudioToolbox, and ship neither FFmpeg's decoders for them nor OpenH264, per [Codecs](distribution.md#codecs). x.com's videos must still play. |
+| T221 | Report an issue | todo | 9/10 | Help → "Report an issue" opens a new GitHub issue with the uw, Chromium, and macOS versions filled in. |
+| T222 | uwbrowser.com | todo | 8/10 | The one-page site, designed on the Doop canvas first, then Next.js in `site/` on Vercel with PostHog, per [Website content](distribution.md#website-content). |
 
 ## 1. Choose the browser foundation
 
@@ -314,6 +321,12 @@ Agreed on 2026-10-24: a `uw` command that runs chats, manages connectors, and ch
 
 Done when the plan's [acceptance checks](uw-command.md#acceptance-checks) pass.
 
+## Public previews
+
+Agreed on 2026-10-26: anyone can download uw as an early preview, signed, notarized, and updating itself, with a website at `uwbrowser.com`. The [distribution plan](distribution.md) has the decisions, T216 to T222 on the board.
+
+Done when v0.1.0 is downloadable from the website, opens without macOS warnings, and updates itself to a later preview.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -327,6 +340,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Chromium build foundation](../../README.md#building) | 7/10 | Verified on one Apple Silicon Mac; Xcode compatibility and ongoing Chromium updates still need maintenance. |
 | [Minimal uw branding and vertical-tab default](../../README.md#customizing-chromium) | 9/10 | Small identity and preference patches reuse upstream native tabs. The customized build and headless smoke test pass; native UI behavior remains unverified. |
 | [App icon](../logo.md#app-icon) | 8/10 | Xcode compiles a layered icon from the logo files, and two lines of `chrome/BUILD.gn` point the app bundle at it. Each logo change means rerunning one command. Logos inside the browser are not covered. |
+| [Public previews](distribution.md) | 5/10 | Signing, the release command, and the website reuse existing tools. Sparkle's hand-off to Chromium's relaunch button and playing H.264 and AAC through macOS carry the risk. |
 | [Chrome-like browsing with vertical tabs](../product.md#minimum-usable-version) | 7/10 | Keeping normal browser behavior intact matters more than drawing the sidebar. |
 | [Native tree-style tabs](../product.md#automatic-tab-organization) | 7/10 | Tasks are native tab groups. uw adds page parents, indentation, child promotion on close, and restore of parent links. |
 | [Arc-style look](arc-style-look.md) | 4/10 | Chromium already has settings for the sizes, colors, and rounded page corners. The tint gradient, the user's own tint, and the task folder row need custom drawing, and each Chromium update can move the views it touches. |
