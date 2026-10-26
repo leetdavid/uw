@@ -69,13 +69,13 @@ Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_l
 
 ## Website content
 
-Agreed: one page, designed on the Doop canvas in the `uw-arc-style` look before it is built.
+Agreed: one page that sells uw, in the `uw-arc-style` look. The approved design is frame `KvI1yY00T8` on the Doop canvas. It shows only uw's own interface, never real or made-up websites, and only features that are built.
 
-1. Hero: the logo, "ur web, ur way", and one line on what uw is.
-2. A "Download for Mac" button with "Apple silicon · macOS 13+ · Early preview", and a GitHub link.
-3. One screenshot of the sidebar with tasks.
-4. Three features that work in the preview: tasks that organize themselves, the built-in agent, and terminal tabs.
-5. Footer: a note that the preview may break, a privacy line (problem reports only with consent; AI requests go only to the providers the user picks), and links to GitHub Issues and the source.
+1. Hero: "ur web, ur way", one line on what uw is, and "Download for Mac" with "Apple silicon · macOS 13 or later". Below it sits the ad video; its poster image stands in until the video is made.
+2. How it works: a pinned scroll demo. Four stops show a messy Scratchpad sorting itself into tasks, a new task forming, and Undo. Phones and reduced-motion settings get four still cards instead.
+3. Features: the mini player docked in the sidebar, the command bar, workspaces and themes, the agent, watching a page, and the terminal.
+4. Four promises: built on Chromium, the user's own AI provider, problem reports only with consent, and Undo for every move.
+5. A closing download button that says the preview is rough, and a footer linking releases, GitHub Issues, and the source.
 
 No email list, docs, or pricing yet.
 

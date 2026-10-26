@@ -321,6 +321,18 @@ pnpm run release 0.1.0
 
 It checks out GitHub's `main` in the release worktree, builds and smoke-tests it, and writes the version and the update feed's address into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there.
 
+## Website
+
+The `uwbrowser.com` page is a Next.js app in [`site/`](site/), checked with Biome:
+
+```sh
+pnpm -F @uw/site dev
+pnpm -F @uw/site lint
+pnpm -F @uw/site build
+```
+
+Its download buttons link to the latest release's `uw-macos-arm64.dmg`, so they work once a release is published. [Website content](docs/plans/distribution.md#website-content) lists what the page shows.
+
 ## CI
 
 - [`checks.yml`](.github/workflows/checks.yml) installs dependencies with pnpm, runs the tooling checks, and validates workflows on a GitHub-hosted runner.

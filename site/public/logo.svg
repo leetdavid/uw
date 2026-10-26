@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640" role="img" aria-labelledby="title">
+  <title id="title">uw browser logo</title>
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="115.2"/></clipPath>
+    <linearGradient id="sheet" x1=".281" y1="-.103" x2=".719" y2="1.103">
+      <stop offset="0" stop-color="#FDFCFF"/>
+      <stop offset="1" stop-color="#F1F4FE"/>
+    </linearGradient>
+    <radialGradient id="wash-violet" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="486.4">
+      <stop offset="0" stop-color="#7342F0" stop-opacity=".26"/>
+      <stop offset=".62" stop-color="#7342F0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-blue" gradientUnits="userSpaceOnUse" cx="512" cy="512" r="486.4">
+      <stop offset="0" stop-color="#4285F0" stop-opacity=".3"/>
+      <stop offset=".62" stop-color="#4285F0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="206">
+      <stop offset="0" stop-color="#fff" stop-opacity=".42"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".6" stop-color="#0A0850" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0A0850" stop-opacity=".22"/>
+    </linearGradient>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="140" y2="206">
+      <stop offset="0" stop-color="#fff" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".15"/>
+    </linearGradient>
+    <filter id="lift" filterUnits="userSpaceOnUse" x="0" y="0" width="640" height="640">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="-140" y="-130" width="580" height="500">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="grain" filterUnits="userSpaceOnUse" x="-140" y="-130" width="580" height="500" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" seed="7"/>
+      <feColorMatrix type="matrix" values="1.6 0 0 0 -.3 1.6 0 0 0 -.3 1.6 0 0 0 -.3 0 0 0 0 1" result="noise"/>
+      <feComposite in="SourceGraphic" in2="noise" operator="arithmetic" k1="0" k2="1" k3=".2" k4="-.1" result="grained"/>
+      <feComposite in="grained" in2="SourceGraphic" operator="in"/>
+    </filter>
+    <path id="u1" d="M24 30V116A60 60 0 0 0 144 116V30"/>
+    <path id="u2" d="M144 30V116A60 60 0 0 0 264 116V30"/>
+    <path id="uu" d="M24 30V116A60 60 0 0 0 144 116V30M144 30V116A60 60 0 0 0 264 116V30"/>
+    <mask id="on-u2" maskUnits="userSpaceOnUse" x="-100" y="-100" width="500" height="450">
+      <use href="#u2" fill="none" stroke="#fff" stroke-width="60" stroke-linecap="round"/>
+    </mask>
+    <mask id="rim-u1" maskUnits="userSpaceOnUse" x="-100" y="-100" width="500" height="450">
+      <g fill="none" stroke-linecap="round">
+        <use href="#u1" stroke="#fff" stroke-width="60"/>
+        <use href="#u1" stroke="#000" stroke-width="52"/>
+      </g>
+    </mask>
+    <mask id="rim-u2" maskUnits="userSpaceOnUse" x="-100" y="-100" width="500" height="450">
+      <g fill="none" stroke-linecap="round">
+        <use href="#u2" stroke="#fff" stroke-width="60"/>
+        <use href="#u2" stroke="#000" stroke-width="52"/>
+      </g>
+    </mask>
+    <g id="inks">
+      <use href="#u2" stroke="#4285F0"/>
+      <use href="#u1" stroke="#7342F0"/>
+      <use href="#u1" stroke="#1E22E2" mask="url(#on-u2)"/>
+    </g>
+  </defs>
+  <rect id="shadow" x="64" y="76" width="512" height="512" rx="115.2" fill="#1E1B2E" opacity=".2" filter="url(#lift)"/>
+  <g transform="translate(64 64)">
+    <g id="art" clip-path="url(#tile)">
+      <rect class="ground" width="512" height="512" fill="url(#sheet)"/>
+      <rect class="ground" width="512" height="512" fill="url(#wash-blue)"/>
+      <rect class="ground" width="512" height="512" fill="url(#wash-violet)"/>
+      <g id="mark" transform="translate(264.3 260.4) rotate(-12) scale(1.68) translate(-144 -100)" fill="none" stroke-width="60" stroke-linecap="round">
+        <g filter="url(#soft)" opacity=".42" transform="translate(0 12)"><use href="#inks"/></g>
+        <g filter="url(#grain)">
+          <use href="#inks"/>
+          <use href="#uu" stroke="url(#shade)"/>
+        </g>
+        <use href="#u2" stroke="url(#rim)" mask="url(#rim-u2)"/>
+        <use href="#u1" stroke="url(#rim)" mask="url(#rim-u1)"/>
+      </g>
+    </g>
+    <rect id="ring" x="1" y="1" width="510" height="510" rx="114.2" fill="none" stroke="#1E1B2E" stroke-opacity=".08" stroke-width="2"/>
+  </g>
+</svg>

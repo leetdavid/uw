@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F8F5FC"/>
+      <stop offset=".5" stop-color="#F0ECFA"/>
+      <stop offset="1" stop-color="#E4E6F8"/>
+    </linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F0B7EA"/>
+      <stop offset=".5" stop-color="#C7A4F5"/>
+      <stop offset="1" stop-color="#A9B4F6"/>
+    </linearGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="1" y2=".3">
+      <stop offset="0" stop-color="#B08CF2"/>
+      <stop offset=".45" stop-color="#7D7FEE"/>
+      <stop offset=".75" stop-color="#5F9DEE"/>
+      <stop offset="1" stop-color="#4FC0EA"/>
+    </linearGradient>
+    <linearGradient id="near" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8A8CF1"/>
+      <stop offset=".5" stop-color="#4FB8EC"/>
+      <stop offset="1" stop-color="#7EE0F4"/>
+    </linearGradient>
+    <linearGradient id="crest" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="dawn" cx=".72" cy=".62" r=".45">
+      <stop offset="0" stop-color="#FFE2F4" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FFE2F4" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="haze" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="26"/></filter>
+    <filter id="soft" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="glow" x="-20%" y="-300%" width="140%" height="700%"><feGaussianBlur stdDeviation="5"/></filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .08 0"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <rect width="1600" height="1000" fill="url(#dawn)"/>
+  <path d="M-200 720 C 100 690 420 650 700 668 C 920 682 1040 600 1180 560 C 1320 520 1500 590 1800 600 L1800 1100 L-200 1100Z" fill="url(#far)" opacity=".55" filter="url(#haze)"/>
+  <path d="M-200 820 C 160 790 460 740 760 750 C 960 757 1080 650 1210 620 C 1360 586 1520 660 1800 690 L1800 1100 L-200 1100Z" fill="url(#mid)" opacity=".85" filter="url(#haze)"/>
+  <path d="M-200 820 C 160 790 460 740 760 750 C 960 757 1080 650 1210 620 C 1360 586 1520 660 1800 690 L1800 760 L-200 900Z" fill="url(#crest)" opacity=".7" filter="url(#soft)"/>
+  <path d="M-200 930 C 240 880 600 900 920 870 C 1180 846 1380 780 1800 800 L1800 1100 L-200 1100Z" fill="url(#near)" opacity=".9" filter="url(#soft)"/>
+  <path d="M-200 930 C 240 880 600 900 920 870 C 1180 846 1380 780 1800 800 L1800 850 L-200 990Z" fill="url(#crest)" opacity=".55" filter="url(#soft)"/>
+  <path d="M-40 742 C 300 732 560 716 800 714 C 980 712 1090 650 1215 628 C 1350 604 1480 640 1640 652" fill="none" stroke="#FFC9EE" stroke-width="8" opacity=".75" filter="url(#glow)"/>
+  <path d="M-40 742 C 300 732 560 716 800 714 C 980 712 1090 650 1215 628 C 1350 604 1480 640 1640 652" fill="none" stroke="#FFFFFF" stroke-width="1.6" opacity=".9"/>
+  <rect width="1600" height="1000" filter="url(#grain)"/>
+</svg>
