@@ -302,6 +302,23 @@ Xcode is a host dependency. Matching source pins alone does not guarantee identi
 
 To update Chromium, choose a release from [Chromium Dash](https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Mac&num=1), verify its upstream tag and commit, and update the pins. Check that revision's SDK requirement, then rerun sync, build, and smoke. Review and refresh any conflicting patches, then run the [customization acceptance checks](#customization-verification).
 
+## Publishing a preview
+
+Previews are built on the owner's Mac, as the [distribution plan](docs/plans/distribution.md#release-pipeline) describes. The Mac needs:
+
+- The owner's `Developer ID Application` certificate in the login keychain.
+- A `notarytool` keychain profile named `uw-notary`, made with `xcrun notarytool store-credentials uw-notary`.
+- `gh` signed in to GitHub.
+- A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
+
+Push `main`, then run:
+
+```sh
+pnpm run release 0.1.0
+```
+
+It checks out GitHub's `main` in the release worktree, builds and smoke-tests it, and writes the version into the app bundle. It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. The `uw` command's program inside the app is signed first, with the one entitlement it needs, `allow-jit`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg` and draft notes. Review the notes on GitHub and publish the draft there.
+
 ## CI
 
 - [`checks.yml`](.github/workflows/checks.yml) installs dependencies with pnpm, runs the tooling checks, and validates workflows on a GitHub-hosted runner.
