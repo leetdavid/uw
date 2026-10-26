@@ -31,7 +31,7 @@ Added on 2026-10-15:
 - The model gets a small context and can still reach everything; see [Context](#context).
 - A new chat opens on "What should the agent do?" with three requests to try, and a click puts one in the composer. For now they are the [product's examples](../product.md#chats). Later the language model writes them once a day from the titles of recent chats and the most-visited sites of the past week (T84). Agreed on 2026-10-15.
 - The agent's answers are drawn as Markdown: headings, lists, tables, task lists, quotes, code with colors for about a dozen languages, and links. A link opens as a child tab under the chat and is selected; Cmd-click opens it in the background. Only `http` and `https` links work. The user's own messages stay plain text.
-- [Agent memory](../CONTEXT.md#language), in v2.1, follows a plain-sentence model: the agent reads every memory at the start of a request, keeps and forgets them without asking, and each change is a line under its answer with Edit and Undo. A switch in the composer keeps one chat out of memory. Memories stay on this Mac, are never taken from page text, and never hold passwords, card numbers, or account numbers. A private chat keeps none. The rest waits for the user's research into how memory is stored.
+- [Agent memory](../CONTEXT.md#language), in v2.1, follows the [agent memory plan](agent-memory.md), agreed on 2026-10-26. It replaces this line's earlier read-all model and its Edit and Undo line.
 
 Added on 2026-10-16:
 

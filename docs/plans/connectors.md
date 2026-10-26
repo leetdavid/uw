@@ -12,7 +12,7 @@ Implementability: **5/10** using the [roadmap convention](roadmap.md#implementab
 
 ### The AI page
 
-- `uw://ai` replaces `uw://providers`. Its sidebar has three sections, each at its own address: Providers at `uw://ai/providers` (which `uw://ai` also opens) with one provider at `uw://ai/providers/<id>`, Skills at `uw://ai/skills`, and Connectors at `uw://ai/connectors`. Agent memory joins later.
+- `uw://ai` replaces `uw://providers`. Its sidebar has three sections, each at its own address: Providers at `uw://ai/providers` (which `uw://ai` also opens) with one provider at `uw://ai/providers/<id>`, Skills at `uw://ai/skills`, and Connectors at `uw://ai/connectors`. Memory joins at `uw://ai/memory`, per the [agent memory plan](agent-memory.md#the-memory-page).
 - Providers is today's providers page, unchanged. Skills moves there from the chat page.
 - The chat page's chat list ends with "AI settings". It opens a menu of Providers, Skills, and Connectors with the counts `uw://ai` shows. Each opens its section, reusing an open `uw://ai` tab as Chromium's Settings does. Agreed on 2026-10-24 in place of a "Skills · N on" row (T178). The settings sidebar's "AI providers" link becomes "AI".
 - The section list ends with "Back to chat". It goes to the window's most recently used chat tab, or opens a new chat when the window has none. Agreed on 2026-10-24 (T180).

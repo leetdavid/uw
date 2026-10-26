@@ -249,8 +249,16 @@ _Avoid_: Delegated browser task, agent task, run, job.
 A chat started from a private window. Nothing from it is kept after the private windows close.
 
 **Agent memory**:
-What uw's agent keeps between chats: plain sentences about the user, one a memory, such as which bank they use. The agent reads them all at the start of a request and keeps or forgets them as it works, without asking; the user rewords, forgets, and puts them back.
+What uw's agent keeps between chats: plain sentences about the user, one a memory, such as which bank they use. Each profile has its own. The agent keeps and forgets them as it works, without asking; the user rewords and forgets them.
 _Avoid_: Notes, knowledge base, context
+
+**Core memory**:
+A memory the agent reads with every request, because it is useful almost always, such as the user's name or city. The agent searches the other memories when a request calls for them.
+_Avoid_: Pinned memory, profile, summary
+
+**Memory check**:
+A quick model call uw makes before the agent keeps a memory, to judge whether the user said or clearly meant it and whether it holds a secret. It sees the user's own messages, never page text, attached material, or tool results. An unsure or missing answer keeps nothing.
+_Avoid_: Memory filter, memory guard
 
 **Skill**:
 Instructions that teach uw's agent how to do one kind of request, with a name and a one-line description. The agent sees every skill's description and reads a skill's instructions only when a request calls for it, or when the user starts the skill by typing `/` and its name. A skill can be for the user only, which the agent never sees, or for the agent only. Unlike agent memory, a skill says how to do something, not what is true about the user.
