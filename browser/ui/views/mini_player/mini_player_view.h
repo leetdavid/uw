@@ -172,7 +172,7 @@ class MiniPlayerView : public views::View {
   void CopyStill();
   void UpdateControlsVisibility();
   void SetFast(bool fast);
-  void SetCorners(float radius, std::optional<SkColor> ring);
+  void SetCorners(float radius, SkColor ring);
   void RegisterFrameSink();
   void UnregisterFrameSink();
 

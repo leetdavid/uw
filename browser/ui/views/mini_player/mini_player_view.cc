@@ -52,6 +52,8 @@ constexpr int kStillWidth = 156;
 constexpr int kFloatingSizesFrom = 320;
 
 constexpr int kFloatingCornerRadius = 12;
+// The floating window's edge: faint and even, so no side reads as a line.
+constexpr SkColor kFloatingEdge = SkColorSetA(SK_ColorWHITE, 0x1F);
 constexpr int kDockedCornerRadius = 10;
 constexpr int kDockedShadowElevation = 4;
 
@@ -378,7 +380,7 @@ void MiniPlayerView::SetControlsAllowed(bool allowed) {
 
 void MiniPlayerView::SetFloatingLook() {
   shadow_.reset();
-  SetCorners(kFloatingCornerRadius, std::nullopt);
+  SetCorners(kFloatingCornerRadius, kFloatingEdge);
 }
 
 void MiniPlayerView::SetDockedLook(SkColor ring, bool shadow) {
@@ -391,7 +393,7 @@ void MiniPlayerView::SetDockedLook(SkColor ring, bool shadow) {
   }
 }
 
-void MiniPlayerView::SetCorners(float radius, std::optional<SkColor> ring) {
+void MiniPlayerView::SetCorners(float radius, SkColor ring) {
   layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(radius));
   layer()->SetIsFastRoundedCorner(true);
   if (rim_) {

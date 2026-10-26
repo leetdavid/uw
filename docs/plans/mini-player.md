@@ -117,6 +117,7 @@ The first round was drawn and signed off on 2026-10-24, T185, on the Doop canvas
 uw's proposals in the frames:
 
 - Docked, it is 232px wide with 10px corners, 6px above the foot, and never taller than it is wide. A 9:16 video is 232px tall and 131px wide, centered.
+- Floating, the window has a faint even 1px edge, white at 12%. The design's lit rim, brightest at the top left, read as a line across the top of a dark video, and was dropped on 2026-10-26 when the user reported it.
 - At Glass's left end each control is a black circle at 40%. Over video the glass stays dark, so the white icons read over any frame.
 - Holding for 300 ms without moving starts 2×. The other controls go, and a "2×" pill shows at the top.
 - The activity card shows above the mini player, so the video never moves.

@@ -404,8 +404,7 @@ void ControlsScrim::OnPaint(gfx::Canvas* canvas) {
 BEGIN_METADATA(ControlsScrim)
 END_METADATA
 
-Rim::Rim(float radius, std::optional<SkColor> ring)
-    : radius_(radius), ring_(ring) {
+Rim::Rim(float radius, SkColor ring) : radius_(radius), ring_(ring) {
   SetCanProcessEventsWithinSubtree(false);
   SetPaintToLayer();
   layer()->SetFillsBoundsOpaquely(false);
@@ -416,27 +415,11 @@ Rim::~Rim() = default;
 void Rim::OnPaint(gfx::Canvas* canvas) {
   gfx::RectF edge(GetLocalBounds());
   edge.Inset(0.5f);
-  if (ring_) {
-    cc::PaintFlags flags;
-    flags.setAntiAlias(true);
-    flags.setStyle(cc::PaintFlags::kStroke_Style);
-    flags.setStrokeWidth(1);
-    flags.setColor(*ring_);
-    canvas->DrawRoundRect(edge, radius_ - 0.5f, flags);
-    return;
-  }
-  const SkPoint points[2] = {gfx::PointFToSkPoint(edge.origin()),
-                             gfx::PointFToSkPoint(edge.bottom_right())};
-  const SkColor4f colors[4] = {
-      SkColor4f::FromColor(White(.7f)), SkColor4f::FromColor(White(.14f)),
-      SkColor4f::FromColor(White(.04f)), SkColor4f::FromColor(White(.32f))};
-  const SkScalar positions[4] = {0, .22f, .5f, 1};
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
   flags.setStyle(cc::PaintFlags::kStroke_Style);
   flags.setStrokeWidth(1);
-  flags.setShader(cc::PaintShader::MakeLinearGradient(points, colors, positions,
-                                                      4, SkTileMode::kClamp));
+  flags.setColor(ring_);
   canvas->DrawRoundRect(edge, radius_ - 0.5f, flags);
 }
 
