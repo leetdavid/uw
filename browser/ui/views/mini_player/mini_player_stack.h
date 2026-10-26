@@ -11,7 +11,9 @@
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
+#include "base/scoped_observation.h"
 #include "base/time/time.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "ui/gfx/image/image_skia.h"
 
 namespace content {
@@ -26,7 +28,7 @@ namespace uw {
 // newest first, until the user plays it again, drops it, or goes to its tab.
 // The stack lives only in the sidebar: unless the mini player docks, the old
 // video pauses and is forgotten.
-class MiniPlayerStack {
+class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
  public:
   // A paused video.
   struct Entry {
@@ -81,11 +83,14 @@ class MiniPlayerStack {
 
   base::CallbackListSubscription Observe(base::RepeatingClosure callback);
 
+  // PictureInPictureWindowManager::Observer:
+  void OnEnterPictureInPicture() override;
+
  private:
   friend class base::NoDestructor<MiniPlayerStack>;
 
   MiniPlayerStack();
-  ~MiniPlayerStack();
+  ~MiniPlayerStack() override;
 
   void ForgetHidden();
   // Shows the newest paused video in the mini player, still paused, once the
@@ -100,6 +105,9 @@ class MiniPlayerStack {
   std::optional<Entry> hidden_;
   std::vector<Entry> paused_;
   base::RepeatingClosureList observers_;
+  base::ScopedObservation<PictureInPictureWindowManager,
+                          PictureInPictureWindowManager::Observer>
+      picture_in_picture_{this};
   base::WeakPtrFactory<MiniPlayerStack> weak_factory_{this};
 };
 

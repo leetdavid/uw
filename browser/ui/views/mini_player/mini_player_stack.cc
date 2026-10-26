@@ -24,7 +24,9 @@ MiniPlayerStack::Entry& MiniPlayerStack::Entry::operator=(const Entry&) =
     default;
 MiniPlayerStack::Entry::~Entry() = default;
 
-MiniPlayerStack::MiniPlayerStack() = default;
+MiniPlayerStack::MiniPlayerStack() {
+  picture_in_picture_.Observe(PictureInPictureWindowManager::GetInstance());
+}
 MiniPlayerStack::~MiniPlayerStack() = default;
 
 // static
@@ -158,6 +160,13 @@ void MiniPlayerStack::KeepHidden() {
   }
   content::MediaSession::Get(hidden_->contents.get())
       ->Suspend(content::MediaSession::SuspendType::kUI);
+  // The stack lives only in the sidebar: elsewhere the video stays paused in
+  // its page.
+  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
+      MiniPlayerMode::kDock) {
+    hidden_.reset();
+    return;
+  }
   paused_.insert(paused_.begin(), std::move(*hidden_));
   hidden_.reset();
   if (paused_.size() > kMaxPaused) {
@@ -179,11 +188,23 @@ base::CallbackListSubscription MiniPlayerStack::Observe(
   return observers_.Add(std::move(callback));
 }
 
+void MiniPlayerStack::OnEnterPictureInPicture() {
+  // A site's own window took the place of the video that just hid: the video
+  // pauses and waits here, as a video another one replaced does.
+  if (hidden_ &&
+      PictureInPictureWindowManager::GetInstance()->GetChildWebContents()) {
+    KeepHidden();
+  }
+}
+
 void MiniPlayerStack::ForgetHidden() {
   // Nothing showed in its place: the mini player was closed, or its tab was.
+  // A site's own window that took its place keeps it.
   if (hidden_) {
     hidden_.reset();
-    BringUpNewest();
+    if (!PictureInPictureWindowManager::GetInstance()->GetWebContents()) {
+      BringUpNewest();
+    }
   }
 }
 

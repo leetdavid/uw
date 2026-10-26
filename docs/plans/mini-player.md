@@ -38,7 +38,7 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - The paused ones peek out a few pixels above the playing one. Hovering slides them up from behind it into rows, each a still of its last frame with its site's icon and title. When the pointer leaves, they slide back down. With reduced motion they move without sliding.
 - Clicking a paused one plays it on top and pauses the one it replaces, which goes under it.
 - Each has its own close. Going to a paused video's tab takes it out of the stack.
-- Closing the playing one closes only it: the newest paused one comes up in its place, still paused. The same goes when it leaves any other way, as when its tab closes. Asked for on 2026-10-26: "closing one mini player should just close that one, not all docked pips". Staying paused is uw's choice.
+- Closing the playing one closes only it: the newest paused one comes up in its place, still paused. The same goes when it leaves any other way, as when its tab closes. A site's own window that takes a playing video's place keeps it: the video pauses into the stack, as a video another one replaced does, and no paused video comes back over the window. Agreed on 2026-10-26. Asked for on 2026-10-26: "closing one mini player should just close that one, not all docked pips". Staying paused is uw's choice.
 - Only the playing one floats. The paused ones come back when it docks again.
 - A live window never joins it.
 - The stack lives only in the sidebar. With Don't dock, or for a site's window too big to dock, a new picture in picture closes the old one and leaves it paused in its page, as Chromium does.

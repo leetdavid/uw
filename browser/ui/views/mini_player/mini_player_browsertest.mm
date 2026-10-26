@@ -749,6 +749,40 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(Bool("isInPictureInPicture()"));
 }
 
+// A call's own window that takes the playing video's place keeps it: the
+// video pauses into the stack, and no paused video comes back over the call.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ACallTakingTheVideosPlacePausesItIntoTheStack) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* first = OpenMiniPlayer();
+  Play();
+  content::WebContents* first_video = video_;
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(first, browser()); }));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  MiniPlayer* second = OpenMiniPlayer();
+  Play();
+  content::WebContents* second_video = video_;
+  ASSERT_TRUE(base::test::RunUntil([&] { return DocksIn(second, browser()); }));
+  ASSERT_EQ(1u, MiniPlayerStack::Get().paused().size());
+
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  OpenSiteWindow(320, 200);
+  SiteWindow* call = SiteWindow::Current();
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(call); }));
+  Settle();
+  EXPECT_TRUE(SiteDocks(call));
+  EXPECT_FALSE(
+      content::EvalJs(first_video, "isInPictureInPicture()").ExtractBool());
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(second_video, "video.paused").ExtractBool();
+  }));
+  const std::vector<MiniPlayerStack::Entry>& paused =
+      MiniPlayerStack::Get().paused();
+  ASSERT_EQ(2u, paused.size());
+  EXPECT_EQ(second_video, paused[0].contents.get());
+  EXPECT_EQ(first_video, paused[1].contents.get());
+}
+
 // A tab playing sound gets one row of playback controls while the user is on
 // another tab. The row pauses and plays it, and a click goes to the tab.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
