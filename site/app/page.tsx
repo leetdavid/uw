@@ -4,80 +4,11 @@ import { Ad } from "./ad";
 import { Brew } from "./brew";
 import { Favicon, Folder } from "./icons";
 import { ScrollDemo, type Stop } from "./scroll-demo";
-import type { Notice, Tab, Task } from "./sidebar";
+import { bike, launch, moved, sorted, tab, trip } from "./tabs";
 
 const DOWNLOAD =
   "https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg";
 const REPO = "https://github.com/leetdavid/uw";
-
-const cadence = { letter: "C", background: "#111" };
-
-const tab = {
-  guide: {
-    id: "guide",
-    title: "Four days in Lisbon",
-    icon: { site: "lonelyplanet.com" },
-  },
-  checklist: {
-    id: "checklist",
-    title: "Launch checklist",
-    icon: { site: "notion.so" },
-  },
-  flight: {
-    id: "flight",
-    title: "SFO to Lisbon, May 14",
-    icon: { site: "kayak.com" },
-  },
-  strada: { id: "strada", title: "Strada AL, gravel", icon: cadence },
-  size: { id: "size", title: "Find your size", icon: cadence, child: true },
-  run: { id: "run", title: "Run #4821 failed", icon: { site: "github.com" } },
-  flat: {
-    id: "flat",
-    title: "Sunlit flat with a balcony",
-    icon: { letter: "s", background: "#0F766E" },
-  },
-  nata: {
-    id: "nata",
-    title: "The best pastel de nata in Lisbon",
-    icon: { letter: "B", background: "#2A1A0E", color: "#F6A15A" },
-  },
-  news: {
-    id: "news",
-    title: "Hacker News",
-    icon: { site: "news.ycombinator.com" },
-  },
-} satisfies Record<string, Tab>;
-
-const trip: Task = {
-  id: "trip",
-  name: "Plan Lisbon trip",
-  color: "#1A73E8",
-  tabs: [tab.guide, tab.flight, tab.flat, tab.nata],
-};
-
-function launch(run: string): Task {
-  return {
-    id: "launch",
-    name: "Ship the launch",
-    color: "#188038",
-    tabs: [tab.checklist, { ...tab.run, title: `Run #4821 ${run}` }],
-  };
-}
-
-function bike(name: string, naming = false): Task {
-  return {
-    id: "bike",
-    name,
-    color: "#D01884",
-    naming,
-    tabs: [tab.strada, tab.size],
-  };
-}
-
-const moved: Notice = {
-  title: "Moved to Plan Lisbon trip",
-  detail: "The best pastel de nata in Lisbon",
-};
 
 const stops: Stop[] = [
   {
@@ -149,12 +80,7 @@ const stops: Stop[] = [
     ),
     label: "Change your mind? One click.",
     text: "Every move uw makes can be undone. Put a tab somewhere yourself, and Keep Here holds it there.",
-    sidebar: {
-      tasks: [trip, launch("passed"), bike("Buy a road bike")],
-      scratchpad: [tab.news],
-      active: "nata",
-      notice: moved,
-    },
+    sidebar: sorted,
     alt: "Three tasks in a calm sidebar, with Undo on the last move",
   },
 ];
@@ -232,7 +158,7 @@ export default function Home() {
           <p className="meta">Apple silicon &middot; macOS 13 or later</p>
         </div>
         <div className="player">
-          <Ad sidebar={stops[3].sidebar} download={DOWNLOAD} />
+          <Ad download={DOWNLOAD} />
         </div>
         <div className="curve" />
       </section>

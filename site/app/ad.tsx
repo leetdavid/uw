@@ -8,9 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import nata from "@/assets/nata.jpg";
-import { Favicon, Folder } from "./icons";
+import tram from "@/assets/tram.jpg";
+import { Favicon, Folder, Line } from "./icons";
 import { Sidebar, type SidebarState } from "./sidebar";
+import { launch, sorted, tab, trip } from "./tabs";
 
 const PILE = [
   "kayak.com",
@@ -39,17 +40,95 @@ const PILE = [
   "mail.google.com",
 ];
 
+const playing: SidebarState = {
+  tasks: [{ ...trip, tabs: [...trip.tabs, tab.walk] }, launch("passed")],
+  scratchpad: [tab.news],
+  active: "flat",
+};
+
+const work: SidebarState = { ...sorted, notice: undefined };
+
+const home: SidebarState = {
+  tasks: [
+    {
+      id: "sintra",
+      name: "Weekend in Sintra",
+      color: "#188038",
+      tabs: [
+        {
+          id: "quinta",
+          title: "Quinta da Regaleira",
+          icon: { site: "booking.com" },
+        },
+        {
+          id: "route",
+          title: "Lisbon to Sintra",
+          icon: { site: "maps.google.com" },
+        },
+      ],
+    },
+    {
+      id: "dinner",
+      name: "Dinner for six",
+      color: "#E8710A",
+      tabs: [
+        {
+          id: "ribs",
+          title: "Braised short ribs",
+          icon: { site: "nytimes.com" },
+        },
+        {
+          id: "wine",
+          title: "Wines under €20",
+          icon: { letter: "V", background: "#7B1E3A" },
+        },
+      ],
+    },
+  ],
+  scratchpad: [
+    { id: "playlist", title: "Sunday morning", icon: { site: "spotify.com" } },
+  ],
+  active: "quinta",
+};
+
 function at(seconds: number) {
   return { animationDelay: `${seconds}s` };
 }
 
-export function Ad({
-  sidebar,
-  download,
-}: {
-  sidebar: SidebarState;
-  download: string;
-}) {
+function Dock() {
+  return (
+    <div className="dock">
+      <Image src={tram} alt="" fill sizes="240px" />
+      <span className="controls">
+        <Line>
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+          <path d="M3 3v5h5" />
+        </Line>
+        <b>
+          <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </svg>
+        </b>
+        <Line>
+          <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+          <path d="M21 3v5h-5" />
+        </Line>
+      </span>
+      <span className="x">
+        <Line>
+          <path d="M18 6 6 18M6 6l12 12" />
+        </Line>
+      </span>
+      <span className="time">12:41 / 38:02</span>
+      <span className="progress">
+        <i />
+      </span>
+    </div>
+  );
+}
+
+export function Ad({ download }: { download: string }) {
   const scenes: { name: string; seconds: number; body: ReactNode }[] = [
     {
       name: "hook dawn",
@@ -176,9 +255,9 @@ export function Ad({
       body: (
         <>
           <div className="sb drift">
-            <Sidebar state={sidebar} label="" />
+            <Sidebar state={sorted} label="" />
           </div>
-          <div className="line">
+          <div className="line aside">
             <span className="rise" style={at(0.3)}>
               It sorts your tabs
             </span>
@@ -193,21 +272,68 @@ export function Ad({
       ),
     },
     {
-      name: "payoff",
+      name: "pip tint",
       seconds: 3.5,
       body: (
         <>
-          <Image
-            className="photo"
-            src={nata}
-            alt=""
-            fill
-            sizes="(max-width: 1080px) 100vw, 1040px"
-          />
-          <div className="caption rise" style={at(0.5)}>
-            <div className="line">
-              So you can get back to <em>the good part.</em>
+          <div className="sb">
+            <Sidebar state={playing} label="" />
+            <Dock />
+          </div>
+          <div className="line aside">
+            <span className="rise" style={at(0.5)}>
+              Your video,
+            </span>
+            <em className="rise" style={at(1.1)}>
+              docked in the sidebar.
+            </em>
+          </div>
+        </>
+      ),
+    },
+    {
+      name: "commands tint",
+      seconds: 3,
+      body: (
+        <>
+          <div className="cmd rise">
+            <div className="field">
+              <Line>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </Line>
+              <span className="typed">9am Lisbon in San Francisco</span>
+              <i className="caret" />
             </div>
+            <div className="reply rise" style={at(1.5)}>
+              <div className="from">
+                9:00 AM <span>Lisbon</span>
+              </div>
+              <b>
+                <Line>
+                  <path d="M5 12h14m-6-6 6 6-6 6" />
+                </Line>
+              </b>
+              <div className="to">
+                1:00 AM<small>San Francisco, same day</small>
+              </div>
+            </div>
+            <div className="hints rise" style={at(1.8)}>
+              <span>
+                <kbd>↵</kbd>Copy
+              </span>
+              <span>
+                <kbd>Cmd ↵</kbd>Ask uw
+              </span>
+            </div>
+          </div>
+          <div className="line aside">
+            <span className="rise" style={at(0.4)}>
+              Type anything.
+            </span>
+            <em className="rise" style={at(1)}>
+              Get anywhere.
+            </em>
           </div>
         </>
       ),
@@ -249,7 +375,7 @@ export function Ad({
               </div>
             </div>
           </div>
-          <div className="line">
+          <div className="line aside">
             <span className="rise" style={at(0.4)}>
               Ask for help.
             </span>
@@ -261,22 +387,95 @@ export function Ad({
       ),
     },
     {
+      name: "terminal",
+      seconds: 3,
+      body: (
+        <>
+          <div className="shell rise">
+            <div className="shellbar">
+              <span className="lights">
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+            <div className="lines">
+              <span>
+                <span className="prompt">~ $</span>{" "}
+                <span className="typed">
+                  uw chat &quot;what&apos;s left before the launch?&quot;
+                </span>
+              </span>
+              <span className="dim rise" style={at(1.5)}>
+                Reading 6 tabs in Ship the launch
+              </span>
+              <span className="rise" style={at(2)}>
+                <span className="ok">●</span> 3 blockers in Linear, 1 failing
+                check.
+              </span>
+              <span className="rise" style={at(2.2)}>
+                {"  "}The pricing page is approved.
+              </span>
+            </div>
+          </div>
+          <div className="line aside">
+            <span className="rise" style={at(0.3)}>
+              Lives in your
+            </span>
+            <em className="rise" style={at(0.8)}>
+              terminal too.
+            </em>
+          </div>
+        </>
+      ),
+    },
+    {
+      name: "spaces tint",
+      seconds: 3.5,
+      body: (
+        <>
+          <div className="viewport">
+            <div className="reel">
+              <div className="sb">
+                <Sidebar state={work} label="" />
+              </div>
+              <div className="sb home">
+                <Sidebar state={home} label="" />
+              </div>
+            </div>
+          </div>
+          <div className="switch">
+            <i className="work">💼</i>
+            <i className="house">🏡</i>
+            <i>🎨</i>
+          </div>
+          <div className="line aside">
+            <span className="rise" style={at(0.3)}>
+              A space for every
+            </span>
+            <em className="rise" style={at(0.9)}>
+              part of your life.
+            </em>
+          </div>
+        </>
+      ),
+    },
+    {
       name: "calm dawn",
       seconds: 3,
       body: (
         <>
           <div className="line">
             <span className="rise" style={at(0.3)}>
-              Calm, <em>on purpose.</em>
+              Calm,
             </span>
+            <em className="rise" style={at(0.7)}>
+              on purpose.
+            </em>
           </div>
-          <div className="window">
-            <div className="sb">
-              <Sidebar state={{ ...sidebar, notice: undefined }} label="" />
-            </div>
-            <div className="pane">
-              <Image src={nata} alt="" fill sizes="700px" />
-            </div>
+          <div className="sb float">
+            <Sidebar state={playing} label="" />
+            <Dock />
           </div>
         </>
       ),

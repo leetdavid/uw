@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 
 export function Folder({ color }: { color: string }) {
   return (
@@ -24,5 +25,28 @@ export function Favicon({
 }) {
   return (
     <Image src={`/icons/${domain}.png`} alt="" width={size} height={size} />
+  );
+}
+
+export function Line({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
   );
 }

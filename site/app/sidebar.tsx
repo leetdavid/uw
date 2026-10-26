@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, ViewTransition } from "react";
-import { Favicon, Folder } from "./icons";
+import { Favicon, Folder, Line } from "./icons";
 
 type Icon =
   | { site: string }
@@ -53,29 +53,6 @@ function Moves({
     <ViewTransition name={name}>{children}</ViewTransition>
   ) : (
     children
-  );
-}
-
-function Line({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
   );
 }
 
