@@ -65,7 +65,7 @@ index 41bf5932c399fc425e6b5669aed0de4025d6cee3..205a56cefbd8177026db6e866c4ef215
    // This is intentionally last.
    RegisterLocalStatePrefsForMigration(registry);
 diff --git a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
-index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4327a95c2 100644
+index a40f9064b4cd44a43ab40d717b97445454af131a..4644f86c804d15a5651f3a3e875559e9919a3dba 100644
 --- a/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
 +++ b/chrome/browser/ui/views/frame/picture_in_picture_browser_frame_view.cc
 @@ -22,6 +22,7 @@
@@ -76,15 +76,16 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4
  #include "chrome/browser/ui/views/frame/top_container_view.h"
  #include "chrome/browser/ui/views/overlay/overlay_window_image_button.h"
  #include "chrome/browser/ui/views/page_info/page_info_bubble_specification.h"
-@@ -60,6 +61,7 @@
+@@ -60,6 +61,8 @@
  #include "ui/views/widget/widget_delegate.h"
  #include "ui/views/window/frame_background.h"
  #include "ui/views/window/window_shape.h"
 +#include "uw/browser/ui/views/mini_player/live_pill.h"  // nogncheck
++#include "uw/browser/ui/views/mini_player/site_window.h"  // nogncheck
  
  #if BUILDFLAG(IS_WIN)
  #include "ui/base/win/hwnd_metrics.h"
-@@ -81,7 +83,8 @@ constexpr int kBackToTabImageSize = 16;
+@@ -81,7 +84,8 @@ constexpr int kBackToTabImageSize = 16;
  constexpr int kContentSettingIconSize = 16;
  
  // The height of the controls bar at the top of the window.
@@ -94,7 +95,7 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4
  // The vertical margin for IconLabelBubbleView to have 24px height.
  constexpr int KIconViewVerticalMargin = 5;
  
-@@ -173,6 +176,17 @@ void DefinitelyExitPictureInPicture(
+@@ -173,6 +177,17 @@ void DefinitelyExitPictureInPicture(
            PictureInPictureBrowserFrameView::CloseReason::kBackToTabButton);
        break;
    }
@@ -112,7 +113,7 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4
    if (!PictureInPictureWindowManager::GetInstance()
             ->ExitPictureInPictureViaWindowUi(behavior)) {
      // If the picture-in-picture controller has been disconnected for
-@@ -206,8 +220,9 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
+@@ -206,8 +221,9 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
                     .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
                     .Build());
  
@@ -124,18 +125,21 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4
  
    // Creates the window icon.
    const gfx::FontList& font_list = views::TypographyProvider::Get().GetFont(
-@@ -299,6 +314,10 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
+@@ -299,6 +315,13 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
    // PictureInPictureWindowOptions. If the options don't exist (this can happen
    // in some test situations), then default to displaying the back to tab
    // button.
 +  // uw: the Live toggle of a site's own window, before back to tab.
 +  button_container_view_->AddChildView(
 +      uw::LivePill::ForOpener(GetWebContents(), uw::LivePill::Look::kBar));
++  // uw: docks a site's window floating outside the sidebar, before back to
++  // tab, while it could dock.
++  button_container_view_->AddChildView(uw::SiteWindow::MakeBarDockButton());
 +
    const std::optional<blink::mojom::PictureInPictureWindowOptions> pip_options =
        browser_view->GetDocumentPictureInPictureOptions();
    if (!pip_options.has_value() || !pip_options->disallow_return_to_opener) {
-@@ -677,7 +696,13 @@ PictureInPictureBrowserFrameView::GetNonDecoratedClientAreaBoundsInScreen()
+@@ -677,7 +700,13 @@ PictureInPictureBrowserFrameView::GetNonDecoratedClientAreaBoundsInScreen()
  
  content::WebContents* PictureInPictureBrowserFrameView::GetActiveWebContents()
      const {
@@ -150,7 +154,7 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..70147b50aa6fc46996a6a409a3c03db4
  }
  
  bool PictureInPictureBrowserFrameView::GetURL(GURL* url) const {
-@@ -709,7 +734,7 @@ bool PictureInPictureBrowserFrameView::ShouldDisplayURL() const {
+@@ -709,7 +738,7 @@ bool PictureInPictureBrowserFrameView::ShouldDisplayURL() const {
  // LocationIconView::Delegate implementations:
  
  content::WebContents* PictureInPictureBrowserFrameView::GetWebContents() {

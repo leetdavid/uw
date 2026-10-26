@@ -148,6 +148,8 @@ std::unique_ptr<content::VideoOverlayWindow> MiniPlayer::Create(
                                       base::Unretained(controller)));
   view->SetFloatingLook();
   view->set_moves_widget(true);
+  view->set_on_by_hand(base::BindRepeating(
+      &MiniPlayer::MoveByHand, base::Unretained(mini_player.get())));
   view->set_on_video_bounds_changed(base::BindRepeating(
       &content::VideoPictureInPictureWindowController::UpdateLayerBounds,
       base::Unretained(controller)));
@@ -372,6 +374,9 @@ void MiniPlayer::Place(MiniPlayerDock* dock) {
   if (!shown_) {
     return;
   }
+  view_->SetByHand(dock                    ? MiniPlayerView::ByHand::kPopOut
+                   : placement_->CanDock() ? MiniPlayerView::ByHand::kDock
+                                           : MiniPlayerView::ByHand::kNone);
   if (!dock) {
     Undock();
     ShowFloating();
@@ -396,6 +401,14 @@ void MiniPlayer::Place(MiniPlayerDock* dock) {
       base::Unretained(this)));
   placement_->set_current(dock_);
   controller_->UpdateLayerBounds();
+}
+
+void MiniPlayer::MoveByHand() {
+  if (dock_) {
+    placement_->PopOut();
+  } else {
+    MiniPlayerPlacement::DockByHand();
+  }
 }
 
 void MiniPlayer::Undock() {

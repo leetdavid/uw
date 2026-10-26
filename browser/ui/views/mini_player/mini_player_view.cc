@@ -98,15 +98,17 @@ struct MiniPlayerView::Sizes {
   int bottom_row;
   int pill;
   int pill_top;
+  // Between back to tab and the dock or pop out button beside it.
+  int corner_gap;
 };
 
 namespace {
 
 // The frames' docked and floating sizes.
-constexpr MiniPlayerView::Sizes kDocked{24, 8,  14, 28, 17, 38, 16, 14, 22,
-                                        13, 11, 3,  10, 9,  9,  17, 22, 9};
-constexpr MiniPlayerView::Sizes kFloating{30, 12, 16, 38, 22, 52, 22, 22, 28,
-                                          15, 12, 4,  14, 13, 11, 24, 26, 12};
+constexpr MiniPlayerView::Sizes kDocked{24, 8, 14, 28, 17, 38, 16, 14, 22, 13,
+                                        11, 3, 10, 9,  9,  17, 22, 9,  6};
+constexpr MiniPlayerView::Sizes kFloating{
+    30, 12, 16, 38, 22, 52, 22, 22, 28, 15, 12, 4, 14, 13, 11, 24, 26, 12, 8};
 
 }  // namespace
 
@@ -165,6 +167,16 @@ MiniPlayerView::MiniPlayerView(
              }),
              kMiniPlayerBackToTabIcon,
              IDS_PICTURE_IN_PICTURE_BACK_TO_TAB_CONTROL_TEXT, kBackToTabButton);
+  by_hand_ =
+      button(base::BindRepeating(
+                 [](MiniPlayerView* view) {
+                   if (view->on_by_hand_) {
+                     view->on_by_hand_.Run();
+                   }
+                 },
+                 base::Unretained(this)),
+             kMiniPlayerPopOutIcon, IDS_UW_MINI_PLAYER_POP_OUT, kByHandButton);
+  by_hand_->SetVisible(false);
   previous_track_ =
       button(base::BindRepeating(&MiniPlayerView::PreviousTrackOrSlide,
                                  base::Unretained(this)),
@@ -378,6 +390,17 @@ void MiniPlayerView::SetControlsAllowed(bool allowed) {
   UpdateControlsVisibility();
 }
 
+void MiniPlayerView::SetByHand(ByHand by_hand) {
+  by_hand_->SetVisible(by_hand != ByHand::kNone);
+  if (by_hand == ByHand::kDock) {
+    by_hand_->SetIcon(kMiniPlayerDockIcon,
+                      l10n_util::GetStringUTF16(IDS_UW_MINI_PLAYER_DOCK));
+  } else if (by_hand == ByHand::kPopOut) {
+    by_hand_->SetIcon(kMiniPlayerPopOutIcon,
+                      l10n_util::GetStringUTF16(IDS_UW_MINI_PLAYER_POP_OUT));
+  }
+}
+
 void MiniPlayerView::SetFloatingLook() {
   shadow_.reset();
   SetCorners(kFloatingCornerRadius, kFloatingEdge);
@@ -454,6 +477,9 @@ void MiniPlayerView::Layout(PassKey) {
   back_to_tab_->SetSizes(s.corner, s.corner_icon);
   back_to_tab_->SetBounds(video.right() - s.corner_inset - s.corner,
                           video.y() + s.corner_inset, s.corner, s.corner);
+  by_hand_->SetSizes(s.corner, s.corner_icon);
+  by_hand_->SetBounds(back_to_tab_->x() - s.corner_gap - s.corner,
+                      video.y() + s.corner_inset, s.corner, s.corner);
 
   std::vector<MiniPlayerButton*> middle;
   for (MiniPlayerButton* button :

@@ -79,6 +79,12 @@ class SiteWindow : public content::WebContentsDelegate,
   void Close();
   // Closes it and goes to the tab that opened it.
   void BackToTab();
+  // Floats it by hand, for its pop out, until docked by hand.
+  void PopOut();
+
+  // The dock button in the bar of a site's floating window, which uw shows
+  // while that window could dock.
+  static std::unique_ptr<views::View> MakeBarDockButton();
 
   // content::WebContentsDelegate, while the page is docked:
   void CloseContents(content::WebContents* source) override;
@@ -113,6 +119,8 @@ class SiteWindow : public content::WebContentsDelegate,
   void Float();
   // Takes the page out of the dock it is in.
   void Undock();
+  // Shows the bar's dock button while it floats and could dock.
+  void UpdateBarDockButton(bool floats);
   // True while a video plays above it in Chromium's eyes.
   bool BesideAVideo();
   // Pauses it into the stack, or closes it outside the sidebar, unless it is

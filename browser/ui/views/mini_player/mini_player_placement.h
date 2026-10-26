@@ -49,6 +49,15 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
   // switch hiding one window and showing another, has settled.
   void ScheduleUpdate();
 
+  // Floats it by hand, until DockByHand().
+  void PopOut();
+  // Docks every mini player that floats, by hand: brings the front window
+  // forward, out of the Dock if minimized, and says again where each goes.
+  static void DockByHand();
+  // True while it could dock in the front window's sidebar: with Dock chosen,
+  // and the sidebar showing, not hidden and not full screen.
+  bool CanDock();
+
   // The dock the mini player is in, or nullptr while it floats.
   void set_current(MiniPlayerDock* dock) { current_ = dock; }
 
@@ -65,6 +74,8 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
   void OnWidgetDestroying(views::Widget* widget) override;
 
  private:
+  // The front window's dock, while the mini player could dock there.
+  MiniPlayerDock* Dockable();
   MiniPlayerDock* Choose(bool just_opened = false);
   void Place(MiniPlayerDock* dock);
   // Follows the sidebar and the window of `front`.
@@ -77,6 +88,8 @@ class MiniPlayerPlacement : public BrowserCollectionObserver,
   // Whether it has been placed yet, and whether it floats there.
   bool placed_ = false;
   bool floats_ = false;
+  // Set by PopOut() until DockByHand().
+  bool popped_out_ = false;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription app_activity_;
   base::CallbackListSubscription collapse_;

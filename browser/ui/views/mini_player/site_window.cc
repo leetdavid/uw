@@ -31,11 +31,15 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/skia_paint_util.h"
+#include "ui/views/controls/button/image_button.h"
+#include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/controls/webview/webview.h"
 #include "ui/views/view.h"
@@ -58,6 +62,11 @@ constexpr int kCornerRadius = 10;
 constexpr int kButton = 24;
 constexpr int kButtonIcon = 14;
 constexpr int kButtonInset = 8;
+// Between back to tab and pop out.
+constexpr int kButtonGap = 6;
+// The bar of a floating site's window, as Chromium's buttons there.
+constexpr int kBarButton = 24;
+constexpr int kBarIcon = 16;
 constexpr int kScrimHeight = 52;
 constexpr base::TimeDelta kPromptCheck = base::Milliseconds(500);
 
@@ -90,8 +99,13 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
         l10n_util::GetStringUTF16(
             IDS_PICTURE_IN_PICTURE_BACK_TO_TAB_CONTROL_TEXT),
         glass));
+    pop_out_ = AddChildView(std::make_unique<MiniPlayerButton>(
+        base::BindRepeating(&SiteWindow::PopOut, base::Unretained(site_window)),
+        kMiniPlayerPopOutIcon,
+        l10n_util::GetStringUTF16(IDS_UW_MINI_PLAYER_POP_OUT), glass));
     shows_back_to_tab_ = site_window->ShowsBackToTab();
-    for (MiniPlayerButton* button : {close_.get(), back_to_tab_.get()}) {
+    for (MiniPlayerButton* button :
+         {close_.get(), back_to_tab_.get(), pop_out_.get()}) {
       button->SetSizes(kButton, kButtonIcon);
     }
   }
@@ -101,7 +115,9 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
     close_->SetVisible(shown);
     live_->SetVisible(shown);
     back_to_tab_->SetVisible(shown && shows_back_to_tab_);
-    for (MiniPlayerButton* button : {close_.get(), back_to_tab_.get()}) {
+    pop_out_->SetVisible(shown);
+    for (MiniPlayerButton* button :
+         {close_.get(), back_to_tab_.get(), pop_out_.get()}) {
       button->UpdateGlass();
     }
     SchedulePaint();
@@ -114,6 +130,11 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
     close_->SetBounds(kButtonInset, kButtonInset, kButton, kButton);
     back_to_tab_->SetBounds(width() - kButtonInset - kButton, kButtonInset,
                             kButton, kButton);
+    const int pop_out_right = shows_back_to_tab_
+                                  ? back_to_tab_->x() - kButtonGap
+                                  : width() - kButtonInset;
+    pop_out_->SetBounds(pop_out_right - kButton, kButtonInset, kButton,
+                        kButton);
     const gfx::Size live = live_->GetPreferredSize();
     live_->SetBounds((width() - live.width()) / 2,
                      kButtonInset + (kButton - live.height()) / 2, live.width(),
@@ -152,6 +173,7 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
                          const gfx::Rect& rect) const override {
     return shown_ && (close_->bounds().Intersects(rect) ||
                       live_->bounds().Intersects(rect) ||
+                      pop_out_->bounds().Intersects(rect) ||
                       (back_to_tab_->GetVisible() &&
                        back_to_tab_->bounds().Intersects(rect)));
   }
@@ -159,6 +181,7 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
  private:
   raw_ptr<MiniPlayerButton> close_ = nullptr;
   raw_ptr<MiniPlayerButton> back_to_tab_ = nullptr;
+  raw_ptr<MiniPlayerButton> pop_out_ = nullptr;
   raw_ptr<LivePill> live_ = nullptr;
   bool shows_back_to_tab_ = true;
   bool shown_ = false;
@@ -166,6 +189,45 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
 
 BEGIN_METADATA(PageControls)
 END_METADATA
+
+// The dock button in the bar of a site's floating window, drawn as Chromium
+// draws back to tab beside it.
+class BarDockButton : public views::ImageButton {
+  METADATA_HEADER(BarDockButton, views::ImageButton)
+
+ public:
+  BarDockButton()
+      : views::ImageButton(
+            base::BindRepeating(&MiniPlayerPlacement::DockByHand)) {
+    SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+    SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+    views::ConfigureVectorImageButton(this);
+    views::InstallCircleHighlightPathGenerator(this);
+    SetInstallFocusRingOnFocus(true);
+    SetImageModel(
+        views::Button::STATE_NORMAL,
+        ui::ImageModel::FromVectorIcon(kMiniPlayerDockIcon,
+                                       kColorPipWindowForeground, kBarIcon));
+    SetTooltipText(l10n_util::GetStringUTF16(IDS_UW_MINI_PLAYER_DOCK));
+    SetPreferredSize(gfx::Size(kBarButton, kBarButton));
+    SetVisible(false);
+  }
+};
+
+BEGIN_METADATA(BarDockButton)
+END_METADATA
+
+BarDockButton* FindBarDockButton(views::View* view) {
+  if (auto* button = views::AsViewClass<BarDockButton>(view)) {
+    return button;
+  }
+  for (views::View* child : view->children()) {
+    if (BarDockButton* found = FindBarDockButton(child)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
 
 // A site's page docked in the sidebar: the live page with rounded corners and
 // a faint ring, and its controls under the pointer.
@@ -341,6 +403,23 @@ void SiteWindow::Close() {
   }
 }
 
+void SiteWindow::PopOut() {
+  placement_->PopOut();
+}
+
+// static
+std::unique_ptr<views::View> SiteWindow::MakeBarDockButton() {
+  return std::make_unique<BarDockButton>();
+}
+
+void SiteWindow::UpdateBarDockButton(bool floats) {
+  views::Widget* widget = own_widget();
+  if (BarDockButton* button =
+          widget ? FindBarDockButton(widget->GetRootView()) : nullptr) {
+    button->SetVisible(floats && !MustFloat() && placement_->CanDock());
+  }
+}
+
 void SiteWindow::BackToTab() {
   if (content::DocumentPictureInPictureWindowController* window_controller =
           controller()) {
@@ -429,6 +508,7 @@ void SiteWindow::Place(MiniPlayerDock* dock) {
   } else {
     prompt_check_.Stop();
   }
+  UpdateBarDockButton(/*floats=*/!dock);
   if (dock == dock_) {
     return;
   }

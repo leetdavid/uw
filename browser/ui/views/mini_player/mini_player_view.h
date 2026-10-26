@@ -77,7 +77,12 @@ class MiniPlayerView : public views::View {
     kMicrophoneButton,
     kCameraButton,
     kHangUpButton,
+    kByHandButton,
   };
+
+  // What the button just left of back to tab does: dock a floating mini
+  // player, pop out a docked one, or nothing, and then it hides.
+  enum class ByHand { kNone, kDock, kPopOut };
 
   // Sizes of the controls: docked, or in the larger floating window.
   struct Sizes;
@@ -132,6 +137,12 @@ class MiniPlayerView : public views::View {
   // Where the video is now.
   base::TimeDelta position() const { return position_.GetPosition(); }
 
+  void SetByHand(ByHand by_hand);
+  // Called when the dock or pop out button is pressed.
+  void set_on_by_hand(base::RepeatingClosure callback) {
+    on_by_hand_ = std::move(callback);
+  }
+
   // Called when the video's place in the view changes, so the controller can
   // tell the page what size it is shown at.
   void set_on_video_bounds_changed(base::RepeatingClosure callback) {
@@ -183,6 +194,7 @@ class MiniPlayerView : public views::View {
   raw_ptr<views::View> controls_ = nullptr;
   raw_ptr<MiniPlayerButton> close_ = nullptr;
   raw_ptr<MiniPlayerButton> back_to_tab_ = nullptr;
+  raw_ptr<MiniPlayerButton> by_hand_ = nullptr;
   raw_ptr<MiniPlayerButton> replay_ = nullptr;
   raw_ptr<MiniPlayerButton> play_pause_ = nullptr;
   raw_ptr<MiniPlayerButton> forward_ = nullptr;
@@ -233,6 +245,7 @@ class MiniPlayerView : public views::View {
   gfx::ImageSkia still_;
 
   base::RepeatingClosure on_video_bounds_changed_;
+  base::RepeatingClosure on_by_hand_;
   base::WeakPtrFactory<MiniPlayerView> weak_factory_{this};
 };
 

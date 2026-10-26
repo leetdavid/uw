@@ -3,15 +3,18 @@
 
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 
+#include <set>
 #include <utility>
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/no_destructor.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"  // nogncheck
 #include "components/prefs/pref_service.h"
+#include "ui/base/base_window.h"
 #include "uw/browser/ui/views/mini_player/app_activity.h"
 #include "uw/browser/ui/views/mini_player/dock_cover.h"
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
@@ -23,11 +26,34 @@ namespace {
 // Long enough for a workspace switch to hide one window and show the next.
 constexpr base::TimeDelta kSettle = base::Milliseconds(150);
 
+// Every placement, so that docking by hand reaches them all.
+std::set<MiniPlayerPlacement*>& All() {
+  static base::NoDestructor<std::set<MiniPlayerPlacement*>> all;
+  return *all;
+}
+
+// A site's own picture-in-picture window is a browser window too, with no
+// sidebar: the front window is the last active normal one.
+BrowserWindowInterface* FrontWindow() {
+  BrowserWindowInterface* front = nullptr;
+  GlobalBrowserCollection::GetInstance()->ForEach(
+      [&front](BrowserWindowInterface* window) {
+        if (window->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
+          return true;
+        }
+        front = window;
+        return false;
+      },
+      BrowserCollection::Order::kActivation);
+  return front;
+}
+
 }  // namespace
 
 MiniPlayerPlacement::MiniPlayerPlacement(views::Widget* floating_window,
                                          PlaceCallback place)
     : floating_window_(floating_window), place_(std::move(place)) {
+  All().insert(this);
   browsers_.Observe(GlobalBrowserCollection::GetInstance());
   app_activity_ = ObserveAppActivity(base::BindRepeating(
       &MiniPlayerPlacement::ScheduleUpdate, base::Unretained(this)));
@@ -41,7 +67,9 @@ MiniPlayerPlacement::MiniPlayerPlacement(views::Widget* floating_window,
   }
 }
 
-MiniPlayerPlacement::~MiniPlayerPlacement() = default;
+MiniPlayerPlacement::~MiniPlayerPlacement() {
+  All().erase(this);
+}
 
 void MiniPlayerPlacement::Update() {
   settle_.Stop();
@@ -63,6 +91,36 @@ void MiniPlayerPlacement::ScheduleUpdate() {
   settle_.Start(
       FROM_HERE, kSettle,
       base::BindOnce(&MiniPlayerPlacement::Update, base::Unretained(this)));
+}
+
+void MiniPlayerPlacement::PopOut() {
+  popped_out_ = true;
+  Update();
+}
+
+// static
+void MiniPlayerPlacement::DockByHand() {
+  for (MiniPlayerPlacement* placement : All()) {
+    placement->popped_out_ = false;
+  }
+  if (BrowserWindowInterface* front = FrontWindow()) {
+    ui::BaseWindow* window = front->GetWindow();
+    if (window->IsMinimized()) {
+      window->Restore();
+    }
+    window->Activate();
+  }
+  // Placing one can end another, as a video closing a site's window.
+  const std::set<MiniPlayerPlacement*> placements = All();
+  for (MiniPlayerPlacement* placement : placements) {
+    if (All().contains(placement)) {
+      placement->Update();
+    }
+  }
+}
+
+bool MiniPlayerPlacement::CanDock() {
+  return Dockable();
 }
 
 void MiniPlayerPlacement::OnBrowserActivated(BrowserWindowInterface* browser) {
@@ -100,28 +158,13 @@ void MiniPlayerPlacement::OnWidgetDestroying(views::Widget* widget) {
   ScheduleUpdate();
 }
 
-MiniPlayerDock* MiniPlayerPlacement::Choose(bool just_opened) {
-  PrefService* local_state = g_browser_process->local_state();
-  // A site's own picture-in-picture window is a browser window too, with no
-  // sidebar: the front window is the last active normal one.
-  BrowserWindowInterface* front = nullptr;
-  GlobalBrowserCollection::GetInstance()->ForEach(
-      [&front](BrowserWindowInterface* window) {
-        if (window->GetType() != BrowserWindowInterface::TYPE_NORMAL) {
-          return true;
-        }
-        front = window;
-        return false;
-      },
-      BrowserCollection::Order::kActivation);
+MiniPlayerDock* MiniPlayerPlacement::Dockable() {
+  BrowserWindowInterface* front = FrontWindow();
   MiniPlayerDock* dock = MiniPlayerDock::From(front);
   Watch(front, dock);
-  if (MiniPlayerModeOf(local_state) != MiniPlayerMode::kDock || !dock ||
-      !dock->GetWidget()) {
-    return nullptr;
-  }
-  views::Widget* window = dock->GetWidget();
-  if (!window->IsVisible() || window->IsMinimized() || window->IsFullscreen()) {
+  if (MiniPlayerModeOf(g_browser_process->local_state()) !=
+          MiniPlayerMode::kDock ||
+      !dock || !dock->GetWidget() || dock->GetWidget()->IsFullscreen()) {
     return nullptr;
   }
   const auto* sidebar = tabs::VerticalTabStripStateController::From(front);
@@ -129,6 +172,19 @@ MiniPlayerDock* MiniPlayerPlacement::Choose(bool just_opened) {
       (!sidebar->ShouldDisplayVerticalTabs() || sidebar->IsCollapsed())) {
     return nullptr;
   }
+  return dock;
+}
+
+MiniPlayerDock* MiniPlayerPlacement::Choose(bool just_opened) {
+  MiniPlayerDock* dock = Dockable();
+  if (!dock || popped_out_) {
+    return nullptr;
+  }
+  views::Widget* window = dock->GetWidget();
+  if (!window->IsVisible() || window->IsMinimized()) {
+    return nullptr;
+  }
+  PrefService* local_state = g_browser_process->local_state();
   if (IsAppActive()) {
     // A click on the floating mini player brings uw to the front, but it is
     // not coming back to a window.

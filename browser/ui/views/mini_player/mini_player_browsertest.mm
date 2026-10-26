@@ -34,6 +34,7 @@
 #include "chrome/browser/ui/views/frame/browser_frame_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
@@ -46,6 +47,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "media/base/media_switches.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
@@ -296,6 +298,27 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
         Mouse(ui::EventType::kMousePressed, gfx::Point()));
   }
 
+  // The button under `root` whose name is `message`, such as Pop out.
+  static views::Button* ButtonNamed(views::View* root, int message) {
+    const std::u16string name = l10n_util::GetStringUTF16(message);
+    std::vector<views::View*> views = {root};
+    while (!views.empty()) {
+      views::View* view = views.back();
+      views.pop_back();
+      auto* button = views::AsViewClass<views::Button>(view);
+      if (button && button->GetTooltipText() == name) {
+        return button;
+      }
+      std::ranges::copy(view->children(), std::back_inserter(views));
+    }
+    return nullptr;
+  }
+
+  static void PressButton(views::Button* button) {
+    views::test::ButtonTestApi(button).NotifyClick(
+        Mouse(ui::EventType::kMousePressed, gfx::Point()));
+  }
+
   // Makes uw the app in front, with the test window as its active window.
   void BringUwToFront() {
     [NSApp activate];
@@ -485,6 +508,82 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, WithOffNoPictureInPictureOpens) {
   // Choosing Dock again lets it open.
   SetMode(MiniPlayerMode::kDock);
   EXPECT_EQ("opened", content::EvalJs(active(), open_window));
+}
+
+// The button just left of back to tab pops a docked video out, which stays
+// out through app switches, and docks it again, per T215.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItPopsOutAndDocksByHand) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  views::View* view = mini_player->view();
+  EXPECT_EQ(view->GetViewByID(MiniPlayerView::kByHandButton),
+            ButtonNamed(view, IDS_UW_MINI_PLAYER_POP_OUT));
+  Click(mini_player, MiniPlayerView::kByHandButton);
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  EXPECT_EQ(view->GetViewByID(MiniPlayerView::kByHandButton),
+            ButtonNamed(view, IDS_UW_MINI_PLAYER_DOCK));
+
+  SetAppActiveForTesting(false);
+  Settle(kPastTheHold);
+  SetAppActiveForTesting(true);
+  Settle();
+  EXPECT_TRUE(Floats(mini_player));
+
+  Click(mini_player, MiniPlayerView::kByHandButton);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+}
+
+// Floating, the dock button shows only while the video could dock: not while
+// the sidebar is hidden, nor with Don't dock.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       TheDockButtonShowsOnlyWhenItCanDock) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  Click(mini_player, MiniPlayerView::kByHandButton);
+  ASSERT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+  views::View* by_hand =
+      mini_player->view()->GetViewByID(MiniPlayerView::kByHandButton);
+  EXPECT_TRUE(by_hand->GetVisible());
+
+  auto* sidebar = tabs::VerticalTabStripStateController::From(browser());
+  sidebar->RequestCollapse(true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !by_hand->GetVisible(); }));
+  sidebar->RequestCollapse(false);
+  EXPECT_TRUE(base::test::RunUntil([&] { return by_hand->GetVisible(); }));
+  EXPECT_TRUE(Floats(mini_player));
+
+  SetMode(MiniPlayerMode::kDontDock);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !by_hand->GetVisible(); }));
+}
+
+// A docked call's pop out floats the call alone, under a video that stays
+// docked; the dock in its floating bar docks it again.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       ACallPopsOutAloneAndItsBarDocksIt) {
+  SiteWindow* site_window = SiteWindowUnderAVideo();
+  MiniPlayerDock* dock = MiniPlayerDock::From(browser());
+  dock->site_window()->OnMouseEntered(
+      Mouse(ui::EventType::kMouseEntered, gfx::Point()));
+  views::Button* pop_out =
+      ButtonNamed(dock->site_window(), IDS_UW_MINI_PLAYER_POP_OUT);
+  ASSERT_TRUE(pop_out);
+  PressButton(pop_out);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteFloats(site_window); }));
+  Settle();
+  EXPECT_TRUE(dock->player());
+
+  views::Button* bar_dock = ButtonNamed(
+      site_window->own_widget()->GetRootView(), IDS_UW_MINI_PLAYER_DOCK);
+  ASSERT_TRUE(bar_dock);
+  EXPECT_TRUE(base::test::RunUntil([&] { return bar_dock->GetVisible(); }));
+  PressButton(bar_dock);
+  EXPECT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  EXPECT_TRUE(dock->player());
 }
 
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, HidingTheSidebarFloatsIt) {

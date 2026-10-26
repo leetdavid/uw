@@ -118,6 +118,9 @@ class MiniPlayer : private internal::MiniPlayerDelegateHolder,
 
   // Docks the video in `dock`, or floats it when nullptr, while it shows.
   void Place(MiniPlayerDock* dock);
+  // Pops a docked video out, or docks everything floating, for the button
+  // just left of back to tab.
+  void MoveByHand();
   // Brings the video back from its dock into the floating window, hidden.
   void Undock();
   void ShowFloating();
