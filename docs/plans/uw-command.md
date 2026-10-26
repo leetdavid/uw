@@ -51,7 +51,7 @@ In v2.2, `uw mcp serve` is the [tool server](#the-tool-server) for outside agent
 - `--model` and `--effort` pick the chat's model, as the composer's chips do.
 - `-c` continues the latest chat in the workspace, and `-r <id>` resumes any chat, wherever it started. A chat whose tab is open in the user's window works there as usual; one without runs out of sight.
 - Piped text with a request argument is attached material, handled like page text: never the user's instruction, and shrunk after the answer. With no argument, the piped text is the request.
-- `--file <path>`, repeatable, attaches a file to the message, as the chat page's composer does, with the same limits; see [attached files](agent-chats.md#agreed-scope). `uw chat` and `uw chat -p` both take it. A missing or unreadable file exits with 2 before the chat starts. Agreed on 2026-10-26, not built yet (T225).
+- `--file <path>`, repeatable, attaches a file to the message, as the chat page's composer does, with the same limits; see [attached files](agent-chats.md#agreed-scope). `uw chat` and `uw chat -p` both take it. A missing or unreadable file exits with 2 before the chat starts. Agreed on 2026-10-26, not built yet (T226).
 - Ctrl-C, a closed terminal, or a killed caller stops the chat, as Stop does. `--timeout <duration>` stops it after that long and exits with 1.
 - While the command is attached, uw sends none of the chat's notifications.
 
