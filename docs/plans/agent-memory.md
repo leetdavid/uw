@@ -1,6 +1,6 @@
 # Agent memory
 
-Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. Not started.
+Status: scope agreed on 2026-10-26 in a grilling session. It replaces the memory line of 2026-10-15 in the [agent chats plan](agent-chats.md#agreed-scope): the agent no longer reads every memory, and a change has no Edit and Undo line. T209, the design, was drawn on 2026-10-26 and waits for the user's sign-off.
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). Each part follows one uw already has: the command check, a store per profile, the agent's tools, a `uw://ai` section, and a `uw` command handler. Chromium's `sql::Database` is well proven, though new to uw. The risk is judgment: what the agent keeps and makes core, and whether the memory check refuses a sentence a page talked the agent into. Like the command check, it needs a set of examples to measure against.
 
@@ -74,6 +74,20 @@ uw's proposals, for the user to accept with the plan:
 ## Design
 
 T209 draws, on the [canvas](../../AGENTS.md#designs) page "Agent chats": the counts under an answer and what hovering them shows, the composer's memory switch before and after the first message, the crossed-out icon, the memory page with its search, a memory being reworded, the paused state, and "Forget all memories", and `uw memory list` in a terminal. The user signs them off before T210 and T211 start.
+
+Drawn on 2026-10-26 with the canvas's `uw-agent-memory` guide:
+
+- "Agent memory: in a chat (Fluid)": a chat whose answer recalled three memories and saved one, with the pointer on "Recalled 3 memories".
+- "Agent memory: the memory page (Fluid)": `uw://ai/memory` with the Use memory switch, search, a memory being reworded, and a memory from a deleted chat.
+- "Agent memory: every state (Fluid)": the counts and their cards, a forgotten memory, a scheduled run, the composer's switch before and after the first message, the crossed-out icon on a chat and a private chat, the AI settings menu, and the page paused, empty, searching, finding nothing, and asking before Forget all.
+- "Agent memory: the uw command": `uw chat -p` with the count lines, `uw memory list`, `forget`, `--json`, `--no-memory`, and a paused workspace.
+
+uw's proposals in the frames:
+
+- Pointing at a count opens a card with its sentences, the chat each came from, and "Manage memory".
+- A chat switched out of memory shows a "Memory off" chip in the composer until its first message.
+- The chat page's AI settings menu gets a Memory row with the count.
+- Forgetting one memory does not ask; Forget all does.
 
 ## How it is built
 
