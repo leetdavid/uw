@@ -1,6 +1,6 @@
 import Image from "next/image";
-import poster from "@/assets/poster.png";
 import tram from "@/assets/tram.jpg";
+import { Ad } from "./ad";
 import { Brew } from "./brew";
 import { Favicon, Folder } from "./icons";
 import { ScrollDemo, type Stop } from "./scroll-demo";
@@ -232,12 +232,7 @@ export default function Home() {
           <p className="meta">Apple silicon &middot; macOS 13 or later</p>
         </div>
         <div className="player">
-          <Image
-            src={poster}
-            alt="Meet uw: a glass sidebar of tasks with a video docked at its foot"
-            sizes="(max-width: 1080px) 100vw, 1040px"
-            preload
-          />
+          <Ad sidebar={stops[3].sidebar} download={DOWNLOAD} />
         </div>
         <div className="curve" />
       </section>

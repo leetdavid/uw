@@ -138,6 +138,7 @@ export function Sidebar({
     return (
       <Moves key={tab.id} name={`tab-${tab.id}`} animate={animate}>
         <div
+          data-tab={tab.id}
           className={["tab", tab.child && "child", active && "on"]
             .filter(Boolean)
             .join(" ")}
