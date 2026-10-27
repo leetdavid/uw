@@ -290,7 +290,7 @@ sudo route -n add -net 192.168.64.0/24 -interface 192.168.64.1 -cloning
 ## Build inputs and updates
 
 - [`chromium/pins.json`](chromium/pins.json) pins Chromium, `depot_tools`, and the SDK requirement.
-- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build that plays H.264 and AAC media, with debug symbols and [development checks](docs/architecture.md#native-lifetime-rules) disabled. It leaves out the trials that Chromium's testing config turns on, so uw runs Chromium's features as released; `uw-trials.patch` turns on the few uw is built on. Changing it rebuilds every file.
+- [`chromium/args.gn`](chromium/args.gn) defines a native, unbranded release build that plays H.264 and AAC media through macOS's own decoders, with FFmpeg's left out ([Codecs](docs/plans/distribution.md#codecs)), with debug symbols and [development checks](docs/architecture.md#native-lifetime-rules) disabled. It leaves out the trials that Chromium's testing config turns on, so uw runs Chromium's features as released; `uw-trials.patch` turns on the few uw is built on. Changing it rebuilds every file.
 - [`chromium/patches/series`](chromium/patches/series) orders the reviewed uw changes on top of the pin.
 - [`browser/`](browser) and [`components/`](components) hold product-owned C++ source linked into the prepared checkout.
 - [`pnpm-lock.yaml`](pnpm-lock.yaml) locks the TypeScript tooling dependencies.

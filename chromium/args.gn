@@ -6,9 +6,14 @@ is_component_build = false
 # Development checks crash tabs on real sites. See docs/architecture.md.
 dcheck_always_on = false
 enable_dangling_raw_ptr_checks = false
-# H.264 and AAC, the only video formats sites such as x.com serve.
+# H.264 and AAC, the only video formats sites such as x.com serve, play through
+# macOS's own decoders, VideoToolbox and AudioToolbox. uw ships neither
+# FFmpeg's decoders for them nor OpenH264. See docs/plans/distribution.md,
+# "Codecs", and chromium/patches/uw-codecs.patch.
 proprietary_codecs = true
-ffmpeg_branding = "Chrome"
+ffmpeg_branding = "Chromium"
+enable_ffmpeg_video_decoders = false
+media_use_openh264 = false
 # Chromium's features as released. Its testing config turns on hundreds of
 # trials, one of which crashed tabs in IndexedDB. The few uw is built on are
 # turned on in chrome_feature_list_creator.cc by uw-trials.patch.

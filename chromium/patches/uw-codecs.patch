@@ -1,0 +1,460 @@
+diff --git a/media/BUILD.gn b/media/BUILD.gn
+index a9ef4aa60e3c44e90d7cf0b04eaf5f3632547e17..342fa711d30c3edc5f216e938f92dbdc164dd731 100644
+--- a/media/BUILD.gn
++++ b/media/BUILD.gn
+@@ -85,11 +85,9 @@ buildflag_header("media_buildflags") {
+   }
+ }
+ 
+-if (proprietary_codecs && media_use_ffmpeg) {
+-  assert(
+-      ffmpeg_branding != "Chromium",
+-      "proprietary codecs and ffmpeg_branding set to Chromium are incompatible")
+-}
++# uw: proprietary codecs with FFmpeg's Chromium branding are how uw plays H.264
++# and AAC through macOS's own decoders and ships neither of FFmpeg's. See
++# uw's docs/plans/distribution.md, "Codecs".
+ 
+ # Common configuration for targets in the media directory; these must not be
+ # exported since things like USE_NEON have different meanings elsewhere in the
+diff --git a/media/ffmpeg/ffmpeg_common.cc b/media/ffmpeg/ffmpeg_common.cc
+index 280dce68853c12508ab94bd3c9516896db963664..0fb9b1690b3ec43c488c7fa3f35b3a27be4574de 100644
+--- a/media/ffmpeg/ffmpeg_common.cc
++++ b/media/ffmpeg/ffmpeg_common.cc
+@@ -409,6 +409,13 @@ bool AVCodecContextToAudioDecoderConfig(const AVCodecContext* codec_context,
+ #else
+       NOTREACHED();
+ #endif
++    // uw: FFmpeg demuxes AAC but does not decode it, so it leaves
++    // |sample_fmt| unset. macOS's AudioToolbox decodes it to float.
++    case AudioCodec::kAAC:
++      if (sample_format == kUnknownSampleFormat) {
++        sample_format = kSampleFormatF32;
++      }
++      break;
+ #if BUILDFLAG(ENABLE_PLATFORM_MPEG_H_AUDIO)
+     case AudioCodec::kMpegHAudio:
+       channel_layout = CHANNEL_LAYOUT_BITSTREAM;
+diff --git a/media/filters/audio_file_reader.cc b/media/filters/audio_file_reader.cc
+index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df3987eb6c 100644
+--- a/media/filters/audio_file_reader.cc
++++ b/media/filters/audio_file_reader.cc
+@@ -35,6 +35,10 @@
+ #include "media/filters/symphonia_audio_decoder.h"
+ #endif
+ 
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(USE_PROPRIETARY_CODECS)
++#include "media/filters/mac/audio_toolbox_audio_decoder.h"
++#endif
++
+ namespace media {
+ 
+ namespace {
+@@ -90,6 +94,19 @@ bool AudioFileReader::OpenDecoder() {
+         nullptr, OpusAudioDecoder::ExecutionMode::kSynchronous);
+   }
+ 
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(USE_PROPRIETARY_CODECS)
++  // uw: AAC decodes through macOS's AudioToolbox, since uw ships no FFmpeg
++  // AAC decoder. See uw's docs/plans/distribution.md, "Codecs".
++  AudioToolboxAudioDecoder* audio_toolbox = nullptr;
++  if (!decoder_ && config.codec() == AudioCodec::kAAC) {
++    auto decoder = std::make_unique<AudioToolboxAudioDecoder>(
++        std::make_unique<NullMediaLog>(),
++        AudioToolboxAudioDecoder::ExecutionMode::kSynchronous);
++    audio_toolbox = decoder.get();
++    decoder_ = std::move(decoder);
++  }
++#endif
++
+   // By default, use the FFmpegAudioDecoder.
+   if (!decoder_) {
+     decoder_ = std::make_unique<FFmpegAudioDecoder>(
+@@ -115,6 +132,18 @@ bool AudioFileReader::OpenDecoder() {
+                      &initialize_status),
+       base::BindRepeating(&AudioFileReader::OnOutput, base::Unretained(this)),
+       base::DoNothing());
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(USE_PROPRIETARY_CODECS)
++  // uw: Web Audio sizes its buffer by the rate and channels the decoder puts
++  // out, which for HE-AAC are not the ones its file names.
++  if (audio_toolbox && initialize_status.value()) {
++    config.Initialize(
++        config.codec(), config.sample_format(),
++        ChannelLayoutConfig::Guess(audio_toolbox->output_channels()),
++        audio_toolbox->output_sample_rate(), config.extra_data(),
++        config.encryption_scheme(), config.seek_preroll(),
++        config.codec_delay());
++  }
++#endif
+   config_ = std::move(config);
+   return initialize_status.value();
+ }
+diff --git a/media/filters/mac/audio_toolbox_audio_decoder.cc b/media/filters/mac/audio_toolbox_audio_decoder.cc
+index 03d630b07fc9ecde73e167b258f8dd528eeafca5..ca4b538abb101030fc1ce67b009cb4915da8da48 100644
+--- a/media/filters/mac/audio_toolbox_audio_decoder.cc
++++ b/media/filters/mac/audio_toolbox_audio_decoder.cc
+@@ -5,6 +5,7 @@
+ #include "media/filters/mac/audio_toolbox_audio_decoder.h"
+ 
+ #include <algorithm>
++#include <array>
+ #include <optional>
+ 
+ #include "base/apple/osstatus_logging.h"
+@@ -31,6 +32,10 @@ namespace media {
+ 
+ namespace {
+ 
++bool IsXheAac(const AudioDecoderConfig& config) {
++  return config.profile() == AudioCodecProfile::kXHE_AAC;
++}
++
+ bool CanUseAudioToolbox(const AudioDecoderConfig& config) {
+ #if BUILDFLAG(ENABLE_PLATFORM_AC3_EAC3_AUDIO)
+   // AC3 is available on macOS 10.2 or later, and E-AC3 is available on
+@@ -40,13 +45,48 @@ bool CanUseAudioToolbox(const AudioDecoderConfig& config) {
+     return true;
+   }
+ #endif
+-  // We use AudioToolbox for decoding xHE-AAC content and that's available on
+-  // macOS 10.15 or higher.
+-  return config.profile() == AudioCodecProfile::kXHE_AAC;
++  // uw: every AAC profile, since uw ships no FFmpeg AAC decoder. See uw's
++  // docs/plans/distribution.md, "Codecs".
++  return config.codec() == AudioCodec::kAAC;
++}
++
++// uw: an AudioSpecificConfig for AAC-LC at the config's rate and channels, for
++// a stream that came without one, such as ADTS handed to WebCodecs without a
++// description.
++std::vector<uint8_t> AudioSpecificConfigFor(const AudioDecoderConfig& config) {
++  constexpr std::array<int, 13> kRates = {96000, 88200, 64000, 48000, 44100,
++                                          32000, 24000, 22050, 16000, 12000,
++                                          11025, 8000,  7350};
++  constexpr uint8_t kAacLc = 2;
++  const auto found = std::ranges::find(kRates, config.samples_per_second());
++  // 44100 when the rate has no index of its own.
++  const uint8_t rate = found == kRates.end()
++                           ? 4
++                           : static_cast<uint8_t>(found - kRates.begin());
++  // Channel configurations 1 to 6 are that many channels; 7 is 7.1.
++  const int channels = config.channels();
++  const uint8_t layout = channels == 8 ? 7 : std::clamp(channels, 1, 6);
++  return {static_cast<uint8_t>(kAacLc << 3 | rate >> 1),
++          static_cast<uint8_t>((rate & 1) << 7 | layout << 3)};
++}
++
++// uw: MSE and HLS hand AAC over with an ADTS header on each frame, which
++// AudioToolbox does not take. Returns the header's size, or 0 without one.
++size_t AdtsHeaderSize(base::span<const uint8_t> frame) {
++  // The sync word 0xFFF and layer 0, then a frame length that spans the
++  // whole buffer.
++  if (frame.size() < 7 || frame[0] != 0xFF || (frame[1] & 0xF6) != 0xF0) {
++    return 0;
++  }
++  const size_t header = (frame[1] & 0x01) ? 7 : 9;
++  const size_t length = (frame[3] & 0x03) << 11 | frame[4] << 3 | frame[5] >> 5;
++  return length == frame.size() && header < frame.size() ? header : 0;
+ }
+ 
+ struct InputData {
+   raw_ptr<DecoderBuffer> buffer = nullptr;
++  // uw: where the coded frame starts, past any ADTS header.
++  size_t offset = 0;
+   AudioStreamPacketDescription packet = {};
+ };
+ 
+@@ -67,11 +107,12 @@ OSStatus ProvideInputCallback(AudioConverterRef decoder,
+ 
+   *num_packets = buffer_list->mNumberBuffers = 1;
+   buffer_list->mBuffers[0].mNumberChannels = 0;
+-  buffer_list->mBuffers[0].mDataByteSize = input_data->buffer->size();
++  base::span<const uint8_t> frame =
++      base::span(*input_data->buffer).subspan(input_data->offset);
++  buffer_list->mBuffers[0].mDataByteSize = frame.size();
+ 
+   // No const version of this API unfortunately, so we need const_cast().
+-  buffer_list->mBuffers[0].mData =
+-      const_cast<uint8_t*>(base::span(*input_data->buffer).data());
++  buffer_list->mBuffers[0].mData = const_cast<uint8_t*>(frame.data());
+ 
+   if (packets)
+     *packets = &input_data->packet;
+@@ -100,8 +141,9 @@ void AudioToolboxAudioDecoder::ScopedAudioConverterRefTraits::Release(
+ }
+ 
+ AudioToolboxAudioDecoder::AudioToolboxAudioDecoder(
+-    std::unique_ptr<MediaLog> media_log)
+-    : media_log_(std::move(media_log)) {}
++    std::unique_ptr<MediaLog> media_log,
++    ExecutionMode mode)
++    : mode_(mode), media_log_(std::move(media_log)) {}
+ 
+ AudioToolboxAudioDecoder::~AudioToolboxAudioDecoder() = default;
+ 
+@@ -115,8 +157,7 @@ void AudioToolboxAudioDecoder::Initialize(const AudioDecoderConfig& config,
+                                           const OutputCB& output_cb,
+                                           const WaitingCB& waiting_cb) {
+   if (!CanUseAudioToolbox(config)) {
+-    DLOG(WARNING)
+-        << "Only xHE-AAC/AC3/E-AC3 decoding is supported by this decoder.";
++    DLOG(WARNING) << "Only AAC/AC3/E-AC3 decoding is supported by this decoder.";
+     std::move(init_cb).Run(DecoderStatus::Codes::kUnsupportedCodec);
+     return;
+   }
+@@ -135,7 +176,7 @@ void AudioToolboxAudioDecoder::Initialize(const AudioDecoderConfig& config,
+   if (!success) {
+     decoder_.reset();
+   }
+-  base::BindPostTaskToCurrentDefault(std::move(init_cb))
++  BindCallbackIfNeeded(std::move(init_cb))
+       .Run(success ? DecoderStatus::Codes::kOk
+                    : DecoderStatus::Codes::kFailedToCreateDecoder);
+ }
+@@ -143,8 +184,7 @@ void AudioToolboxAudioDecoder::Initialize(const AudioDecoderConfig& config,
+ void AudioToolboxAudioDecoder::Decode(scoped_refptr<DecoderBuffer> buffer,
+                                       DecodeCB decode_cb) {
+   CHECK(decoder_);
+-  DecodeCB decode_cb_bound =
+-      base::BindPostTaskToCurrentDefault(std::move(decode_cb));
++  DecodeCB decode_cb_bound = BindCallbackIfNeeded(std::move(decode_cb));
+ 
+   // Make sure we are notified if https://crbug.com/49709 returns. Issue also
+   // occurs with some damaged files.
+@@ -171,7 +211,10 @@ void AudioToolboxAudioDecoder::Decode(scoped_refptr<DecoderBuffer> buffer,
+       return;
+     }
+     last_input_timestamp_ = buffer->timestamp();
+-    input_data.packet.mDataByteSize = buffer->size();
++    if (aac_) {
++      input_data.offset = AdtsHeaderSize(base::span(*buffer));
++    }
++    input_data.packet.mDataByteSize = buffer->size() - input_data.offset;
+   }
+ 
+   // Must be filled in each time in case AudioConverterFillComplexBuffer()
+@@ -257,7 +300,7 @@ void AudioToolboxAudioDecoder::Reset(base::OnceClosure reset_cb) {
+   discard_helper_->Reset(discard_helper_->decoder_delay());
+   limiter_queue_->Clear();
+   last_input_timestamp_ = kNoTimestamp;
+-  base::BindPostTaskToCurrentDefault(std::move(reset_cb)).Run();
++  BindCallbackIfNeeded(std::move(reset_cb)).Run();
+ }
+ 
+ bool AudioToolboxAudioDecoder::NeedsBitstreamConversion() const {
+@@ -272,10 +315,13 @@ bool AudioToolboxAudioDecoder::CreateDecoder(const AudioDecoderConfig& config) {
+ 
+   switch (config.codec()) {
+     case AudioCodec::kAAC: {
+-      // Input is xHE-AAC / USAC.
+-      CHECK_EQ(config.profile(), AudioCodecProfile::kXHE_AAC);
+-      input_format.mFormatID = kAudioFormatMPEGD_USAC;
+-      magic_cookie = mp4::ESDescriptor::CreateEsds(config.extra_data());
++      // Input is xHE-AAC / USAC, or uw's other AAC profiles.
++      input_format.mFormatID =
++          IsXheAac(config) ? kAudioFormatMPEGD_USAC : kAudioFormatMPEG4AAC;
++      magic_cookie = mp4::ESDescriptor::CreateEsds(
++          config.extra_data().empty() && !IsXheAac(config)
++              ? AudioSpecificConfigFor(config)
++              : config.extra_data());
+ 
+       // Have macOS fill in the rest of the input_format for us.
+       UInt32 format_size = sizeof(input_format);
+@@ -287,6 +333,9 @@ bool AudioToolboxAudioDecoder::CreateDecoder(const AudioDecoderConfig& config) {
+             << "AudioFormatGetProperty() failed";
+         return false;
+       }
++      if (!IsXheAac(config) && !UseBestAacLayer(magic_cookie, input_format)) {
++        return false;
++      }
+       break;
+     }
+ #if BUILDFLAG(ENABLE_PLATFORM_AC3_EAC3_AUDIO)
+@@ -424,6 +473,9 @@ bool AudioToolboxAudioDecoder::CreateDecoder(const AudioDecoderConfig& config) {
+           << "AudioConverterSetProperty() failed";
+       return false;
+     }
++  }
++
++  if (IsXheAac(config)) {
+ 
+     // macOS doesn't provide a default target loudness. Use the value
+     // recommended by Fraunhofer. AC3/E-AC3 doesn't support set this,
+@@ -452,6 +504,9 @@ bool AudioToolboxAudioDecoder::CreateDecoder(const AudioDecoderConfig& config) {
+     }
+   }
+ 
++  aac_ = config.codec() == AudioCodec::kAAC && !IsXheAac(config);
++  output_sample_rate_ = input_format.mSampleRate;
++  output_channels_ = input_format.mChannelsPerFrame;
+   discard_helper_ = std::make_unique<AudioDiscardHelper>(
+       input_format.mSampleRate, config.codec_delay(), false);
+   discard_helper_->Reset(config.codec_delay());
+@@ -476,12 +531,44 @@ bool AudioToolboxAudioDecoder::CreateDecoder(const AudioDecoderConfig& config) {
+   return true;
+ }
+ 
++bool AudioToolboxAudioDecoder::UseBestAacLayer(
++    const std::vector<uint8_t>& magic_cookie,
++    AudioStreamBasicDescription& format) {
++  // HE-AAC carries a fuller layer over its core, with twice the rate and, for
++  // v2, a second channel. Decode the best layer this Mac plays: its rate and
++  // channels are the decoder's output.
++  AudioFormatInfo info = {format, magic_cookie.data(),
++                          static_cast<UInt32>(magic_cookie.size())};
++  UInt32 size = 0;
++  auto status = AudioFormatGetPropertyInfo(kAudioFormatProperty_FormatList,
++                                           sizeof(info), &info, &size);
++  if (status != noErr || size < sizeof(AudioFormatListItem)) {
++    OSSTATUS_MEDIA_LOG(ERROR, status, media_log_)
++        << "AudioFormatGetPropertyInfo() failed";
++    return false;
++  }
++  std::vector<AudioFormatListItem> layers(size / sizeof(AudioFormatListItem));
++  status = AudioFormatGetProperty(kAudioFormatProperty_FormatList, sizeof(info),
++                                  &info, &size, layers.data());
++  if (status != noErr) {
++    OSSTATUS_MEDIA_LOG(ERROR, status, media_log_)
++        << "AudioFormatGetProperty() failed";
++    return false;
++  }
++  UInt32 best = 0;
++  UInt32 best_size = sizeof(best);
++  status = AudioFormatGetProperty(kAudioFormatProperty_FirstPlayableFormatFromList,
++                                  layers.size() * sizeof(AudioFormatListItem),
++                                  layers.data(), &best_size, &best);
++  format = layers[status == noErr && best < layers.size() ? best : 0].mASBD;
++  return true;
++}
++
+ void AudioToolboxAudioDecoder::OnOutputReady(
+     AudioDiscardHelper::TimeInfo time_info,
+     scoped_refptr<AudioBuffer> output_buffer) {
+   if (discard_helper_->ProcessBuffers(time_info, output_buffer.get())) {
+-    base::BindPostTaskToCurrentDefault(output_cb_)
+-        .Run(std::move(output_buffer));
++    BindCallbackIfNeeded(output_cb_).Run(std::move(output_buffer));
+   }
+ }
+ 
+diff --git a/media/filters/mac/audio_toolbox_audio_decoder.h b/media/filters/mac/audio_toolbox_audio_decoder.h
+index b50c0ca201a937460c64e609a483295bb07be8fe..d9d37d484c5b8ccc49758e53f6976d428662418c 100644
+--- a/media/filters/mac/audio_toolbox_audio_decoder.h
++++ b/media/filters/mac/audio_toolbox_audio_decoder.h
+@@ -8,9 +8,11 @@
+ #include <AudioToolbox/AudioToolbox.h>
+ 
+ #include <memory>
++#include <vector>
+ 
+ #include "base/apple/scoped_typeref.h"
+ #include "base/memory/free_deleter.h"
++#include "base/task/bind_post_task.h"
+ #include "media/base/audio_bus.h"
+ #include "media/base/audio_decoder.h"
+ #include "media/base/audio_decoder_config.h"
+@@ -26,7 +28,13 @@ class MediaLog;
+ // API is required to decode codecs that aren't supported by Chromium.
+ class MEDIA_EXPORT AudioToolboxAudioDecoder : public AudioDecoder {
+  public:
+-  explicit AudioToolboxAudioDecoder(std::unique_ptr<MediaLog> media_log);
++  // uw: kSynchronous runs every callback before the call returns, for
++  // AudioFileReader, which decodes Web Audio's files.
++  enum class ExecutionMode { kAsynchronous, kSynchronous };
++
++  explicit AudioToolboxAudioDecoder(
++      std::unique_ptr<MediaLog> media_log,
++      ExecutionMode mode = ExecutionMode::kAsynchronous);
+ 
+   AudioToolboxAudioDecoder(const AudioToolboxAudioDecoder&) = delete;
+   AudioToolboxAudioDecoder& operator=(const AudioToolboxAudioDecoder&) = delete;
+@@ -44,6 +52,11 @@ class MEDIA_EXPORT AudioToolboxAudioDecoder : public AudioDecoder {
+   void Reset(base::OnceClosure reset_cb) override;
+   bool NeedsBitstreamConversion() const override;
+ 
++  // uw: what the decoder puts out once initialized. HE-AAC decodes at twice
++  // the rate its config names, and v2 to stereo.
++  int output_sample_rate() const { return output_sample_rate_; }
++  int output_channels() const { return output_channels_; }
++
+  private:
+   struct ScopedAudioConverterRefTraits {
+     static AudioConverterRef InvalidValue() { return nullptr; }
+@@ -55,10 +68,27 @@ class MEDIA_EXPORT AudioToolboxAudioDecoder : public AudioDecoder {
+                                  ScopedAudioConverterRefTraits>;
+ 
+   bool CreateDecoder(const AudioDecoderConfig& config);
++  // uw: sets `format` to the best layer of the AAC that `magic_cookie`
++  // describes.
++  bool UseBestAacLayer(const std::vector<uint8_t>& magic_cookie,
++                       AudioStreamBasicDescription& format);
+ 
+   void OnOutputReady(AudioDiscardHelper::TimeInfo time_info,
+                      scoped_refptr<AudioBuffer> output_buffer);
+ 
++  // uw: posts `callback` to the current sequence unless the decoder runs
++  // synchronously.
++  template <typename T>
++  std::decay_t<T> BindCallbackIfNeeded(T&& callback) {
++    return mode_ == ExecutionMode::kAsynchronous
++               ? base::BindPostTaskToCurrentDefault(std::forward<T>(callback))
++               : std::forward<T>(callback);
++  }
++
++  const ExecutionMode mode_;
++  int output_sample_rate_ = 0;
++  int output_channels_ = 0;
++
+   std::unique_ptr<MediaLog> media_log_;
+ 
+   // "Converter" for turning encoded samples into raw audio.
+@@ -78,6 +108,10 @@ class MEDIA_EXPORT AudioToolboxAudioDecoder : public AudioDecoder {
+   // Keeps track of the last input timestamp to use for output generated during
+   // flush (EOS).
+   base::TimeDelta last_input_timestamp_ = kNoTimestamp;
++
++  // uw: true for AAC other than xHE-AAC, whose frames may come with an ADTS
++  // header.
++  bool aac_ = false;
+ };
+ 
+ }  // namespace media
+diff --git a/sandbox/policy/mac/renderer.sb b/sandbox/policy/mac/renderer.sb
+index 687bca71bdff74c14ed837907f8d44922ebce5ea..25530007058c2376adf5d39530c6dd1782c85d6a 100644
+--- a/sandbox/policy/mac/renderer.sb
++++ b/sandbox/policy/mac/renderer.sb
+@@ -84,6 +84,16 @@
+   (global-name "com.apple.system.notification_center")  ; https://crbug.com/792217
+ )
+ 
++; uw: Web Audio decodes AAC through macOS's AudioToolbox, since uw ships no
++; FFmpeg AAC decoder. The GPU process has the same two allowances. See uw's
++; docs/plans/distribution.md, "Codecs".
++(allow mach-lookup
++  (global-name "com.apple.audio.AudioComponentRegistrar")
++)
++(allow file-read*
++  (subpath "/System/Library/Components/AudioCodecs.component")
++)
++
+ (if (param-true? enable-distributed-notifications)
+   (allow mach-lookup
+     (global-name "com.apple.distributed_notifications@Uv3")
+diff --git a/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc b/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc
+index 63011d9d02a7cda639f0602a05d5145ee2369770..235bc3ab1a4e7a23f140a55a1136b8032d2b93da 100644
+--- a/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc
++++ b/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc
+@@ -131,7 +131,12 @@ IsH264ConstrainedBaselineProfileAvailableForAcceleratedEncoder() {
+ }
+ 
+ bool PLATFORM_EXPORT UseH264AcceleratedEncoderForWebRTC() {
+-#if !BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(IS_MAC)
++  // uw: VideoToolbox's encoder falls back to its own software encoder, so uw
++  // sends H.264 without OpenH264. See uw's docs/plans/distribution.md,
++  // "Codecs".
++  return true;
++#elif !BUILDFLAG(IS_ANDROID)
+   // On non-Android, H264 HW encoder cannot be used unless SW encoder is also
+   // available because of assumptions that SW fallback is always possible. This
+   // check should be removed when SW implementation is always available.

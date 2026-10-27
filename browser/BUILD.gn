@@ -3,6 +3,7 @@ group("browser_tests") {
   deps = [
     "agent:browser_tests",
     "branding:browser_tests",
+    "codecs:browser_tests",
     "connectors:browser_tests",
     "pins:browser_tests",
     "problem_reports:browser_tests",

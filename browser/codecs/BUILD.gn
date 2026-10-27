@@ -1,0 +1,23 @@
+# Checks that H.264 and AAC play through macOS's own decoders. See
+# docs/plans/distribution.md, "Codecs".
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "codecs_browsertest.cc" ]
+  deps = [
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//media",
+    "//net:test_support",
+    "//testing/gtest",
+    "//third_party/ffmpeg",
+    "//url",
+  ]
+  data = [ "test_data/" ]
+}

@@ -53,7 +53,8 @@ Decided on 2026-10-27:
 
 - Raw `.aac` files and ADTS streams keep playing. uw reads ADTS itself and hands the audio to AudioToolbox (T229).
 - WebRTC keeps sending H.264, through VideoToolbox's encoder.
-- When the GPU process is gone, H.264 plays through VideoToolbox's software decoder in another process (T230).
+- When accelerated video decoding is off, as with `--disable-gpu`, or the hardware turns a stream down, H.264 plays through VideoToolbox's software decoder in the GPU process, which every launch on a Mac has, with frames copied for the page (T230). Changed the same day from "in another process" once research found the GPU process is always there.
+- Web Audio's `decodeAudioData` decodes AAC with AudioToolbox in the page's own process. Its sandbox allows the two things AudioToolbox needs, the same two the GPU process has: the audio component registrar and the `AudioCodecs.component` bundle. Chosen by the user over decoding in the GPU process.
 
 ## Domain and bundle ID
 
@@ -150,8 +151,8 @@ Work, in order, with scores from the [roadmap convention](roadmap.md#implementab
 | Sparkle behind Chromium's relaunch button | 5/10 | A patch hands Sparkle's ready update to `UpgradeDetector`, and Chromium's relaunch has to finish Sparkle's install with tabs restored. |
 | Problem reports and consent | 5/10 | First-run Yes/No, one settings switch, Crashpad uploads to Sentry, symbols per release, and every uw page's problems sent to PostHog through uw. |
 | Codecs through macOS | 4/10 | Plain AAC through AudioToolbox, H.264 through VideoToolbox only, and WebRTC's H.264 without OpenH264. Several media paths, each checked on real sites. |
-| Raw AAC without FFmpeg | 5/10 | uw's own ADTS reader for `src=` playback, feeding AudioToolbox. |
-| H.264 without the GPU process | 3/10 | VideoToolbox's software decoder in another process, chosen only when the GPU process is gone. |
+| Raw AAC without FFmpeg | 7/10 | An early ADTS check, then a uw engine in Chromium's HLS player that feeds its ADTS parser. |
+| H.264 without the GPU process | 5/10 | VideoToolbox's software decoder in the GPU process with frames copied for the page, chosen when accelerated decoding is off or refuses a stream. |
 | Report an issue | 9/10 | One Help-menu item. |
 | Website | 8/10 | Doop design first, then Next.js in `site/` on Vercel. |
 | Homebrew | 8/10 | A cask that always installs the latest release. It can't be tried end to end until 0.1.0 is published. |
