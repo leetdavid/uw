@@ -17,9 +17,11 @@
 #include "chrome/browser/ui/views/frame/main_background_region_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+#include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
@@ -486,6 +488,14 @@ gfx::Rect WorkspaceSwipe::SlidingArea(const std::string& target) const {
   gfx::Point origin;
   views::View::ConvertPointToTarget(strip, region_, &origin);
   gfx::Rect area(origin, strip->size());
+  // The strip is only as tall as its tabs, and the other workspace may have
+  // more, so the slide goes on down over the empty space below them.
+  if (auto* vertical =
+          views::AsViewClass<VerticalTabStripRegionView>(region_.get())) {
+    area.set_height(
+        std::max(area.height(),
+                 vertical->GetBottomContainer()->bounds().bottom() - area.y()));
+  }
   // Within a profile the pins stay, since both workspaces have them.
   const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(target);
   const bool same_profile =

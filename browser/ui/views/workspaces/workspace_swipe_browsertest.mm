@@ -33,6 +33,7 @@
 #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -360,17 +361,17 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
         window->GetTabStripModel()->active_index(), true);
   }
 
-  // Where the part of `window`'s sidebar that slides starts, in its sidebar.
-  static int SlideTop(BrowserWindowInterface* window) {
+  // Where the part of `window`'s sidebar that slides is, in its sidebar.
+  static gfx::Rect SlideArea(BrowserWindowInterface* window) {
     TabStripRegionView* region =
         BrowserView::GetBrowserViewForBrowser(window)->tab_strip_view();
     for (views::View* child : region->children()) {
       if (std::string_view(child->GetClassName()) == "SlideView" &&
           child->GetVisible()) {
-        return child->y();
+        return child->bounds();
       }
     }
-    return -1;
+    return gfx::Rect();
   }
 
   // Where `window`'s tab strip starts, and where its pins end, in its sidebar.
@@ -431,7 +432,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, ThePinsStayWithinAProfile) {
   WorkspaceSwipe* swipe = SwipeOf(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
   EXPECT_GT(PinsBottom(browser()), StripTop(browser()));
-  EXPECT_EQ(SlideTop(browser()), PinsBottom(browser()));
+  EXPECT_EQ(SlideArea(browser()).y(), PinsBottom(browser()));
   SaveWindowScreenshot(browser(), "swipe-pins-stay");
   Lift(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
@@ -445,7 +446,48 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   MoveFingers(browser(), -kShortSwipe);
   WorkspaceSwipe* swipe = SwipeOf(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
-  EXPECT_EQ(SlideTop(browser()), StripTop(browser()));
+  EXPECT_EQ(SlideArea(browser()).y(), StripTop(browser()));
+  Lift(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
+
+// The tab strip is only as tall as its tabs, so the slide reaches down past
+// them, and a workspace with more tabs slides in with all of them.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       AWorkspaceWithMoreTabsSlidesInWithAllOfThem) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  RunWindowCommand(browser(), kNextWorkspace);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  TabStripRegionView* region =
+      BrowserView::GetBrowserViewForBrowser(browser())->tab_strip_view();
+  const int tab =
+      region
+          ->GetTabAnchorView(
+              browser()->GetTabStripModel()->GetActiveTab()->GetHandle())
+          ->height();
+  for (int i = 0; i < 4; ++i) {
+    chrome::AddTabAt(partner->GetBrowserForMigrationOnly(), GURL("about:blank"),
+                     -1, true);
+  }
+  views::View* partner_strip = BrowserView::GetBrowserViewForBrowser(partner)
+                                   ->tab_strip_view()
+                                   ->GetTabStripView();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return partner_strip->height() >=
+           region->GetTabStripView()->height() + 4 * tab;
+  }));
+  RunWindowCommand(partner, kPreviousWorkspace);
+  WaitForShown(browser(), work_);
+  const gfx::ImageSkia& coming = SwipeOf(partner)->picture();
+  ASSERT_GT(coming.height(), region->GetTabStripView()->height());
+
+  MoveFingers(browser(), -SidebarWidth(browser()) * 0.45f);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  EXPECT_EQ(swipe->target(), reading);
+  EXPECT_GE(SlideArea(browser()).bottom(),
+            StripTop(browser()) + coming.height());
+  SaveWindowScreenshot(browser(), "swipe-more-tabs-coming");
   Lift(browser());
   ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
 }
