@@ -19,7 +19,6 @@ export const SENTRY_CLI_SHA256 = "c80d92b6d34eb64fe7402f56cc7968fbb15aab1c763254
 // docs/plans/distribution.md, "Problem reports".
 export const SENTRY_ORG = "eslee";
 export const SENTRY_PROJECT = "uw";
-export const SENTRY_TOKEN_ITEM = "uw-sentry";
 export const CRASH_REPORT_URL =
   "https://o4512323831070720.ingest.us.sentry.io/api/4512323876618240/minidump/?sentry_key=47ca5329021071c1a1fd038b8a1ec13e";
 const REPOSITORY = "https://github.com/leetdavid/uw";
@@ -32,24 +31,29 @@ export interface ReleaseOptions {
   sha?: string;
   worktree: string;
   jobs: number;
+  // The git-ignored file the release's secrets come from; default: the repo's .env.
+  envFile?: string;
 }
 
 /**
- * PostHog's project token and region, from the environment or else the repo's
- * git-ignored .env. Only these two entries are read from the file.
+ * One of the release's secrets, from the environment or else the git-ignored
+ * `envFile`, of which nothing else is read.
  */
-export function posthogKeys(env: NodeJS.ProcessEnv, envFile = join(REPO, ".env")): { key: string; host: string } {
-  const names = ["POSTHOG_PROJECT_TOKEN", "POSTHOG_PROJECT_REGION"] as const;
-  const values = new Map(names.map((name) => [name, env[name]?.trim()]));
-  if (existsSync(envFile)) {
-    for (const line of readFileSync(envFile, "utf8").split("\n")) {
-      const match = /^\s*(POSTHOG_PROJECT_TOKEN|POSTHOG_PROJECT_REGION)\s*=\s*["']?(.*?)["']?\s*$/.exec(line);
-      const name = match?.[1] as (typeof names)[number] | undefined;
-      if (name && !values.get(name)) values.set(name, match![2]);
-    }
+export function envValue(env: NodeJS.ProcessEnv, name: string, envFile = join(REPO, ".env")): string {
+  const set = env[name]?.trim();
+  if (set) return set;
+  if (!existsSync(envFile)) return "";
+  for (const line of readFileSync(envFile, "utf8").split("\n")) {
+    const match = /^\s*([A-Z0-9_]+)\s*=\s*["']?(.*?)["']?\s*$/.exec(line);
+    if (match?.[1] === name) return match[2]!;
   }
-  const key = values.get("POSTHOG_PROJECT_TOKEN") ?? "";
-  const region = (values.get("POSTHOG_PROJECT_REGION") ?? "").toLowerCase();
+  return "";
+}
+
+/** PostHog's project token and region. */
+export function posthogKeys(env: NodeJS.ProcessEnv, envFile?: string): { key: string; host: string } {
+  const key = envValue(env, "POSTHOG_PROJECT_TOKEN", envFile);
+  const region = envValue(env, "POSTHOG_PROJECT_REGION", envFile).toLowerCase();
   if (!/^phc_\w+$/.test(key)) throw new BuildError("Set POSTHOG_PROJECT_TOKEN to PostHog's project token (phc_...) in .env");
   if (region !== "us" && region !== "eu") throw new BuildError("Set POSTHOG_PROJECT_REGION to US or EU in .env");
   return { key, host: `https://${region}.i.posthog.com` };
@@ -126,13 +130,10 @@ export class Release {
     return directory;
   }
 
-  /** The token that uploads symbols, from the login keychain. */
+  /** The Sentry organization token that uploads symbols. */
   sentryToken(): string {
-    let token = "";
-    try { token = this.capture(["security", "find-generic-password", "-s", SENTRY_TOKEN_ITEM, "-a", SENTRY_ORG, "-w"]); } catch {}
-    if (!token) {
-      throw new BuildError(`No Sentry token in the keychain. Add one with: security add-generic-password -s ${SENTRY_TOKEN_ITEM} -a ${SENTRY_ORG} -w`);
-    }
+    const token = envValue(this.runtime.env, "SENTRY_TOKEN", this.options.envFile);
+    if (!token) throw new BuildError("Set SENTRY_TOKEN to a Sentry organization token in .env");
     return token;
   }
 
@@ -170,7 +171,7 @@ export class Release {
     const identity = this.identity();
     this.capture(["xcrun", "notarytool", "history", "--keychain-profile", NOTARY_PROFILE], REPO, NETWORK_TIMEOUT);
     this.capture(["gh", "auth", "status"]);
-    const posthog = posthogKeys(this.runtime.env);
+    const posthog = posthogKeys(this.runtime.env, this.options.envFile);
     const sentryToken = this.sentryToken();
     const cli = this.sentryCli();
 

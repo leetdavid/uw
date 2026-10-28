@@ -41,10 +41,6 @@ function fixture(t: TestContext, {
       return `  1) ${HASH} "Developer ID Application: Test Person (${TEAM_ID})"\n     1 valid identities found`;
     }
     if (line.startsWith("git log")) return subjects.join("\n");
-    if (line.startsWith("security find-generic-password")) {
-      if (!token) throw new BuildError("not found");
-      return token;
-    }
     if (command[0] === "curl") writeFileSync(command[command.indexOf("-o") + 1]!, "download");
     if (line.startsWith("shasum")) return `${command.at(-1)!.includes("sentry-cli") ? cliChecksum : checksum}  ${command.at(-1)}`;
     if (command[1]?.endsWith("sign_chrome.py")) {
@@ -57,10 +53,11 @@ function fixture(t: TestContext, {
   };
   const runtime: Runtime = {
     run, start: () => {},
-    env: { PATH: "/usr/bin", POSTHOG_PROJECT_TOKEN: "phc_test", POSTHOG_PROJECT_REGION: "US" }, platform: "darwin", arch: "arm64", nodeVersion: "24.13.0",
+    env: { PATH: "/usr/bin", POSTHOG_PROJECT_TOKEN: "phc_test", POSTHOG_PROJECT_REGION: "US", SENTRY_TOKEN: token }, platform: "darwin", arch: "arm64", nodeVersion: "24.13.0",
     memoryBytes: 64 * 1024 ** 3, freeBytes: () => 0, addresses: () => [], log: () => {},
   };
-  const release = (version = "0.1.0") => new Release({ version, worktree, jobs: 8 }, runtime);
+  const release = (version = "0.1.0") =>
+    new Release({ version, worktree, jobs: 8, envFile: join(worktree, "no.env") }, runtime);
   const find = (prefix: string) => calls.map(({ command }) => command).filter((command) => command.join(" ").startsWith(prefix));
   return { worktree, calls, release, find };
 }
@@ -138,7 +135,7 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
 test("a release needs the Sentry token before it builds", (t) => {
   const { release, find } = fixture(t, { token: "" });
 
-  assert.throws(() => release().publish(), /No Sentry token in the keychain/);
+  assert.throws(() => release().publish(), /Set SENTRY_TOKEN/);
   assert.deepEqual(find("node scripts/chromium.ts"), []);
 });
 
