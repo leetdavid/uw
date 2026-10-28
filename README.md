@@ -334,12 +334,16 @@ pnpm -F @uw/site build
 
 Its download buttons and Homebrew command use the latest release's `uw-macos-arm64.dmg`, so they work once a release is published. [Website content](docs/plans/distribution.md#website-content) lists what the page shows.
 
-The Vercel project `uw` in team `eslee` serves it at `uwbrowser.com`; `www` redirects there. Deploys are run by hand from the repo root. The build runs on this Mac with the pnpm lockfile, and Vercel receives only the output:
+The Vercel project `uw` in team `eslee` serves it at `uwbrowser.com`; `www` redirects there. Deploys are run by hand from a clean checkout of `main`, so uncommitted work in `site/` never ships. The build runs on this Mac with the pnpm lockfile, and Vercel receives only the output:
 
 ```sh
-vercel link --yes --project uw --scope eslee   # once per checkout
+git worktree add --detach /tmp/uw-deploy main
+cd /tmp/uw-deploy
+pnpm install --frozen-lockfile
+vercel link --yes --project uw --scope eslee
 vercel build --prod --scope eslee
 vercel deploy --prebuilt --prod --scope eslee
+cd - && git worktree remove --force /tmp/uw-deploy
 ```
 
 [Help](docs/plans/help.md) is MDX in [`site/content/help/`](site/content/help/), served at `/help` by Fumadocs with search, `/llms.txt`, `/llms-full.txt`, and each page's Markdown at its address plus `.md`. Help on `main` can describe features that are not released yet, so deploy the site after a release is published, and before any deploy between releases check that Help describes nothing unreleased. "Was this helpful?" sends its answers to PostHog once the Vercel project has `POSTHOG_PROJECT_TOKEN` and `POSTHOG_PROJECT_REGION`, the same values as in `.env`.
