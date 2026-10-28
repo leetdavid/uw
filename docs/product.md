@@ -275,6 +275,7 @@ Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Schedul
 - A watched page's row shows the page's icon and title, what it watches for, the latest value, the last run, and the next run. The last run reads Waiting for approval, Sign in required, Paused, or Didn't finish when one applies. The title and icon come from an open tab of the page, else from history, else the site.
 - A click on a watched page's row opens the page, or goes to its tab if one is open. A click on any other row opens the chat. On hover, a watched page's row offers Open chat, and every row Pause or Resume. Edit, Mute, Stop watching, and Delete stay on the chat page and the watch card.
 - The Inbox's "See all" and the "Show Scheduled" command open it.
+- Its header has Pause all, New scheduled chat, and Watch a page, two more ways to set one up. Watch a page opens the watch card with an Address field above "Watch for"; the page need not be open, and an address already watched links to its watch. New scheduled chat opens the schedule card with a Request field; saving makes a chat whose first message is the request. Both run at once when saved, and the page stays open.
 
 Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
 
