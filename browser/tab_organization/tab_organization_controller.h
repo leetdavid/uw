@@ -193,8 +193,12 @@ class TabOrganizationController : public TabStripModelObserver,
   std::optional<UndoMove> NextUndo() const;
 
   // A tab drag reorders the strip natively. The tree follows each step, and
-  // the strip is put in tree order once the drag ends.
-  void BeginTabDrag();
+  // the strip is put in tree order once the drag ends. A dragged parent
+  // carries its branch, unless `alone`, as with Option held.
+  void BeginTabDrag(bool alone);
+  // The tabs a drag of `tabs` moves, in strip order: each with its branch.
+  std::vector<tabs::TabInterface*> DraggedTabs(
+      std::vector<tabs::TabInterface*> tabs);
   void EndTabDrag();
 
   std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
@@ -281,6 +285,7 @@ class TabOrganizationController : public TabStripModelObserver,
   void ApplyOrder();
   void ScheduleApply();
   void ApplyWhenIdle();
+  void RestoreDragSelection(std::vector<tabs::TabHandle> handles);
   // Saves the window for Undo before an action that moves `roots`, into
   // `task` when the action changes their task.
   void Record(const std::vector<PageId>& roots,
@@ -320,6 +325,10 @@ class TabOrganizationController : public TabStripModelObserver,
   bool applying_ = false;
   bool apply_pending_ = false;
   bool dragging_ = false;
+  bool drag_alone_ = false;
+  // The tabs the user had selected when a drag carried a branch. Chromium
+  // selects everything it drags, and the user's selection comes back after.
+  std::vector<tabs::TabHandle> drag_selection_;
   bool update_pending_ = false;
   base::RepeatingClosureList changed_;
   // The task whose row should turn its name into a field.

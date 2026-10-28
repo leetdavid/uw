@@ -33,10 +33,10 @@
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
-#include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -59,6 +59,8 @@
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/hit_test.h"
+#include "ui/base/l10n/l10n_util.h"
+#include "ui/base/models/list_selection_model.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
@@ -67,7 +69,6 @@
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/menus/simple_menu_model.h"
-#include "ui/base/l10n/l10n_util.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/checkbox.h"
@@ -251,7 +252,8 @@ class TabOrganizationControllerBrowserTest
     // Session restore skips a tab with no committed page.
     ASSERT_TRUE(base::test::RunUntil([&] {
       for (int i = 0; i < tabs()->count(); ++i) {
-        content::WebContents* contents = tabs()->GetTabAtIndex(i)->GetContents();
+        content::WebContents* contents =
+            tabs()->GetTabAtIndex(i)->GetContents();
         if (contents->GetLastCommittedURL() != contents->GetVisibleURL()) {
           return false;
         }
@@ -266,8 +268,8 @@ class TabOrganizationControllerBrowserTest
   // Opens `a` with `b` under it and waits until both pages are committed,
   // which session restore needs.
   void OpenAWithBUnderIt() {
-    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(),
-                                             GURL("chrome://version/?a")));
+    ASSERT_TRUE(
+        ui_test_utils::NavigateToURL(browser(), GURL("chrome://version/?a")));
     tabs::TabInterface* b =
         OpenLinkFrom(InitialTab(), GURL("chrome://version/?b"));
     ASSERT_TRUE(base::test::RunUntil([&] {
@@ -277,8 +279,8 @@ class TabOrganizationControllerBrowserTest
     base::RunLoop().RunUntilIdle();
   }
 
-  // The window's tree in tab order: each named tab's name, its depth, `*` when its
-  // branch is collapsed, and its task's title with who named it.
+  // The window's tree in tab order: each named tab's name, its depth, `*` when
+  // its branch is collapsed, and its task's title with who named it.
   std::string TreeShape() {
     std::string shape;
     for (int i = 0; i < tabs()->count(); ++i) {
@@ -290,8 +292,7 @@ class TabOrganizationControllerBrowserTest
         continue;
       }
       shape += shape.empty() ? "" : " ";
-      shape += name +
-               base::NumberToString(controller()->DepthFor(tab));
+      shape += name + base::NumberToString(controller()->DepthFor(tab));
       if (controller()->IsCollapsed(*id)) {
         shape += "*";
       }
@@ -1282,8 +1283,9 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        TheTreeComesBackAfterTheSessionFileIsRewritten) {
-  EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == kRestoredTree; }))
-      << TreeShape();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return TreeShape() == kRestoredTree;
+  })) << TreeShape();
 }
 
 // After a crash, Chromium saves nothing until its restore has run, and then
@@ -1300,8 +1302,9 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        TheTreeComesBackWhenItWasBuiltWhileSavingWasOff) {
-  EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == kRestoredTree; }))
-      << TreeShape();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return TreeShape() == kRestoredTree;
+  })) << TreeShape();
 }
 
 // On the Mac, uw keeps running when its last window closes, and the next new
@@ -1326,8 +1329,9 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   restore.Wait();
   ASSERT_EQ(GlobalBrowserCollection::GetInstance()->GetSize(), 1u);
   SetBrowser(GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser());
-  EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == kRestoredTree; }))
-      << TreeShape();
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return TreeShape() == kRestoredTree;
+  })) << TreeShape();
 }
 
 // A launch restores the last session, though the user set nothing.
@@ -1398,8 +1402,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        OnceTickedACrashRestoresWithoutTheCrashPrompt) {
   ASSERT_EQ(TreeShape(), "");
-  browser()->GetProfile()->GetPrefs()->SetBoolean(kRestoreAfterCrashPref,
-                                                  true);
+  browser()->GetProfile()->GetPrefs()->SetBoolean(kRestoreAfterCrashPref, true);
   SessionCrashedBubble::ShowIfNotOffTheRecordProfile(browser(), true);
   EXPECT_FALSE(SessionCrashedBubbleView::GetInstanceForTest());
   EXPECT_TRUE(base::test::RunUntil([&] { return TreeShape() == "a0 b1"; }))
@@ -1491,6 +1494,56 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
     ++checked;
   }
   EXPECT_GT(checked, 0);
+}
+
+// A dragged parent carries its branch, which keeps its nesting where it is
+// dropped, and the user's own selection comes back after. With Option the
+// parent moves alone, and its children move up a level.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ADraggedParentCarriesItsBranch) {
+  tabs::TabInterface* parent = InitialTab();
+  tabs::TabInterface* first = OpenLinkFrom(parent);
+  tabs::TabInterface* second = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  ASSERT_EQ(Strip(), (std::vector<PageId>{Id(parent), Id(first), Id(second),
+                                          Id(other)}));
+  ASSERT_EQ(controller()->DepthFor(first), 1);
+
+  // Moves what a drag of `tab` takes to `index`, as Chromium's drop does.
+  const auto drag = [&](tabs::TabInterface* tab, bool alone, int index) {
+    tabs()->ActivateTabAt(tabs()->GetIndexOfTab(tab));
+    controller()->BeginTabDrag(alone);
+    const std::vector<tabs::TabInterface*> dragged =
+        controller()->DraggedTabs({tab});
+    ui::ListSelectionModel selection;
+    for (const tabs::TabInterface* each : dragged) {
+      selection.AddIndexToSelection(tabs()->GetIndexOfTab(each));
+    }
+    selection.set_active(tabs()->GetIndexOfTab(tab));
+    selection.set_anchor(tabs()->GetIndexOfTab(tab));
+    tabs()->SetSelectionFromModel(selection);
+    tabs()->MoveSelectedTabsTo(index, std::nullopt);
+    controller()->EndTabDrag();
+    base::RunLoop().RunUntilIdle();
+    return dragged;
+  };
+
+  EXPECT_EQ(drag(parent, /*alone=*/false, 1),
+            (std::vector<tabs::TabInterface*>{parent, first, second}));
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(other), Id(parent), Id(first),
+                                          Id(second)}));
+  EXPECT_EQ(controller()->DepthFor(parent), 0);
+  EXPECT_EQ(controller()->DepthFor(first), 1);
+  EXPECT_EQ(controller()->DepthFor(second), 1);
+  EXPECT_EQ(tabs()->selection_model().GetListSelectionModel().size(), 1u);
+  EXPECT_EQ(tabs()->GetActiveTab(), parent);
+
+  EXPECT_EQ(drag(parent, /*alone=*/true, 3),
+            (std::vector<tabs::TabInterface*>{parent}));
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(other), Id(first), Id(second),
+                                          Id(parent)}));
+  EXPECT_EQ(controller()->DepthFor(first), 0);
+  EXPECT_EQ(controller()->DepthFor(second), 0);
 }
 }  // namespace
 }  // namespace uw

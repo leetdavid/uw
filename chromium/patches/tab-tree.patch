@@ -780,29 +780,44 @@ index 9354e0d5497b85db204ebae5d6adcd41973ea01a..f3b526cc11c8dd433fc17a65c59f0ef6
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index cdc7c0f..a260033 100644
+index cdc7c0f320fed580814d4f71c90702d9450be81e..393cd0f2bfb3800e5a8149d01a3df17e4dfd658b 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-@@ -3,6 +3,7 @@
- // found in the LICENSE file.
- 
- #include "chrome/browser/ui/views/tabs/common/tab_drag_handler.h"
+@@ -46,6 +46,7 @@
+ #include "ui/gfx/geometry/vector2d.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+ #include "ui/views/view_utils.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
  
- #include <algorithm>
- #include <memory>
-@@ -191,6 +192,10 @@ void TabDragHandlerImpl::InitializeDrag(
+ DEFINE_UI_CLASS_PROPERTY_TYPE(gfx::Vector2d*)
+ 
+@@ -191,6 +192,11 @@ void TabDragHandlerImpl::InitializeDrag(
      const ui::ListSelectionModel& original_selection_model,
      const ui::LocatedEvent& event) {
    ResetDragState();
++  // uw: Option moves the dragged tab without its branch.
 +  if (auto* organizer =
 +          uw::TabOrganizationController::From(&tab_strip_model_.get())) {
-+    organizer->BeginTabDrag();
++    organizer->BeginTabDrag(/*alone=*/event.IsAltDown());
 +  }
    drag_controller_ = std::make_unique<TabDragController>();
  
    DragInitData drag_init_data;
-@@ -358,6 +363,10 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -257,6 +263,13 @@ TabDragHandlerImpl::DragInitData TabDragHandlerImpl::GetDragInitDataForTabDrag(
+     // tabs themselves. These must be inserted into `dragged_views` in the
+     // order they appear within the tab strip.
+     dragged_groups = GetFullySelectedGroups(selected_tabs);
++    // uw: a dragged parent carries its branch. The branch joins after the
++    // groups are counted, so a branch that fills its task moves its tabs,
++    // not the task with its header.
++    if (auto* organizer =
++            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++      selected_tabs = organizer->DraggedTabs(std::move(selected_tabs));
++    }
+   }
+ 
+   // Track the node and build a shim view for each selected node.
+@@ -358,6 +371,10 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
  }
  
  void TabDragHandlerImpl::EndDrag(EndDragReason reason) {

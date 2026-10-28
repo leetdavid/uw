@@ -29,6 +29,7 @@
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/models/list_selection_model.h"
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
 #include "uw/browser/terminal/terminal_shell.h"
@@ -725,8 +726,8 @@ bool TabOrganizationController::IsKept(const PageId& id) const {
 
 bool TabOrganizationController::KeepsTabs(
     const std::vector<PageId>& ids) const {
-  return std::ranges::any_of(
-      ids, [this](const PageId& id) { return !IsKept(id); });
+  return std::ranges::any_of(ids,
+                             [this](const PageId& id) { return !IsKept(id); });
 }
 
 void TabOrganizationController::ToggleKept(const std::vector<PageId>& ids) {
@@ -869,13 +870,77 @@ void TabOrganizationController::Undo() {
   }
 }
 
-void TabOrganizationController::BeginTabDrag() {
+void TabOrganizationController::BeginTabDrag(bool alone) {
   dragging_ = true;
+  drag_alone_ = alone;
+  drag_selection_.clear();
+}
+
+std::vector<tabs::TabInterface*> TabOrganizationController::DraggedTabs(
+    std::vector<tabs::TabInterface*> tabs) {
+  if (drag_alone_) {
+    return tabs;
+  }
+  std::set<tabs::TabInterface*> dragged(tabs.begin(), tabs.end());
+  for (const tabs::TabInterface* tab : tabs) {
+    if (const std::optional<PageId> id = IdFor(tab)) {
+      for (const PageId& page : tree_.BranchOf(*id)) {
+        if (tabs::TabInterface* in_branch = TabFor(page)) {
+          dragged.insert(in_branch);
+        }
+      }
+    }
+  }
+  if (dragged.size() == tabs.size()) {
+    return tabs;
+  }
+  drag_selection_.clear();
+  for (const tabs::TabInterface* tab : tabs) {
+    drag_selection_.push_back(tab->GetHandle());
+  }
+  std::vector<tabs::TabInterface*> in_order(dragged.begin(), dragged.end());
+  std::ranges::sort(in_order, {}, [this](const tabs::TabInterface* tab) {
+    return tabs_->GetIndexOfTab(tab);
+  });
+  return in_order;
 }
 
 void TabOrganizationController::EndTabDrag() {
   dragging_ = false;
+  if (!drag_selection_.empty()) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&TabOrganizationController::RestoreDragSelection,
+                       weak_factory_.GetWeakPtr(), std::move(drag_selection_)));
+    drag_selection_.clear();
+  }
   ScheduleApply();
+}
+
+// Puts back the selection the user had before a drag selected a whole branch.
+// A click that made the selection smaller, with no drag, is left alone.
+void TabOrganizationController::RestoreDragSelection(
+    std::vector<tabs::TabHandle> handles) {
+  ui::ListSelectionModel selection;
+  const tabs::TabInterface* active = tabs_->GetActiveTab();
+  for (const tabs::TabHandle& handle : handles) {
+    if (const tabs::TabInterface* tab = handle.Get()) {
+      const int index = tabs_->GetIndexOfTab(tab);
+      if (index != TabStripModel::kNoTab) {
+        selection.AddIndexToSelection(index);
+        if (tab == active) {
+          selection.set_active(index);
+          selection.set_anchor(index);
+        }
+      }
+    }
+  }
+  if (selection.empty() || !selection.active().has_value() ||
+      selection.size() >=
+          tabs_->selection_model().GetListSelectionModel().size()) {
+    return;
+  }
+  tabs_->SetSelectionFromModel(selection);
 }
 
 std::u16string TabOrganizationController::TaskTitle(

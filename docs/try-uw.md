@@ -74,6 +74,16 @@ Open a few links from one page with Cmd-click, so they sit under it.
 
 Expected result: the hidden tabs stay open and come back in place. Closing the collapsed tab shows them one level up.
 
+### Drag a branch
+
+Open a few links from one page with Cmd-click, so they sit under it.
+
+- Drag the page's tab: the tabs under it come along, still under it.
+- Hold Option while you drag: the page moves alone, and its tabs move up a level.
+- Collapse the branch first: it moves with its hidden tabs and stays collapsed.
+
+Expected result: after the drop, only the tab you dragged is selected.
+
 ### New child tab
 
 Right-click a tab that has children but is not selected, and choose `New Child Tab`, under `New Tab Below`.

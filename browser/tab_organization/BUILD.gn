@@ -20,7 +20,6 @@ source_set("tab_organization") {
     "//uw/components/tab_organization",
   ]
   deps = [
-    "//uw/browser/ai_providers",
     "//base:i18n",
     "//chrome:strings",
     "//chrome/browser/profiles:profile",
@@ -35,6 +34,7 @@ source_set("tab_organization") {
     "//services/network/public/cpp",
     "//ui/base",
     "//ui/menus",
+    "//uw/browser/ai_providers",
     "//uw/browser/terminal",
   ]
 }
@@ -52,6 +52,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "automatic_organizer_browsertest.cc",
+    "branch_drag_browsertest.mm",
     "mouse_actions_browsertest.mm",
     "sidebar_menus_browsertest.mm",
     "tab_organization_controller_browsertest.cc",
@@ -61,20 +62,20 @@ source_set("browser_tests") {
   ]
   deps = [
     ":ai_connection",
-    "//uw/browser/ai_providers:test_support",
-    "//uw/browser/ai_providers",
     ":tab_organization",
     ":test_support",
     "//base",
-    "//chrome/browser",
     "//chrome:strings",
+    "//chrome/browser",
     "//chrome/browser:global_keyboard_shortcuts_mac",
-    "//chrome/browser/tab_group_sync:factories",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles/keep_alive",
     "//chrome/browser/sessions",
     "//chrome/browser/sessions:test_support",
+    "//chrome/browser/tab_group_sync:factories",
     "//chrome/browser/ui",
+    "//chrome/browser/ui/views/tabs/common:impl",
+    "//chrome/browser/ui/views/tabs/tab",
     "//chrome/common",
     "//chrome/test:test_support",
     "//components/content_extraction/content/browser",
@@ -89,14 +90,15 @@ source_set("browser_tests") {
     "//net:test_support",
     "//testing/gtest",
     "//ui/base",
+    "//ui/base:test_support",
     "//ui/compositor",
     "//ui/events:test_support",
     "//ui/views:test_support",
     "//url",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
     "//uw/browser/terminal",
     "//uw/browser/ui/views/command_bar",
-    "//chrome/browser/ui/views/tabs/common:impl",
-    "//chrome/browser/ui/views/tabs/tab",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/workspaces",
     "//uw/components/ai_providers",
