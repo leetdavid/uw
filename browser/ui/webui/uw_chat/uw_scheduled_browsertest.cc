@@ -292,18 +292,19 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, WatchesAPageByItsAddress) {
   EXPECT_EQ(chats()->Find(stock)->watch_for, "Back in stock");
   ASSERT_TRUE(Shows(page, base::StrCat({"[data-row='", stock, "']"})));
 
-  // "Open its watch" opens a watch of the page in place, and Stop watching
-  // ends that one only.
+  // With two watches, Open lists them, a row opens one in place, and Stop
+  // watching ends that one only.
   Click(page, "#watch-a-page");
   ASSERT_TRUE(Shows(page, "#watch-address"));
   Type(page, "#watch-address", Url("/desk").spec());
-  ASSERT_TRUE(Shows(page, "#watch-open-watch"));
+  ASSERT_TRUE(Says(page, "#watch-already", "Watched for 2 things."));
   Click(page, "#watch-open-watch");
+  ASSERT_TRUE(Shows(page, "#watch-list"));
+  Click(page, base::StrCat({"[data-watch='", stock, "']"}));
   ASSERT_TRUE(Shows(page, "#watch-stop"));
-  const std::string opened =
-      Text(page, "#watch-for") == "Back in stock" ? stock : id;
+  EXPECT_EQ(Text(page, "#watch-for"), "Back in stock");
   Click(page, "#watch-stop");
-  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Find(opened); }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Find(stock); }));
   EXPECT_EQ(chats()->ChatsWatching(Url("/desk")).size(), 1u);
 }
 

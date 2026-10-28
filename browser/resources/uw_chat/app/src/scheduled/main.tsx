@@ -42,6 +42,7 @@ import { ScheduleRows, WATCH_CHIPS } from "../schedule";
 import {
   useModels,
   WatchForm,
+  WatchList,
   Watched,
   type WatchView,
 } from "../watch-card/watch-parts";
@@ -589,15 +590,20 @@ function Card({
 function WatchAPage({
   state,
   rows,
+  typed: first,
   onClose,
   onOpenWatch,
+  onOpenWatches,
 }: {
   state: ScheduleState;
   rows: ScheduledRow[];
+  // The address typed before, when coming back from the page's watches.
+  typed: string;
   onClose: () => void;
   onOpenWatch: (chatId: string) => void;
+  onOpenWatches: (page: string, typed: string) => void;
 }) {
-  const [typed, setTyped] = useState("");
+  const [typed, setTyped] = useState(first);
   const [found, setFound] = useState<WatchAddress | null>(null);
   const [left, setLeft] = useState(false);
   useEffect(() => {
@@ -636,9 +642,11 @@ function WatchAPage({
       </p>
     );
   } else if (found?.chatId) {
+    const watching = rows.filter(
+      (row) => row.watch.state.schedule.page === found.page,
+    );
     const watchFor =
-      rows.find((row) => row.watch.chatId === found.chatId)?.watch.state
-        .schedule.watchFor ?? "";
+      watching.length === 1 ? watching[0]!.watch.state.schedule.watchFor : "";
     line = (
       <p
         id="watch-already"
@@ -646,15 +654,21 @@ function WatchAPage({
       >
         <Eye aria-hidden className="size-3.5 shrink-0 text-primary" />
         <span className="min-w-0 truncate">
-          {watchFor
-            ? `Watched for ${watchFor.charAt(0).toLowerCase()}${watchFor.slice(1)}`
-            : "Watched"}
+          {watching.length > 1
+            ? `Watched for ${watching.length} things.`
+            : watchFor
+              ? `Watched for ${watchFor.charAt(0).toLowerCase()}${watchFor.slice(1)}.`
+              : "Watched."}
         </span>
         <button
           type="button"
           id="watch-open-watch"
           className="ml-auto shrink-0 font-medium text-primary"
-          onClick={() => onOpenWatch(found.chatId)}
+          onClick={() =>
+            watching.length > 1
+              ? onOpenWatches(found.page, typed)
+              : onOpenWatch(found.chatId)
+          }
         >
           Open
         </button>
@@ -775,6 +789,35 @@ function OpenWatch({
   );
 }
 
+// The watches of a page several chats watch, opened from Watch a page.
+function WatchesOf({
+  open,
+  rows,
+  onOpen,
+  onAnother,
+}: {
+  open: { page: string };
+  rows: ScheduledRow[];
+  onOpen: (chatId: string) => void;
+  onAnother: () => void;
+}) {
+  const watching = rows.filter(
+    (row) => row.watch.state.schedule.page === open.page,
+  );
+  const first = watching[0];
+  if (!first) {
+    return null;
+  }
+  return (
+    <WatchList
+      page={{ title: first.pageTitle, host: first.host, favicon: first.favicon }}
+      watches={watching.map((row) => row.watch)}
+      onOpen={onOpen}
+      onAnother={onAnother}
+    />
+  );
+}
+
 // New scheduled chat: the schedule card with a Request field on top.
 function NewScheduledChat({
   state,
@@ -850,7 +893,8 @@ function NewScheduledChat({
 }
 
 type Open =
-  | { kind: "watch"; state: ScheduleState }
+  | { kind: "watch"; state: ScheduleState; typed?: string }
+  | { kind: "watches"; page: string; state: ScheduleState; typed: string }
   | { kind: "chat"; state: ScheduleState }
   | { kind: "watched"; chatId: string };
 
@@ -981,7 +1025,7 @@ function ScheduledPage() {
         label={
           open?.kind === "chat"
             ? "New scheduled chat"
-            : open?.kind === "watched"
+            : open?.kind === "watched" || open?.kind === "watches"
               ? "Watching this page"
               : "Watch a page"
         }
@@ -992,8 +1036,22 @@ function ScheduledPage() {
           <WatchAPage
             state={open.state}
             rows={rows}
+            typed={open.typed ?? ""}
+            onOpenWatches={(page, typed) =>
+              setOpen({ kind: "watches", page, state: open.state, typed })
+            }
             onClose={() => setOpen(null)}
             onOpenWatch={(chatId) => setOpen({ kind: "watched", chatId })}
+          />
+        )}
+        {open?.kind === "watches" && (
+          <WatchesOf
+            open={open}
+            rows={rows}
+            onOpen={(chatId) => setOpen({ kind: "watched", chatId })}
+            onAnother={() =>
+              setOpen({ kind: "watch", state: open.state, typed: open.typed })
+            }
           />
         )}
         {open?.kind === "chat" && (
