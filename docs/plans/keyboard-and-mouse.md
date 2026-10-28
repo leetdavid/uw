@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. [Sideways drag](#sideways-drag), T56, was agreed on 2026-10-28 and waits for its design. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -127,7 +127,7 @@ Agreed on 2026-10-28 as T56. Before, a dropped tab joined the branch of the tab 
 - Sideways never changes the task. The task is the one the tab is dropped in, as in Chromium. Dragging left past the sidebar's edge does not tear the tab off into a new window.
 - A drop that gives a tab a new parent nests it by hand, like Nest under previous tab. A reorder inside the same branch does not. Dragging it out of the branch ends that.
 - "Drag sideways to nest tabs", in the Mouse section of uw's settings and on by default, turns sideways off. A straight drag still follows the first rule.
-- The design is the frames "Sideways drag: the sidebar", "Sideways drag: every state", and "Sideways drag: a branch" on the canvas page "Keyboard and mouse". The user signs them off before it is built.
+- The design is the frames "Sideways drag: the sidebar", "Sideways drag: every state", and "Sideways drag: a branch" on the canvas page "Keyboard and mouse". The user signed them off on 2026-10-28.
 
 ### Side by side in the sidebar
 
