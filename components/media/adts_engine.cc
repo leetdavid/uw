@@ -2,10 +2,9 @@
 
 #include "uw/components/media/adts_engine.h"
 
+#include <algorithm>
 #include <optional>
 #include <utility>
-
-#include <algorithm>
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -25,13 +24,16 @@ constexpr char kRole[] = "adts";
 constexpr base::TimeDelta kAhead = base::Seconds(10);
 constexpr base::TimeDelta kWhileFull = base::Seconds(1);
 
-} // namespace
+}  // namespace
 
 AdtsEngine::AdtsEngine(base::SequenceBound<HlsDataSourceProvider> provider,
-                       GURL url, bool would_taint_origin,
+                       GURL url,
+                       bool would_taint_origin,
                        std::optional<int64_t> size)
-    : provider_(std::move(provider)), url_(std::move(url)),
-      would_taint_origin_(would_taint_origin), size_(size) {}
+    : provider_(std::move(provider)),
+      url_(std::move(url)),
+      would_taint_origin_(would_taint_origin),
+      size_(size) {}
 
 AdtsEngine::~AdtsEngine() = default;
 
@@ -43,19 +45,26 @@ int64_t AdtsEngine::GetMemoryUsage() const {
   return stream_ ? static_cast<int64_t>(stream_->memory_usage()) : 0;
 }
 
-bool AdtsEngine::WouldTaintOrigin() const { return would_taint_origin_; }
+bool AdtsEngine::WouldTaintOrigin() const {
+  return would_taint_origin_;
+}
 
-bool AdtsEngine::IsStreaming() const { return !size_; }
+bool AdtsEngine::IsStreaming() const {
+  return !size_;
+}
 
-std::string AdtsEngine::GetName() const { return "AdtsEngine"; }
+std::string AdtsEngine::GetName() const {
+  return "AdtsEngine";
+}
 
-void AdtsEngine::Initialize(ManifestDemuxerEngineHost *host,
+void AdtsEngine::Initialize(ManifestDemuxerEngineHost* host,
                             PipelineStatusCallback status_cb) {
   host_ = host;
   std::move(status_cb).Run(OkStatus());
 }
 
-void AdtsEngine::OnTimeUpdate(base::TimeDelta time, double playback_rate,
+void AdtsEngine::OnTimeUpdate(base::TimeDelta time,
+                              double playback_rate,
                               ManifestDemuxer::DelayCallback cb) {
   time_ = time;
   // The first event comes once ChunkDemuxer is open.
@@ -129,7 +138,9 @@ void AdtsEngine::AbortPendingReads(base::OnceClosure cb) {
   std::move(cb).Run();
 }
 
-bool AdtsEngine::IsSeekable() const { return size_.has_value(); }
+bool AdtsEngine::IsSeekable() const {
+  return size_.has_value();
+}
 
 void AdtsEngine::Stop() {
   weak_factory_.InvalidateWeakPtrs();
@@ -137,12 +148,12 @@ void AdtsEngine::Stop() {
   host_ = nullptr;
 }
 
-void AdtsEngine::SelectAudioTrack(const MediaTrack::Id &track_id) {}
+void AdtsEngine::SelectAudioTrack(const MediaTrack::Id& track_id) {}
 
-void AdtsEngine::SelectVideoTrack(const MediaTrack::Id &track_id) {}
+void AdtsEngine::SelectVideoTrack(const MediaTrack::Id& track_id) {}
 
 std::vector<raw_ptr<DemuxerStream>> AdtsEngine::FilterDemuxerStreams(
-    std::vector<raw_ptr<DemuxerStream>> &&streams) {
+    std::vector<raw_ptr<DemuxerStream>>&& streams) {
   return std::move(streams);
 }
 
@@ -212,4 +223,4 @@ void AdtsEngine::OnRead(ManifestDemuxer::DelayCallback cb,
                                                   : kWhileFull);
 }
 
-} // namespace media
+}  // namespace media

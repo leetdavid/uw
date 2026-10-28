@@ -56,7 +56,7 @@ constexpr char kPlay[] = R"(
 // A radio station: `tone` over and over, with no length, in small pieces,
 // starting partway through a frame as a station's stream can.
 class Station : public net::test_server::HttpResponse {
-public:
+ public:
   explicit Station(std::string tone) : tone_(std::move(tone)) {}
 
   void SendResponse(
@@ -68,7 +68,7 @@ public:
     Send();
   }
 
-private:
+ private:
   void Send() {
     if (!delegate_) {
       return;
@@ -99,8 +99,8 @@ private:
 };
 
 class CodecsBrowserTest : public headless::HeadlessModeBrowserTest {
-protected:
-  void SetUpCommandLine(base::CommandLine *command_line) override {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
     HeadlessModeBrowserTest::SetUpCommandLine(command_line);
     // Tests never make a sound.
     command_line->AppendSwitch(switches::kMuteAudio);
@@ -129,8 +129,8 @@ protected:
     }
     embedded_test_server()->ServeFilesFromDirectory(long_files_.GetPath());
     embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
-        [](const std::string &tone,
-           const net::test_server::HttpRequest &request)
+        [](const std::string& tone,
+           const net::test_server::HttpRequest& request)
             -> std::unique_ptr<net::test_server::HttpResponse> {
           if (request.relative_url != "/station") {
             return nullptr;
@@ -145,7 +145,7 @@ protected:
 
   base::ScopedTempDir long_files_;
 
-  content::EvalJsResult Run(const std::string &body) {
+  content::EvalJsResult Run(const std::string& body) {
     return content::EvalJs(
         browser()->tab_strip_model()->GetActiveWebContents(),
         base::StrCat({"(async () => {", kPlay, body, "})()"}));
@@ -160,7 +160,7 @@ IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, FFmpegCannotDecodeH264OrAac) {
 }
 
 IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, AacPlaysInEachProfile) {
-  for (const char *file : {"lc.m4a", "he.m4a", "he_v2.m4a"}) {
+  for (const char* file : {"lc.m4a", "he.m4a", "he_v2.m4a"}) {
     SCOPED_TRACE(file);
     EXPECT_EQ(true,
               Run(base::StrCat({"const audio = await play('audio', '", file,
@@ -298,7 +298,7 @@ IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, ALongRawAacFileSeeks) {
 
 IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, H264PlaysAtEverySize) {
   // Under 360 pixels tall went to FFmpeg before uw dropped its decoder.
-  for (const char *file : {"small.mp4", "large.mp4"}) {
+  for (const char* file : {"small.mp4", "large.mp4"}) {
     SCOPED_TRACE(file);
     EXPECT_EQ(true,
               Run(base::StrCat({"const video = await play('video', '", file,
@@ -308,5 +308,5 @@ IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, H264PlaysAtEverySize) {
   }
 }
 
-} // namespace
-} // namespace uw
+}  // namespace
+}  // namespace uw
