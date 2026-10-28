@@ -720,6 +720,247 @@ index b50c0ca201a937460c64e609a483295bb07be8fe..d9d37d484c5b8ccc49758e53f6976d42
  };
  
  }  // namespace media
+diff --git a/media/gpu/mac/BUILD.gn b/media/gpu/mac/BUILD.gn
+index 704a619b940ef8a351605fa5f003bb4256983c00..c87e7d6ef8374a58911f0e1653d7079fc89584d9 100644
+--- a/media/gpu/mac/BUILD.gn
++++ b/media/gpu/mac/BUILD.gn
+@@ -34,6 +34,10 @@ source_set("mac") {
+     "video_toolbox_output_queue.h",
+     "video_toolbox_video_decoder.cc",
+     "video_toolbox_video_decoder.h",
++
++    # uw: frames VideoToolbox decoded in software, copied for the page.
++    "//uw/components/media/vt_cpu_frame.cc",
++    "//uw/components/media/vt_cpu_frame.h",
+     "video_toolbox_vp9_accelerator.cc",
+     "video_toolbox_vp9_accelerator.h",
+     "vt_config_util.h",
+diff --git a/media/gpu/mac/video_toolbox_decompression_metadata.h b/media/gpu/mac/video_toolbox_decompression_metadata.h
+index 424f6a4c2542347ddc708c5ddb33d5e601c34dc7..71da8960b81f25655208277a642615fb8d423091 100644
+--- a/media/gpu/mac/video_toolbox_decompression_metadata.h
++++ b/media/gpu/mac/video_toolbox_decompression_metadata.h
+@@ -33,6 +33,9 @@ struct MEDIA_GPU_EXPORT VideoToolboxDecompressionSessionMetadata {
+   bool has_alpha = false;
+   // Selects the output image size.
+   gfx::Rect visible_rect;
++  // uw: asks for plain 8-bit 4:2:0 that a CPU can read, never a compressed
++  // format, for frames copied to the page's process.
++  bool cpu_readable = false;
+ };
+ 
+ // Metadata used when decoding a frame.
+diff --git a/media/gpu/mac/video_toolbox_decompression_session_manager.mm b/media/gpu/mac/video_toolbox_decompression_session_manager.mm
+index 48629da904481a99a24977ebb93f88cf0e28381f..bfc0f36bf17de4c4f20bb659cacd24eea631cdbb 100644
+--- a/media/gpu/mac/video_toolbox_decompression_session_manager.mm
++++ b/media/gpu/mac/video_toolbox_decompression_session_manager.mm
+@@ -257,7 +257,8 @@ bool VideoToolboxDecompressionSessionManager::CreateSession(
+   // Prefer compressed pixel formats, if available.
+   // https://crbug.com/500766607
+   if (@available(macOS 12.0, iOS 15.0, *)) {
+-    if (base::FeatureList::IsEnabled(kVideoToolboxCompressedPixelFormats)) {
++    if (base::FeatureList::IsEnabled(kVideoToolboxCompressedPixelFormats) &&
++        !session_metadata.cpu_readable) {
+       constexpr auto kFormatMap = base::MakeFixedFlatMap<uint32_t, uint32_t>(
+           {{kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+             kCVPixelFormatType_Lossless_420YpCbCr8BiPlanarVideoRange},
+diff --git a/media/gpu/mac/video_toolbox_video_decoder.cc b/media/gpu/mac/video_toolbox_video_decoder.cc
+index b74a725bc29053139a8053f284a58cde30c63cb6..b4013ac4cd37238a1ae8cee2b6eda2e1b4fd5526 100644
+--- a/media/gpu/mac/video_toolbox_video_decoder.cc
++++ b/media/gpu/mac/video_toolbox_video_decoder.cc
+@@ -30,6 +30,7 @@
+ #include "media/gpu/mac/video_toolbox_h264_accelerator.h"
+ #include "media/gpu/mac/video_toolbox_vp9_accelerator.h"
+ #include "media/gpu/vp9_decoder.h"
++#include "uw/components/media/vt_cpu_frame.h"
+ #include "ui/gfx/geometry/size.h"
+ 
+ #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
+@@ -83,6 +84,7 @@ VideoToolboxVideoDecoder::VideoToolboxVideoDecoder(
+       gpu_workarounds_(gpu_workarounds),
+       gpu_task_runner_(std::move(gpu_task_runner)),
+       get_stub_cb_(std::move(get_stub_cb)),
++      software_(get_stub_cb_.is_null()),
+       video_toolbox_(
+           task_runner_,
+           media_log_->Clone(),
+@@ -375,6 +377,10 @@ void VideoToolboxVideoDecoder::OnAcceleratorDecode(
+       metadata->picture->dynamic_hdr_metadata());
+ 
+   metadata->session_metadata = session_metadata;
++  if (software_) {
++    metadata->session_metadata.allow_software_decoding = true;
++    metadata->session_metadata.cpu_readable = true;
++  }
+ 
+   video_toolbox_.Decode(std::move(sample), std::move(metadata));
+ }
+@@ -401,6 +407,13 @@ void VideoToolboxVideoDecoder::OnVideoToolboxOutput(
+     return;
+   }
+ 
++  if (software_) {
++    scoped_refptr<VideoFrame> frame = CopyToCpuFrame(image.get(), *metadata);
++    ++num_conversions_;
++    OnConverterOutput(std::move(frame), std::move(metadata));
++    return;
++  }
++
+   // Lazily create `converter_`.
+   if (!converter_) {
+     converter_ = base::MakeRefCounted<VideoToolboxFrameConverter>(
+diff --git a/media/gpu/mac/video_toolbox_video_decoder.h b/media/gpu/mac/video_toolbox_video_decoder.h
+index 50b15438845168282fcc7459b3a0929fedd81b7a..3cb64942a72d6ca3b3b395f7f4a437feeb7eb0d9 100644
+--- a/media/gpu/mac/video_toolbox_video_decoder.h
++++ b/media/gpu/mac/video_toolbox_video_decoder.h
+@@ -105,6 +105,9 @@ class MEDIA_GPU_EXPORT VideoToolboxVideoDecoder : public VideoDecoder {
+   gpu::GpuDriverBugWorkarounds gpu_workarounds_;
+   scoped_refptr<base::SequencedTaskRunner> gpu_task_runner_;
+   GetCommandBufferStubCB get_stub_cb_;
++  // uw: no command buffer, so VideoToolbox may decode in software and frames
++  // are copied for the page's process.
++  const bool software_;
+ 
+   bool has_error_ = false;
+ 
+diff --git a/media/mojo/services/gpu_mojo_media_client.cc b/media/mojo/services/gpu_mojo_media_client.cc
+index ded9c564c3b11afcc5fb22533101f59a76ef05a9..86636b66050bcda3a7b2089239c80285c201c670 100644
+--- a/media/mojo/services/gpu_mojo_media_client.cc
++++ b/media/mojo/services/gpu_mojo_media_client.cc
+@@ -157,7 +157,7 @@ GpuMojoMediaClient::GetSupportedVideoDecoderConfigs() {
+     // Only bother to query if accelerated video decoding is enabled.
+     // (RenderMediaClient does not know about GPU features before it asks.)
+     if (IsAcceleratedDecodingDisabled(gpu_preferences_, gpu_feature_info_)) {
+-      supported_config_cache_ = SupportedVideoDecoderConfigs();
++      supported_config_cache_ = GetPlatformSoftwareVideoDecoderConfigs();
+     } else {
+       supported_config_cache_ = GetPlatformSupportedVideoDecoderConfigs();
+     }
+@@ -215,14 +215,20 @@ std::unique_ptr<VideoDecoder> GpuMojoMediaClient::CreateVideoDecoder(
+     RequestOverlayInfoCB request_overlay_info_cb,
+     const gfx::ColorSpace& target_color_space,
+     mojo::PendingRemote<mojom::VideoDecoder> oop_video_decoder) {
+-  if (IsAcceleratedDecodingDisabled(gpu_preferences_, gpu_feature_info_)) {
+-    return nullptr;
+-  }
+-  // All implementations require a command buffer.
+-  if (!command_buffer_id)
+-    return nullptr;
+   std::unique_ptr<MediaLog> log =
+       media_log ? media_log->Clone() : std::make_unique<media::NullMediaLog>();
++  // uw: without accelerated decoding or a command buffer, a decoder that needs
++  // neither.
++  if (IsAcceleratedDecodingDisabled(gpu_preferences_, gpu_feature_info_) ||
++      !command_buffer_id) {
++    VideoDecoderTraits traits(
++        task_runner, std::move(log), std::move(request_overlay_info_cb),
++        &target_color_space,
++        base::BindRepeating(&GpuMojoMediaClient::GetSupportedVideoDecoderConfigs,
++                            base::Unretained(this)),
++        GetCommandBufferStubCB(), std::move(oop_video_decoder));
++    return CreatePlatformSoftwareVideoDecoder(traits);
++  }
+   auto get_stub_cb = base::BindRepeating(
+       &GetCommandBufferStub, gpu_task_runner_, media_gpu_channel_manager_,
+       command_buffer_id->channel_token, command_buffer_id->route_id);
+@@ -238,6 +244,16 @@ std::unique_ptr<VideoDecoder> GpuMojoMediaClient::CreateVideoDecoder(
+   return CreatePlatformVideoDecoder(traits);
+ }
+ 
++std::unique_ptr<VideoDecoder> GpuMojoMediaClient::CreatePlatformSoftwareVideoDecoder(
++    VideoDecoderTraits& traits) {
++  return nullptr;
++}
++
++SupportedVideoDecoderConfigs
++GpuMojoMediaClient::GetPlatformSoftwareVideoDecoderConfigs() {
++  return {};
++}
++
+ std::unique_ptr<CdmFactory> GpuMojoMediaClient::CreateCdmFactory(
+     mojom::FrameInterfaceFactory* frame_interfaces) {
+   return CreatePlatformCdmFactory(frame_interfaces);
+diff --git a/media/mojo/services/gpu_mojo_media_client.h b/media/mojo/services/gpu_mojo_media_client.h
+index ebcbd648a3b6808da24bf66df845fcecec318e2e..a5f2ea372dfc953845e72a4b6092f69fc53bd25a 100644
+--- a/media/mojo/services/gpu_mojo_media_client.h
++++ b/media/mojo/services/gpu_mojo_media_client.h
+@@ -140,6 +140,15 @@ class MEDIA_MOJO_EXPORT GpuMojoMediaClient : public MojoMediaClient {
+   virtual std::optional<SupportedVideoDecoderConfigs>
+   GetPlatformSupportedVideoDecoderConfigs() = 0;
+ 
++  // uw: a platform decoder that needs no accelerated decoding and no command
++  // buffer, for when those are missing, and what it decodes. uw's FFmpeg has
++  // no H.264 decoder to fall back on. See uw's docs/plans/distribution.md,
++  // "Codecs".
++  virtual std::unique_ptr<VideoDecoder> CreatePlatformSoftwareVideoDecoder(
++      VideoDecoderTraits& traits);
++  virtual SupportedVideoDecoderConfigs
++  GetPlatformSoftwareVideoDecoderConfigs();
++
+   // Queries the platform decoder type.
+   virtual VideoDecoderType GetPlatformDecoderImplementationType() = 0;
+ 
+diff --git a/media/mojo/services/gpu_mojo_media_client_mac.cc b/media/mojo/services/gpu_mojo_media_client_mac.cc
+index 1d1ec8a5dbba2ac4d45d822a8eaddc2b555ee922..2a843984e5bc311bf75752465d7d73506745e51a 100644
+--- a/media/mojo/services/gpu_mojo_media_client_mac.cc
++++ b/media/mojo/services/gpu_mojo_media_client_mac.cc
+@@ -8,10 +8,13 @@
+ #include "base/task/thread_pool.h"
+ #include "media/base/audio_decoder.h"
+ #include "media/base/offloading_audio_encoder.h"
++#include "media/base/supported_video_decoder_config.h"
++#include "media/base/video_codecs.h"
+ #include "media/filters/mac/audio_toolbox_audio_decoder.h"
+ #include "media/filters/mac/audio_toolbox_audio_encoder.h"
+ #include "media/gpu/mac/video_toolbox_video_decoder.h"
+ #include "media/mojo/services/gpu_mojo_media_client.h"
++#include "ui/gfx/geometry/size.h"
+ 
+ namespace media {
+ 
+@@ -46,6 +49,23 @@ class GpuMojoMediaClientMac final : public GpuMojoMediaClient {
+         gpu_workarounds_);
+   }
+ 
++  // uw: VideoToolbox's own software decoder, for H.264 when accelerated
++  // decoding is off or there is no command buffer.
++  std::unique_ptr<VideoDecoder> CreatePlatformSoftwareVideoDecoder(
++      VideoDecoderTraits& traits) final {
++    return std::make_unique<VideoToolboxVideoDecoder>(
++        traits.task_runner, traits.media_log->Clone(), gpu_workarounds_,
++        gpu_task_runner_, VideoToolboxVideoDecoder::GetCommandBufferStubCB());
++  }
++
++  SupportedVideoDecoderConfigs GetPlatformSoftwareVideoDecoderConfigs() final {
++    return {SupportedVideoDecoderConfig(
++        /*profile_min=*/H264PROFILE_MIN, /*profile_max=*/H264PROFILE_HIGH,
++        /*coded_size_min=*/gfx::Size(16, 16),
++        /*coded_size_max=*/gfx::Size(4096, 4096),
++        /*allow_encrypted=*/false, /*require_encrypted=*/false)};
++  }
++
+   std::unique_ptr<AudioDecoder> CreatePlatformAudioDecoder(
+       scoped_refptr<base::SequencedTaskRunner> task_runner,
+       std::unique_ptr<MediaLog> media_log) final {
+diff --git a/media/renderers/default_decoder_factory.cc b/media/renderers/default_decoder_factory.cc
+index a408f2ffaeab72ac0fe50d678cd528090e57cbec..f02ce61f9b05556ff0af95fd37a0b3c3a7f55427 100644
+--- a/media/renderers/default_decoder_factory.cc
++++ b/media/renderers/default_decoder_factory.cc
+@@ -158,6 +158,15 @@ void DefaultDecoderFactory::CreateVideoDecoders(
+ #if BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
+   video_decoders->push_back(
+       std::make_unique<FFmpegVideoDecoder>(media_log->Clone()));
++#elif BUILDFLAG(IS_MAC)
++  // uw: with no FFmpeg H.264 decoder, the last resort is VideoToolbox's
++  // software decoder in the GPU process, which needs no accelerated decoding
++  // or command buffer. See uw's docs/plans/distribution.md, "Codecs".
++  if (external_decoder_factory_) {
++    external_decoder_factory_->CreateVideoDecoders(
++        task_runner, /*gpu_factories=*/nullptr, media_log,
++        RequestOverlayInfoCB(), target_color_space, video_decoders);
++  }
+ #endif
+ }
+ 
 diff --git a/sandbox/policy/mac/renderer.sb b/sandbox/policy/mac/renderer.sb
 index 687bca71bdff74c14ed837907f8d44922ebce5ea..25530007058c2376adf5d39530c6dd1782c85d6a 100644
 --- a/sandbox/policy/mac/renderer.sb

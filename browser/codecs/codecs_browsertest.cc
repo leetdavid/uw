@@ -24,6 +24,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "media/base/media_switches.h"
@@ -298,6 +299,29 @@ IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, ALongRawAacFileSeeks) {
 
 IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, H264PlaysAtEverySize) {
   // Under 360 pixels tall went to FFmpeg before uw dropped its decoder.
+  for (const char* file : {"small.mp4", "large.mp4"}) {
+    SCOPED_TRACE(file);
+    EXPECT_EQ(true,
+              Run(base::StrCat({"const video = await play('video', '", file,
+                                "');"
+                                "return video.getVideoPlaybackQuality()"
+                                "    .totalVideoFrames > 30;"})));
+  }
+}
+
+// With accelerated video decoding off, as after a GPU crash loop, H.264 still
+// plays: VideoToolbox decodes it in software in the GPU process, and frames are
+// copied for the page.
+class CodecsWithoutAcceleratedDecodingBrowserTest : public CodecsBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    CodecsBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(switches::kDisableAcceleratedVideoDecode);
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(CodecsWithoutAcceleratedDecodingBrowserTest,
+                       H264PlaysAtEverySize) {
   for (const char* file : {"small.mp4", "large.mp4"}) {
     SCOPED_TRACE(file);
     EXPECT_EQ(true,
