@@ -122,11 +122,12 @@ Agreed on 2026-10-28 as T56. Before, a dropped tab joined the branch of the tab 
 - Moving the pointer sideways changes the depth by one level per 16px, after a small dead zone, so a wobbly vertical drag keeps the depth. The dragged rows' indent follows, and the drop keeps the depth shown. Nothing else is drawn.
 - The depth can go from the level of the tab below up to one deeper than the tab above, and no deeper than 6 levels. The tab below always keeps its parent. To leave a branch, drag past its last child and move left.
 - The slot below a collapsed parent goes no deeper than the parent. To nest under it, expand it first.
+- A dragged parent's branch keeps its shape. Up, down, or sideways, every tab in it moves by the same number of levels. The limits above apply to the parent, and the branch's deepest tab goes no deeper than 6 levels. Asked for on 2026-10-28.
 - Several selected tabs land as siblings at the depth shown, each with its branch. Sideways counts from the depth of the row grabbed.
 - Sideways never changes the task. The task is the one the tab is dropped in, as in Chromium. Dragging left past the sidebar's edge does not tear the tab off into a new window.
 - A drop that gives a tab a new parent nests it by hand, like Nest under previous tab. A reorder inside the same branch does not. Dragging it out of the branch ends that.
 - "Drag sideways to nest tabs", in the Mouse section of uw's settings and on by default, turns sideways off. A straight drag still follows the first rule.
-- The design is the frames "Sideways drag: the sidebar" and "Sideways drag: every state" on the canvas page "Keyboard and mouse". The user signs them off before it is built.
+- The design is the frames "Sideways drag: the sidebar", "Sideways drag: every state", and "Sideways drag: a branch" on the canvas page "Keyboard and mouse". The user signs them off before it is built.
 
 ### Side by side in the sidebar
 
@@ -220,6 +221,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
    - A wobbly vertical drag keeps the depth. A drag goes no deeper than 6 levels.
    - The place below a collapsed parent goes no deeper than the parent.
    - Several selected tabs land as siblings at the depth shown, each with its branch.
+   - A dragged parent's branch keeps its shape, moved up, down, or sideways. Its deepest tab goes no deeper than 6 levels.
    - A drop that gives a tab a new parent nests it by hand. A reorder inside the same branch does not, and dragging the tab out ends it.
    - Sideways never changes the task. Dragging left past the sidebar's edge does not tear the tab off.
    - With "Drag sideways to nest tabs" off, sideways does nothing and a straight drag still keeps its parent as above.
