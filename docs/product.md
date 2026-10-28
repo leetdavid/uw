@@ -266,9 +266,22 @@ Agreed management, on 2026-10-22:
 
 - A scheduled chat's page shows a strip under its title, such as `Every day at 9:00 · Next: tomorrow 9:00 · Last: No change, $129`, with Edit, which opens the schedule card, Pause, and Mute. A running trigger shows there with Stop.
 - The Chats list shows a clock and the next time.
-- A Scheduled filter at the top of the chat page's chat list shows every scheduled chat and every chat with a running trigger, next time first, with Pause all.
 - Pause stops runs and triggers. Resuming does not catch up on the paused time.
 - Deleting the chat deletes its schedule. Removing the schedule keeps it as an ordinary chat.
+
+Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
+
+- It lists each scheduled chat once, in two sections: "Watched pages" first, then "Scheduled chats", which also holds chats with a running trigger, as the filter did. An empty section is left out. The header has Pause all.
+- A watched page's row shows the page's icon and title, what it watches for, the latest value, the last run, and the next run. The last run reads Waiting for approval, Sign in required, Paused, or Didn't finish when one applies. The title and icon come from an open tab of the page, else from history, else the site.
+- A click on a watched page's row opens the page, or goes to its tab if one is open. A click on any other row opens the chat. On hover, a watched page's row offers Open chat, and every row Pause or Resume. Edit, Mute, Stop watching, and Delete stay on the chat page and the watch card.
+- The Inbox's "See all" and the "Show Scheduled" command open it.
+
+Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
+
+- The Inbox button sits at the top of the sidebar in every normal window, the floating sidebar included, and never in private windows. It shows how many alerts are unseen. Opening the Inbox marks them all seen, and clicking an alert's notification marks that one seen.
+- An alert shows the page's icon, or a clock for a chat with no page, the chat's title, what the notification said, and the time.
+- A click on a watched page's alert opens the page, or goes to its tab if one is open, with Open chat on hover. Any other alert opens its chat. "Waiting for your approval" always opens the chat. A click on the notification itself still opens the chat.
+- Alerts stay until Clear all or until their chat is deleted. Stopping a watch or removing a schedule keeps them. An approval's alert goes once the step is answered or stopped.
 
 ### The uw command
 
