@@ -91,6 +91,10 @@ A terminal tab whose shell is running a command.
 A page that is part of the browser, such as settings. Its address starts with `uw://`.
 _Avoid_: Chrome page, internal page, WebUI page.
 
+**New tab page**:
+The uw page in a blank tab: a box to search or ask, and the state of uw's features, such as steps waiting for approval, finished chats and runs, and what runs next.
+_Avoid_: Dashboard, home, status page, NTP.
+
 **Command bar**:
 uw's popup for opening pages and running commands from the keyboard. It searches commands, tasks, open tabs, history, bookmarks, and the web, and can send what was typed to a chat or a terminal.
 _Avoid_: Palette, command palette, launcher, omnibox.
