@@ -2,16 +2,22 @@
 
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/functional/function_ref.h"
+#include "base/memory/weak_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
+#include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/performance_manager/public/background_tab_loading_policy.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -23,6 +29,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_tabrestore.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
@@ -33,6 +40,10 @@
 #include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/performance_manager/public/graph/page_node.h"
+#include "components/performance_manager/public/performance_manager.h"
+#include "components/sessions/core/serialized_navigation_entry.h"
+#include "components/sessions/core/serialized_user_agent_override.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -89,6 +100,24 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_TRUE(content::WaitForLoadStop(tab->GetContents()));
     tabs->SetTabPinned(tabs->GetIndexOfTab(tab), true);
     return tab;
+  }
+
+  // Adds `url` to `window` as a pin that a restart brought back. It waits,
+  // unloaded, in Chromium's queue of restored tabs to load.
+  static content::WebContents* RestorePin(Browser* window, const GURL& url) {
+    sessions::SerializedNavigationEntry entry;
+    entry.set_index(0);
+    entry.set_virtual_url(url);
+    content::WebContents* page = chrome::AddRestoredTab(
+        window, base::span_from_ref(std::as_const(entry)),
+        window->tab_strip_model()->count(), /*selected_navigation=*/0,
+        /*extension_app_id=*/std::string(), /*group=*/std::nullopt,
+        /*select=*/false, /*pin=*/true, base::TimeTicks::Now(),
+        base::Time::Now(), /*storage_namespace=*/nullptr,
+        sessions::SerializedUserAgentOverride(), /*extra_data=*/{},
+        /*from_session_restore=*/true, /*is_active_browser=*/true);
+    performance_manager::policies::ScheduleLoadForRestoredTabs({page});
+    return page;
   }
 
   static std::vector<GURL> PinnedUrls(Browser* window) {
@@ -412,6 +441,43 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowAfterTheLastOneGetsThePage) {
   SetBrowser(next);
   ASSERT_TRUE(Holds(next, page));
   EXPECT_EQ(StateOf(page), state);
+}
+
+// A restored pin that has not loaded yet outlives its window too. Chromium's
+// queue of restored tabs to load must not reach it outside every tab: uw
+// itself stops there on a check that tests skip, so here it would load in no
+// window.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APinThatHasNotLoadedOutlivesItsWindow) {
+  performance_manager::policies::SetMaxSimultaneousBackgroundTabLoadsForTesting(
+      0);
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  base::WeakPtr<content::WebContents> restored =
+      RestorePin(second, GURL(kIssue))->GetWeakPtr();
+  ASSERT_TRUE(ShowsPins(browser(), {GURL(kIssue)}));
+
+  CloseBrowserSynchronously(second);
+
+  // The queue moves on once another page has loaded and gone quiet. It counts
+  // every page still loading anywhere, so it gets room to spare.
+  performance_manager::policies::SetMaxSimultaneousBackgroundTabLoadsForTesting(
+      10);
+  content::WebContents* other =
+      browser()->tab_strip_model()->GetWebContentsAt(1);
+  ASSERT_TRUE(content::NavigateToURL(other, GURL(kMail)));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return performance_manager::PerformanceManager::
+               GetPrimaryPageNodeForWebContents(other)
+                   ->GetLoadingState() ==
+           performance_manager::PageNode::LoadingState::kLoadedIdle;
+  }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(restored && Started(restored.get()));
+
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return PinPageOf(browser())->GetLastCommittedURL() == GURL(kIssue);
+  }));
+  EXPECT_EQ(LiveCopies(), 1);
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, MovingAPinMovesItEverywhere) {

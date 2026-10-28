@@ -140,19 +140,27 @@ void Load(const tabs::TabInterface* tab, const GURL& url) {
                                               std::string());
 }
 
-// A page with `page`'s history and no renderer, to stand in for it. It stays
-// unloaded when shown, as a discarded tab does.
-std::unique_ptr<content::WebContents> MakePlaceholder(
-    content::WebContents* page,
-    const std::string& id) {
+// A page with `page`'s history and no renderer. With `needs_reload`, it loads
+// that history once it shows.
+std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
+                                                  bool needs_reload) {
   content::WebContents::CreateParams params(page->GetBrowserContext());
   params.initially_hidden = true;
   params.desired_renderer_state =
       content::WebContents::CreateParams::kNoRendererProcess;
-  std::unique_ptr<content::WebContents> placeholder =
+  std::unique_ptr<content::WebContents> copy =
       content::WebContents::Create(params);
-  placeholder->GetController().CopyStateFrom(&page->GetController(),
-                                             /*needs_reload=*/false);
+  copy->GetController().CopyStateFrom(&page->GetController(), needs_reload);
+  return copy;
+}
+
+// A page to stand in for `page`. It stays unloaded when shown, as a discarded
+// tab does.
+std::unique_ptr<content::WebContents> MakePlaceholder(
+    content::WebContents* page,
+    const std::string& id) {
+  std::unique_ptr<content::WebContents> placeholder =
+      CopyHistory(page, /*needs_reload=*/false);
   Mark(placeholder.get(), id, /*restored=*/false, /*placeholder=*/true);
   return placeholder;
 }
@@ -797,7 +805,16 @@ void PinSync::HoldLivePages() {
     }
     const std::string id = mark->id();
     TakePicture(page, id);
-    pages->Hold(id, tabs_->DiscardWebContents(page, MakePlaceholder(page, id)));
+    std::unique_ptr<content::WebContents> live =
+        tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
+    // A page that has not loaded since the restart still waits in Chromium's
+    // queue of restored tabs to load, which expects each one in a tab. A copy
+    // of its history that was never a tab outlives the window instead.
+    if (live->GetController().NeedsReload()) {
+      live = CopyHistory(live.get(), /*needs_reload=*/true);
+      Mark(live.get(), id);
+    }
+    pages->Hold(id, std::move(live));
   }
   SaveSession();
 }
