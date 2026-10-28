@@ -1263,7 +1263,7 @@ html:has(.home) {
     animation: enter-fade 2.4s ease-out both;
   }
 
-  .home .hero .nav {
+  .home .hero .nav > * {
     animation: enter-drop 0.9s 0.1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
