@@ -241,6 +241,14 @@ _Avoid_: Condition-based alert.
 A notification after every run of a scheduled chat, saying what the run found.
 _Avoid_: Scheduled summary, digest.
 
+**Alert**:
+A notification from a scheduled chat, kept in uw, such as a change alert, a regular update, a failed run, or a step waiting for approval. Notifications from other chats are not alerts.
+_Avoid_: Notification, when meaning the kept copy.
+
+**Inbox**:
+The list of alerts, opened from a button at the top of the sidebar.
+_Avoid_: Notification center, alerts panel.
+
 **Chat**:
 A conversation with uw's built-in agent, which may browse for the user to answer or carry out a request. Its page is a regular tab, and the tabs the agent opens are child tabs beneath it.
 _Avoid_: Delegated browser task, agent task, run, job.
