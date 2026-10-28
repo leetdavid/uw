@@ -12,12 +12,19 @@
 #include "url/gurl.h"
 
 // How a web connector signs in, by MCP's authorization rules: OAuth with
-// automatic client registration and PKCE. See docs/plans/connectors.md.
+// automatic client registration, or uw's client metadata document, and PKCE.
+// See docs/plans/connectors.md.
 namespace uw::oauth {
 
 // Where the sign-in page sends the browser back. uw catches it in the tab,
 // so nothing listens there.
 inline constexpr char kRedirectUri[] = "http://127.0.0.1:47651/callback";
+
+// uw's client metadata document, whose address is uw's client ID on a server
+// that lets no app register. Builds carry it, so it never moves; see ADR
+// 0023 in docs/adr.
+inline constexpr char kClientMetadataUrl[] =
+    "https://uwbrowser.com/oauth/client.json";
 
 // Where a server's protected-resource metadata may be, most specific first,
 // when its 401 did not say.
@@ -43,6 +50,8 @@ struct ServerMetadata {
   GURL registration_endpoint;
   // PKCE with S256, which MCP requires.
   bool s256 = false;
+  // Takes a client ID that is the address of a client metadata document.
+  bool client_metadata_document = false;
 };
 // Nothing for metadata without both endpoints.
 std::optional<ServerMetadata> ParseServerMetadata(std::string_view json);

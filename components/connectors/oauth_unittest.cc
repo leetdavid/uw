@@ -57,6 +57,16 @@ TEST(OAuthTest, ReadsMetadata) {
   EXPECT_TRUE(server->s256);
   EXPECT_EQ(server->registration_endpoint,
             GURL("https://mcp.linear.app/register"));
+  EXPECT_FALSE(server->client_metadata_document);
+  server = ParseServerMetadata(R"({
+    "issuer": "https://home.example",
+    "authorization_endpoint": "https://home.example/auth/authorize",
+    "token_endpoint": "https://home.example/auth/token",
+    "client_id_metadata_document_supported": true,
+    "code_challenge_methods_supported": ["S256"]})");
+  ASSERT_TRUE(server);
+  EXPECT_TRUE(server->client_metadata_document);
+  EXPECT_FALSE(server->registration_endpoint.is_valid());
   EXPECT_FALSE(ParseServerMetadata(R"({"token_endpoint": "https://a/t"})"));
 }
 

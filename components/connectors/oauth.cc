@@ -137,6 +137,8 @@ std::optional<ServerMetadata> ParseServerMetadata(std::string_view json) {
   server.authorization_endpoint = ReadUrl(*dict, "authorization_endpoint");
   server.token_endpoint = ReadUrl(*dict, "token_endpoint");
   server.registration_endpoint = ReadUrl(*dict, "registration_endpoint");
+  server.client_metadata_document =
+      dict->FindBool("client_id_metadata_document_supported").value_or(false);
   if (!server.authorization_endpoint.is_valid() ||
       !server.token_endpoint.is_valid()) {
     return std::nullopt;

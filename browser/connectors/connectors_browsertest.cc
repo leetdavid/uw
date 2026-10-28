@@ -82,11 +82,19 @@ class WebConnector {
   }
 
   // Makes /mcp need a token, and serves the sign-in server that gives one.
-  // Without registration, it takes no client registration.
-  void RequireSignIn(bool registration = true) {
+  // Without registration, it takes no client registration. With a client
+  // file, it takes a client ID that is a client metadata document's address.
+  void RequireSignIn(bool registration = true, bool client_file = false) {
     base::AutoLock lock(lock_);
     sign_in_ = true;
     registration_ = registration;
+    client_file_ = client_file;
+  }
+
+  // The client ID of each sign-in page and token request.
+  std::vector<std::string> client_ids() {
+    base::AutoLock lock(lock_);
+    return client_ids_;
   }
 
   // The token given out stops working.
@@ -116,6 +124,8 @@ class WebConnector {
            registration_ ? base::StrCat({R"("registration_endpoint": ")", base,
                                          R"(register",)"})
                          : std::string(),
+           client_file_ ? R"("client_id_metadata_document_supported": true,)"
+                        : "",
            R"("code_challenge_methods_supported": ["S256"]})"}));
     } else if (url.path() == "/register") {
       response->set_content(R"({"client_id": "client-1"})");
@@ -123,6 +133,7 @@ class WebConnector {
       std::string state;
       net::GetValueForKeyInQuery(url, "state", &state);
       net::GetValueForKeyInQuery(url, "code_challenge", &challenge_);
+      net::GetValueForKeyInQuery(url, "client_id", &client_ids_.emplace_back());
       response->set_code(net::HTTP_FOUND);
       response->AddCustomHeader(
           "Location", net::AppendQueryParameter(
@@ -137,6 +148,8 @@ class WebConnector {
       std::string grant;
       std::string value;
       net::GetValueForKeyInQuery(form, "grant_type", &grant);
+      net::GetValueForKeyInQuery(form, "client_id",
+                                 &client_ids_.emplace_back());
       if (grant == "authorization_code" &&
           net::GetValueForKeyInQuery(form, "code_verifier", &value) &&
           oauth::Challenge(value) == challenge_) {
@@ -216,8 +229,10 @@ class WebConnector {
   const bool legacy_;
   bool sign_in_ GUARDED_BY(lock_) = false;
   bool registration_ GUARDED_BY(lock_) = true;
+  bool client_file_ GUARDED_BY(lock_) = false;
   std::string access_ GUARDED_BY(lock_) = "none yet";
   std::string challenge_ GUARDED_BY(lock_);
+  std::vector<std::string> client_ids_ GUARDED_BY(lock_);
   std::vector<std::string> seen_ GUARDED_BY(lock_);
 };
 
@@ -714,7 +729,8 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
                        AWebConnectorSignsInAndRefreshesItsToken) {
   net::test_server::EmbeddedTestServer server;
   WebConnector web(server, /*legacy=*/false);
-  web.RequireSignIn();
+  // It also takes client files, but uw registers wherever it can.
+  web.RequireSignIn(/*registration=*/true, /*client_file=*/true);
   ASSERT_TRUE(server.Start());
   Add(Web("linear", server.GetURL("/mcp")));
   ASSERT_EQ(Settled("linear").state, Connectors::State::kNeedsSignIn);
@@ -736,6 +752,7 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
                       0, server.base_url().spec().size() - 1)))
                   .value_or(""),
               HasSubstr("client-1"));
+  EXPECT_THAT(web.client_ids(), ElementsAre("client-1", "client-1"));
 
   // A token that stopped working is refreshed, and the call goes again.
   web.Expire();
@@ -765,8 +782,32 @@ IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
            Connectors::State::kCantSignIn;
   }));
   EXPECT_EQ(Connectors::Get().Find("notion")->error,
-            "This connector's sign-in needs a registration uw doesn't "
-            "support yet.");
+            "This connector only signs in apps it already knows. If the "
+            "service gives you a key, add the connector again with the key as "
+            "a header.");
+}
+
+IN_PROC_BROWSER_TEST_F(ConnectorsBrowserTest,
+                       ASignInServerWithoutRegistrationTakesUwsClientFile) {
+  net::test_server::EmbeddedTestServer server;
+  WebConnector web(server, /*legacy=*/false);
+  web.RequireSignIn(/*registration=*/false, /*client_file=*/true);
+  ASSERT_TRUE(server.Start());
+  Add(Web("home", server.GetURL("/mcp")));
+  ASSERT_EQ(Settled("home").state, Connectors::State::kNeedsSignIn);
+
+  Connectors::Get().SignIn("home", OpenInTab(browser()));
+  EXPECT_TRUE(base::test::RunUntil([] {
+    return Connectors::Get().Find("home")->state == Connectors::State::kReady;
+  })) << Connectors::Get().Find("home")->error;
+  EXPECT_THAT(web.client_ids(), ElementsAre(oauth::kClientMetadataUrl,
+                                            oauth::kClientMetadataUrl));
+  EXPECT_EQ(Call("home", "echo", base::DictValue().Set("text", "in"))->text,
+            "in");
+  // Nothing was registered, so there is no client to keep.
+  EXPECT_FALSE(
+      ApiKeyStore().GetKey(ClientAccount(server.base_url().spec().substr(
+          0, server.base_url().spec().size() - 1))));
 }
 
 }  // namespace

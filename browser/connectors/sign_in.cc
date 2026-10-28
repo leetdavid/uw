@@ -25,7 +25,8 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         sender: "uw connectors"
         description:
           "Signs a web connector in with OAuth: reads where its sign-in "
-          "server is and how it works, registers uw there, and trades the "
+          "server is and how it works, registers uw there or names uw's "
+          "client file on uwbrowser.com, and trades the "
           "code the sign-in page gives for tokens, or refreshes them."
         trigger: "The user clicks Sign in on a connector, or a signed-in "
           "connector's token runs out."
@@ -40,6 +41,10 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
       })");
 
 constexpr size_t kMaxAnswer = 1024 * 1024;
+
+constexpr char kCannotSignIn[] =
+    "This connector only signs in apps it already knows. If the service gives "
+    "you a key, add the connector again with the key as a header.";
 
 std::unique_ptr<network::SimpleURLLoader> Request(const GURL& url,
                                                   std::string body,
@@ -183,9 +188,11 @@ void ConnectorSignIn::OnServerMetadata(std::vector<GURL> urls,
     }
   }
   if (!metadata_.registration_endpoint.is_valid()) {
-    Finish(Error(
-        "This connector's sign-in needs a registration uw doesn't support yet.",
-        /*cannot_register=*/true));
+    if (metadata_.client_metadata_document) {
+      OpenSignInPage(oauth::Client{oauth::kClientMetadataUrl});
+      return;
+    }
+    Finish(Error(kCannotSignIn, /*cannot_register=*/true));
     return;
   }
   Fetch(metadata_.registration_endpoint, oauth::RegistrationBody(),
@@ -198,9 +205,7 @@ void ConnectorSignIn::OnRegistered(int status, std::string body) {
   std::optional<oauth::Client> client =
       status / 100 == 2 ? oauth::ParseClient(body) : std::nullopt;
   if (!client) {
-    Finish(Error(
-        "This connector's sign-in needs a registration uw doesn't support yet.",
-        /*cannot_register=*/true));
+    Finish(Error(kCannotSignIn, /*cannot_register=*/true));
     return;
   }
   ApiKeyStore().SetKey(ClientAccount(metadata_.issuer), body);
