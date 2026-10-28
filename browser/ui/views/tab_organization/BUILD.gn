@@ -10,6 +10,8 @@ source_set("tab_organization") {
     "floating_sidebar.h",
     "floating_window_buttons.cc",
     "floating_window_buttons.h",
+    "inbox_button.cc",
+    "inbox_button.h",
     "kept_mark.cc",
     "kept_mark.h",
     "menu_card_row.cc",
@@ -57,6 +59,7 @@ source_set("tab_organization") {
     "//chrome/browser/ui/views:bubble_menu_item_factory",
     "//chrome/browser/ui/views/controls",
     "//chrome/browser/ui/views/tabs/common",
+    "//chrome/browser/ui/webui/top_chrome",
     "//components/prefs",
     "//components/tab_groups",
     "//components/tabs:public",
@@ -85,6 +88,7 @@ source_set("tab_organization") {
     "//uw/browser/ui/views/mini_player",
     "//uw/browser/ui/views/theme_picker",
     "//uw/browser/ui/views/watch_card",
+    "//uw/browser/ui/webui/uw_chat",
     "//uw/browser/workspaces",
   ]
 }

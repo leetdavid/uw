@@ -1566,10 +1566,30 @@ index dba4f324e7e9d3a8c60a5b0e807912b7051d03fb..de02729b59aefd1792497032ece1d228
    // ui::View overrides:
    std::unique_ptr<ui::Layer> RecreateLayer() override;
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
-index 15393d6b279d5c38a746595b64062db052574894..22f8846d00e5e695bfa1806320f087d01ed58eb0 100644
+index 15393d6b279d5c38a746595b64062db052574894..f3c83318c35a302366b0341418bf52c8cc5e2451 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
-@@ -88,7 +88,9 @@ views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
+@@ -29,6 +29,7 @@
+ #include "ui/views/layout/layout_types.h"
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view_class_properties.h"
++#include "uw/browser/ui/views/tab_organization/inbox_button.h"
+ 
+ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(
+     VerticalTabStripTopContainer,
+@@ -64,6 +65,11 @@ VerticalTabStripTopContainer::VerticalTabStripTopContainer(
+       combo_button_orientation_ = state_controller->IsCollapsed()
+                                       ? views::LayoutOrientation::kVertical
+                                       : views::LayoutOrientation::kHorizontal);
++
++  // uw: the Inbox, at the right end of the line, in normal windows.
++  if (auto inbox = uw::InboxButton::Make(browser_)) {
++    uw_inbox_button_ = AddChildView(std::move(inbox));
++  }
+ }
+ 
+ VerticalTabStripTopContainer::~VerticalTabStripTopContainer() = default;
+@@ -88,7 +94,9 @@ views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
            ? host_size.width()
            : parent()->GetAvailableSize(this).width().value_or(0);
  
@@ -1580,6 +1600,77 @@ index 15393d6b279d5c38a746595b64062db052574894..22f8846d00e5e695bfa1806320f087d0
  
    // Once the available width is below the collapse snap width, we update the
    // orientation in order to have smooth transition during animation.
+@@ -101,6 +109,12 @@ views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
+     combo_button_orientation_ = views::LayoutOrientation::kVertical;
+     int current_y = 0;
+ 
++    // uw: the Inbox shows only on a line of buttons.
++    if (uw_inbox_button_) {
++      layout.child_layouts.emplace_back(uw_inbox_button_.get(), false,
++                                        gfx::Rect());
++    }
++
+     // Find height of the first visible button to calculate the matching
+     // baseline offset.
+     int first_button_height = 0;
+@@ -257,6 +271,20 @@ views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
+     bool wrap_during_animation =
+         caption_button_width_ != 0 && available_width < GetPreferredWidth();
+ 
++    // uw: the Inbox takes the right end, and the combo button sits left of
++    // it. It hides while the buttons wrap.
++    if (uw_inbox_button_) {
++      const gfx::Size pref_size = uw_inbox_button_->GetPreferredSize();
++      right_alignment -= pref_size.width();
++      gfx::Rect bounds(right_alignment,
++                       std::max(0, y_baseline - pref_size.height() / 2),
++                       pref_size.width(), pref_size.height());
++      layout.child_layouts.emplace_back(uw_inbox_button_.get(),
++                                        !wrap_during_animation, bounds);
++      right_alignment -=
++          GetLayoutConstant(LayoutConstant::kVerticalTabStripTopButtonPadding);
++    }
++
+     if (combo_button_) {
+       const gfx::Size pref_size = combo_button_->GetPreferredSizeForOrientation(
+           combo_button_orientation_);
+@@ -315,6 +343,11 @@ bool VerticalTabStripTopContainer::IsPositionInWindowCaption(
+     return false;
+   }
+ 
++  if (uw_inbox_button_ && uw_inbox_button_->GetVisible() &&
++      IsHitInView(uw_inbox_button_, point)) {
++    return false;
++  }
++
+   return true;
+ }
+ 
+@@ -447,6 +480,11 @@ int VerticalTabStripTopContainer::GetPreferredWidth() const {
+     total_width += unfocus_button_->GetPreferredSize().width() + padding;
+   }
+ 
++  // uw: the Inbox.
++  if (uw_inbox_button_) {
++    total_width += uw_inbox_button_->GetPreferredSize().width() + padding;
++  }
++
+   return total_width;
+ }
+ 
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
+index 27763751c72b75beb4f71359e336ed68f8671828..a5a3b7ad77158c202205820c177e010a42e9b308 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
+@@ -102,6 +102,8 @@ class VerticalTabStripTopContainer : public views::View,
+   raw_ptr<TabStripComboButton> combo_button_ = nullptr;
+   raw_ptr<views::LabelButton> collapse_button_ = nullptr;
+   raw_ptr<views::LabelButton> unfocus_button_ = nullptr;
++  // uw: the Inbox, or null in a private window.
++  raw_ptr<views::View> uw_inbox_button_ = nullptr;
+ 
+   std::unique_ptr<views::ActionViewController> action_view_controller_;
+ 
 diff --git a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc
 index af4cd825d4c10c6b0802cf4134a902dd7346e9b8..79a51edc3fce181b5585c4664fc95cb3c1c16673 100644
 --- a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view.cc

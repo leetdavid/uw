@@ -634,7 +634,8 @@
     }
 }
 
-/* The watch card over frosted glass, while its window's glass is on. */
+/* The watch card and the Inbox over frosted glass, while their window's glass
+   is on. */
 html.frosted {
   background: transparent;
 }

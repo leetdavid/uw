@@ -1,7 +1,8 @@
-// Builds the uw://chat, uw://ai, and uw://scheduled pages and the watch card
-// for Chromium's build: checks their types, bundles their scripts, writes
-// their stylesheet, and puts them in one folder with the pages' HTML, icons,
-// and fonts. GN runs it with Chromium's node from the build directory:
+// Builds the uw://chat, uw://ai, and uw://scheduled pages, the watch card,
+// and the Inbox for Chromium's build: checks their types, bundles their
+// scripts, writes their stylesheet, and puts them in one folder with the
+// pages' HTML, icons, and fonts. GN runs it with Chromium's node from the
+// build directory:
 //   bundle.ts --out <dir> --gen <root gen dir> --depfile <file>
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
@@ -59,6 +60,7 @@ const bundled = await esbuild.build({
     providers: join(app, "src/providers/main.tsx"),
     scheduled: join(app, "src/scheduled/main.tsx"),
     watch_card: join(app, "src/watch-card/main.tsx"),
+    inbox: join(app, "src/inbox/main.tsx"),
     problems: join(app, "src/problems/main.ts"),
   },
   outdir: out,
@@ -119,6 +121,7 @@ for (const file of [
   "providers.html",
   "scheduled.html",
   "watch_card.html",
+  "inbox.html",
   "favicon.svg",
   "plug.svg",
   "clock.svg",

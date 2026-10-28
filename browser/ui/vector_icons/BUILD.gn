@@ -9,6 +9,7 @@ aggregate_vector_icons("uw_vector_icons") {
     "arrow_down.icon",
     "chevrons_up_down.icon",
     "eye_filled.icon",
+    "inbox.icon",
     "life_buoy.icon",
     "list_tree.icon",
     "log_in.icon",

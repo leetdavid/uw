@@ -203,7 +203,7 @@ diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop
 index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08f6bc0952 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -223,6 +223,22 @@
+@@ -223,6 +223,23 @@
  #include "chrome/browser/ui/webui/default_browser/visual_guided_setter_ui.h"
  #endif
  
@@ -218,6 +218,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar.mojom.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
++#include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
 +#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
 +#include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
@@ -226,7 +227,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08
  namespace chrome::internal {
  
  using content::RegisterWebUIControllerInterfaceBinder;
-@@ -361,6 +377,24 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -361,6 +378,26 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
                                           WhatsNewUI>(map);
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
  
@@ -242,6 +243,8 @@ index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08
 +                                         uw::UwWatchCardUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ScheduledHandlerFactory,
 +                                         uw::UwScheduledUI>(map);
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::InboxHandlerFactory,
++                                         uw::UwInboxUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::ThemePickerHandlerFactory,
 +                                         uw::UwThemePickerUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<uw::mojom::CalculatorHandler,
@@ -251,7 +254,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
    RegisterWebUIControllerInterfaceBinder<
        feature_showcase::mojom::DefaultBrowserPageHandlerFactory,
-@@ -393,7 +427,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -393,7 +430,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
  
    RegisterWebUIControllerInterfaceBinder<searchbox::mojom::PageHandlerFactory,
                                           NewTabPageUI, OmniboxPopupUI,
@@ -261,7 +264,7 @@ index 8a0281a596af3532fa6342b5653f93e913261023..025412055057c6b14327369d79d87b08
  
    RegisterWebUIControllerInterfaceBinder<
        omnibox_everywhere_debug::mojom::PageHandlerFactory, OmniboxEverywhereUI>(
-@@ -676,6 +711,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -676,6 +714,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
  #if !BUILDFLAG(IS_CHROMEOS)
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()

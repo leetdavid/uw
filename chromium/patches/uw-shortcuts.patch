@@ -481,7 +481,7 @@ diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop
  #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
  #include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
  #include "uw/browser/ui/webui/uw_terminal/uw_terminal.mojom.h"
-@@ -708,6 +709,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -711,6 +712,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
        .Add<theme_color_picker::mojom::ThemeColorPickerHandlerFactory>()
        .Add<signin::mojom::SigninPageHandlerFactory>()
        .Add<uw::mojom::OrganizationHandler>()

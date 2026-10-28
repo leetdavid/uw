@@ -685,3 +685,52 @@ interface ScheduledPage {
   // page connects, and again whenever one changes.
   OnRows(array<ScheduledRow> rows);
 };
+
+// An alert in the Inbox: a notification a scheduled chat sent. See
+// docs/product.md, "Scheduled chats".
+struct InboxAlert {
+  string id;
+  string chat_id;
+  string chat_title;
+  // For a watched page: its address, and its icon as a data: URL, or empty.
+  string page;
+  string favicon;
+  // The chat has a trigger, so its icon is a terminal's.
+  bool trigger;
+  // What the notification said, such as "Change alert", and its text.
+  string what;
+  string text;
+  // When, in milliseconds since the Unix epoch.
+  double time;
+  // A step of the chat's run waits for approval.
+  bool waiting;
+};
+
+// Links the Inbox's page to its handler.
+interface InboxHandlerFactory {
+  CreateInboxHandler(pending_remote<InboxPage> page,
+                     pending_receiver<InboxHandler> handler);
+};
+
+// Browser side. Only the Inbox's page can reach it.
+interface InboxHandler {
+  // The page has drawn and can be shown.
+  ShowUI();
+  // Goes to a tab of the alert's watched page, or opens the page; opens the
+  // chat for any other alert and for one that waits for approval. Then
+  // closes the Inbox.
+  OpenAlert(string id);
+  // Shows the chat `chat_id` and closes the Inbox.
+  OpenChat(string chat_id);
+  ClearAll();
+  // Opens uw://scheduled and closes the Inbox.
+  ShowScheduled();
+  Close();
+};
+
+// The Inbox's page.
+interface InboxPage {
+  // The alerts, newest first, and how many chats are scheduled: once the page
+  // connects, and again whenever either changes.
+  OnAlerts(array<InboxAlert> alerts, int32 scheduled, bool frosted);
+};

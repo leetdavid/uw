@@ -1,7 +1,7 @@
 # The uw://chat page, one chat with uw's agent, uw://ai, the AI page,
-# uw://scheduled, the Scheduled page, and the watch card under the eye in the
-# address bar, and every uw page's problems.js, which reports what goes wrong
-# on the page. All four are one React
+# uw://scheduled, the Scheduled page, the watch card under the eye in the
+# address bar, the Inbox at the top of the sidebar, and every uw page's
+# problems.js, which reports what goes wrong on the page. All are one React
 # app in app/, built from Fluid Functionalism's parts. app/bundle.ts checks
 # its types, bundles it with Chromium's node, and puts the pages' files in
 # one folder; the bundle carries the pages' mojo bindings.
@@ -17,6 +17,7 @@ app_files = [
   "providers.html",
   "scheduled.html",
   "watch_card.html",
+  "inbox.html",
   "favicon.svg",
   "plug.svg",
   "clock.svg",
@@ -24,6 +25,7 @@ app_files = [
   "providers.js",
   "scheduled.js",
   "watch_card.js",
+  "inbox.js",
   "problems.js",
   "chat.css",
   "icons/openai.svg",
@@ -46,6 +48,7 @@ node("app") {
     "providers.html",
     "scheduled.html",
     "watch_card.html",
+    "inbox.html",
     "favicon.svg",
     "plug.svg",
     "clock.svg",

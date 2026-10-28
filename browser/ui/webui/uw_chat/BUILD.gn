@@ -16,6 +16,10 @@ source_set("uw_chat") {
     "uw_chat_handler.h",
     "uw_chat_ui.cc",
     "uw_chat_ui.h",
+    "uw_inbox_handler.cc",
+    "uw_inbox_handler.h",
+    "uw_inbox_ui.cc",
+    "uw_inbox_ui.h",
     "uw_scheduled_handler.cc",
     "uw_scheduled_handler.h",
     "uw_scheduled_ui.cc",
@@ -45,6 +49,7 @@ source_set("uw_chat") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/webui:webui_util",
     "//chrome/common:constants",
     "//components/favicon/content",
     "//components/favicon/core",
@@ -85,6 +90,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "uw_chat_browsertest.cc",
+    "uw_inbox_browsertest.cc",
     "uw_scheduled_browsertest.cc",
   ]
   data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]
@@ -115,6 +121,7 @@ source_set("browser_tests") {
     "//ui/events:events_base",
     "//ui/message_center/public/cpp",
     "//ui/views",
+    "//ui/views:test_support",
     "//url",
     "//uw/browser/agent",
     "//uw/browser/agent:chat_tab",

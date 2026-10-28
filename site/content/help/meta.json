@@ -20,6 +20,7 @@
     "---The agent---",
     "chats",
     "approvals",
+    "scheduled-chats",
     "skills",
     "connectors",
     "---The uw command---",

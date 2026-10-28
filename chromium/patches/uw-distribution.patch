@@ -146,7 +146,7 @@ diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop
 index 6946107eae3956929cf28ec25eb3e45b6406d08f..ca2ed5541532751b513a0f4bfd411728342377c0 100644
 --- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
 +++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
-@@ -238,6 +238,7 @@
+@@ -239,6 +239,7 @@
  #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
  #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
  #include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
@@ -154,18 +154,18 @@ index 6946107eae3956929cf28ec25eb3e45b6406d08f..ca2ed5541532751b513a0f4bfd411728
  #endif
  
  namespace chrome::internal {
-@@ -394,6 +395,10 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+@@ -397,6 +398,10 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
                                           uw::UwThemePickerUI>(map);
    RegisterWebUIControllerInterfaceBinder<uw::mojom::CalculatorHandler,
                                           uw::UwCommandBarUI>(map);
 +  RegisterWebUIControllerInterfaceBinder<
 +      uw::mojom::ProblemReporter, uw::UwChatUI, uw::UwWatchCardUI,
 +      uw::UwProvidersUI, uw::UwTerminalUI, uw::UwCommandBarUI,
-+      uw::UwThemePickerUI, uw::UwScheduledUI>(map);
++      uw::UwThemePickerUI, uw::UwScheduledUI, uw::UwInboxUI>(map);
  #endif
  
  #if BUILDFLAG(ENABLE_DICE_SUPPORT)
-@@ -714,6 +719,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
+@@ -717,6 +722,7 @@ void PopulateChromeWebUIFrameInterfaceBrokersTrustedPartsDesktop(
        .Add<signin::mojom::SigninPageHandlerFactory>()
        .Add<uw::mojom::OrganizationHandler>()
        .Add<uw::mojom::ShortcutsHandler>()
