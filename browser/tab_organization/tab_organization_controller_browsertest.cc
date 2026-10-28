@@ -1545,5 +1545,44 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(first), 0);
   EXPECT_EQ(controller()->DepthFor(second), 0);
 }
+
+// Moving a drag's pointer sideways nests the dragged tab deeper or shallower
+// where it is. A drop under a new parent nests it by hand. With the switch
+// off, sideways does nothing.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       MovingADragSidewaysNestsTheTab) {
+  tabs::TabInterface* parent = InitialTab();
+  tabs::TabInterface* first = OpenLinkFrom(parent);
+  tabs::TabInterface* second = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  ASSERT_EQ(controller()->DepthFor(second), 1);
+
+  // Drags `tab` without moving it, with its pointer moved `dx` sideways.
+  const auto drag = [&](tabs::TabInterface* tab, int dx) {
+    tabs()->ActivateTabAt(tabs()->GetIndexOfTab(tab));
+    controller()->BeginTabDrag(/*alone=*/false);
+    controller()->DraggedTabs({tab});
+    controller()->ContinueTabDrag(300);
+    controller()->ContinueTabDrag(300 + dx);
+    const int depth = controller()->DepthFor(tab);
+    controller()->EndTabDrag();
+    base::RunLoop().RunUntilIdle();
+    return depth;
+  };
+
+  EXPECT_EQ(drag(second, -8), 1);
+  EXPECT_EQ(drag(second, -20), 0);
+  EXPECT_EQ(controller()->DepthFor(first), 1);
+  EXPECT_FALSE(controller()->IsHeld(*controller()->IdFor(second)));
+
+  EXPECT_EQ(drag(other, 20), 1);
+  EXPECT_EQ(controller()->DepthFor(other), 1);
+  EXPECT_TRUE(controller()->IsHeld(*controller()->IdFor(other)));
+  EXPECT_EQ(drag(other, 40), 1);
+
+  browser()->GetProfile()->GetPrefs()->SetBoolean(kDragSidewaysNestsTabsPref,
+                                                  false);
+  EXPECT_EQ(drag(other, -40), 1);
+}
 }  // namespace
 }  // namespace uw

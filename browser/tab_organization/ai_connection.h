@@ -59,6 +59,8 @@ inline constexpr char kDoubleClickOpensTabPref[] =
     "uw.mouse.double_click_opens_tab";
 inline constexpr char kMiddleClickClosesTaskPref[] =
     "uw.mouse.middle_click_closes_task";
+inline constexpr char kDragSidewaysNestsTabsPref[] =
+    "uw.mouse.drag_sideways_nests_tabs";
 
 // The European Central Bank's rates the command bar last downloaded: "date",
 // "fetched" in seconds since the epoch, and "per_euro".

@@ -23,8 +23,10 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
+#include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 
 namespace uw {
 namespace {
@@ -93,10 +95,26 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
   void DragBelow(const tabs::TabInterface* tab,
                  const tabs::TabInterface* onto,
                  bool alone) {
+    const gfx::Rect target = RowOf(onto)->GetBoundsInScreen();
+    Drag(tab, gfx::Point(target.CenterPoint().x(), target.bottom() - 3), alone);
+  }
+
+  // Drags `tab`'s row `dx` sideways, where it is.
+  void DragSideways(const tabs::TabInterface* tab,
+                    int dx,
+                    const char* shot = nullptr) {
+    const gfx::Point from = RowOf(tab)->GetBoundsInScreen().CenterPoint();
+    Drag(tab, gfx::Point(from.x() + dx, from.y()), /*alone=*/false, shot);
+  }
+
+  // Drags `tab`'s row to `to`, holding Option when `alone`. Saves a picture
+  // of the window named `shot` just before the drop.
+  void Drag(const tabs::TabInterface* tab,
+            const gfx::Point& to,
+            bool alone,
+            const char* shot = nullptr) {
     ui_controls::EnableUIControls();
     const gfx::Point from = RowOf(tab)->GetBoundsInScreen().CenterPoint();
-    const gfx::Rect target = RowOf(onto)->GetBoundsInScreen();
-    const gfx::Point to(target.CenterPoint().x(), target.bottom() - 3);
     const int modifiers =
         alone ? ui_controls::kAlt : ui_controls::kNoAccelerator;
     MoveMouse(from);
@@ -106,6 +124,10 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
       MoveMouse(gfx::Point(from.x() + (to.x() - from.x()) * step / kSteps,
                            from.y() + (to.y() - from.y()) * step / kSteps));
       Wait(base::Milliseconds(20));
+    }
+    if (shot) {
+      Wait(base::Milliseconds(300));
+      SaveWindowScreenshot(browser(), shot);
     }
     PressMouse(ui_controls::UP, modifiers);
     Wait(base::Milliseconds(500));
@@ -181,6 +203,53 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
                                                        second_}));
   EXPECT_EQ(controller()->DepthFor(first_), 1);
   EXPECT_TRUE(controller()->IsCollapsed(*id));
+}
+
+// Moving the pointer left takes a tab out of its branch where it is, and
+// moving it right nests a tab under the one above.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_MovingADragSidewaysChangesTheDepth) {
+  StageBranch();
+  DragSideways(second_, -24, "sideways-drag-left");
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, first_, second_,
+                                                       other_}));
+  EXPECT_EQ(controller()->DepthFor(first_), 1);
+  EXPECT_EQ(controller()->DepthFor(second_), 0);
+
+  DragSideways(other_, 24, "sideways-drag-right");
+  EXPECT_EQ(controller()->DepthFor(other_), 1);
+  EXPECT_TRUE(controller()->IsHeld(*controller()->IdFor(other_)));
+}
+
+// A child dragged straight down past another tab lands at that tab's level,
+// not under it.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_AStraightDragDoesNotNestUnderATabItPasses) {
+  StageBranch();
+  DragBelow(first_, other_, /*alone=*/false);
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, second_, other_,
+                                                       first_}));
+  EXPECT_EQ(controller()->DepthFor(first_), 0);
+}
+
+// A drag that pulls a tab out of its branch past the window's left edge
+// keeps the tab in this window.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_DraggingPastTheLeftEdgeKeepsTheTab) {
+  StageBranch();
+  views::Widget* widget =
+      BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+  gfx::Rect bounds = widget->GetWindowBoundsInScreen();
+  bounds.set_x(160);
+  widget->SetBounds(bounds);
+  Wait(base::Milliseconds(500));
+  const int edge = widget->GetWindowBoundsInScreen().x();
+  const gfx::Point from = RowOf(second_)->GetBoundsInScreen().CenterPoint();
+  Drag(second_, gfx::Point(edge - 40, from.y()), /*alone=*/false,
+       "sideways-drag-past-the-edge");
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, first_, second_,
+                                                       other_}));
+  EXPECT_EQ(controller()->DepthFor(second_), 0);
 }
 
 }  // namespace

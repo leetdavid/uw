@@ -240,6 +240,7 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
       {"taskRowPlusToggle", kTaskRowNewTabPref},
       {"doubleClickToggle", kDoubleClickOpensTabPref},
       {"middleClickToggle", kMiddleClickClosesTaskPref},
+      {"dragSidewaysToggle", kDragSidewaysNestsTabsPref},
   };
   for (const auto& [toggle, pref] : switches) {
     EXPECT_TRUE(prefs()->GetBoolean(pref)) << pref;

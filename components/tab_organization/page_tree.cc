@@ -109,23 +109,65 @@ const Page* PageTree::NextSibling(const PageId& id) const {
 }
 
 void PageTree::Adopt(const std::vector<Page>& strip,
-                     const std::set<PageId>& moved) {
+                     const std::set<PageId>& moved,
+                     const Drop& drop) {
   const PageTree earlier = *this;
-  std::map<PageId, std::string> task_of;
-  for (const Page& entry : strip) {
-    task_of[entry.id] = entry.task;
-  }
-  std::vector<PageId> open;
-  const auto is_open_in = [&](const PageId& id, const std::string& task) {
-    return Has(open, id) && task_of[id] == task;
+  const PageTree& before = drop.before ? *drop.before : earlier;
+  const auto dropped = [&](const PageId& id) {
+    return moved.contains(id) || !earlier.Find(id);
   };
-  const auto ancestors = [&earlier](const PageId& id) {
+  const auto ancestors = [&](const PageId& id) {
+    const PageTree& tree = dropped(id) ? before : earlier;
     std::vector<PageId> chain;
-    for (const Page* page = earlier.Find(id); page && IsSet(page->parent);
-         page = earlier.Find(page->parent)) {
+    for (const Page* page = tree.Find(id); page && IsSet(page->parent);
+         page = tree.Find(page->parent)) {
       chain.push_back(page->parent);
     }
     return chain;
+  };
+
+  // A dropped run between two pages of a collapsed branch moves after that
+  // branch, where its rows show.
+  std::vector<Page> order = strip;
+  for (size_t i = 1; i < order.size(); ++i) {
+    if (!dropped(order[i].id) || dropped(order[i - 1].id)) {
+      continue;
+    }
+    size_t end = i;
+    while (end < order.size() && dropped(order[end].id)) {
+      ++end;
+    }
+    if (end == order.size()) {
+      break;
+    }
+    std::vector<PageId> above = ancestors(order[i - 1].id);
+    above.insert(above.begin(), order[i - 1].id);
+    PageId hider;
+    for (const PageId& id : above) {
+      if (drop.collapsed.contains(id) && Has(ancestors(order[end].id), id)) {
+        hider = id;
+      }
+    }
+    if (!IsSet(hider)) {
+      continue;
+    }
+    size_t after = end;
+    while (after < order.size() && !dropped(order[after].id) &&
+           Has(ancestors(order[after].id), hider)) {
+      ++after;
+    }
+    std::rotate(order.begin() + i, order.begin() + end, order.begin() + after);
+    i = after - 1;
+  }
+
+  std::map<PageId, std::string> task_of;
+  for (const Page& entry : order) {
+    task_of[entry.id] = entry.task;
+  }
+  // The ancestor chain of the last page placed, outermost first.
+  std::vector<PageId> open;
+  const auto is_open_in = [&](const PageId& id, const std::string& task) {
+    return Has(open, id) && task_of[id] == task;
   };
   const auto nearest_open_ancestor = [&](const Page& entry) {
     for (const PageId& ancestor : ancestors(entry.id)) {
@@ -135,33 +177,77 @@ void PageTree::Adopt(const std::vector<Page>& strip,
     }
     return PageId();
   };
-  const auto dropped = [&](const PageId& id) {
-    return moved.contains(id) || !earlier.Find(id);
+  const auto level_under = [&](const PageId& parent) {
+    if (!IsSet(parent)) {
+      return 0;
+    }
+    return static_cast<int>(std::ranges::find(open, parent) - open.begin()) + 1;
   };
-
-  std::vector<Page> adopted;
-  for (size_t i = 0; i < strip.size(); ++i) {
-    const Page& entry = strip[i];
-    PageId parent;
-    if (dropped(entry.id)) {
-      for (const PageId& ancestor : ancestors(entry.id)) {
-        if (dropped(ancestor) && is_open_in(ancestor, entry.task)) {
-          parent = ancestor;
-          break;
-        }
+  // The parent of the first page of a dropped run.
+  const auto place = [&](size_t i) {
+    const Page& entry = order[i];
+    std::vector<PageId> chain;
+    if (!open.empty() && task_of[open.back()] == entry.task) {
+      chain = open;
+    }
+    int low = 0;
+    for (size_t j = i + 1; j < order.size(); ++j) {
+      if (dropped(order[j].id)) {
+        continue;
       }
-      for (size_t j = i + 1; !IsSet(parent) && j < strip.size(); ++j) {
-        if (dropped(strip[j].id)) {
-          continue;
-        }
-        if (strip[j].task == entry.task) {
-          parent = nearest_open_ancestor(strip[j]);
-        }
+      if (order[j].task == entry.task) {
+        low = level_under(nearest_open_ancestor(order[j]));
+      }
+      break;
+    }
+    int high = static_cast<int>(chain.size());
+    for (size_t level = 0; level < chain.size(); ++level) {
+      if (drop.collapsed.contains(chain[level])) {
+        high = static_cast<int>(level);
         break;
       }
     }
-    if (!IsSet(parent)) {
+    int height = 0;
+    for (const PageId& id : before.BranchOf(entry.id)) {
+      if (dropped(id)) {
+        height =
+            std::max(height, before.DepthOf(id) - before.DepthOf(entry.id));
+      }
+    }
+    high = std::max(low, std::min(high, kMaxShownDepth - height));
+    const int kept = std::max(low, level_under(nearest_open_ancestor(entry)));
+    const int level = std::clamp(kept + drop.levels, low, high);
+    return level == 0 ? PageId() : chain[level - 1];
+  };
+
+  std::vector<Page> adopted;
+  PageId run_parent;
+  std::string run_task;
+  bool in_run = false;
+  for (size_t i = 0; i < order.size(); ++i) {
+    const Page& entry = order[i];
+    PageId parent;
+    if (!dropped(entry.id)) {
+      in_run = false;
       parent = nearest_open_ancestor(entry);
+    } else {
+      bool carried = false;
+      for (const PageId& ancestor : ancestors(entry.id)) {
+        if (dropped(ancestor) && is_open_in(ancestor, entry.task)) {
+          parent = ancestor;
+          carried = true;
+          break;
+        }
+      }
+      if (!carried) {
+        if (!in_run || run_task != entry.task ||
+            (IsSet(run_parent) && !is_open_in(run_parent, entry.task))) {
+          run_parent = place(i);
+          run_task = entry.task;
+          in_run = true;
+        }
+        parent = run_parent;
+      }
     }
     while (!open.empty() && open.back() != parent) {
       open.pop_back();

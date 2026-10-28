@@ -18,9 +18,6 @@
 namespace uw {
 namespace {
 
-constexpr int kIndentPerLevel = 16;
-constexpr int kMaxIndentLevels = 6;
-
 TabOrganizationController* ControllerFor(TabCollectionNode* node) {
   TabStripCollectionController* strip = node ? node->GetController() : nullptr;
   return strip ? TabOrganizationController::From(
@@ -69,7 +66,7 @@ int TabIndentFor(TabCollectionNode* parent, const views::View* child) {
     return 0;
   }
   // A split's row sits where the shallower of its pair would.
-  int depth = kMaxIndentLevels;
+  int depth = kMaxShownDepth;
   for (const tabs::TabInterface* tab : shown) {
     depth = std::min(depth, controller->DepthFor(tab));
   }

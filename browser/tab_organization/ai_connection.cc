@@ -32,7 +32,8 @@ void RegisterAiConnectionProfilePrefs(
   registry->RegisterBooleanPref(kRestoreAfterCrashPref, false);
   for (const char* mouse_action :
        {kOptionClickClosesBranchPref, kTaskRowNewTabPref,
-        kDoubleClickOpensTabPref, kMiddleClickClosesTaskPref}) {
+        kDoubleClickOpensTabPref, kMiddleClickClosesTaskPref,
+        kDragSidewaysNestsTabsPref}) {
     registry->RegisterBooleanPref(mouse_action, true);
   }
   registry->RegisterDictionaryPref(kCommandBarRatesPref);

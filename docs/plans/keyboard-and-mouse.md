@@ -178,7 +178,8 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - The menu bar, the keys, the tab menu, and the Organize menu all run commands through `browser/ui/views/tab_organization/window_commands`.
 - Branch drags extend Chromium's drag set to the branch in `TabDragHandlerImpl::InitializeDrag`, which uw already hooks. Chromium already drags several selected tabs together.
 - uw hooks `TabDragHandlerImpl::ContinueDrag` to pass the pointer's sideways distance to `TabOrganizationController`. The page tree works out the depths each place allows, and `Adopt` takes the one asked for. `tab_indent` shows it while the drag runs.
-- If Chromium tears a tab off when the pointer leaves the sidebar's left edge, uw gives that edge room, as Chromium already does above and below the tab strip.
+- Chromium tears a tab off once the pointer leaves the window. `ContinueDrag` holds a pointer up to 96px left of the window, six levels of indent, at the window's edge, so pulling a tab out of its branch keeps it. Farther out, a tab still tears off to another window.
+- During a drag the page tree takes a dropped tab's ancestors from the tree when the drag began, so a branch keeps its shape through Chromium's steps, and a tab dragged back keeps its old parent.
 - `TabOrganizationController` keeps which parents are collapsed and saves it with the session data that already carries parent links. Collapsing is not an organization action, so it is not in the undo history.
 - Both vertical layouts that `tab-tree.patch` changes give a hidden row no height. The tab row places the chevron and the count from `browser/ui/views/tab_organization/branch_toggle`.
 - `TabStripModel::IsTabCollapsed` also asks `HiddenTabs`, which the controller provides through the window. Ctrl+Tab and the choice of the next tab after a close already skip collapsed groups through it.

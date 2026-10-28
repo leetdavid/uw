@@ -45,6 +45,7 @@ struct State {
   bool task_row_new_tab;
   bool double_click_opens_tab;
   bool middle_click_closes_task;
+  bool drag_sideways_nests_tabs;
   // The mini player's settings, for all of uw.
   MiniPlayerMode mini_player_mode;
   bool mini_player_on_tab_switch;
@@ -67,6 +68,7 @@ enum MouseAction {
   kTaskRowNewTab,
   kDoubleClickOpensTab,
   kMiddleClickClosesTask,
+  kDragSidewaysNestsTabs,
 };
 
 // Where picture in picture goes, uw::MiniPlayerMode.

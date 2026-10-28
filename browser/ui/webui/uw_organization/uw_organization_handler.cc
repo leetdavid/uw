@@ -43,6 +43,8 @@ const char* MouseActionPref(mojom::MouseAction action) {
       return kDoubleClickOpensTabPref;
     case mojom::MouseAction::kMiddleClickClosesTask:
       return kMiddleClickClosesTaskPref;
+    case mojom::MouseAction::kDragSidewaysNestsTabs:
+      return kDragSidewaysNestsTabsPref;
   }
 }
 
@@ -121,6 +123,7 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMouseTaskRowPlus", IDS_UW_SETTINGS_MOUSE_TASK_ROW_PLUS},
       {"uwMouseDoubleClick", IDS_UW_SETTINGS_MOUSE_DOUBLE_CLICK},
       {"uwMouseMiddleClick", IDS_UW_SETTINGS_MOUSE_MIDDLE_CLICK},
+      {"uwMouseDragSideways", IDS_UW_SETTINGS_MOUSE_DRAG_SIDEWAYS},
       {"uwMiniPlayerTitle", IDS_UW_SETTINGS_MINI_PLAYER_TITLE},
       {"uwMiniPlayerMode", IDS_UW_SETTINGS_MINI_PLAYER_MODE},
       {"uwMiniPlayerDock", IDS_UW_SETTINGS_MINI_PLAYER_DOCK},
@@ -229,6 +232,8 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->double_click_opens_tab = prefs->GetBoolean(kDoubleClickOpensTabPref);
   state->middle_click_closes_task =
       prefs->GetBoolean(kMiddleClickClosesTaskPref);
+  state->drag_sideways_nests_tabs =
+      prefs->GetBoolean(kDragSidewaysNestsTabsPref);
   const PrefService* local_state = g_browser_process->local_state();
   state->mini_player_mode =
       static_cast<mojom::MiniPlayerMode>(MiniPlayerModeOf(local_state));

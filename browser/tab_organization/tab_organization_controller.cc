@@ -3,6 +3,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 #include "base/auto_reset.h"
@@ -25,6 +26,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
@@ -32,6 +34,7 @@
 #include "ui/base/models/list_selection_model.h"
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/terminal/terminal_shell.h"
 
 namespace uw {
@@ -46,6 +49,15 @@ std::string TaskOf(const tabs::TabInterface* tab) {
 
 bool Has(const std::vector<PageId>& ids, const PageId& id) {
   return std::ranges::find(ids, id) != ids.end();
+}
+
+// Sideways movement counts once it passes a dead zone, so a wobbly drag keeps
+// its depth. Then each indent is a level.
+int LevelsMoved(int dx) {
+  constexpr int kDeadZone = 12;
+  const int levels =
+      (std::abs(dx) + kIndentPerLevel - kDeadZone) / kIndentPerLevel;
+  return dx < 0 ? -levels : levels;
 }
 
 }  // namespace
@@ -874,21 +886,29 @@ void TabOrganizationController::BeginTabDrag(bool alone) {
   dragging_ = true;
   drag_alone_ = alone;
   drag_selection_.clear();
+  drag_carried_.clear();
+  drag_before_ = tree_;
+  drag_x_.reset();
+  drag_levels_ = 0;
 }
 
 std::vector<tabs::TabInterface*> TabOrganizationController::DraggedTabs(
     std::vector<tabs::TabInterface*> tabs) {
-  if (drag_alone_) {
-    return tabs;
-  }
   std::set<tabs::TabInterface*> dragged(tabs.begin(), tabs.end());
   for (const tabs::TabInterface* tab : tabs) {
-    if (const std::optional<PageId> id = IdFor(tab)) {
-      for (const PageId& page : tree_.BranchOf(*id)) {
-        if (tabs::TabInterface* in_branch = TabFor(page)) {
-          dragged.insert(in_branch);
-        }
+    const std::optional<PageId> id = IdFor(tab);
+    if (!id || drag_alone_) {
+      continue;
+    }
+    for (const PageId& page : tree_.BranchOf(*id)) {
+      if (tabs::TabInterface* in_branch = TabFor(page)) {
+        dragged.insert(in_branch);
       }
+    }
+  }
+  for (const tabs::TabInterface* tab : dragged) {
+    if (const std::optional<PageId> id = IdFor(tab)) {
+      drag_carried_.insert(*id);
     }
   }
   if (dragged.size() == tabs.size()) {
@@ -905,8 +925,36 @@ std::vector<tabs::TabInterface*> TabOrganizationController::DraggedTabs(
   return in_order;
 }
 
+void TabOrganizationController::ContinueTabDrag(int x) {
+  if (!dragging_ || drag_carried_.empty() ||
+      !tabs_->profile()->GetPrefs()->GetBoolean(kDragSidewaysNestsTabsPref)) {
+    return;
+  }
+  if (!drag_x_) {
+    drag_x_ = x;
+    return;
+  }
+  const int levels = LevelsMoved(x - *drag_x_);
+  if (levels == drag_levels_) {
+    return;
+  }
+  drag_levels_ = levels;
+  Mirror(drag_carried_);
+  NotifyNativeMoves(drag_carried_);
+}
+
 void TabOrganizationController::EndTabDrag() {
   dragging_ = false;
+  for (const PageId& id : drag_carried_) {
+    const Page* now = tree_.Find(id);
+    const Page* then = drag_before_.Find(id);
+    if (now && then && !now->parent.value().empty() &&
+        now->parent != then->parent && !drag_carried_.contains(now->parent)) {
+      held_[id] = now->parent;
+    }
+  }
+  drag_carried_.clear();
+  drag_before_ = PageTree();
   if (!drag_selection_.empty()) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
@@ -1007,7 +1055,9 @@ void TabOrganizationController::OnTabStripModelChanged(
   }
   std::set<PageId> moved;
   if (change.type() == TabStripModelChange::kMoved) {
-    if (const std::optional<PageId> id = IdFor(change.GetMove()->tab)) {
+    if (dragging_ && !drag_carried_.empty()) {
+      moved = drag_carried_;
+    } else if (const std::optional<PageId> id = IdFor(change.GetMove()->tab)) {
       moved.insert(*id);
     }
   }
@@ -1049,7 +1099,9 @@ void TabOrganizationController::TabGroupedStateChanged(
     return;
   }
   std::set<PageId> moved;
-  if (const std::optional<PageId> id = IdFor(tab)) {
+  if (dragging_ && !drag_carried_.empty()) {
+    moved = drag_carried_;
+  } else if (const std::optional<PageId> id = IdFor(tab)) {
     moved.insert(*id);
   }
   Mirror(moved);
@@ -1173,7 +1225,12 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   }
   std::erase_if(
       ids_, [&live](const auto& entry) { return !live.contains(entry.first); });
-  tree_.Adopt(strip, moved);
+  Drop drop{.collapsed = collapsed_};
+  if (dragging_ && !drag_carried_.empty()) {
+    drop.levels = drag_levels_;
+    drop.before = &drag_before_;
+  }
+  tree_.Adopt(strip, moved, drop);
   std::erase_if(opened_, [this](const PageId& id) { return !tree_.Find(id); });
   LinkRestoredPages();
   RevealSelected();

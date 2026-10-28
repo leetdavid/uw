@@ -291,6 +291,12 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
         action: MouseAction.kMiddleClickClosesTask,
         on: state.middleClickClosesTask,
       },
+      {
+        id: 'dragSideways',
+        label: 'uwMouseDragSideways',
+        action: MouseAction.kDragSidewaysNestsTabs,
+        on: state.dragSidewaysNestsTabs,
+      },
     ];
   }
 

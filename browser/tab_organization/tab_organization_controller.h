@@ -199,6 +199,11 @@ class TabOrganizationController : public TabStripModelObserver,
   // The tabs a drag of `tabs` moves, in strip order: each with its branch.
   std::vector<tabs::TabInterface*> DraggedTabs(
       std::vector<tabs::TabInterface*> tabs);
+  // The drag's pointer is at `x` on the screen. Moving it sideways from where
+  // the drag began nests the dragged tabs deeper or shallower, unless the
+  // switch for it is off.
+  void ContinueTabDrag(int x);
+  // A drop that gave a dragged tab a new parent nests it by hand.
   void EndTabDrag();
 
   std::optional<tab_groups::TabGroupId> GroupFor(const std::string& task) const;
@@ -329,6 +334,12 @@ class TabOrganizationController : public TabStripModelObserver,
   // The tabs the user had selected when a drag carried a branch. Chromium
   // selects everything it drags, and the user's selection comes back after.
   std::vector<tabs::TabHandle> drag_selection_;
+  // The tabs a drag carries, the tree when it began, where its pointer was
+  // first seen, and how many levels the pointer has moved sideways since.
+  std::set<PageId> drag_carried_;
+  PageTree drag_before_;
+  std::optional<int> drag_x_;
+  int drag_levels_ = 0;
   bool update_pending_ = false;
   base::RepeatingClosureList changed_;
   // The task whose row should turn its name into a field.

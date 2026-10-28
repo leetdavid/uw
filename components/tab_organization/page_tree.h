@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "base/types/strong_alias.h"
 
 namespace uw {
@@ -23,6 +24,24 @@ struct Page {
   PageId parent;
 
   friend bool operator==(const Page&, const Page&) = default;
+};
+
+// The sidebar indents a nested tab this much per level, and shows no more
+// levels than kMaxShownDepth.
+inline constexpr int kIndentPerLevel = 16;
+inline constexpr int kMaxShownDepth = 6;
+
+class PageTree;
+
+// What places the tabs a native move dropped, besides the tab strip's order.
+struct Drop {
+  // How many levels a drag's pointer has moved sideways: right is deeper.
+  int levels = 0;
+  // Pages whose branch is collapsed. Nothing lands inside one.
+  std::set<PageId> collapsed;
+  // The tree when the drag began, where dropped pages find their ancestors.
+  // Null means the tree before this change.
+  raw_ptr<const PageTree> before = nullptr;
 };
 
 // The regular tabs of one window in tab-strip order. Each task's pages are
@@ -54,9 +73,19 @@ class PageTree {
   // Takes the tab strip's order and task membership after a native change.
   // `strip` parent fields are ignored. Pages missing from `strip` are closed
   // and their children move up one level. A page keeps its nearest earlier
-  // ancestor whose branch it still sits inside. A page in `moved`, or one new
-  // to the tree, instead joins the branch it was dropped into.
-  void Adopt(const std::vector<Page>& strip, const std::set<PageId>& moved);
+  // ancestor whose branch it still sits inside.
+  //
+  // A page in `moved`, or one new to the tree, is dropped. It keeps its
+  // dropped ancestor where it still sits under one, so a dragged branch keeps
+  // its shape. Otherwise it keeps its nearest ancestor whose branch it was
+  // dropped inside, or takes the level of the page below it. Then it moves
+  // `drop.levels` deeper or shallower, never shallower than the page below,
+  // which keeps its parent, and never deeper than one under the page above,
+  // a collapsed page, or kMaxShownDepth for its branch. Dropped pages side by
+  // side land as siblings. A drop inside a collapsed branch lands after it.
+  void Adopt(const std::vector<Page>& strip,
+             const std::set<PageId>& moved,
+             const Drop& drop = {});
 
   // A blank new tab: sibling directly below `active`'s branch.
   bool OpenBeside(const PageId& id, const PageId& active);

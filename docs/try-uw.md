@@ -74,15 +74,18 @@ Open a few links from one page with Cmd-click, so they sit under it.
 
 Expected result: the hidden tabs stay open and come back in place. Closing the collapsed tab shows them one level up.
 
-### Drag a branch
+### Drag tabs in and out of branches
 
 Open a few links from one page with Cmd-click, so they sit under it.
 
 - Drag the page's tab: the tabs under it come along, still under it.
 - Hold Option while you drag: the page moves alone, and its tabs move up a level.
 - Collapse the branch first: it moves with its hidden tabs and stays collapsed.
+- Drag the last tab under the page and move the pointer left: it leaves the branch. Move it right instead: it goes under the tab above. Each 16px is a level.
+- Drag a tab straight down past other tabs: it never ends up under one of them.
+- Turn off `Drag sideways to nest tabs` under Mouse on uw's settings page: moving sideways does nothing.
 
-Expected result: after the drop, only the tab you dragged is selected.
+Expected result: the indent follows the pointer during the drag, and the drop keeps it. A dragged branch keeps its shape. After the drop, only the tab you dragged is selected.
 
 ### New child tab
 

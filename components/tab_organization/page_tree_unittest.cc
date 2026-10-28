@@ -279,6 +279,101 @@ TEST(PageTreeTest, AMovedBranchKeepsItsShape) {
   EXPECT_EQ(Render(tree), (Lines{"q@-", "r@-", "p@-", "  c@-"}));
 }
 
+TEST(PageTreeTest, MovingLeftAfterTheLastChildLeavesTheBranch) {
+  PageTree tree({P("a"), P("b", "", "a"), P("c", "", "a"), P("d")});
+  std::vector<Page> strip = Strip(tree);
+  MoveTo(strip, "b", 2);
+  tree.Adopt(strip, {Id("b")}, {.levels = -1});
+  EXPECT_EQ(Render(tree), (Lines{"a@-", "  c@-", "b@-", "d@-"}));
+}
+
+TEST(PageTreeTest, AStraightDragNeverNestsUnderATabItPasses) {
+  const PageTree before({P("a"), P("b", "", "a"), P("c"), P("d")});
+  PageTree tree = before;
+  std::vector<Page> strip = Strip(tree);
+  MoveTo(strip, "b", 2);
+  tree.Adopt(strip, {Id("b")});
+  EXPECT_EQ(Render(tree), (Lines{"a@-", "c@-", "b@-", "d@-"}));
+
+  tree = before;
+  tree.Adopt(strip, {Id("b")}, {.levels = 1});
+  EXPECT_EQ(Render(tree), (Lines{"a@-", "c@-", "  b@-", "d@-"}));
+}
+
+TEST(PageTreeTest, SidewaysStaysBetweenTheTabBelowAndOneUnderTheTabAbove) {
+  const PageTree before(
+      {P("p"), P("a", "", "p"), P("b", "", "p"), P("x"), P("y")});
+  std::vector<Page> strip = Strip(before);
+  MoveTo(strip, "x", 2);
+
+  PageTree tree = before;
+  tree.Adopt(strip, {Id("x")}, {.levels = -3});
+  EXPECT_EQ(Render(tree), (Lines{"p@-", "  a@-", "  x@-", "  b@-", "y@-"}));
+
+  tree = before;
+  tree.Adopt(strip, {Id("x")}, {.levels = 5});
+  EXPECT_EQ(Render(tree), (Lines{"p@-", "  a@-", "    x@-", "  b@-", "y@-"}));
+
+  strip = Strip(before);
+  MoveTo(strip, "x", 3);
+  tree = before;
+  tree.Adopt(strip, {Id("x")}, {.levels = 1});
+  EXPECT_EQ(Render(tree), (Lines{"p@-", "  a@-", "  b@-", "  x@-", "y@-"}));
+}
+
+TEST(PageTreeTest, NothingLandsInsideACollapsedBranch) {
+  const PageTree before(
+      {P("p"), P("a", "", "p"), P("b", "", "p"), P("q"), P("x")});
+  const Lines after = {"p@-", "  a@-", "  b@-", "x@-", "q@-"};
+  for (size_t index : {size_t{1}, size_t{2}, size_t{3}}) {
+    std::vector<Page> strip = Strip(before);
+    MoveTo(strip, "x", index);
+    PageTree tree = before;
+    tree.Adopt(strip, {Id("x")}, {.levels = 1, .collapsed = {Id("p")}});
+    EXPECT_EQ(Render(tree), after) << index;
+  }
+}
+
+TEST(PageTreeTest, ADraggedBranchKeepsItsShapeSideways) {
+  PageTree tree(
+      {P("p"), P("c", "", "p"), P("g", "", "c"), P("d", "", "p"), P("q")});
+  std::vector<Page> strip = Strip(tree);
+  MoveTo(strip, "q", 0);
+  tree.Adopt(strip, {Id("p"), Id("c"), Id("g"), Id("d")}, {.levels = 1});
+  EXPECT_EQ(Render(tree),
+            (Lines{"q@-", "  p@-", "    c@-", "      g@-", "    d@-"}));
+}
+
+TEST(PageTreeTest, ADraggedBranchGoesNoDeeperThanTheSidebarShows) {
+  PageTree tree({P("l0"), P("l1", "", "l0"), P("l2", "", "l1"),
+                 P("l3", "", "l2"), P("l4", "", "l3"), P("b"), P("b1", "", "b"),
+                 P("b2", "", "b1")});
+  tree.Adopt(Strip(tree), {Id("b"), Id("b1"), Id("b2")}, {.levels = 9});
+  EXPECT_EQ(tree.DepthOf(Id("b")), kMaxShownDepth - 2);
+  EXPECT_EQ(tree.DepthOf(Id("b2")), kMaxShownDepth);
+}
+
+TEST(PageTreeTest, DroppedTabsSideBySideLandAsSiblings) {
+  PageTree tree({P("p"), P("a", "", "p"), P("x"), P("x1", "", "x"), P("y")});
+  tree.Adopt(Strip(tree), {Id("x"), Id("x1"), Id("y")}, {.levels = 1});
+  EXPECT_EQ(Render(tree),
+            (Lines{"p@-", "  a@-", "  x@-", "    x1@-", "  y@-"}));
+}
+
+TEST(PageTreeTest, ADraggedTabKeepsTheParentItHadWhenTheDragBegan) {
+  const PageTree before({P("p"), P("a", "", "p"), P("b", "", "p"), P("q")});
+  PageTree tree = before;
+  std::vector<Page> strip = Strip(tree);
+  MoveTo(strip, "b", 3);
+  tree.Adopt(strip, {Id("b")}, {.before = &before});
+  EXPECT_EQ(Render(tree), (Lines{"p@-", "  a@-", "q@-", "b@-"}));
+
+  strip = Strip(tree);
+  MoveTo(strip, "b", 2);
+  tree.Adopt(strip, {Id("b")}, {.before = &before});
+  EXPECT_EQ(Render(tree), (Lines{"p@-", "  a@-", "  b@-", "q@-"}));
+}
+
 TEST(PageTreeTest, AnUngroupedTabDroppedBetweenTasksReturnsToTheScratchpad) {
   PageTree tree = Seed();
   std::vector<Page> strip = Strip(tree);
