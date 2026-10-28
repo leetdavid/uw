@@ -22,8 +22,6 @@ export const SENTRY_PROJECT = "uw";
 export const SENTRY_TOKEN_ITEM = "uw-sentry";
 export const CRASH_REPORT_URL =
   "https://o4512323831070720.ingest.us.sentry.io/api/4512323876618240/minidump/?sentry_key=47ca5329021071c1a1fd038b8a1ec13e";
-export const POSTHOG_KEY = "";
-export const POSTHOG_HOST = "https://us.i.posthog.com";
 const REPOSITORY = "https://github.com/leetdavid/uw";
 export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
 const BRANCH = "origin/main";
@@ -34,6 +32,27 @@ export interface ReleaseOptions {
   sha?: string;
   worktree: string;
   jobs: number;
+}
+
+/**
+ * PostHog's project token and region, from the environment or else the repo's
+ * git-ignored .env. Only these two entries are read from the file.
+ */
+export function posthogKeys(env: NodeJS.ProcessEnv, envFile = join(REPO, ".env")): { key: string; host: string } {
+  const names = ["POSTHOG_PROJECT_TOKEN", "POSTHOG_PROJECT_REGION"] as const;
+  const values = new Map(names.map((name) => [name, env[name]?.trim()]));
+  if (existsSync(envFile)) {
+    for (const line of readFileSync(envFile, "utf8").split("\n")) {
+      const match = /^\s*(POSTHOG_PROJECT_TOKEN|POSTHOG_PROJECT_REGION)\s*=\s*["']?(.*?)["']?\s*$/.exec(line);
+      const name = match?.[1] as (typeof names)[number] | undefined;
+      if (name && !values.get(name)) values.set(name, match![2]);
+    }
+  }
+  const key = values.get("POSTHOG_PROJECT_TOKEN") ?? "";
+  const region = (values.get("POSTHOG_PROJECT_REGION") ?? "").toLowerCase();
+  if (!/^phc_\w+$/.test(key)) throw new BuildError("Set POSTHOG_PROJECT_TOKEN to PostHog's project token (phc_...) in .env");
+  if (region !== "us" && region !== "eu") throw new BuildError("Set POSTHOG_PROJECT_REGION to US or EU in .env");
+  return { key, host: `https://${region}.i.posthog.com` };
 }
 
 export function newer(version: string, than: string): boolean {
@@ -151,7 +170,7 @@ export class Release {
     const identity = this.identity();
     this.capture(["xcrun", "notarytool", "history", "--keychain-profile", NOTARY_PROFILE], REPO, NETWORK_TIMEOUT);
     this.capture(["gh", "auth", "status"]);
-    if (!POSTHOG_KEY) throw new BuildError("POSTHOG_KEY in scripts/release.ts is empty");
+    const posthog = posthogKeys(this.runtime.env);
     const sentryToken = this.sentryToken();
     const cli = this.sentryCli();
 
@@ -178,8 +197,8 @@ export class Release {
       ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],
       ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
       ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
-      ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", POSTHOG_KEY],
-      ["UWPostHogHost", "-string", POSTHOG_HOST],
+      ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", posthog.key],
+      ["UWPostHogHost", "-string", posthog.host],
     ] as const) {
       this.step(["plutil", "-replace", key, type, value, plist], directory);
     }

@@ -312,6 +312,7 @@ Previews are built on the owner's Mac, as the [distribution plan](docs/plans/dis
 - `gh` signed in to GitHub.
 - Sparkle's update-signing key in the login keychain, made once with Sparkle's `generate_keys`. Keep a backup: without it, installed copies can never update.
 - A Sentry organization token, for uploading symbols, in the login keychain: `security add-generic-password -s uw-sentry -a eslee -w`, which asks for the token.
+- PostHog's project token and region in the repo's git-ignored `.env`, as `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`). The release reads only these two entries.
 - A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
 
 Push `main`, then run:
