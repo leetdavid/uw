@@ -34,7 +34,7 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 - **Adding.** uw keeps its own list. Add connector takes the JSON every server's README gives: `{"mcpServers": {"name": {"command", "args", "env"}}}` for a local one, or `{"type": "http", "url", "headers"}` for a remote one. uw does not read other agents' lists. A connector can be removed. Agreed on 2026-10-22: the [connect dialog](connect-dialog.md) adds search, recommended connectors, and plugins, and keeps this paste box behind "Add by address or JSON".
 - **One list for every profile**, like providers, sign-ins included. Two accounts of one service are two connectors with two names.
 - **Keys.** Values in `env` and `headers` go to Keychain and show masked.
-- **Sign-in.** A remote connector that asks for OAuth shows "Sign in". uw opens the server's sign-in page in a tab and catches the return address itself. It follows MCP's authorization rules: it finds the sign-in server from the connector's address, registers itself automatically (Dynamic Client Registration), keeps the client ID by the sign-in server's issuer, and uses PKCE. Tokens go to Keychain and refresh on their own; Sign out deletes them. A server that only takes Client ID Metadata Documents shows "This connector's sign-in needs a registration uw doesn't support yet."
+- **Sign-in.** A remote connector that asks for OAuth shows "Sign in". uw opens the server's sign-in page in a tab and catches the return address itself. It follows MCP's authorization rules: it finds the sign-in server from the connector's address, registers itself automatically (Dynamic Client Registration), keeps the client ID by the sign-in server's issuer, and uses PKCE. Tokens go to Keychain and refresh on their own; Sign out deletes them. Agreed on 2026-10-28: a server that offers no registration but takes Client ID Metadata Documents, such as Home Assistant, gets `https://uwbrowser.com/oauth/client.json` as uw's client ID; see [ADR 0023](../adr/0023-uw-signs-in-with-a-client-file-on-uwbrowser-com-when-a-server-cant-register-it.md). A server that takes neither shows "This connector only signs in apps it already knows. If the service gives you a key, add the connector again with the key as a header."
 - **Addresses.** A remote connector's address is `https`, or `http` on this Mac or a private network, by the [providers rule](ai-providers.md#agreed-scope).
 - **Starting.** Every connector that is on starts when uw starts. Adding, editing, or turning one on starts or restarts it at once. One process, or one remote connection, per connector serves every chat. It stops when uw quits or the connector is turned off.
 - **Environment.** A local connector starts through the user's login shell, `$SHELL -l -c 'exec <command> <args>'`, so it finds the programs the terminal finds. The pasted `env` goes on top. On 2026-10-22 this missed Node set up in `.zshrc`; the [connect dialog plan](connect-dialog.md#fixes) replaces this rule.
@@ -55,7 +55,6 @@ A [connector](../CONTEXT.md#language) gives the agent more tools. Underneath it 
 ### Not in this plan
 
 - Resources, elicitation, and sampling. uw does not announce support for them.
-- Client ID Metadata Documents, which need an address uw means to keep.
 - A user's own OAuth client ID. uw's own apps for services that need one are in the [connect dialog plan](connect-dialog.md#uws-own-sign-in-apps).
 - "Allow for this chat" on page steps or terminal commands.
 - Stopping an idle local connector.
@@ -103,6 +102,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 7. T140: connector approvals and tool switches.
 8. T141: connectors per chat.
 9. T142: connector prompts in the `/` menu.
+10. T245: sign-in with uw's client file.
 
 ## Acceptance checks
 
@@ -112,3 +112,4 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 4. In Auto, a read-only tool runs at once and a tool without the hint waits for Allow once; Always allow stops the asking in every chat until it is taken back.
 5. A connector turned off in a chat's "+" menu is neither listed nor loaded in that chat.
 6. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
+7. A Home Assistant connector, whose sign-in server offers no registration, signs in from its row and lists its tools.

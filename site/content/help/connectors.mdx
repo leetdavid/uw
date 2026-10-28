@@ -33,6 +33,18 @@ uw mcp add --transport http linear https://mcp.linear.app/mcp
 uw mcp list
 ```
 
+## If a connector *can't sign in*
+
+Some services sign in only apps they already know. The connector's row then says **Can't sign in**. If the service gives you a key, add the connector again with the key as a header:
+
+```bash title="Terminal"
+read -s TOKEN
+uw mcp add --transport http files https://files.example.com/mcp \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+`read -s` keeps the key out of your shell history. The key goes to the macOS Keychain.
+
 ## Turn *tools on and off*
 
 Each connector on `uw://ai/connectors` has a switch. Connectors start with uw and serve every profile.
