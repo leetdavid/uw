@@ -102,6 +102,8 @@ Added on 2026-10-22 for T147: "Scheduled chat: the chat page" and "Scheduled cha
 
 Added on 2026-10-26 for T226: "Files in a message: a chat (Fluid)" and "Files in a message: every state (Fluid)" draw attached files: "Add files" in the "+" menu, file cards beside image tiles in the composer and above a sent message, the drop target, the limits, the note for a model that can't see images, a file the model read only part of, the recall step, and `uw chat --file`. Their rules are in the canvas guide `uw-attached-files`. The user signed them off the same day.
 
+Added on 2026-10-28 for T237: "Scheduled page (Fluid)", "Inbox: the pop-up (Fluid)", and "Scheduled page and Inbox: every state (Fluid)" draw the [Scheduled page and the Inbox](../product.md#scheduled-chats): both tables with each last-run and next-run state, the empty page, the Inbox button with its count, open, in dark mode, and on the floating sidebar, the pop-up with each kind of alert and empty, and the chat list without its Scheduled filter. Their rules are in the canvas guide `uw-scheduled-page-and-inbox`. They wait for the user's sign-off.
+
 How the chat is built:
 
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages. uw turns off the engine's Gemini-only pieces: the toolbar task icon, the take-over button, the overlay over the agent's tab, and the "Gemini is working" toast. The task icon brought Gemini's button with it, and clicking that button aborted uw on 2026-10-15. The blue icon on the agent's tab stays.
