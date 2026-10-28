@@ -1584,5 +1584,27 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                                                   false);
   EXPECT_EQ(drag(other, -40), 1);
 }
+
+// A cancelled drag puts the tab back at its depth and nests nothing by hand.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ACancelledDragPutsTheDepthBack) {
+  tabs::TabInterface* parent = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  ASSERT_EQ(controller()->DepthFor(child), 1);
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(other));
+  controller()->BeginTabDrag(/*alone=*/false);
+  controller()->DraggedTabs({other});
+  controller()->ContinueTabDrag(300);
+  controller()->ContinueTabDrag(340);
+  ASSERT_EQ(controller()->DepthFor(other), 2);
+  controller()->CancelTabDrag();
+  base::RunLoop().RunUntilIdle();
+  controller()->EndTabDrag();
+  EXPECT_EQ(controller()->DepthFor(other), 0);
+  EXPECT_FALSE(controller()->IsHeld(*controller()->IdFor(other)));
+  EXPECT_EQ(controller()->DepthFor(child), 1);
+}
 }  // namespace
 }  // namespace uw

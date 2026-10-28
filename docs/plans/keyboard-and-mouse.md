@@ -119,13 +119,14 @@ Agreed on 2026-10-15.
 Agreed on 2026-10-28 as T56. Before, a dropped tab joined the branch of the tab below it, so a child dragged to the bottom of its task could not leave its parent's branch.
 
 - Up and down picks the tab's place, as in Chromium. A straight drag keeps the tab's parent anywhere inside that parent's branch, including just after its last child. Elsewhere the tab takes the level of the tab below it, or the task's top level when nothing is below. It never becomes the child of a tab it passes.
-- Moving the pointer sideways changes the depth by one level per 16px, after a small dead zone, so a wobbly vertical drag keeps the depth. The dragged rows' indent follows, and the drop keeps the depth shown. Nothing else is drawn.
+- Moving the pointer sideways changes the depth by one level per 16px, after a small dead zone, so a wobbly vertical drag keeps the depth. The dragged rows slide to each new indent, as Chromium moves its tabs, and the drop keeps the depth shown. Nothing else is drawn. The slide was asked for on 2026-10-28.
 - The depth can go from the level of the tab below up to one deeper than the tab above, and no deeper than 6 levels. The tab below always keeps its parent. To leave a branch, drag past its last child and move left.
 - The slot below a collapsed parent goes no deeper than the parent. To nest under it, expand it first.
 - A dragged parent's branch keeps its shape. Up, down, or sideways, every tab in it moves by the same number of levels. The limits above apply to the parent, and the branch's deepest tab goes no deeper than 6 levels. Asked for on 2026-10-28.
 - Several selected tabs land as siblings at the depth shown, each with its branch. Sideways counts from the depth of the row grabbed.
 - Sideways never changes the task. The task is the one the tab is dropped in, as in Chromium. Dragging left past the sidebar's edge does not tear the tab off into a new window.
 - A drop that gives a tab a new parent nests it by hand, like Nest under previous tab. A reorder inside the same branch does not. Dragging it out of the branch ends that.
+- Esc during a drag puts the tabs back where they were, depths included, and nests nothing by hand.
 - "Drag sideways to nest tabs", in the Mouse section of uw's settings and on by default, turns sideways off. A straight drag still follows the first rule.
 - The design is the frames "Sideways drag: the sidebar", "Sideways drag: every state", and "Sideways drag: a branch" on the canvas page "Keyboard and mouse". The user signed them off on 2026-10-28.
 
@@ -179,6 +180,8 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - Branch drags extend Chromium's drag set to the branch in `TabDragHandlerImpl::InitializeDrag`, which uw already hooks. Chromium already drags several selected tabs together.
 - uw hooks `TabDragHandlerImpl::ContinueDrag` to pass the pointer's sideways distance to `TabOrganizationController`. The page tree works out the depths each place allows, and `Adopt` takes the one asked for. `tab_indent` shows it while the drag runs.
 - Chromium tears a tab off once the pointer leaves the window. `ContinueDrag` holds a pointer up to 96px left of the window, six levels of indent, at the window's edge, so pulling a tab out of its branch keeps it. Farther out, a tab still tears off to another window.
+- Chromium's `TabCollectionAnimatingLayoutManager` slides every row to new bounds in 200ms but puts a dragged row straight at its target. In a vertical strip uw slides a dragged row's x and width too.
+- Chromium reverts a cancelled drag itself, from `TabDragController::EndDrag`, which tells `TabOrganizationController` first. The tree then goes back to how it was when the drag began.
 - During a drag the page tree takes a dropped tab's ancestors from the tree when the drag began, so a branch keeps its shape through Chromium's steps, and a tab dragged back keeps its old parent.
 - `TabOrganizationController` keeps which parents are collapsed and saves it with the session data that already carries parent links. Collapsing is not an organization action, so it is not in the undo history.
 - Both vertical layouts that `tab-tree.patch` changes give a hidden row no height. The tab row places the chevron and the count from `browser/ui/views/tab_organization/branch_toggle`.
@@ -225,8 +228,9 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
    - A dragged parent's branch keeps its shape, moved up, down, or sideways. Its deepest tab goes no deeper than 6 levels.
    - A drop that gives a tab a new parent nests it by hand. A reorder inside the same branch does not, and dragging the tab out ends it.
    - Sideways never changes the task. Dragging left past the sidebar's edge does not tear the tab off.
+   - Esc during a drag puts the tab back at its place and depth.
    - With "Drag sideways to nest tabs" off, sideways does nothing and a straight drag still keeps its parent as above.
-   - A window screenshot shows the indent following the pointer, as in the signed-off frames.
+   - A window screenshot shows the indent following the pointer, as in the signed-off frames, and the dragged row slides to a new depth.
    - `PageTreeTest` checks the depth rules, and a headless controller test checks nesting by hand. The mouse drags are `MANUAL_` tests in `BranchDragBrowserTest`, run with `pnpm run window-tests`.
 6. A collapsed branch hides its children and shows their count. Ctrl+Tab skips them. Cmd+1 to 9 onto a hidden tab expands the branch. Closing the collapsed parent shows its children one level up. The collapse survives a restart, and an organizer move leaves it collapsed.
 7. Each mouse action works, and does nothing once its switch is off.

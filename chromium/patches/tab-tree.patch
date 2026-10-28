@@ -2327,3 +2327,52 @@ index b35f686251462c443d02dcd284f9b4fc46b610ad..f4e64cf0ee6b540950b665178e635a12
    int resize_area_width_;
    raw_ptr<views::FlexLayout> flex_layout_ = nullptr;
  
+diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
+index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..c487c2c5d2bac0fdb4e80253a8232c0c090bb6ba 100644
+--- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
++++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
+@@ -84,6 +84,7 @@
+ #include "ui/views/view.h"
+ #include "ui/views/view_tracker.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/public/cpp/window_properties.h"  // nogncheck
+@@ -824,6 +825,13 @@ void TabDragController::EndDrag(EndDragReason reason) {
+   }
+   drag_start_time_.reset();
+ 
++  // uw: a cancelled drag's tabs go back to their depths as well.
++  if (reason != EndDragReason::kComplete && source_context_) {
++    if (auto* organizer = uw::TabOrganizationController::From(
++            source_context_->GetTabStripModel())) {
++      organizer->CancelTabDrag();
++    }
++  }
+   EndDragImpl(reason != EndDragReason::kComplete && source_context_
+                   ? EndDragType::kCanceled
+                   : EndDragType::kNormal);
+diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
+index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..298dda3bf2ba719e3a14fa1fd23b10e624e8bf37 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
+@@ -475,6 +475,18 @@ views::ProposedLayout TabCollectionAnimatingLayoutManager::InterpolateLayout(
+         if (child_view->layer() && (child_view->layer()->opacity() != 1.0f)) {
+           child_view->layer()->SetOpacity(1.0f);
+         }
++        // uw: a dragged tab in a vertical strip slides sideways to its new
++        // depth, as the tabs around it do.
++        if (auto start_it = start_view_layout_map_.find(child_view);
++            animation_axis_ == AnimationAxis::kVertical &&
++            start_it != start_view_layout_map_.end()) {
++          const gfx::Rect& start = start_it->second.bounds;
++          const gfx::Rect& target = target_it->second.bounds;
++          interpolated_child.bounds.set_x(
++              gfx::Tween::IntValueBetween(value, start.x(), target.x()));
++          interpolated_child.bounds.set_width(gfx::Tween::IntValueBetween(
++              value, start.width(), target.width()));
++        }
+       } else if (auto start_it = start_view_layout_map_.find(child_view);
+                  start_it != start_view_layout_map_.end()) {
+         // Moved child.

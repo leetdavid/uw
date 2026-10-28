@@ -943,16 +943,36 @@ void TabOrganizationController::ContinueTabDrag(int x) {
   NotifyNativeMoves(drag_carried_);
 }
 
+void TabOrganizationController::CancelTabDrag() {
+  if (!dragging_) {
+    return;
+  }
+  drag_canceled_ = true;
+  drag_levels_ = 0;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&TabOrganizationController::EndTabDrag,
+                                weak_factory_.GetWeakPtr()));
+}
+
 void TabOrganizationController::EndTabDrag() {
+  if (!dragging_) {
+    return;
+  }
   dragging_ = false;
-  for (const PageId& id : drag_carried_) {
-    const Page* now = tree_.Find(id);
-    const Page* then = drag_before_.Find(id);
-    if (now && then && !now->parent.value().empty() &&
-        now->parent != then->parent && !drag_carried_.contains(now->parent)) {
-      held_[id] = now->parent;
+  if (drag_canceled_) {
+    tree_.Restore(drag_before_);
+    ScheduleUpdate();
+  } else {
+    for (const PageId& id : drag_carried_) {
+      const Page* now = tree_.Find(id);
+      const Page* then = drag_before_.Find(id);
+      if (now && then && !now->parent.value().empty() &&
+          now->parent != then->parent && !drag_carried_.contains(now->parent)) {
+        held_[id] = now->parent;
+      }
     }
   }
+  drag_canceled_ = false;
   drag_carried_.clear();
   drag_before_ = PageTree();
   if (!drag_selection_.empty()) {

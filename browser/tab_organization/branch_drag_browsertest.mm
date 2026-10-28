@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -19,6 +21,7 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
@@ -108,11 +111,13 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Drags `tab`'s row to `to`, holding Option when `alone`. Saves a picture
-  // of the window named `shot` just before the drop.
+  // of the window named `shot` just before the drop, and presses Escape
+  // before letting go when `cancel`.
   void Drag(const tabs::TabInterface* tab,
             const gfx::Point& to,
             bool alone,
-            const char* shot = nullptr) {
+            const char* shot = nullptr,
+            bool cancel = false) {
     ui_controls::EnableUIControls();
     const gfx::Point from = RowOf(tab)->GetBoundsInScreen().CenterPoint();
     const int modifiers =
@@ -128,6 +133,15 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
     if (shot) {
       Wait(base::Milliseconds(300));
       SaveWindowScreenshot(browser(), shot);
+    }
+    if (cancel) {
+      base::RunLoop pressed;
+      ASSERT_TRUE(ui_controls::SendKeyPressNotifyWhenDone(
+          browser()->GetWindow()->GetNativeWindow(), ui::VKEY_ESCAPE,
+          /*control=*/false, /*shift=*/false, /*alt=*/false,
+          /*command=*/false, pressed.QuitClosure()));
+      pressed.Run();
+      Wait(base::Milliseconds(300));
     }
     PressMouse(ui_controls::UP, modifiers);
     Wait(base::Milliseconds(500));
@@ -230,6 +244,46 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, second_, other_,
                                                        first_}));
   EXPECT_EQ(controller()->DepthFor(first_), 0);
+}
+
+// A dragged tab slides to its new depth instead of jumping there.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_ADraggedTabSlidesToItsNewDepth) {
+  StageBranch();
+  ui_controls::EnableUIControls();
+  const views::View* row = RowOf(second_);
+  const gfx::Point from = row->GetBoundsInScreen().CenterPoint();
+  const int start = row->bounds().x();
+  MoveMouse(from);
+  PressMouse(ui_controls::DOWN, ui_controls::kNoAccelerator);
+  MoveMouse(gfx::Point(from.x(), from.y() + 10));
+  Wait(base::Milliseconds(100));
+  MoveMouse(gfx::Point(from.x() - 24, from.y() + 10));
+  std::vector<int> xs;
+  for (int frame = 0; frame < 20; ++frame) {
+    Wait(base::Milliseconds(16));
+    xs.push_back(row->bounds().x());
+  }
+  PressMouse(ui_controls::UP, ui_controls::kNoAccelerator);
+  Wait(base::Milliseconds(500));
+  EXPECT_EQ(xs.back(), start - kIndentPerLevel);
+  EXPECT_TRUE(std::ranges::any_of(
+      xs, [&](int x) { return x < start && x > start - kIndentPerLevel; }));
+  EXPECT_EQ(controller()->DepthFor(second_), 0);
+}
+
+// Escape during a sideways drag puts the tab back where it was, depth
+// included.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_EscapePutsADraggedTabBack) {
+  StageBranch();
+  const gfx::Point from = RowOf(second_)->GetBoundsInScreen().CenterPoint();
+  Drag(second_, gfx::Point(from.x() - 24, from.y()), /*alone=*/false,
+       "sideways-drag-before-escape", /*cancel=*/true);
+  Wait(base::Milliseconds(300));
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, first_, second_,
+                                                       other_}));
+  EXPECT_EQ(controller()->DepthFor(second_), 1);
 }
 
 // A drag that pulls a tab out of its branch past the window's left edge

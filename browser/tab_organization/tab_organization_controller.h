@@ -203,6 +203,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // the drag began nests the dragged tabs deeper or shallower, unless the
   // switch for it is off.
   void ContinueTabDrag(int x);
+  // Chromium is putting the tabs of a cancelled drag back. The tree goes back
+  // to how it was when the drag began, depths included.
+  void CancelTabDrag();
   // A drop that gave a dragged tab a new parent nests it by hand.
   void EndTabDrag();
 
@@ -340,6 +343,7 @@ class TabOrganizationController : public TabStripModelObserver,
   PageTree drag_before_;
   std::optional<int> drag_x_;
   int drag_levels_ = 0;
+  bool drag_canceled_ = false;
   bool update_pending_ = false;
   base::RepeatingClosureList changed_;
   // The task whose row should turn its name into a field.
