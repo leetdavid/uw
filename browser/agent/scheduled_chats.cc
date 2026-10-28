@@ -19,6 +19,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/device_service.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/run_window.h"
@@ -411,6 +412,9 @@ void ScheduledChats::AnswerApproval(const std::string& chat_id,
     return;
   }
   run->second.step.reset();
+  if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
+    alerts->RemoveWaiting(chat_id);
+  }
   std::move(run->second.approval).Run(std::move(answer));
   Changed(chat_id);
 }
@@ -456,6 +460,17 @@ void ScheduledChats::OnChatsChanged() {
   for (const std::string& id : triggers_.ChatIds()) {
     if (index->WasDeleted(id)) {
       triggers_.End(id);
+    }
+  }
+  if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
+    std::vector<std::string> gone;
+    for (const ChatAlerts::Alert& alert : alerts->alerts()) {
+      if (index->WasDeleted(alert.chat_id)) {
+        gone.push_back(alert.chat_id);
+      }
+    }
+    for (const std::string& id : gone) {
+      alerts->RemoveChat(id);
     }
   }
 }
@@ -825,7 +840,7 @@ void ScheduledChats::OnApproval(
   run->second.approval = std::move(answer);
   const std::string action = approval.action;
   run->second.step = std::move(approval);
-  Notify(chat_id, "Waits for your approval", action);
+  Notify(chat_id, "Waits for your approval", action, /*waiting=*/true);
   Changed(chat_id);
 }
 
@@ -838,6 +853,9 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
     skipped = run->second.skipped;
     trigger = std::move(run->second.trigger);
     runs_.erase(run);
+  }
+  if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
+    alerts->RemoveWaiting(chat_id);
   }
   // Lines a trigger printed while this run went wake the chat again.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -898,7 +916,8 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
 
 void ScheduledChats::Notify(const std::string& chat_id,
                             const std::string& what,
-                            const std::string& text) {
+                            const std::string& text,
+                            bool waiting) {
   // A chat without a schedule can still have a trigger's runs to tell of.
   const auto chat = chats_.find(chat_id);
   if (chat != chats_.end() && chat->second.muted) {
@@ -913,6 +932,9 @@ void ScheduledChats::Notify(const std::string& chat_id,
     }
   }
   NotifyAboutChat(profile_, chat_id, title, what, text);
+  if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
+    alerts->Add(chat_id, what, text, waiting);
+  }
 }
 
 }  // namespace uw

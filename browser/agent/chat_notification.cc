@@ -19,6 +19,7 @@
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notifier_id.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_tab.h"
 
 namespace uw {
@@ -103,8 +104,12 @@ void ChatNotificationHandler::OnClick(
     std::move(completed_closure).Run();
     return;
   }
+  const std::string chat_id(origin.path().substr(1));
+  if (ChatAlerts* alerts = ChatAlerts::For(profile)) {
+    alerts->SeeNewest(chat_id);
+  }
   const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile, origin.path().substr(1));
+      TabsShowingChat(profile, chat_id);
   if (!showing.empty()) {
     GoToTab(showing[0]);
   }

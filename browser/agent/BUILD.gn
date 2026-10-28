@@ -82,6 +82,8 @@ source_set("skill_folders") {
 # The saved chats and the list of them, which the sidebar reads too.
 source_set("chats") {
   sources = [
+    "chat_alerts.cc",
+    "chat_alerts.h",
     "chat_file.cc",
     "chat_file.h",
     "chat_index.cc",
@@ -201,6 +203,7 @@ source_set("chat_notification") {
   public_deps = [ "//chrome/browser/notifications" ]
   deps = [
     ":chat_tab",
+    ":chats",
     "//base",
     "//chrome/browser/profiles:profile",
     "//components/tabs:public",

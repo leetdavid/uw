@@ -37,6 +37,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/message_center/public/cpp/notification.h"
+#include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_triggers.h"
@@ -271,6 +272,120 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_EQ(*lines[0].GetDict().FindString("end"), "reported");
   // It stays with the user after the run ends.
   EXPECT_EQ(tabs->count(), 2);
+}
+
+// Every notification a scheduled chat sends is kept as an alert for the
+// Inbox, until the chat goes. See docs/product.md, "Scheduled chats".
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ANotificationIsKeptAsAnAlertUntilItsChatGoes) {
+  SaveChat();
+  const std::string provider = ProviderId();
+  model_.Script(
+      {Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(provider));
+  LinesAfterTheRun();
+
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_TRUE(alerts);
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_EQ(alerts->alerts()[0].chat_id, kChat);
+  EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
+  EXPECT_THAT(alerts->alerts()[0].text, HasSubstr("Down to $479."));
+  EXPECT_EQ(alerts->Unseen(), 1u);
+  // Opening the Inbox sees them all.
+  alerts->SeeAll();
+  EXPECT_EQ(alerts->Unseen(), 0u);
+
+  // A muted chat sends no notification, so it keeps no alert.
+  ScheduledChat muted = DeskWatch(provider);
+  muted.muted = true;
+  model_.Script(
+      {Report(true, "Down to $469."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, muted);
+  LinesAfterTheRun();
+  EXPECT_EQ(alerts->alerts().size(), 1u);
+
+  // Removing the schedule keeps the alert; deleting the chat takes it.
+  chats()->Remove(kChat);
+  EXPECT_EQ(alerts->alerts().size(), 1u);
+  ChatIndex::For(profile())->Delete(kChat);
+  EXPECT_TRUE(alerts->alerts().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       AnApprovalsAlertGoesOnceItIsAnswered) {
+  SaveChat();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Url("/desk"))))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
+       ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("click", base::DictValue()
+                                            .Set("tab", 1)
+                                            .Set("element", 1)
+                                            .Set("changes", true)))),
+       Report(false, "You did not want to buy it."),
+       ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats()->Waiting(kChat); }));
+
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_EQ(alerts->alerts()[0].what, "Waits for your approval");
+  EXPECT_TRUE(alerts->alerts()[0].waiting);
+
+  AgentLoop::ApprovalAnswer answer;
+  answer.choice = AgentLoop::ApprovalAnswer::Choice::kDecline;
+  chats()->AnswerApproval(kChat, std::move(answer));
+  EXPECT_TRUE(alerts->alerts().empty());
+  // The run found nothing to tell, so nothing else is kept.
+  LinesAfterTheRun();
+  EXPECT_TRUE(alerts->alerts().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ClickingANotificationSeesItsAlertAndClearEmptiesThem) {
+  SaveChat();
+  model_.Script({ScriptedModel::Answer("I looked around.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_EQ(alerts->alerts()[0].what, "Couldn't check");
+  EXPECT_EQ(alerts->Unseen(), 1u);
+  ASSERT_EQ(Notifications().size(), 1u);
+  notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT,
+                                Notifications()[0].id(), std::nullopt,
+                                std::nullopt);
+  EXPECT_EQ(alerts->Unseen(), 0u);
+  EXPECT_EQ(alerts->alerts().size(), 1u);
+
+  alerts->Clear();
+  EXPECT_TRUE(alerts->alerts().empty());
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       PRE_AlertsLastAcrossARestart) {
+  SaveChat();
+  model_.Script(
+      {Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return alerts->loaded(); }));
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  // Pause it, so that it does not run again when uw starts.
+  chats()->SetPaused(kChat, true);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, AlertsLastAcrossARestart) {
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return alerts->loaded(); }));
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
+  EXPECT_EQ(alerts->Unseen(), 1u);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {

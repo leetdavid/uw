@@ -216,9 +216,12 @@ class ScheduledChats : public base::SupportsUserData::Data,
   void OnRunDone(const std::string& chat_id,
                  base::Time when,
                  ChatRun::Outcome outcome);
+  // Sends the chat's notification, unless it is muted, and keeps it as an
+  // alert. A `waiting` one is about a step that waits for approval.
   void Notify(const std::string& chat_id,
               const std::string& what,
-              const std::string& text);
+              const std::string& text,
+              bool waiting = false);
 
   const raw_ptr<Profile> profile_;
   base::ImportantFileWriter writer_;
