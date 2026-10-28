@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, ViewTransition } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Favicon, Folder, Line } from "./icons";
 
 type Icon =
@@ -39,22 +39,6 @@ const FAVORITES = [
   "linear.app",
   "spotify.com",
 ];
-
-function Moves({
-  name,
-  animate,
-  children,
-}: {
-  name: string;
-  animate: boolean;
-  children: ReactNode;
-}) {
-  return animate ? (
-    <ViewTransition name={name}>{children}</ViewTransition>
-  ) : (
-    children
-  );
-}
 
 function TabIcon({ icon }: { icon: Icon }) {
   if ("site" in icon) return <Favicon domain={icon.site} size={16} />;
@@ -104,31 +88,29 @@ function NoticeCard({ notice }: { notice: Notice }) {
 export function Sidebar({
   state,
   label,
-  animate = false,
+  children,
 }: {
   state: SidebarState;
   label: string;
-  animate?: boolean;
+  children?: ReactNode;
 }) {
   const row = (tab: Tab) => {
     const active = tab.id === state.active;
     return (
-      <Moves key={tab.id} name={`tab-${tab.id}`} animate={animate}>
-        <div
-          data-tab={tab.id}
-          className={["tab", tab.child && "child", active && "on"]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <TabIcon icon={tab.icon} />
-          <span>{tab.title}</span>
-          {active && (
-            <Line className="close">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </Line>
-          )}
-        </div>
-      </Moves>
+      <div
+        key={tab.id}
+        className={["tab", tab.child && "child", active && "on"]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <TabIcon icon={tab.icon} />
+        <span>{tab.title}</span>
+        {active && (
+          <Line className="close">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </Line>
+        )}
+      </div>
     );
   };
 
@@ -154,25 +136,18 @@ export function Sidebar({
       </div>
       {state.tasks.map((task) => (
         <Fragment key={task.id}>
-          <Moves name={`task-${task.id}`} animate={animate}>
-            <div className="task">
-              <Folder color={task.color} />
-              <span>{task.name}</span>
-              {task.naming && <i className="spin" />}
-            </div>
-          </Moves>
+          <div className="task">
+            <Folder color={task.color} />
+            <span>{task.name}</span>
+            {task.naming && <i className="spin" />}
+          </div>
           <div className="in">{task.tabs.map(row)}</div>
         </Fragment>
       ))}
-      <Moves name="scratchpad" animate={animate}>
-        <div className="label">Scratchpad</div>
-      </Moves>
+      {state.scratchpad.length > 0 && <div className="label">Scratchpad</div>}
       {state.scratchpad.map(row)}
-      {state.notice && (
-        <Moves name="notice" animate={animate}>
-          <NoticeCard notice={state.notice} />
-        </Moves>
-      )}
+      {state.notice && <NoticeCard notice={state.notice} />}
+      {children}
       <div className="foot">
         <span className="organize">
           <Line>
