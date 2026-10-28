@@ -75,7 +75,15 @@ Drawn on 2026-10-28 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 - "Help: a page": "Hide the sidebar" with the section list, a figure, steps, a note, "On this page", and Copy as Markdown.
 - "Help: search and every state": search results over a page, no results, a section's version pill, and Copy as Markdown's states.
 
-T241 adds the rest in the same look: code blocks, warning callouts, tables, tabs, and heading links; a narrow screen; the dark look and its switch; search before typing; the page actions menu and Ask uw; "Was this helpful?"; and the `uwbrowser.com/ask` page.
+T241 drew the rest on 2026-10-28, in the same look and beside the first three:
+
+- "Help: a page's parts": "Claude Code and other agents" with a code block under tabs, info and warning callouts, a table, a heading link, the page actions with Open in's menu, "Was this helpful?", and the theme switch.
+- "Help: dark": "Hide the sidebar" at night, following the Mac.
+- "Help: narrow screens": a page, "On this page" open, and the menu sliding in.
+- "Help: Ask uw and search": search before typing, "Ask uw" as the last result, no results, the new chat in uw with the text waiting, and `uwbrowser.com/ask` in another browser.
+- "Help: feedback and zoom": the note after No, the thanks, and a zoomed figure.
+
+"Help: a page" gained the theme switch and the page actions in the same round.
 
 ## Stages
 
@@ -107,3 +115,4 @@ Each stage is a ticket on the [board](roadmap.md#board).
 ## Open questions
 
 - How figures are made. Proposed: draw them in MDX with the site's demo sidebar component, `site/app/sidebar.tsx`, as the T231 figure does, instead of screenshots of uw.
+- Whether a chat opened by Ask in uw says where its text came from. Proposed: a line above the composer, "A link typed this in. Read it, then press Send.", as "Help: Ask uw and search" shows.
