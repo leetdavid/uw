@@ -1,11 +1,12 @@
 # Help
 
-Status: scope agreed on 2026-10-28, and the design, T231, signed off the same day. Nothing else is built.
+Status: scope agreed on 2026-10-28, and the design, T231, signed off the same day. The same day the user picked which Fumadocs features Help uses and added Ask in uw; their design, T241, is next. Nothing else is built.
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates).
 
-- The site is 8/10. Fumadocs gives the pages, search, `llms.txt`, a Markdown copy of each page, and the MCP route. Whether it works with the Next.js 16.4 that `site/` uses, and how much of its look must change for `uw-arc-style`, are unknown until T232.
+- The site is 8/10. Fumadocs gives the pages, search, `llms.txt`, a Markdown copy of each page, the MCP route, and most of the page parts below. Fumadocs 16.17.8 works with the Next.js 16.4, React 19.3, and Tailwind 4 that `site/` uses, checked on 2026-10-28. How far its look bends to the website's is unknown until T232.
 - The connector is 7/10. A connector that comes with uw, cannot be removed, and never asks for approval is new to `Connectors` and the approval rules.
+- Ask in uw is 6/10. uw catches one address before it loads, and a chat that starts with text waiting in its composer is new to the chat page.
 - Help is only useful while it is right. That depends on each change updating it, which is a rule, not code.
 
 On 2026-10-28 the user asked for published docs that uw's agent can look up, as Claude Code looks up its own. [Help](../CONTEXT.md#language) is those pages. The design docs in `docs/` stay in the repo.
@@ -19,6 +20,11 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 - English only. There is one version, for the latest release. A page notes the version a feature arrived in when it is later than 0.1.0, such as "In uw 0.3 and later".
 - The first pages come from the "What works now" sections of [Try the current build](../try-uw.md), reworded for someone using a release instead of a dev build. Then `try-uw.md` is deleted: "Start uw" moves to the README's [Using your local build](../../README.md#using-your-local-build), and its links point to Help.
 - The pages look like the rest of the site.
+- From Fumadocs, a page has headings with links, code blocks with a title and a copy button, info and warning callouts, tables, tabs, steps, and figures that zoom when clicked. Search lists chosen pages before anything is typed. A narrow screen gets Fumadocs' top bar, a sidebar that slides out, and "On this page" as a dropdown.
+- uw's own parts: key caps such as Cmd S, and the version pill.
+- Light or dark follows macOS. A switch in the sidebar picks light, dark, or the Mac's setting. The rest of uwbrowser.com stays light for now.
+- Beside "On this page": Copy as Markdown, a menu that opens the page in ChatGPT or Claude and links to its source on GitHub, and [Ask uw about this page](#ask-in-uw). There is no "Edit on GitHub", since the repo takes no pull requests.
+- Each page ends with "Was this helpful?": Yes or No, and an optional note. The answer, the note, and the page's address go to PostHog as one event. The box says that the note goes to uw's team.
 
 ### The MCP route
 
@@ -34,6 +40,13 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 - Otherwise it follows the [connector rules](connectors.md#in-a-chat): the instructions list its tools, and the agent loads them when it needs them.
 - The agent's instructions tell it to search Help before answering a question about uw itself, and to say when Help does not cover something instead of guessing.
 - The Help menu gets "uw Help", which opens `uwbrowser.com/help` in a new tab, in place of Chromium's help item. "Report an issue" (T221) stays.
+
+### Ask in uw
+
+- A Help page's actions have "Ask uw about this page". Search ends with "Ask uw: <what was typed>", and when nothing is found that is its main action.
+- Each is a link to `uwbrowser.com/ask?q=<text>`. Opened in uw, uw catches that address before it loads and opens a new chat tab beside the current one, with the text in the composer and nothing sent. "Ask uw about this page" starts the text with "About Hide the sidebar: ".
+- Any site can link to that address, so it only fills the composer. Nothing happens until the user presses Send ([ADR 0022](../adr/0022-uw-catches-one-help-address-to-open-a-chat.md)).
+- In another browser the address loads a page that says the question opens in uw, with the download button.
 
 ### Outside agents
 
@@ -51,6 +64,8 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 - Help per version, in other languages, or offline.
 - Recording what people search for.
 - A Help page inside uw.
+- An AI chat panel hosted on the site. uw's agent and outside agents answer instead.
+- Collapsing the sidebar on wide screens, and a banner across the site.
 
 ## Design
 
@@ -60,16 +75,20 @@ Drawn on 2026-10-28 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#desi
 - "Help: a page": "Hide the sidebar" with the section list, a figure, steps, a note, "On this page", and Copy as Markdown.
 - "Help: search and every state": search results over a page, no results, a section's version pill, and Copy as Markdown's states.
 
+T241 adds the rest in the same look: code blocks, warning callouts, tables, tabs, and heading links; a narrow screen; the dark look and its switch; search before typing; the page actions menu and Ask uw; "Was this helpful?"; and the `uwbrowser.com/ask` page.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
 
 1. T231: the design, signed off by the user.
-2. T232: Help in `site/` with Fumadocs, search, `llms.txt`, and `.md` pages. The first pages come from `try-uw.md`, which is then deleted. Adds the AGENTS.md rule and the deploy step.
-3. T233: the MCP route.
-4. T234: the uw Help connector and the agent's instruction.
-5. T235: Help → uw Help.
-6. T236: Help in `uw mcp serve`. Needs T197.
+2. T241: the second design round, signed off by the user.
+3. T232: Help in `site/` with Fumadocs, search, `llms.txt`, and `.md` pages, the page parts, dark mode, the page actions, and "Was this helpful?". The first pages come from `try-uw.md`, which is then deleted. Adds the AGENTS.md rule and the deploy step.
+4. T233: the MCP route.
+5. T234: the uw Help connector and the agent's instruction.
+6. T235: Help → uw Help.
+7. T236: Help in `uw mcp serve`. Needs T197.
+8. T242: Ask in uw: uw catches `uwbrowser.com/ask`, the chat opens with the text in its composer, and the site's `/ask` page. Needs T232.
 
 ## Acceptance checks
 
@@ -80,8 +99,11 @@ Each stage is a ticket on the [board](roadmap.md#board).
 5. In Ask first, a chat asked "how do I hide the sidebar?" searches Help with no approval card and answers from the page. A browser test plays the MCP route on a local server.
 6. Help → uw Help opens `uwbrowser.com/help`.
 7. After `claude mcp add uw -- uw mcp serve`, Claude Code searches Help through uw.
-8. `pnpm run check`, `pnpm -F @uw/site lint`, `pnpm -F @uw/site build`, and the focused test suites pass. Browser tests stay headless.
+8. Help is dark when macOS is, and the switch overrides it. A narrow window shows the top bar, the sliding sidebar, and the "On this page" dropdown.
+9. "Was this helpful?" sends one PostHog event with the answer, the note, and the page's address.
+10. In uw, "Ask uw about this page" opens a new chat tab with "About Hide the sidebar: " in the composer and nothing sent. A browser test checks that the same link from another site also sends nothing. In another browser, `uwbrowser.com/ask` shows the download page.
+11. `pnpm run check`, `pnpm -F @uw/site lint`, `pnpm -F @uw/site build`, and the focused test suites pass. Browser tests stay headless.
 
 ## Open questions
 
-None.
+- How figures are made. Proposed: draw them in MDX with the site's demo sidebar component, `site/app/sidebar.tsx`, as the T231 figure does, instead of screenshots of uw.
