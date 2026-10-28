@@ -1,9 +1,10 @@
 // A scheduled chat on the chat page: the header's buttons, the strip under
 // the title, the lines its runs add, and the schedule card. See the frames
-// "Scheduled chat: the chat page", "Scheduled chat: every state", and
-// "Watch this page: every state" on the canvas page "Agent chats", and the
-// canvas guide uw-scheduled-chats.
-import { useState, type ReactNode } from "react";
+// "Scheduled chat: the chat page" and "Scheduled chat: every state" on the
+// canvas page "Agent chats", the "Watch this page" and "Watch from a chat"
+// frames on the canvas page beside them, and the canvas guide
+// uw-scheduled-chats.
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   BellOff,
@@ -12,16 +13,24 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Eye,
+  Globe,
+  Info,
   KeyRound,
+  ListPlus,
   Loader2,
+  Package,
   Pause,
   Pencil,
   Play,
   SkipForward,
+  Sparkles,
   Square,
+  Tag,
   Terminal as TerminalIcon,
   TriangleAlert,
   WifiOff,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -53,6 +62,31 @@ const WEEKDAYS = [
 ];
 
 const EVERY_HOURS = [1, 2, 3, 4, 6, 12];
+
+export type WatchPick = "price" | "stock" | "new" | "anything";
+
+// The fixed "Watch for" chips. The watch card's pick becomes the chat's
+// request, so no model fills in that card; the agent picks one by the same
+// labels.
+export const WATCH_CHIPS: { pick: WatchPick; label: string; icon: LucideIcon }[] =
+  [
+    { pick: "price", label: "Price drops", icon: Tag },
+    { pick: "stock", label: "Back in stock", icon: Package },
+    { pick: "new", label: "New items", icon: ListPlus },
+    { pick: "anything", label: "Anything worth knowing", icon: Sparkles },
+  ];
+
+export function FilledEye({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className={className}>
+      <path
+        fill="currentColor"
+        d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"
+      />
+      <circle cx="12" cy="12" r="3" className="fill-background" />
+    </svg>
+  );
+}
 
 function clock(hour: number, minute: number): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
@@ -781,11 +815,58 @@ export function ScheduleRows({
   );
 }
 
+// The page a chat's card watches: its icon and title from an open tab or
+// history, else its site and path.
+function WatchedPage({ page }: { page: string }) {
+  const [known, setKnown] = useState({ title: "", favicon: "" });
+  useEffect(() => {
+    let current = true;
+    chatHandler.describePage(page).then((found) => {
+      if (current) {
+        setKnown(found);
+      }
+    });
+    return () => {
+      current = false;
+    };
+  }, [page]);
+  const url = new URL(page);
+  const host = url.hostname.replace(/^www\./, "");
+  return (
+    <p
+      id="schedule-page"
+      className="-mt-1.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted-foreground"
+    >
+      {known.favicon ? (
+        <img src={known.favicon} alt="" className="size-3.5 shrink-0 rounded-[3px]" />
+      ) : (
+        <Globe aria-hidden className="size-3.5 shrink-0" />
+      )}
+      {known.title ? (
+        <>
+          <span className="truncate text-foreground">{known.title}</span>{" "}
+          <span className="shrink-0">· {host}</span>
+        </>
+      ) : (
+        <>
+          <span className="shrink-0 text-foreground">{host}</span>
+          <span className="truncate">
+            {url.pathname === "/" ? "" : url.pathname}
+            {url.search}
+          </span>
+        </>
+      )}
+    </p>
+  );
+}
+
 // "Run this chat again": the card that makes or changes a chat's schedule.
-// Nothing is saved until the user presses Save schedule.
+// With a page, which only the agent fills in, it is the chat's watch of that
+// page. Nothing is saved until the user presses Save schedule or Watch.
 export function ScheduleCard({
   state,
   editing,
+  watching,
   providers,
   lists,
   onOpenModels,
@@ -795,6 +876,8 @@ export function ScheduleCard({
   state: ScheduleState;
   // The chat has a schedule already.
   editing: boolean;
+  // The chat already watches the card's page.
+  watching: boolean;
   providers: Provider[];
   lists: Record<string, ModelList | undefined>;
   onOpenModels: () => void;
@@ -817,17 +900,55 @@ export function ScheduleCard({
     chatHandler.saveSchedule(draft);
     onClose();
   };
+  const page = state.schedule.page;
+  const title = !page
+    ? "Run this chat again"
+    : watching
+      ? "Watching this page"
+      : "Watch this page";
+  const ChipIcon =
+    WATCH_CHIPS.find((chip) => state.schedule.watchFor.startsWith(chip.label))
+      ?.icon ?? Tag;
   return (
     <div
       id="schedule-card"
       role="dialog"
-      aria-label="Run this chat again"
+      aria-label={title}
       className="absolute top-12 right-7 z-20 flex w-96 flex-col gap-2.5 rounded-[14px] bg-background p-4 shadow-[0_0_0_1px_rgba(30,27,46,.08),0_18px_48px_rgba(30,27,46,.22)]"
     >
       <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-        <Clock aria-hidden className="size-[17px] text-primary" />
-        Run this chat again
+        {!page ? (
+          <Clock aria-hidden className="size-[17px] text-primary" />
+        ) : watching ? (
+          <FilledEye className="size-[17px] text-primary" />
+        ) : (
+          <Eye aria-hidden className="size-[17px] text-primary" />
+        )}
+        {title}
       </h2>
+      {page && <WatchedPage page={page} />}
+      {state.schedule.watchFor && (
+        <>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Watch for
+          </p>
+          <p
+            id="schedule-watch-for"
+            className="-mt-1 flex h-8 items-center gap-2 rounded-[9px] bg-primary/[0.08] px-2.5 text-[12.5px] font-medium text-primary"
+          >
+            <ChipIcon aria-hidden className="size-3.5 shrink-0" />
+            {state.schedule.watchFor}
+          </p>
+        </>
+      )}
+      {page && (
+        <p className="-mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Info aria-hidden className="size-3.5 shrink-0" />
+          {state.schedule.watchFor
+            ? "To change the page or what it watches for, ask in the chat."
+            : "To change the page, ask in the chat."}
+        </p>
+      )}
       <textarea
         id="schedule-request"
         aria-label="What each run is asked"
@@ -857,7 +978,7 @@ export function ScheduleCard({
               onClose();
             }}
           >
-            Remove schedule
+            {watching ? "Stop watching" : "Remove schedule"}
           </Button>
         )}
         <Button
@@ -876,7 +997,7 @@ export function ScheduleCard({
           disabled={!draft.request.trim() || !draft.model.model}
           onClick={save}
         >
-          Save schedule
+          {page && !watching ? "Watch" : "Save schedule"}
         </Button>
       </div>
     </div>

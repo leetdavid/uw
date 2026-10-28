@@ -86,8 +86,7 @@ void UwWatchCardHandler::ShowUI() {
   }
 }
 
-void UwWatchCardHandler::Watch(mojom::ChatSchedulePtr schedule,
-                               const std::string& watch_for) {
+void UwWatchCardHandler::Watch(mojom::ChatSchedulePtr schedule) {
   ScheduledChats* chats = observation_.GetSource();
   tabs::TabInterface* tab = Tab();
   std::optional<ScheduledChat> chat = ScheduledChatFrom(*schedule);
@@ -99,7 +98,7 @@ void UwWatchCardHandler::Watch(mojom::ChatSchedulePtr schedule,
     return;
   }
   chat->page = WatchedAddress(page).spec();
-  chat->watch_for = watch_for;
+  chat->watch_for = schedule->watch_for;
   if (const std::string id = Watcher(); !id.empty()) {
     chats->Save(id, std::move(*chat));
   } else {
@@ -207,7 +206,6 @@ void UwWatchCardHandler::SendCard() {
   if (const std::string id = Watcher(); !id.empty()) {
     const ScheduledChat& chat = *chats->Find(id);
     card->chat_id = id;
-    card->watch_for = chat.watch_for;
     card->state = ScheduleStateOf(chats, id, chat);
     for (const base::Value& entry : runs_) {
       auto run = mojom::Step::New();

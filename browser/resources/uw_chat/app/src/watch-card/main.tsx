@@ -13,14 +13,11 @@ import {
   Check,
   Clock,
   Eye,
-  ListPlus,
   Loader2,
-  Package,
   Pencil,
   Sparkles,
   Tag,
   TriangleAlert,
-  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,7 +29,14 @@ import {
   type Provider,
 } from "../providers/providers-api";
 import { WatchChart } from "../chart";
-import { ScheduleRows, describeSchedule, whenText } from "../schedule";
+import {
+  FilledEye,
+  ScheduleRows,
+  WATCH_CHIPS,
+  describeSchedule,
+  whenText,
+  type WatchPick,
+} from "../schedule";
 import {
   connect,
   watchCardHandler,
@@ -40,16 +44,8 @@ import {
   type WatchCardState,
 } from "./watch-card-api";
 
-type Pick = "price" | "stock" | "new" | "anything";
-
-// The fixed "Watch for" chips. A pick becomes the chat's request, so no model
-// fills in the card.
-const PICKS: { pick: Pick; label: string; icon: LucideIcon }[] = [
-  { pick: "price", label: "Price drops", icon: Tag },
-  { pick: "stock", label: "Back in stock", icon: Package },
-  { pick: "new", label: "New items", icon: ListPlus },
-  { pick: "anything", label: "Anything worth knowing", icon: Sparkles },
-];
+type Pick = WatchPick;
+const PICKS = WATCH_CHIPS;
 
 const PRICE_BELOW = "Price drops below ";
 
@@ -141,18 +137,6 @@ function useModels(providerId: string | undefined) {
 }
 
 // A watched page's eye: filled, with its pupil cut out.
-function FilledEye({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className={className}>
-      <path
-        fill="currentColor"
-        d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"
-      />
-      <circle cx="12" cy="12" r="3" className="fill-background" />
-    </svg>
-  );
-}
-
 function PageLine({ card }: { card: WatchCardState }) {
   return (
     <p
@@ -176,7 +160,7 @@ function WatchForm({
   card: WatchCardState;
   onSave: () => void;
 }) {
-  const saved = pickOf(card.watchFor);
+  const saved = pickOf(card.state.schedule.watchFor);
   const [pick, setPick] = useState<Pick | null>(saved.pick);
   const [below, setBelow] = useState(saved.below);
   const [words, setWords] = useState(
@@ -192,7 +176,7 @@ function WatchForm({
   const watchFor = pick
     ? labelFor(pick, below.trim())
     : card.chatId && request === card.state.schedule.request
-      ? card.watchFor
+      ? card.state.schedule.watchFor
       : "";
   return (
     <>
@@ -285,7 +269,7 @@ function WatchForm({
           size="compact"
           disabled={!request || !draft.model.model}
           onClick={() => {
-            watchCardHandler.watch({ ...draft, request }, watchFor);
+            watchCardHandler.watch({ ...draft, request, watchFor });
             onSave();
           }}
         >
@@ -358,9 +342,9 @@ function Watched({
         className="flex items-center gap-2 rounded-[9px] bg-primary/[0.08] px-3 py-2 text-[13px] font-medium text-primary"
       >
         <Tag aria-hidden className="size-3.5 shrink-0" />
-        {card.watchFor || schedule.request}
+        {schedule.watchFor || schedule.request}
       </p>
-      <WatchChart runs={card.runs} watchFor={card.watchFor} />
+      <WatchChart runs={card.runs} watchFor={schedule.watchFor} />
       <ul className="flex flex-col gap-1.5 text-[13px] text-muted-foreground">
         <li className="flex items-center gap-2">
           <Clock aria-hidden className="size-3.5 shrink-0" />

@@ -274,6 +274,93 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, TheCardWatchesThePage) {
   EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
 }
 
+// Asked in a chat to watch a page, the agent fills in the chat's card with
+// the page and what to watch for, and hears which chats already watch it.
+// Only Watch saves it; the chat then watches the page too.
+IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, AChatsAgentFillsInAWatch) {
+  const std::string other = WatchTheDesk();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url("/desk")));
+  chrome::ExecuteCommand(browser(), kNewChatCommand);
+  content::WebContents* chat =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(content::WaitForLoadStop(chat));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !content::EvalJs(chat, "document.body.dataset.chatId ?? ''")
+                .ExtractString()
+                .empty();
+  }));
+  const std::string id =
+      content::EvalJs(chat, "document.body.dataset.chatId").ExtractString();
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "schedule",
+           base::DictValue()
+               .Set("request", "Tell me when the Jarvis desk drops below $500.")
+               .Set("repeat", "daily")
+               .Set("time", "09:00")
+               .Set("page", Url("/desk?utm_source=mail").spec())
+               .Set("watch_for", "price_drops")
+               .Set("below", "$500")))),
+       ScriptedModel::Answer("Press Watch to start it.")});
+  ASSERT_TRUE(content::ExecJs(
+      chat, content::JsReplace(
+                "const field = document.getElementById('message');"
+                "Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"
+                "    'value').set.call(field, $1);"
+                "field.dispatchEvent(new Event('input', {bubbles: true}));"
+                "setTimeout(() => field.dispatchEvent(new KeyboardEvent("
+                "    'keydown', {key: 'Enter', bubbles: true})), 50);",
+                "Tell me when this desk drops below $500, every morning.")));
+  ASSERT_TRUE(Shows(chat, ".answer"));
+  ASSERT_TRUE(Shows(chat, "#schedule-card"));
+  EXPECT_EQ(content::EvalJs(chat,
+                            "document.querySelector('#schedule-card')"
+                            ".getAttribute('aria-label')"),
+            "Watch this page");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(
+               chat, "document.querySelector('#schedule-page').textContent")
+               .ExtractString() == "Jarvis Bamboo Standing Desk · fully.test";
+  }));
+  EXPECT_EQ(
+      content::EvalJs(
+          chat, "document.querySelector('#schedule-watch-for').textContent"),
+      "Price drops below $500");
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-request').value"),
+            "Tell me when the Jarvis desk drops below $500.");
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-save').textContent"),
+            "Watch");
+  EXPECT_THAT(model_.Requests().back(),
+              testing::HasSubstr("These chats already watch that page"));
+  EXPECT_FALSE(chats()->Find(id));
+  SaveWindowScreenshot(browser(), "watch-from-a-chat");
+
+  ScriptARun();
+  Click(chat, "#schedule-save");
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return chats()->Find(id) != nullptr; }));
+  const ScheduledChat& watch = *chats()->Find(id);
+  EXPECT_EQ(watch.page, Url("/desk").spec());
+  EXPECT_EQ(watch.watch_for, "Price drops below $500");
+  EXPECT_EQ(watch.request, "Tell me when the Jarvis desk drops below $500.");
+  EXPECT_THAT(chats()->ChatsWatching(Url("/desk")),
+              testing::UnorderedElementsAre(id, other));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
+
+  // The step opens the card again, now as the chat's own watch.
+  Click(chat, ".schedule-reopen");
+  ASSERT_TRUE(Shows(chat, "#schedule-card[aria-label=\"Watching this page\"]"));
+  EXPECT_EQ(content::EvalJs(
+                chat, "document.querySelector('#schedule-remove').textContent"),
+            "Stop watching");
+
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  EXPECT_TRUE(EyeSays(kWatching));
+}
+
 IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest,
                        AWatchedPagesCardOpensItsChatAndStopsWatching) {
   const std::string id = WatchTheDesk();

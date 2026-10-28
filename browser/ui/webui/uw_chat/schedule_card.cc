@@ -12,6 +12,7 @@
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
 #include "third_party/icu/source/i18n/unicode/timezone.h"
+#include "url/gurl.h"
 #include "uw/browser/agent/scheduled_chats.h"
 
 namespace uw {
@@ -105,6 +106,8 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
   schedule->mode =
       static_cast<mojom::ApprovalMode>(ModeNamed(chat.approval_mode));
   schedule->trigger = chat.trigger;
+  schedule->page = chat.page;
+  schedule->watch_for = chat.watch_for;
 
   auto state = mojom::ScheduleState::New();
   state->schedule = std::move(schedule);
@@ -126,8 +129,6 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
       base::StrAppend(&state->last_text, {", ", DescribeValue(value)});
     }
   }
-  state->page = chat.page;
-  state->watch_for = chat.watch_for;
   state->paused = chat.paused;
   state->muted = chat.muted;
   state->pause_reason = chat.pause_reason;
@@ -223,6 +224,10 @@ std::optional<ScheduledChat> ScheduledChatFrom(
   chat.approval_mode =
       std::string(NameOf(static_cast<ApprovalMode>(schedule.mode)));
   chat.trigger = schedule.trigger;
+  if (const GURL page(schedule.page); page.SchemeIsHTTPOrHTTPS()) {
+    chat.page = WatchedAddress(page).spec();
+    chat.watch_for = schedule.watch_for;
+  }
   if (chat.request.empty() || !IsValid(chat.schedule)) {
     return std::nullopt;
   }

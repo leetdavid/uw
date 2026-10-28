@@ -223,6 +223,20 @@ const std::string* ScheduledChats::ChatWatching(const GURL& page) const {
   return nullptr;
 }
 
+std::vector<std::string> ScheduledChats::ChatsWatching(const GURL& page) const {
+  std::vector<std::string> watching;
+  if (!page.is_valid()) {
+    return watching;
+  }
+  const GURL address = WatchedAddress(page);
+  for (const auto& [id, chat] : chats_) {
+    if (!chat.page.empty() && WatchedAddress(GURL(chat.page)) == address) {
+      watching.push_back(id);
+    }
+  }
+  return watching;
+}
+
 std::optional<base::Time> ScheduledChats::NextRunOf(
     std::string_view chat_id) const {
   const ScheduledChat* chat = Find(chat_id);
@@ -247,12 +261,6 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
     // A changed schedule keeps what its runs found, and starts again.
     chat.recent = std::move(saved->second.recent);
     chat.last = saved->second.last;
-    if (chat.page.empty()) {
-      chat.page = saved->second.page;
-      if (chat.request == saved->second.request) {
-        chat.watch_for = saved->second.watch_for;
-      }
-    }
   }
   const ChatTriggers::Trigger* running = triggers_.Find(chat_id);
   if (running && !chat.trigger.empty() && running->command == chat.trigger) {

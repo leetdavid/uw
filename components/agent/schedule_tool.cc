@@ -8,9 +8,11 @@
 #include <utility>
 #include <vector>
 
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "url/gurl.h"
 
 namespace uw {
 
@@ -22,6 +24,14 @@ constexpr std::pair<std::string_view, Schedule::Repeat> kRepeats[] = {
     {"weekdays", Schedule::Repeat::kWeekdays},
     {"weekly", Schedule::Repeat::kWeekly},
     {"once", Schedule::Repeat::kOnce},
+};
+
+// The watch card's chips, as the tool names them and as the card labels them.
+constexpr std::pair<std::string_view, std::string_view> kChips[] = {
+    {"price_drops", "Price drops"},
+    {"back_in_stock", "Back in stock"},
+    {"new_items", "New items"},
+    {"anything", "Anything worth knowing"},
 };
 
 // In base::Time::Exploded's order, from Sunday.
@@ -76,7 +86,22 @@ base::DictValue ScheduleToolSchema() {
                Parameter("boolean",
                          "True to tell the user what every run found. Leave "
                          "out to tell them only when a run finds what they "
-                         "asked to hear about."));
+                         "asked to hear about."))
+          .Set("page",
+               Parameter("string",
+                         "To watch a page: its http or https address. This "
+                         "chat then watches it, once the user saves the "
+                         "card."))
+          .Set("watch_for",
+               Parameter("string",
+                         "With a page, when the user's ask matches one: "
+                         "price_drops, back_in_stock, new_items, or "
+                         "anything. Leave out otherwise; the request says "
+                         "it."))
+          .Set("below",
+               Parameter("string",
+                         "With price_drops, the price the user named, as "
+                         "they wrote it, such as $500."));
   return base::DictValue()
       .Set("type", "function")
       .Set("function",
@@ -85,8 +110,9 @@ base::DictValue ScheduleToolSchema() {
                .Set("description",
                     "Fills in the schedule card for this chat when the user "
                     "asks for something to happen on a schedule, such as "
-                    "checking a page every morning. The user saves it; "
-                    "nothing is scheduled until they do.")
+                    "checking a page every morning. To watch a page, give "
+                    "its address as page. The user saves it; nothing is "
+                    "scheduled until they do.")
                .Set("parameters",
                     base::DictValue()
                         .Set("type", "object")
@@ -164,6 +190,45 @@ base::expected<ScheduledChat, std::string> FillScheduleCard(
   }
   if (!IsValid(schedule)) {
     return base::unexpected("The schedule card cannot make that schedule.");
+  }
+  const std::string* page = args.FindString("page");
+  const std::string* watch_for = args.FindString("watch_for");
+  const std::string* below = args.FindString("below");
+  if (page) {
+    const std::string address(base::TrimWhitespaceASCII(*page, base::TRIM_ALL));
+    GURL url(address);
+    if (!url.is_valid() && address.find("://") == std::string::npos) {
+      url = GURL(base::StrCat({"https://", address}));
+    }
+    if (!url.SchemeIsHTTPOrHTTPS()) {
+      return base::unexpected("page must be an http or https address.");
+    }
+    card.page = WatchedAddress(url).spec();
+  }
+  if (page || watch_for) {
+    const auto* chip = std::ranges::find_if(kChips, [&](const auto& entry) {
+      return watch_for && entry.first == *watch_for;
+    });
+    if (watch_for && chip == std::end(kChips)) {
+      return base::unexpected(
+          "watch_for must be price_drops, back_in_stock, new_items, or "
+          "anything.");
+    }
+    if (card.page.empty()) {
+      return base::unexpected("watch_for needs the page it watches.");
+    }
+    card.watch_for = watch_for ? std::string(chip->second) : std::string();
+  }
+  if (below) {
+    if (!watch_for || *watch_for != "price_drops") {
+      return base::unexpected("below goes only with watch_for price_drops.");
+    }
+    const std::string_view price =
+        base::TrimWhitespaceASCII(*below, base::TRIM_ALL);
+    if (std::ranges::none_of(price, base::IsAsciiDigit<char>)) {
+      return base::unexpected("below must be a price, such as $500.");
+    }
+    base::StrAppend(&card.watch_for, {" below ", price});
   }
   card.request = std::string(trimmed);
   card.regular_updates =

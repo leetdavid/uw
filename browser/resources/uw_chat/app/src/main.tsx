@@ -23,6 +23,7 @@ import {
   Blocks,
   ChevronUp,
   Clock,
+  Eye,
   Info,
   KeyRound,
   Link2,
@@ -377,7 +378,19 @@ function describe(step: Step): ReactNode {
         </>
       );
     case "schedule":
-      return (
+      return args.page ? (
+        <>
+          Filled in{" "}
+          <button
+            type="button"
+            className="schedule-reopen inline-flex h-[22px] items-center gap-1.5 rounded-md bg-accent px-2 align-middle text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => chatHandler.reopenScheduleCard(step.args)}
+          >
+            <Eye aria-hidden className="size-3 text-primary" />
+            Watch this page
+          </button>
+        </>
+      ) : (
         <>
           Filled in the <b>schedule card</b>
         </>
@@ -2223,8 +2236,8 @@ function Chat() {
           <div className="px-7 pt-2">
             <ScheduleChart
               runs={runs}
-              page={schedule.page}
-              watchFor={schedule.watchFor}
+              page={schedule.schedule.page}
+              watchFor={schedule.schedule.watchFor}
             />
           </div>
         )}
@@ -2235,6 +2248,10 @@ function Chat() {
             key={JSON.stringify(card.schedule)}
             state={card}
             editing={Boolean(schedule)}
+            watching={
+              Boolean(card.schedule.page) &&
+              schedule?.schedule.page === card.schedule.page
+            }
             providers={providers}
             lists={lists}
             onOpenModels={async () => {

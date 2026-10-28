@@ -93,6 +93,58 @@ TEST(ScheduleToolTest, TakesEachKindOfRepeat) {
   EXPECT_EQ(card->schedule.start, Local(2026, 10, 24, 15));
 }
 
+TEST(ScheduleToolTest, FillsInAWatch) {
+  base::expected<ScheduledChat, std::string> card = FillScheduleCard(
+      Args(R"({"request": "Tell me when the Jarvis desk drops below $500.",
+               "repeat": "daily", "time": "09:00",
+               "page": "https://www.fully.com/desk?utm_source=mail#reviews",
+               "watch_for": "price_drops", "below": " $500 "})"),
+      NewCard(), Now());
+  ASSERT_TRUE(card.has_value()) << card.error();
+  EXPECT_EQ(card->page, "https://www.fully.com/desk");
+  EXPECT_EQ(card->watch_for, "Price drops below $500");
+  // The chip is a label; the request stays in the user's words.
+  EXPECT_EQ(card->request, "Tell me when the Jarvis desk drops below $500.");
+
+  card = FillScheduleCard(
+      Args(R"({"request": "Tell me when the walnut desk is back.",
+               "repeat": "every_hours", "hours": 4,
+               "page": "fully.com/desk", "watch_for": "back_in_stock"})"),
+      NewCard(), Now());
+  ASSERT_TRUE(card.has_value()) << card.error();
+  EXPECT_EQ(card->page, "https://fully.com/desk");
+  EXPECT_EQ(card->watch_for, "Back in stock");
+}
+
+TEST(ScheduleToolTest, KeepsTheChatsWatchUnlessTheCallChangesIt) {
+  ScheduledChat watching = NewCard();
+  watching.page = "https://www.bbc.com/news/technology";
+  watching.watch_for = "Anything worth knowing";
+
+  base::expected<ScheduledChat, std::string> card = FillScheduleCard(
+      Args(R"({"request": "x", "repeat": "daily", "time": "08:00"})"), watching,
+      Now());
+  ASSERT_TRUE(card.has_value()) << card.error();
+  EXPECT_EQ(card->page, "https://www.bbc.com/news/technology");
+  EXPECT_EQ(card->watch_for, "Anything worth knowing");
+
+  card = FillScheduleCard(Args(R"({"request": "x", "repeat": "daily",
+                                   "time": "08:00", "watch_for": "new_items"})"),
+                          watching, Now());
+  ASSERT_TRUE(card.has_value()) << card.error();
+  EXPECT_EQ(card->page, "https://www.bbc.com/news/technology");
+  EXPECT_EQ(card->watch_for, "New items");
+
+  // A new page without a chip is watched in the request's words.
+  card = FillScheduleCard(
+      Args(R"({"request": "News about AI chips", "repeat": "daily",
+               "time": "08:00", "page": "https://www.bbc.com/news"})"),
+      watching, Now());
+  ASSERT_TRUE(card.has_value()) << card.error();
+  EXPECT_EQ(card->page, "https://www.bbc.com/news");
+  EXPECT_EQ(card->watch_for, "");
+}
+
 TEST(ScheduleToolTest, SaysWhatIsWrongWithACall) {
   const auto error = [](std::string_view json) {
     base::expected<ScheduledChat, std::string> card =
@@ -118,6 +170,25 @@ TEST(ScheduleToolTest, SaysWhatIsWrongWithACall) {
   EXPECT_EQ(error(R"({"request": "x", "repeat": "once", "time": "09:00",
                       "date": "2026-10-22"})"),
             "That time has passed.");
+  EXPECT_EQ(error(R"({"request": "x", "repeat": "daily", "time": "09:00",
+                      "page": "file:///Users/me/notes.txt"})"),
+            "page must be an http or https address.");
+  EXPECT_EQ(error(R"({"request": "x", "repeat": "daily", "time": "09:00",
+                      "watch_for": "price_drops"})"),
+            "watch_for needs the page it watches.");
+  EXPECT_EQ(error(R"({"request": "x", "repeat": "daily", "time": "09:00",
+                      "page": "https://fully.com/desk",
+                      "watch_for": "cheaper"})"),
+            "watch_for must be price_drops, back_in_stock, new_items, or "
+            "anything.");
+  EXPECT_EQ(error(R"({"request": "x", "repeat": "daily", "time": "09:00",
+                      "page": "https://fully.com/desk",
+                      "watch_for": "back_in_stock", "below": "$500"})"),
+            "below goes only with watch_for price_drops.");
+  EXPECT_EQ(error(R"({"request": "x", "repeat": "daily", "time": "09:00",
+                      "page": "https://fully.com/desk",
+                      "watch_for": "price_drops", "below": "cheap"})"),
+            "below must be a price, such as $500.");
 }
 
 }  // namespace

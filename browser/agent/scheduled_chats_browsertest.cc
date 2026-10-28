@@ -323,15 +323,6 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   ASSERT_EQ(entries.size(), 1u);
   EXPECT_EQ(entries[0].id, id);
   EXPECT_EQ(entries[0].title, watch.request);
-
-  // The chat's own card, which has no page, keeps the watch.
-  ScheduledChat edited = *chats()->Find(id);
-  edited.page.clear();
-  edited.watch_for.clear();
-  edited.schedule.hour = 8;
-  chats()->Save(id, edited);
-  EXPECT_EQ(chats()->Find(id)->page, Url("/desk"));
-  EXPECT_EQ(chats()->Find(id)->watch_for, "Price drops below $500");
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

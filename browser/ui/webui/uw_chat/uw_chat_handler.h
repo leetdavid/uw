@@ -15,8 +15,10 @@
 #include "base/observer_list.h"
 #include "base/observer_list_types.h"
 #include "base/scoped_observation.h"
+#include "base/task/cancelable_task_tracker.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "components/history/core/browser/history_types.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -27,6 +29,7 @@
 #include "base/files/file_path.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/task/sequenced_task_runner.h"
+#include "url/gurl.h"
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/agent/chat_files.h"
 #include "uw/browser/agent/chat_file.h"
@@ -138,6 +141,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void NewSchedule(NewScheduleCallback callback) override;
   void SaveSchedule(mojom::ChatSchedulePtr schedule) override;
   void RemoveSchedule() override;
+  void ReopenScheduleCard(const std::string& args) override;
+  void DescribePage(const std::string& page,
+                    DescribePageCallback callback) override;
   void SetSchedulePaused(bool paused) override;
   void SetScheduleMuted(bool muted) override;
   void StopRun() override;
@@ -216,6 +222,10 @@ class UwChatHandler : public mojom::ChatHandler,
   // chat's schedule if it has one, and tells the model that nothing is saved
   // until the user saves it.
   base::DictValue OpenScheduleCard(const base::DictValue& args);
+  // DescribePage's answer for `page`, which no open tab shows, from history.
+  void OnPageInHistory(const GURL& page,
+                       DescribePageCallback callback,
+                       history::QueryURLResult result);
   // The agent's trigger and stop_trigger calls.
   base::DictValue StartTrigger(const TriggerAsk& ask,
                                const base::FilePath& folder);
@@ -414,6 +424,8 @@ class UwChatHandler : public mojom::ChatHandler,
   // the step a run waits on shows.
   base::ListValue early_run_lines_;
   bool run_step_shown_ = false;
+  // DescribePage's lookups in history and favicons.
+  base::CancelableTaskTracker page_tasks_;
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer>
       schedules_observation_{this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{

@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "base/files/important_file_writer.h"
 #include "base/memory/raw_ptr.h"
@@ -87,6 +88,8 @@ class ScheduledChats : public base::SupportsUserData::Data,
   std::optional<base::Time> NextRunOf(std::string_view chat_id) const;
   // The chat that watches `page`, matched by WatchedAddress(), or null.
   const std::string* ChatWatching(const GURL& page) const;
+  // Every chat that watches `page`, matched by WatchedAddress().
+  std::vector<std::string> ChatsWatching(const GURL& page) const;
   // The model the last saved schedule card picked, which a new card starts
   // on.
   std::optional<ModelChoice> LastModel() const { return last_model_; }
@@ -106,8 +109,7 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // back to the chat file with null.
   void SetPage(const std::string& chat_id, Page* page);
 
-  // Saves the schedule card's settings for `chat_id` and runs it at once. A
-  // card without a page keeps the chat's watched page.
+  // Saves the schedule card's settings for `chat_id` and runs it at once.
   void Save(const std::string& chat_id, ScheduledChat chat);
   // Makes a chat that watches `chat.page`, which starts with `chat.request`
   // as the user's message, saves `chat` as its schedule, and returns its id.

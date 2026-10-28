@@ -90,6 +90,12 @@ interface ChatHandler {
   SaveSchedule(ChatSchedule schedule);
   // Takes the chat's schedule off. The chat stays.
   RemoveSchedule();
+  // Opens the schedule card again as the agent's schedule call, whose
+  // arguments `args` are JSON, filled it in.
+  ReopenScheduleCard(string args);
+  // The title of the watched page `page` and its icon as a data: URL, from
+  // an open tab of the page, else from history. Empty when uw knows neither.
+  DescribePage(string page) => (string title, string favicon);
   // Pausing stops runs; resuming does not catch up on the paused time.
   SetSchedulePaused(bool paused);
   SetScheduleMuted(bool muted);
@@ -265,6 +271,11 @@ struct ChatSchedule {
   // The trigger the schedule keeps: the command of the chat's running
   // trigger, or empty for none.
   string trigger;
+  // For a watched page: its address, and what the watch card's chip asked
+  // for, such as "Price drops below $500", or empty for the user's own
+  // words. Both empty for any other chat.
+  string page;
+  string watch_for;
 };
 
 // A chat's running trigger, for the strip under its title.
@@ -298,10 +309,6 @@ struct ScheduleState {
   // sign-in on the last run, if any.
   string pause_reason;
   string sign_in;
-  // For a watched page: its address, and what the watch card's chip asked
-  // for, such as "Price drops below $500". Both empty for any other chat.
-  string page;
-  string watch_for;
 };
 
 // What the chat list shows beside a chat. Matches uw::ChatIndex::State.
@@ -569,9 +576,6 @@ struct WatchCardState {
   string favicon;
   // The chat that watches the page, or empty when none does.
   string chat_id;
-  // What the card's chip asked for, such as "Price drops below $500", or
-  // empty for the user's own words.
-  string watch_for;
   // The watch's schedule and how it stands, or a new card's settings.
   ScheduleState state;
   // The watch's runs of the last 14 days, oldest first, for its chart. Each
@@ -591,9 +595,10 @@ interface WatchCardHandlerFactory {
 interface WatchCardHandler {
   // The page has drawn and can be shown.
   ShowUI();
-  // Watches the page on `schedule`, which asks `schedule.request`, or saves
-  // the watch's changed schedule. Then closes the card.
-  Watch(ChatSchedule schedule, string watch_for);
+  // Watches the page on `schedule`, which asks `schedule.request` and
+  // watches for `schedule.watch_for`, or saves the watch's changed schedule.
+  // Then closes the card.
+  Watch(ChatSchedule schedule);
   // Removes the watch's schedule and closes the card. Its chat stays.
   StopWatching();
   // Shows the watch's chat and closes the card.

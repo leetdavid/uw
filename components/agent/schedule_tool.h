@@ -13,8 +13,8 @@
 namespace uw {
 
 // The tool a chat's agent fills in the schedule card with, when the user asks
-// in words for something to happen on a schedule. Only the user saves the
-// card. See docs/product.md, "Scheduled chats".
+// in words for something to happen on a schedule or to watch a page. Only the
+// user saves the card. See docs/product.md, "Scheduled chats".
 inline constexpr char kScheduleTool[] = "schedule";
 
 // The schedule tool, as a model is told about it.

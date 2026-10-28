@@ -34,6 +34,8 @@ source_set("uw_chat") {
     "//uw/browser/ui/webui/uw_providers",
   ]
   deps = [
+    "//chrome/browser/favicon",
+    "//chrome/browser/history",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/tab_list",
     "//chrome/browser/ui/browser_window",
@@ -41,6 +43,10 @@ source_set("uw_chat") {
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/common:constants",
     "//components/favicon/content",
+    "//components/favicon/core",
+    "//components/favicon_base",
+    "//components/history/core/browser",
+    "//components/keyed_service/core",
     "//components/performance_manager",
     "//components/prefs",
     "//components/split_tabs",
