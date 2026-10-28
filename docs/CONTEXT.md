@@ -226,7 +226,7 @@ A value a run records each time, such as a price or whether something is in stoc
 _Avoid_: Metric, data point.
 
 **Watched page**:
-A page that a scheduled chat checks. The page shows that it is watched, and watching a page is how the user starts a scheduled chat from it.
+A page that a scheduled chat checks. The page shows that it is watched. The user starts one from the page itself, or by asking in a chat.
 _Avoid_: Page watch, tracked page.
 
 **Catch-up run**:
