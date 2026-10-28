@@ -241,7 +241,7 @@ html:has(.home) {
 
 .home .scene {
   position: relative;
-  height: 480px;
+  height: 760px;
   margin-top: 70px;
 }
 
@@ -265,7 +265,7 @@ html:has(.home) {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 4;
+  z-index: 1;
   height: 260px;
   background: linear-gradient(transparent, var(--night));
 }
@@ -1104,7 +1104,7 @@ html:has(.home) {
   }
 
   .home .scene {
-    height: 384px;
+    height: 608px;
   }
 
   .home .scene .horizon {
@@ -1118,7 +1118,7 @@ html:has(.home) {
   }
 
   .home .scene {
-    height: 300px;
+    height: 472px;
   }
 
   .home .scene .horizon {
@@ -1168,7 +1168,7 @@ html:has(.home) {
   }
 
   .home .scene {
-    height: 150px;
+    height: 228px;
     margin-top: 48px;
   }
 
@@ -1259,6 +1259,18 @@ html:has(.home) {
   .home .win {
     animation: enter-lift 1.6s 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
+
+  @supports (animation-timeline: scroll()) {
+    .home .win {
+      animation:
+        enter-lift 1.6s 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+        face-viewer linear both;
+      animation-timeline: auto, scroll(root);
+      animation-range:
+        normal,
+        0 60vh;
+    }
+  }
 }
 
 @keyframes enter-fade {
@@ -1292,6 +1304,13 @@ html:has(.home) {
 @keyframes enter-lift {
   from {
     opacity: 0;
-    transform: translateY(180px) rotateX(38deg);
+    translate: 0 180px;
+    rotate: x 22deg;
+  }
+}
+
+@keyframes face-viewer {
+  to {
+    transform: rotateX(0deg);
   }
 }
