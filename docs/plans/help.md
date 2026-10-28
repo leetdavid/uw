@@ -18,7 +18,7 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 - The pages are MDX in `site/`, served at `uwbrowser.com/help` by [Fumadocs](https://www.fumadocs.dev/docs/integrations/llms), from the same Vercel project as the home page. Fumadocs gives search, `llms.txt`, `llms-full.txt`, and each page's Markdown at its address plus `.md`.
 - English only. There is one version, for the latest release. A page notes the version a feature arrived in when it is later than 0.1.0, such as "In uw 0.3 and later".
 - The first pages come from the "What works now" sections of [Try the current build](../try-uw.md), reworded for someone using a release instead of a dev build. Then `try-uw.md` is deleted: "Start uw" moves to the README's [Using your local build](../../README.md#using-your-local-build), and its links point to Help.
-- The pages look like the rest of the site, in `uw-arc-style`.
+- The pages look like the rest of the site.
 
 ### The MCP route
 
@@ -54,7 +54,11 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 
 ## Design
 
-Help is drawn on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Help", in `uw-arc-style`: a Help page with its section list and search box, and search results.
+Drawn on 2026-10-28 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), beside the website's frames, in the website's look. The `uw-help` guide has the rules.
+
+- "Help: the home": `uwbrowser.com/help` with search, a card per section, and a card that gives agents the MCP address and `llms.txt`.
+- "Help: a page": "Hide the sidebar" with the section list, a figure, steps, a note, "On this page", and Copy as Markdown.
+- "Help: search and every state": search results over a page, no results, a section's version pill, and Copy as Markdown's states.
 
 ## Stages
 
