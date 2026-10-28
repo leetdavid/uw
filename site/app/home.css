@@ -522,13 +522,34 @@ html:has(.home) {
 }
 
 .home .stop .rule {
+  position: relative;
   height: 1px;
   background: var(--rim);
 }
 
-.home .stop.on .rule {
+.home .stop .rule::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: linear-gradient(90deg, #ff9ad5, #b9a6ff, #7fe3f7);
   box-shadow: 0 0 14px rgba(185, 166, 255, 0.7);
+  transform-origin: left;
+  scale: 0 1;
+}
+
+.home .stop.on .rule::after {
+  scale: 1 1;
+  animation: rule-fill 3.5s linear;
+}
+
+.home .strip.held .stop.on .rule::after {
+  animation: none;
+}
+
+@keyframes rule-fill {
+  from {
+    scale: 0 1;
+  }
 }
 
 .home .stop .n {
@@ -571,8 +592,7 @@ html:has(.home) {
     box-shadow 0.4s ease;
 }
 
-.home .stop.on .mini,
-.home .stop:hover .mini {
+.home .stop.on .mini {
   opacity: 1;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.5),
@@ -592,7 +612,8 @@ html:has(.home) {
 
 .home .mini .notice {
   bottom: calc(10 * var(--px));
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 -6px 16px rgba(30, 27, 46, 0.08);
 }
 
 /* Features: glass tiles */
@@ -1185,5 +1206,9 @@ html:has(.home) {
   .home .btn,
   .home .mini {
     transition: none;
+  }
+
+  .home .stop.on .rule::after {
+    animation: none;
   }
 }

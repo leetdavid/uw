@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Brew } from "./brew";
 import { Dock } from "./dock";
+import { Filmstrip, type Stop } from "./filmstrip";
 import { Favicon } from "./icons";
 import { Sidebar, type SidebarState } from "./sidebar";
 import { bike, launch, moved, sorted, tab, trip } from "./tabs";
@@ -53,7 +54,7 @@ const docked: SidebarState = {
   active: "alfama",
 };
 
-const stops: { title: string; text: string; sidebar: SidebarState }[] = [
+const stops: Stop[] = [
   {
     title: "Go down every rabbit hole",
     text: "Every new tab starts in the Scratchpad.",
@@ -259,19 +260,7 @@ export default function Home() {
             back.
           </p>
         </div>
-        <ol className="strip">
-          {stops.map((stop, index) => (
-            <li key={stop.title} className={index === 1 ? "stop on" : "stop"}>
-              <div className="rule" />
-              <div className="n">0{index + 1}</div>
-              <h3>{stop.title}</h3>
-              <p>{stop.text}</p>
-              <div className="mini">
-                <Sidebar state={stop.sidebar} label={stop.title} />
-              </div>
-            </li>
-          ))}
-        </ol>
+        <Filmstrip stops={stops} />
       </section>
 
       <section className="feat" id="features">
