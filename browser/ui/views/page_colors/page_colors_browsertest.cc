@@ -4,21 +4,27 @@
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 #include "base/strings/stringprintf.h"
 #include "base/test/run_until.h"
+#include "chrome/browser/extensions/chrome_test_extension_loader.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/top_container_view.h"
+#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "extensions/test/test_extension_dir.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/color/color_id.h"
@@ -26,6 +32,8 @@
 #include "ui/compositor/layer.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
+#include "ui/views/layout/animating_layout_manager.h"
+#include "ui/views/view.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_color.h"
@@ -150,6 +158,31 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, APageThatChangesItsColor) {
       content::ExecJs(browser()->tab_strip_model()->GetActiveWebContents(),
                       "document.body.style.background = '#1a4fd6'"));
   EXPECT_TRUE(ToolbarBecomes(kBlue));
+}
+
+// Chromium's outline around hovered extension icons sits on the icons, though
+// page colors give the toolbar a layer of its own.
+IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest,
+                       TheExtensionsOutlineSitsOnTheIcons) {
+  extensions::TestExtensionDir dir;
+  dir.WriteManifest(R"({"name": "Action", "version": "1",
+                        "manifest_version": 3, "action": {}})");
+  ASSERT_TRUE(extensions::ChromeTestExtensionLoader(browser()->GetProfile())
+                  .LoadExtension(dir.UnpackedPath()));
+  ExtensionsToolbarDesktop* extensions =
+      view()->toolbar()->extensions_container();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return extensions->GetVisible() && !extensions->size().IsEmpty() &&
+           !extensions->GetAnimatingLayoutManager()->is_animating();
+  }));
+  ASSERT_TRUE(view()->top_container()->layer());
+  std::vector<ui::Layer*> outline =
+      extensions->GetLayersInOrder(views::ViewLayer::kExclude);
+  ASSERT_EQ(outline.size(), 1u);
+  EXPECT_EQ(outline[0]->bounds(), extensions->layer()->bounds());
+
+  outline[0]->SetOpacity(1);
+  SaveWindowScreenshot(browser(), "extensions-outline");
 }
 
 }  // namespace

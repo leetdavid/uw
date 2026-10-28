@@ -1678,3 +1678,18 @@ index 8725df360ab579d28070ff0f191ec5f542800825..c1b578fd996e160374a02c665ac4f38e
  
    // Chrome surfaces.
    mixer[kColorSysBase] = {dark_mode ? kColorRefNeutral25 : kColorRefNeutral100};
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
+index 5a0ed1aabef35e0d89d152a034b1544f398f55d5..821cc7903f59e91513387a270e753f45318d0ecd 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
+@@ -245,7 +245,9 @@ views::FlexLayout* ToolbarIconContainerView::GetTargetLayoutManager() {
+ void ToolbarIconContainerView::OnBoundsChanged(
+     const gfx::Rect& previous_bounds) {
+   const gfx::Rect bounds = GetLocalBounds();
+-  border_.layer()->SetBounds(ConvertRectToWidget(bounds));
++  // uw: the border shares this view's parent layer, which is not the
++  // widget's when page colors give the toolbar a layer of its own.
++  border_.layer()->SetBounds(layer()->GetTargetBounds());
+   border_.layer()->SchedulePaint(bounds);
+ }
+ 
