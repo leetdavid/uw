@@ -1,6 +1,6 @@
 # Help
 
-Status: scope agreed on 2026-10-28. Nothing is built.
+Status: scope agreed on 2026-10-28, and the design, T231, signed off the same day. Nothing else is built.
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates).
 
@@ -54,7 +54,7 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 
 ## Design
 
-Drawn on 2026-10-28 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), beside the website's frames, in the website's look. The `uw-help` guide has the rules.
+Drawn on 2026-10-28 on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), beside the website's frames, and signed off by the user the same day. Help uses the living website's look: the dawn hills, glass pills, and lavender tiles. The `uw-help` guide has the rules.
 
 - "Help: the home": `uwbrowser.com/help` with search, a card per section, and a card that gives agents the MCP address and `llms.txt`.
 - "Help: a page": "Hide the sidebar" with the section list, a figure, steps, a note, "On this page", and Copy as Markdown.

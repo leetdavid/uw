@@ -116,7 +116,7 @@ Sections fade and rise in as they scroll into view. Each feature tile plays a sh
 
 The ad has a pause button. With the system's "Reduce motion" setting on, the page holds still: the ad rests on its end card, the background and tiles stop, and the demo shows still cards. Animations stop while off screen. Each part is reviewed as a recording of the real site before it goes live: the ad, then the background, then the tiles.
 
-No email list, docs, or pricing yet.
+No email list or pricing yet. Help is its own plan: [Help](help.md).
 
 ## Cadence
 
