@@ -1,6 +1,6 @@
 # Help
 
-Status: scope agreed on 2026-10-28, and the design, T231, signed off the same day. The same day the user picked which Fumadocs features Help uses and added Ask in uw; their design, T241, is next. Nothing else is built.
+Status: scope agreed on 2026-10-28, and the designs, T231 and T241, signed off the same day. T232 is being built.
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates).
 
