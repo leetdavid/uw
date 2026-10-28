@@ -17,6 +17,46 @@ index a9ef4aa60e3c44e90d7cf0b04eaf5f3632547e17..342fa711d30c3edc5f216e938f92dbdc
  
  # Common configuration for targets in the media directory; these must not be
  # exported since things like USE_NEON have different meanings elsewhere in the
+diff --git a/media/base/pipeline_impl.cc b/media/base/pipeline_impl.cc
+index 55ed412ee1b18e2fcc4670ec53adbb76fb56171a..7532aba7ba5f292d983122f416c37e1573a2f5d7 100644
+--- a/media/base/pipeline_impl.cc
++++ b/media/base/pipeline_impl.cc
+@@ -1084,7 +1084,8 @@ void PipelineImpl::RendererWrapper::OnPipelineError(PipelineStatus error) {
+   // not fatal errors. They are just signals to restart or reconfig the
+   // pipeline.
+   if (error != PIPELINE_ERROR_HARDWARE_CONTEXT_RESET &&
+-      error != DEMUXER_ERROR_DETECTED_HLS) {
++      error != DEMUXER_ERROR_DETECTED_HLS &&
++      error != DEMUXER_ERROR_DETECTED_ADTS) {
+     status_ = error;
+   }
+ 
+diff --git a/media/base/pipeline_status.h b/media/base/pipeline_status.h
+index c87b8f9f556ba731468f8fa852a8c19a3e719aab..c3b65081d45ffdaef6d3afe45865d41ed68fa50b 100644
+--- a/media/base/pipeline_status.h
++++ b/media/base/pipeline_status.h
+@@ -79,8 +79,12 @@ enum PipelineStatusCodes : StatusCodeType {
+   // rather than it being unsupported.
+   DEMUXER_ERROR_PROGRESSIVE_DISABLED = 27,
+ 
++  // uw: raw ADTS AAC, which uw's FFmpeg can't open. A signal to restart on
++  // uw's ADTS engine, as DEMUXER_ERROR_DETECTED_HLS is for HLS.
++  DEMUXER_ERROR_DETECTED_ADTS = 28,
++
+   // Must be equal to the largest value ever logged.
+-  PIPELINE_STATUS_MAX = DEMUXER_ERROR_PROGRESSIVE_DISABLED,
++  PIPELINE_STATUS_MAX = DEMUXER_ERROR_DETECTED_ADTS,
+ };
+ 
+ MEDIA_EXPORT std::string_view PipelineStatusCodeToString(
+@@ -115,6 +119,7 @@ struct PipelineStatusTraits {
+       STRINGIFY_STATUS_CASE(DEMUXER_ERROR_NO_SUPPORTED_STREAMS);
+       STRINGIFY_STATUS_CASE(DEMUXER_ERROR_DETECTED_HLS);
+       STRINGIFY_STATUS_CASE(DEMUXER_ERROR_PROGRESSIVE_DISABLED);
++      STRINGIFY_STATUS_CASE(DEMUXER_ERROR_DETECTED_ADTS);
+       STRINGIFY_STATUS_CASE(DECODER_ERROR_NOT_SUPPORTED);
+       STRINGIFY_STATUS_CASE(DEMUXER_ERROR_BITSTREAM_CONVERSION_FAILED);
+       STRINGIFY_STATUS_CASE(CHUNK_DEMUXER_ERROR_APPEND_FAILED);
 diff --git a/media/ffmpeg/ffmpeg_common.cc b/media/ffmpeg/ffmpeg_common.cc
 index 280dce68853c12508ab94bd3c9516896db963664..0fb9b1690b3ec43c488c7fa3f35b3a27be4574de 100644
 --- a/media/ffmpeg/ffmpeg_common.cc
@@ -35,6 +75,21 @@ index 280dce68853c12508ab94bd3c9516896db963664..0fb9b1690b3ec43c488c7fa3f35b3a27
  #if BUILDFLAG(ENABLE_PLATFORM_MPEG_H_AUDIO)
      case AudioCodec::kMpegHAudio:
        channel_layout = CHANNEL_LAYOUT_BITSTREAM;
+diff --git a/media/filters/BUILD.gn b/media/filters/BUILD.gn
+index 4a53e96173ce5dc48f81b63f1c29aebd7b73dbf1..3e3a4b928764fd6231ae777b02d7add5987defdd 100644
+--- a/media/filters/BUILD.gn
++++ b/media/filters/BUILD.gn
+@@ -278,6 +278,10 @@ source_set("filters") {
+       "hls_rendition_impl.h",
+       "manifest_demuxer.cc",
+       "manifest_demuxer.h",
++
++      # uw: raw ADTS AAC, which uw's FFmpeg can't demux.
++      "//uw/components/media/adts_engine.cc",
++      "//uw/components/media/adts_engine.h",
+     ]
+   }
+ }
 diff --git a/media/filters/audio_file_reader.cc b/media/filters/audio_file_reader.cc
 index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df3987eb6c 100644
 --- a/media/filters/audio_file_reader.cc
@@ -89,6 +144,252 @@ index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df
    config_ = std::move(config);
    return initialize_status.value();
  }
+diff --git a/media/filters/demuxer_manager.cc b/media/filters/demuxer_manager.cc
+index 7401dbf9e4898109b750a97051bd9947f50a3835..c76f79ae343797adbe9ca518688fdb76f3caa409 100644
+--- a/media/filters/demuxer_manager.cc
++++ b/media/filters/demuxer_manager.cc
+@@ -25,6 +25,7 @@
+ #include "base/time/time.h"
+ #include "media/filters/hls_manifest_demuxer_engine.h"
+ #include "media/filters/manifest_demuxer.h"
++#include "uw/components/media/adts_engine.h"
+ #endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
+ 
+ namespace media {
+@@ -124,6 +125,26 @@ void DemuxerManager::OnPipelineError(PipelineStatus error) {
+ 
+     return;
+   }
++
++  // uw: uw's FFmpeg has no AAC demuxer, so raw ADTS AAC restarts on uw's
++  // ADTS engine, the way HLS restarts on Chromium's player. See uw's
++  // docs/plans/distribution.md, "Codecs".
++  if (error == DEMUXER_ERROR_DETECTED_ADTS) {
++    adts_fallback_ = true;
++    CHECK(data_source_);
++    int64_t size = -1;
++    adts_size_.reset();
++    if (!IsStreaming() && data_source_->GetSize(&size) && size > 0) {
++      adts_size_ = size;
++    }
++    loaded_url_ = GetDataSourceUrlAfterRedirects().value();
++    client_->UpdateLoadedUrl(loaded_url_);
++    client_->StopForDemuxerReset();
++    data_source_->Stop();
++    FreeResourcesAfterMediaThreadWait(base::BindOnce(
++        &DemuxerManager::RestartClientForHLS, weak_factory_.GetWeakPtr()));
++    return;
++  }
+ #endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
+ 
+   client_->OnError(std::move(error));
+@@ -240,6 +261,15 @@ PipelineStatus DemuxerManager::CreateDemuxer(
+   }
+ 
+ #if BUILDFLAG(ENABLE_HLS_DEMUXER)
++  if (adts_fallback_) {
++    std::unique_ptr<Demuxer> demuxer;
++    std::tie(data_source_info_, demuxer) = CreateAdtsDemuxer();
++    SetDemuxer(std::move(demuxer));
++    return std::move(on_demuxer_created)
++        .Run(demuxer_.get(), suspended_mode,
++             /*is_streaming=*/!adts_size_.has_value(),
++             /*is_static=*/false);
++  }
+   if (hls_fallback_ || IsManifestDemuxerURL()) {
+     std::unique_ptr<Demuxer> demuxer;
+     std::tie(data_source_info_, demuxer) = CreateHlsDemuxer();
+@@ -465,6 +495,22 @@ DemuxerManager::CreateHlsDemuxer() {
+           std::move(engine), media_log_.get()));
+ }
+ 
++std::tuple<raw_ptr<DataSourceInfo>, std::unique_ptr<Demuxer>>
++DemuxerManager::CreateAdtsDemuxer() {
++  auto engine = std::make_unique<AdtsEngine>(
++      client_->GetHlsDataSourceProvider(), loaded_url_,
++      data_source_info_ && data_source_info_->WouldTaintOrigin(), adts_size_);
++  raw_ptr<DataSourceInfo> datasource_info = engine.get();
++  return std::make_tuple(
++      datasource_info,
++      std::make_unique<ManifestDemuxer>(
++          media_task_runner_,
++          base::BindPostTaskToCurrentDefault(
++              base::BindRepeating(&DemuxerManager::DemuxerRequestsSeek,
++                                  weak_factory_.GetWeakPtr())),
++          std::move(engine), media_log_.get()));
++}
++
+ void DemuxerManager::AddTrack(const MediaTrack& track) {
+   client_->AddTrack(track);
+ }
+diff --git a/media/filters/demuxer_manager.h b/media/filters/demuxer_manager.h
+index 3455c5c0a1c328d80030c2d5138787784bdcc02e..10ad3d4cf679c5b8811c8c6fba16d2d99520140e 100644
+--- a/media/filters/demuxer_manager.h
++++ b/media/filters/demuxer_manager.h
+@@ -154,6 +154,9 @@ class MEDIA_EXPORT DemuxerManager {
+ #if BUILDFLAG(ENABLE_HLS_DEMUXER)
+   std::tuple<raw_ptr<DataSourceInfo>, std::unique_ptr<Demuxer>>
+   CreateHlsDemuxer();
++  // uw: raw ADTS AAC on uw's ADTS engine.
++  std::tuple<raw_ptr<DataSourceInfo>, std::unique_ptr<Demuxer>>
++  CreateAdtsDemuxer();
+ 
+   void AddTrack(const MediaTrack&);
+   void RemoveTrack(const MediaTrack&);
+@@ -209,6 +212,10 @@ class MEDIA_EXPORT DemuxerManager {
+ 
+ #if BUILDFLAG(ENABLE_HLS_DEMUXER)
+   bool hls_fallback_ = false;
++  // uw: FFmpeg found raw ADTS AAC: a file of this size, or with no size, an
++  // endless station.
++  bool adts_fallback_ = false;
++  std::optional<int64_t> adts_size_;
+ #endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
+ 
+   // Are we allowed to switch demuxer mid-stream when fallback error codes
+diff --git a/media/filters/ffmpeg_demuxer.cc b/media/filters/ffmpeg_demuxer.cc
+index b82ff7e55087f7897f8c62a8121c08685976a607..556e15879044db67f08c67762ec5506026061267 100644
+--- a/media/filters/ffmpeg_demuxer.cc
++++ b/media/filters/ffmpeg_demuxer.cc
+@@ -1243,6 +1243,15 @@ void FFmpegDemuxer::OnOpenContextDone(bool result) {
+   }
+ #endif
+ 
++#if BUILDFLAG(ENABLE_HLS_DEMUXER)
++  // uw: raw ADTS AAC plays on uw's ADTS engine. See ffmpeg_glue.cc.
++  if (glue_->detected_adts()) {
++    MEDIA_LOG(INFO, media_log_) << GetDisplayName() << ": detected ADTS";
++    RunInitCB(DEMUXER_ERROR_DETECTED_ADTS);
++    return;
++  }
++#endif
++
+   if (!result) {
+     MEDIA_LOG(ERROR, media_log_) << GetDisplayName() << ": open context failed";
+     RunInitCB(DEMUXER_ERROR_COULD_NOT_OPEN);
+diff --git a/media/filters/ffmpeg_glue.cc b/media/filters/ffmpeg_glue.cc
+index 6ecbf5d8b3157a05e7d62c9ff4e38f88041b3971..6fc47c1c5bc175abcb45fda403b1fd652acc8967 100644
+--- a/media/filters/ffmpeg_glue.cc
++++ b/media/filters/ffmpeg_glue.cc
+@@ -5,8 +5,10 @@
+ #include "media/filters/ffmpeg_glue.h"
+ 
+ #include <utility>
++#include <vector>
+ 
+ #include "base/check_op.h"
++#include "base/containers/span.h"
+ #include "base/compiler_specific.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/no_destructor.h"
+@@ -16,6 +18,7 @@
+ #include "media/base/media_switches.h"
+ #include "media/base/supported_types.h"
+ #include "media/ffmpeg/ffmpeg_common.h"
++#include "media/media_buildflags.h"
+ 
+ namespace media {
+ 
+@@ -145,9 +148,78 @@ FFmpegGlue::FFmpegGlue(FFmpegURLProtocol* protocol) {
+   format_context_->format_whitelist = av_strdup(GetAllowedDemuxers());
+ }
+ 
++namespace {
++
++// uw: the length of the ADTS frame `frame` starts with, or 0 when it does
++// not start with one: the sync word 0xFFF, layer 0, a known sampling rate,
++// and a length that holds at least its header.
++size_t AdtsFrameLength(base::span<const uint8_t> frame) {
++  if (frame.size() < 7 || frame[0] != 0xFF || (frame[1] & 0xF6) != 0xF0 ||
++      ((frame[2] >> 2) & 0x0F) > 12) {
++    return 0;
++  }
++  const size_t length = (frame[3] & 0x03) << 11 | frame[4] << 3 | frame[5] >> 5;
++  return length >= 7 ? length : 0;
++}
++
++}  // namespace
++
++bool FFmpegGlue::LooksLikeAdts() {
++  // A station's stream can start partway through a frame, so look for the
++  // first whole one in the first few kilobytes.
++  constexpr size_t kLookAt = 8192;
++  constexpr size_t kSearch = 4096;
++  std::vector<uint8_t> buffer(kLookAt);
++  int64_t start = 0;
++  size_t read = 0;
++  for (int tags = 0; tags < 2; ++tags) {
++    if (AVIOSeekOperation(avio_context_->opaque, start, SEEK_SET) < 0) {
++      return false;
++    }
++    read = 0;
++    while (read < kLookAt) {
++      const int got =
++          AVIOReadOperation(avio_context_->opaque,
++                            base::span(buffer).subspan(read).data(),
++                            kLookAt - read);
++      if (got <= 0) {
++        break;
++      }
++      read += got;
++    }
++    // Skip one ID3v2 tag: "ID3", then its size in four 7-bit bytes.
++    if (tags == 0 && read >= 10 && buffer[0] == 'I' && buffer[1] == 'D' &&
++        buffer[2] == '3') {
++      start = 10 + ((buffer[6] & 0x7F) << 21 | (buffer[7] & 0x7F) << 14 |
++                    (buffer[8] & 0x7F) << 7 | (buffer[9] & 0x7F)) +
++              ((buffer[5] & 0x10) ? 10 : 0);
++      continue;
++    }
++    break;
++  }
++  base::span<const uint8_t> data = base::span(buffer).first(read);
++  bool found = false;
++  for (size_t at = 0; at < kSearch && at + 7 <= data.size() && !found; ++at) {
++    const size_t length = AdtsFrameLength(data.subspan(at));
++    found = length && at + length < data.size() &&
++            AdtsFrameLength(data.subspan(at + length));
++  }
++  return AVIOSeekOperation(avio_context_->opaque, 0, SEEK_SET) >= 0 && found;
++}
++
+ bool FFmpegGlue::OpenContext(bool is_local_file) {
+   DCHECK(!open_called_) << "OpenContext() shouldn't be called twice.";
+ 
++#if BUILDFLAG(ENABLE_HLS_DEMUXER)
++  // uw: uw's FFmpeg has no AAC demuxer, and would probe an endless ADTS radio
++  // stream for a megabyte before giving up. Spot ADTS first and leave it to
++  // uw's ADTS engine. See uw's docs/plans/distribution.md, "Codecs".
++  if (LooksLikeAdts()) {
++    detected_adts_ = true;
++    return false;
++  }
++#endif
++
+   // If avformat_open_input() is called we have to take a slightly different
+   // destruction path to avoid double frees.
+   open_called_ = true;
+diff --git a/media/filters/ffmpeg_glue.h b/media/filters/ffmpeg_glue.h
+index 866e12837db55e1bba7a44984f8912f9ebdf8146..32990fa392730a585ad3f32043398b633ae61c50 100644
+--- a/media/filters/ffmpeg_glue.h
++++ b/media/filters/ffmpeg_glue.h
+@@ -82,10 +82,16 @@ class MEDIA_EXPORT FFmpegGlue {
+ 
+   // Used on Android to switch to using the native MediaPlayer to play HLS.
+   bool detected_hls() { return detected_hls_; }
++  // uw: raw ADTS AAC, which plays on uw's ADTS engine.
++  bool detected_adts() { return detected_adts_; }
+ 
+  private:
++  // uw: two ADTS frames in a row near the start, after any ID3v2 tag.
++  bool LooksLikeAdts();
++
+   bool open_called_ = false;
+   bool detected_hls_ = false;
++  bool detected_adts_ = false;
+ 
+   // DanglingUntriaged: We seem to get a dangling pointer warning
+   // if avformat_open_input fails. It seems spurious, possibly this pointer
 diff --git a/media/filters/mac/audio_toolbox_audio_decoder.cc b/media/filters/mac/audio_toolbox_audio_decoder.cc
 index 03d630b07fc9ecde73e167b258f8dd528eeafca5..ca4b538abb101030fc1ce67b009cb4915da8da48 100644
 --- a/media/filters/mac/audio_toolbox_audio_decoder.cc
@@ -440,6 +741,18 @@ index 687bca71bdff74c14ed837907f8d44922ebce5ea..25530007058c2376adf5d39530c6dd17
  (if (param-true? enable-distributed-notifications)
    (allow mach-lookup
      (global-name "com.apple.distributed_notifications@Uv3")
+diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.cc b/third_party/blink/renderer/platform/media/web_media_player_impl.cc
+index 839bcbcfe76c3cb39df329cf73e6bc458b4033dc..9b96997c127e8b26dbcd61fc764f9a0ca118b417 100644
+--- a/third_party/blink/renderer/platform/media/web_media_player_impl.cc
++++ b/third_party/blink/renderer/platform/media/web_media_player_impl.cc
+@@ -384,6 +384,7 @@ WebMediaPlayer::NetworkState PipelineErrorToNetworkState(
+     case media::DEMUXER_ERROR_COULD_NOT_PARSE:
+     case media::DEMUXER_ERROR_NO_SUPPORTED_STREAMS:
+     case media::DEMUXER_ERROR_DETECTED_HLS:
++    case media::DEMUXER_ERROR_DETECTED_ADTS:
+     case media::DEMUXER_ERROR_PROGRESSIVE_DISABLED:
+     case media::DECODER_ERROR_NOT_SUPPORTED:
+     case media::DEMUXER_ERROR_BITSTREAM_CONVERSION_FAILED:
 diff --git a/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc b/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc
 index 63011d9d02a7cda639f0602a05d5145ee2369770..235bc3ab1a4e7a23f140a55a1136b8032d2b93da 100644
 --- a/third_party/blink/renderer/platform/peerconnection/webrtc_util.cc
