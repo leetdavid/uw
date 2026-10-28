@@ -817,8 +817,9 @@ function when(updated: number): string {
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-// Every saved chat, newest first. A click goes to the chat's tab or reopens
-// it; the browser does that, so the list works the same in every chat tab.
+// Every saved chat, the one the user last wrote to first. A click goes to the
+// chat's tab or reopens it; the browser does that, so the list works the same
+// in every chat tab.
 function ChatList({
   chats,
   current,

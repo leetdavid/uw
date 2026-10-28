@@ -325,7 +325,7 @@ enum ChatState {
 struct ChatSummary {
   string id;
   string title;
-  // When it last changed, in milliseconds since the Unix epoch.
+  // When the user last wrote to it, in milliseconds since the Unix epoch.
   double updated;
   ChatState state;
   // For a scheduled chat: its next run, in milliseconds since the Unix epoch,

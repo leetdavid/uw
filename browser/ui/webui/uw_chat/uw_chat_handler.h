@@ -362,7 +362,7 @@ class UwChatHandler : public mojom::ChatHandler,
   std::unique_ptr<AgentContext> saved_context_;
   std::map<int, std::string> saved_tabs_;
   std::unique_ptr<AgentLoop> agent_;
-  // When the chat last changed, for the chat list's order.
+  // When the user last wrote to the chat, for the chat list's order.
   base::Time updated_;
   // An answer came while the page was out of sight.
   bool unread_ = false;

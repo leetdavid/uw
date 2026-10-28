@@ -1610,6 +1610,10 @@ mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {
 }
 
 void UwChatHandler::Log(base::DictValue entry) {
+  const std::string* kind = entry.FindString("kind");
+  if (kind && *kind == "user") {
+    updated_ = base::Time::Now();
+  }
   log_.Append(std::move(entry));
 }
 
@@ -1724,7 +1728,9 @@ void UwChatHandler::Save() {
   if (!file_ || !context || (index && index->WasDeleted(id_))) {
     return;
   }
-  updated_ = base::Time::Now();
+  if (updated_.is_null()) {
+    updated_ = base::Time::Now();
+  }
   base::ListValue tabs;
   tabs::TabInterface* chat =
       tabs::TabInterface::MaybeGetFromContents(contents_);

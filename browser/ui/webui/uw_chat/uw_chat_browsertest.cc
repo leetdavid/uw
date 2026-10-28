@@ -840,6 +840,34 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheChatListGoesToAChatsTab) {
       [&] { return tabs()->GetActiveWebContents() == first; }));
 }
 
+// The list keeps the order the user wrote in. A chat that answers later does
+// not move up.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerDoesNotMoveAChatUpTheList) {
+  UseAgentModel();
+  ScriptOrder("Ordered.");
+  content::WebContents* first = OpenChat();
+  ASSERT_TRUE(content::ExecJs(first, SendScript("Place the order")));
+  Approval(first);
+  model_.Script(
+      {ScriptedModel::Answer("Two hours."), ScriptedModel::Answer("Ordered.")});
+  content::WebContents* second = OpenChat();
+  ASSERT_EQ(Ask(second, "How long is it?"), "Two hours.");
+
+  ASSERT_EQ(UntilTheEnd(first, ChooseScript("Approve")), "Ordered.");
+
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(second,
+                           content::JsReplace(
+                               "['done', 'unread'].includes(document"
+                               "    .querySelector('button[data-chat=\"' + $1"
+                               "        + '\"]').dataset.state)",
+                               IdOf(first)))
+        .ExtractBool();
+  }));
+  EXPECT_EQ(ChatList(second, 2),
+            (std::vector<std::string>{"How long is it?", "Place the order"}));
+}
+
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AClosedChatOpensAgainFromTheList) {
   UseAgentModel();
   model_.Script({ScriptedModel::Answer("At noon.")});

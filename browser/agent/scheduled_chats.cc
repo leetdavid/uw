@@ -139,7 +139,6 @@ void AppendToChat(const base::FilePath& file, base::ListValue lines) {
   for (base::Value& line : lines) {
     log->Append(std::move(line));
   }
-  chat->Set("updated", base::TimeToValue(base::Time::Now()));
   if (std::optional<std::string> out = base::WriteJson(*chat)) {
     base::ImportantFileWriter::WriteFileAtomically(file, *out);
   }

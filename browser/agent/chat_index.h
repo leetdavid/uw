@@ -22,8 +22,8 @@ class Profile;
 
 namespace uw {
 
-// The saved chats of a profile, for the chat list: each chat's title, when it
-// last changed, and what the list shows beside it. Kept in
+// The saved chats of a profile, for the chat list: each chat's title, when the
+// user last wrote to it, and what the list shows beside it. Kept in
 // uw_chats/index.json beside the chats, so the list never reads every chat.
 // A profile that kept chats before the index existed gets one built from its
 // chat files.
