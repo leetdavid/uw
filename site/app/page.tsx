@@ -222,7 +222,7 @@ export default function Home() {
             <b>v0.1</b>Early preview for Mac is here
           </span>
           <h1>
-            ur web, <em className="glow">ur way</em>
+            <span>ur web,</span> <em className="glow">ur way</em>
           </h1>
           <p className="lead">
             The browser that puts your tabs away for you. uw sorts them into
