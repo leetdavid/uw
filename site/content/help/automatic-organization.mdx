@@ -1,0 +1,49 @@
+---
+title: Automatic organization
+description: Let uw file your tabs into tasks as you browse, and name the tasks it starts. It uses your own AI provider.
+---
+
+## Turn it *on*
+
+1. Pick a decision model, a language model, or both. See [Add an AI provider](./add-an-ai-provider.mdx).
+2. Open `uw://settings/uwOrganization` and turn on the switch at the top.
+3. Browse as usual.
+
+For each tab, uw sends your models its title, address, the tab it came from, your task names, and a short excerpt of its text. A terminal tab sends its title and folder, never what the shell printed. Pinned tabs are never sorted.
+
+## What *moves*
+
+When the model is sure enough, uw moves the tab, with the tabs under it, and a message such as "Moved to Plan Lisbon trip" shows above **Organize** for a few seconds, with **Undo**. Nothing shows when the tab stays put.
+
+- A tab that fits one of your tasks moves into it.
+- A one-off page that doesn't fit its task, such as a sign-in page, moves to the Scratchpad.
+- A page that starts something of its own moves at once into a new task, "New task". Tabs under it go along, unless they still fit the old task.
+
+To keep a tab where it is, right-click it and choose **Keep Here**. An anchor marks its row, and uw leaves it alone. Click the anchor to let it go.
+
+Three sliders on the settings page set how sure the model must be:
+
+| Slider | What it decides | Starts at |
+| --- | --- | --- |
+| **Move a tab** | Moving a tab into or out of a task | 0.70 |
+| **Start a task** | Starting a new task | 0.55 |
+| **Rename a task** | Giving a task uw named a wider name | 0.70 |
+
+Each runs from 0.50 to 0.95. Lower one and uw does that more often, and is wrong more often.
+
+## How tasks *get names*
+
+With a language model set, "New task" takes a name within a few seconds of a page that starts a piece of work. A sign-in page, a home page, or a feed names nothing.
+
+A task uw named can take a wider name as related pages join it. A name you typed is never replaced; a lock on the row shows it. Click the lock to hand the name back to uw.
+
+**Name Task**, in the task's menu or the **Tasks** menu, asks for a name now, even while automatic organization is paused or off. If you type a name meanwhile, yours wins.
+
+## Pause it and *watch it work*
+
+Click **Organize** at the foot of the sidebar. Its first line says what automatic organization is doing.
+
+- **Pause** offers **1 hour**, **Until restart**, and **Until I resume**. While paused, the row reads **Resume**.
+- **Undo Move** reverses the last move. See [Undo a move](./undo-a-move.mdx).
+- **Show Activity** shows what the model answered for each tab and how sure it was. A move that fell short of its slider gets **Confirm**, which carries it out.
+- **Settings…** opens the settings page.

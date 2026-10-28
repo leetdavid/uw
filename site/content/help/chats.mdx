@@ -1,0 +1,36 @@
+---
+title: Chats
+description: Ask uw's agent to find something out or get something done. It works in tabs of its own and asks before it changes anything.
+---
+
+## Start *a chat*
+
+1. Pick an **Agent model** that calls tools at `uw://ai/providers`. Without one, chats use the language model. See [Add an AI provider](./add-an-ai-provider.mdx).
+2. Choose **File → New Chat**, or click **▾** at the foot of the sidebar and choose **New Chat**. You can also go to `uw://chat`.
+3. Ask for something, such as "What is the top story on Hacker News?", and press <kbd>Return</kbd>.
+
+A new chat suggests three requests. <kbd>Tab</kbd> takes the one in the field, and a click takes another. You can also ask from the [command bar](./command-bar.mdx) with <kbd>Cmd</kbd> <kbd>Return</kbd>.
+
+## While the agent *works*
+
+The chat's tab takes your first message as its title. The pages the agent opens appear as tabs under the chat's tab and load in the background, so your own tab stays selected. Each step shows as a short line, such as `Clicked button "Send" in tab 1`, and then the answer comes.
+
+The agent reads pages as text, and clicks and types only on https pages. It asks before it changes anything on a site. See [Approvals](./approvals.mdx).
+
+- While the agent works and the message box is empty, its button is **Stop**.
+- <kbd>Return</kbd> sends a message the agent reads after its current step. <kbd>Cmd</kbd> <kbd>Return</kbd> queues it above the message box, to send once the agent answers.
+- If you switch to another tab or app, macOS notifies you when the chat answers, fails, or waits for your approval. Click the notification to go back to the chat. If none comes, allow uw in **System Settings → Notifications**.
+
+## Files *and models*
+
+Paste or drag files onto the message box, or click **+** and choose **Add files**. A message takes up to 10 files, at most 5 of them images. uw copies each file into a folder for the chat in `~/Library/Application Support/uw/Chat files/`, so the agent can open it in its terminal. The model also reads text files, PDFs, and images. Deleting the chat deletes its folder.
+
+Each chat has its own model. The model and effort chips in the message box switch them from the next request, even while the agent works.
+
+## Your *saved chats*
+
+uw saves a chat after every step. If uw quits in the middle of one, the chat comes back with "Stopped before it finished" and **Continue**.
+
+The chat page lists your chats on its left, the one you last wrote to first. A chat keeps its place while it works and when it answers. Click one to go to its tab, or to open it again. The search field filters them by title, and the bin deletes a chat and closes its tab.
+
+On the right, a card for each of the agent's tabs shows what the agent did there. **Side by side** puts the chat and the agent's tab next to each other.

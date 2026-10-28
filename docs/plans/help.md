@@ -85,6 +85,28 @@ T241 drew the rest on 2026-10-28, in the same look and beside the first three:
 
 "Help: a page" gained the theme switch and the page actions in the same round.
 
+## Built
+
+T232 was built on 2026-10-28 in `site/`:
+
+- `content/help/`: one MDX file per page, and `meta.json` for the order and the section names.
+- `lib/source.ts`: the Fumadocs source, with each page's last-modified date from git and code blocks in a dark theme. `lib/shared.ts`: the addresses.
+- `app/help/`: Fumadocs' provider and `help.css`, which loads on Help pages only. Links between Help and the home page are plain links, so the two never share a page load. The home is `page.tsx`; the pages use Fumadocs' docs layout in `(docs)/`, under the site's nav from `site-nav.tsx`.
+- `app/api/search`, `app/llms.txt`, `app/llms-full.txt`, `app/llms.mdx/help/`, and `proxy.ts`, which serves `/help/<page>.md` and answers a request that asks for Markdown with Markdown.
+- `components/feedback.tsx` and `lib/feedback.ts`: "Was this helpful?", sent to PostHog's capture API from the server.
+
+Where the build differs from the design:
+
+- The Open in menu is Fumadocs' own: GitHub, View as Markdown, ChatGPT, and Claude, plus Scira AI and Cursor.
+- Search is Fumadocs' dialog in Help's colors, without the key hints at its foot.
+- No page has a figure yet, so nothing zooms. Fumadocs zooms images; a drawn figure would need its own zoom. See [Open questions](#open-questions).
+- No page needs the version pill yet, so it isn't built.
+- The agent tile on the Help home lists `llms.txt` and `llms-full.txt`; the MCP address joins it with T233. Ask uw joins the pages with T242.
+- "Was this helpful?" does not remember an answer after the page reloads.
+- On a phone, the Help home's nav shows the logo and Download only.
+- Dark mode takes the night colors of the redesigned home page (`site/app/home.css`): a deep indigo sky, a glowing horizon in place of the darkened dawn, gradient italics, and a white Download button. "Help: dark" on the canvas shows the earlier violet night.
+- `try-uw.md` is not deleted yet: other sessions still add manual tests to it as features land. See [Open questions](#open-questions).
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
@@ -116,3 +138,4 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 - How figures are made. Proposed: draw them in MDX with the site's demo sidebar component, `site/app/sidebar.tsx`, as the T231 figure does, instead of screenshots of uw.
 - Whether a chat opened by Ask in uw says where its text came from. Proposed: a line above the composer, "A link typed this in. Read it, then press Send.", as "Help: Ask uw and search" shows.
+- Whether `try-uw.md` goes once Help is live, as agreed, or stays as the dev build's list of manual tests beside Help. Other sessions still add to it.

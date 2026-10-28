@@ -1,0 +1,53 @@
+---
+title: Claude Code and other agents
+description: Let Claude Code or another agent open, read, and use pages in uw, with uw's approvals.
+---
+
+## Add uw *to your agent*
+
+First [install the command](./install-the-command.mdx). Then add uw to your agent:
+
+<Tabs items={["Claude Code", "Other MCP clients"]}>
+<Tab value="Claude Code">
+
+```bash title="Terminal"
+claude mcp add uw -- uw mcp serve
+```
+
+</Tab>
+<Tab value="Other MCP clients">
+
+Add a local server that runs `uw mcp serve`:
+
+```json title="MCP config"
+{
+  "mcpServers": {
+    "uw": { "command": "/usr/local/bin/uw", "args": ["mcp", "serve"] }
+  }
+}
+```
+
+</Tab>
+</Tabs>
+
+## What the agent *can do*
+
+The agent gets uw's page tools: open, navigate, read, click, and type. It doesn't get uw's terminal, settings, connectors, or chats.
+
+Ask Claude Code to open and read a page, and the tab opens out of sight. None shows in your windows, and the tabs close when the agent disconnects. Nothing is saved, and nothing shows in uw's chat list.
+
+## Approve *its steps*
+
+The agent's steps need approval as a chat's do, in the [approval mode](./approvals.mdx) new chats start on.
+
+When the agent wants to send a form, Claude Code shows uw's question. Meanwhile the tab waits, unselected, at the end of your front uw window. **Not this one**, with a note, keeps the step from happening and tells the agent why.
+
+To be asked before every click and typing, add `--mode ask-first`:
+
+```bash title="Terminal"
+claude mcp add uw -- uw mcp serve --mode ask-first
+```
+
+<Callout>
+  A client that can't ask, such as Claude's desktop app, leaves the step waiting in uw. uw's notification asks instead, with **Approve** and **Not this one**. Click the notification to see the tab.
+</Callout>

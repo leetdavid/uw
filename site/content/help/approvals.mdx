@@ -1,0 +1,36 @@
+---
+title: Approvals
+description: Decide how much the agent asks before it acts. Nothing on a page can answer for you.
+---
+
+## When the agent *asks*
+
+Before the agent changes something on a site, a card in the chat names the step, such as `Click button "Place order"?`. It offers:
+
+- **Approve**, to let that one step happen.
+- **Not this one**, to skip it. Type in the field first to tell the agent what to do instead.
+- **Stop the chat**.
+
+While a step waits, pressing <kbd>Return</kbd> in the message box declines it, with your message as the note.
+
+By default, uw asks before a form's submit button, before pressing <kbd>Return</kbd> in a form's field, and before typing a password or payment details. The agent marks other changes itself. When Chromium's list marks a site as sensitive, the chat asks first, such as `Let the agent act on example.com?`. Reading, searching, and opening pages don't ask.
+
+The agent works only while Safe Browsing is on.
+
+## Pick *a mode*
+
+The shield chip in the message box sets how much a chat asks:
+
+| Mode | Asks before |
+| --- | --- |
+| **Ask first** | Every click and typing, every terminal command, and every connector tool. |
+| **Auto** | Each change on a site, each terminal command uw's check finds risky, and each connector tool that does more than read. This is the default. |
+| **Full auto** | Nothing, not even for a sensitive site, except reading a sensitive file. The chip turns amber. |
+
+A mode you pick on a new chat, before its first message, becomes the mode new chats start on. A mode you pick later stays with that chat, also when you open it again.
+
+## Terminal commands *and connectors*
+
+The agent can run commands in a terminal tab under its chat. Its card shows the command, its folder, and why uw asks. Before a command that may read a sensitive file, such as a `.env` file or a key, uw asks in every mode. When a command asks for a password, as `sudo` does, the agent hands the tab to you and never types it.
+
+A [connector](./connectors.mdx) tool's card asks, for example, `Run save_issue in linear?`. Its button is **Allow once**. The arrow beside it offers **Allow for this chat** and **Always allow**. You can take back an **Always allow** on the connector's page at `uw://ai/connectors`.

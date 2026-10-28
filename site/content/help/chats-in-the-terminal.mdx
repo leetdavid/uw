@@ -1,0 +1,48 @@
+---
+title: Chats in the terminal
+description: Run uw's agent from a terminal, in a chat that fills the terminal or as one command that prints the answer.
+---
+
+## Chat *in the terminal*
+
+Run `uw chat`, type a request, and press <kbd>Return</kbd>. The steps tick off as the agent works, and the answer is drawn as Markdown.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>Return</kbd> | Send a message. While the agent works, it steers the agent. |
+| <kbd>Esc</kbd> | Stop the agent. |
+| `/` | List your skills and connector prompts. |
+| <kbd>Ctrl</kbd> <kbd>O</kbd> | Move the chat and its tabs into your front uw window. |
+| <kbd>Ctrl</kbd> <kbd>C</kbd> | Leave, and print how to carry on. |
+
+When a step needs approval, a card shows. Press a number to pick a choice, or type what to do instead and press <kbd>Return</kbd>.
+
+## Print *the answer*
+
+```bash title="Terminal"
+uw chat -p "What's the newest post on Hacker News?"
+```
+
+The agent works out of sight. Its steps print as it goes, and the answer prints at the end as Markdown, so you can save it with `> answer.md`. <kbd>Ctrl</kbd> <kbd>C</kbd> stops the chat.
+
+The chat shows in uw's chat list with a terminal icon. `uw chats` lists your chats. Useful options:
+
+- `--mode ask-first`, `auto`, or `full-auto` sets the chat's [approval mode](./approvals.mdx).
+- `--file <path>` attaches a file. Repeat it for more.
+- `-c` continues your latest chat, and `-r <id>` picks up any chat.
+- Text piped in goes along as information, never as your instruction: `cat notes.md | uw chat -p "File these as Linear issues"`.
+
+`uw chat --help` lists the rest.
+
+## Approve *from the terminal*
+
+In a terminal, a step that needs approval asks there. Type `1` to approve it. You can answer in uw instead; the first answer counts.
+
+With no terminal attached, as when a script runs the command or you pipe it into `cat`, the command prints the waiting step and `uw approve <id> allow`, and exits with 3. Answer it, then carry on:
+
+```bash title="Terminal"
+uw approve 3f9c2e18 allow
+uw chat -r 3f9c2e18 -p
+```
+
+To turn the step down, run `uw approve 3f9c2e18 decline --note "Cancel the yearly plan instead"`.

@@ -1,0 +1,50 @@
+---
+title: Connectors
+description: Give the agent more tools, such as your issue tracker or your notes. A connector is a web address or a program on this Mac.
+---
+
+## Add *a connector*
+
+1. Open `uw://ai/connectors` and click **Add connector**. In a chat, you can also click **+**, then **Connectors → Add connector…**.
+2. Search for a service, or pick one under **Recommended**. uw has tested each recommended one with a real account.
+3. Click **Add**. If the service needs you to sign in, its sign-in page opens in a tab. Finish signing in there.
+
+If a service needs a key, uw asks for it before it adds the connector. Keys and sign-ins go to the macOS Keychain.
+
+For a service you can't find, click **Add by address or JSON**. Paste its web address, or the JSON from its README, such as:
+
+```json title="Connector JSON"
+{
+  "mcpServers": {
+    "files": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/you/Documents"]
+    }
+  }
+}
+```
+
+A program on this Mac starts with your terminal's environment, so it finds what your terminal finds.
+
+With the [`uw` command](./install-the-command.mdx), a line from a README that starts with `claude mcp add` works with `uw` in its place:
+
+```bash title="Terminal"
+uw mcp add --transport http linear https://mcp.linear.app/mcp
+uw mcp list
+```
+
+## Turn *tools on and off*
+
+Each connector on `uw://ai/connectors` has a switch. Connectors start with uw and serve every profile.
+
+Click a connector to see its tools, each with its own switch. A tool that's off is never offered to the agent. **Reads only** marks a tool that only reads, and **Always allowed** one you've allowed in every chat.
+
+In a chat, **+ → Connectors** turns a connector off or on for that chat only. A new chat starts with every connector that's on.
+
+When a connector fails, its row shows the error, with **Show log** and **Open in terminal**. **Open in terminal** runs its command in a terminal tab, so you can see what goes wrong.
+
+## Use them *in a chat*
+
+The agent sees each connector's tools by name and loads them when a request calls for them. Before it runs a tool that does more than read, it asks. See [Approvals](./approvals.mdx).
+
+A connector's prompts show in the chat's `/` menu after your skills, named like `/linear:triage`. When a prompt takes arguments, a field for each shows above the message box.

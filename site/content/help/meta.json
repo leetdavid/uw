@@ -1,0 +1,30 @@
+{
+  "title": "uw Help",
+  "pages": [
+    "---Get started---",
+    "install-uw",
+    "add-an-ai-provider",
+    "report-a-problem",
+    "---Tabs and tasks---",
+    "tasks",
+    "tabs-under-tabs",
+    "collapse-a-branch",
+    "automatic-organization",
+    "undo-a-move",
+    "---The window---",
+    "hide-the-sidebar",
+    "themes",
+    "mini-player",
+    "command-bar",
+    "terminal-tabs",
+    "---The agent---",
+    "chats",
+    "approvals",
+    "skills",
+    "connectors",
+    "---The uw command---",
+    "install-the-command",
+    "chats-in-the-terminal",
+    "claude-code-and-other-agents"
+  ]
+}

@@ -1,0 +1,43 @@
+---
+title: Skills
+description: Teach the agent how to do one kind of request your way. The agent picks a skill when a request calls for it, or you start one yourself.
+---
+
+## See *your skills*
+
+Open `uw://ai/skills`, or click **AI settings** at the foot of the chat list and choose **Skills**. The page lists every skill the agent can use, each with a switch. A skill that's off isn't used in any chat.
+
+Skills come from three places:
+
+- uw's skills folder, `~/Library/Application Support/uw/skills`. **Open skills folder** shows it in Finder.
+- `~/.agents/skills`, which other agents share. A skill there with the same name as one of uw's is left out.
+- Your chats. Ask a chat to "make this a skill", and a **Save a skill?** card appears. Nothing is written until you click **Save skill**.
+
+## How skills *get used*
+
+The agent sees each skill's one-line description. When a request matches it, the agent reads the skill's instructions, and the chat says which skill it's using. Scripts in a skill don't run.
+
+To start a skill yourself, type `/` at the very start of the message box. A menu lists your skills and narrows as you type. <kbd>Tab</kbd> or <kbd>Return</kbd> picks one, and any text you type after its name goes along with it.
+
+A tag on the skills page shows when only one side can start a skill:
+
+- **Only you**: the agent can't use it on its own. Type `/` and its name.
+- **Only the agent**: it isn't in the `/` menu.
+
+## Write *a skill*
+
+Make a folder in uw's skills folder, with a `SKILL.md` file in it. The lines between the `---` give the skill's name and its one-line description. The instructions follow.
+
+```md title="SKILL.md"
+---
+name: handoff
+description: Write a short note on where this work stands, for whoever picks it up next.
+disable-model-invocation: true
+---
+
+Write a handoff note about $ARGUMENTS. List what's done, what's left, and any open questions.
+```
+
+- A name is 1 to 64 lowercase letters, digits, and hyphens.
+- `disable-model-invocation: true` makes it **Only you**. `user-invocable: false` makes it **Only the agent**.
+- `$ARGUMENTS` is replaced by the text you type after `/handoff`. Without it, your text goes after the instructions.

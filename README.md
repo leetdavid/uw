@@ -320,7 +320,7 @@ Push `main`, then run:
 pnpm run release 0.1.0
 ```
 
-It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there.
+It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there. Then [deploy the website](#website), so Help matches the release.
 
 ## Website
 
@@ -341,6 +341,8 @@ vercel link --yes --project uw --scope eslee   # once per checkout
 vercel build --prod --scope eslee
 vercel deploy --prebuilt --prod --scope eslee
 ```
+
+[Help](docs/plans/help.md) is MDX in [`site/content/help/`](site/content/help/), served at `/help` by Fumadocs with search, `/llms.txt`, `/llms-full.txt`, and each page's Markdown at its address plus `.md`. Help on `main` can describe features that are not released yet, so deploy the site after a release is published, and before any deploy between releases check that Help describes nothing unreleased. "Was this helpful?" sends its answers to PostHog once the Vercel project has `POSTHOG_PROJECT_TOKEN` and `POSTHOG_PROJECT_REGION`, the same values as in `.env`.
 
 ## CI
 

@@ -1,0 +1,40 @@
+---
+title: Add an AI provider
+description: Connect uw to the models you already use, such as OpenAI, Anthropic, or a local Ollama. Automatic organization and chats need one.
+---
+
+## Add *a provider*
+
+1. Open `uw://ai/providers`.
+2. Click **Add provider** and pick OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, or Custom.
+3. Paste the provider's key. uw lists the provider's models before it adds it.
+
+The key goes to the macOS Keychain. Every profile shares your providers, so you add each one once. For a provider that isn't in the list, use OpenRouter, Vercel AI Gateway, or **Custom**.
+
+Click a provider to see its address, key, format, and models, or to remove it. Each model shows whether it calls tools and which effort levels it takes.
+
+## Pick *your models*
+
+The page has three model choices:
+
+| Model | What it does |
+| --- | --- |
+| **Language model** | Names tasks. Places tabs when no decision model is set. |
+| **Decision model** | Optional. Decides where a tab goes. |
+| **Agent model** | New chats start on it. Each chat can switch. |
+
+Until you pick an agent model, chats use the language model. A chat needs a model that calls tools: in the agent model's menu, one that doesn't is dimmed and says "No tool calls".
+
+When a model has effort levels, a chip beside it picks one. `default` sends no effort, so the provider's own default applies.
+
+**Test** beside the language or decision model sends it one small request. It says how long the model took to answer, or why it failed. **Details** shows what uw sent and what came back.
+
+## Use *another address*
+
+Every provider's address can change. The **Add provider** dialog shows a preset's address ready to edit, and **Change** on a provider's page takes a new one. uw saves a new address only once it can list the models there. Otherwise it says why and keeps the old one.
+
+An address is https, or plain http on this Mac or your own network, such as `http://192.168.1.20:8317/v1`.
+
+<Callout>
+  For a proxy such as CLIProxyAPI, add a **Custom** provider at `http://localhost:8317/v1` with the format **Each model's own**. Claude models then go over Anthropic's format, GPT models over OpenAI's, and the rest over chat completions.
+</Callout>

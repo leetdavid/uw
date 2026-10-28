@@ -1,0 +1,39 @@
+---
+title: Install the command
+description: Add the uw command to your Mac, so you and your scripts can start chats, add connectors, and change settings from a terminal.
+---
+
+## Install *it*
+
+1. Open `uw://settings/system`.
+2. Under **uw command**, click **Install uw command**.
+3. macOS asks for your Mac's password once.
+
+The row then says **Installed at** `/usr/local/bin/uw`, with **Uninstall**. **Uninstall** removes the command.
+
+Until you install it, uw doesn't listen for the command, and nothing else on this Mac can start chats through it. The command lives inside uw, so it updates when uw does.
+
+## Try *it*
+
+```bash title="Terminal"
+uw --help
+uw settings --help
+```
+
+Every command asks the running uw. If uw isn't running, the command starts it with no window, and uw keeps running afterwards.
+
+`--workspace <name>` picks the workspace a command applies to. Without it, the command uses the workspace you used last. Every command takes `--json` and exits with 0 when done, 1 when it failed or was stopped, 2 for wrong usage, and 3 when it needs you, such as for an approval or a sign-in.
+
+## Change *settings*
+
+```bash title="Terminal"
+uw settings list
+uw settings get organizer.enabled
+uw settings set theme.grain 30 --workspace Work
+```
+
+- `uw settings list` prints uw's settings, each with its value, what it takes, and the workspaces that share it.
+- `uw settings get organizer.enabled` prints `true` or `false`.
+- `uw settings set` changes a setting at once. The example sets the grain of the Work workspace's theme. A wrong value, such as `uw settings set theme.grain 140`, says what the setting takes.
+
+The command can also run [chats](./chats-in-the-terminal.mdx), add [connectors](./connectors.mdx), and give [other agents](./claude-code-and-other-agents.mdx) uw's page tools.
