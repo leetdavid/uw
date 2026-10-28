@@ -2,10 +2,12 @@
 
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "base/json/values_util.h"
 #include "base/strings/strcat.h"
@@ -184,8 +186,9 @@ class WatchCardBrowserTest : public headless::HeadlessModeBrowserTest {
   // Waits for the card's page to show `selector`.
   bool Shows(content::WebContents* page, std::string_view selector) {
     return base::test::RunUntil([&] {
-      return content::EvalJs(page, base::StrCat({"!!document.querySelector('",
-                                                 selector, "')"}))
+      return content::EvalJs(
+                 page,
+                 content::JsReplace("!!document.querySelector($1)", selector))
           .ExtractBool();
     });
   }
@@ -357,8 +360,9 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, AChatsAgentFillsInAWatch) {
                 chat, "document.querySelector('#schedule-remove').textContent"),
             "Stop watching");
 
+  // Two chats watch the page now, and the eye counts them.
   browser()->tab_strip_model()->ActivateTabAt(0);
-  EXPECT_TRUE(EyeSays(kWatching));
+  EXPECT_TRUE(EyeSays(u"Watching this page for 2 things"));
 }
 
 IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest,
@@ -396,6 +400,80 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest,
     kept = kept || entry.id == id;
   }
   EXPECT_TRUE(kept);
+}
+
+IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, APageCanHaveSeveralWatches) {
+  const std::string price = WatchTheDesk();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url("/desk")));
+  ASSERT_TRUE(EyeSays(kWatching));
+  const auto watching = [&] { return chats()->ChatsWatching(Url("/desk")); };
+  const auto row = [](const std::string& id) {
+    return base::StrCat({"[data-watch='", id, "']"});
+  };
+  const auto settled = [&] {
+    return base::test::RunUntil([&] {
+      return std::ranges::none_of(watching(), [&](const std::string& id) {
+        return chats()->Running(id);
+      });
+    });
+  };
+
+  // A single watch's card ends with "Watch for something else", which opens
+  // the chips with a back arrow and makes a second chat.
+  ASSERT_TRUE(WatchCard::Open(browser()));
+  content::WebContents* page = card()->page();
+  ASSERT_TRUE(page);
+  ASSERT_TRUE(Shows(page, "#watch-another"));
+  EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('#watch-back')")
+                   .ExtractBool());
+  Click(page, "#watch-another");
+  ASSERT_TRUE(Shows(page, "#watch-for-stock"));
+  EXPECT_TRUE(Shows(page, "#watch-back"));
+  ScriptARun();
+  Click(page, "#watch-for-stock");
+  Click(page, "#watch-save");
+  ASSERT_TRUE(base::test::RunUntil([&] { return watching().size() == 2; }));
+  ASSERT_TRUE(settled());
+  const std::vector<std::string> two = watching();
+  const std::string stock = two[0] == price ? two[1] : two[0];
+  EXPECT_EQ(chats()->Find(stock)->watch_for, "Back in stock");
+  EXPECT_EQ(chats()->Find(price)->watch_for, "Price drops below $500");
+
+  // The eye counts them, and the card lists them.
+  EXPECT_TRUE(EyeSays(u"Watching this page for 2 things"));
+  ASSERT_TRUE(Shows(page, row(price)));
+  ASSERT_TRUE(Shows(page, row(stock)));
+
+  // A row opens its watch, whose back arrow returns to the list.
+  Click(page, row(price));
+  ASSERT_TRUE(Shows(page, "#watch-stop"));
+  EXPECT_EQ(
+      content::EvalJs(page, "document.querySelector('#watch-for').textContent"),
+      "Price drops below $500");
+  Click(page, "#watch-back");
+  ASSERT_TRUE(Shows(page, "#watch-list"));
+
+  // "Watch for something else" on the list makes a third chat.
+  Click(page, "#watch-another");
+  ASSERT_TRUE(Shows(page, "#watch-for-new"));
+  ScriptARun();
+  Click(page, "#watch-for-new");
+  Click(page, "#watch-save");
+  ASSERT_TRUE(base::test::RunUntil([&] { return watching().size() == 3; }));
+  ASSERT_TRUE(settled());
+  EXPECT_TRUE(EyeSays(u"Watching this page for 3 things"));
+
+  // Stop watching on one leaves the others, and the card goes back to the
+  // list.
+  ASSERT_TRUE(Shows(page, row(price)));
+  Click(page, row(price));
+  ASSERT_TRUE(Shows(page, "#watch-stop"));
+  Click(page, "#watch-stop");
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Find(price); }));
+  EXPECT_EQ(watching().size(), 2u);
+  EXPECT_TRUE(chats()->Find(stock));
+  ASSERT_TRUE(Shows(page, "#watch-list"));
+  EXPECT_TRUE(EyeSays(u"Watching this page for 2 things"));
 }
 
 // A headless bubble never draws its page, so the card is shown in a tab to

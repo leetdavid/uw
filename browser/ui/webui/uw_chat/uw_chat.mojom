@@ -572,15 +572,21 @@ struct WatchCardState {
   string host;
   // The page's icon as a data: URL, or empty.
   string favicon;
-  // The chat that watches the page, or empty when none does.
-  string chat_id;
-  // The watch's schedule and how it stands, or a new card's settings.
-  ScheduleState state;
-  // The watch's runs of the last 14 days, oldest first, for its chart. Each
-  // is a kRun step.
-  array<Step> runs;
+  // The chats that watch the page, in a steady order; empty when none does.
+  // Each watch's runs are those of the last 14 days, for its chart.
+  array<PageWatch> watches;
+  // A new watch's settings.
+  ScheduleState fresh;
   // Whether the card is frosted glass: its window's glass is on.
   bool frosted;
+};
+
+// One chat that watches a page: its schedule and how it stands, and its runs,
+// oldest first, each a kRun step.
+struct PageWatch {
+  string chat_id;
+  ScheduleState state;
+  array<Step> runs;
 };
 
 // Links the watch card's page to its handler.
@@ -594,13 +600,13 @@ interface WatchCardHandler {
   // The page has drawn and can be shown.
   ShowUI();
   // Watches the page on `schedule`, which asks `schedule.request` and
-  // watches for `schedule.watch_for`, or saves the watch's changed schedule.
-  // Then closes the card.
-  Watch(ChatSchedule schedule);
-  // Removes the watch's schedule and closes the card. Its chat stays.
-  StopWatching();
-  // Shows the watch's chat and closes the card.
-  OpenChat();
+  // watches for `schedule.watch_for`, in a new chat when `chat_id` is empty,
+  // or saves the changed schedule of the watch `chat_id`.
+  Watch(string chat_id, ChatSchedule schedule);
+  // Removes the schedule of the watch `chat_id`. Its chat stays.
+  StopWatching(string chat_id);
+  // Shows the chat `chat_id` and closes the card.
+  OpenChat(string chat_id);
   Close();
 };
 
@@ -616,10 +622,14 @@ interface WatchCardPage {
 struct ScheduledRow {
   // The chat's title.
   string title;
-  // The chat as a watch card shows it. A watched page's card has its page's
-  // title, site, and icon. Its runs are every run the chat keeps, oldest
-  // first, without their steps.
-  WatchCardState card;
+  // For a watched page: the page's title and its icon as a data: URL, from a
+  // tab of it or history, or empty, and its site.
+  string page_title;
+  string favicon;
+  string host;
+  // The chat's schedule and how it stands, with every run it keeps, without
+  // their steps.
+  PageWatch watch;
   // Whether it has a schedule. A chat with only a running trigger has none.
   bool scheduled;
   // The command of the chat's running trigger, or empty.
@@ -636,7 +646,7 @@ struct WatchAddress {
   string title;
   string favicon;
   string host;
-  // The chat that already watches it, or empty.
+  // A chat that already watches it, or empty.
   string chat_id;
 };
 
@@ -653,11 +663,12 @@ interface ScheduledHandler {
   // approval mode.
   NewSchedule() => (ScheduleState state);
   LookUpAddress(string address) => (WatchAddress address);
-  // Watches `schedule.page`, an address LookUpAddress gave, on `schedule`,
-  // or saves the changed schedule of the chat that watches it.
-  Watch(ChatSchedule schedule);
-  // Removes the schedule of the chat that watches `page`. The chat stays.
-  StopWatching(string page);
+  // Watches `schedule.page`, an address LookUpAddress gave, on `schedule`
+  // in a new chat when `chat_id` is empty, even when other chats watch the
+  // page, or saves the changed schedule of the watch `chat_id`.
+  Watch(string chat_id, ChatSchedule schedule);
+  // Removes the schedule of the watch `chat_id`. Its chat stays.
+  StopWatching(string chat_id);
   // Makes a chat whose first message is `schedule.request` and saves its
   // schedule, which runs at once.
   StartScheduledChat(ChatSchedule schedule);

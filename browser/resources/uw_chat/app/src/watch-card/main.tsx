@@ -1,8 +1,9 @@
 // The watch card, under the eye in the address bar. It watches the page of
-// the tab it opened for, or shows the scheduled chat that watches that page.
-// See the frames "Watch this page: the card" and "Watch this page: every
-// state" on the canvas page "Agent chats", and docs/product.md, "Scheduled
-// chats".
+// the tab it opened for, or shows the scheduled chats that watch that page:
+// one watch's card, or with several, a list of them. See the frames "Watch
+// this page: the card", "Watch this page: every state", "Several watches: the
+// eye's card", and "Watch from a chat and several watches: every state" on the
+// canvas, and docs/product.md, "Scheduled chats".
 import "@/trusted-types";
 import "@/theme-colors";
 import { StrictMode, useEffect, useRef, useState } from "react";
@@ -14,11 +15,19 @@ import {
   watchCardPage,
   type WatchCardState,
 } from "./watch-card-api";
-import { WatchForm, Watched } from "./watch-parts";
+import { WatchForm, WatchList, Watched, viewOf } from "./watch-parts";
+
+// What the card shows: the page's watches, one watch, a watch being changed,
+// or a new watch of the page.
+type Showing =
+  | { kind: "watches" }
+  | { kind: "watch"; chatId: string }
+  | { kind: "edit"; chatId: string }
+  | { kind: "new" };
 
 function WatchCard() {
   const [card, setCard] = useState<WatchCardState | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [showing, setShowing] = useState<Showing>({ kind: "watches" });
   const shown = useRef(false);
   useEffect(() => {
     const id = watchCardPage.onCard.addListener((next: WatchCardState) =>
@@ -30,7 +39,7 @@ function WatchCard() {
     };
   }, []);
   useEffect(() => {
-    document.documentElement.classList.toggle('frosted', !!card?.frosted);
+    document.documentElement.classList.toggle("frosted", !!card?.frosted);
   }, [card]);
   useEffect(() => {
     if (card && !shown.current) {
@@ -41,6 +50,88 @@ function WatchCard() {
   if (!card) {
     return null;
   }
+  const watches = card.watches;
+  const fresh = viewOf(card, { chatId: "", state: card.fresh, runs: [] });
+  const watchOf = (chatId: string) =>
+    watches.find((watch) => watch.chatId === chatId);
+  const toWatches = () => setShowing({ kind: "watches" });
+  const another = () => setShowing({ kind: "new" });
+  let body;
+  if (watches.length === 0) {
+    body = (
+      <WatchForm
+        card={fresh}
+        onWatch={(schedule) => {
+          watchCardHandler.watch("", schedule);
+          watchCardHandler.close();
+        }}
+        onCancel={() => watchCardHandler.close()}
+      />
+    );
+  } else if (showing.kind === "new") {
+    body = (
+      <WatchForm
+        key="new"
+        card={fresh}
+        onBack={toWatches}
+        onWatch={(schedule) => {
+          watchCardHandler.watch("", schedule);
+          toWatches();
+        }}
+        onCancel={toWatches}
+      />
+    );
+  } else {
+    const selected =
+      showing.kind === "watch" || showing.kind === "edit"
+        ? watchOf(showing.chatId)
+        : watches.length === 1
+          ? watches[0]
+          : undefined;
+    // With several watches, a watch's card goes back to their list.
+    const back = watches.length > 1 ? toWatches : undefined;
+    if (!selected) {
+      body = (
+        <WatchList
+          page={card}
+          watches={watches}
+          onOpen={(chatId) => setShowing({ kind: "watch", chatId })}
+          onAnother={another}
+        />
+      );
+    } else if (showing.kind === "edit") {
+      body = (
+        <WatchForm
+          key={selected.chatId}
+          card={viewOf(card, selected)}
+          onBack={() => setShowing({ kind: "watch", chatId: selected.chatId })}
+          onWatch={(schedule) => {
+            watchCardHandler.watch(selected.chatId, schedule);
+            watchCardHandler.close();
+          }}
+          onCancel={() => watchCardHandler.close()}
+        />
+      );
+    } else {
+      body = (
+        <Watched
+          card={viewOf(card, selected)}
+          onBack={back}
+          onOpenChat={() => watchCardHandler.openChat(selected.chatId)}
+          onEdit={() => setShowing({ kind: "edit", chatId: selected.chatId })}
+          onStopWatching={() => {
+            watchCardHandler.stopWatching(selected.chatId);
+            if (watches.length > 1) {
+              toWatches();
+            } else {
+              watchCardHandler.close();
+            }
+          }}
+          onAnother={another}
+        />
+      );
+    }
+  }
   return (
     <div
       id="watch-card"
@@ -48,24 +139,7 @@ function WatchCard() {
       aria-label="Watch this page"
       className="flex w-96 flex-col gap-2.5 bg-background p-4"
     >
-      {card.chatId && !editing ? (
-        <Watched
-          card={card}
-          onOpenChat={() => watchCardHandler.openChat()}
-          onEdit={() => setEditing(true)}
-          onStopWatching={() => watchCardHandler.stopWatching()}
-        />
-      ) : (
-        <WatchForm
-          key={card.chatId}
-          card={card}
-          onWatch={(schedule) => {
-            watchCardHandler.watch(schedule);
-            setEditing(false);
-          }}
-          onCancel={() => watchCardHandler.close()}
-        />
-      )}
+      {body}
     </div>
   );
 }

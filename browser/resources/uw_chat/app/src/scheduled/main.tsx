@@ -39,8 +39,12 @@ import {
 } from "../chat-api";
 import { numberText } from "../chart";
 import { ScheduleRows, WATCH_CHIPS } from "../schedule";
-import type { WatchCardState } from "../watch-card/watch-card-api";
-import { useModels, WatchForm, Watched } from "../watch-card/watch-parts";
+import {
+  useModels,
+  WatchForm,
+  Watched,
+  type WatchView,
+} from "../watch-card/watch-parts";
 import {
   connect,
   scheduledHandler,
@@ -200,8 +204,8 @@ function Cell({
 
 // When it last ran, and how that went.
 function LastRun({ row }: { row: ScheduledRow }) {
-  const state = row.card.state;
-  const run = row.card.runs.at(-1)?.run;
+  const state = row.watch.state;
+  const run = row.watch.runs.at(-1)?.run;
   const time = state.last || run?.time;
   const top = time ? dayAndTime(time) : "Not run yet";
   if (state.running) {
@@ -296,7 +300,7 @@ function LastRun({ row }: { row: ScheduledRow }) {
 
 // When it runs next, and how often.
 function NextRun({ row }: { row: ScheduledRow }) {
-  const state = row.card.state;
+  const state = row.watch.state;
   if (!row.scheduled) {
     return (
       <Cell
@@ -348,8 +352,8 @@ function RowButtons({
   row: ScheduledRow;
   withChat: boolean;
 }) {
-  const id = row.card.chatId;
-  const paused = row.card.state.paused;
+  const id = row.watch.chatId;
+  const paused = row.watch.state.paused;
   const button =
     "grid size-7 place-items-center rounded-[7px] text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-[0_1px_3px_rgba(30,27,46,.14)] [&_svg]:size-[15px]";
   return (
@@ -427,7 +431,7 @@ function Row({
     <div
       role="button"
       tabIndex={0}
-      data-row={row.card.chatId}
+      data-row={row.watch.chatId}
       className={cn(
         COLUMNS,
         "group h-[54px] cursor-default border-t border-border pr-2.5 pl-3.5 text-[13px] whitespace-nowrap outline-none hover:bg-accent focus-visible:bg-accent",
@@ -445,21 +449,21 @@ function Row({
 }
 
 function WatchedRow({ row }: { row: ScheduledRow }) {
-  const card = row.card;
-  const schedule = card.state.schedule;
-  const latest = latestOf(card.runs, schedule.watchFor);
+  const watch = row.watch;
+  const schedule = watch.state.schedule;
+  const latest = latestOf(watch.runs, schedule.watchFor);
   const Icon = watchIcon(schedule.watchFor);
   return (
-    <Row row={row} onClick={() => scheduledHandler.openPage(card.chatId)}>
+    <Row row={row} onClick={() => scheduledHandler.openPage(watch.chatId)}>
       <div className="flex min-w-0 items-center gap-[11px]">
-        {card.favicon ? (
-          <img src={card.favicon} alt="" className="size-4 shrink-0" />
+        {row.favicon ? (
+          <img src={row.favicon} alt="" className="size-4 shrink-0" />
         ) : (
           <Globe aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         )}
         <Cell
-          top={card.title || schedule.page.replace(/^https?:\/\//, "")}
-          under={card.host}
+          top={row.pageTitle || schedule.page.replace(/^https?:\/\//, "")}
+          under={row.host}
         />
       </div>
       <span className="flex min-w-0 items-center gap-[7px] text-muted-foreground">
@@ -489,9 +493,9 @@ function WatchedRow({ row }: { row: ScheduledRow }) {
 }
 
 function ChatRow({ row }: { row: ScheduledRow }) {
-  const state = row.card.state;
+  const state = row.watch.state;
   return (
-    <Row row={row} onClick={() => scheduledHandler.openChat(row.card.chatId)}>
+    <Row row={row} onClick={() => scheduledHandler.openChat(row.watch.chatId)}>
       <div className="flex min-w-0 items-center gap-[11px]">
         {row.scheduled ? (
           <Clock aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -527,11 +531,11 @@ function ChatRow({ row }: { row: ScheduledRow }) {
 // Soonest next run first, then chats with no time, paused ones last.
 function order(rows: ScheduledRow[]): ScheduledRow[] {
   const rank = (row: ScheduledRow) =>
-    row.card.state.paused ? 2 : row.card.state.next ? 0 : 1;
+    row.watch.state.paused ? 2 : row.watch.state.next ? 0 : 1;
   return [...rows].sort(
     (a, b) =>
       rank(a) - rank(b) ||
-      (a.card.state.next || Infinity) - (b.card.state.next || Infinity),
+      (a.watch.state.next || Infinity) - (b.watch.state.next || Infinity),
   );
 }
 
@@ -539,8 +543,8 @@ function summary(rows: ScheduledRow[]): string {
   const count = `${rows.length} scheduled ${rows.length === 1 ? "chat" : "chats"}.`;
   const next = Math.min(
     ...rows
-      .filter((row) => !row.card.state.paused && row.card.state.next)
-      .map((row) => row.card.state.next),
+      .filter((row) => !row.watch.state.paused && row.watch.state.next)
+      .map((row) => row.watch.state.next),
   );
   if (!Number.isFinite(next)) {
     return count;
@@ -584,10 +588,12 @@ function Card({
 // Watch a page: the watch card with an Address field on top.
 function WatchAPage({
   state,
+  rows,
   onClose,
   onOpenWatch,
 }: {
   state: ScheduleState;
+  rows: ScheduledRow[];
   onClose: () => void;
   onOpenWatch: (chatId: string) => void;
 }) {
@@ -613,14 +619,13 @@ function WatchAPage({
     };
   }, [typed]);
   const invalid = left && !!typed.trim() && found !== null && !found.page;
-  const card: WatchCardState = {
+  const card: WatchView = {
     title: found?.title ?? "",
     host: found?.host ?? "",
     favicon: found?.favicon ?? "",
     chatId: "",
     state,
     runs: [],
-    frosted: false,
   };
   let line: ReactNode = null;
   if (invalid) {
@@ -631,20 +636,27 @@ function WatchAPage({
       </p>
     );
   } else if (found?.chatId) {
+    const watchFor =
+      rows.find((row) => row.watch.chatId === found.chatId)?.watch.state
+        .schedule.watchFor ?? "";
     line = (
       <p
         id="watch-already"
         className="flex items-center gap-2 rounded-[9px] bg-primary/[0.06] px-2.5 py-1.5 text-[12.5px]"
       >
         <Eye aria-hidden className="size-3.5 shrink-0 text-primary" />
-        Already watched.
+        <span className="min-w-0 truncate">
+          {watchFor
+            ? `Watched for ${watchFor.charAt(0).toLowerCase()}${watchFor.slice(1)}`
+            : "Watched"}
+        </span>
         <button
           type="button"
           id="watch-open-watch"
-          className="ml-auto font-medium text-primary"
+          className="ml-auto shrink-0 font-medium text-primary"
           onClick={() => onOpenWatch(found.chatId)}
         >
-          Open its watch
+          Open
         </button>
       </p>
     );
@@ -679,7 +691,7 @@ function WatchAPage({
     <WatchForm
       card={card}
       heading="Watch a page"
-      blocked={!found?.page || !!found.chatId}
+      blocked={!found?.page}
       top={
         <>
           <label
@@ -708,7 +720,7 @@ function WatchAPage({
       }
       onWatch={(schedule) => {
         if (found?.page) {
-          scheduledHandler.watch({ ...schedule, page: found.page });
+          scheduledHandler.watch("", { ...schedule, page: found.page });
         }
         onClose();
       }}
@@ -727,16 +739,20 @@ function OpenWatch({
 }) {
   const [editing, setEditing] = useState(false);
   const since = Date.now() - 14 * 86_400_000;
-  const card: WatchCardState = {
-    ...row.card,
-    runs: row.card.runs.filter((line) => (line.run?.time ?? 0) >= since),
+  const card: WatchView = {
+    title: row.pageTitle,
+    host: row.host,
+    favicon: row.favicon,
+    chatId: row.watch.chatId,
+    state: row.watch.state,
+    runs: row.watch.runs.filter((line) => (line.run?.time ?? 0) >= since),
   };
   if (editing) {
     return (
       <WatchForm
         card={card}
         onWatch={(schedule) => {
-          scheduledHandler.watch(schedule);
+          scheduledHandler.watch(card.chatId, schedule);
           setEditing(false);
         }}
         onCancel={onClose}
@@ -752,7 +768,7 @@ function OpenWatch({
       }}
       onEdit={() => setEditing(true)}
       onStopWatching={() => {
-        scheduledHandler.stopWatching(card.state.schedule.page);
+        scheduledHandler.stopWatching(card.chatId);
         onClose();
       }}
     />
@@ -877,14 +893,14 @@ function ScheduledPage() {
       </Button>
     </>
   );
-  const watched = order(rows.filter((row) => row.card.state.schedule.page));
-  const chats = order(rows.filter((row) => !row.card.state.schedule.page));
+  const watched = order(rows.filter((row) => row.watch.state.schedule.page));
+  const chats = order(rows.filter((row) => !row.watch.state.schedule.page));
   const scheduled = rows.filter((row) => row.scheduled);
   const allPaused =
-    scheduled.length > 0 && scheduled.every((row) => row.card.state.paused);
+    scheduled.length > 0 && scheduled.every((row) => row.watch.state.paused);
   const watchedRow =
     open?.kind === "watched"
-      ? rows.find((row) => row.card.chatId === open.chatId)
+      ? rows.find((row) => row.watch.chatId === open.chatId)
       : undefined;
   return (
     <main className="mx-auto flex max-w-[1020px] flex-col px-10 py-7">
@@ -940,7 +956,7 @@ function ScheduledPage() {
             head={["Page", "Watching for", "Latest", "Last run", "Next run", ""]}
           >
             {watched.map((row) => (
-              <WatchedRow key={row.card.chatId} row={row} />
+              <WatchedRow key={row.watch.chatId} row={row} />
             ))}
           </Table>
         </section>
@@ -956,7 +972,7 @@ function ScheduledPage() {
           </h2>
           <Table head={["Chat", "Asks for", "Last run", "Next run"]}>
             {chats.map((row) => (
-              <ChatRow key={row.card.chatId} row={row} />
+              <ChatRow key={row.watch.chatId} row={row} />
             ))}
           </Table>
         </section>
@@ -975,6 +991,7 @@ function ScheduledPage() {
         {open?.kind === "watch" && (
           <WatchAPage
             state={open.state}
+            rows={rows}
             onClose={() => setOpen(null)}
             onOpenWatch={(chatId) => setOpen({ kind: "watched", chatId })}
           />

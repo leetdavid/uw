@@ -2,6 +2,9 @@
 
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 
+#include <string>
+#include <vector>
+
 #include "base/functional/bind.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -152,12 +155,16 @@ void WatchCard::UpdateEye(tabs::TabInterface& tab) {
     return;
   }
   const ScheduledChats* chats = chats_observation_.GetSource();
-  const std::string* id =
-      chats ? chats->ChatWatching(tab.GetContents()->GetLastCommittedURL())
-            : nullptr;
-  const ScheduledChat* chat = id ? chats->Find(*id) : nullptr;
+  const std::vector<std::string> watching =
+      chats ? chats->ChatsWatching(tab.GetContents()->GetLastCommittedURL())
+            : std::vector<std::string>();
+  const ScheduledChat* chat =
+      watching.empty() ? nullptr : chats->Find(watching.front());
   std::u16string name = l10n_util::GetStringUTF16(IDS_UW_WATCH_THIS_PAGE);
-  if (chat && chat->watch_for.empty()) {
+  if (watching.size() > 1) {
+    name = l10n_util::GetPluralStringFUTF16(IDS_UW_WATCHING_THINGS,
+                                            watching.size());
+  } else if (chat && chat->watch_for.empty()) {
     name = l10n_util::GetStringUTF16(IDS_UW_WATCHING_THIS_PAGE);
   } else if (chat) {
     // "Price drops below $500" reads "Watching for price drops below $500".

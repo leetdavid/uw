@@ -3,7 +3,9 @@
 #ifndef UW_BROWSER_UI_WEBUI_UW_CHAT_UW_WATCH_CARD_HANDLER_H_
 #define UW_BROWSER_UI_WEBUI_UW_CHAT_UW_WATCH_CARD_HANDLER_H_
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
@@ -50,7 +52,7 @@ void LookUpPage(Profile* profile,
                                         const std::string& favicon)> done);
 
 // The watch card's browser side: the page of the tab its address names, and
-// the scheduled chat that watches that page.
+// the scheduled chats that watch that page.
 class UwWatchCardHandler : public mojom::WatchCardHandler,
                            public ScheduledChats::Observer {
  public:
@@ -63,9 +65,10 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
 
   // mojom::WatchCardHandler:
   void ShowUI() override;
-  void Watch(mojom::ChatSchedulePtr schedule) override;
-  void StopWatching() override;
-  void OpenChat() override;
+  void Watch(const std::string& chat_id,
+             mojom::ChatSchedulePtr schedule) override;
+  void StopWatching(const std::string& chat_id) override;
+  void OpenChat(const std::string& chat_id) override;
   void Close() override;
 
   // ScheduledChats::Observer:
@@ -74,9 +77,9 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
  private:
   // The tab whose page the card is about, or null once it closes.
   tabs::TabInterface* Tab() const;
-  // The id of the chat that watches the tab's page, or empty.
-  std::string Watcher() const;
-  // Reads the watch's runs from its chat, then sends the card.
+  // The ids of the chats that watch the tab's page.
+  std::vector<std::string> Watchers() const;
+  // Reads each watch's runs from its chat, then sends the card.
   void LoadRuns();
   void OnRunsLoaded(const std::string& chat_id,
                     std::optional<base::DictValue> saved);
@@ -88,8 +91,9 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
   mojo::Receiver<mojom::WatchCardHandler> receiver_;
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer>
       observation_{this};
-  // The lines of the watch's runs of the last 14 days, as its chat keeps them.
-  base::ListValue runs_;
+  // The lines of each watch's runs of the last 14 days, as its chat keeps
+  // them.
+  std::map<std::string, base::ListValue> runs_;
   base::WeakPtrFactory<UwWatchCardHandler> weak_factory_{this};
 };
 

@@ -104,7 +104,8 @@ void UwScheduledHandler::LookUpAddress(const std::string& address,
           std::move(found), std::move(callback)));
 }
 
-void UwScheduledHandler::Watch(mojom::ChatSchedulePtr schedule) {
+void UwScheduledHandler::Watch(const std::string& chat_id,
+                               mojom::ChatSchedulePtr schedule) {
   ScheduledChats* chats = schedules_.GetSource();
   const GURL address = AddressFrom(schedule->page);
   std::optional<ScheduledChat> chat = ScheduledChatFrom(*schedule);
@@ -112,21 +113,17 @@ void UwScheduledHandler::Watch(mojom::ChatSchedulePtr schedule) {
     return;
   }
   chat->page = address.spec();
-  if (const std::string* watching = chats->ChatWatching(address)) {
-    chats->Save(std::string(*watching), std::move(*chat));
-  } else {
+  if (chat_id.empty()) {
     chats->Watch(std::move(*chat));
+  } else if (chats->Find(chat_id)) {
+    chats->Save(chat_id, std::move(*chat));
   }
 }
 
-void UwScheduledHandler::StopWatching(const std::string& page) {
+void UwScheduledHandler::StopWatching(const std::string& chat_id) {
   ScheduledChats* chats = schedules_.GetSource();
-  const GURL address = AddressFrom(page);
-  if (!chats || !address.is_valid()) {
-    return;
-  }
-  if (const std::string* watching = chats->ChatWatching(address)) {
-    chats->Remove(std::string(*watching));
+  if (chats && chats->Find(chat_id)) {
+    chats->Remove(chat_id);
   }
 }
 
@@ -269,17 +266,17 @@ void UwScheduledHandler::SendRows() {
     }
     auto row = mojom::ScheduledRow::New();
     row->title = entry.title;
-    auto card = mojom::WatchCardState::New();
-    card->chat_id = entry.id;
+    auto watch = mojom::PageWatch::New();
+    watch->chat_id = entry.id;
     const ScheduledChat* chat = chats->Find(entry.id);
     row->scheduled = chat != nullptr;
-    card->state =
+    watch->state =
         ScheduleStateOf(chats, entry.id, chat ? *chat : ScheduledChat());
     if (chat && !chat->page.empty()) {
-      card->host = HostOf(GURL(chat->page));
+      row->host = HostOf(GURL(chat->page));
       if (const auto look = looks_.find(chat->page); look != looks_.end()) {
-        card->title = look->second.title;
-        card->favicon = look->second.favicon;
+        row->page_title = look->second.title;
+        row->favicon = look->second.favicon;
       }
     }
     if (const auto runs = runs_.find(entry.id); runs != runs_.end()) {
@@ -290,10 +287,10 @@ void UwScheduledHandler::SendRows() {
           run->text = *text;
         }
         run->run = RunLineFrom(line.GetDict());
-        card->runs.push_back(std::move(run));
+        watch->runs.push_back(std::move(run));
       }
     }
-    row->card = std::move(card);
+    row->watch = std::move(watch);
     if (const ChatTriggers::Trigger* trigger = chats->TriggerOf(entry.id)) {
       row->trigger = trigger->command;
     }

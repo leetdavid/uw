@@ -4,9 +4,9 @@ import {
   WatchCardHandlerRemote,
   WatchCardPageCallbackRouter,
 } from "uw-chat-mojom";
-import type { WatchCardState } from "uw-chat-mojom";
+import type { PageWatch, WatchCardState } from "uw-chat-mojom";
 
-export type { WatchCardState };
+export type { PageWatch, WatchCardState };
 
 export const watchCardPage = new WatchCardPageCallbackRouter();
 export const watchCardHandler = new WatchCardHandlerRemote();

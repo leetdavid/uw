@@ -177,8 +177,8 @@ class ScheduledPageBrowserTest : public headless::HeadlessModeBrowserTest {
   bool Shows(content::WebContents* page, std::string_view selector) {
     return base::test::RunUntil([&] {
       return content::EvalJs(
-                 page, content::JsReplace("!!document.querySelector($1)",
-                                          selector))
+                 page,
+                 content::JsReplace("!!document.querySelector($1)", selector))
           .ExtractBool();
     });
   }
@@ -271,21 +271,40 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, WatchesAPageByItsAddress) {
   EXPECT_TRUE(Says(page, "#watched-pages", "Jarvis Bamboo Standing Desk"));
   EXPECT_TRUE(Says(page, "#watched-pages", "$549"));
 
-  // The same page again is already watched, and its watch opens in place.
+  // The same page again says it is already watched, and watching it again
+  // makes a second chat.
   Click(page, "#watch-a-page");
   ASSERT_TRUE(Shows(page, "#watch-address"));
   Type(page, "#watch-address", Url("/desk#reviews").spec());
   ASSERT_TRUE(Shows(page, "#watch-already"));
-  EXPECT_TRUE(content::EvalJs(page,
-                              "document.querySelector('#watch-save')"
-                              ".disabled")
-                  .ExtractBool());
+  ScriptARun();
+  Click(page, "#watch-for-stock");
+  Click(page, "#watch-save");
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return chats()->ChatsWatching(Url("/desk")).size() == 2; }));
+  std::string stock;
+  for (const std::string& each : chats()->ChatsWatching(Url("/desk"))) {
+    if (each != id) {
+      stock = each;
+    }
+  }
+  EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(stock); }));
+  EXPECT_EQ(chats()->Find(stock)->watch_for, "Back in stock");
+  ASSERT_TRUE(Shows(page, base::StrCat({"[data-row='", stock, "']"})));
+
+  // "Open its watch" opens a watch of the page in place, and Stop watching
+  // ends that one only.
+  Click(page, "#watch-a-page");
+  ASSERT_TRUE(Shows(page, "#watch-address"));
+  Type(page, "#watch-address", Url("/desk").spec());
+  ASSERT_TRUE(Shows(page, "#watch-open-watch"));
   Click(page, "#watch-open-watch");
   ASSERT_TRUE(Shows(page, "#watch-stop"));
-  EXPECT_EQ(Text(page, "#watch-for"), "Price drops below $500");
+  const std::string opened =
+      Text(page, "#watch-for") == "Back in stock" ? stock : id;
   Click(page, "#watch-stop");
-  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Find(id); }));
-  EXPECT_TRUE(Shows(page, "#scheduled-empty"));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Find(opened); }));
+  EXPECT_EQ(chats()->ChatsWatching(Url("/desk")).size(), 1u);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, StartsAScheduledChat) {

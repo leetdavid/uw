@@ -2,6 +2,7 @@
 
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -164,7 +165,8 @@ void UwWatchCardHandler::ShowUI() {
   }
 }
 
-void UwWatchCardHandler::Watch(mojom::ChatSchedulePtr schedule) {
+void UwWatchCardHandler::Watch(const std::string& chat_id,
+                               mojom::ChatSchedulePtr schedule) {
   ScheduledChats* chats = observation_.GetSource();
   tabs::TabInterface* tab = Tab();
   std::optional<ScheduledChat> chat = ScheduledChatFrom(*schedule);
@@ -177,29 +179,27 @@ void UwWatchCardHandler::Watch(mojom::ChatSchedulePtr schedule) {
   }
   chat->page = WatchedAddress(page).spec();
   chat->watch_for = schedule->watch_for;
-  if (const std::string id = Watcher(); !id.empty()) {
-    chats->Save(id, std::move(*chat));
-  } else {
+  if (chat_id.empty()) {
     chats->Watch(std::move(*chat));
+  } else if (std::ranges::contains(Watchers(), chat_id)) {
+    chats->Save(chat_id, std::move(*chat));
   }
-  Close();
 }
 
-void UwWatchCardHandler::StopWatching() {
-  if (const std::string id = Watcher(); !id.empty()) {
-    observation_.GetSource()->Remove(id);
+void UwWatchCardHandler::StopWatching(const std::string& chat_id) {
+  if (std::ranges::contains(Watchers(), chat_id)) {
+    observation_.GetSource()->Remove(chat_id);
   }
-  Close();
 }
 
-void UwWatchCardHandler::OpenChat() {
-  const std::string id = Watcher();
+void UwWatchCardHandler::OpenChat(const std::string& chat_id) {
   tabs::TabInterface* tab = Tab();
-  if (!id.empty() && tab) {
+  if (tab && std::ranges::contains(Watchers(), chat_id)) {
     const std::vector<tabs::TabInterface*> showing =
-        TabsShowingChat(Profile::FromWebUI(ui_->web_ui()), id);
+        TabsShowingChat(Profile::FromWebUI(ui_->web_ui()), chat_id);
     if (showing.empty()) {
-      chrome::AddTabAt(tab->GetBrowserWindowInterface(), ChatUrl(id), -1, true);
+      chrome::AddTabAt(tab->GetBrowserWindowInterface(), ChatUrl(chat_id), -1,
+                       true);
     } else {
       GoToTab(showing[0]);
     }
@@ -221,38 +221,40 @@ tabs::TabInterface* UwWatchCardHandler::Tab() const {
   return tab_.Get();
 }
 
-std::string UwWatchCardHandler::Watcher() const {
+std::vector<std::string> UwWatchCardHandler::Watchers() const {
   const ScheduledChats* chats = observation_.GetSource();
   const tabs::TabInterface* tab = Tab();
-  const std::string* id =
-      chats && tab
-          ? chats->ChatWatching(tab->GetContents()->GetLastCommittedURL())
-          : nullptr;
-  return id ? *id : std::string();
+  return chats && tab
+             ? chats->ChatsWatching(tab->GetContents()->GetLastCommittedURL())
+             : std::vector<std::string>();
 }
 
 void UwWatchCardHandler::LoadRuns() {
-  const std::string id = Watcher();
-  if (id.empty()) {
-    runs_.clear();
+  const std::vector<std::string> watchers = Watchers();
+  std::erase_if(runs_, [&watchers](const auto& runs) {
+    return !std::ranges::contains(watchers, runs.first);
+  });
+  if (watchers.empty()) {
     SendCard();
-    return;
   }
   // A run's lines go into the chat file on its sequence before the schedule
   // says it changed, so this reads them.
-  ChatFile(Profile::FromWebUI(ui_->web_ui())->GetPath(), id)
-      .Load(base::BindOnce(&UwWatchCardHandler::OnRunsLoaded,
-                           weak_factory_.GetWeakPtr(), id));
+  for (const std::string& id : watchers) {
+    ChatFile(Profile::FromWebUI(ui_->web_ui())->GetPath(), id)
+        .Load(base::BindOnce(&UwWatchCardHandler::OnRunsLoaded,
+                             weak_factory_.GetWeakPtr(), id));
+  }
 }
 
 void UwWatchCardHandler::OnRunsLoaded(const std::string& chat_id,
                                       std::optional<base::DictValue> saved) {
-  if (chat_id != Watcher()) {
+  if (!std::ranges::contains(Watchers(), chat_id)) {
     return;
   }
   constexpr base::TimeDelta kChart = base::Days(14);
   const base::Time since = base::Time::Now() - kChart;
-  runs_.clear();
+  base::ListValue& runs = runs_[chat_id];
+  runs.clear();
   const base::ListValue* log = saved ? saved->FindList("log") : nullptr;
   if (log) {
     for (const base::Value& entry : *log) {
@@ -261,7 +263,7 @@ void UwWatchCardHandler::OnRunsLoaded(const std::string& chat_id,
       if (kind && *kind == "run" &&
           base::ValueToTime(line->Find("time")).value_or(base::Time()) >=
               since) {
-        runs_.Append(line->Clone());
+        runs.Append(line->Clone());
       }
     }
   }
@@ -281,27 +283,29 @@ void UwWatchCardHandler::SendCard() {
   card->favicon = FaviconOf(contents);
   card->frosted = ElementGlassOfWindow(tab->GetBrowserWindowInterface()) > 0;
   const ScheduledChats* chats = observation_.GetSource();
-  if (const std::string id = Watcher(); !id.empty()) {
-    const ScheduledChat& chat = *chats->Find(id);
-    card->chat_id = id;
-    card->state = ScheduleStateOf(chats, id, chat);
-    for (const base::Value& entry : runs_) {
-      auto run = mojom::Step::New();
-      run->kind = mojom::StepKind::kRun;
-      if (const std::string* text = entry.GetDict().FindString("text")) {
-        run->text = *text;
+  for (const std::string& id : Watchers()) {
+    auto watch = mojom::PageWatch::New();
+    watch->chat_id = id;
+    watch->state = ScheduleStateOf(chats, id, *chats->Find(id));
+    if (const auto runs = runs_.find(id); runs != runs_.end()) {
+      for (const base::Value& entry : runs->second) {
+        auto run = mojom::Step::New();
+        run->kind = mojom::StepKind::kRun;
+        if (const std::string* text = entry.GetDict().FindString("text")) {
+          run->text = *text;
+        }
+        run->run = RunLineFrom(entry.GetDict());
+        watch->runs.push_back(std::move(run));
       }
-      run->run = RunLineFrom(entry.GetDict());
-      card->runs.push_back(std::move(run));
     }
-  } else {
-    const PrefService& prefs =
-        *Profile::FromBrowserContext(contents->GetBrowserContext())->GetPrefs();
-    card->state = ScheduleStateOf(
-        chats, {},
-        DefaultSchedule(chats, AgentChoice(prefs),
-                        ModeNamed(prefs.GetString(kAgentApprovalModePref))));
+    card->watches.push_back(std::move(watch));
   }
+  const PrefService& prefs =
+      *Profile::FromBrowserContext(contents->GetBrowserContext())->GetPrefs();
+  card->fresh = ScheduleStateOf(
+      chats, {},
+      DefaultSchedule(chats, AgentChoice(prefs),
+                      ModeNamed(prefs.GetString(kAgentApprovalModePref))));
   page_->OnCard(std::move(card));
 }
 

@@ -48,8 +48,9 @@ class UwScheduledHandler : public mojom::ScheduledHandler,
   void NewSchedule(NewScheduleCallback callback) override;
   void LookUpAddress(const std::string& address,
                      LookUpAddressCallback callback) override;
-  void Watch(mojom::ChatSchedulePtr schedule) override;
-  void StopWatching(const std::string& page) override;
+  void Watch(const std::string& chat_id,
+             mojom::ChatSchedulePtr schedule) override;
+  void StopWatching(const std::string& chat_id) override;
   void StartScheduledChat(mojom::ChatSchedulePtr schedule) override;
   void OpenPage(const std::string& chat_id) override;
   void OpenChat(const std::string& chat_id) override;

@@ -12,7 +12,7 @@ diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources
 index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8d4abc7e0e7239e3ca665b5f9a47fc30ce502cc6 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,188 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,189 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -133,6 +133,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8d4abc7e0e7239e3ca665b5f9a47fc30
 +      <message name="IDS_UW_WATCH_THIS_PAGE" desc="Tooltip of the eye in the address bar on a page that is not watched. A click opens a card that sets up a scheduled chat, which checks the page and tells the user when something they asked about happens. Also the card's name in the task manager.">Watch this page</message>
 +      <message name="IDS_UW_WATCHING_THIS_PAGE" desc="Tooltip of the filled eye in the address bar on a page that a scheduled chat checks, when the user described what to watch for in their own words.">Watching this page</message>
 +      <message name="IDS_UW_WATCHING_FOR" desc="Tooltip of the filled eye in the address bar on a page that a scheduled chat checks for what the user picked on the watch card.">Watching for <ph name="WHAT">$1<ex>price drops below $500</ex></ph></message>
++      <message name="IDS_UW_WATCHING_THINGS" desc="Tooltip of the filled eye in the address bar on a page that several scheduled chats check, each for something else.">{COUNT, plural, other {Watching this page for # things}}</message>
 +      <message name="IDS_UW_THEME_MODE_AUTO" desc="Theme picker choice that follows the system's light or dark appearance.">Auto</message>
 +      <message name="IDS_UW_THEME_MODE_LIGHT" desc="Theme picker choice for light mode.">Light</message>
 +      <message name="IDS_UW_THEME_MODE_DARK" desc="Theme picker choice for dark mode.">Dark</message>
@@ -201,7 +202,7 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8d4abc7e0e7239e3ca665b5f9a47fc30
        <!-- Access Code Cast specific strings -->
        <part file="access_code_cast_strings.grdp" />
  
-@@ -1778,7 +1960,7 @@ are declared in tools/grit/grit_args.gni.
+@@ -1778,7 +1961,7 @@ are declared in tools/grit/grit_args.gni.
            R&amp;eopen closed window
          </message>
          <message name="IDS_REOPEN_GROUP" desc="The text label of the Reopen Closed Group menu item">
