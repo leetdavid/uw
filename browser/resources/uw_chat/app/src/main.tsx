@@ -19,7 +19,6 @@ import {
   Columns2,
   Loader2,
   Pause,
-  Play,
   Blocks,
   ChevronUp,
   Clock,
@@ -828,30 +827,15 @@ function ChatList({
   current: string;
 }) {
   const [query, setQuery] = useState("");
-  const [scheduledOnly, setScheduledOnly] = useState(false);
   const wanted = query.trim().toLowerCase();
-  const scheduled = chats.filter((chat) => chat.scheduled || chat.trigger);
-  const onlyScheduled = scheduledOnly && scheduled.length > 0;
-  const shown = (onlyScheduled ? scheduled : chats).filter((chat) =>
+  const shown = chats.filter((chat) =>
     (chat.title || "New chat").toLowerCase().includes(wanted),
   );
   const midnight = new Date().setHours(0, 0, 0, 0);
-  // The Scheduled filter puts the next run first, and paused chats last.
-  const groups = onlyScheduled
-    ? [
-        {
-          label: "Scheduled",
-          chats: [...shown].sort(
-            (a, b) =>
-              Number(a.schedulePaused) - Number(b.schedulePaused) ||
-              (a.nextRun || Infinity) - (b.nextRun || Infinity),
-          ),
-        },
-      ]
-    : [
-        { label: "Today", chats: shown.filter((chat) => chat.updated >= midnight) },
-        { label: "Earlier", chats: shown.filter((chat) => chat.updated < midnight) },
-      ].filter((group) => group.chats.length);
+  const groups = [
+    { label: "Today", chats: shown.filter((chat) => chat.updated >= midnight) },
+    { label: "Earlier", chats: shown.filter((chat) => chat.updated < midnight) },
+  ].filter((group) => group.chats.length);
   return (
     <Sidebar>
       <SidebarHeader>
@@ -873,31 +857,6 @@ function ChatList({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        {scheduled.length > 0 && (
-          <div id="chat-filter" className="flex rounded-[9px] bg-accent p-[3px]" role="radiogroup">
-            {[false, true].map((only) => (
-              <button
-                key={String(only)}
-                type="button"
-                role="radio"
-                aria-checked={onlyScheduled === only}
-                className={cn(
-                  "flex h-[26px] flex-1 items-center justify-center gap-1.5 rounded-[7px] text-xs font-medium text-muted-foreground",
-                  onlyScheduled === only &&
-                    "bg-background text-foreground shadow-[0_1px_3px_rgba(30,27,46,.14)]",
-                )}
-                onClick={() => setScheduledOnly(only)}
-              >
-                {only ? "Scheduled" : "All"}
-                {only && (
-                  <span className="font-normal text-muted-foreground">
-                    {scheduled.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </SidebarHeader>
       <SidebarContent>
         {groups.map((group) => (
@@ -941,15 +900,13 @@ function ChatList({
                           <TerminalIcon className="size-3.5" />
                         </span>
                       )}
-                      {onlyScheduled
-                        ? chat.schedulePaused
-                          ? "Paused"
-                          : chat.nextRun
-                            ? when(chat.nextRun)
-                            : chat.trigger
-                              ? "Trigger"
-                              : ""
-                        : when(chat.updated)}
+                      {chat.scheduled && chat.schedulePaused
+                        ? "Paused"
+                        : chat.scheduled && chat.nextRun
+                          ? when(chat.nextRun)
+                          : chat.trigger
+                            ? "Trigger"
+                            : when(chat.updated)}
                     </span>
                   </SidebarMenuButton>
                   <SidebarMenuAction
@@ -967,26 +924,6 @@ function ChatList({
         ))}
       </SidebarContent>
       <SidebarFooter>
-        {onlyScheduled && (
-          <Button
-            id="pause-all"
-            variant="secondary"
-            size="compact"
-            className="mx-2 mb-1"
-            leadingIcon={
-              scheduled.every((chat) => chat.schedulePaused) ? Play : Pause
-            }
-            onClick={() =>
-              chatHandler.pauseAllSchedules(
-                !scheduled.every((chat) => chat.schedulePaused),
-              )
-            }
-          >
-            {scheduled.every((chat) => chat.schedulePaused)
-              ? "Resume all"
-              : "Pause all"}
-          </Button>
-        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <AiSettingsMenu />

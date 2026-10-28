@@ -33,7 +33,9 @@ enum WindowCommand {
   kClearScratchpad,
   kTidyScratchpad,
   kReportIssue,
-  kLastWindowCommand = kReportIssue,
+  // Opens uw://scheduled, every watched page and scheduled chat.
+  kShowScheduled,
+  kLastWindowCommand = kShowScheduled,
 };
 
 bool IsWindowCommand(int command);

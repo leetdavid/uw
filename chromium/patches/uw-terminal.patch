@@ -2,11 +2,12 @@ diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/u
 index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..03064d62c27e2dc756eba05d73d14797ea124d8f 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,12 @@
+@@ -69,6 +69,13 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
++#include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
 +#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
@@ -15,7 +16,7 @@ index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..03064d62c27e2dc756eba05d73d14797
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +407,12 @@ void RegisterChromeWebUIConfigs() {
+@@ -401,6 +408,13 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());
@@ -25,6 +26,7 @@ index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..03064d62c27e2dc756eba05d73d14797
 +  map.AddWebUIConfig(std::make_unique<uw::UwCommandBarUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwThemePickerUIConfig>());
 +  map.AddWebUIConfig(std::make_unique<uw::UwWatchCardUIConfig>());
++  map.AddWebUIConfig(std::make_unique<uw::UwScheduledUIConfig>());
  #endif  // BUILDFLAG(IS_ANDROID)
  
  #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_OPENBSD)

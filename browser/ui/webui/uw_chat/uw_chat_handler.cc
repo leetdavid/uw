@@ -28,21 +28,13 @@
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/models.h"
 // //chrome/browser depends on this target, so it cannot depend back.
-#include "chrome/browser/favicon/favicon_service_factory.h"
-#include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
-#include "components/favicon/content/content_favicon_driver.h"
-#include "components/favicon/core/favicon_service.h"
-#include "components/favicon_base/favicon_types.h"
-#include "components/history/core/browser/history_service.h"
-#include "components/keyed_service/core/service_access_type.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/split_tabs/split_tab_visual_data.h"
@@ -55,11 +47,8 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/codec/jpeg_codec.h"
-#include "ui/gfx/codec/png_codec.h"
-#include "ui/gfx/favicon_size.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/chat_suggestions.h"
@@ -69,6 +58,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
+#include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/attachment.h"
 #include "uw/components/agent/schedule_tool.h"
@@ -270,20 +260,6 @@ constexpr int kCardLines = 14;
 
 std::string DataUrl(std::string_view type, base::span<const uint8_t> bytes) {
   return base::StrCat({"data:", type, ";base64,", base::Base64Encode(bytes)});
-}
-
-// The icon of the page `contents` shows, as a data: URL, or empty.
-std::string FaviconOf(content::WebContents* contents) {
-  const favicon::FaviconDriver* icons =
-      favicon::ContentFaviconDriver::FromWebContents(contents);
-  const gfx::Image favicon = icons ? icons->GetFavicon() : gfx::Image();
-  if (favicon.IsEmpty()) {
-    return std::string();
-  }
-  const std::optional<std::vector<uint8_t>> png =
-      gfx::PNGCodec::EncodeBGRASkBitmap(*favicon.ToSkBitmap(),
-                                        /*discard_transparency=*/false);
-  return png ? DataUrl("image/png", *png) : std::string();
 }
 
 // The agent's tab a tool step acted in: the one it named, or the one it
@@ -2098,63 +2074,8 @@ void UwChatHandler::DescribePage(const std::string& page,
     std::move(callback).Run(std::string(), std::string());
     return;
   }
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
-  const GURL address = WatchedAddress(url);
-  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
-    if (window->GetProfile() != profile) {
-      continue;
-    }
-    for (tabs::TabInterface* tab :
-         TabListInterface::From(window)->GetAllTabs()) {
-      content::WebContents* contents = tab->GetContents();
-      if (WatchedAddress(contents->GetLastCommittedURL()) == address) {
-        std::move(callback).Run(base::UTF16ToUTF8(contents->GetTitle()),
-                                FaviconOf(contents));
-        return;
-      }
-    }
-  }
-  history::HistoryService* history = HistoryServiceFactory::GetForProfile(
-      profile, ServiceAccessType::EXPLICIT_ACCESS);
-  if (!history) {
-    std::move(callback).Run(std::string(), std::string());
-    return;
-  }
-  history->QueryURL(
-      address,
-      base::BindOnce(&UwChatHandler::OnPageInHistory,
-                     weak_factory_.GetWeakPtr(), address, std::move(callback)),
-      &page_tasks_);
-}
-
-void UwChatHandler::OnPageInHistory(const GURL& page,
-                                    DescribePageCallback callback,
-                                    history::QueryURLResult result) {
-  std::string title =
-      result.success ? base::UTF16ToUTF8(result.row.title()) : std::string();
-  favicon::FaviconService* icons = FaviconServiceFactory::GetForProfile(
-      Profile::FromBrowserContext(contents_->GetBrowserContext()),
-      ServiceAccessType::EXPLICIT_ACCESS);
-  if (!icons) {
-    std::move(callback).Run(std::move(title), std::string());
-    return;
-  }
-  icons->GetRawFaviconForPageURL(
-      page, {favicon_base::IconType::kFavicon}, gfx::kFaviconSize,
-      /*fallback_to_host=*/true,
-      base::BindOnce(
-          [](DescribePageCallback callback, std::string title,
-             const favicon_base::FaviconRawBitmapResult& icon) {
-            std::move(callback).Run(
-                std::move(title),
-                icon.is_valid()
-                    ? DataUrl("image/png",
-                              base::span<const uint8_t>(*icon.bitmap_data))
-                    : std::string());
-          },
-          std::move(callback), std::move(title)),
-      &page_tasks_);
+  LookUpPage(Profile::FromBrowserContext(contents_->GetBrowserContext()),
+             WatchedAddress(url), &page_tasks_, std::move(callback));
 }
 
 void UwChatHandler::SaveSchedule(mojom::ChatSchedulePtr schedule) {
@@ -2192,12 +2113,6 @@ void UwChatHandler::SetScheduleMuted(bool muted) {
 void UwChatHandler::StopRun() {
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->Stop(id_);
-  }
-}
-
-void UwChatHandler::PauseAllSchedules(bool paused) {
-  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
-    chats->SetAllPaused(paused);
   }
 }
 

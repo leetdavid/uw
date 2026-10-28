@@ -1,6 +1,7 @@
-# The uw://chat page, one chat with uw's agent, uw://ai, the AI page, and
-# the watch card under the eye in the address bar, and every uw page's
-# problems.js, which reports what goes wrong on the page. All three are one React
+# The uw://chat page, one chat with uw's agent, uw://ai, the AI page,
+# uw://scheduled, the Scheduled page, and the watch card under the eye in the
+# address bar, and every uw page's problems.js, which reports what goes wrong
+# on the page. All four are one React
 # app in app/, built from Fluid Functionalism's parts. app/bundle.ts checks
 # its types, bundles it with Chromium's node, and puts the pages' files in
 # one folder; the bundle carries the pages' mojo bindings.
@@ -14,11 +15,14 @@ app_dir = "$target_gen_dir/app"
 app_files = [
   "chat.html",
   "providers.html",
+  "scheduled.html",
   "watch_card.html",
   "favicon.svg",
   "plug.svg",
+  "clock.svg",
   "chat.js",
   "providers.js",
+  "scheduled.js",
   "watch_card.js",
   "problems.js",
   "chat.css",
@@ -40,9 +44,11 @@ node("app") {
     "app/bundle.ts",
     "chat.html",
     "providers.html",
+    "scheduled.html",
     "watch_card.html",
     "favicon.svg",
     "plug.svg",
+    "clock.svg",
   ]
   outputs = []
   foreach(file, app_files) {

@@ -37,6 +37,7 @@ namespace {
 constexpr char kSettingsSubPage[] = "uwOrganization";
 constexpr char kShortcutsSubPage[] = "shortcuts";
 constexpr char kProvidersUrl[] = "chrome://ai/providers";
+constexpr char kScheduledUrl[] = "chrome://scheduled/";
 
 std::optional<tab_groups::TabGroupId> SelectedTask(
     BrowserWindowInterface* window) {
@@ -204,6 +205,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kReportIssue:
       ShowSingletonTab(window, NewIssueUrl());
+      break;
+    case kShowScheduled:
+      ShowSingletonTab(window, GURL(kScheduledUrl));
       break;
   }
 }

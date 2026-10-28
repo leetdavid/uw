@@ -103,8 +103,6 @@ interface ChatHandler {
   StopRun();
   // Stops the chat's trigger and its command.
   StopTrigger();
-  // Pauses, or resumes, every scheduled chat of the profile.
-  PauseAllSchedules(bool paused);
 };
 
 // The model a chat runs on, from a provider on uw://ai/providers.
@@ -611,4 +609,68 @@ interface WatchCardPage {
   // What the card shows: once it connects, and again whenever the watch
   // changes.
   OnCard(WatchCardState card);
+};
+
+// A scheduled chat on the Scheduled page, uw://scheduled. See
+// docs/product.md, "Scheduled chats".
+struct ScheduledRow {
+  // The chat's title.
+  string title;
+  // The chat as a watch card shows it. A watched page's card has its page's
+  // title, site, and icon. Its runs are every run the chat keeps, oldest
+  // first, without their steps.
+  WatchCardState card;
+  // Whether it has a schedule. A chat with only a running trigger has none.
+  bool scheduled;
+  // The command of the chat's running trigger, or empty.
+  string trigger;
+};
+
+// An address typed into Watch a page.
+struct WatchAddress {
+  // The address as uw watches it, with https:// added when it was left out,
+  // or empty when it is not a web page's address.
+  string page;
+  // The page's title and icon from an open tab or history, or empty, and its
+  // site.
+  string title;
+  string favicon;
+  string host;
+  // The chat that already watches it, or empty.
+  string chat_id;
+};
+
+// Links the Scheduled page to its handler.
+interface ScheduledHandlerFactory {
+  CreateScheduledHandler(pending_remote<ScheduledPage> page,
+                         pending_receiver<ScheduledHandler> handler);
+};
+
+// Browser side. Only the Scheduled page can reach it.
+interface ScheduledHandler {
+  // A new card's settings: daily at 9:00 in the Mac's time zone, change
+  // alerts, the model last picked on a schedule card, and the agent's
+  // approval mode.
+  NewSchedule() => (ScheduleState state);
+  LookUpAddress(string address) => (WatchAddress address);
+  // Watches `schedule.page`, an address LookUpAddress gave, on `schedule`,
+  // or saves the changed schedule of the chat that watches it.
+  Watch(ChatSchedule schedule);
+  // Removes the schedule of the chat that watches `page`. The chat stays.
+  StopWatching(string page);
+  // Makes a chat whose first message is `schedule.request` and saves its
+  // schedule, which runs at once.
+  StartScheduledChat(ChatSchedule schedule);
+  // A watched page's row: goes to a tab of its page, or opens one.
+  OpenPage(string chat_id);
+  OpenChat(string chat_id);
+  SetPaused(string chat_id, bool paused);
+  PauseAll(bool paused);
+};
+
+// The Scheduled page.
+interface ScheduledPage {
+  // Every scheduled chat, and every chat with a running trigger: once the
+  // page connects, and again whenever one changes.
+  OnRows(array<ScheduledRow> rows);
 };

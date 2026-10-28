@@ -5,9 +5,11 @@
 
 #include <string>
 
+#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/task/cancelable_task_tracker.h"
 #include "base/values.h"
 #include "components/tabs/public/tab_interface.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -18,12 +20,34 @@
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 
+class Profile;
+
+namespace content {
+class WebContents;
+}  // namespace content
+
 namespace uw {
 
 class UwWatchCardUI;
 
 // The address of the watch card for `tab`'s page.
 GURL WatchCardUrl(const tabs::TabInterface& tab);
+
+// The icon of the page `contents` shows, as a data: URL, or empty.
+std::string FaviconOf(content::WebContents* contents);
+
+// A tab of `page`, matched by WatchedAddress(), in one of `profile`'s windows
+// the user sees, or null.
+tabs::TabInterface* TabOfPage(Profile* profile, const GURL& page);
+
+// Gives `done` the title of `page` and its icon as a data: URL, from a tab of
+// it, else from history, or empty when uw knows neither. `tracker` cancels a
+// lookup still under way.
+void LookUpPage(Profile* profile,
+                const GURL& page,
+                base::CancelableTaskTracker* tracker,
+                base::OnceCallback<void(const std::string& title,
+                                        const std::string& favicon)> done);
 
 // The watch card's browser side: the page of the tab its address names, and
 // the scheduled chat that watches that page.

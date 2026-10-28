@@ -12,19 +12,29 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/favicon/favicon_service_factory.h"
+#include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/favicon/core/favicon_service.h"
+#include "components/favicon_base/favicon_types.h"
+#include "components/history/core/browser/history_service.h"
+#include "components/keyed_service/core/service_access_type.h"
 #include "components/prefs/pref_service.h"
 #include "components/url_formatter/url_formatter.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "net/base/url_util.h"
 #include "ui/gfx/codec/png_codec.h"
+#include "ui/gfx/favicon_size.h"
 #include "ui/gfx/image/image.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/ui/glass/glass.h"
@@ -34,7 +44,12 @@
 namespace uw {
 namespace {
 
-// The page's icon as a data: URL, or empty.
+std::string PngDataUrl(base::span<const uint8_t> png) {
+  return base::StrCat({"data:image/png;base64,", base::Base64Encode(png)});
+}
+
+}  // namespace
+
 std::string FaviconOf(content::WebContents* contents) {
   const favicon::FaviconDriver* icons =
       favicon::ContentFaviconDriver::FromWebContents(contents);
@@ -45,12 +60,75 @@ std::string FaviconOf(content::WebContents* contents) {
   const std::optional<std::vector<uint8_t>> png =
       gfx::PNGCodec::EncodeBGRASkBitmap(*favicon.ToSkBitmap(),
                                         /*discard_transparency=*/false);
-  return png ? base::StrCat(
-                   {"data:image/png;base64,", base::Base64Encode(*png)})
-             : std::string();
+  return png ? PngDataUrl(*png) : std::string();
 }
 
-}  // namespace
+tabs::TabInterface* TabOfPage(Profile* profile, const GURL& page) {
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    if (window->GetProfile() != profile || IsRunWindow(window)) {
+      continue;
+    }
+    for (tabs::TabInterface* tab :
+         TabListInterface::From(window)->GetAllTabs()) {
+      const GURL& url = tab->GetContents()->GetLastCommittedURL();
+      if (url.SchemeIsHTTPOrHTTPS() && WatchedAddress(url) == page) {
+        return tab;
+      }
+    }
+  }
+  return nullptr;
+}
+
+void LookUpPage(Profile* profile,
+                const GURL& page,
+                base::CancelableTaskTracker* tracker,
+                base::OnceCallback<void(const std::string& title,
+                                        const std::string& favicon)> done) {
+  if (tabs::TabInterface* tab = TabOfPage(profile, page)) {
+    std::move(done).Run(base::UTF16ToUTF8(tab->GetContents()->GetTitle()),
+                        FaviconOf(tab->GetContents()));
+    return;
+  }
+  history::HistoryService* history = HistoryServiceFactory::GetForProfile(
+      profile, ServiceAccessType::EXPLICIT_ACCESS);
+  favicon::FaviconService* icons = FaviconServiceFactory::GetForProfile(
+      profile, ServiceAccessType::EXPLICIT_ACCESS);
+  if (!history || !icons) {
+    std::move(done).Run(std::string(), std::string());
+    return;
+  }
+  history->QueryURL(
+      page,
+      base::BindOnce(
+          [](favicon::FaviconService* icons, GURL page,
+             base::CancelableTaskTracker* tracker,
+             base::OnceCallback<void(const std::string&, const std::string&)>
+                 done,
+             history::QueryURLResult result) {
+            std::string title = result.success
+                                    ? base::UTF16ToUTF8(result.row.title())
+                                    : std::string();
+            icons->GetRawFaviconForPageURL(
+                page, {favicon_base::IconType::kFavicon}, gfx::kFaviconSize,
+                /*fallback_to_host=*/true,
+                base::BindOnce(
+                    [](base::OnceCallback<void(const std::string&,
+                                               const std::string&)> done,
+                       std::string title,
+                       const favicon_base::FaviconRawBitmapResult& icon) {
+                      std::move(done).Run(
+                          title, icon.is_valid()
+                                     ? PngDataUrl(base::span<const uint8_t>(
+                                           *icon.bitmap_data))
+                                     : std::string());
+                    },
+                    std::move(done), std::move(title)),
+                tracker);
+          },
+          base::Unretained(icons), page, base::Unretained(tracker),
+          std::move(done)),
+      tracker);
+}
 
 GURL WatchCardUrl(const tabs::TabInterface& tab) {
   return GURL(base::StrCat(

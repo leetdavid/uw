@@ -18,7 +18,6 @@
 #include "base/task/cancelable_task_tracker.h"
 #include "base/time/time.h"
 #include "base/values.h"
-#include "components/history/core/browser/history_types.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -148,7 +147,6 @@ class UwChatHandler : public mojom::ChatHandler,
   void SetScheduleMuted(bool muted) override;
   void StopRun() override;
   void StopTrigger() override;
-  void PauseAllSchedules(bool paused) override;
 
   const std::string& id() const { return id_; }
   bool loaded() const { return loaded_; }
@@ -222,10 +220,6 @@ class UwChatHandler : public mojom::ChatHandler,
   // chat's schedule if it has one, and tells the model that nothing is saved
   // until the user saves it.
   base::DictValue OpenScheduleCard(const base::DictValue& args);
-  // DescribePage's answer for `page`, which no open tab shows, from history.
-  void OnPageInHistory(const GURL& page,
-                       DescribePageCallback callback,
-                       history::QueryURLResult result);
   // The agent's trigger and stop_trigger calls.
   base::DictValue StartTrigger(const TriggerAsk& ask,
                                const base::FilePath& folder);
