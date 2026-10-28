@@ -16,6 +16,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
+#include "chrome/browser/sessions/session_service.h"
+#include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -24,6 +26,7 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -566,6 +569,39 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, PinsComeBackOnceAfterARestart) {
   EXPECT_EQ(PinnedUrls(browser()), std::vector<GURL>{GURL(kIssue)});
   ASSERT_EQ(store()->pins().size(), 1u);
   EXPECT_EQ(store()->pins()[0].home, GURL(kIssues));
+}
+
+// A rebuild of the session file leaves out a window that has no tabs yet, as
+// one that is opening, until the next rebuild. The pins it gets meanwhile
+// still come back as the same pins.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_PinsOfAWindowOpenedDuringARebuildComeBackOnce) {
+  Profile* profile = browser()->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  Pin(browser(), GURL(kMail));
+  SessionService* session = SessionServiceFactory::GetForProfile(profile);
+  BrowserWindowInterface* second = CreateBrowserWindow(
+      BrowserWindowCreateParams(profile, /*from_user_gesture=*/true));
+  session->ResetFromCurrentBrowsers();
+  AddBlankTabAndShow(second);
+  ASSERT_TRUE(ShowsPins(second->GetBrowserForMigrationOnly(), {GURL(kMail)}));
+  base::RunLoop().RunUntilIdle();
+  session->ResetFromCurrentBrowsers();
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PinsOfAWindowOpenedDuringARebuildComeBackOnce) {
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return GetAllBrowserWindowInterfaces().size() == 2u &&
+           AllShow(GetAllBrowserWindowInterfaces(), {GURL(kMail)});
+  }));
+  for (int i = 0; i < 5; ++i) {
+    base::RunLoop().RunUntilIdle();
+  }
+  EXPECT_EQ(store()->pins().size(), 1u);
+  EXPECT_TRUE(AllShow(GetAllBrowserWindowInterfaces(), {GURL(kMail)}));
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest,

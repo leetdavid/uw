@@ -1989,7 +1989,7 @@ index d8f32a1ca60e441fd998fbb05e3df7aeb1fd8dd6..ed003ac952f2729b20db09a8e607ea7d
    registry->RegisterBooleanPref(
        prefs::kShowManagedBookmarksInBookmarkBar, true,
 diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
-index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef0102553b 100644
+index 781d2e2f7ef99797284888c446e290488cdc1620..484dd529f151fe0734e8a860ea9360d2ba40c41b 100644
 --- a/chrome/browser/sessions/session_service.cc
 +++ b/chrome/browser/sessions/session_service.cc
 @@ -64,6 +64,7 @@
@@ -2000,15 +2000,18 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "chrome/browser/ash/crostini/crostini_util.h"
-@@ -354,12 +355,16 @@ void SessionService::AddTabExtraData(SessionID window_id,
+@@ -350,6 +351,10 @@ void SessionService::AddTabExtraData(SessionID window_id,
+                                      SessionID tab_id,
+                                      const char* key,
+                                      const std::string& data) {
++  // uw: kept even while saving is off, as it is until a restore after a
++  // crash, and while a rebuild leaves the window out because it had no tabs
++  // yet. The next rebuild writes the window and this data with it.
++  tab_extra_data_[tab_id][key] = data;
+   if (!ShouldTrackChangesToWindow(window_id)) {
      return;
    }
- 
-+  // Kept even while saving is off, as it is until a restore after a crash.
-+  tab_extra_data_[tab_id][key] = data;
-   ScheduleCommand(sessions::CreateAddTabExtraDataCommand(tab_id, key, data));
- }
- 
+@@ -360,6 +365,8 @@ void SessionService::AddTabExtraData(SessionID window_id,
  void SessionService::AddWindowExtraData(SessionID window_id,
                                          const char* key,
                                          const std::string& data) {
@@ -2017,15 +2020,15 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef
    if (!ShouldTrackChangesToWindow(window_id)) {
      return;
    }
-@@ -381,6 +386,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
-   if (i != tab_to_available_range()->end()) {
-     tab_to_available_range()->erase(i);
+@@ -372,6 +379,7 @@ void SessionService::TabClosed(SessionID window_id, SessionID tab_id) {
+   if (!tab_id.id()) {
+     return;  // Happens when the tab is replaced.
    }
 +  tab_extra_data_.erase(tab_id);
  
-   if (pending_window_close_ids_.contains(window_id)) {
-     // Tab is in last window and the window is being closed. Don't commit it
-@@ -473,6 +479,7 @@ void SessionService::WindowClosing(SessionID window_id) {
+   if (!ShouldTrackChangesToWindow(window_id)) {
+     return;
+@@ -473,6 +481,7 @@ void SessionService::WindowClosing(SessionID window_id) {
  
  void SessionService::WindowClosed(SessionID window_id) {
    windows_tracking()->erase(window_id);
@@ -2033,7 +2036,7 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef
    last_selected_tab_in_window()->erase(window_id);
  
    if (window_closing_ids_.contains(window_id)) {
-@@ -663,6 +670,16 @@ void SessionService::BuildCommandsForTab(
+@@ -663,6 +672,16 @@ void SessionService::BuildCommandsForTab(
      command_storage_manager()->AppendRebuildCommand(
          sessions::CreateSplitTabCommand(session_id, std::move(split)));
    }
@@ -2050,7 +2053,7 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef
  }
  
  void SessionService::ScheduleResetCommands() {
-@@ -674,6 +691,17 @@ void SessionService::ScheduleResetCommands() {
+@@ -674,6 +693,17 @@ void SessionService::ScheduleResetCommands() {
    last_selected_tab_in_window()->clear();
    set_rebuild_on_next_save(false);
    BuildCommandsFromBrowsers(tab_to_available_range(), windows_tracking());
@@ -2068,7 +2071,7 @@ index 781d2e2f7ef99797284888c446e290488cdc1620..1d96cf1dfaaa30e512df1e0af8a8b0ef
    if (!windows_tracking()->empty()) {
      // We're lazily created on startup and won't get an initial batch of
      // SetWindowType messages. Set these here to make sure our state is correct.
-@@ -736,7 +764,10 @@ bool SessionService::HasOpenTrackableBrowsers(SessionID window_id) const {
+@@ -736,7 +766,10 @@ bool SessionService::HasOpenTrackableBrowsers(SessionID window_id) const {
        [this, window_id, &has_open_trackable](BrowserWindowInterface* browser) {
          const SessionID browser_id = browser->GetSessionID();
          if (browser_id != window_id &&
