@@ -288,6 +288,10 @@ _Avoid_: Integration, plugin, tool server.
 A service on uw's own short list of connectors that uw has tested: its web address is the service's own, and uw signed in to it and listed its tools with a real account.
 _Avoid_: Verified, official, featured.
 
+**Help**:
+uw's how-to pages for the people who use it, published at uwbrowser.com/help. They describe only what is built. uw's agent reads them through the uw Help connector, which comes with uw and can be turned off but not removed.
+_Avoid_: Docs, documentation, user guide, manual, design docs.
+
 **Plugin**:
 A package a service publishes that adds its connector, its skills, or both to uw in one step.
 _Avoid_: App, extension, integration.
