@@ -341,7 +341,7 @@ git worktree add --detach /tmp/uw-deploy main
 cd /tmp/uw-deploy
 pnpm install --frozen-lockfile
 vercel link --yes --project uw --scope eslee
-vercel build --prod --scope eslee
+vercel build --prod --yes --scope eslee
 vercel deploy --prebuilt --prod --scope eslee
 cd - && git worktree remove --force /tmp/uw-deploy
 ```

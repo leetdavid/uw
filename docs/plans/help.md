@@ -107,6 +107,8 @@ Where the build differs from the design:
 - Dark mode takes the night colors of the redesigned home page (`site/app/home.css`): a deep indigo sky, a glowing horizon in place of the darkened dawn, gradient italics, and a white Download button. "Help: dark" on the canvas shows the earlier violet night.
 - `try-uw.md` is not deleted yet: other sessions still add manual tests to it as features land. See [Open questions](#open-questions).
 
+Help went live at `uwbrowser.com/help` on 2026-10-28, before a release, at the user's call: some pages describe things the 2026-10-24 prerelease doesn't have.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
