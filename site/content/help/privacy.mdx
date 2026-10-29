@@ -1,0 +1,55 @@
+---
+title: "Privacy: what uw sends"
+description: Everything uw sends over the internet besides the pages you visit, who receives it, and when.
+---
+
+uw sends Google nothing about what you do. Other services get only what a feature you use needs. This page lists every one.
+
+## Never sent *to Google*
+
+- What you do in a private window.
+- The forms on the pages you visit. Chromium sends Google a fingerprint of each form for Autofill; uw doesn't.
+- What you typed before picking a suggestion, and which suggestions the address bar showed. Chromium adds both to every Google search; uw leaves them out.
+- Checks for Google's AI Mode.
+- The address, name, and fingerprint of files you download.
+- Chromium's usage statistics, surveys, and its own problem reports.
+
+## What still reaches *Google*
+
+| What | When |
+| --- | --- |
+| Your searches | You search with Google, uw's default search engine. |
+| Search suggestions | You type in the address bar of a normal window. The [command bar](./command-bar.mdx) sends nothing until you pick a row, and private windows never send suggestions. |
+| The new tab page | Chromium's new tab page opens in a normal window. Google's bar at its top right, its doodles, and its promos come from Google and report back to it. uw will replace this page with its own. |
+| Component updates | At launch and every few hours. They carry the list of revoked website certificates and other data Chromium needs. Google sees the browser version, not what you browse. |
+| Push messaging | A website you allowed to send notifications needs it. |
+| A sign-in check | At launch, a normal window asks Google which Google accounts it is signed in to, with your Google cookies. |
+
+## Your *AI provider*
+
+The [provider you add](./add-an-ai-provider.mdx) receives what you ask it to work on:
+
+- Each tab's title, address, and a short excerpt of its text, when uw [organizes your tabs](./automatic-organization.mdx). Never from a private window.
+- Your [chats](./chats.mdx), with the pages the agent reads for you. A chat in a private window goes to your provider too, but uw keeps nothing from it.
+
+What your provider keeps follows its own rules.
+
+## Crash and *problem reports*
+
+Only after you say yes. See [Report a problem](./report-a-problem.mdx).
+
+## Other *services*
+
+| Service | What and when |
+| --- | --- |
+| models.dev | uw downloads its public list of what each AI model can do, at most once a day. |
+| The MCP Registry and GitHub | The connect dialog downloads their public lists of connectors and plugins, at most once a day. |
+| The European Central Bank | The command bar downloads the day's exchange rates for currency conversions, at most once a day, and again in each private session. |
+| Your connectors | Each [connector](./connectors.mdx) you add receives what the agent sends it. |
+| GitHub | uw checks for updates on uw's GitHub releases. |
+
+None of these requests carry cookies or anything about you.
+
+## Two settings uw *removed*
+
+Chromium's **Make searches and browsing better** and **Enhanced protection** are gone from uw's settings. Each would send Google the address of every page you visit. If either was on, uw turns it off.

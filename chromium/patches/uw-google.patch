@@ -1,0 +1,294 @@
+diff --git a/chrome/browser/policy/configuration_policy_handler_list_factory.cc b/chrome/browser/policy/configuration_policy_handler_list_factory.cc
+index bbcb61aa574f00fcd28a8e1a7e25729d698ab447..2e0f8a78b3d85ee0b62f7f625511a85e1bef7136 100644
+--- a/chrome/browser/policy/configuration_policy_handler_list_factory.cc
++++ b/chrome/browser/policy/configuration_policy_handler_list_factory.cc
+@@ -2672,14 +2672,8 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
+   handlers->AddHandler(
+       std::make_unique<URLBlocklistPolicyHandler>(key::kURLBlocklist));
+ 
+-  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
+-      std::make_unique<SimplePolicyHandler>(
+-          key::kUrlKeyedAnonymizedDataCollectionEnabled,
+-          unified_consent::prefs::kUrlKeyedAnonymizedDataCollectionEnabled,
+-          base::Value::Type::BOOLEAN),
+-      std::make_unique<BooleanDisablingPolicyHandler>(
+-          key::kUrlKeyedMetricsAllowed,
+-          unified_consent::prefs::kUrlKeyedAnonymizedDataCollectionEnabled)));
++  // uw: "Make searches and browsing better" is removed, so no policy turns
++  // it on. See docs/plans/google-requests.md.
+ 
+   handlers->AddHandler(
+       std::make_unique<
+diff --git a/chrome/browser/resources/settings/privacy_page/personalization_options.html b/chrome/browser/resources/settings/privacy_page/personalization_options.html
+index f4968fb7c8f1463279e9284551b02d5c8eb03081..5f44fed959c2eb246e224e8b6cf1f1ba7e027bda 100644
+--- a/chrome/browser/resources/settings/privacy_page/personalization_options.html
++++ b/chrome/browser/resources/settings/privacy_page/personalization_options.html
+@@ -88,7 +88,9 @@ import {RestartType} from '../relaunch_mixin_lit.js';
+     ` : ''}
+ </if><!-- not chromeos -->
+ </if><!-- _google_chrome -->
+-    <settings-toggle-button id="urlCollectionToggle"
++    <!-- uw: "Make searches and browsing better" is removed. See
++         docs/plans/google-requests.md. -->
++    <settings-toggle-button id="urlCollectionToggle" hidden
+         class="hr"
+         pref-key="url_keyed_anonymized_data_collection.enabled"
+         label="$i18n{urlKeyedAnonymizedDataCollection}"
+diff --git a/chrome/browser/resources/settings/privacy_page/privacy_guide/privacy_guide_page.ts b/chrome/browser/resources/settings/privacy_page/privacy_guide/privacy_guide_page.ts
+index bb9717c1f1d6e927632632cdc62ff2c00acf9a8d..34ae65ca66282aa7dce242465b1a708a72128234 100644
+--- a/chrome/browser/resources/settings/privacy_page/privacy_guide/privacy_guide_page.ts
++++ b/chrome/browser/resources/settings/privacy_page/privacy_guide/privacy_guide_page.ts
+@@ -37,7 +37,6 @@ import {routes} from '../../route.js';
+ import type {Route} from '../../router.js';
+ import {RouteObserverMixin, Router} from '../../router.js';
+ import {ContentSetting} from '../../site_settings/constants.js';
+-import {SafeBrowsingSetting} from '../security/safe_browsing_types.js';
+ 
+ import {PrivacyGuideStep} from './constants.js';
+ import {PrivacyGuideAvailabilityMixin} from './privacy_guide_availability_mixin.js';
+@@ -215,7 +214,9 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
+             this.metricsBrowserProxy_.recordAction(
+                 'Settings.PrivacyGuide.BackClickMSBB');
+           },
+-          isAvailable: () => true,
++          // uw: "Make searches and browsing better" is removed. See
++          // docs/plans/google-requests.md.
++          isAvailable: () => false,
+         },
+       ],
+       [
+@@ -506,14 +507,9 @@ export class SettingsPrivacyGuidePageElement extends PrivacyGuideBase {
+   }
+ 
+   private shouldShowSafeBrowsingCard_(): boolean {
+-    if (!this.prefs) {
+-      // Prefs are not available yet. Show the card until they become available.
+-      return true;
+-    }
+-    const currentSafeBrowsingSetting =
+-        this.getPref('generated.safe_browsing').value;
+-    return currentSafeBrowsingSetting === SafeBrowsingSetting.ENHANCED ||
+-        currentSafeBrowsingSetting === SafeBrowsingSetting.STANDARD;
++    // uw: the card offers Enhanced protection, which is removed. See
++    // docs/plans/google-requests.md.
++    return false;
+   }
+ 
+   private showAnySettingFragment_(): boolean {
+diff --git a/chrome/browser/resources/settings/privacy_page/security/security_page.html b/chrome/browser/resources/settings/privacy_page/security/security_page.html
+index 2918ece84f2a235c98088c2f81e44af0ca14c8db..3f73c3985dc07e6adaa202b5aef442813a78b7ad 100644
+--- a/chrome/browser/resources/settings/privacy_page/security/security_page.html
++++ b/chrome/browser/resources/settings/privacy_page/security/security_page.html
+@@ -79,7 +79,9 @@
+           pref="{{prefs.generated.safe_browsing}}"
+           selectable-elements="cr-radio-button, settings-collapse-radio-button"
+           on-change="onSafeBrowsingRadioChange_">
+-        <settings-collapse-radio-button id="safeBrowsingEnhanced"
++        <!-- uw: Enhanced protection is removed. See
++             docs/plans/google-requests.md. -->
++        <settings-collapse-radio-button id="safeBrowsingEnhanced" hidden
+             name="[[safeBrowsingSettingEnum_.ENHANCED]]"
+             pref="[[prefs.generated.safe_browsing]]"
+             label="$i18n{safeBrowsingEnhanced}"
+diff --git a/chrome/browser/safe_browsing/chrome_v4_protocol_config_provider.cc b/chrome/browser/safe_browsing/chrome_v4_protocol_config_provider.cc
+index 503c9cb0dbcb9fff4d0d92feed6bcc07a79617b8..ad1f31df88c3dd153f0d75bf7c7114275e61a1a0 100644
+--- a/chrome/browser/safe_browsing/chrome_v4_protocol_config_provider.cc
++++ b/chrome/browser/safe_browsing/chrome_v4_protocol_config_provider.cc
+@@ -10,6 +10,7 @@
+ #include "build/branding_buildflags.h"
+ #include "chrome/common/chrome_switches.h"
+ #include "components/safe_browsing/core/browser/db/v4_protocol_config.h"
++#include "google_apis/google_api_keys.h"
+ 
+ #if BUILDFLAG(IS_WIN)
+ #include "chrome/install_static/install_util.h"
+@@ -43,9 +44,12 @@ std::string GetProtocolConfigClientName() {
+ 
+ V4ProtocolConfig GetV4ProtocolConfig() {
+   base::CommandLine* cmdline = base::CommandLine::ForCurrentProcess();
++  // uw: without a Google API key, Google refuses the list updates, so uw
++  // does not send them. See docs/plans/google-requests.md.
+   return ::safe_browsing::GetV4ProtocolConfig(
+       GetProtocolConfigClientName(),
+-      cmdline->HasSwitch(::switches::kDisableBackgroundNetworking));
++      cmdline->HasSwitch(::switches::kDisableBackgroundNetworking) ||
++          !google_apis::HasAPIKeyConfigured());
+ }
+ 
+ }  // namespace safe_browsing
+diff --git a/chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc b/chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc
+index e174a588b38f6a5daddd3ee54cb7f358ba945a75..c35f757749b780bff81f48bbddb78cdba0871aef 100644
+--- a/chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc
++++ b/chrome/browser/safe_browsing/download_protection/download_protection_delegate_desktop.cc
+@@ -68,6 +68,11 @@ bool DownloadProtectionDelegateDesktop::ShouldCheckDownloadUrl(
+ 
+ bool DownloadProtectionDelegateDesktop::MayCheckClientDownload(
+     download::DownloadItem* item) const {
++  // uw: without a Google API key, Google refuses the scan, so uw does not send
++  // the download's address, name, and hash. See docs/plans/google-requests.md.
++  if (!google_apis::HasAPIKeyConfigured()) {
++    return false;
++  }
+   if (!IsSafeBrowsingEnabledForDownloadProfile(item)) {
+     return false;
+   }
+@@ -77,6 +82,10 @@ bool DownloadProtectionDelegateDesktop::MayCheckClientDownload(
+ 
+ bool DownloadProtectionDelegateDesktop::MayCheckFileSystemAccessWrite(
+     content::FileSystemAccessWriteItem* item) const {
++  // uw: as in MayCheckClientDownload().
++  if (!google_apis::HasAPIKeyConfigured()) {
++    return false;
++  }
+   Profile* profile = Profile::FromBrowserContext(item->browser_context);
+   if (!profile || !IsSafeBrowsingEnabled(*profile->GetPrefs())) {
+     return false;
+diff --git a/chrome/browser/safe_browsing/safe_browsing_service.cc b/chrome/browser/safe_browsing/safe_browsing_service.cc
+index 613157ec0fb54699a48b501f874473c38df1c809..3a3d26133e04a0dc7d250ac5b06954bcfea74f5b 100644
+--- a/chrome/browser/safe_browsing/safe_browsing_service.cc
++++ b/chrome/browser/safe_browsing/safe_browsing_service.cc
+@@ -561,6 +561,12 @@ void SafeBrowsingServiceImpl::OnProfileAdded(Profile* profile) {
+ 
+   // Start following the safe browsing preference on |pref_service|.
+   PrefService* pref_service = profile->GetPrefs();
++  // uw: "Enhanced protection" and "Make searches and browsing better" are
++  // removed. A profile that had one on gets it off. See
++  // docs/plans/google-requests.md.
++  pref_service->ClearPref(prefs::kSafeBrowsingEnhanced);
++  pref_service->ClearPref(
++      unified_consent::prefs::kUrlKeyedAnonymizedDataCollectionEnabled);
+   DCHECK(prefs_map_.find(pref_service) == prefs_map_.end());
+   std::unique_ptr<PrefChangeRegistrar> registrar =
+       std::make_unique<PrefChangeRegistrar>();
+diff --git a/components/omnibox/browser/aim_eligibility_service.cc b/components/omnibox/browser/aim_eligibility_service.cc
+index 5e1a8533f2737458845b454ccf1a1825c897532e..8fdc413468207f237d0a7ea58b7be6d36d0e13b4 100644
+--- a/components/omnibox/browser/aim_eligibility_service.cc
++++ b/components/omnibox/browser/aim_eligibility_service.cc
+@@ -1091,6 +1091,11 @@ void AimEligibilityService::ScheduleServerEligibilityRequest(
+ void AimEligibilityService::StartServerEligibilityRequest(
+     RequestSource request_source,
+     const std::string& locale) {
++  // uw: AI Mode is off, so uw never asks Google whether it may use it. See
++  // docs/plans/google-requests.md.
++  if (!base::FeatureList::IsEnabled(omnibox::kAimEnabled)) {
++    return;
++  }
+   if (IsManualOverrideActive() && request_source != RequestSource::kUser) {
+     return;
+   }
+diff --git a/components/safe_browsing/core/browser/client_side_detection_service_base.cc b/components/safe_browsing/core/browser/client_side_detection_service_base.cc
+index 77274df0e44fbcca17f5ce12cb51fa8ca6890d43..0c4ef3cec49053eb4d4cc0bc018c41960a875241 100644
+--- a/components/safe_browsing/core/browser/client_side_detection_service_base.cc
++++ b/components/safe_browsing/core/browser/client_side_detection_service_base.cc
+@@ -475,7 +475,9 @@ void ClientSideDetectionServiceBase::SendClientReportPhishingRequest(
+     ClientReportPhishingRequestCallback callback,
+     const std::string& access_token) {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-  if (!IsEnabled()) {
++  // uw: without a Google API key, Google refuses the report, so uw does not
++  // send the page's address. See docs/plans/google-requests.md.
++  if (!IsEnabled() || !google_apis::HasAPIKeyConfigured()) {
+     if (!callback.is_null()) {
+       base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+           FROM_HERE, base::BindOnce(std::move(callback), GURL(verdict->url()),
+diff --git a/components/safe_browsing/core/browser/password_protection/password_protection_service_base.cc b/components/safe_browsing/core/browser/password_protection/password_protection_service_base.cc
+index 907b996c1d2719bdaf88a6d298bc7843c5b808b2..c1de20011459ae204ed4c4585e13801ee2631003 100644
+--- a/components/safe_browsing/core/browser/password_protection/password_protection_service_base.cc
++++ b/components/safe_browsing/core/browser/password_protection/password_protection_service_base.cc
+@@ -146,7 +146,10 @@ bool PasswordProtectionServiceBase::CanSendPing(
+     LoginReputationClientRequest::TriggerType trigger_type,
+     const GURL& main_frame_url,
+     ReusedPasswordAccountType password_type) {
+-  return IsPingingEnabled(trigger_type, password_type) &&
++  // uw: without a Google API key, Google refuses the ping, so uw does not send
++  // it. See docs/plans/google-requests.md.
++  return google_apis::HasAPIKeyConfigured() &&
++         IsPingingEnabled(trigger_type, password_type) &&
+          !IsURLAllowlistedForPasswordEntry(main_frame_url) &&
+          !IsInExcludedCountry() &&
+          // Although we can't get the reputation of the main frame URL for
+diff --git a/components/safe_browsing/core/common/safe_browsing_policy_handler.cc b/components/safe_browsing/core/common/safe_browsing_policy_handler.cc
+index 83a3ebf61c64a3925ab78bdb2ecfc835bca4ace2..6160ad29f0326c827cd2d250037342df9596bc85 100644
+--- a/components/safe_browsing/core/common/safe_browsing_policy_handler.cc
++++ b/components/safe_browsing/core/common/safe_browsing_policy_handler.cc
+@@ -192,11 +192,10 @@ void SafeBrowsingPolicyHandler::ApplyPolicySettings(
+       prefs->SetBoolean(prefs::kSafeBrowsingEnhanced, false);
+       return;
+     case ProtectionLevel::kEnhancedProtection:
+-      // |kSafeBrowsingEnhanced| is enabled, but so is
+-      // |kSafeBrowsingEnabled| because the extensions API should see Safe
+-      // Browsing as enabled. See https://crbug.com/1064722 for more background.
++      // uw: Enhanced protection is removed, so the policy gets standard
++      // protection. See docs/plans/google-requests.md.
+       prefs->SetBoolean(prefs::kSafeBrowsingEnabled, true);
+-      prefs->SetBoolean(prefs::kSafeBrowsingEnhanced, true);
++      prefs->SetBoolean(prefs::kSafeBrowsingEnhanced, false);
+       return;
+   }
+ }
+diff --git a/components/search_engines/template_url.cc b/components/search_engines/template_url.cc
+index a04255be8d55935377562753f3d22b388451a422..33c1065c71aabdfc59d282ea23bc3c35627b1067 100644
+--- a/components/search_engines/template_url.cc
++++ b/components/search_engines/template_url.cc
+@@ -1223,45 +1223,8 @@ std::string TemplateURLRef::HandleReplacements(
+                             &url);
+         }
+ 
+-        const size_t searchbox_stats_size =
+-            search_terms_args.searchbox_stats.ByteSizeLong();
+-        if (searchbox_stats_size == 0) {
+-          break;
+-        }
+-
+-        // Don't have to attach the searchbox stats to prefetch requests.
+-        if (is_search_prefetch &&
+-            base::FeatureList::IsEnabled(
+-                switches::kRemoveSearchboxStatsParamFromPrefetchRequests)) {
+-          break;
+-        }
+-
+-        // Get the base URL without substituting gs_lcrp to avoid infinite
+-        // recursion and unwanted replacement respectively. We need the URL to
+-        // find out if it meets all gs_lcrp requirements (e.g. HTTPS protocol
+-        // check). See TemplateURLRef::SearchTermsArgs for more details.
+-        SearchTermsArgs sanitized_search_terms_args(search_terms_args);
+-        // Clear the proto. Its empty state has a serialized size of zero.
+-        sanitized_search_terms_args.searchbox_stats.Clear();
+-        GURL base_url(ReplaceSearchTerms(sanitized_search_terms_args,
+-                                         search_terms_data, nullptr));
+-        if (base_url.SchemeIsCryptographic()) {
+-          TRACE_EVENT0(
+-              "omnibox",
+-              "TemplateURLRef::HandleReplacement:serialize_searchbox_stats");
+-          std::vector<uint8_t> serialized_searchbox_stats(searchbox_stats_size);
+-          search_terms_args.searchbox_stats.SerializeWithCachedSizesToArray(
+-              &serialized_searchbox_stats[0]);
+-          std::string encoded_searchbox_stats;
+-          base::Base64UrlEncode(serialized_searchbox_stats,
+-                                base::Base64UrlEncodePolicy::OMIT_PADDING,
+-                                &encoded_searchbox_stats);
+-          HandleReplacement("gs_lcrp", encoded_searchbox_stats, replacement,
+-                            &url);
+-          base::UmaHistogramCounts1000(
+-              "Omnibox.SearchboxStats.Length",
+-              static_cast<int>(encoded_searchbox_stats.length()));
+-        }
++        // uw: Google searches carry no record of the suggestions shown or
++        // picked. See docs/plans/google-requests.md.
+         break;
+       }
+ 
+@@ -1325,11 +1288,8 @@ std::string TemplateURLRef::HandleReplacements(
+ 
+       case GOOGLE_ORIGINAL_QUERY_FOR_SUGGESTION:
+         DCHECK(!replacement.is_post_param);
+-        if (search_terms_args.accepted_suggestion >= 0 ||
+-            search_terms_args.searchbox_stats.ByteSizeLong() > 0) {
+-          HandleReplacement("oq", base::UTF16ToUTF8(encoded_original_query),
+-                            replacement, &url);
+-        }
++        // uw: Google searches leave out what was typed before a suggestion
++        // was picked. See docs/plans/google-requests.md.
+         break;
+ 
+       case GOOGLE_PAGE_CLASSIFICATION:

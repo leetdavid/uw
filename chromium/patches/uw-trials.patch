@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
-index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..65d6b7458da85e825f87cfb391a9f013a3c5d8c8 100644
+index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f80e3f091 100644
 --- a/chrome/browser/metrics/chrome_feature_list_creator.cc
 +++ b/chrome/browser/metrics/chrome_feature_list_creator.cc
 @@ -22,6 +22,8 @@
@@ -11,15 +11,18 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..65d6b7458da85e825f87cfb391a9f013
  #include "chrome/common/chrome_paths.h"
  #include "chrome/common/chrome_switches.h"
  #include "chrome/installer/util/initial_preferences.h"
-@@ -30,6 +32,7 @@
+@@ -29,7 +31,10 @@
+ #include "components/network_time/network_time_tracker.h"
  #include "components/prefs/json_pref_store.h"
  #include "components/prefs/pref_registry_simple.h"
++#include "components/autofill/core/common/autofill_debug_features.h"  // nogncheck
++#include "components/omnibox/browser/aim_eligibility_service_features.h"  // nogncheck
  #include "components/privacy_sandbox/privacy_sandbox_features.h"
 +#include "components/tab_groups/features.h"  // nogncheck
  #include "components/variations/pref_names.h"
  #include "components/variations/service/variations_service.h"
  #include "components/variations/variations_crash_keys.h"
-@@ -39,7 +42,9 @@
+@@ -39,7 +44,9 @@
  #include "content/public/common/content_switches.h"
  #include "services/network/public/cpp/network_switches.h"
  #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -29,7 +32,7 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..65d6b7458da85e825f87cfb391a9f013
  
  #if BUILDFLAG(IS_WIN)
  #include "chrome/installer/util/google_update_settings.h"
-@@ -238,11 +243,29 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
+@@ -238,11 +245,37 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
  
    variations::VariationsService* variations_service =
        metrics_services_manager_->GetVariationsService();
@@ -57,6 +60,14 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..65d6b7458da85e825f87cfb391a9f013
 +  overrides.emplace_back(
 +      std::cref(blink::features::kAutoPictureInPictureVideoHeuristics),
 +      base::FeatureList::OVERRIDE_ENABLE_FEATURE);
++  // uw: Chromium features that send Google what the user does. See
++  // docs/plans/google-requests.md.
++  for (const base::Feature* google :
++       {&autofill::features::debug::kAutofillServerCommunication,
++        &network_time::kNetworkTimeServiceQuerying, &omnibox::kAimEnabled}) {
++    overrides.emplace_back(std::cref(*google),
++                           base::FeatureList::OVERRIDE_DISABLE_FEATURE);
++  }
 +  variations_service->SetUpFieldTrials(variation_ids, overrides,
 +                                       std::move(feature_list),
 +                                       browser_field_trials_.get());

@@ -6,6 +6,7 @@ group("browser_tests") {
     "codecs:browser_tests",
     "connectors:browser_tests",
     "pins:browser_tests",
+    "privacy:browser_tests",
     "problem_reports:browser_tests",
     "shortcuts:browser_tests",
     "uw_command:browser_tests",

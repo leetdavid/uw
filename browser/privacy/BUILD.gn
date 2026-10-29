@@ -1,0 +1,35 @@
+# uw sends Google nothing about what the user does. The changes live in
+# chromium/patches/uw-google.patch and uw-trials.patch; these tests hold them.
+# See docs/plans/google-requests.md.
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "google_requests_browsertest.cc" ]
+  deps = [
+    "//base",
+    "//base/test:test_support",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/safe_browsing",
+    "//chrome/browser/search_engines",
+    "//chrome/browser/ui",
+    "//chrome/common:constants",
+    "//chrome/test:test_support",
+    "//components/autofill/core/common",
+    "//components/download/public/common:public",
+    "//components/network_time",
+    "//components/omnibox/browser",
+    "//components/prefs",
+    "//components/safe_browsing/core/common:safe_browsing_prefs",
+    "//components/search_engines",
+    "//components/unified_consent",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//google_apis",
+    "//net:test_support",
+    "//testing/gtest",
+    "//url",
+  ]
+}
