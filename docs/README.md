@@ -71,6 +71,8 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 
 - [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
 - [Workspaces plan](plans/workspaces.md): Arc-style workspaces you swipe between, several to a profile, and pinned tabs shared by every window of a profile.
+- [Shared tabs plan](plans/shared-tabs.md): a workspace's tabs in every window on it, one live page per tab, and windows that close no tabs.
+- [ADR 0024: a workspace's tabs show in every window](adr/0024-a-workspaces-tabs-show-in-every-window.md): why tabs belong to the workspace and not the window, and why each has one live page.
 - [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, black dark mode, a page mode apart from the window's, a toolbar in each page's color, and proposed glass.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Hidden sidebar plan](plans/hidden-sidebar.md): Cmd+S hides the sidebar, and it floats in over the page at the window's left edge, as in Arc.

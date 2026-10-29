@@ -94,7 +94,7 @@ Agreed:
 - Never make a [hub](CONTEXT.md#language) into a task. A feed, an inbox, or a dashboard stays in the Scratchpad, or in a task it fits by name, while the tabs opened from it are filed on their own. Agreed on 2026-10-13.
 - A regular tab opened from a shared pin starts ungrouped in the current window. A confident classification may place it immediately; the last active task alone does not determine its placement.
 - For now, when a tab clearly belongs to an existing task but has no clear parent page, append it at that task group's top level. Nest it under a page only when the parent relationship is clear, such as a link explicitly opened from that page.
-- Organize the regular tab tree independently within each window. Moving regular tabs between windows remains a manual action; [pinned tabs](#pinned-tabs) have their own shared-state requirements.
+- Organize one regular tab tree per workspace, shown in every window on it; see [Workspaces](#workspaces). Changed on 2026-10-29: each window had its own tree. [Pinned tabs](#pinned-tabs) have their own shared-state requirements.
 - Each regular tab has one home position in the hierarchy. Separate tabs showing the same page may belong to different task groups.
 - Preserve the user's expanded/collapsed group choices. The organizer does not change them when tasks switch.
 - When a selected tab moves into a collapsed task group, keep the group collapsed and show a brief destination cue rather than changing the user's expansion choice.
@@ -325,6 +325,8 @@ Agreed: use [automatic tab organization](#automatic-tab-organization) to help tr
 ### Workspaces
 
 Agreed on 2026-10-21: [workspaces](CONTEXT.md#language) work as Arc's spaces. The user swipes between them in the sidebar, each has its own theme, and several can share one [profile](CONTEXT.md#language)'s logins and history. Switching replaces the window with its partner for that workspace. Tasks still organize the tabs inside a workspace. The [workspaces plan](plans/workspaces.md) has the details.
+
+Agreed on 2026-10-29, not built: every window showing a workspace shows its tabs, as in Arc, with one live page per tab that moves to the window that selects it, as pins do. Closing a window closes no tabs. The [shared tabs plan](plans/shared-tabs.md) has the details, and [ADR 0024](adr/0024-a-workspaces-tabs-show-in-every-window.md) the reasons.
 
 Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
 

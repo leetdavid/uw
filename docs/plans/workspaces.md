@@ -125,5 +125,5 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 - Arc's pinned tabs that belong to one space. uw has only pins shared by a profile, for now.
 - Peek previews from pins. They stay a separate row in the [roadmap](roadmap.md#current-features).
-- Showing a workspace's tabs in every window, as Arc does. Each window keeps its own [tab tree](../CONTEXT.md#language).
+- Showing a workspace's tabs in every window, as Arc does. Agreed on 2026-10-29 as its own plan, [Shared tabs](shared-tabs.md).
 - Syncing workspaces between Macs.

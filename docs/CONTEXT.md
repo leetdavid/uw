@@ -8,7 +8,7 @@ Terms used in the product docs.
 The immediate activity the user is pursuing with a set of tabs. A broader project can contain several browsing tasks; this is the level of user intent that tab organization tries to infer.
 
 **Task**:
-The regular tabs of one browsing task in one window, shown as a folder in the sidebar. Tasks do not nest. uw says "task" wherever it shows one, in menus, tooltips, and VoiceOver. Underneath, a task is a Chromium tab group; say "tab group" only for that mechanism.
+The regular tabs of one browsing task in one workspace, shown as a folder in the sidebar. Tasks do not nest. uw says "task" wherever it shows one, in menus, tooltips, and VoiceOver. Underneath, a task is a Chromium tab group; say "tab group" only for that mechanism.
 _Avoid_: Group, tab group, task group, workspace, space.
 
 **Workspace**:
@@ -74,7 +74,7 @@ A persistent sidebar icon with a saved home URL. When open, it represents one co
 A hazed placeholder where a pinned page's live session is currently displayed in another window. Selecting it transfers the session back.
 
 **Regular tab**:
-A page tab or terminal tab in a window's tab tree.
+A page tab or terminal tab in a workspace's tab tree.
 
 **Integration**:
 A tool from the user's computer that uw brings into the browser, such as the shell in a terminal tab.
@@ -113,7 +113,7 @@ The scheme and registrable domain of a pin's home URL. Navigation inside that si
 A temporary view opened from a pinned tab for a page outside the pin's site. Promoting it creates a regular tab in Scratchpad.
 
 **Tab tree**:
-The arrangement of regular tabs within one browser window: the Scratchpad, the tasks, and regular tabs nested under parent tabs.
+The arrangement of regular tabs within one workspace, shown the same in every window on it: the Scratchpad, the tasks, and regular tabs nested under parent tabs.
 
 **Tab branch**:
 A tab together with all its descendant tabs. It is the only level below a task.
@@ -132,7 +132,7 @@ The tab whose page is currently displayed in a browser window.
 A tab currently outside every task, so in the Scratchpad. Its relationship to a browsing task may still be unclear.
 
 **Scratchpad**:
-The always-visible section holding ungrouped regular tabs and candidate branches in one window. It is not a task.
+The always-visible section holding ungrouped regular tabs and candidate branches in one workspace. It is not a task.
 
 **Manual adjustment**:
 A user-made change to tab grouping, ordering, or a task's name.
