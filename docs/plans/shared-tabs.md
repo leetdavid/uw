@@ -1,8 +1,8 @@
 # Shared tabs
 
-Status: scope agreed with the user on 2026-10-29. Nothing is built. The spike, T252, comes first.
+Status: scope agreed with the user on 2026-10-29. The spike, T252, ran the same day; see the [shared tabs spike](../research/shared-tabs-spike.md). How T253 is built waits for the user's choice. Nothing else is built.
 
-Implementability: **2/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium gives each window its own tab list, so every window on a workspace holds its own copy of every tab: one live page, and placeholders elsewhere, as [live pins](workspaces.md#how-the-live-pin-page-works) do today. Pins alone scored 4/10. On top of that, tasks, nesting, and collapse must stay in step across windows, the organizer must run once per workspace, a restart must not double tabs, and the first launch merges windows. The largest unknown is the rest of Chromium seeing each tab once per window: extensions' tab lists, Memory Saver, tab search, and open tabs synced to other devices.
+Implementability: **3/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium gives each window its own tab list, so every window on a workspace holds its own copy of every tab: one live page, and placeholders elsewhere, as [live pins](workspaces.md#how-the-live-pin-page-works) do today. Pins alone scored 4/10. On top of that, the organizer must run once per workspace, a restart must not double tabs, and the first launch merges windows. Up from 2/10 on 2026-10-29, after the spike: a copy costs about what an unloaded tab does, a task stays in step through Chromium's own tab group calls, and Memory Saver's rules work for a page in no window. Extensions, recently closed, tab search, and the command bar still see every copy unless uw hides them.
 
 The user asked on 2026-10-29. Dragging a tab out of a window and then into another window left the middle window open with only its pins, since Chromium counts pins as tabs. The user chose to show a workspace's tabs in every window, as Arc does, before fixing that case on its own. [ADR 0024](../adr/0024-a-workspaces-tabs-show-in-every-window.md) records why.
 
@@ -45,18 +45,22 @@ The user asked on 2026-10-29. Dragging a tab out of a window and then into anoth
 
 ## How it could work
 
-Proposed by uw on 2026-10-29. The spike decides.
+Proposed by uw on 2026-10-29 and tried in the spike. The user has not chosen yet.
 
 - Each window's Chromium tab list holds every tab of its workspace. One window holds a tab's live page and the others hold placeholders, as `PinSync` does for pins with `TabStripModel::DiscardWebContents`.
 - Switching workspace still swaps the window, per [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md). Each hidden partner holds its own workspace's tabs.
-- One page tree and one organizer per workspace, copied into each window's tab groups and indents.
-- Unloading asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, and adds uw's own cases.
+- One page tree and one organizer per workspace, copied into each window's tab groups and indents. A copy moves a task as a whole before it places single tabs, or the task splits.
+- A new window shows first and fills with copies after, the selected tab first: 100 copies take about 0.6 s.
+- Unloading asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, and adds uw's own cases. The spike found it answers for a page in no window, and never unloads a copy.
+- uw leaves a closed window out of recently closed.
 
-The spike, T252, answers:
+The other way, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
 
-- How much memory and time four windows on one workspace of 100 tabs cost, hidden partners included.
-- What extensions' tab lists, Memory Saver, tab search, recently closed, and open tabs synced to other devices see, and which of them must skip placeholders.
-- Whether a task can be kept in step across windows through Chromium's tab group model.
+Open questions for T253:
+
+- Whether extensions, tab search, and the command bar see copies, or uw hides them.
+- What a window shows when another window collapses the task that holds its selected tab. Chromium keeps the selection.
+- Whether a hidden partner closes after a while to save its copies, since closing it loses no tabs.
 
 ## Design
 
