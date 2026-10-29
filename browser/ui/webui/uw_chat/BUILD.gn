@@ -91,6 +91,7 @@ source_set("uw_chat") {
     "//uw/browser/terminal",
     "//uw/browser/ui/glass",
     "//uw/browser/ui/webui/uw_command_bar",
+    "//uw/browser/update:pending_update",
     "//uw/components/agent",
     "//uw/components/ai_providers",
   ]
@@ -149,6 +150,7 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
     "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/update:pending_update",
     "//uw/components/agent",
     "//uw/components/ai_providers",
   ]

@@ -14,6 +14,8 @@ source_set("ai_providers") {
     "models.h",
     "provider_sync.cc",
     "provider_sync.h",
+    "rejected_keys.cc",
+    "rejected_keys.h",
     "remote_model_client.cc",
     "remote_model_client.h",
   ]

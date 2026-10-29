@@ -84,6 +84,8 @@ class RemoteModelClient {
   GURL endpoint_;
   // Never logged.
   std::string api_key_;
+  // The key's hash, which outlives it, for RejectedKeys.
+  std::string key_hash_;
   std::string request_body_;
   base::TimeDelta timeout_;
   KeyHeader key_header_;

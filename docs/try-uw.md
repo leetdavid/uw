@@ -200,7 +200,11 @@ Expected result: Running lists the terminal as `Running sleep` and the video as 
 
 Then turn on automatic organization, let it move a tab, and open a new tab.
 
-Expected result: Tabs lists the move, such as `Moved to Plan Lisbon trip`, with Undo, which puts the tab back. Pause offers 1 hour, until next launch, and indefinitely. While paused, the line says so, and Resume turns organization back on. With automatic organization off, the section goes. The Setup section is not built yet.
+Expected result: Tabs lists the move, such as `Moved to Plan Lisbon trip`, with Undo, which puts the tab back. Pause offers 1 hour, until next launch, and indefinitely. While paused, the line says so, and Resume turns organization back on. With automatic organization off, the section goes.
+
+Then give an AI provider a wrong key on its page, and open a new tab.
+
+Expected result: Setup lists `<provider> rejected the key` with Fix, which opens the provider. Put the right key back: once a request with it works, the row goes. A connector that needs you to sign in shows with Sign in. In a profile with no AI provider, Setup shows Add an AI provider.
 
 ### Chats
 

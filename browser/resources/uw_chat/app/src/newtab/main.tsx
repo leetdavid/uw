@@ -26,10 +26,13 @@ import {
   Loader2,
   Pause,
   Play,
+  Plug,
+  RotateCcw,
   Search,
   Terminal as TerminalIcon,
   Undo2,
   Video,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -41,7 +44,8 @@ import { cn } from "@/lib/utils";
 import { KIND_COLORS } from "../alert-kinds";
 import type { ChatSchedule, ScheduleState } from "../chat-api";
 import { CHIP, ModelChip } from "../providers/model-chip";
-import { providersHandler } from "../providers/providers-api";
+import { ProviderIcon } from "../providers/provider-parts";
+import { type ProviderPreset, providersHandler } from "../providers/providers-api";
 import { repeatText, ScheduleRows } from "../schedule";
 import { useModels } from "../watch-card/watch-parts";
 import {
@@ -58,6 +62,8 @@ import {
   type NewTabRow,
   type NewTabRunningRow,
   type NewTabSections,
+  type NewTabSetupRow,
+  NewTabSetupKind,
   type NewTabTabs,
   OrganizationPause,
 } from "./newtab-api";
@@ -536,6 +542,7 @@ function Section({
 function Row({
   chat,
   tab,
+  art,
   favicon,
   icon: Icon,
   title,
@@ -545,6 +552,7 @@ function Row({
 }: {
   chat?: string;
   tab?: number;
+  art?: ReactNode;
   favicon: string;
   icon: LucideIcon | typeof AskIcon;
   title: string;
@@ -566,11 +574,11 @@ function Row({
       }}
       className="group flex h-[52px] cursor-default items-center gap-[11px] border-t border-border pr-2.5 pl-3 text-[13px] whitespace-nowrap outline-none first:border-t-0 hover:bg-accent focus-visible:bg-accent"
     >
-      {favicon ? (
+      {art ?? (favicon ? (
         <img src={favicon} alt="" className="size-4 shrink-0" />
       ) : (
         <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      )}
+      ))}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <b className="truncate font-medium">{title}</b>
         <span className="truncate text-[12.5px] text-muted-foreground">{under}</span>
@@ -950,10 +958,110 @@ function Tabs({ tabs }: { tabs: NewTabTabs }) {
   );
 }
 
+// What is broken or waiting, with the button that sets it right.
+function Setup({ rows }: { rows: NewTabSetupRow[] }) {
+  const button = "h-[26px] shrink-0 px-2.5";
+  return (
+    <Section id="newtab-setup" icon={Wrench} name="Setup" count={rows.length}>
+      {rows.map((row) => {
+        switch (row.kind) {
+          case NewTabSetupKind.kKeyRejected:
+            return (
+              <Row
+                key={`key-${row.id}`}
+                art={<ProviderIcon preset={row.preset as ProviderPreset} />}
+                favicon=""
+                icon={Plug}
+                title={`${row.name} rejected the key`}
+                under={
+                  <>
+                    <span className="font-medium text-destructive">Its models stop working</span>{" "}
+                    until the key is fixed
+                  </>
+                }
+              >
+                <Button
+                  data-fix={row.id}
+                  variant="tertiary"
+                  size="compact"
+                  className={button}
+                  onClick={() => providersHandler.showAiPage(`providers/${encodeURIComponent(row.id)}`)}
+                >
+                  Fix
+                </Button>
+              </Row>
+            );
+          case NewTabSetupKind.kSignIn:
+            return (
+              <Row
+                key={`sign-in-${row.id}`}
+                favicon=""
+                icon={Plug}
+                title={`${row.name} needs you to sign in`}
+                under={`The agent can't use ${row.name} until then`}
+              >
+                <Button
+                  data-sign-in={row.id}
+                  variant="tertiary"
+                  size="compact"
+                  className={button}
+                  onClick={() => providersHandler.signInConnector(row.id)}
+                >
+                  Sign in
+                </Button>
+              </Row>
+            );
+          case NewTabSetupKind.kUpdate:
+            return (
+              <Row
+                key="update"
+                favicon=""
+                icon={RotateCcw}
+                title="An update to uw is ready"
+                under="Tabs come back after relaunch"
+              >
+                <Button
+                  id="newtab-relaunch"
+                  variant="primary"
+                  size="compact"
+                  className={button}
+                  onClick={() => newTabHandler.relaunch()}
+                >
+                  Relaunch
+                </Button>
+              </Row>
+            );
+          default:
+            return (
+              <Row
+                key="add-provider"
+                favicon=""
+                icon={Plug}
+                title="Add an AI provider"
+                under="uw needs one to organize tabs and answer chats"
+              >
+                <Button
+                  id="newtab-add-provider"
+                  variant="primary"
+                  size="compact"
+                  className={button}
+                  onClick={() => providersHandler.showAiPage("providers")}
+                >
+                  Add provider
+                </Button>
+              </Row>
+            );
+        }
+      })}
+    </Section>
+  );
+}
+
 // Under the box, in two columns: what wants the user on the left, what goes
 // on by itself on the right. A section with nothing to show is left out.
 function Sections({ sections }: { sections: NewTabSections }) {
-  const left = sections.needsYou.length > 0 || sections.finished.length > 0;
+  const left =
+    sections.needsYou.length > 0 || sections.finished.length > 0 || sections.setup.length > 0;
   const right =
     sections.comingUp.length > 0 || sections.running.length > 0 || !!sections.tabs;
   if (!left && !right) {
@@ -966,6 +1074,7 @@ function Sections({ sections }: { sections: NewTabSections }) {
         {sections.finished.length > 0 && (
           <Finished rows={sections.finished} count={sections.finishedCount} />
         )}
+        {sections.setup.length > 0 && <Setup rows={sections.setup} />}
       </div>
       <div className="flex min-w-0 flex-col gap-[18px]">
         {sections.comingUp.length > 0 && (

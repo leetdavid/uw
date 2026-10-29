@@ -847,6 +847,29 @@ struct NewTabTabs {
   double paused_until;
 };
 
+// What a row of Setup is about.
+enum NewTabSetupKind {
+  // A provider rejected its key.
+  kKeyRejected,
+  // A connector needs the user to sign in.
+  kSignIn,
+  // An update waits to install on relaunch.
+  kUpdate,
+  // No AI provider is added yet.
+  kNoProvider,
+};
+
+// A row of Setup: something broken or waiting.
+struct NewTabSetupRow {
+  NewTabSetupKind kind;
+  // The provider's id, or the connector's name.
+  string id;
+  // The provider's or the connector's name.
+  string name;
+  // The provider's preset, a uw::ProviderPreset, for its icon.
+  int32 preset;
+};
+
 // The sections of the new tab page. See docs/plans/new-tab-page.md.
 struct NewTabSections {
   // Steps waiting for the user, and sign-ins, oldest first.
@@ -862,6 +885,8 @@ struct NewTabSections {
   array<NewTabRunningRow> running;
   // Null while automatic organization is off.
   NewTabTabs? tabs;
+  // Rejected keys, then sign-ins, then an update, or a missing provider.
+  array<NewTabSetupRow> setup;
 };
 
 // Links the new tab page to its handler.
@@ -899,13 +924,15 @@ interface NewTabHandler {
   UndoChange();
   // Pauses automatic organization, or resumes it with kOff.
   Pause(OrganizationPause pause);
+  // Quits uw, installs the update waiting, and starts the new uw.
+  Relaunch();
 };
 
 // The new tab page.
 interface NewTabPage {
   // The box's state: once the page connects, and again whenever it changes.
   OnBox(NewTabBox box);
-  // Once the page connects, and again whenever a chat, a run, a terminal, or
-  // the video changes. Never in a private window.
+  // Once the page connects, and again whenever something a section shows
+  // changes. Never in a private window.
   OnSections(NewTabSections sections);
 };

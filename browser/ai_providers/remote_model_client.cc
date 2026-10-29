@@ -14,6 +14,7 @@
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/models.h"
+#include "uw/browser/ai_providers/rejected_keys.h"
 #include "uw/components/ai_providers/formats.h"
 
 namespace uw {
@@ -131,6 +132,7 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
       resource->headers.SetHeader(net::HttpRequestHeaders::kAuthorization,
                                   "Bearer " + api_key_);
     }
+    key_hash_ = RejectedKeys::HashOf(api_key_);
     // Drop the secret from memory as soon as the header is set.
     api_key_.assign(api_key_.size(), '\0');
     api_key_.clear();
@@ -189,6 +191,7 @@ void RemoteModelClient::OnComplete(std::optional<std::string> body) {
 }
 
 void RemoteModelClient::Finish(Outcome outcome) {
+  RejectedKeys::Get().Heard(key_hash_, outcome.ok, outcome.http_status);
   if (callback_) {
     std::move(callback_).Run(std::move(outcome));
   }

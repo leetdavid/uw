@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
@@ -27,7 +28,9 @@
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scheduled_chats.h"
+#include "uw/browser/connectors/connectors.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
+#include "uw/components/ai_providers/providers.h"
 
 class BrowserWindowInterface;
 class Profile;
@@ -46,6 +49,7 @@ class UwNewTabHandler : public mojom::NewTabHandler,
                         public ChatIndex::Observer,
                         public ScheduledChats::Observer,
                         public PictureInPictureWindowManager::Observer,
+                        public Connectors::Observer,
                         public media_session::mojom::MediaSessionObserver {
  public:
   UwNewTabHandler(content::WebUI* web_ui,
@@ -73,6 +77,7 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   void PlayOrPause(int32_t tab) override;
   void UndoChange() override;
   void Pause(mojom::OrganizationPause pause) override;
+  void Relaunch() override;
 
   // ChatAlerts::Observer:
   void OnAlertsChanged() override;
@@ -80,6 +85,8 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   void OnChatsChanged() override;
   // ScheduledChats::Observer:
   void OnScheduleChanged(const std::string& chat_id) override;
+  // Connectors::Observer:
+  void OnConnectorsChanged() override;
   // PictureInPictureWindowManager::Observer:
   void OnEnterPictureInPicture() override;
   void OnExitPictureInPicture() override;
@@ -132,6 +139,10 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   // The window the page is in, or null.
   BrowserWindowInterface* Window() const;
   mojom::NewTabTabsPtr TabsOf(BrowserWindowInterface* window) const;
+  // Notes which providers' keys were rejected. It reads their keys only once
+  // some key was.
+  void CheckKeys();
+  void OnModelsChanged();
   // Shows `url` in this tab, as a chat that starts with `start` when given.
   void Become(const GURL& url, std::optional<ChatStart> start);
 
@@ -159,6 +170,9 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   // Automatic organization's moves, and the window's tree, which Undo changes.
   base::CallbackListSubscription organizer_events_;
   base::CallbackListSubscription tree_changes_;
+  std::vector<Provider> rejected_;
+  base::CallbackListSubscription rejected_keys_;
+  base::ScopedObservation<Connectors, Connectors::Observer> connectors_{this};
   base::ScopedObservation<ChatAlerts, ChatAlerts::Observer> alerts_{this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_{this};
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer> schedules_{

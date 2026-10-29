@@ -36,7 +36,9 @@
 #include "ui/base/page_transition_types.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/run_window_mark.h"
+#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/models.h"
+#include "uw/browser/ai_providers/rejected_keys.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -46,6 +48,7 @@
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
+#include "uw/browser/update/pending_update.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -96,7 +99,7 @@ UwNewTabHandler::UwNewTabHandler(
   prefs_.Init(profile()->GetPrefs());
   for (const char* pref :
        {kProvidersPref, kLanguageChoicePref, kAgentChoicePref}) {
-    prefs_.Add(pref, base::BindRepeating(&UwNewTabHandler::SendBox,
+    prefs_.Add(pref, base::BindRepeating(&UwNewTabHandler::OnModelsChanged,
                                          base::Unretained(this)));
   }
   SendBox();
@@ -130,6 +133,14 @@ UwNewTabHandler::UwNewTabHandler(
       prefs_.Add(pref, base::BindRepeating(&UwNewTabHandler::SendSections,
                                            base::Unretained(this)));
     }
+    connectors_.Observe(&Connectors::Get());
+    rejected_keys_ = RejectedKeys::Get().Observe(base::BindRepeating(
+        [](UwNewTabHandler* self) {
+          self->CheckKeys();
+          self->SendSections();
+        },
+        base::Unretained(this)));
+    CheckKeys();
     SendSections();
     poll_.Start(
         FROM_HERE, kPollEvery,
@@ -265,6 +276,14 @@ void UwNewTabHandler::Pause(mojom::OrganizationPause pause) {
   SetPauseState(profile()->GetPrefs(), static_cast<PauseMode>(pause),
                 pause == mojom::OrganizationPause::kTimed ? base::Hours(1)
                                                           : base::TimeDelta());
+}
+
+void UwNewTabHandler::Relaunch() {
+  InstallPendingUpdate();
+}
+
+void UwNewTabHandler::OnConnectorsChanged() {
+  SendSections();
 }
 
 void UwNewTabHandler::OnAlertsChanged() {
@@ -480,6 +499,27 @@ void UwNewTabHandler::SendSections() {
     sections->tabs = TabsOf(window);
   }
 
+  for (const Provider& provider : rejected_) {
+    sections->setup.push_back(mojom::NewTabSetupRow::New(
+        mojom::NewTabSetupKind::kKeyRejected, provider.id, provider.name,
+        static_cast<int32_t>(provider.preset)));
+  }
+  for (const Connectors::Info& connector : Connectors::Get().list()) {
+    if (connector.on && connector.state == Connectors::State::kNeedsSignIn) {
+      sections->setup.push_back(mojom::NewTabSetupRow::New(
+          mojom::NewTabSetupKind::kSignIn, connector.config.name,
+          connector.config.name, 0));
+    }
+  }
+  if (HasPendingUpdate()) {
+    sections->setup.push_back(mojom::NewTabSetupRow::New(
+        mojom::NewTabSetupKind::kUpdate, std::string(), std::string(), 0));
+  }
+  if (ReadProviders(*profile()->GetPrefs()).empty()) {
+    sections->setup.push_back(mojom::NewTabSetupRow::New(
+        mojom::NewTabSetupKind::kNoProvider, std::string(), std::string(), 0));
+  }
+
   page_->OnSections(std::move(sections));
 }
 
@@ -580,6 +620,28 @@ mojom::NewTabTabsPtr UwNewTabHandler::TabsOf(
     tabs->paused_until = PausedUntil(&prefs).InMillisecondsFSinceUnixEpoch();
   }
   return tabs;
+}
+
+void UwNewTabHandler::CheckKeys() {
+  rejected_.clear();
+  if (RejectedKeys::Get().empty()) {
+    return;
+  }
+  ApiKeyStore keys;
+  for (Provider& provider : ReadProviders(*profile()->GetPrefs())) {
+    const std::optional<std::string> key =
+        provider.key_account.empty() ? std::nullopt
+                                     : keys.GetKey(provider.key_account);
+    if (key && RejectedKeys::Get().Rejected(*key)) {
+      rejected_.push_back(std::move(provider));
+    }
+  }
+}
+
+void UwNewTabHandler::OnModelsChanged() {
+  SendBox();
+  CheckKeys();
+  SendSections();
 }
 
 void UwNewTabHandler::Poll() {

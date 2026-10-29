@@ -4,6 +4,7 @@ import {
   NewTabHandlerFactory,
   NewTabHandlerRemote,
   NewTabPageCallbackRouter,
+  NewTabSetupKind,
   OrganizationPause,
 } from "uw-chat-mojom";
 import type {
@@ -11,6 +12,7 @@ import type {
   NewTabRow,
   NewTabRunningRow,
   NewTabSections,
+  NewTabSetupRow,
   NewTabTabs,
 } from "uw-chat-mojom";
 import { SuggestInventory } from "//resources/mojo/components/omnibox/browser/fusebox_action.mojom-webui.js";
@@ -32,10 +34,11 @@ export type {
   NewTabRow,
   NewTabRunningRow,
   NewTabSections,
+  NewTabSetupRow,
   NewTabTabs,
 };
 
-export { OrganizationPause };
+export { NewTabSetupKind, OrganizationPause };
 
 export const newTabPage = new NewTabPageCallbackRouter();
 export const newTabHandler = new NewTabHandlerRemote();

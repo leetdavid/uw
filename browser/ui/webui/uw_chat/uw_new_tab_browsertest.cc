@@ -10,7 +10,9 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -29,6 +31,7 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -44,12 +47,15 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/agent/scripted_model.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
+#include "uw/browser/update/pending_update.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -520,6 +526,65 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, TabsPausesAndResumesOrganization) {
   prefs.SetBoolean(kOrganizationEnabledPref, false);
   EXPECT_EQ(true,
             Run(tab, "return !!(await until(() => !$('#newtab-tabs')));"));
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, SetupAsksForAProviderFirst) {
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab, R"(
+    const setup = await until(() => $('#newtab-setup'));
+    if (!setup.textContent.includes('Add an AI provider')) {
+      return setup.textContent;
+    }
+    $('#newtab-add-provider').click();
+    return true;)"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return browser()->tab_strip_model()->GetActiveWebContents() == tab &&
+           tab->GetLastCommittedURL().host() == "ai";
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, SetupListsAKeyUntilItWorksAgain) {
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  Provider provider = *FindProvider(prefs, UseAgentModel());
+  provider.key_account = KeyAccountFor(provider.id);
+  ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, "test-key"));
+  UpdateProvider(prefs, provider);
+  const auto ask = [&](int status) {
+    model_.Script({ScriptedModel::Answer("Hello.")}, status);
+    RemoteModelClient client(
+        browser()
+            ->GetProfile()
+            ->GetDefaultStoragePartition()
+            ->GetURLLoaderFactoryForBrowserProcess(),
+        embedded_test_server()->GetURL("/v1/chat/completions"), "test-key",
+        "{}", base::Seconds(10));
+    base::test::TestFuture<RemoteModelClient::Outcome> done;
+    client.Send(done.GetCallback());
+    EXPECT_EQ(done.Get().http_status, status);
+  };
+
+  ask(401);
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab, R"(
+    const setup = await until(() => $('#newtab-setup'));
+    return setup.textContent.includes('Test server rejected the key') &&
+        !!$('[data-fix]');)"));
+  SaveWindowScreenshot(browser(), "new_tab_page_setup");
+  ask(200);
+  EXPECT_EQ(true,
+            Run(tab, "return !!(await until(() => !$('#newtab-setup')));"));
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, SetupRelaunchesForAnUpdate) {
+  UseAgentModel();
+  bool installed = false;
+  SetPendingUpdate(base::BindLambdaForTesting([&] { installed = true; }));
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab,
+                      "(await until(() => $('#newtab-relaunch'))).click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return installed; }));
+  ClearPendingUpdateForTesting();
 }
 
 }  // namespace
