@@ -125,7 +125,9 @@ Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The
 
 The page stops softly at the film: scrolling slowly into the pinned stretch settles where the film is fully formed, and a quick flick goes past. Nothing holds the page while the film plays.
 
-Open: the sound button, what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
+Two small round buttons in dark glass sit in the film's bottom-right corner while it shows: pause and play, and sound on and off. Turning sound on carries on from where the film is.
+
+Open: what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
