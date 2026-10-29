@@ -767,6 +767,45 @@ struct NewTabBox {
   bool can_ask;
 };
 
+// A row of a section of the new tab page: a chat, or a run of one.
+struct NewTabRow {
+  string chat_id;
+  // The alert the row shows, or empty for a chat's own state.
+  string alert_id;
+  // The chat's title, or a watched page's title, or its address until uw
+  // knows its title.
+  string title;
+  // For a watched page: its address, and its icon as a data: URL, or empty.
+  string page;
+  string favicon;
+  // The chat has a schedule, or the command of its running trigger, so its
+  // icon is a clock or a terminal, not a chat.
+  bool scheduled;
+  string trigger;
+  // What the row says first, such as "Change alert", and the rest.
+  string what;
+  string text;
+  // When it began to wait, ended, or runs next, in milliseconds since the
+  // Unix epoch, or 0 for a chat that runs when its trigger wakes it.
+  double time;
+  // In Coming up: the schedule, which says how often it runs.
+  ChatSchedule? schedule;
+};
+
+// The sections of the new tab page that come from chats. See
+// docs/plans/new-tab-page.md.
+struct NewTabSections {
+  // Steps waiting for the user, and sign-ins, oldest first.
+  array<NewTabRow> needs_you;
+  // What ended since the user last looked, newest first: five at most of
+  // `finished_count`.
+  array<NewTabRow> finished;
+  int32 finished_count;
+  // The next runs, soonest first: three at most of `coming_up_count`.
+  array<NewTabRow> coming_up;
+  int32 coming_up_count;
+};
+
 // Links the new tab page to its handler.
 interface NewTabHandlerFactory {
   CreateNewTabHandler(pending_remote<NewTabPage> page,
@@ -783,10 +822,24 @@ interface NewTabHandler {
   // Turns this tab into a chat whose first message is `schedule.request`,
   // saved with its schedule, which runs at once.
   AskOnSchedule(ChatSchedule schedule);
+  // Goes to a tab of the chat, or shows it in this tab. The row leaves
+  // Finished.
+  OpenChat(string chat_id, string alert_id);
+  // Goes to a tab of the chat's watched page, or opens the page in this tab.
+  // The row leaves Finished.
+  OpenPage(string chat_id, string alert_id);
+  // Takes the row off Finished. The Inbox keeps its alert.
+  Dismiss(string chat_id, string alert_id);
+  ShowInbox();
+  // Goes to the Scheduled page's tab, or shows it in this tab.
+  ShowScheduled();
 };
 
 // The new tab page.
 interface NewTabPage {
   // The box's state: once the page connects, and again whenever it changes.
   OnBox(NewTabBox box);
+  // Once the page connects, and again whenever a chat or run changes. Never
+  // in a private window.
+  OnSections(NewTabSections sections);
 };

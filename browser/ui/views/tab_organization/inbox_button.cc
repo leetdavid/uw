@@ -32,9 +32,11 @@
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/menu_card.h"
+#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -58,12 +60,35 @@ constexpr SkAlpha kInactiveIconAlpha = 0x8C;
 constexpr SkAlpha kHoverAlpha = 0x1A;
 // The primary color at 12% fills the button while the Inbox is open.
 constexpr SkAlpha kOpenAlpha = 0x1F;
+// How far in from the page's top-left corner the Inbox shows while the
+// sidebar is hidden.
+constexpr int kCornerGap = 10;
+
+InboxButton* FindIn(views::View* view) {
+  if (auto* button = views::AsViewClass<InboxButton>(view)) {
+    return button;
+  }
+  for (views::View* child : view->children()) {
+    if (InboxButton* found = FindIn(child)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
 
 }  // namespace
 
 std::unique_ptr<InboxButton> InboxButton::Make(BrowserWindowInterface* window) {
   ChatAlerts* alerts = ChatAlerts::For(window->GetProfile());
   return alerts ? std::make_unique<InboxButton>(window, alerts) : nullptr;
+}
+
+// static
+void InboxButton::OpenIn(BrowserWindowInterface* window) {
+  if (InboxButton* button =
+          FindIn(BrowserView::GetBrowserViewForBrowser(window))) {
+    button->Show(/*by_page_corner=*/IsSidebarHidden(window));
+  }
 }
 
 InboxButton::InboxButton(BrowserWindowInterface* window, ChatAlerts* alerts)
@@ -170,13 +195,26 @@ void InboxButton::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void InboxButton::Open() {
+  Show(/*by_page_corner=*/false);
+}
+
+void InboxButton::Show(bool by_page_corner) {
   if (bubble_widget_.IsObserving()) {
     return;
   }
   // A new page each time, as the theme picker's.
   bubble_ = WebUIBubbleManager::Create<UwInboxUI>(window_, GURL(kInboxUrl),
                                                   IDS_UW_INBOX);
-  bubble_->ShowBubble(this, views::BubbleBorder::TOP_CENTER);
+  if (by_page_corner) {
+    const gfx::Rect card = BrowserView::GetBrowserViewForBrowser(window_)
+                               ->contents_container()
+                               ->GetBoundsInScreen();
+    bubble_->ShowBubble(
+        gfx::Rect(card.x() + kCornerGap, card.y() + kCornerGap, 0, 0),
+        views::BubbleBorder::TOP_LEFT);
+  } else {
+    bubble_->ShowBubble(this, views::BubbleBorder::TOP_CENTER);
+  }
   views::Widget* widget = bubble_->GetBubbleWidget();
   if (!widget) {
     return;

@@ -112,6 +112,14 @@ void ChatAlerts::SeeNewest(std::string_view chat_id) {
   }
 }
 
+void ChatAlerts::See(std::string_view id) {
+  const auto alert = std::ranges::find(alerts_, id, &Alert::id);
+  if (alert != alerts_.end() && !alert->seen) {
+    alert->seen = true;
+    Changed();
+  }
+}
+
 void ChatAlerts::Clear() {
   if (!alerts_.empty()) {
     alerts_.clear();

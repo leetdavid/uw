@@ -40,6 +40,10 @@ class InboxButton : public views::Button,
   // The button of `window`, or null in a private window, which keeps no
   // alerts.
   static std::unique_ptr<InboxButton> Make(BrowserWindowInterface* window);
+  // Opens the Inbox of `window`, as a press on its button does. While the
+  // sidebar is hidden, it stays hidden, and the Inbox shows by the page's
+  // top-left corner.
+  static void OpenIn(BrowserWindowInterface* window);
 
   InboxButton(BrowserWindowInterface* window, ChatAlerts* alerts);
   InboxButton(const InboxButton&) = delete;
@@ -64,6 +68,7 @@ class InboxButton : public views::Button,
 
  private:
   void Open();
+  void Show(bool by_page_corner);
   void UpdateName();
 
   const raw_ptr<BrowserWindowInterface> window_;

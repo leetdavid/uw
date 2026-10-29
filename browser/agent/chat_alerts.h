@@ -65,6 +65,8 @@ class ChatAlerts : public base::SupportsUserData::Data {
   void SeeAll();
   // The notification of `chat_id` was clicked, so its newest alert is seen.
   void SeeNewest(std::string_view chat_id);
+  // The alert `id` was opened or dismissed on the new tab page.
+  void See(std::string_view id);
   void Clear();
   void RemoveChat(std::string_view chat_id);
   // The step a run of `chat_id` waited on was answered, or the run ended.

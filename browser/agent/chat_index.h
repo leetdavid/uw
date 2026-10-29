@@ -58,6 +58,8 @@ class ChatIndex : public base::SupportsUserData::Data {
   // Newest first.
   std::vector<Entry> Entries() const;
   void Update(Entry entry);
+  // The user saw how the unread chat `id` ended, away from its page.
+  void MarkRead(std::string_view id);
   // Forgets the chat and deletes its file. A chat deleted here is never
   // saved again by a page that still has it.
   void Delete(std::string_view id);

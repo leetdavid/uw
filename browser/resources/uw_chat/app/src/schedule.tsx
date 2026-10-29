@@ -136,6 +136,24 @@ export function describeSchedule(schedule: ChatSchedule): string {
   }
 }
 
+// How often it runs, beside its next run: "Every day", "Every 4 hours".
+export function repeatText(schedule: ChatSchedule): string {
+  switch (schedule.repeat) {
+    case ScheduleRepeat.kEveryHours:
+      return schedule.hours === 1
+        ? "Every hour"
+        : `Every ${schedule.hours} hours`;
+    case ScheduleRepeat.kDaily:
+      return "Every day";
+    case ScheduleRepeat.kWeekdays:
+      return "Weekdays";
+    case ScheduleRepeat.kWeekly:
+      return `Every ${WEEKDAYS[schedule.weekday]}`;
+    default:
+      return "Once";
+  }
+}
+
 export function ScheduleButtons({
   state,
   charted,

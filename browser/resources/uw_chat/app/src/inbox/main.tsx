@@ -17,17 +17,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { KIND_COLORS } from "../alert-kinds";
 import { connect, inboxHandler, inboxPage, type InboxAlert } from "./inbox-api";
-
-// The color of what a notification said, by its words.
-const KIND_COLORS: Record<string, string> = {
-  "Change alert": "text-primary",
-  "No change": "text-muted-foreground",
-  "Couldn't check": "text-destructive",
-  Paused: "text-destructive",
-  "Sign in required": "text-[#B4580A] dark:text-warning",
-  "Waits for your approval": "text-[#B4580A] dark:text-warning",
-};
 
 function clockText(ms: number): string {
   return new Date(ms).toLocaleTimeString([], {

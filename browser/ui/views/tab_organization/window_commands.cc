@@ -26,6 +26,7 @@
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -208,6 +209,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kShowScheduled:
       ShowSingletonTab(window, GURL(kScheduledUrl));
+      break;
+    case kShowInbox:
+      InboxButton::OpenIn(window);
       break;
   }
 }

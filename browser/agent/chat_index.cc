@@ -156,6 +156,14 @@ void ChatIndex::Update(Entry entry) {
   Save();
 }
 
+void ChatIndex::MarkRead(std::string_view id) {
+  const auto entry = entries_.find(std::string(id));
+  if (entry != entries_.end() && entry->second.state == State::kUnread) {
+    entry->second.state = State::kDone;
+    Save();
+  }
+}
+
 void ChatIndex::Delete(std::string_view id) {
   deleted_.insert(std::string(id));
   entries_.erase(std::string(id));

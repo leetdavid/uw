@@ -1162,6 +1162,10 @@ void UwChatHandler::OnChatsChanged() {
   }
   std::vector<mojom::ChatSummaryPtr> chats;
   for (const ChatIndex::Entry& entry : index->Entries()) {
+    // The new tab page marked this chat read.
+    if (entry.id == id_ && entry.state == ChatIndex::State::kDone) {
+      unread_ = false;
+    }
     auto chat = mojom::ChatSummary::New();
     chat->id = entry.id;
     chat->title = entry.title;

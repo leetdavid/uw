@@ -35,7 +35,9 @@ enum WindowCommand {
   kReportIssue,
   // Opens uw://scheduled, every watched page and scheduled chat.
   kShowScheduled,
-  kLastWindowCommand = kShowScheduled,
+  // Opens the Inbox, as its button in the sidebar does.
+  kShowInbox,
+  kLastWindowCommand = kShowInbox,
 };
 
 bool IsWindowCommand(int command);

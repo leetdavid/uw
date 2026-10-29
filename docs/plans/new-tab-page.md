@@ -36,7 +36,7 @@ Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" an
 
 - The sections sit under the box in two columns: Needs you, Finished, and Setup on the left, which want the user; Coming up, Running, and Tabs on the right, which go on by themselves.
 - Needs you lists steps oldest first, with Review, which opens the chat at its question, or Open page to sign in.
-- Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it takes it off this page; the Inbox keeps the alert.
+- Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it takes it off this page; the Inbox keeps the alert. With the sidebar hidden, Inbox › opens the Inbox by the page's top-left corner, and the sidebar stays hidden.
 - Coming up shows the next three runs. Paused chats are left out.
 - Running plays and pauses the mini player's media from the page.
 - Tabs shows the organizer's moves and new tasks of the last hour, three at most, each with Undo, and a line saying whether automatic organization is on or paused, with Pause or Resume. With automatic organization off, the section is left out.

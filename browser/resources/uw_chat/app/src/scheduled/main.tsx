@@ -32,14 +32,13 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   RunEnd,
-  ScheduleRepeat,
   type ChatSchedule,
   type ScheduleState,
   type Step,
   type TrackedValue,
 } from "../chat-api";
 import { numberText } from "../chart";
-import { ScheduleRows, WATCH_CHIPS } from "../schedule";
+import { repeatText, ScheduleRows, WATCH_CHIPS } from "../schedule";
 import {
   useModels,
   WatchForm,
@@ -54,16 +53,6 @@ import {
   type ScheduledRow,
   type WatchAddress,
 } from "./scheduled-api";
-
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
 
 const AMBER = "text-[#B4580A] dark:text-warning";
 
@@ -101,24 +90,6 @@ function dayAndTime(ms: number): string {
             ? new Date(ms).toLocaleDateString([], { weekday: "short" })
             : dateText(ms);
   return `${day} ${clockText(ms)}`;
-}
-
-// How often it runs, under its next run: "Every day", "Every 4 hours".
-function repeatText(schedule: ChatSchedule): string {
-  switch (schedule.repeat) {
-    case ScheduleRepeat.kEveryHours:
-      return schedule.hours === 1
-        ? "Every hour"
-        : `Every ${schedule.hours} hours`;
-    case ScheduleRepeat.kDaily:
-      return "Every day";
-    case ScheduleRepeat.kWeekdays:
-      return "Weekdays";
-    case ScheduleRepeat.kWeekly:
-      return `Every ${WEEKDAYS[schedule.weekday]}`;
-    default:
-      return "Once";
-  }
 }
 
 // The watch's chip icon, read back from what it watches for.

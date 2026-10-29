@@ -13,14 +13,26 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { ArrowUp, Clock, Search } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronRight,
+  Clock,
+  Flag,
+  Globe,
+  Hand,
+  Search,
+  Terminal as TerminalIcon,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { KIND_COLORS } from "../alert-kinds";
 import type { ChatSchedule, ScheduleState } from "../chat-api";
 import { CHIP, ModelChip } from "../providers/model-chip";
 import { providersHandler } from "../providers/providers-api";
-import { ScheduleRows } from "../schedule";
+import { repeatText, ScheduleRows } from "../schedule";
 import { useModels } from "../watch-card/watch-parts";
 import {
   connect,
@@ -33,6 +45,8 @@ import {
   type AutocompleteMatch,
   type AutocompleteResult,
   type NewTabBox,
+  type NewTabRow,
+  type NewTabSections,
 } from "./newtab-api";
 
 type Mode = "search" | "ask";
@@ -425,13 +439,296 @@ function Box({ box }: { box: NewTabBox }) {
   );
 }
 
+// "9:02" today, else with its day: "Tomorrow 7:30", "Yesterday 19:00", or
+// "Oct 24 10:00".
+function rowTime(ms: number): string {
+  const clock = new Date(ms).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const day = new Date(ms).setHours(0, 0, 0, 0);
+  const days = Math.round((day - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days === 0) {
+    return clock;
+  }
+  const name =
+    days === 1
+      ? "Tomorrow"
+      : days === -1
+        ? "Yesterday"
+        : new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${name} ${clock}`;
+}
+
+// How a run comes up: what it looks for and how often, or the trigger that
+// wakes it.
+function comingUpText(row: NewTabRow): ReactNode {
+  const schedule = row.schedule;
+  if (!schedule) {
+    return (
+      <>
+        When <code className="font-mono text-[11.5px]">{row.trigger}</code> wakes it
+      </>
+    );
+  }
+  const what = schedule.page
+    ? schedule.watchFor || schedule.request
+    : schedule.regularUpdates
+      ? "Regular updates"
+      : "Change alerts";
+  const repeat = repeatText(schedule);
+  return `${what} · ${repeat.charAt(0).toLowerCase()}${repeat.slice(1)}`;
+}
+
+function Section({
+  id,
+  icon: Icon,
+  name,
+  count,
+  link,
+  children,
+}: {
+  id: string;
+  icon: LucideIcon;
+  name: string;
+  count: number;
+  link?: { id: string; name: string; onClick: () => void };
+  children: ReactNode;
+}) {
+  return (
+    <section id={id}>
+      <div className="box-content flex h-[22px] items-center gap-[7px] px-0.5 pb-1.5 text-[13px] font-semibold">
+        <Icon aria-hidden className="size-[15px] text-muted-foreground" />
+        {name}
+        <span className="font-normal text-muted-foreground">{count}</span>
+        {link && (
+          <button
+            type="button"
+            id={link.id}
+            onClick={link.onClick}
+            className="ml-auto flex items-center gap-[3px] text-xs font-medium text-primary outline-none focus-visible:underline"
+          >
+            {link.name}
+            <ChevronRight aria-hidden className="size-3" />
+          </button>
+        )}
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border">{children}</div>
+    </section>
+  );
+}
+
+// A row: the page's icon, or a clock, terminal, or chat; its title over what
+// it says; and at the end a time or buttons.
+function Row({
+  row,
+  under,
+  onOpen,
+  children,
+}: {
+  row: NewTabRow;
+  under: ReactNode;
+  onOpen: () => void;
+  children: ReactNode;
+}) {
+  const Icon = row.page ? Globe : row.trigger ? TerminalIcon : row.scheduled ? Clock : AskIcon;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-chat={row.chatId}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          onOpen();
+        }
+      }}
+      className="group flex h-[52px] cursor-default items-center gap-[11px] border-t border-border pr-2.5 pl-3 text-[13px] whitespace-nowrap outline-none first:border-t-0 hover:bg-accent focus-visible:bg-accent"
+    >
+      {row.favicon ? (
+        <img src={row.favicon} alt="" className="size-4 shrink-0" />
+      ) : (
+        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <b className="truncate font-medium">{row.title || "New chat"}</b>
+        <span className="truncate text-[12.5px] text-muted-foreground">{under}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// What the row says first, in its color, then the rest.
+function Said({ row }: { row: NewTabRow }) {
+  return (
+    <>
+      <span className={cn("font-medium", KIND_COLORS[row.what] ?? "text-foreground")}>
+        {row.what}
+      </span>
+      {row.text && ` · ${row.text}`}
+    </>
+  );
+}
+
+function Time({ children }: { children: ReactNode }) {
+  return (
+    <span className="mt-[9px] shrink-0 self-start text-xs text-muted-foreground tabular-nums group-focus-within:hidden group-hover:hidden">
+      {children}
+    </span>
+  );
+}
+
+const openRow = (row: NewTabRow) =>
+  row.page
+    ? newTabHandler.openPage(row.chatId, row.alertId)
+    : newTabHandler.openChat(row.chatId, row.alertId);
+
+function NeedsYou({ rows }: { rows: NewTabRow[] }) {
+  return (
+    <Section id="newtab-needs-you" icon={Hand} name="Needs you" count={rows.length}>
+      {rows.map((row) => {
+        // A run that could not sign in sends the user to the page.
+        const signIn = row.what === "Sign in required";
+        const onOpen = () =>
+          signIn
+            ? newTabHandler.openPage(row.chatId, row.alertId)
+            : newTabHandler.openChat(row.chatId, row.alertId);
+        return (
+          <Row key={row.alertId || row.chatId} row={row} under={<Said row={row} />} onOpen={onOpen}>
+            <Button
+              variant="secondary"
+              size="compact"
+              tabIndex={-1}
+              className="h-[26px] shrink-0 px-2.5"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen();
+              }}
+            >
+              {signIn ? "Open page" : "Review"}
+            </Button>
+          </Row>
+        );
+      })}
+    </Section>
+  );
+}
+
+function Finished({ rows, count }: { rows: NewTabRow[]; count: number }) {
+  const button =
+    "grid size-7 shrink-0 place-items-center rounded-[7px] text-muted-foreground outline-none hover:bg-background hover:text-foreground hover:shadow-[0_1px_3px_rgba(30,27,46,.14)] focus-visible:bg-background [&_svg]:size-[15px]";
+  return (
+    <Section
+      id="newtab-finished"
+      icon={Flag}
+      name="Finished"
+      count={count}
+      link={{ id: "newtab-inbox", name: "Inbox", onClick: () => newTabHandler.showInbox() }}
+    >
+      {rows.map((row) => (
+        <Row
+          key={row.alertId || row.chatId}
+          row={row}
+          under={<Said row={row} />}
+          onOpen={() => openRow(row)}
+        >
+          <Time>{rowTime(row.time)}</Time>
+          <span className="hidden items-center gap-1.5 group-focus-within:flex group-hover:flex">
+            {/* A watched page's row opens the page, so its chat is a chip away. */}
+            {row.page && (
+              <button
+                type="button"
+                data-open-chat={row.chatId}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  newTabHandler.openChat(row.chatId, row.alertId);
+                }}
+                className="flex h-[22px] items-center rounded-md bg-background px-2 text-[11.5px] font-medium shadow-[0_1px_3px_rgba(30,27,46,.14)] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Open chat
+              </button>
+            )}
+            <button
+              type="button"
+              data-dismiss={row.alertId || row.chatId}
+              title="Dismiss"
+              aria-label="Dismiss"
+              onClick={(event) => {
+                event.stopPropagation();
+                newTabHandler.dismiss(row.chatId, row.alertId);
+              }}
+              className={button}
+            >
+              <X aria-hidden />
+            </button>
+          </span>
+        </Row>
+      ))}
+    </Section>
+  );
+}
+
+function ComingUp({ rows, count }: { rows: NewTabRow[]; count: number }) {
+  return (
+    <Section
+      id="newtab-coming-up"
+      icon={Clock}
+      name="Coming up"
+      count={count}
+      link={{
+        id: "newtab-scheduled",
+        name: "Scheduled",
+        onClick: () => newTabHandler.showScheduled(),
+      }}
+    >
+      {rows.map((row) => (
+        <Row key={row.chatId} row={row} under={comingUpText(row)} onOpen={() => openRow(row)}>
+          <span className="mt-[9px] shrink-0 self-start text-xs text-muted-foreground tabular-nums">
+            {row.time ? rowTime(row.time) : "Trigger"}
+          </span>
+        </Row>
+      ))}
+    </Section>
+  );
+}
+
+// Under the box, in two columns: what wants the user on the left, what goes
+// on by itself on the right. A section with nothing to show is left out.
+function Sections({ sections }: { sections: NewTabSections }) {
+  const left = sections.needsYou.length > 0 || sections.finished.length > 0;
+  const right = sections.comingUp.length > 0;
+  if (!left && !right) {
+    return null;
+  }
+  return (
+    <div className="mt-7 grid w-full max-w-[760px] grid-cols-2 items-start gap-x-6">
+      <div className="flex min-w-0 flex-col gap-[18px]">
+        {sections.needsYou.length > 0 && <NeedsYou rows={sections.needsYou} />}
+        {sections.finished.length > 0 && (
+          <Finished rows={sections.finished} count={sections.finishedCount} />
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col gap-[18px]">
+        {right && <ComingUp rows={sections.comingUp} count={sections.comingUpCount} />}
+      </div>
+    </div>
+  );
+}
+
 function NewTabPage() {
   const [box, setBox] = useState<NewTabBox | null>(null);
+  const [sections, setSections] = useState<NewTabSections | null>(null);
   useEffect(() => {
-    const id = newTabPage.onBox.addListener((next: NewTabBox) => setBox(next));
+    const ids = [
+      newTabPage.onBox.addListener((next: NewTabBox) => setBox(next)),
+      newTabPage.onSections.addListener((next: NewTabSections) => setSections(next)),
+    ];
     connect();
     return () => {
-      newTabPage.removeListener(id);
+      for (const id of ids) {
+        newTabPage.removeListener(id);
+      }
     };
   }, []);
   if (!box) {
@@ -452,6 +749,7 @@ function NewTabPage() {
           A private window. uw keeps nothing from it after it closes.
         </p>
       )}
+      {sections && <Sections sections={sections} />}
     </main>
   );
 }

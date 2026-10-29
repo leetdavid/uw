@@ -5,7 +5,7 @@ import {
   NewTabHandlerRemote,
   NewTabPageCallbackRouter,
 } from "uw-chat-mojom";
-import type { NewTabBox } from "uw-chat-mojom";
+import type { NewTabBox, NewTabRow, NewTabSections } from "uw-chat-mojom";
 import { SuggestInventory } from "//resources/mojo/components/omnibox/browser/fusebox_action.mojom-webui.js";
 import {
   InputMethod,
@@ -18,7 +18,13 @@ import type {
   AutocompleteResult,
 } from "//resources/mojo/components/omnibox/browser/searchbox.mojom-webui.js";
 
-export type { AutocompleteMatch, AutocompleteResult, NewTabBox };
+export type {
+  AutocompleteMatch,
+  AutocompleteResult,
+  NewTabBox,
+  NewTabRow,
+  NewTabSections,
+};
 
 export const newTabPage = new NewTabPageCallbackRouter();
 export const newTabHandler = new NewTabHandlerRemote();

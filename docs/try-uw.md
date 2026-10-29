@@ -188,7 +188,11 @@ Expected result: the panel lists your open tabs, history, bookmarks, and a searc
 
 Turn off `Cmd+T opens the command bar`, then press Cmd-T. Do the same in a private window (Cmd-Shift-N).
 
-Expected result: the tab shows uw's logo and one box, `Search or type an address`, with a Search | Ask switch, and the address bar stays empty. Nothing on the page comes from Google. Type a few letters of a page you visited: the box lists your open tabs, history, and bookmarks, as the command bar does, and Return opens the row in this tab. Tab switches to Ask: type a request and press Return, and this tab becomes a chat with your text as its first message, on the model the chip shows. Once makes it a scheduled chat. In a private window the page shows only the box and the line `A private window. uw keeps nothing from it after it closes.`, and Ask has no Once. Before any AI provider is added, Ask is grayed. The page's sections, such as Needs you and Finished, are not built yet.
+Expected result: the tab shows uw's logo and one box, `Search or type an address`, with a Search | Ask switch, and the address bar stays empty. Nothing on the page comes from Google. Type a few letters of a page you visited: the box lists your open tabs, history, and bookmarks, as the command bar does, and Return opens the row in this tab. Tab switches to Ask: type a request and press Return, and this tab becomes a chat with your text as its first message, on the model the chip shows. Once makes it a scheduled chat. In a private window the page shows only the box and the line `A private window. uw keeps nothing from it after it closes.`, and Ask has no Once. Before any AI provider is added, Ask is grayed.
+
+Then watch a page with the eye in the address bar and let its first run finish. Ask something in a chat and switch to another tab before it answers. Open a new tab.
+
+Expected result: under the box, Finished lists the run's alert and the chat's answer, newest first, and Coming up lists the watched page's next run. Point at a Finished row and click ×: the row goes, and the Inbox still has the alert. Click a row: the page or chat opens in this tab, or uw switches to the tab that already shows it. Inbox › opens the Inbox, and Scheduled › opens the Scheduled page in this tab. A chat waiting for your approval shows under Needs you, and Review goes to it. The Running, Tabs, and Setup sections are not built yet.
 
 ### Chats
 
