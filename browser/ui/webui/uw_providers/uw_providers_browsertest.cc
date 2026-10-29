@@ -8,12 +8,14 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/json/json_writer.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/platform_util_internal.h"
@@ -297,6 +299,24 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                   .ExtractString(),
               HasSubstr("HTTP 401 Bad key."));
   EXPECT_TRUE(ReadProviders(prefs()).empty());
+}
+
+// Vercel AI Gateway lists its models in over half a megabyte.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, ALongModelListIsListed) {
+  AddTestServer(ProviderFormat::kChatCompletions);
+  base::ListValue data;
+  for (int i = 0; i < 1000; ++i) {
+    data.Append(base::DictValue()
+                    .Set("id", "chat-" + base::NumberToString(i))
+                    .Set("description", std::string(500, 'x')));
+  }
+  models_.Answer(
+      "/v1/models",
+      base::WriteJson(base::DictValue().Set("data", std::move(data))).value());
+  Open();
+
+  EXPECT_EQ(true, Run("await until(() => withText('a *', '1000 models'));"
+                      "return true;"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,

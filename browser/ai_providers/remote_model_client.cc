@@ -21,6 +21,9 @@ namespace uw {
 namespace {
 
 constexpr size_t kMaxResponseBytes = 64 * 1024;
+// Vercel AI Gateway and OpenRouter list their models in over half a megabyte.
+constexpr size_t kMaxListBytes =
+    network::SimpleURLLoader::kMaxBoundedStringDownloadSize;
 
 constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
     net::DefineNetworkTrafficAnnotation("uw_tab_organization", R"(
@@ -152,7 +155,7 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   loader_->DownloadToString(loader_factory_.get(),
                             base::BindOnce(&RemoteModelClient::OnComplete,
                                            weak_factory_.GetWeakPtr()),
-                            kMaxResponseBytes);
+                            post ? kMaxResponseBytes : kMaxListBytes);
 }
 
 // Runs inside the loader, so the answer goes out from a fresh task.

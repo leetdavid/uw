@@ -26,9 +26,10 @@ namespace uw {
 
 // One-shot HTTPS JSON client for the model providers. POST bodies go
 // through Send(); SendGet() covers model listing. Responses are bounded
-// (64 KiB) and timed out; a redirect fails the request and credentials are
-// never sent. No retries: a failed request leaves the branch where it is.
-// Destroying the client cancels the in-flight request.
+// (64 KiB, or 5 MiB for a model list) and timed out; a redirect fails the
+// request and credentials are never sent. No retries: a failed request
+// leaves the branch where it is. Destroying the client cancels the
+// in-flight request.
 class RemoteModelClient {
  public:
   struct Outcome {
