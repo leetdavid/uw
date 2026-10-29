@@ -168,6 +168,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
 
+  // A move or a new task of the organizer's, for the new tab page, with the
+  // Undo step that takes it back.
+  struct Change {
+    Event event;
+    base::Time time;
+    uint64_t step = 0;
+  };
+  // The changes of the last hour on the window's workspace, newest first.
+  std::vector<Change> RecentChanges() const;
+
  private:
   struct Activity {
     std::u16string title;
@@ -233,6 +243,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
     // How many moves there had been once this one started a task. A later
     // move is what Undo reverses then.
     uint64_t moves = 0;
+    // The Undo step of the move it made.
+    uint64_t step = 0;
   };
   // A request on its way, with the client that sends it.
   struct Pending {
@@ -277,8 +289,11 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // what their pages show without asking, so one can take over when the
   // first window closes. Null when no window has an organizer.
   AutomaticOrganizer* Leader() const;
-  // Tells the sidebar of every window on the workspace.
-  void Broadcast(const Event& event);
+  // Tells the sidebar of every window on the workspace. A move or a new task
+  // goes on each window's changes, with `step`, the Undo step it made.
+  void Broadcast(const Event& event, uint64_t step = 0);
+  // The step Undo would take back now, or 0.
+  uint64_t UndoStep() const;
   void NotifyNaming();
 
   Profile* profile() const;
@@ -417,6 +432,8 @@ class AutomaticOrganizer : public TabStripModelObserver {
   std::set<std::string> owed_names_;
   uint64_t next_request_ = 1;
   base::RepeatingCallbackList<void(const Event&)> events_;
+  // Oldest first.
+  std::vector<Change> changes_;
   base::OneShotTimer timer_;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription tree_changed_;

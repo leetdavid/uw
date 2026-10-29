@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/barrier_callback.h"
+#include "base/containers/span.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
@@ -37,7 +38,9 @@
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
@@ -50,6 +53,7 @@ namespace {
 
 constexpr size_t kFinishedRows = 5;
 constexpr size_t kComingUpRows = 3;
+constexpr size_t kTabsRows = 3;
 constexpr base::TimeDelta kPollEvery = base::Seconds(2);
 
 // How the chat file at `path` ended, on the chats' sequence.
@@ -106,6 +110,26 @@ UwNewTabHandler::UwNewTabHandler(
     schedules_.Observe(chats);
     pictures_.Observe(PictureInPictureWindowManager::GetInstance());
     WatchVideo();
+    if (BrowserWindowInterface* window = Window()) {
+      if (AutomaticOrganizer* organizer = AutomaticOrganizer::From(window)) {
+        organizer_events_ = organizer->ObserveEvents(base::BindRepeating(
+            [](UwNewTabHandler* self, const AutomaticOrganizer::Event&) {
+              self->SendSections();
+            },
+            base::Unretained(this)));
+      }
+      if (TabOrganizationController* controller =
+              TabOrganizationController::From(window)) {
+        tree_changes_ = controller->Observe(base::BindRepeating(
+            &UwNewTabHandler::SendSections, base::Unretained(this)));
+      }
+    }
+    for (const char* pref :
+         {kOrganizationEnabledPref, kOrganizationPauseModePref,
+          kOrganizationPauseUntilPref}) {
+      prefs_.Add(pref, base::BindRepeating(&UwNewTabHandler::SendSections,
+                                           base::Unretained(this)));
+    }
     SendSections();
     poll_.Start(
         FROM_HERE, kPollEvery,
@@ -217,6 +241,30 @@ void UwNewTabHandler::PlayOrPause(int32_t tab) {
   } else {
     session->Resume(content::MediaSession::SuspendType::kUI);
   }
+}
+
+void UwNewTabHandler::UndoChange() {
+  BrowserWindowInterface* window = Window();
+  AutomaticOrganizer* organizer =
+      window ? AutomaticOrganizer::From(window) : nullptr;
+  TabOrganizationController* controller =
+      window ? TabOrganizationController::From(window) : nullptr;
+  if (!organizer || !controller) {
+    return;
+  }
+  const std::vector<AutomaticOrganizer::Change> changes =
+      organizer->RecentChanges();
+  const std::optional<TabOrganizationController::UndoMove> next =
+      controller->NextUndo();
+  if (!changes.empty() && next && next->step == changes.front().step) {
+    controller->Undo();
+  }
+}
+
+void UwNewTabHandler::Pause(mojom::OrganizationPause pause) {
+  SetPauseState(profile()->GetPrefs(), static_cast<PauseMode>(pause),
+                pause == mojom::OrganizationPause::kTimed ? base::Hours(1)
+                                                          : base::TimeDelta());
 }
 
 void UwNewTabHandler::OnAlertsChanged() {
@@ -428,6 +476,10 @@ void UwNewTabHandler::SendSections() {
     sections->running.push_back(std::move(row));
   }
 
+  if (BrowserWindowInterface* window = Window()) {
+    sections->tabs = TabsOf(window);
+  }
+
   page_->OnSections(std::move(sections));
 }
 
@@ -491,6 +543,43 @@ void UwNewTabHandler::Remove(const std::string& chat_id,
   } else if (ChatIndex* index = index_.GetSource()) {
     index->MarkRead(chat_id);
   }
+}
+
+BrowserWindowInterface* UwNewTabHandler::Window() const {
+  return webui::GetBrowserWindowInterface(web_ui_->GetWebContents());
+}
+
+mojom::NewTabTabsPtr UwNewTabHandler::TabsOf(
+    BrowserWindowInterface* window) const {
+  const PrefService& prefs = *profile()->GetPrefs();
+  const AutomaticOrganizer* organizer = AutomaticOrganizer::From(window);
+  const TabOrganizationController* controller =
+      TabOrganizationController::From(window);
+  if (!organizer || !controller ||
+      !prefs.GetBoolean(kOrganizationEnabledPref)) {
+    return nullptr;
+  }
+  auto tabs = mojom::NewTabTabs::New();
+  const std::vector<AutomaticOrganizer::Change> changes =
+      organizer->RecentChanges();
+  const std::optional<TabOrganizationController::UndoMove> next =
+      controller->NextUndo();
+  tabs->can_undo = !changes.empty() && next && changes.front().step &&
+                   next->step == changes.front().step;
+  for (const AutomaticOrganizer::Change& change :
+       base::span(changes).first(std::min(changes.size(), kTabsRows))) {
+    tabs->changes.push_back(mojom::NewTabChange::New(
+        change.event.kind == AutomaticOrganizer::Event::Kind::kCreated,
+        base::UTF16ToUTF8(change.event.page),
+        base::UTF16ToUTF8(change.event.detail),
+        change.time.InMillisecondsFSinceUnixEpoch()));
+  }
+  const PauseMode pause = ReadPauseState(&prefs);
+  tabs->pause = static_cast<mojom::OrganizationPause>(pause);
+  if (pause == PauseMode::kTimed) {
+    tabs->paused_until = PausedUntil(&prefs).InMillisecondsFSinceUnixEpoch();
+  }
+  return tabs;
 }
 
 void UwNewTabHandler::Poll() {

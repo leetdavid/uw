@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -28,6 +29,7 @@
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 
+class BrowserWindowInterface;
 class Profile;
 
 namespace content {
@@ -69,6 +71,8 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   void ShowScheduled() override;
   void ShowTab(int32_t tab) override;
   void PlayOrPause(int32_t tab) override;
+  void UndoChange() override;
+  void Pause(mojom::OrganizationPause pause) override;
 
   // ChatAlerts::Observer:
   void OnAlertsChanged() override;
@@ -125,6 +129,9 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   // Follows the media session of the mini player's video, if it is this
   // profile's.
   void WatchVideo();
+  // The window the page is in, or null.
+  BrowserWindowInterface* Window() const;
+  mojom::NewTabTabsPtr TabsOf(BrowserWindowInterface* window) const;
   // Shows `url` in this tab, as a chat that starts with `start` when given.
   void Become(const GURL& url, std::optional<ChatStart> start);
 
@@ -149,6 +156,9 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   base::ScopedObservation<PictureInPictureWindowManager,
                           PictureInPictureWindowManager::Observer>
       pictures_{this};
+  // Automatic organization's moves, and the window's tree, which Undo changes.
+  base::CallbackListSubscription organizer_events_;
+  base::CallbackListSubscription tree_changes_;
   base::ScopedObservation<ChatAlerts, ChatAlerts::Observer> alerts_{this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_{this};
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer> schedules_{

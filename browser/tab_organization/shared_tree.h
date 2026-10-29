@@ -3,6 +3,7 @@
 #ifndef UW_BROWSER_TAB_ORGANIZATION_SHARED_TREE_H_
 #define UW_BROWSER_TAB_ORGANIZATION_SHARED_TREE_H_
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -64,7 +65,7 @@ class SharedTree : public base::RefCounted<SharedTree> {
 
   // What Undo takes back: the tree and the tasks' looks before an action,
   // the title of the first tab it moved, and the task it moved them into,
-  // empty for the Scratchpad.
+  // empty for the Scratchpad. `id` tells the step from every other.
   struct Step {
     Step();
     Step(Step&&);
@@ -74,9 +75,11 @@ class SharedTree : public base::RefCounted<SharedTree> {
     std::map<std::string, tab_groups::TabGroupVisualData> tasks;
     std::u16string tab;
     std::optional<std::string> task;
+    uint64_t id = 0;
   };
   // The workspace's actions Undo can take back, the last one last.
   std::vector<Step>& undo() { return undo_; }
+  uint64_t NewUndoId() { return ++undo_ids_; }
 
   // The windows on the tree, the first to join first.
   const std::vector<raw_ptr<TabOrganizationController>>& windows() const {
@@ -181,6 +184,7 @@ class SharedTree : public base::RefCounted<SharedTree> {
   std::map<std::string, std::u16string> generated_names_;
   std::set<PageId> opened_;
   std::vector<Step> undo_;
+  uint64_t undo_ids_ = 0;
   std::vector<raw_ptr<TabOrganizationController>> windows_;
   // The tree as the other windows last followed it.
   PageTree propagated_;

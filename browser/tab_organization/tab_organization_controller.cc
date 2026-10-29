@@ -1176,7 +1176,7 @@ TabOrganizationController::NextUndo() const {
     return std::nullopt;
   }
   const SharedTree::Step& snapshot = shared_->undo().back();
-  UndoMove move{snapshot.tab, {}};
+  UndoMove move{snapshot.tab, {}, snapshot.id};
   if (snapshot.task) {
     move.place = snapshot.task->empty()
                      ? l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD)
@@ -1960,6 +1960,7 @@ void TabOrganizationController::Record(const std::vector<PageId>& roots,
   SharedTree::Step snapshot;
   snapshot.tree = shared_->tree();
   snapshot.task = std::move(task);
+  snapshot.id = shared_->NewUndoId();
   if (const tabs::TabInterface* tab =
           roots.empty() ? nullptr : TabFor(roots.front())) {
     snapshot.tab = tab->GetContents()->GetTitle();

@@ -207,10 +207,12 @@ class TabOrganizationController : public TabStripModelObserver,
   void Undo();
   // What Undo would reverse: the title of the first tab the action moved, and
   // the task it went to, or the Scratchpad. `place` is empty for a move
-  // within the tree, such as nesting a tab.
+  // within the tree, such as nesting a tab. `step` tells the action from
+  // every other.
   struct UndoMove {
     std::u16string tab;
     std::u16string place;
+    uint64_t step = 0;
   };
   std::optional<UndoMove> NextUndo() const;
 

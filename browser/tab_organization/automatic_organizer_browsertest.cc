@@ -543,6 +543,44 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(bar()->card_visible());
 }
 
+// The new tab page lists the move under Tabs, with Undo while Undo would
+// take it back. See docs/plans/new-tab-page.md.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TheNewTabPageListsAMoveWithUndo) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+
+  chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+  content::WebContents* page =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(content::WaitForLoadStop(page));
+  EXPECT_EQ(true, content::EvalJs(page, R"((async () => {
+    const until = (probe) => new Promise((resolve) => {
+      const check = () => probe() ? resolve(probe()) : setTimeout(check, 20);
+      check();
+    });
+    const tabs = await until(() => document.querySelector('#newtab-tabs'));
+    if (!tabs.textContent.includes('Moved to Plan Lisbon trip') ||
+        !tabs.textContent.includes('lisbon')) {
+      return tabs.textContent;
+    }
+    (await until(() => document.querySelector('#newtab-undo'))).click();
+    return true;
+  })())"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !link->GetGroup(); }));
+  EXPECT_EQ(controller()->DepthFor(link), 1);
+  EXPECT_EQ(true, content::EvalJs(page, R"((async () => {
+    while (document.querySelector('#newtab-undo')) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return true;
+  })())"));
+}
+
 // While the sidebar is hidden, the card shows alone over the page's
 // bottom-left corner, and its Undo works there.
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

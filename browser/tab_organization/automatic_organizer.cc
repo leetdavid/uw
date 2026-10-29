@@ -42,6 +42,8 @@ namespace uw {
 namespace {
 
 constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
+// How long the new tab page lists a move or a new task.
+constexpr base::TimeDelta kChangesKept = base::Hours(1);
 
 // The key in `account`: empty when there is no account, nothing when the key
 // is gone.
@@ -466,12 +468,39 @@ AutomaticOrganizer* AutomaticOrganizer::Leader() const {
   return nullptr;
 }
 
-void AutomaticOrganizer::Broadcast(const Event& event) {
+void AutomaticOrganizer::Broadcast(const Event& event, uint64_t step) {
+  const bool change =
+      event.kind == Event::Kind::kMoved || event.kind == Event::Kind::kCreated;
+  const base::Time now = base::Time::Now();
   for (BrowserWindowInterface* window : controller_->Windows()) {
     if (AutomaticOrganizer* organizer = From(window)) {
+      if (change) {
+        std::erase_if(organizer->changes_, [now](const Change& old) {
+          return now - old.time > kChangesKept;
+        });
+        organizer->changes_.push_back({event, now, step});
+      }
       organizer->events_.Notify(event);
     }
   }
+}
+
+uint64_t AutomaticOrganizer::UndoStep() const {
+  const std::optional<TabOrganizationController::UndoMove> next =
+      controller_->NextUndo();
+  return next ? next->step : 0;
+}
+
+std::vector<AutomaticOrganizer::Change> AutomaticOrganizer::RecentChanges()
+    const {
+  const base::Time now = base::Time::Now();
+  std::vector<Change> recent;
+  for (auto change = changes_.rbegin(); change != changes_.rend(); ++change) {
+    if (now - change->time <= kChangesKept) {
+      recent.push_back(*change);
+    }
+  }
+  return recent;
 }
 
 void AutomaticOrganizer::NotifyNaming() {
@@ -1177,6 +1206,9 @@ void AutomaticOrganizer::Apply(Request request,
                            {request.page}, *group,
                            TabOrganizationController::Origin::kOrganizer,
                            request.staying);
+    if (moved) {
+      request.step = UndoStep();
+    }
     Report(moved ? Event::Kind::kMoved : Event::Kind::kDropped, request,
            TargetName(request));
     if (moved) {
@@ -1201,6 +1233,7 @@ void AutomaticOrganizer::Apply(Request request,
     return;
   }
   request.moves = ++moves_;
+  request.step = UndoStep();
   std::unique_ptr<RemoteModelClient> client =
       task_name ? nullptr : PrepareNaming(request, TitlesUnder(request.page));
   if (client) {
@@ -1305,10 +1338,11 @@ void AutomaticOrganizer::Report(Event::Kind kind,
                          LogDetails(request));
     request.logged = true;
   }
-  Broadcast(Event{kind, base::UTF8ToUTF16(request.context.title),
-                  std::move(detail), request.confidence, request.needed,
-                  base::UTF8ToUTF16(request.decision.model),
-                  request.decision.took});
+  Broadcast(
+      Event{kind, base::UTF8ToUTF16(request.context.title), std::move(detail),
+            request.confidence, request.needed,
+            base::UTF8ToUTF16(request.decision.model), request.decision.took},
+      request.step);
 }
 
 std::u16string AutomaticOrganizer::TargetName(const Request& request) const {

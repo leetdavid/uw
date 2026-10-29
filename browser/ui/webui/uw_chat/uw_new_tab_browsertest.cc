@@ -45,6 +45,7 @@
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
@@ -452,8 +453,9 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningShowsChatsAndBusyTerminals) {
                                "\"]'));"
                                "return row.textContent.includes('Working');",
                            })));
-  EXPECT_EQ(true, Run(tab, "return !!(await until(() =>"
-                           "    $('#newtab-running [data-tab]')));"));
+  EXPECT_EQ(true, Run(tab,
+                      "return !!(await until(() =>"
+                      "    $('#newtab-running [data-tab]')));"));
   SaveWindowScreenshot(browser(), "new_tab_page_running");
   // A click on a busy terminal's row goes to its tab.
   EXPECT_EQ(true, Run(tab,
@@ -488,6 +490,36 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningPlaysAndPausesTheMiniPlayer) {
                       "return !!(await until(() =>"
                       "    row.textContent.includes('Paused')));"));
   EXPECT_EQ(true, content::EvalJs(video, "video.paused"));
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, TabsPausesAndResumesOrganization) {
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  prefs.SetBoolean(kOrganizationEnabledPref, true);
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab, R"(
+    const tabs = await until(() => $('#newtab-tabs'));
+    return tabs.textContent.includes('Automatic organization is on');)"));
+  SaveWindowScreenshot(browser(), "new_tab_page_tabs");
+
+  // Pause offers the Organize menu's lengths.
+  EXPECT_EQ(true, Run(tab, R"(
+    (await until(() => $('#newtab-pause'))).dispatchEvent(new PointerEvent(
+        'pointerdown', {bubbles: true, button: 0, pointerType: 'mouse'}));
+    (await until(() => [...document.querySelectorAll(
+        '[role="menu"] [role^="menuitem"]')].find((row) =>
+            row.getAttribute('aria-label') === 'Pause indefinitely'))).click();
+    const resume = await until(() => $('#newtab-resume'));
+    return $('#newtab-tabs').textContent.includes('Paused');)"));
+  EXPECT_EQ(ReadPauseState(&prefs), PauseMode::kIndefinite);
+  EXPECT_EQ(true, Run(tab, R"(
+    $('#newtab-resume').click();
+    return !!(await until(() => $('#newtab-pause')));)"));
+  EXPECT_EQ(ReadPauseState(&prefs), PauseMode::kOff);
+
+  // With automatic organization off, the section is left out.
+  prefs.SetBoolean(kOrganizationEnabledPref, false);
+  EXPECT_EQ(true,
+            Run(tab, "return !!(await until(() => !$('#newtab-tabs')));"));
 }
 
 }  // namespace

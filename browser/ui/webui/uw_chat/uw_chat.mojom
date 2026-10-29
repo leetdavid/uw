@@ -815,6 +815,38 @@ struct NewTabRunningRow {
   double position_time;
 };
 
+// A move or a new task of automatic organization, for Tabs.
+struct NewTabChange {
+  // A new task, else a move.
+  bool created;
+  // The first tab it moved, and the task it went to, or the Scratchpad.
+  string tab;
+  string place;
+  // When, in milliseconds since the Unix epoch.
+  double time;
+};
+
+// How automatic organization is paused. Matches uw::PauseMode.
+enum OrganizationPause {
+  kOff,
+  // For an hour.
+  kTimed,
+  kUntilLaunch,
+  kIndefinite,
+};
+
+// The Tabs section: automatic organization's recent work, and whether it is
+// paused.
+struct NewTabTabs {
+  // The last hour's on this window's workspace, newest first, three at most.
+  array<NewTabChange> changes;
+  // Undo would take back the newest change.
+  bool can_undo;
+  OrganizationPause pause;
+  // When a timed pause ends, in milliseconds since the Unix epoch.
+  double paused_until;
+};
+
 // The sections of the new tab page. See docs/plans/new-tab-page.md.
 struct NewTabSections {
   // Steps waiting for the user, and sign-ins, oldest first.
@@ -828,6 +860,8 @@ struct NewTabSections {
   int32 coming_up_count;
   // Chats at work, then busy terminals, then the video.
   array<NewTabRunningRow> running;
+  // Null while automatic organization is off.
+  NewTabTabs? tabs;
 };
 
 // Links the new tab page to its handler.
@@ -861,6 +895,10 @@ interface NewTabHandler {
   ShowTab(int32 tab);
   // Plays or pauses the mini player's video, in the tab `tab`.
   PlayOrPause(int32 tab);
+  // Takes back automatic organization's newest change, while Undo would.
+  UndoChange();
+  // Pauses automatic organization, or resumes it with kOff.
+  Pause(OrganizationPause pause);
 };
 
 // The new tab page.

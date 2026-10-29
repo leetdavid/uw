@@ -196,7 +196,11 @@ Expected result: under the box, Finished lists the run's alert and the chat's an
 
 Then run `sleep 60` in a terminal tab, play a video in the mini player, and open a new tab.
 
-Expected result: Running lists the terminal as `Running sleep` and the video as `Playing` with its time. The video's button pauses it without leaving the page, and a click on a row goes to its tab. The Tabs and Setup sections are not built yet.
+Expected result: Running lists the terminal as `Running sleep` and the video as `Playing` with its time. The video's button pauses it without leaving the page, and a click on a row goes to its tab.
+
+Then turn on automatic organization, let it move a tab, and open a new tab.
+
+Expected result: Tabs lists the move, such as `Moved to Plan Lisbon trip`, with Undo, which puts the tab back. Pause offers 1 hour, until next launch, and indefinitely. While paused, the line says so, and Resume turns organization back on. With automatic organization off, the section goes. The Setup section is not built yet.
 
 ### Chats
 

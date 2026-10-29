@@ -19,19 +19,24 @@ import {
   ChevronRight,
   Clock,
   Flag,
+  Folder,
   Globe,
   Hand,
+  ListTree,
   Loader2,
   Pause,
   Play,
   Search,
   Terminal as TerminalIcon,
+  Undo2,
   Video,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
+import { MenuItem } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
 import { KIND_COLORS } from "../alert-kinds";
 import type { ChatSchedule, ScheduleState } from "../chat-api";
@@ -53,6 +58,8 @@ import {
   type NewTabRow,
   type NewTabRunningRow,
   type NewTabSections,
+  type NewTabTabs,
+  OrganizationPause,
 } from "./newtab-api";
 
 type Mode = "search" | "ask";
@@ -497,7 +504,7 @@ function Section({
   id: string;
   icon: LucideIcon;
   name: string;
-  count: number;
+  count?: number;
   link?: { id: string; name: string; onClick: () => void };
   children: ReactNode;
 }) {
@@ -542,18 +549,18 @@ function Row({
   icon: LucideIcon | typeof AskIcon;
   title: string;
   under: ReactNode;
-  onOpen: () => void;
+  onOpen?: () => void;
   children: ReactNode;
 }) {
   return (
     <div
-      role="button"
-      tabIndex={0}
+      role={onOpen && "button"}
+      tabIndex={onOpen && 0}
       data-chat={chat || undefined}
       data-tab={tab || undefined}
       onClick={onOpen}
       onKeyDown={(event) => {
-        if (event.key === "Enter") {
+        if (onOpen && event.key === "Enter") {
           onOpen();
         }
       }}
@@ -637,7 +644,7 @@ function NeedsYou({ rows }: { rows: NewTabRow[] }) {
         return (
           <ChatRow key={row.alertId || row.chatId} row={row} under={<Said row={row} />} onOpen={onOpen}>
             <Button
-              variant="secondary"
+              variant="tertiary"
               size="compact"
               tabIndex={-1}
               className="h-[26px] shrink-0 px-2.5"
@@ -744,16 +751,16 @@ function mediaTime(seconds: number): string {
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
-// The time, each second while `on`.
-function useNow(on: boolean): number {
+// The time, every `every` milliseconds while `on`.
+function useNow(on: boolean, every = 1000): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!on) {
       return;
     }
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), every);
     return () => clearInterval(id);
-  }, [on]);
+  }, [on, every]);
   return now;
 }
 
@@ -832,11 +839,123 @@ function Running({ rows }: { rows: NewTabRunningRow[] }) {
   );
 }
 
+// "Just now", "2 min ago", or "1 hr ago".
+function agoText(ms: number, now: number): string {
+  const minutes = Math.floor((now - ms) / 60_000);
+  if (minutes < 1) {
+    return "Just now";
+  }
+  return minutes < 60 ? `${minutes} min ago` : "1 hr ago";
+}
+
+// The Organize menu's lengths.
+const PAUSES = [
+  { pause: OrganizationPause.kTimed, name: "Pause for 1 hour" },
+  { pause: OrganizationPause.kUntilLaunch, name: "Pause until next launch" },
+  { pause: OrganizationPause.kIndefinite, name: "Pause indefinitely" },
+];
+
+function pausedText(tabs: NewTabTabs): string {
+  switch (tabs.pause) {
+    case OrganizationPause.kOff:
+      return "Automatic organization is on";
+    case OrganizationPause.kTimed:
+      return `Paused until ${new Date(tabs.pausedUntil).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}`;
+    case OrganizationPause.kUntilLaunch:
+      return "Paused until next launch";
+    default:
+      return "Paused";
+  }
+}
+
+function Tabs({ tabs }: { tabs: NewTabTabs }) {
+  const now = useNow(tabs.changes.length > 0, 30_000);
+  const on = tabs.pause === OrganizationPause.kOff;
+  const pill = "h-6 shrink-0 px-2.5";
+  return (
+    <Section id="newtab-tabs" icon={ListTree} name="Tabs">
+      {tabs.changes.map((change, index) => (
+        <Row
+          key={`${change.time}-${change.tab}`}
+          favicon=""
+          icon={Folder}
+          title={change.created ? `Created task ${change.place}` : `Moved to ${change.place}`}
+          under={`${change.tab} · ${agoText(change.time, now)}`}
+        >
+          {index === 0 && tabs.canUndo && (
+            <Button
+              id="newtab-undo"
+              variant="tertiary"
+              size="compact"
+              leadingIcon={Undo2}
+              className="h-[26px] shrink-0 px-2.5"
+              onClick={() => newTabHandler.undoChange()}
+            >
+              Undo
+            </Button>
+          )}
+        </Row>
+      ))}
+      <div
+        id="newtab-organization"
+        className="flex h-10 items-center gap-[11px] border-t border-border pr-2.5 pl-3 text-xs text-muted-foreground first:border-t-0"
+      >
+        <span
+          aria-hidden
+          className={cn("size-[7px] shrink-0 rounded-full", on ? "bg-[#188038]" : "bg-[#E8710A]")}
+        />
+        <span className="min-w-0 flex-1 truncate">{pausedText(tabs)}</span>
+        {on ? (
+          <DropdownMenu>
+            <DropdownTrigger
+              render={
+                <Button
+                  id="newtab-pause"
+                  variant="tertiary"
+                  size="compact"
+                  leadingIcon={Pause}
+                  className={pill}
+                >
+                  Pause
+                </Button>
+              }
+            />
+            <DropdownContent className="w-[220px]">
+              {PAUSES.map((each, index) => (
+                <MenuItem
+                  key={each.name}
+                  index={index}
+                  label={each.name}
+                  onSelect={() => newTabHandler.pause(each.pause)}
+                />
+              ))}
+            </DropdownContent>
+          </DropdownMenu>
+        ) : (
+          <Button
+            id="newtab-resume"
+            variant="tertiary"
+            size="compact"
+            className={pill}
+            onClick={() => newTabHandler.pause(OrganizationPause.kOff)}
+          >
+            Resume
+          </Button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 // Under the box, in two columns: what wants the user on the left, what goes
 // on by itself on the right. A section with nothing to show is left out.
 function Sections({ sections }: { sections: NewTabSections }) {
   const left = sections.needsYou.length > 0 || sections.finished.length > 0;
-  const right = sections.comingUp.length > 0 || sections.running.length > 0;
+  const right =
+    sections.comingUp.length > 0 || sections.running.length > 0 || !!sections.tabs;
   if (!left && !right) {
     return null;
   }
@@ -853,6 +972,7 @@ function Sections({ sections }: { sections: NewTabSections }) {
           <ComingUp rows={sections.comingUp} count={sections.comingUpCount} />
         )}
         {sections.running.length > 0 && <Running rows={sections.running} />}
+        {sections.tabs && <Tabs tabs={sections.tabs} />}
       </div>
     </div>
   );
