@@ -1,6 +1,6 @@
 # Tab tools
 
-Status: scope agreed on 2026-10-29 in a grilling session. Nothing is built.
+Status: scope agreed on 2026-10-29 in a grilling session. T267, the design, was signed off by the user on 2026-10-30, and T268 started the same day.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). The tab tree already moves and closes tabs as one undoable action, page ids already outlast a restart, and chats, the [`uw` command](uw-command.md), and `uw mcp serve` already add tools the same way. The risks: [shared tabs](shared-tabs.md) are being built at the same time, a new kind of approval card has to show in four places, and the tools reach every window of a profile while a chat's tools today hang off its own tab.
 
@@ -102,7 +102,7 @@ The tools speak of workspaces, tasks, and tabs, not windows, since every window 
 
 ## Design
 
-Drawn on 2026-10-29 for T267 on the "Agent chats" page of the [canvas](../../AGENTS.md#designs). Their rules are the "Tab tools" section of the canvas guide `uw-command`, since the canvas holds at most 20 guides. Nothing is built before the user signs them off.
+Drawn on 2026-10-29 for T267 on the "Agent chats" page of the [canvas](../../AGENTS.md#designs). Their rules are the "Tab tools" section of the canvas guide `uw-command`, since the canvas holds at most 20 guides. The user signed them off on 2026-10-30, uw's proposals below included.
 
 - "Tab tools: a close waits for you (Fluid)": a chat that listed the tabs and moved two to a new task, with the close card.
 - "Tab tools: every state (Fluid)": every step line, steps opened, the move, task close, and rename cards, a declined step, the tabs the tools leave alone, a scheduled run's notification, and the `uw chat` card, the `uw mcp serve` text, and `uw tabs list --json`.
