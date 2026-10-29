@@ -43,7 +43,7 @@ These rules come from fixed native crashes. They apply to every uw customization
 - Never add a view to a Chromium tab container and remove it later. The animating layout manager caches raw pointers to laid-out children. A uw view inside one of those containers is created with its host and dies with it; show and hide it instead.
 - Never keep an unowned pointer to an object owned by a dialog, bubble, or host view. Look it up from the owning model while that model is alive.
 
-The build turns Chromium's `DCHECK` and dangling-pointer checks off, as official Chrome builds do. With them on, real sites crashed tabs on checks in Chromium's own code: nine crashes in two days of use, none in uw's code. chatgpt.com was one of them. This reverses the earlier rule, decided on 2026-10-13.
+The build turns Chromium's `DCHECK` and dangling-pointer checks off, as official Chrome builds do. With them on, real sites crashed tabs on checks in Chromium's own code: nine crashes in two days of use, none in uw's code. chatgpt.com was one of them. This reverses the earlier rule, decided on 2026-10-13. Chromium's dump-only checks also only dump, as in Chrome; see [Build flags](plans/distribution.md#build-flags).
 
 `CHECK` stays on. Treat a crash on one as the safeguard working: fix the lifetime instead of silencing the check. The tests no longer catch what the two disabled checks caught, so the rules above matter more.
 

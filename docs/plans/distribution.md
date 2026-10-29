@@ -100,6 +100,8 @@ Decided on 2026-10-27:
 
 Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_level = 1` and `enable_dsyms = true` for crash reports, so what people download matches what the owner uses. An official build with link-time and profile-guided optimization may come later, once measured.
 
+Decided on 2026-10-29: Chromium's dump-only checks (`DUMP_WILL_BE_CHECK`, `DUMP_WILL_BE_NOTREACHED`, and `CHECK`s that are not fatal until a later milestone) log and send a crash report without crashing, as they do in Chrome, though uw's builds are not official builds. Outside official builds Chromium makes them fatal, and 0.1.0 crashed at every start on a profile an earlier build had left, in such a check about search engine data. `uw-checks.patch` changes `GetDumpSeverity` in `base/check.cc` (T247).
+
 ## Website content
 
 Agreed: one calm page that sells uw, "dawn at night". The approved design is frame `XS-shfv_9t` on the Doop canvas, chosen on 2026-10-28 over a louder poster direction because uw should feel zen. It shows only uw's own interface, never real or made-up websites, and only features that are built.

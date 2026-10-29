@@ -1,0 +1,22 @@
+diff --git a/base/check.cc b/base/check.cc
+index a91851e30eee21d9e63fbc7ebd9057acd2218764..9f2b124705389a011475ec8c0b9b8ea9c71297fb 100644
+--- a/base/check.cc
++++ b/base/check.cc
+@@ -56,14 +56,10 @@ constexpr char kCheckFailureMessageSeparator[] =
+     ;
+ 
+ LogSeverity GetDumpSeverity() {
+-#if defined(OFFICIAL_BUILD)
++  // uw: uw's builds are not official builds, but people browse with them, so
++  // these checks dump without crashing, as they do in Chrome. See uw's
++  // docs/plans/distribution.md, "Build flags".
+   return DCHECK_IS_ON() ? LOGGING_DCHECK : LOGGING_ERROR;
+-#else
+-  // Crash outside official builds (outside user-facing builds) to detect
+-  // invariant violations early in release-build testing like fuzzing, etc.
+-  // These should eventually be migrated to fatal CHECKs.
+-  return LOGGING_FATAL;
+-#endif
+ }
+ 
+ LogSeverity GetNotFatalUntilSeverity(base::NotFatalUntil fatal_milestone) {

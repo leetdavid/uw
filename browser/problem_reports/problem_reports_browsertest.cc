@@ -5,10 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "base/check.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
+#include "base/notreached.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/synchronization/lock.h"
@@ -301,6 +303,15 @@ IN_PROC_BROWSER_TEST_F(ProblemReportsBrowserTest,
                                            GURL("chrome://settings/privacy")));
   ASSERT_EQ(true, Run("await until(() => part('reportIssue'));"
                       "return !part('sendToggle');"));
+}
+
+// Chromium's dump-only checks crash only outside official builds. uw's
+// builds are not official, but people browse with them.
+IN_PROC_BROWSER_TEST_F(ProblemReportsBrowserTest,
+                       ADumpOnlyCheckLeavesTheBrowserRunning) {
+  DUMP_WILL_BE_NOTREACHED();
+  DUMP_WILL_BE_CHECK(false);
+  EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));
 }
 
 }  // namespace
