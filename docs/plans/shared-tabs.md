@@ -68,8 +68,14 @@ No new frames are planned. Regular tabs reuse the hazed view from the frame "Pin
 Each stage is a ticket on the [board](roadmap.md#board).
 
 1. T252: the spike.
-2. T253: one tab tree per workspace: sharing, the live page, windows, dragging, and the last tab.
-3. T254: restarts and the first-launch merge.
+2. T253: one tree behind every window on a workspace. Copies come and go, tasks, nesting, collapse, and names stay in step, and one live page moves to the window that selects it, with the hazed view.
+3. T255: one organizer per workspace: the automatic organizer, undo, kept and held tabs, Tidy, and Clear, asking only through live pages.
+4. T256: windows that close no tabs: unloading unless still running, recently closed, the last tab, and Close Task and Clear leaving out pins.
+5. T257: dragging a tab out and back, dragging it to another workspace, and Cmd+N's blank tab.
+6. T258: tab search and the command bar listing each tab once, and a folded task keeping another window's selected row.
+7. T254: restarts, the first-launch merge, and the switch turned on.
+
+Until T254, shared tabs are behind the Chromium feature `UwSharedTabs`, off by default, so each stage can land without changing the user's browsing. Tests turn it on.
 
 ## Acceptance checks
 
