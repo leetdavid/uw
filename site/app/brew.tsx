@@ -37,11 +37,28 @@ function CheckIcon() {
   );
 }
 
+function copyBySelection() {
+  const field = document.createElement("textarea");
+  field.value = COMMAND;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  const copied = document.execCommand("copy");
+  field.remove();
+  return copied;
+}
+
 export function Brew() {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
-    await navigator.clipboard.writeText(COMMAND);
+    try {
+      await navigator.clipboard.writeText(COMMAND);
+    } catch {
+      if (!copyBySelection()) return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

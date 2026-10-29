@@ -95,6 +95,15 @@ html:has(.home) {
   color: var(--text);
 }
 
+.home .brew:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.home .brew:active {
+  scale: 0.98;
+}
+
 .home .cta {
   display: flex;
   flex-wrap: wrap;
