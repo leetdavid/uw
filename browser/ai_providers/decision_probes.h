@@ -6,6 +6,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,6 +20,7 @@
 #include "uw/components/ai_providers/providers.h"
 
 class PrefRegistrySimple;
+class PrefService;
 class Profile;
 
 namespace uw {
@@ -49,6 +51,11 @@ class DecisionProbes : public base::SupportsUserData::Data {
   // Whether uw asks `provider`'s models: the OpenAI preset and a Custom
   // provider in a decision format, once saved.
   static bool Asks(const Provider& provider);
+  // What `model` answered when uw last asked it, however long ago, or
+  // nothing when uw never heard.
+  static std::optional<bool> Decided(const PrefService& prefs,
+                                     const Provider& provider,
+                                     const std::string& model);
 
   DecisionProbes(const DecisionProbes&) = delete;
   DecisionProbes& operator=(const DecisionProbes&) = delete;

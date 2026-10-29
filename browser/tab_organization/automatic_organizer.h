@@ -210,6 +210,9 @@ class AutomaticOrganizer : public TabStripModelObserver {
     // not told about it. The answer is read that way even if the task has a
     // name by the time it arrives.
     bool in_unnamed_task = false;
+    // True when the model asked where the tab goes also names tasks, so a
+    // name in its answer is used.
+    bool names_in_answer = false;
     BranchContext context;
     // The placement request, and the naming request when there was one.
     OrganizerExchange decision;

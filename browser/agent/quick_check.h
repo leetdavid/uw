@@ -28,8 +28,8 @@ namespace uw {
 class ModelCatalog;
 
 // One quick check under way, such as the command check or the memory check:
-// to the decision model, or to the language model when there is none, or
-// else to the chat's own model. A language model checks with thinking off
+// to the quick-choice model, a decision model or a language model, or else
+// to the chat's own model. A language model checks with thinking off
 // where the catalog says how, and is asked again without that if its
 // provider rejects it; one with no known way gets 90 seconds. Destroying the
 // check drops it. See docs/plans/agent-chats.md and

@@ -79,7 +79,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 5. T103: proxies and addresses: changeable addresses, the "Each model's own" format, the key headers, and plain http on private networks. Built on 2026-10-16, on T104's catalog lookups by address. A live check through CLIProxyAPI is for the user: the tests play a proxy with a local server.
 6. T264: the design of [quick choices](#quick-choices) on the canvas: the rows by job with each menu, and every state.
 7. T265: decision models by provider: the lists, probes, the counts and tags, and decision models out of the language and agent menus. The tests play the providers; a live OpenRouter decision is for the user to check. Built on 2026-10-30: `DecisionProbes` keeps the answers in the profile pref `uw.providers.decision_probes`, and the page lists a provider again with each answer while it says "checking". Until T266 the rows keep their old names.
-8. T266: the rows by job and a language model for quick choices, with the other plans, the architecture, and the Help page.
+8. T266: the rows by job and a language model for quick choices, with the other plans, the architecture, and the Help page. Built on 2026-10-30. A language model making quick choices gets the placement request with no effort, so its provider's default applies; the command and memory checks turn its thinking off. With no decision model anywhere, Add provider is a row of the menu under the hint.
 
 ## Acceptance checks
 

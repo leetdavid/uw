@@ -110,6 +110,15 @@ bool DecisionProbes::Asks(const Provider& provider) {
           DecisionFormatOf(provider).has_value());
 }
 
+// static
+std::optional<bool> DecisionProbes::Decided(const PrefService& prefs,
+                                            const Provider& provider,
+                                            const std::string& model) {
+  const base::DictValue* models = KeptModels(prefs, provider);
+  const base::DictValue* kept = models ? models->FindDict(model) : nullptr;
+  return kept ? kept->FindBool(kDecides) : std::nullopt;
+}
+
 DecisionProbes::DecisionProbes(Profile* profile) : profile_(profile) {}
 
 DecisionProbes::~DecisionProbes() = default;

@@ -753,10 +753,13 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
   NoteAsked(id, activity->second);
   const PrefService* prefs = profile()->GetPrefs();
   const DecisionModelConfig decision = ReadDecisionModelConfig(prefs);
-  const AiConnectionConfig language = ReadAiConnectionConfig(prefs);
+  const AiConnectionConfig language = ReadQuickLanguageConfig(prefs);
   const bool decides = IsComplete(decision);
+  const AiConnectionConfig namer = ReadAiConnectionConfig(prefs);
 
   Request request;
+  request.names_in_answer = !decides && language.endpoint == namer.endpoint &&
+                            language.model == namer.model;
   request.page = id;
   request.revision = revision;
   request.task = page->task;
@@ -939,6 +942,10 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
   if (answer && answer->choice != kNewTaskOption &&
       answer->choice != kScratchpadOption && !Named(answer->choice)) {
     answer.reset();
+  }
+  // Another model names tasks, and is asked for the name.
+  if (answer && !request.names_in_answer) {
+    answer->task_name.reset();
   }
   if (!Current(request)) {
     Report(Event::Kind::kDropped, request);

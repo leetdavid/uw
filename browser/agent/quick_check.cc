@@ -58,7 +58,7 @@ std::unique_ptr<QuickCheck> QuickCheck::Send(
         kProviderTimeout));
     return check;
   }
-  AiConnectionConfig language = ReadAiConnectionConfig(prefs);
+  AiConnectionConfig language = ReadQuickLanguageConfig(prefs);
   std::optional<std::string> key =
       IsComplete(language) ? KeyIn(language.key_account) : std::nullopt;
   if (!key) {

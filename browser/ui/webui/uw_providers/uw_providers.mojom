@@ -57,6 +57,8 @@ struct ModelChoice {
   string model;
   // Empty for the provider's default.
   string effort;
+  // A language model making the quick choices, which kDecision holds.
+  bool language;
 };
 
 // A model as its provider lists it, with what the models.dev catalog, or
@@ -299,9 +301,11 @@ interface ProvidersHandler {
   // Removes its key from the Keychain. Model choices that used it stay, and
   // wait for the user to pick another model.
   RemoveProvider(string provider_id) => ();
-  // Ignored when the provider cannot serve that slot.
-  PickModel(ModelSlot slot, string provider_id, string model) => ();
-  // Leaves the decision model unset, or chats on the language model.
+  // Ignored when the provider cannot serve that slot. `language` picks a
+  // language model for the quick choices, which kDecision holds.
+  PickModel(ModelSlot slot, string provider_id, string model, bool language)
+      => ();
+  // Leaves the quick choices to the language model, or chats on it.
   ClearModel(ModelSlot slot) => ();
   // One of the slot's model's levels, or empty for its provider's default.
   SetEffort(ModelSlot slot, string effort) => ();

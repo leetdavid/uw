@@ -106,7 +106,7 @@ Settings hold an optional decision model and a language model. See [ADR 0003](ad
 
 Since T77, each model is picked from the providers the user saves once on `uw://providers`. Since T78, a language model gets its requests in its provider's format: chat completions, Anthropic Messages, or OpenAI Responses. See the [AI providers plan](plans/ai-providers.md) and [ADR 0007](adr/0007-uw-speaks-three-wire-formats-to-language-models.md). Since T265, a decision model menu lists only models that make decisions: as the provider's list says, or as uw learned by asking each model once, per [ADR 0025](adr/0025-uw-asks-a-provider-which-models-are-decision-models-when-its-list-does-not-say.md). `DecisionProbes` in `browser/ai_providers/` keeps those answers.
 
-The decision model picks one option: an existing task, a new task, or the Scratchpad. The language model names a new task. With no decision model, the language model does both in one call.
+The [quick-choice model](CONTEXT.md#language) picks one option: an existing task, a new task, or the Scratchpad. It is a decision model, or since T266 a language model the user picked for it. The language model names a new task. When one language model does both, it does them in one call.
 
 Apply results asynchronously and check them against current tab state, so a late response never overrides a manual action or a newer navigation. A result needs the [agreed confidence](plans/automatic-organization.md#agreed-scope) to move anything.
 

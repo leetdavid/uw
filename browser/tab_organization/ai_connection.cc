@@ -47,7 +47,7 @@ void RegisterAiConnectionProfilePrefs(
 bool OrganizationReady(const PrefService* prefs) {
   return prefs && prefs->GetBoolean(kOrganizationEnabledPref) &&
          (IsComplete(ReadDecisionModelConfig(prefs)) ||
-          IsComplete(ReadAiConnectionConfig(prefs)));
+          IsComplete(ReadQuickLanguageConfig(prefs)));
 }
 
 Thresholds ReadThresholds(const PrefService* prefs) {

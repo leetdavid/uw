@@ -96,7 +96,16 @@ std::optional<ModelChoice> AgentChoice(const PrefService& prefs);
 // gone or cannot serve it.
 AiConnectionConfig ConfigForChoice(const PrefService& prefs,
                                    const ModelChoice& choice);
+// The quick-choice model when it is a decision model. Empty otherwise.
 DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs);
+// Whether `choice`, the quick-choice model, is a language model: picked as
+// one, or a saved pick that told uw it makes no decisions. See
+// docs/plans/ai-providers.md#quick-choices.
+bool IsLanguageQuickChoice(const PrefService& prefs, const ModelChoice& choice);
+// The language model that makes the quick choices when no decision model
+// does: the one picked for them, sent with no effort, or else the language
+// model.
+AiConnectionConfig ReadQuickLanguageConfig(const PrefService* prefs);
 
 // Request URLs under a base endpoint like https://api.openai.com/v1. A
 // language model takes requests at its format's own path.

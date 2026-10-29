@@ -128,6 +128,22 @@ constexpr char kOnlyIn[] = R"(
     await until(() => !document.querySelector('[role="menu"]'));
     return found;
   };
+  // The models the quick choices list under "Decision models", once `shown`
+  // is there, joined with spaces.
+  const decisionModels = async (shown) => {
+    const menu = await openMenu('Makes quick choices');
+    await until(() => item(shown, menu));
+    const languages = all('div', menu).find((label) =>
+        label.textContent.startsWith('Or a language model'));
+    const names = all('[role^="menuitem"]', menu)
+        .filter((row) => row.compareDocumentPosition(languages) &
+                         Node.DOCUMENT_POSITION_FOLLOWING)
+        .map((row) => row.getAttribute('aria-label'));
+    document.dispatchEvent(new KeyboardEvent('keydown',
+        {key: 'Escape', bubbles: true}));
+    await until(() => !document.querySelector('[role="menu"]'));
+    return names.join(' ');
+  };
 )";
 
 // models.dev's catalog, cut down, and an OpenRouter list of its two models.
@@ -233,7 +249,7 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
         page(), base::StrCat({"(async () => {", kHelpers, body, "})()"}));
   }
 
-  // Picks `model` in the menu of the `slot` chip, such as "Language model".
+  // Picks `model` in the menu of the `slot` chip, such as "Names tasks".
   void Pick(const std::string& slot, const std::string& model) {
     ASSERT_EQ(true, Run(content::JsReplace(
                         "const menu = await openMenu($1);"
@@ -350,7 +366,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   models_.Answer("/v1/chat/completions", ChatAnswer("Hello"));
   Open();
 
-  Pick("Language model", "chat-b");
+  Pick("Names tasks", "chat-b");
   std::optional<ModelChoice> choice = ReadChoice(prefs(), ModelSlot::kLanguage);
   ASSERT_TRUE(choice);
   EXPECT_EQ(choice->provider_id, id);
@@ -358,7 +374,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   // Picking sends nothing; only Test does.
   EXPECT_THAT(RequestsTo("/v1/chat/completions"), IsEmpty());
 
-  EXPECT_THAT(Test("Language model"), HasSubstr("chat-b answered in"));
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("chat-b answered in"));
   EXPECT_THAT(RequestsTo("/v1/chat/completions"),
               ElementsAre("POST Bearer sk-test"));
 }
@@ -370,8 +386,8 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   models_.Answer("/v1/chat/completions", ChatAnswer(""));
   Open();
 
-  Pick("Language model", "chat-a");
-  EXPECT_THAT(Test("Language model"),
+  Pick("Names tasks", "chat-a");
+  EXPECT_THAT(Test("Names tasks"),
               HasSubstr("chat-a answered, but not with text."));
 }
 
@@ -384,7 +400,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   Open();
 
   // A provider that only decides offers no language model.
-  EXPECT_EQ(true, Run("const menu = await openMenu('Language model');"
+  EXPECT_EQ(true, Run("const menu = await openMenu('Names tasks');"
                       "await until(() => menu.textContent.includes("
                       "    'Add a provider first'));"
                       "document.dispatchEvent(new KeyboardEvent('keydown',"
@@ -392,8 +408,8 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                       "await until(() => !document.querySelector("
                       "    '[role=\"menu\"]'));"
                       "return true;"));
-  Pick("Decision model", "chat-a");
-  EXPECT_THAT(Test("Decision model"), HasSubstr("chat-a answered in"));
+  Pick("Makes quick choices", "chat-a");
+  EXPECT_THAT(Test("Makes quick choices"), HasSubstr("chat-a answered in"));
   // Asked once each whether chat-a and chat-b decide, then the test.
   EXPECT_THAT(RequestsTo("/v1/decisions"),
               ElementsAre("POST Bearer sk-test", "POST Bearer sk-test",
@@ -412,18 +428,27 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
   Open();
 
-  EXPECT_EQ(true, Run(base::StrCat(
-                      {"await until(() => withText('a *', '1 decision'));",
-                       kOnlyIn,
-                       "return onlyIn('Decision model', 'typesafe-ai/jev',"
-                       "    'anthropic/claude-haiku-5.5');"})));
+  EXPECT_EQ("typesafe-ai/jev",
+            Run(base::StrCat(
+                {"await until(() => withText('a *', '1 decision'));", kOnlyIn,
+                 "return await decisionModels('typesafe-ai/jev');"})));
+  EXPECT_EQ(true, Run("await openMenu('Makes quick choices');"
+                      "await until(() => item('typesafe-ai/jev'));"
+                      "return true;"));
+  SaveWindowScreenshot(browser(), "quick-choices-menu");
+  EXPECT_EQ(true, Run("document.dispatchEvent(new KeyboardEvent('keydown',"
+                      "    {key: 'Escape', bubbles: true}));"
+                      "await until(() => !document.querySelector("
+                      "    '[role=\"menu\"]'));"
+                      "return true;"));
   EXPECT_EQ(true, Run(base::StrCat(
                       {kOnlyIn,
-                       "return onlyIn('Language model',"
+                       "return onlyIn('Names tasks',"
                        "    'anthropic/claude-haiku-5.5',"
                        "    'typesafe-ai/jev');"})));
-  Pick("Decision model", "typesafe-ai/jev");
-  EXPECT_THAT(Test("Decision model"), HasSubstr("typesafe-ai/jev answered in"));
+  Pick("Makes quick choices", "typesafe-ai/jev");
+  EXPECT_THAT(Test("Makes quick choices"),
+              HasSubstr("typesafe-ai/jev answered in"));
   EXPECT_THAT(RequestsTo("/v1/decisions"), ElementsAre("POST Bearer sk-test"));
 }
 
@@ -438,13 +463,13 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   models_.Answer("/v1/decisions", kProbeAnswer);
   Open();
 
-  EXPECT_EQ(true, Run(base::StrCat(
-                      {"await until(() => withText('a *', '1 decision'));",
-                       kOnlyIn, "return onlyIn('Decision model', "
-                       "    'gpt-6-luna', 'gpt-6.1-terra');"})));
+  EXPECT_EQ("gpt-6-luna",
+            Run(base::StrCat(
+                {"await until(() => withText('a *', '1 decision'));", kOnlyIn,
+                 "return await decisionModels('gpt-6-luna');"})));
   // It writes text too, so it stays in the language menu.
   EXPECT_EQ(true,
-            Run("const menu = await openMenu('Language model');"
+            Run("const menu = await openMenu('Names tasks');"
                 "await until(() => item('gpt-6.1-terra', menu));"
                 "return !!item('gpt-6-luna', menu);"));
   EXPECT_EQ(RequestsTo("/v1/decisions").size(), 2u);
@@ -506,16 +531,59 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
   Open();
 
+  EXPECT_EQ("liquid/d1",
+            Run(base::StrCat(
+                {"await until(() => withText('a *', '2 models'));", kOnlyIn,
+                 "return await decisionModels('liquid/d1');"})));
   EXPECT_EQ(true, Run(base::StrCat(
-                      {"await until(() => withText('a *', '2 models'));",
-                       kOnlyIn, "return onlyIn('Decision model', "
-                       "    'liquid/d1', 'maker/talker');"})));
-  EXPECT_EQ(true, Run(base::StrCat(
-                      {kOnlyIn, "return onlyIn('Language model', "
+                      {kOnlyIn, "return onlyIn('Names tasks', "
                        "    'maker/talker', 'liquid/d1');"})));
-  Pick("Decision model", "liquid/d1");
-  EXPECT_THAT(Test("Decision model"), HasSubstr("liquid/d1 answered in"));
+  Pick("Makes quick choices", "liquid/d1");
+  EXPECT_THAT(Test("Makes quick choices"), HasSubstr("liquid/d1 answered in"));
   EXPECT_THAT(RequestsTo("/v1/systemone"), ElementsAre("POST Bearer sk-test"));
+}
+
+// A language model can make the quick choices, marked as one. Its test asks
+// it where a tab goes.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       ALanguageModelMakesQuickChoices) {
+  AddTestServer(ProviderFormat::kChatCompletions);
+  models_.Answer("/v1/models", kTwoModels);
+  models_.Answer("/v1/chat/completions",
+                 ChatAnswer(R"({\"task\":\"none\",\"confidence\":0.95,)"
+                            R"(\"new_task\":0.9})"));
+  Open();
+
+  Pick("Makes quick choices", "chat-b");
+  const std::optional<ModelChoice> choice =
+      ReadChoice(prefs(), ModelSlot::kDecision);
+  ASSERT_TRUE(choice);
+  EXPECT_EQ(choice->model, "chat-b");
+  EXPECT_TRUE(choice->language);
+  EXPECT_EQ(true, Run("await until(() => withText("
+                      "    '[aria-label=\"Makes quick choices\"] span',"
+                      "    'Language model'));"
+                      "return true;"));
+  EXPECT_THAT(Test("Makes quick choices"), HasSubstr("chat-b answered in"));
+  SaveWindowScreenshot(browser(), "quick-choices-language");
+}
+
+// With no decision model at any provider, the quick choices offer the
+// language models and say where decision models come from.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       WithoutDecisionModelsQuickChoicesOfferLanguageModels) {
+  AddPreset(ProviderPreset::kAnthropic, Address());
+  models_.Answer("/v1/models", kTwoModels);
+  Open();
+
+  EXPECT_EQ(true, Run("const menu = await openMenu('Makes quick choices');"
+                      "await until(() => item('chat-a', menu));"
+                      "return menu.textContent.includes("
+                      "    'OpenRouter, OpenAI, and Jev have them');"));
+  SaveWindowScreenshot(browser(), "quick-choices-empty");
+  EXPECT_EQ(true, Run("item('Add provider').click();"
+                      "await until(dialog);"
+                      "return true;"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
@@ -527,7 +595,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
 
   content::TestNavigationObserver back_to_list(page());
   EXPECT_EQ(true, Run("await until(() => withText('h1', 'Test server'));"
-                      "await until(() => withText('span', 'Language model'));"
+                      "await until(() => withText('span', 'Names tasks'));"
                       "withText('button', 'Remove provider').click();"
                       "return true;"));
   back_to_list.Wait();
@@ -580,7 +648,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                       "return true;"));
   SaveWindowScreenshot(browser(), "providers");
 
-  EXPECT_EQ(true, Run("await openMenu('Agent model');"
+  EXPECT_EQ(true, Run("await openMenu('Starts chats');"
                       "await until(() => item('chat-b'));"
                       "return true;"));
   SaveWindowScreenshot(browser(), "providers-menu");
@@ -622,8 +690,8 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                                  R"({"type":"text","text":"Hello"}]})");
   Open();
 
-  Pick("Language model", "chat-a");
-  EXPECT_THAT(Test("Language model"), HasSubstr("chat-a answered in"));
+  Pick("Names tasks", "chat-a");
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("chat-a answered in"));
 
   std::vector<std::string> keys;
   for (const ModelRequest& request : models_.Requests()) {
@@ -653,7 +721,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
 
   Open();
   EXPECT_EQ("No tool calls|",
-            Run("const menu = await openMenu('Agent model');"
+            Run("const menu = await openMenu('Starts chats');"
                 "const note = (name) => item(name, menu)?.dataset.note ?? '';"
                 "await until(() => item('maker/talker', menu));"
                 "return note('maker/talker') + '|' + note('maker/thinker');"));
@@ -684,11 +752,11 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnEffortGoesWithTheModel) {
   models_.Answer("/v1/catalog.json", kCatalog);
   models_.Answer("/v1/chat/completions", ChatAnswer("Hello"));
   Open();
-  Pick("Language model", "maker/thinker");
+  Pick("Names tasks", "maker/thinker");
   ASSERT_EQ(
       true,
       Run("const effort = () => document.querySelector("
-          "    '[aria-label=\"Language model\"] [aria-label=\"Effort\"]');"
+          "    '[aria-label=\"Names tasks\"] [aria-label=\"Effort\"]');"
           "(await until(effort)).dispatchEvent(new PointerEvent("
           "    'pointerdown', {bubbles: true, button: 0, pointerType: "
           "'mouse'}));"
@@ -699,7 +767,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AnEffortGoesWithTheModel) {
           "return true;"));
   EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->effort, "high");
 
-  EXPECT_THAT(Test("Language model"), HasSubstr("maker/thinker answered in"));
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("maker/thinker answered in"));
   std::string sent;
   for (const ModelRequest& request : models_.Requests()) {
     if (request.path == "/v1/chat/completions") {
@@ -799,12 +867,12 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   SaveWindowScreenshot(browser(), "each-model");
 
   Open();
-  Pick("Language model", "claude-x");
+  Pick("Names tasks", "claude-x");
   EXPECT_EQ(ReadChoice(prefs(), ModelSlot::kLanguage)->format,
             ProviderFormat::kAnthropicMessages);
-  EXPECT_THAT(Test("Language model"), HasSubstr("claude-x answered in"));
-  Pick("Language model", "gpt-x");
-  EXPECT_THAT(Test("Language model"), HasSubstr("gpt-x answered in"));
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("claude-x answered in"));
+  Pick("Names tasks", "gpt-x");
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("gpt-x answered in"));
 
   std::vector<std::string> sent;
   for (const ModelRequest& request : models_.Requests()) {

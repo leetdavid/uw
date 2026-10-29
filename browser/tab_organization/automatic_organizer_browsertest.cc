@@ -141,6 +141,12 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
                         std::move(body));
   }
 
+  // Answers the chat completions requests to the model named `model`.
+  void AnswerChatTo(const std::string& model, std::string body) {
+    models_.AnswerAbout("/v1/chat/completions",
+                        "\"model\":\"" + model + "\"", std::move(body));
+  }
+
   // The body of the decision request about the tab titled `title`.
   std::string RequestAbout(const std::string& title) {
     for (const ModelRequest& request : Requests()) {
@@ -168,7 +174,8 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
   void UseModel(ModelSlot slot,
                 ProviderFormat format,
                 const std::string& model,
-                const std::string& key) {
+                const std::string& key,
+                bool language = false) {
     Provider provider = PresetProvider(ProviderPreset::kCustom);
     provider.name = model;
     provider.address = embedded_test_server()->GetURL("/v1").spec();
@@ -177,7 +184,7 @@ class AutomaticOrganizerBrowserTest : public headless::HeadlessModeBrowserTest {
     provider.key_account = KeyAccountFor(provider.id);
     ASSERT_TRUE(ApiKeyStore().SetKey(provider.key_account, key));
     UpdateProvider(*prefs(), provider);
-    SetChoice(*prefs(), slot, provider.id, model);
+    SetChoice(*prefs(), slot, provider.id, model, std::nullopt, language);
     prefs()->SetBoolean(kOrganizationEnabledPref, true);
   }
 
@@ -714,6 +721,29 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   const std::vector<ModelRequest> requests = Requests();
   ASSERT_EQ(requests.size(), 1u);
   EXPECT_EQ(requests[0].path, "/v1/chat/completions");
+}
+
+// A language model picked for the quick choices places the tab, and the one
+// that names tasks names the new task.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ALanguageModelMakesTheQuickChoicesAndAnotherNames) {
+  UseModel(ModelSlot::kDecision, ProviderFormat::kChatCompletions,
+           "quick-model", "quick-key", /*language=*/true);
+  UseLanguageModel();
+  AnswerChatTo("quick-model",
+               ChatAnswer(R"({\"task\":\"none\",\"confidence\":0.95,)"
+                          R"(\"new_task\":0.9,\"name\":\"Not this name\"})"));
+  AnswerChatTo("language-model", ChatAnswer("Read news"));
+
+  tabs::TabInterface* link = OpenLinkFrom(InitialTab(), "news");
+  ASSERT_TRUE(SettleAfter(2));
+
+  ASSERT_TRUE(link->GetGroup());
+  EXPECT_EQ(TitleOf(*link->GetGroup()), u"Read news");
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_EQ(requests[0].authorization, "Bearer quick-key");
+  EXPECT_EQ(requests[1].authorization, "Bearer language-key");
 }
 
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,

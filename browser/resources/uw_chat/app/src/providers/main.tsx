@@ -56,28 +56,29 @@ const FORMAT_BADGES: Record<ProviderFormat, string> = {
 };
 
 // What the chip says while the slot is empty, and the menu row that empties
-// it. The language model has no such row.
+// it. Names tasks has no such row.
 const UNSET: Record<ModelSlot, string | undefined> = {
   [ModelSlot.kLanguage]: undefined,
-  [ModelSlot.kDecision]: "None",
-  [ModelSlot.kAgent]: "Same as the language model",
+  [ModelSlot.kDecision]: "Same as Names tasks",
+  [ModelSlot.kAgent]: "Same as Names tasks",
 };
 
+// Each row is named for what its model does. kDecision holds the
+// quick-choice model, a decision model or a language model.
 const ROWS = [
   {
-    slot: ModelSlot.kLanguage,
-    name: "Language model",
-    what: "Names tasks. Places tabs when no decision model is set.",
+    slot: ModelSlot.kDecision,
+    name: "Makes quick choices",
+    what: "Places tabs, and checks the agent's commands and memories.",
   },
   {
-    slot: ModelSlot.kDecision,
-    name: "Decision model",
-    optional: true,
-    what: "Decides where a tab goes.",
+    slot: ModelSlot.kLanguage,
+    name: "Names tasks",
+    what: "Writes a short name for each new task.",
   },
   {
     slot: ModelSlot.kAgent,
-    name: "Agent model",
+    name: "Starts chats",
     what: "New chats start on it. Each chat can switch.",
   },
 ];
@@ -248,10 +249,10 @@ function ProvidersList({
       />
 
       <h2 className="mb-2 mt-[22px] flex h-[30px] items-center text-[13px] font-semibold">
-        Models
+        What uw uses models for
       </h2>
       <div className="overflow-hidden rounded-xl border border-border">
-        {ROWS.map(({ slot, name, optional, what }) => {
+        {ROWS.map(({ slot, name, what }) => {
           const choice = data.choices[slot];
           const testable = slot !== ModelSlot.kAgent && choice;
           return (
@@ -261,32 +262,41 @@ function ProvidersList({
               aria-label={name}
               className="border-border px-4 py-3 [&+&]:border-t"
             >
-              <div className="grid grid-cols-[minmax(0,1fr)_232px_118px_76px] items-center gap-2.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_260px_118px_76px] items-center gap-2.5">
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-semibold">
-                    {name}
-                    {optional && (
-                      <span className="pl-1 text-[12px] font-normal text-muted-foreground">
-                        Optional
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
+                  <div className="text-[13.5px] font-semibold">{name}</div>
+                  <div className="mt-0.5 text-[12.5px] leading-[1.35] text-muted-foreground">
                     {what}
                   </div>
                 </div>
                 <ModelChip
                   choice={choice}
-                  providers={data.providers.filter((provider) =>
-                    servesSlot(provider, slot),
-                  )}
+                  providers={
+                    slot === ModelSlot.kDecision
+                      ? data.providers
+                      : data.providers.filter((provider) =>
+                          servesSlot(provider, slot),
+                        )
+                  }
                   lists={data.lists}
                   unset={UNSET[slot]}
-                  decisions={slot === ModelSlot.kDecision}
+                  quick={
+                    slot === ModelSlot.kDecision
+                      ? {
+                          namesModel: data.choices[ModelSlot.kLanguage]?.model,
+                          onAddProvider: () => setAdding(true),
+                        }
+                      : undefined
+                  }
                   needsTools={slot === ModelSlot.kAgent}
                   className="w-full"
-                  onPick={async (provider, model) => {
-                    await providersHandler.pickModel(slot, provider.id, model);
+                  onPick={async (provider, model, language) => {
+                    await providersHandler.pickModel(
+                      slot,
+                      provider.id,
+                      model,
+                      language,
+                    );
                     forget(slot);
                     onChanged();
                   }}
@@ -297,7 +307,13 @@ function ProvidersList({
                   }}
                 />
                 {slot === ModelSlot.kDecision ? (
-                  <span />
+                  choice?.language ? (
+                    <span className="justify-self-start whitespace-nowrap rounded-[5px] bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-inset ring-border">
+                      Language model
+                    </span>
+                  ) : (
+                    <span />
+                  )
                 ) : (
                   <EffortChip
                     efforts={modelOf(data, choice)?.efforts ?? []}

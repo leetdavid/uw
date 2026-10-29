@@ -51,9 +51,9 @@ export const FORMAT_NAMES: Record<ProviderFormat, string> = {
 };
 
 export const SLOT_NAMES: Record<ModelSlot, string> = {
-  [ModelSlot.kLanguage]: "Language model",
-  [ModelSlot.kDecision]: "Decision model",
-  [ModelSlot.kAgent]: "Agent model",
+  [ModelSlot.kLanguage]: "Names tasks",
+  [ModelSlot.kDecision]: "Makes quick choices",
+  [ModelSlot.kAgent]: "Starts chats",
 };
 
 export function ProviderIcon({

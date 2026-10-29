@@ -138,6 +138,14 @@ TEST_F(ProvidersTest, OpenAiServesBothKindsOfModelAndJevOnlyDecisions) {
   EXPECT_FALSE(DecisionFormatOf(PresetProvider(ProviderPreset::kAnthropic)));
 }
 
+TEST_F(ProvidersTest, AQuickChoiceCanBeALanguageModel) {
+  SetChoice(prefs_, ModelSlot::kDecision, "openai", "gpt-6.1-terra",
+            std::nullopt, /*language=*/true);
+  EXPECT_TRUE(ReadChoice(prefs_, ModelSlot::kDecision)->language);
+  SetChoice(prefs_, ModelSlot::kDecision, "openai", "gpt-6-luna");
+  EXPECT_FALSE(ReadChoice(prefs_, ModelSlot::kDecision)->language);
+}
+
 TEST_F(ProvidersTest, GatewaysServeDecisionsInTheirOwnFormats) {
   const Provider vercel = PresetProvider(ProviderPreset::kVercelAiGateway);
   EXPECT_EQ(LanguageFormatOf(vercel), ProviderFormat::kChatCompletions);

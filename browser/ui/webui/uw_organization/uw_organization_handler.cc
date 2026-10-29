@@ -59,7 +59,7 @@ const char* MiniPlayerPref(mojom::MiniPlayerSwitch which) {
 
 mojom::Waiting WaitingFor(const PrefService* prefs) {
   return IsComplete(ReadDecisionModelConfig(prefs)) ||
-                 IsComplete(ReadAiConnectionConfig(prefs))
+                 IsComplete(ReadQuickLanguageConfig(prefs))
              ? mojom::Waiting::kNothing
              : mojom::Waiting::kNoModel;
 }

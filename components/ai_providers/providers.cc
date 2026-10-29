@@ -28,6 +28,7 @@ constexpr char kKeyAccount[] = "key_account";
 constexpr char kProvider[] = "provider";
 constexpr char kModel[] = "model";
 constexpr char kEffort[] = "effort";
+constexpr char kLanguage[] = "language";
 
 const char* ChoicePref(ModelSlot slot) {
   switch (slot) {
@@ -222,18 +223,23 @@ std::optional<ModelChoice> ReadChoice(const PrefService& prefs,
   }
   const std::string* effort = dict.FindString(kEffort);
   return ModelChoice{*provider, *model, FormatFrom(dict.FindInt(kFormat)),
-                     effort ? *effort : std::string()};
+                     effort ? *effort : std::string(),
+                     dict.FindBool(kLanguage).value_or(false)};
 }
 
 void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
                std::string_view model,
-               std::optional<ProviderFormat> format) {
+               std::optional<ProviderFormat> format,
+               bool language) {
   base::DictValue choice =
       base::DictValue().Set(kProvider, provider_id).Set(kModel, model);
   if (format) {
     choice.Set(kFormat, static_cast<int>(*format));
+  }
+  if (language) {
+    choice.Set(kLanguage, true);
   }
   prefs.SetDict(ChoicePref(slot), std::move(choice));
 }

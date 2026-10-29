@@ -117,14 +117,18 @@ mojom::ProviderPtr PageProvider(const Provider& provider) {
 
 mojom::ModelChoicePtr PageChoice(const PrefService& prefs, ModelSlot slot) {
   const std::optional<ModelChoice> choice = ReadChoice(prefs, slot);
-  return choice ? mojom::ModelChoice::New(choice->provider_id, choice->model,
-                                          choice->effort)
+  return choice ? mojom::ModelChoice::New(
+                      choice->provider_id, choice->model, choice->effort,
+                      slot == ModelSlot::kDecision &&
+                          IsLanguageQuickChoice(prefs, *choice))
                 : nullptr;
 }
 
-bool ServesSlot(const Provider& provider, ModelSlot slot) {
-  return slot == ModelSlot::kDecision ? DecisionFormatOf(provider).has_value()
-                                      : LanguageFormatOf(provider).has_value();
+// A language model can make the quick choices too.
+bool ServesSlot(const Provider& provider, ModelSlot slot, bool language) {
+  return slot == ModelSlot::kDecision && !language
+             ? DecisionFormatOf(provider).has_value()
+             : LanguageFormatOf(provider).has_value();
 }
 
 BranchContext CheckContext() {
@@ -164,10 +168,31 @@ mojom::ModelListPtr PageList(ModelListing listing) {
 
 // Sent to the slot's model as automatic organization reaches it. A language
 // model passes when it answers with text, a decision model when it answers
-// with a choice.
+// with a choice, and a language model making the quick choices when it
+// answers with a placement.
 UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
                                       const PrefService& prefs) {
   UwProvidersHandler::ModelTest test;
+  const std::optional<ModelChoice> quick =
+      ReadChoice(prefs, ModelSlot::kDecision);
+  if (slot == ModelSlot::kDecision && quick &&
+      IsLanguageQuickChoice(prefs, *quick)) {
+    const AiConnectionConfig config = ReadQuickLanguageConfig(&prefs);
+    if (!IsComplete(config)) {
+      return test;
+    }
+    test.url = LanguageModelUrl(config.endpoint, config.format);
+    test.key_account = config.key_account;
+    test.language = config;
+    test.body = BuildDecisionRequestBody(DecisionFormat::kChat, config.model,
+                                         CheckContext(), {});
+    test.reads = base::BindRepeating([](const std::string& body) {
+      return ParseDecisionResponse(DecisionFormat::kChat, body,
+                                   /*has_tasks=*/false)
+          .has_value();
+    });
+    return test;
+  }
   if (slot == ModelSlot::kDecision) {
     const DecisionModelConfig config = ReadDecisionModelConfig(&prefs);
     if (!IsComplete(config)) {
@@ -349,26 +374,30 @@ void UwProvidersHandler::RemoveProvider(const std::string& provider_id,
 void UwProvidersHandler::PickModel(mojom::ModelSlot page_slot,
                                    const std::string& provider_id,
                                    const std::string& model,
+                                   bool language,
                                    PickModelCallback callback) {
   PrefService& prefs = *profile_->GetPrefs();
   const ModelSlot slot = SlotFrom(page_slot);
+  language = language && slot == ModelSlot::kDecision;
   const std::optional<Provider> provider = FindProvider(prefs, provider_id);
-  if (!provider || !ServesSlot(*provider, slot) || model.empty()) {
+  if (!provider || !ServesSlot(*provider, slot, language) || model.empty()) {
     std::move(callback).Run();
     return;
   }
   CatalogStore::For(profile_)->FormatOf(
       *provider, model,
       base::BindOnce(&UwProvidersHandler::OnPickFormat,
-                     weak_factory_.GetWeakPtr(), slot, provider_id, model)
+                     weak_factory_.GetWeakPtr(), slot, provider_id, model,
+                     language)
           .Then(std::move(callback)));
 }
 
 void UwProvidersHandler::OnPickFormat(ModelSlot slot,
                                       const std::string& provider_id,
                                       const std::string& model,
+                                      bool language,
                                       std::optional<ProviderFormat> format) {
-  SetChoice(*profile_->GetPrefs(), slot, provider_id, model, format);
+  SetChoice(*profile_->GetPrefs(), slot, provider_id, model, format, language);
 }
 
 void UwProvidersHandler::ClearModel(mojom::ModelSlot slot,

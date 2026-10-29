@@ -67,6 +67,9 @@ struct ModelChoice {
   std::optional<ProviderFormat> format;
   // One of the model's effort levels, or empty for the provider's default.
   std::string effort;
+  // For the quick-choice model, which kDecision holds: picked as a language
+  // model, not a decision model.
+  bool language = false;
 };
 
 void RegisterProviderPrefs(PrefRegistrySimple* registry);
@@ -103,7 +106,8 @@ void SetChoice(PrefService& prefs,
                ModelSlot slot,
                std::string_view provider_id,
                std::string_view model,
-               std::optional<ProviderFormat> format = std::nullopt);
+               std::optional<ProviderFormat> format = std::nullopt,
+               bool language = false);
 void ClearChoice(PrefService& prefs, ModelSlot slot);
 // Sets the effort of the model the slot holds. Empty is the provider's
 // default. Picking another model starts on the default again.

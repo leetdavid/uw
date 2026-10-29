@@ -22,7 +22,21 @@ import {
 } from "./provider-parts";
 
 const FIRST_MODELS = 8;
-const SLOTS = [ModelSlot.kLanguage, ModelSlot.kDecision, ModelSlot.kAgent];
+const SLOTS = [ModelSlot.kDecision, ModelSlot.kLanguage, ModelSlot.kAgent];
+
+// What the provider is used to do, after "Used to".
+const SLOT_USES: Record<ModelSlot, string> = {
+  [ModelSlot.kDecision]: "make quick choices",
+  [ModelSlot.kLanguage]: "name tasks",
+  [ModelSlot.kAgent]: "start chats",
+};
+
+// "a", "a and b", or "a, b, and c".
+function listed(parts: string[]) {
+  return parts.length < 3
+    ? parts.join(" and ")
+    : `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
 
 // Where the tool calls and effort levels on the page come from.
 function abilitiesSource(provider: Provider) {
@@ -132,7 +146,7 @@ export function ProviderPage({
           </h1>
           <div className="mt-0.5 text-[12.5px] text-muted-foreground">
             {usedBy.length
-              ? `Used by the ${usedBy.map((slot) => SLOT_NAMES[slot].toLowerCase()).join(" and the ")}`
+              ? `Used to ${listed(usedBy.map((slot) => SLOT_USES[slot]))}`
               : "No model of uw uses it yet"}
           </div>
         </div>

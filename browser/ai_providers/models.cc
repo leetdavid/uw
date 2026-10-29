@@ -254,7 +254,7 @@ DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs) {
       choice ? FindProvider(*prefs, choice->provider_id) : std::nullopt;
   const std::optional<ProviderFormat> format =
       provider ? DecisionFormatOf(*provider) : std::nullopt;
-  if (!format) {
+  if (!format || IsLanguageQuickChoice(*prefs, *choice)) {
     return config;
   }
   config.format = format == ProviderFormat::kSystemOne
@@ -263,6 +263,31 @@ DecisionModelConfig ReadDecisionModelConfig(const PrefService* prefs) {
   config.endpoint = provider->address;
   config.model = choice->model;
   config.key_account = provider->key_account;
+  return config;
+}
+
+bool IsLanguageQuickChoice(const PrefService& prefs,
+                           const ModelChoice& choice) {
+  if (choice.language) {
+    return true;
+  }
+  const std::optional<Provider> provider =
+      FindProvider(prefs, choice.provider_id);
+  const std::optional<bool> decided =
+      provider && DecisionProbes::Asks(*provider) && LanguageFormatOf(*provider)
+          ? DecisionProbes::Decided(prefs, *provider, choice.model)
+          : std::nullopt;
+  return decided.has_value() && !*decided;
+}
+
+AiConnectionConfig ReadQuickLanguageConfig(const PrefService* prefs) {
+  const std::optional<ModelChoice> choice =
+      prefs ? ReadChoice(*prefs, ModelSlot::kDecision) : std::nullopt;
+  if (!choice || !IsLanguageQuickChoice(*prefs, *choice)) {
+    return ReadAiConnectionConfig(prefs);
+  }
+  AiConnectionConfig config = ConfigForChoice(*prefs, *choice);
+  config.effort.clear();
   return config;
 }
 

@@ -74,6 +74,7 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void PickModel(mojom::ModelSlot slot,
                  const std::string& provider_id,
                  const std::string& model,
+                 bool language,
                  PickModelCallback callback) override;
   void ClearModel(mojom::ModelSlot slot, ClearModelCallback callback) override;
   void SetEffort(mojom::ModelSlot slot,
@@ -152,6 +153,7 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void OnPickFormat(ModelSlot slot,
                     const std::string& provider_id,
                     const std::string& model,
+                    bool language,
                     std::optional<ProviderFormat> format);
   void OnAddressListed(Provider moved,
                        ChangeAddressCallback callback,

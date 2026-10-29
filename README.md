@@ -32,7 +32,7 @@ uw has no account and no AI service of its own. Add the providers you already us
 
 - OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, or any other address with a compatible API.
 - Keys stay in the macOS Keychain.
-- Pick a model for each job: a decision model places tabs, a language model names tasks, and an agent model runs chats. Each sends its requests only to its own provider.
+- Pick a model for each job: one makes quick choices such as where a tab goes, one names tasks, and one starts chats. Each sends its requests only to its own provider.
 - Use Ollama to keep everything on your Mac.
 
 ![The uw://ai providers page. OpenAI, Anthropic, Ollama, and Jev are added, with a model picked for each job.](docs/assets/screenshots/bring-your-own-key.png)
