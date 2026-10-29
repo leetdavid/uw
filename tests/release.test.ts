@@ -85,6 +85,7 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
   assert.deepEqual(find("node scripts/chromium.ts").map((command) => command.slice(2)), [
     ["build", "--jobs", "8", "--symbols"], ["smoke"],
   ]);
+  assert.deepEqual(find("node scripts/google-check.ts"), [["node", "scripts/google-check.ts"]]);
   assert.deepEqual(find("plutil").map((command) => command.slice(2, 5)), [
     ["CFBundleShortVersionString", "-string", "0.1.0"], ["CFBundleVersion", "-string", "0.1.0"],
     ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],

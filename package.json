@@ -18,6 +18,7 @@
     "launch": "launch() { pnpm --silent run launch:check \"$1\" && if [ \"$1\" = -y ]; then shift; fi && env -i open -n \"$(pnpm --silent run chromium root)/src/out/uw/uw.app\" --args --user-data-dir=\"$HOME/Library/Application Support/uw-dev\" --uw-organizer-log=\"$HOME/Library/Application Support/uw-dev/organizer-log.jsonl\" \"$@\"; }; launch",
     "launch:nolog": "launch() { pnpm --silent run launch:check \"$1\" && if [ \"$1\" = -y ]; then shift; fi && env -i open -n \"$(pnpm --silent run chromium root)/src/out/uw/uw.app\" --args --user-data-dir=\"$HOME/Library/Application Support/uw-dev\" \"$@\"; }; launch",
     "smoke": "node scripts/chromium.ts smoke",
+    "google-check": "node scripts/google-check.ts",
     "release": "node scripts/release.ts",
     "verify": "node scripts/chromium.ts verify",
     "window-tests": "node scripts/chromium.ts window-tests",

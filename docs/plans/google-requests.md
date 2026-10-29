@@ -42,17 +42,18 @@ These reach Google only in Google Chrome builds, or only with Chromium's usage s
 
 ## The Google check
 
-`pnpm run google-check` runs the built app headless with a new profile for about five minutes, since the background services start one to four minutes after launch. It opens a normal and a private window, loads local pages with a form and a download, and records the network log. It fails when a Google host outside the kept list appears, and names the host and the request.
+`pnpm run google-check` runs the built app headless with a new profile for about five minutes, since the background services start one to four minutes after launch. It opens a normal and a private window, loads a local page with a form, and records the network log. It does not download: a headless private window cancels downloads, and a test file that is not a real program gets no scan, so T261 shows the download scan is skipped with a browser test instead. It fails when a Google host outside the kept list appears, and names the host and the request.
 
 It never opens Chromium's new tab page. `pnpm run release` runs it and stops when it fails, so a Chromium update that adds a Google service is caught before it ships.
 
 ## Acceptance checks
 
 1. Against a build without T261, `pnpm run google-check` fails and names Autofill, the AI Mode check, Safe Browsing, and network time.
-2. With T261, it passes.
-3. A Google search from the address bar or the command bar, in a normal or a private window, carries neither `gs_lcrp` nor `oq`.
-4. Settings, the Privacy Guide, and the download bubble offer neither "Make searches and browsing better" nor "Enhanced protection".
-5. The Help page [Privacy: what uw sends](https://uwbrowser.com/help/privacy) matches this plan.
+2. A browser test shows a download in a private window sends no download scan when uw has no Google API key.
+3. With T261, `pnpm run google-check` passes.
+4. A Google search from the address bar or the command bar, in a normal or a private window, carries neither `gs_lcrp` nor `oq`.
+5. Settings, the Privacy Guide, and the download bubble offer neither "Make searches and browsing better" nor "Enhanced protection".
+6. The Help page [Privacy: what uw sends](https://uwbrowser.com/help/privacy) matches this plan.
 
 ## Not in this plan
 

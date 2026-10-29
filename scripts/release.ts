@@ -180,6 +180,7 @@ export class Release {
     this.step(["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"], worktree);
     this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols"], worktree);
     this.step(["node", "scripts/chromium.ts", "smoke"], worktree);
+    this.step(["node", "scripts/google-check.ts"], worktree);
     this.step([join(this.tools, "autoninja"), "-C", "out/uw", `-j${jobs}`, "chrome/installer/mac"], this.source);
 
     const output = join(this.source, "out/uw");

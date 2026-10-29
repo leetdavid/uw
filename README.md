@@ -141,6 +141,7 @@ pnpm run smoke
 - `sync` downloads the pinned Chromium source, dependencies, and upstream tools, then applies uw's patches.
 - `build` prepares the current patches, generates the build files, and compiles the `chrome` target into `uw.app`.
 - `smoke` checks the uw product name and version, then runs a headless JavaScript/DOM test in a temporary incognito profile, with the sandbox enabled.
+- `pnpm run google-check` runs the built app headless for five minutes in a normal and a private window, with a new profile and a local page that has a form, and fails when uw contacts Google outside the requests it keeps. See [Google requests](docs/plans/google-requests.md#the-google-check). Add `--seconds 60` for a quick look; the background requests start one to four minutes in.
 
 Start with `--jobs 2` on a 16 GiB Mac. `caffeinate` prevents idle sleep during the download and build. Rerun `build` to reuse completed work after an interruption.
 
@@ -322,7 +323,7 @@ pnpm run release 0.1.0
 
 Add `--sha <commit>` to release an earlier commit on GitHub's `main`. A rerun of a version that failed is quick, since the build and the Sentry upload are already done.
 
-It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there. Then [deploy the website](#website), so Help matches the release.
+It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), runs the [Google check](docs/plans/google-requests.md#the-google-check), which adds five minutes, and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there. Then [deploy the website](#website), so Help matches the release.
 
 ## Website
 
