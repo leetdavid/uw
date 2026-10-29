@@ -39,6 +39,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 
 - [Agent chats plan](plans/agent-chats.md): chats with a built-in agent, scheduled chats, approvals, releases, and stages.
 - [uw command plan](plans/uw-command.md): the `uw` command for scripts, outside agents, and the terminal: chats with approvals in the terminal, connectors, and settings.
+- [Tab tools plan](plans/tab-tools.md): tools that list, show, move, and close the user's tabs and rename tasks, for chats and the `uw` command, without reading the pages.
 - [Agent memory plan](plans/agent-memory.md): what the agent keeps about the user across chats and the `uw` command, core memories and search, the memory check, and the memory page.
 - [Context and cost plan](plans/context-and-cost.md): a chat's indicator of how full its context is and what it has cost, and the card behind it.
 - [Agent engine spike](research/agent-engine-spike.md): uw drives Chromium's agent engine without Gemini's panel, and what it cannot do yet.

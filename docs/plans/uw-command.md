@@ -24,8 +24,9 @@ The user asked on 2026-10-24 for a [`uw` command](../CONTEXT.md#language) that a
 | `uw connectors`, also `uw mcp` | `add`, `add-json`, `list`, `remove`, and `sign-in`. |
 | `uw settings` | `list`, `get`, and `set`. |
 | `uw memory` | `list` and `forget` agent memory; `uw chat --no-memory` keeps a chat out of it. See the [agent memory plan](agent-memory.md#the-uw-command). |
+| `uw tabs` | `list`, `select`, `move`, `rename-task`, `close`, and `close-task`. See the [tab tools plan](tab-tools.md). |
 
-Later: skills, providers, scheduled chats, and opening or reading tabs without the agent.
+Later: skills, providers, scheduled chats, and opening or reading pages without the agent.
 
 In v2.2, `uw mcp serve` is the [tool server](#the-tool-server) for outside agents, over the same channel: `claude mcp add uw -- uw mcp serve`.
 
@@ -100,7 +101,7 @@ Not yet: images, the per-chat connector switches (every connector that is on is 
 
 Agreed on 2026-10-25. `uw mcp serve` speaks MCP on stdin and stdout to an [outside agent](../CONTEXT.md#language) and reaches uw over the command's channel.
 
-- It offers the agent's page tools only: `open`, `navigate`, `read`, `click`, and `type`. Not the terminal tools, since an outside agent has its own shell, and never settings, connectors, or chats.
+- It offers the agent's page tools, `open`, `navigate`, `read`, `click`, and `type`, and the [tab tools](tab-tools.md#who-gets-the-tools) but `select`. Not the terminal tools, since an outside agent has its own shell, and never settings, connectors, or chats.
 - The tabs open out of sight in the run window, as a `uw chat` chat's do, and close when the client disconnects. A step that waits for approval brings its tab into the front window, unselected, as a scheduled chat's does.
 - Steps need approval as a chat's do, under the mode new chats start on. `--mode ask-first | auto | full-auto` picks one for that client, and `--workspace` picks the profile.
 - uw asks through MCP elicitation, so a client such as Claude Code shows uw's card as a dialog: Approve, Not this one, or a note. The model can't answer it.
