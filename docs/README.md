@@ -82,11 +82,16 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Scratchpad buttons plan](plans/scratchpad-buttons.md): Tidy files the Scratchpad's tabs into tasks with one request, and Clear closes them, as in Arc.
 - [Command bar plan](plans/command-bar.md): one panel on Cmd+T and Cmd+L for commands, tasks, tabs, and the web, ranked by use, that can also send the typed text to a chat or a terminal.
 - [Command bar spike](research/command-bar-spike.md): what the panel, the searchbox handler, and headless tests did, and the keyboard checks still open.
+- [New tab page plan](plans/new-tab-page.md): uw's page in a blank tab, with a box to search or ask and the state of uw's features, replacing Chromium's.
 - [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
 - [ADR 0011: uw keeps its own key list](adr/0011-uw-keeps-its-own-key-list.md): why keys are changed in uw's settings and not through macOS App Shortcuts.
 - [ADR 0017: the theme's light or dark rides in Chromium's color key](adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md): why page mode drives all of Chromium's colors and the sidebar keeps its own.
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Logo](logo.md): the mark, its colors and files, and what is still undecided.
+
+### Privacy
+
+- [Google requests plan](plans/google-requests.md): every request Chromium makes to Google in uw, which ones uw stops, which it keeps and why, and the Google check that catches new ones.
 
 ### Building
 

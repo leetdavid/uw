@@ -420,6 +420,8 @@ Agreed defaults: enable ad blocking, tracker blocking, and "Apply cookie prefere
 
 How per-site overrides take precedence remains open.
 
+Agreed on 2026-10-29: uw sends Google nothing about what the user does in the browser. Google receives data only when the user uses a Google service, such as searching with Google, translating a page, or opening a Google site, and then only what that service needs. Background requests that keep the browser working, such as component updates and push messaging, stay; they carry no browsing data. Private windows follow the same rule. The [Google requests plan](plans/google-requests.md) lists each request and what uw does with it, and the Help page [Privacy: what uw sends](https://uwbrowser.com/help/privacy) lists everything uw sends, to Google and everyone else.
+
 Other proposed privacy behavior:
 
 - Use maintained filter lists for blocking.

@@ -161,14 +161,7 @@ How the chat is built:
 
 ## New tab page
 
-T49, proposed on 2026-10-24 and not built. The user first chose to build it after a UI review that day, then left it in the backlog: Cmd+T opens the command bar, which already opens an address, searches, and asks in a new chat, so this page would only show for a blank tab. Chromium's new tab page stays, with "Customize uw". The proposal below is kept for a later decision. Drawn in the frame "New tab: Search or Ask". Implementability 6/10: the page reuses the chat page's composer, and the risk is in Chromium's many special cases for its own new tab page.
-
-- Every tab that would show Chromium's new tab page shows `uw://newtab` instead: "New blank tab" in the command bar, Cmd+T with the command bar off, and the first tab of a new window or workspace. Chromium's page, with its Google logo, shortcuts, and "Customize uw" button, no longer shows. The patch points `NewTabURLDetails::ForProfile` at it, and the page counts as a new tab page wherever Chromium checks, so the address bar stays empty and the box takes the focus.
-- The page is uw's logo, one box, and a Search | Ask switch, centered, as drawn. It follows light and dark mode. Its tab reads "New Tab".
-- Search is on when the page opens. Return goes where the address bar would with the same text: an address opens, other text searches with the default search engine, in this tab.
-- Ask turns this tab into a chat whose first message is the text, as Cmd+Return in the command bar does in a new tab. The box shows the chat page's model chip and the "Once" chip, which opens the schedule card. The agent's tabs open under it, per acceptance check 1.
-- Tab moves between Search and Ask; the switch keeps no memory between pages.
-- Not in T49: chat cards on the page (v2.1) and a Chats section in the sidebar (T50).
+Moved to the [new tab page plan](new-tab-page.md) on 2026-10-29, when the page grew from an Ask box into a page for all of uw's features.
 
 ## Context
 
@@ -205,7 +198,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 16. T105: approval modes, per [Agreed scope](#agreed-scope).
 17. T106: images in a message, drawn on the canvas first.
 18. T107: stop, steer, and queue.
-19. T49: Ask box on the new tab page. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
+19. T49: the [new tab page](new-tab-page.md), with its Ask box. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
 20. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
 21. Scheduled chats, agreed on 2026-10-22, in this order: T147, the chat page design; T148, a window that is never shown; T149, the scheduler; T51, scheduled chats; T150, watch this page; T151, tracked values and charts; T152, the agent filling in the card; T153, triggers. Added on 2026-10-28: T243, the agent watching a page; T244, several watches on one page. See the [board](roadmap.md#board).
 22. T52: private chats.

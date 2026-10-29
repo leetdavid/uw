@@ -83,7 +83,7 @@ The website uses PostHog for visits and download clicks.
 
 Found so far, at Chromium 153 on 2026-10-27:
 
-- Crashpad runs in unbranded builds but has no upload address, and every launch turns uploads off (`ApplyMetricsReportingPolicy`). A patch gives `GetUploadUrl` Sentry's minidump address, reads the answer from the user data folder's "Consent To Send Stats" file, and stops the reset. Crashpad sends at most one report an hour unless started with `--no-rate-limit`.
+- Crashpad runs in unbranded builds but has no upload address, and every launch turns uploads off (`ApplyMetricsReportingPolicy`). A patch gives `GetUploadUrl` Sentry's minidump address, reads the answer from uw's own file, `uw Problem Reports.json` in the crash dumps folder, and stops the reset. Chromium's usage statistics consent stays off whatever the answer; see [Google requests](google-requests.md#already-off). Crashpad sends at most one report an hour unless started with `--no-rate-limit`.
 - Release symbols need `enable_dsyms = true` beside `symbol_level = 1`. The dSYMs may run to gigabytes.
 - The React pages are the chat page, `uw://ai`, and the watch card. Settings and the organizer page are Lit. Chromium gives WebUI pages that use Mojo no network access, so a page reports its problems over Mojo, and C++ sends them to PostHog.
 - Chromium's own consent switch and first-run dialog appear only in Google Chrome builds, so uw adds its own.
