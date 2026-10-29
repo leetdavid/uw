@@ -30,7 +30,20 @@ Below the box, each section is hidden when it has nothing to show, so a quiet da
 | Tabs | Whether automatic organization is on or paused, and recent automatic moves with Undo. |
 | Setup | What is broken: a provider failing or missing a key, a connector that needs sign-in, or an update ready to install. |
 
-How each row looks and what a click on it does is decided in the design round.
+## Design
+
+Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" and "New tab page: every state (Fluid)" on the "Agent chats" page of the [canvas](../../AGENTS.md#designs), with the rules in the guide `uw-new-tab-page`. Proposed, awaiting the user's sign-off:
+
+- The sections sit under the box in two columns: Needs you, Finished, and Setup on the left, which want the user; Coming up, Running, and Tabs on the right, which go on by themselves.
+- Needs you lists steps oldest first, with Review, which opens the chat at its question, or Open page to sign in.
+- Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it takes it off this page; the Inbox keeps the alert.
+- Coming up shows the next three runs. Paused chats are left out.
+- Running plays and pauses the mini player's media from the page.
+- Tabs shows the organizer's moves and new tasks of the last hour, three at most, each with Undo, and a line saying whether automatic organization is on or paused, with Pause or Resume. With automatic organization off, the section is left out.
+- Setup lists a provider whose key was rejected, a connector that needs sign-in, an update ready to install, and, before any provider is added, "Add an AI provider".
+- A click on a row opens what it names: a watched page's row opens the page, a chat's row the chat, and a running row goes to its tab.
+- Before any provider is added, Ask is grayed with the tooltip "Add an AI provider to ask".
+- A private window's page shows the line "A private window. uw keeps nothing from it after it closes." Its Ask has no Once chip, since a private chat never runs on a schedule.
 
 ## Private windows
 
