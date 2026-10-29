@@ -207,8 +207,8 @@ export class Release {
     const sparkle = this.sparkle();
     const framework = join(app, "Contents/Frameworks/Sparkle.framework");
     this.step(["cp", "-cR", join(sparkle, "Sparkle.framework"), join(app, "Contents/Frameworks")], directory);
-    rmSync(join(framework, "Versions/B/XPCServices"), { recursive: true, force: true });
-    rmSync(join(framework, "XPCServices"), { force: true });
+    // `rm` takes the top-level link too; a disk image's copy fails on a link to nothing.
+    this.step(["rm", "-rf", join(framework, "Versions/B/XPCServices"), join(framework, "XPCServices")], directory);
     for (const part of ["Versions/B/Autoupdate", "Versions/B/Updater.app", ""]) {
       this.step(["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", join(framework, part)],
         directory);

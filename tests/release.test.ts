@@ -100,9 +100,14 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
     join(worktree, ".chromium/src/out/uw"),
   ]);
   assert.equal(upload.options.env?.SENTRY_AUTH_TOKEN, "sntrys_test");
+  const framework = (path: string) => path.split("Contents/Frameworks/")[1];
+  const [removed] = find("rm -rf");
+  assert.ok(removed);
+  assert.deepEqual(removed.slice(2).map(framework), [
+    "Sparkle.framework/Versions/B/XPCServices", "Sparkle.framework/XPCServices",
+  ]);
   const signing = find("codesign --force");
-  const framework = (command: readonly string[]) => command.at(-1)!.split("Contents/Frameworks/")[1];
-  assert.deepEqual(signing.slice(0, 3).map(framework), [
+  assert.deepEqual(signing.slice(0, 3).map((command) => framework(command.at(-1)!)), [
     "Sparkle.framework/Versions/B/Autoupdate", "Sparkle.framework/Versions/B/Updater.app", "Sparkle.framework",
   ]);
   const helper = signing.find((command) => command.includes("--identifier"));
