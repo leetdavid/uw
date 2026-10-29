@@ -123,7 +123,9 @@ Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The
 4. The film then starts from the beginning, muted, and plays once at normal speed. It does not loop, and scrolling does not move it forward or back.
 5. After about one more screen the page lets go. The film keeps playing as it scrolls away and pauses once it is mostly out of view.
 
-Open: the sound button, whether the page holds visitors at the film, what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
+The page stops softly at the film: scrolling slowly into the pinned stretch settles where the film is fully formed, and a quick flick goes past. Nothing holds the page while the film plays.
+
+Open: the sound button, what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
