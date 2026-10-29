@@ -1249,6 +1249,12 @@ void TabOrganizationController::ContinueTabDrag(int x) {
       !tabs_->profile()->GetPrefs()->GetBoolean(kDragSidewaysNestsTabsPref)) {
     return;
   }
+  // Once the dragged tabs go on to another window, this one no longer nests
+  // them, nor drops them from the tree.
+  if (!std::ranges::all_of(drag_carried_,
+                           [this](const PageId& id) { return TabFor(id); })) {
+    return;
+  }
   if (!drag_x_) {
     drag_x_ = x;
     return;
@@ -1449,7 +1455,10 @@ void TabOrganizationController::OnTabStripModelChanged(
       const std::optional<PageId> id = IdFor(removed.tab);
       if (id && removed.remove_reason ==
                     TabRemovedReason::kInsertedIntoOtherTabStrip) {
-        SharedTree::Depart(removed.tab->GetHandle(), *id, shared_.get());
+        // A drag may have moved and nested it on its way out, so it keeps
+        // the place it had when the drag began.
+        SharedTree::Depart(removed.tab->GetHandle(), *id, shared_.get(),
+                           dragging_ ? drag_before_ : shared_->tree());
         moved_out = true;
       }
     }

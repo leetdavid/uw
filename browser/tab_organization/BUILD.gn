@@ -80,6 +80,7 @@ source_set("browser_tests") {
     "branch_drag_browsertest.mm",
     "mouse_actions_browsertest.mm",
     "shared_tabs_browsertest.cc",
+    "shared_tabs_drag_browsertest.cc",
     "sidebar_menus_browsertest.mm",
     "tab_organization_controller_browsertest.cc",
     "task_keys_browsertest.mm",

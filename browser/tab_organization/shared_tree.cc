@@ -489,11 +489,12 @@ void SharedTree::CloseIfEmpty() {
 // static
 void SharedTree::Depart(const tabs::TabHandle& tab,
                         const PageId& page,
-                        SharedTree* from) {
+                        SharedTree* from,
+                        PageTree before) {
   Transit transit;
   transit.page = page;
   transit.from = from;
-  transit.before = from->tree_;
+  transit.before = std::move(before);
   Transits()[tab] = std::move(transit);
 }
 

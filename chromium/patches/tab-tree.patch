@@ -783,7 +783,7 @@ index 9354e0d5497b85db204ebae5d6adcd41973ea01a..f3b526cc11c8dd433fc17a65c59f0ef6
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index cdc7c0f320fed580814d4f71c90702d9450be81e..007a7b482bdcf3d2693d8ff0d70491e98a57e73f 100644
+index cdc7c0f320fed580814d4f71c90702d9450be81e..9c067809c332fc904ab0c22892da375b1e4e940f 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 @@ -46,6 +46,8 @@
@@ -838,7 +838,7 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..007a7b482bdcf3d2693d8ff0d70491e9
  
    // Dragging may start a blocking loop, which may allow this to be destroyed.
    auto ref = weak_factory_.GetWeakPtr();
-@@ -354,10 +378,19 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -354,10 +378,24 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
      ResetDragState();
      return false;
    }
@@ -851,8 +851,13 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..007a7b482bdcf3d2693d8ff0d70491e9
  }
  
  void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
++  // uw: capture lost during a drag may only mean a dragged tab detached into
++  // a window of its own, which takes the capture. TabDragController decides
++  // then, and tells the tab tree once the drag ends.
 +  if (auto* organizer =
-+          uw::TabOrganizationController::From(&tab_strip_model_.get())) {
++          uw::TabOrganizationController::From(&tab_strip_model_.get());
++      organizer && (reason != EndDragReason::kCaptureLost ||
++                    !TabDragController::IsActive())) {
 +    organizer->EndTabDrag();
 +  }
    // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture

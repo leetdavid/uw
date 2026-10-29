@@ -148,9 +148,11 @@ class SharedTree : public base::RefCounted<SharedTree> {
     scoped_refptr<SharedTree> from;
     PageTree before;
   };
+  // `before` is the tree with the page in its place, as when a drag began.
   static void Depart(const tabs::TabHandle& tab,
                      const PageId& page,
-                     SharedTree* from);
+                     SharedTree* from,
+                     PageTree before);
   static std::optional<Transit> Arrive(const tabs::TabHandle& tab);
   // `window` joins once the drag under way on the tree ends, since Chromium
   // ends a drag when a tab strip gains a tab.
