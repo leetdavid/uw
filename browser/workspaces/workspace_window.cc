@@ -270,6 +270,7 @@ void WorkspaceWindow::Restore(
       self->group_ = std::move(group);
     }
     self->SetHidden(Find(extra_data, kHiddenKey) == "true");
+    self->keeper_ = self->hidden_ && Find(extra_data, kKeeperKey) == "true";
   } else {
     // The window of a deleted workspace comes back on its own.
     self->workspace_ = WorkspaceList::Get().FirstFor(window->GetProfile()).id;
@@ -313,6 +314,7 @@ void WorkspaceWindow::AddRestoreData(
     extra_data[kWorkspaceKey] = self->workspace_;
     extra_data[kGroupKey] = self->group_;
     extra_data[kHiddenKey] = self->hidden_ ? "true" : "false";
+    extra_data[kKeeperKey] = self->keeper_ ? "true" : "false";
   }
 }
 
@@ -445,6 +447,7 @@ void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
 void WorkspaceWindow::Present(base::WeakPtr<WorkspaceWindow> shown) {
   revealing_ = false;
   reveal_timer_.Stop();
+  keeper_ = false;
   SetHidden(false);
   SaveSession();
   if (shown && shown.get() != this) {
@@ -714,10 +717,13 @@ void WorkspaceWindow::RestorePartners() {
 void WorkspaceWindow::RevealOrphans() {
   std::set<std::string> shown;
   std::vector<WorkspaceWindow*> hidden;
+  std::vector<WorkspaceWindow*> keepers;
   for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
     if (WorkspaceWindow* self = From(window);
         self && !window->IsDeleteScheduled()) {
-      if (self->hidden_) {
+      if (self->keeper_) {
+        keepers.push_back(self);
+      } else if (self->hidden_) {
         hidden.push_back(self);
       } else {
         shown.insert(self->group_);
@@ -729,6 +735,24 @@ void WorkspaceWindow::RevealOrphans() {
       self->Reveal();
     }
   }
+  // A window the user closed stays closed, unless no other window would
+  // show at all.
+  if (shown.empty() && !keepers.empty()) {
+    keepers.front()->Reveal();
+  }
+}
+
+void WorkspaceWindow::Keep() {
+  if (!hidden_) {
+    for (WorkspaceWindow* partner : Partners()) {
+      partner->window_->GetWindow()->Close();
+    }
+  }
+  group_ = base::Uuid::GenerateRandomV4().AsLowercaseString();
+  keeper_ = true;
+  SetHidden(true);
+  window_->GetWindow()->Hide();
+  SaveSession();
 }
 
 }  // namespace uw

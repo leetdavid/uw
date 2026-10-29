@@ -86,6 +86,13 @@ class TabOrganizationController : public TabStripModelObserver,
   static void RestoreTab(BrowserWindowInterface* window,
                          content::WebContents* page,
                          const std::map<std::string, std::string>& extra_data);
+  // Asked before `window` closes. With shared tabs, another window on its
+  // workspace takes the window's live pages, and the window closes. The last
+  // window on the workspace keeps the workspace's tabs instead: it hides, and
+  // its pages that are doing nothing unload. True when it stays.
+  static bool KeepsWindow(BrowserWindowInterface* window);
+  // True for a window that shares its tabs, so closing it closes none.
+  static bool ClosesNoTabs(BrowserWindowInterface* window);
   // Opens a new tab in a new task of its own. Returns false when `window`
   // has no tab tree, in which case nothing opened.
   static bool OpenNewTask(BrowserWindowInterface* window);

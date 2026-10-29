@@ -50,6 +50,9 @@ class WorkspaceWindow : public views::WidgetObserver,
   static constexpr char kWorkspaceKey[] = "uw.workspace";
   static constexpr char kGroupKey[] = "uw.workspace_group";
   static constexpr char kHiddenKey[] = "uw.workspace_hidden";
+  // Set on a window that keeps its workspace's tabs, hidden, after the user
+  // closed it, since no other window shows the workspace. See Keep().
+  static constexpr char kKeeperKey[] = "uw.workspace_keeper";
 
   explicit WorkspaceWindow(BrowserWindowInterface* window);
   WorkspaceWindow(const WorkspaceWindow&) = delete;
@@ -76,6 +79,15 @@ class WorkspaceWindow : public views::WidgetObserver,
   BrowserWindowInterface* window() { return window_; }
   const std::string& workspace() const { return workspace_; }
   bool hidden() const { return hidden_; }
+  bool keeper() const { return keeper_; }
+  // True while the window closes for a deleted workspace.
+  bool forgetting() const { return forget_; }
+  // In place of closing, with shared tabs: the window hides and keeps its
+  // workspace's tabs, since no other window shows the workspace. To the user
+  // it has closed, so its group's other windows close with it, and it leaves
+  // the group. It stays hidden at launch while another window shows, and a
+  // window that shows it, as the Dock does, brings it back.
+  void Keep();
   // The other windows of this window's group.
   std::vector<WorkspaceWindow*> Partners() const;
 
@@ -183,6 +195,7 @@ class WorkspaceWindow : public views::WidgetObserver,
   std::string workspace_;
   std::string group_;
   bool hidden_ = false;
+  bool keeper_ = false;
   // Set while the window waits under its partner to draw.
   bool revealing_ = false;
   // Counts reveals, so a late frame of an older one is left.

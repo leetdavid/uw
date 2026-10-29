@@ -10,6 +10,13 @@
 #include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
+#include "chrome/browser/actor/actor_keyed_service.h"
+#include "chrome/browser/performance_manager/policies/cannot_discard_reason.h"
+#include "chrome/browser/performance_manager/policies/discard_eligibility_policy.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "components/performance_manager/public/graph/page_node.h"
+#include "components/performance_manager/public/performance_manager.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
@@ -18,10 +25,13 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/referrer.h"
+#include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/page_copy.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 
@@ -102,6 +112,55 @@ class CopyMark : public content::WebContentsUserData<CopyMark>,
 };
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(CopyMark);
+
+// Whether the live page in `tab` is at work: the agent works in it, or Memory
+// Saver would keep it for sound, the mini player, capture, devices,
+// notifications, a title or icon that changes out of sight, unsaved input,
+// an extension that asks, or DevTools.
+bool AtWork(tabs::TabInterface* tab) {
+  using performance_manager::policies::CannotDiscardReason;
+  using performance_manager::policies::DiscardEligibilityPolicy;
+  content::WebContents* page = tab->GetContents();
+  if (actor::ActorKeyedService* agent =
+          actor::ActorKeyedService::Get(page->GetBrowserContext());
+      agent && agent->IsActiveOnTab(*tab)) {
+    return true;
+  }
+  base::WeakPtr<performance_manager::PageNode> node =
+      performance_manager::PerformanceManager::GetPrimaryPageNodeForWebContents(
+          page);
+  if (!node) {
+    return false;
+  }
+  std::vector<CannotDiscardReason> reasons;
+  DiscardEligibilityPolicy::GetFromGraph(node->GetGraph())
+      ->CanDiscard(node.get(),
+                   DiscardEligibilityPolicy::DiscardReason::PROACTIVE,
+                   /*ignore_recent_visibility=*/true, &reasons);
+  return std::ranges::any_of(reasons, [](CannotDiscardReason reason) {
+    switch (reason) {
+      case CannotDiscardReason::kAudible:
+      case CannotDiscardReason::kRecentlyAudible:
+      case CannotDiscardReason::kPictureInPicture:
+      case CannotDiscardReason::kNotificationsEnabled:
+      case CannotDiscardReason::kExtensionProtected:
+      case CannotDiscardReason::kCapturingVideo:
+      case CannotDiscardReason::kCapturingAudio:
+      case CannotDiscardReason::kBeingMirrored:
+      case CannotDiscardReason::kCapturingWindow:
+      case CannotDiscardReason::kCapturingDisplay:
+      case CannotDiscardReason::kConnectedToBluetooth:
+      case CannotDiscardReason::kConnectedToUSB:
+      case CannotDiscardReason::kDevToolsOpen:
+      case CannotDiscardReason::kBackgroundActivity:
+      case CannotDiscardReason::kFormInteractions:
+      case CannotDiscardReason::kUserEdits:
+        return true;
+      default:
+        return false;
+    }
+  });
+}
 
 }  // namespace
 
@@ -306,6 +365,114 @@ void SharedTree::Refresh(const PageId& id) {
 gfx::ImageSkia SharedTree::PictureOf(const PageId& id) const {
   const auto picture = pictures_.find(id);
   return picture == pictures_.end() ? gfx::ImageSkia() : picture->second;
+}
+
+void SharedTree::HandOver(TabOrganizationController* from) {
+  TabOrganizationController* to = nullptr;
+  for (TabOrganizationController* window : windows_) {
+    if (window != from &&
+        (!to || (WorkspaceWindow::IsHidden(to->window()) &&
+                 !WorkspaceWindow::IsHidden(window->window())))) {
+      to = window;
+    }
+  }
+  if (!to) {
+    return;
+  }
+  for (const Page& page : tree_.pages()) {
+    const tabs::TabInterface* tab = from->TabFor(page.id);
+    if (tab && !IsCopy(tab->GetContents())) {
+      BringLivePage(to, page.id);
+    }
+  }
+}
+
+bool SharedTree::Unseen() const {
+  return std::ranges::all_of(windows_, [](const auto& window) {
+    const WorkspaceWindow* workspace = WorkspaceWindow::From(window->window());
+    return workspace && workspace->keeper();
+  });
+}
+
+void SharedTree::UnloadIdlePages() {
+  if (windows_.empty() || !Unseen()) {
+    unloading_.Stop();
+    return;
+  }
+  bool at_work = false;
+  for (TabOrganizationController* window : windows_) {
+    for (const Page& page : tree_.pages()) {
+      tabs::TabInterface* tab = window->TabFor(page.id);
+      if (!tab || IsCopy(tab->GetContents())) {
+        continue;
+      }
+      if (AtWork(tab)) {
+        at_work = true;
+      } else if (TerminalShell* shell =
+                     TerminalShell::From(tab->GetContents())) {
+        at_work = true;
+        shell->GetActivity(base::BindOnce(
+            [](base::WeakPtr<SharedTree> self, PageId id,
+               ShellHost::Activity activity) {
+              if (self) {
+                self->UnloadTerminal(id, !activity.program.empty());
+              }
+            },
+            weak_factory_.GetWeakPtr(), page.id));
+      } else {
+        window->ReplacePage(tab, MakeCopy(tab->GetContents()));
+      }
+    }
+  }
+  if (!at_work) {
+    unloading_.Stop();
+  } else if (!unloading_.IsRunning()) {
+    unloading_.Start(FROM_HERE, base::Minutes(1),
+                     base::BindRepeating(&SharedTree::UnloadIdlePages,
+                                         base::Unretained(this)));
+  }
+}
+
+void SharedTree::UnloadTerminal(const PageId& id, bool busy) {
+  TabOrganizationController* holder = HolderOf(id, nullptr);
+  if (busy || !holder || !Unseen()) {
+    return;
+  }
+  tabs::TabInterface* tab = holder->TabFor(id);
+  holder->ReplacePage(tab, MakeCopy(tab->GetContents()));
+}
+
+void SharedTree::CloseIfEmpty() {
+  if (!tree_.pages().empty()) {
+    had_pages_ = true;
+    return;
+  }
+  if (!had_pages_ || std::ranges::any_of(windows_, [](const auto& window) {
+        return window->dragging();
+      })) {
+    return;
+  }
+  had_pages_ = false;
+  // Closing a window while its tab strip reports a change is not allowed.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<SharedTree> self) {
+            if (!self || !self->tree_.pages().empty()) {
+              return;
+            }
+            std::set<BrowserWindowInterface*> closing;
+            for (TabOrganizationController* window : self->windows_) {
+              closing.insert(window->window());
+            }
+            for (BrowserWindowInterface* window :
+                 GetAllBrowserWindowInterfaces()) {
+              if (closing.contains(window)) {
+                window->GetWindow()->Close();
+              }
+            }
+          },
+          weak_factory_.GetWeakPtr()));
 }
 
 void SharedTree::SetPicture(const PageId& id, gfx::ImageSkia picture) {

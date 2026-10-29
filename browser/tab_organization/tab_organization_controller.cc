@@ -18,6 +18,7 @@
 #include "base/token.h"
 #include "base/uuid.h"
 #include "base/values.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
@@ -32,6 +33,7 @@
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/base_window.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/list_selection_model.h"
 #include "ui/menus/simple_menu_model.h"
@@ -152,6 +154,33 @@ void TabOrganizationController::JoinWorkspace() {
   reveals_ = WorkspaceWindow::ObserveReveals(base::BindRepeating(
       &TabOrganizationController::OnRevealed, base::Unretained(this)));
   Apply();
+  // A window kept for the workspace's tabs closes once another one shows
+  // them. Its live pages go to that window first.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<TabOrganizationController> self) {
+                       if (!self || !self->joined_) {
+                         return;
+                       }
+                       std::vector<BrowserWindowInterface*> keepers;
+                       bool shown = false;
+                       for (BrowserWindowInterface* window : self->Windows()) {
+                         const WorkspaceWindow* workspace =
+                             WorkspaceWindow::From(window);
+                         if (workspace && workspace->keeper()) {
+                           keepers.push_back(window);
+                         } else {
+                           shown = true;
+                         }
+                       }
+                       if (!shown) {
+                         return;
+                       }
+                       for (BrowserWindowInterface* keeper : keepers) {
+                         keeper->GetWindow()->Close();
+                       }
+                     },
+                     weak_factory_.GetWeakPtr()));
 }
 
 void TabOrganizationController::Leave() {
@@ -333,6 +362,33 @@ TabOrganizationController* TabOrganizationController::From(
     TabStripModel* model) {
   tabs::TabInterface* tab = model ? model->GetActiveTab() : nullptr;
   return tab ? From(tab->GetBrowserWindowInterface()) : nullptr;
+}
+
+// static
+bool TabOrganizationController::KeepsWindow(BrowserWindowInterface* window) {
+  TabOrganizationController* self = From(window);
+  WorkspaceWindow* workspace = WorkspaceWindow::From(window);
+  if (!self || !self->joined_ || !workspace ||
+      browser_shutdown::IsTryingToQuit()) {
+    return false;
+  }
+  if (self->shared_->windows().size() > 1) {
+    self->shared_->HandOver(self);
+    return false;
+  }
+  if (workspace->forgetting() || workspace->keeper() ||
+      self->shared_->tree().pages().empty()) {
+    return false;
+  }
+  workspace->Keep();
+  self->shared_->UnloadIdlePages();
+  return true;
+}
+
+// static
+bool TabOrganizationController::ClosesNoTabs(BrowserWindowInterface* window) {
+  const TabOrganizationController* self = From(window);
+  return self && self->joined_;
 }
 
 bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
@@ -804,7 +860,9 @@ void TabOrganizationController::ClearScratchpad() {
         if (ids.empty()) {
           return;
         }
-        if (ids.size() == static_cast<size_t>(self->tabs_->count())) {
+        if (ids.size() ==
+            static_cast<size_t>(self->tabs_->count() -
+                                self->tabs_->IndexOfFirstNonPinnedTab())) {
           chrome::AddTabAt(self->window_, GURL(), -1, /*foreground=*/true);
         }
         self->Close(std::move(ids));
@@ -837,7 +895,8 @@ void TabOrganizationController::CloseTask(const tab_groups::TabGroupId& task) {
       !tabs_->group_model()->ContainsTabGroup(task)) {
     return;
   }
-  if (tabs_->count() == tabs_->group_model()->GetTabGroup(task)->tab_count()) {
+  if (tabs_->count() - tabs_->IndexOfFirstNonPinnedTab() ==
+      static_cast<int>(tabs_->group_model()->GetTabGroup(task)->tab_count())) {
     chrome::AddTabAt(window_, GURL(), -1, /*foreground=*/true);
   }
   tabs_->CloseAllTabsInGroup(task);
@@ -1483,6 +1542,7 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   ScheduleUpdate();
   if (joined_) {
     shared_->Propagate(this);
+    shared_->CloseIfEmpty();
   }
 }
 

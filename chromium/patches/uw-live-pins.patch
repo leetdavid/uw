@@ -34,28 +34,46 @@ index 5582ae1d0febd9ad2d9ecc9d62c64390b89fb992..f739184700bb5e3a5125e1579e7eac8e
  // LINT.ThenChange(/tools/metrics/histograms/metadata/profile/enums.xml)
  
 diff --git a/chrome/browser/ui/unload_controller.cc b/chrome/browser/ui/unload_controller.cc
-index e5cd22968a6d8569e1853a1926f0c187adc56fba..0c184a5c14016260ede3155eb5bf0c943b9a2bdf 100644
+index e5cd22968a6d8569e1853a1926f0c187adc56fba..fe28338306287e27371659b4b5422c2ba4592051 100644
 --- a/chrome/browser/ui/unload_controller.cc
 +++ b/chrome/browser/ui/unload_controller.cc
-@@ -47,6 +47,7 @@
+@@ -47,6 +47,8 @@
  #include "content/public/browser/render_view_host.h"
  #include "content/public/browser/web_contents.h"
  #include "extensions/buildflags/buildflags.h"
 +#include "uw/browser/pins/pin_sync.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
  
  #if BUILDFLAG(ENABLE_EXTENSIONS)
  #include "chrome/browser/profiles/profile.h"
-@@ -106,6 +107,10 @@ const UnloadController* UnloadController::From(
+@@ -106,6 +108,16 @@ const UnloadController* UnloadController::From(
  }
  
  bool UnloadController::HandleBeforeClose() {
 +  // uw: a live pin page moves out of the window before its pages are asked,
 +  // so it outlives the window.
 +  uw::PinSync::WillCloseWindow(browser_);
++  // uw: with shared tabs, another window on the workspace takes the window's
++  // live pages, or the window, the last on its workspace, keeps the
++  // workspace's tabs, hidden, in place of closing.
++  if (uw::TabOrganizationController::KeepsWindow(browser_)) {
++    return false;
++  }
 +
    const auto get_closing_status =
        [this]() -> BrowserWindowInterface::ClosingStatus {
      // If `force_skip_warning_user_` is true, then we should immediately
+@@ -172,6 +184,10 @@ void UnloadController::OnWindowClosing() {
+       (browser_type == BrowserWindowInterface::Type::TYPE_APP) ||
+       (browser_type == BrowserWindowInterface::Type::TYPE_APP_POPUP);
+ #endif
++  // uw: a window with shared tabs closes none of them, so Cmd+Shift+T has
++  // nothing of it to bring back.
++  notify_restore_service &=
++      !uw::TabOrganizationController::ClosesNoTabs(browser_);
+ 
+   if (tab_restore_service && notify_restore_service) {
+     tab_restore_service->BrowserClosing(
 diff --git a/tools/metrics/histograms/metadata/profile/enums.xml b/tools/metrics/histograms/metadata/profile/enums.xml
 index 0277245142ca88ca7322c7d9df684f39d21de6b3..f58a358987e3cea6dc340405fb408ac2d0a98ad3 100644
 --- a/tools/metrics/histograms/metadata/profile/enums.xml

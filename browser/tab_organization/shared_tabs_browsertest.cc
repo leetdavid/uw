@@ -1,5 +1,6 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,14 +13,20 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
+#include "components/performance_manager/public/graph/page_node.h"
+#include "components/performance_manager/public/performance_manager.h"
+#include "components/sessions/core/tab_restore_service.h"
+#include "components/sessions/core/tab_restore_types.h"
 #include "components/tab_groups/tab_group_color.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
@@ -28,6 +35,10 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
+#include "ui/base/base_window.h"
 #include "ui/base/window_open_disposition.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/shared_tree.h"
@@ -94,11 +105,49 @@ void SelectByClick(Browser* window, tabs::TabInterface* tab) {
           TabStripUserGestureDetails::GestureType::kMouse));
 }
 
+bool IsOpen(BrowserWindowInterface* window) {
+  return std::ranges::contains(GetAllBrowserWindowInterfaces(), window);
+}
+
 class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
  public:
   SharedTabsBrowserTest() { features_.InitAndEnableFeature(kUwSharedTabs); }
 
+  void SetUpOnMainThread() override {
+    headless::HeadlessModeBrowserTest::SetUpOnMainThread();
+    // A page that counts in its title, as a timer does.
+    embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
+        [](const net::test_server::HttpRequest& request)
+            -> std::unique_ptr<net::test_server::HttpResponse> {
+          auto response =
+              std::make_unique<net::test_server::BasicHttpResponse>();
+          response->set_content_type("text/html");
+          response->set_content(
+              request.relative_url == "/timer"
+                  ? "<title>0</title><script>let n = 0;"
+                    "setInterval(() => document.title = ++n, 1000)</script>"
+                  : "<title>Plain</title>");
+          return response;
+        }));
+    ASSERT_TRUE(embedded_test_server()->Start());
+  }
+
  protected:
+  // Waits until `page` has loaded and gone quiet, from when Memory Saver
+  // counts its title changes out of sight as work, and for one more change.
+  static void WaitUntilAtWork(content::WebContents* page) {
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      base::WeakPtr<performance_manager::PageNode> node = performance_manager::
+          PerformanceManager::GetPrimaryPageNodeForWebContents(page);
+      return node &&
+             node->GetLoadingState() ==
+                 performance_manager::PageNode::LoadingState::kLoadedIdle;
+    }));
+    const std::u16string title = page->GetTitle();
+    ASSERT_TRUE(
+        base::test::RunUntil([&] { return page->GetTitle() != title; }));
+  }
+
   tabs::TabInterface* Open(Browser* window,
                            const char* url,
                            bool select = false) {
@@ -258,7 +307,138 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, PrivateWindowsKeepTheirOwnTabs) {
   EXPECT_FALSE(TabAt(first, kIssues));
 }
 
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ClosingOneOfTwoWindowsClosesNoTab) {
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(), kTypeIntoNotes));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+
+  CloseBrowserSynchronously(first);
+  tabs::TabInterface* kept = TabAt(second, kNotes);
+  ASSERT_TRUE(kept);
+  // The second window took the live page, half-typed input and all.
+  EXPECT_FALSE(TabOrganizationController::IsCopy(kept));
+  EXPECT_EQ("half-typed", content::EvalJs(kept->GetContents(), kNotesInput));
+  // Cmd+Shift+T has no window to bring back.
+  for (const auto& entry :
+       TabRestoreServiceFactory::GetForProfile(profile)->entries()) {
+    EXPECT_NE(entry->type, sessions::tab_restore::WINDOW);
+  }
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       TheLastWindowKeepsItsTabsUntilAnotherShowsThem) {
+  Profile* profile = browser()->GetProfile();
+  // A private window, so the app keeps a window of its own.
+  CreateIncognitoBrowser(profile);
+  Browser* first = browser();
+  Open(first, kMail);
+  content::WebContents* timer = chrome::AddAndReturnTabAt(
+      first, embedded_test_server()->GetURL("/timer"), -1, false);
+  WaitUntilAtWork(timer);
+  const GURL timer_url = timer->GetLastCommittedURL();
+
+  // Closing it hides it. The page doing nothing unloads, and the timer
+  // keeps counting.
+  first->GetWindow()->Close();
+  WorkspaceWindow* kept = WorkspaceWindow::From(first);
+  ASSERT_TRUE(base::test::RunUntil([&] { return kept->keeper(); }));
+  EXPECT_TRUE(IsOpen(first));
+  EXPECT_FALSE(first->GetWindow()->IsVisible());
+  EXPECT_TRUE(TabOrganizationController::IsCopy(TabAt(first, kMail)));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(
+      first->tab_strip_model()->GetTabForWebContents(timer)));
+
+  // A new window on the workspace shows the tabs, takes the timer live, and
+  // the kept window closes.
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !IsOpen(first) && TabAt(second, kMail); }));
+  tabs::TabInterface* counting = nullptr;
+  for (int i = 0; i < second->tab_strip_model()->count(); ++i) {
+    if (second->tab_strip_model()->GetWebContentsAt(i)->GetLastCommittedURL() ==
+        timer_url) {
+      counting = second->tab_strip_model()->GetTabAtIndex(i);
+    }
+  }
+  ASSERT_TRUE(counting);
+  EXPECT_FALSE(TabOrganizationController::IsCopy(counting));
+  // The unloaded page loads again once selected.
+  tabs::TabInterface* mail = TabAt(second, kMail);
+  SelectByClick(second, mail);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(mail) &&
+           mail->GetContents()->GetTitle() == u"Mail";
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       TheLastTabClosesEveryWindowOnTheWorkspace) {
+  Profile* profile = browser()->GetProfile();
+  CreateIncognitoBrowser(profile);
+  Browser* first = browser();
+  // A pin keeps each window's tab strip from emptying.
+  tabs::TabInterface* pin = Open(first, kMail);
+  first->tab_strip_model()->SetTabPinned(
+      first->tab_strip_model()->GetIndexOfTab(pin), true);
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return InStep(first, second) && TabAt(second, kMail) &&
+           second->tab_strip_model()->IndexOfFirstNonPinnedTab() == 1;
+  }));
+
+  // Closing the last tab closes the windows, so they close in one go.
+  TabStripModel* tabs = first->tab_strip_model();
+  const int regular = tabs->count() - tabs->IndexOfFirstNonPinnedTab();
+  for (int i = 0; i < regular; ++i) {
+    tabs->CloseWebContentsAt(tabs->count() - 1,
+                             TabCloseTypes::CLOSE_USER_GESTURE);
+  }
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !IsOpen(first) && !IsOpen(second); }));
+}
+
 class SharedTabsOffBrowserTest : public headless::HeadlessModeBrowserTest {};
+
+// Close Task and Clear leave a blank tab instead of closing a window's last
+// tabs. Pins do not count.
+IN_PROC_BROWSER_TEST_F(SharedTabsOffBrowserTest,
+                       CloseTaskAndClearLeaveABlankTabBesidePins) {
+  Browser* window = browser();
+  TabStripModel* tabs = window->tab_strip_model();
+  TabOrganizationController* controller = ControllerOf(window);
+  content::WebContents* pinned =
+      chrome::AddAndReturnTabAt(window, GURL(kMail), -1, false);
+  ASSERT_TRUE(content::WaitForLoadStop(pinned));
+  tabs->SetTabPinned(tabs->GetIndexOfWebContents(pinned), true);
+  const auto regular = [&] {
+    return tabs->count() - tabs->IndexOfFirstNonPinnedTab();
+  };
+  ASSERT_EQ(regular(), 1);
+
+  const std::optional<PageId> only =
+      controller->IdFor(tabs->GetTabAtIndex(tabs->IndexOfFirstNonPinnedTab()));
+  const std::optional<tab_groups::TabGroupId> task =
+      controller->MoveToNewTask({*only}, u"Trip");
+  ASSERT_TRUE(task);
+  controller->CloseTask(*task);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return regular() == 1 &&
+           !tabs->GetTabAtIndex(tabs->IndexOfFirstNonPinnedTab())->GetGroup();
+  }));
+
+  const content::WebContents* blank =
+      tabs->GetWebContentsAt(tabs->IndexOfFirstNonPinnedTab());
+  controller->ClearScratchpad();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return regular() == 1 &&
+           tabs->GetWebContentsAt(tabs->IndexOfFirstNonPinnedTab()) != blank;
+  }));
+  EXPECT_TRUE(IsOpen(window));
+}
 
 IN_PROC_BROWSER_TEST_F(SharedTabsOffBrowserTest, EachWindowKeepsItsOwnTabs) {
   Browser* first = browser();

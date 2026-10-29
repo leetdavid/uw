@@ -14,6 +14,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
+#include "base/timer/timer.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "ui/gfx/image/image_skia.h"
 #include "uw/components/tab_organization/page_tree.h"
@@ -120,11 +121,30 @@ class SharedTree : public base::RefCounted<SharedTree> {
   // Page `id`'s picture as it last left a window, empty if there is none.
   gfx::ImageSkia PictureOf(const PageId& id) const;
 
+  // Before `from` closes, another window on the workspace takes each live
+  // page `from` holds, so closing it closes no page.
+  void HandOver(TabOrganizationController* from);
+  // While no window shows the workspace, as after its last window closed,
+  // unloads each page that is doing nothing, and looks again each minute at
+  // the ones that were: those Memory Saver keeps for sound, the mini player,
+  // capture, devices, notifications, a title or icon that changes out of
+  // sight, or unsaved input, and busy terminals and tabs the agent works in.
+  void UnloadIdlePages();
+  // Once the workspace has no tab left besides pins, closes every window on
+  // it.
+  void CloseIfEmpty();
+
  private:
   friend class base::RefCounted<SharedTree>;
   ~SharedTree();
 
   void Refresh(const PageId& id);
+  // Unloads page `id` in a window that shows no workspace, now that its
+  // terminal has said whether a command runs in it.
+  void UnloadTerminal(const PageId& id, bool busy);
+  // Whether every window on the tree keeps it for a workspace no window
+  // shows.
+  bool Unseen() const;
   void SetPicture(const PageId& id, gfx::ImageSkia picture);
 
   // The workspace this tree is listed under, empty for a window's own.
@@ -142,6 +162,8 @@ class SharedTree : public base::RefCounted<SharedTree> {
   bool propagating_ = false;
   std::set<PageId> refreshing_;
   std::map<PageId, gfx::ImageSkia> pictures_;
+  bool had_pages_ = false;
+  base::RepeatingTimer unloading_;
   base::WeakPtrFactory<SharedTree> weak_factory_{this};
 };
 
