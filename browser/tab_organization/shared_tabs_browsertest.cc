@@ -11,6 +11,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
@@ -43,6 +44,7 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
@@ -107,6 +109,30 @@ void SelectByClick(Browser* window, tabs::TabInterface* tab) {
 
 bool IsOpen(BrowserWindowInterface* window) {
   return std::ranges::contains(GetAllBrowserWindowInterfaces(), window);
+}
+
+// The window opened since `known` were, or null.
+Browser* NewWindow(const std::vector<BrowserWindowInterface*>& known) {
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    if (!std::ranges::contains(known, window)) {
+      return window->GetBrowserForMigrationOnly();
+    }
+  }
+  return nullptr;
+}
+
+// How many of `window`'s tabs show the new tab page.
+int BlankTabs(Browser* window) {
+  int blank = 0;
+  for (int i = 0; i < window->tab_strip_model()->count(); ++i) {
+    const GURL& url =
+        window->tab_strip_model()->GetWebContentsAt(i)->GetVisibleURL();
+    if (url.SchemeIs("chrome") &&
+        (url.host() == "newtab" || url.host() == "new-tab-page")) {
+      ++blank;
+    }
+  }
+  return blank;
 }
 
 class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
@@ -399,6 +425,132 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   }
   EXPECT_TRUE(
       base::test::RunUntil([&] { return !IsOpen(first) && !IsOpen(second); }));
+}
+
+// Moving a tab to a window of its own, as dragging it out does, opens a
+// window on its workspace that shows it, and the tab keeps its place. Moving
+// it back closes that window.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ATabMovedOutKeepsItsPlaceAndItsWindowClosesAfter) {
+  Browser* first = browser();
+  Open(first, kMail);
+  tabs::TabInterface* issues = Open(first, kIssues);
+  Open(first, kIssue);
+  const std::vector<std::string> before = Layout(first);
+  const PageId id = ControllerOf(first)->IdFor(issues).value();
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+
+  chrome::MoveTabsToNewWindow(
+      first, {first->tab_strip_model()->GetIndexOfTab(issues)});
+  Browser* own = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    own = NewWindow(known);
+    return own && ControllerOf(own)->TabFor(id) && InStep(first, own);
+  }));
+  EXPECT_EQ(Layout(first), before);
+  EXPECT_EQ(own->tab_strip_model()->GetActiveTab(),
+            ControllerOf(own)->TabFor(id));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(own, kIssues)));
+  EXPECT_TRUE(TabOrganizationController::IsCopy(TabAt(first, kIssues)));
+
+  chrome::MoveTabsToExistingWindow(
+      own, first, {own->tab_strip_model()->GetIndexOfTab(TabAt(own, kIssues))});
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !IsOpen(own) && TabAt(first, kIssues) &&
+           !TabOrganizationController::IsCopy(TabAt(first, kIssues));
+  }));
+  EXPECT_EQ(std::ranges::count_if(Layout(first),
+                                  [](const std::string& row) {
+                                    return row.starts_with(
+                                        std::string(kIssues) + " ");
+                                  }),
+            1);
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AWindowUsedForAnotherTabStays) {
+  Browser* first = browser();
+  Open(first, kMail);
+  tabs::TabInterface* issues = Open(first, kIssues);
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::MoveTabsToNewWindow(
+      first, {first->tab_strip_model()->GetIndexOfTab(issues)});
+  Browser* own = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    own = NewWindow(known);
+    return own && TabAt(own, kMail) && InStep(first, own);
+  }));
+
+  SelectByClick(own, TabAt(own, kMail));
+  chrome::MoveTabsToExistingWindow(
+      own, first, {own->tab_strip_model()->GetIndexOfTab(TabAt(own, kIssues))});
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(TabAt(first, kIssues));
+  }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(IsOpen(own));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ATabMovedToAnotherWorkspaceLeavesThisOne) {
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  tabs::TabInterface* mail = Open(first, kMail);
+  Open(first, kIssues);
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(second, kMail) && InStep(first, second); }));
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal = list.Add(
+      "Personal", std::string(list.UnusedIcon()), profile->GetBaseName());
+  BrowserWindowInterface* partner = nullptr;
+  WorkspaceWindow::From(first)->WithPartner(
+      personal,
+      base::BindOnce([](BrowserWindowInterface** partner,
+                        BrowserWindowInterface* opened) { *partner = opened; },
+                     &partner));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return partner && partner->GetTabStripModel()->count() == 1; }));
+
+  chrome::MoveTabsToExistingWindow(
+      first, partner, {first->tab_strip_model()->GetIndexOfTab(mail)});
+  Browser* other = partner->GetBrowserForMigrationOnly();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return TabAt(other, kMail) && !TabAt(first, kMail) && !TabAt(second, kMail);
+  }));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(other, kMail)));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       CmdNOpensTheCommandBarOverABlankTabThatGoesUnused) {
+  Browser* first = browser();
+  Open(first, kMail);
+  std::vector<BrowserWindowInterface*> known = GetAllBrowserWindowInterfaces();
+  chrome::ExecuteCommand(first, IDC_NEW_WINDOW);
+  Browser* fresh = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    fresh = NewWindow(known);
+    return fresh && TabAt(fresh, kMail) && BlankTabs(first) == 1 &&
+           InStep(first, fresh);
+  }));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return CommandBar::From(fresh)->IsShowing(); }));
+
+  // Closed unused, the window takes its blank tab along.
+  CloseBrowserSynchronously(fresh);
+  ASSERT_TRUE(base::test::RunUntil([&] { return BlankTabs(first) == 0; }));
+
+  // So does picking another tab in it.
+  known = GetAllBrowserWindowInterfaces();
+  chrome::ExecuteCommand(first, IDC_NEW_WINDOW);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    fresh = NewWindow(known);
+    return fresh && TabAt(fresh, kMail) && BlankTabs(first) == 1;
+  }));
+  SelectByClick(fresh, TabAt(fresh, kMail));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return BlankTabs(first) == 0 && BlankTabs(fresh) == 0; }));
 }
 
 class SharedTabsOffBrowserTest : public headless::HeadlessModeBrowserTest {};

@@ -192,6 +192,14 @@ CommandBar::CommandBar(BrowserWindowInterface* window)
                base::BindRepeating(&CommandBar::OnSettingChanged,
                                    base::Unretained(this)));
   OnSettingChanged();
+  // A new window on a workspace with tabs opens with the command bar over
+  // its blank tab.
+  if (TabOrganizationController* tabs =
+          TabOrganizationController::From(window)) {
+    requests_ = tabs->ObserveCommandBarRequests(base::BindRepeating(
+        [](BrowserWindowInterface* window) { CommandBar::Open(window); },
+        window));
+  }
 }
 
 CommandBar::~CommandBar() {

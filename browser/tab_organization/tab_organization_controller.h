@@ -272,6 +272,10 @@ class TabOrganizationController : public TabStripModelObserver,
   gfx::ImageSkia PictureOf(const tabs::TabInterface* tab) const;
   base::CallbackListSubscription ObservePictures(
       base::RepeatingClosure callback);
+  // Runs when the window should open its command bar, as a new window on a
+  // workspace with tabs does over its blank tab.
+  base::CallbackListSubscription ObserveCommandBarRequests(
+      base::RepeatingClosure callback);
   bool dragging() const { return dragging_; }
   // The tree's key for the task `group` shows in this window.
   std::string KeyOf(const tab_groups::TabGroupId& group) const;
@@ -328,6 +332,21 @@ class TabOrganizationController : public TabStripModelObserver,
   void BringSelectedPage(bool chosen);
   void OnRevealed(BrowserWindowInterface* window);
   void NotifyPictures();
+  base::WeakPtr<TabOrganizationController> GetWeakPtr();
+  // Closes this window's copies of pages whose tab came here from another
+  // window.
+  void CloseLeaving();
+  // Whether page `id` is a blank tab nothing was opened in yet.
+  bool IsBlank(const PageId& id) const;
+  // Closes the blank tab the window opened with, once the user leaves it
+  // unused: picks another tab, or closes the window.
+  void CloseUnusedBlank(bool closing);
+  // After a drag ends, a window opened during it joins, and the other
+  // windows follow.
+  void SettleDrag();
+  // A window opened for some tabs, and used for no other, closes once they
+  // have all gone to another window.
+  void CloseIfLeft();
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
@@ -377,6 +396,18 @@ class TabOrganizationController : public TabStripModelObserver,
   std::map<tab_groups::TabGroupId, std::string> keys_;
   base::CallbackListSubscription reveals_;
   base::RepeatingClosureList pictures_changed_;
+  base::RepeatingClosureList command_bar_requests_;
+  // This window's copies of pages whose tab came here from another window.
+  // They are no page of this window's, and close.
+  std::set<tabs::TabHandle> leaving_;
+  // The pages this window was opened for by moving their tabs out of
+  // another, until the user picks another tab in it.
+  std::set<PageId> opened_for_;
+  // The tree the window's first tabs left, which puts them back in place.
+  std::optional<PageTree> opened_from_;
+  // The blank tab the window opened with beside its workspace's tabs, while
+  // it may be unused.
+  std::optional<PageId> unused_blank_;
   std::map<tabs::TabHandle, PageId> ids_;
   std::optional<PageId> active_;
   std::optional<PageId> previous_active_;

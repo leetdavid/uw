@@ -28,6 +28,7 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
@@ -147,13 +148,38 @@ void TabOrganizationController::JoinWorkspace() {
     return;
   }
   scoped_refptr<SharedTree> shared = SharedTree::For(workspace->workspace());
+  if (std::ranges::any_of(shared->windows(), [](const auto& window) {
+        return window->dragging();
+      })) {
+    shared->WaitToJoin(this);
+    return;
+  }
+  // A new window on a workspace with tabs, as from Cmd+N, opens with a blank
+  // tab that stays only if used, and with its command bar.
+  std::optional<PageId> blank;
+  if (shared_->tree().pages().size() == 1 && !shared->tree().pages().empty()) {
+    const PageId& only = shared_->tree().pages().front().id;
+    if (shared_->opened().contains(only) && IsBlank(only)) {
+      blank = only;
+    }
+  }
   shared->Merge(*shared_);
   shared_ = std::move(shared);
   shared_->Add(this);
   joined_ = true;
+  unused_blank_ = blank;
+  // A window opened by moving tabs out of another, as by dragging them out,
+  // puts them back in their place in the tree.
+  if (opened_from_) {
+    shared_->tree().Restore(*opened_from_);
+    opened_from_.reset();
+  }
   reveals_ = WorkspaceWindow::ObserveReveals(base::BindRepeating(
       &TabOrganizationController::OnRevealed, base::Unretained(this)));
   Apply();
+  if (blank && !WorkspaceWindow::IsHidden(window_)) {
+    command_bar_requests_.Notify();
+  }
   // A window kept for the workspace's tabs closes once another one shows
   // them. Its live pages go to that window first.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -280,6 +306,60 @@ void TabOrganizationController::NotifyPictures() {
   pictures_changed_.Notify();
 }
 
+base::CallbackListSubscription
+TabOrganizationController::ObserveCommandBarRequests(
+    base::RepeatingClosure callback) {
+  return command_bar_requests_.Add(std::move(callback));
+}
+
+base::WeakPtr<TabOrganizationController>
+TabOrganizationController::GetWeakPtr() {
+  return weak_factory_.GetWeakPtr();
+}
+
+void TabOrganizationController::CloseLeaving() {
+  base::AutoReset<bool> guard(&applying_, true);
+  for (const tabs::TabHandle& handle : leaving_) {
+    const tabs::TabInterface* tab = handle.Get();
+    const int index = tab ? tabs_->GetIndexOfTab(tab) : TabStripModel::kNoTab;
+    if (index != TabStripModel::kNoTab) {
+      tabs_->CloseWebContentsAt(index, TabCloseTypes::CLOSE_NONE);
+    }
+  }
+  leaving_.clear();
+}
+
+bool TabOrganizationController::IsBlank(const PageId& id) const {
+  const tabs::TabInterface* tab = TabFor(id);
+  content::WebContents* page = tab ? tab->GetContents() : nullptr;
+  if (!page || page->GetController().GetEntryCount() > 1) {
+    return false;
+  }
+  const GURL& url = page->GetVisibleURL();
+  return url.is_empty() || url.IsAboutBlank() ||
+         url == GURL(chrome::kChromeUINewTabURL) ||
+         url.host() == chrome::kChromeUINewTabPageHost;
+}
+
+void TabOrganizationController::CloseUnusedBlank(bool closing) {
+  if (!unused_blank_) {
+    return;
+  }
+  tabs::TabInterface* tab = TabFor(*unused_blank_);
+  if (!tab || !IsBlank(*unused_blank_)) {
+    unused_blank_.reset();
+    return;
+  }
+  // It is still the one shown, as after the user picked it again, or the
+  // window's last tab.
+  if ((!closing && tab == tabs_->GetActiveTab()) || tabs_->count() == 1) {
+    return;
+  }
+  unused_blank_.reset();
+  tabs_->CloseWebContentsAt(tabs_->GetIndexOfTab(tab),
+                            TabCloseTypes::CLOSE_NONE);
+}
+
 bool TabOrganizationController::IsCommand(int command) {
   return command >= kNewTask && command <= kLastCommand;
 }
@@ -372,6 +452,7 @@ bool TabOrganizationController::KeepsWindow(BrowserWindowInterface* window) {
       browser_shutdown::IsTryingToQuit()) {
     return false;
   }
+  self->CloseUnusedBlank(/*closing=*/true);
   if (self->shared_->windows().size() > 1) {
     self->shared_->HandOver(self);
     return false;
@@ -1210,6 +1291,14 @@ void TabOrganizationController::EndTabDrag() {
       }
     }
   }
+  // The other windows follow once Chromium has finished the drop.
+  const bool settle = joined_;
+  if (settle) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&TabOrganizationController::SettleDrag,
+                                  weak_factory_.GetWeakPtr()));
+  }
+  CloseIfLeft();
   drag_canceled_ = false;
   drag_carried_.clear();
   drag_before_ = PageTree();
@@ -1219,6 +1308,33 @@ void TabOrganizationController::EndTabDrag() {
         base::BindOnce(&TabOrganizationController::RestoreDragSelection,
                        weak_factory_.GetWeakPtr(), std::move(drag_selection_)));
     drag_selection_.clear();
+  }
+  if (!settle) {
+    ScheduleApply();
+  }
+}
+
+void TabOrganizationController::CloseIfLeft() {
+  if (opened_for_.empty() ||
+      std::ranges::any_of(opened_for_,
+                          [this](const PageId& id) { return TabFor(id); })) {
+    return;
+  }
+  opened_for_.clear();
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<TabOrganizationController> self) {
+                       if (self) {
+                         self->window_->GetWindow()->Close();
+                       }
+                     },
+                     weak_factory_.GetWeakPtr()));
+}
+
+void TabOrganizationController::SettleDrag() {
+  // A window opened during the drag joins now.
+  if (joined_) {
+    shared_->JoinWaiting();
   }
   ScheduleApply();
 }
@@ -1325,6 +1441,19 @@ void TabOrganizationController::OnTabStripModelChanged(
             (selection.reason &
              TabStripModelObserver::CHANGE_REASON_USER_GESTURE) != 0));
   }
+  // A tab that leaves for another window, as in a drag, takes its page along.
+  bool moved_out = false;
+  if (change.type() == TabStripModelChange::kRemoved) {
+    for (const TabStripModelChange::RemovedTab& removed :
+         change.GetRemove()->contents) {
+      const std::optional<PageId> id = IdFor(removed.tab);
+      if (id && removed.remove_reason ==
+                    TabRemovedReason::kInsertedIntoOtherTabStrip) {
+        SharedTree::Depart(removed.tab->GetHandle(), *id, shared_.get());
+        moved_out = true;
+      }
+    }
+  }
   std::set<PageId> moved;
   if (change.type() == TabStripModelChange::kMoved) {
     if (dragging_ && !drag_carried_.empty()) {
@@ -1335,12 +1464,30 @@ void TabOrganizationController::OnTabStripModelChanged(
   }
   Mirror(moved);
   NotifyNativeMoves(moved);
+  // A window opened for a tab closes once the tab moved on to another window,
+  // or, during a drag, once the drag ends.
+  if (moved_out && !dragging_) {
+    CloseIfLeft();
+  }
   if (selection.active_tab_changed()) {
     if (const std::optional<PageId> old = IdFor(selection.old_tab)) {
       previous_active_ = old;
     }
     active_ = IdFor(selection.new_tab);
     Remember(active_);
+    // Picking another tab uses the window for more than the tab it was
+    // opened for, and leaves its blank tab unused.
+    if ((selection.reason &
+         TabStripModelObserver::CHANGE_REASON_USER_GESTURE) &&
+        active_ && !opened_for_.contains(*active_)) {
+      opened_for_.clear();
+    }
+    if (unused_blank_ && active_ != unused_blank_) {
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&TabOrganizationController::CloseUnusedBlank,
+                         weak_factory_.GetWeakPtr(), /*closing=*/false));
+    }
   }
   // A tab strip may not change while it reports a change, so the window
   // joins its workspace, and takes in its tabs, right after.
@@ -1512,11 +1659,44 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   if (joined_ && tabs_->closing_all()) {
     Leave();
   }
+  // A tab that came from another window keeps its page, and this window's
+  // copy of it makes way. A window that opened with such tabs was opened for
+  // them.
+  const bool opening = ids_.empty();
+  for (int i = 0; i < tabs_->count(); ++i) {
+    const tabs::TabInterface* tab = tabs_->GetTabAtIndex(i);
+    if (tab->IsPinned() || ids_.contains(tab->GetHandle())) {
+      continue;
+    }
+    std::optional<SharedTree::Transit> transit =
+        SharedTree::Arrive(tab->GetHandle());
+    if (!transit) {
+      continue;
+    }
+    for (const auto& [handle, id] : ids_) {
+      if (id == transit->page) {
+        leaving_.insert(handle);
+      }
+    }
+    ids_[tab->GetHandle()] = transit->page;
+    if (opening) {
+      opened_for_.insert(transit->page);
+      opened_from_ = std::move(transit->before);
+    }
+  }
+  if (!leaving_.empty()) {
+    std::erase_if(ids_, [this](const auto& entry) {
+      return leaving_.contains(entry.first);
+    });
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&TabOrganizationController::CloseLeaving,
+                                  weak_factory_.GetWeakPtr()));
+  }
   std::set<tabs::TabHandle> live;
   std::vector<Page> strip;
   for (int i = 0; i < tabs_->count(); ++i) {
     const tabs::TabInterface* tab = tabs_->GetTabAtIndex(i);
-    if (tab->IsPinned()) {
+    if (tab->IsPinned() || leaving_.contains(tab->GetHandle())) {
       continue;
     }
     live.insert(tab->GetHandle());

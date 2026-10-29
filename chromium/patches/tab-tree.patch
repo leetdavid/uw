@@ -2331,7 +2331,7 @@ index b35f686251462c443d02dcd284f9b4fc46b610ad..f4e64cf0ee6b540950b665178e635a12
    raw_ptr<views::FlexLayout> flex_layout_ = nullptr;
  
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
-index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..c487c2c5d2bac0fdb4e80253a8232c0c090bb6ba 100644
+index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..20d03cdac04cc19a53e9e12d0bd0a34d7bbd5b8a 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 @@ -84,6 +84,7 @@
@@ -2342,15 +2342,20 @@ index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..c487c2c5d2bac0fdb4e80253a8232c0c
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/public/cpp/window_properties.h"  // nogncheck
-@@ -824,6 +825,13 @@ void TabDragController::EndDrag(EndDragReason reason) {
+@@ -824,6 +825,18 @@ void TabDragController::EndDrag(EndDragReason reason) {
    }
    drag_start_time_.reset();
  
-+  // uw: a cancelled drag's tabs go back to their depths as well.
-+  if (reason != EndDragReason::kComplete && source_context_) {
++  // uw: the window the drag began in ends it too, wherever it ended. A
++  // cancelled drag's tabs go back to their depths as well.
++  if (source_context_) {
 +    if (auto* organizer = uw::TabOrganizationController::From(
 +            source_context_->GetTabStripModel())) {
-+      organizer->CancelTabDrag();
++      if (reason == EndDragReason::kComplete) {
++        organizer->EndTabDrag();
++      } else {
++        organizer->CancelTabDrag();
++      }
 +    }
 +  }
    EndDragImpl(reason != EndDragReason::kComplete && source_context_

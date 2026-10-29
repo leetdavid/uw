@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -79,6 +80,7 @@ class CommandBar : public views::WidgetObserver {
 
   const raw_ptr<BrowserWindowInterface> window_;
   PrefChangeRegistrar setting_;
+  base::CallbackListSubscription requests_;
   std::unique_ptr<Page> contents_;
   base::WeakPtr<WebUIBubbleDialogView> bubble_;
   base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};

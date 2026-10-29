@@ -16,6 +16,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/tab_interface.h"
 #include "ui/gfx/image/image_skia.h"
 #include "uw/components/tab_organization/page_tree.h"
 
@@ -134,6 +135,28 @@ class SharedTree : public base::RefCounted<SharedTree> {
   // it.
   void CloseIfEmpty();
 
+  // A tab that leaves a window for another, as in a drag, keeps its page: the
+  // window it leaves notes it, and the window it reaches takes it.
+  struct Transit {
+    Transit();
+    Transit(const Transit&);
+    Transit& operator=(const Transit&);
+    ~Transit();
+    PageId page;
+    // The tree the tab left, and that tree just before, with the page in
+    // its place.
+    scoped_refptr<SharedTree> from;
+    PageTree before;
+  };
+  static void Depart(const tabs::TabHandle& tab,
+                     const PageId& page,
+                     SharedTree* from);
+  static std::optional<Transit> Arrive(const tabs::TabHandle& tab);
+  // `window` joins once the drag under way on the tree ends, since Chromium
+  // ends a drag when a tab strip gains a tab.
+  void WaitToJoin(TabOrganizationController* window);
+  void JoinWaiting();
+
  private:
   friend class base::RefCounted<SharedTree>;
   ~SharedTree();
@@ -163,6 +186,7 @@ class SharedTree : public base::RefCounted<SharedTree> {
   std::set<PageId> refreshing_;
   std::map<PageId, gfx::ImageSkia> pictures_;
   bool had_pages_ = false;
+  std::vector<base::WeakPtr<TabOrganizationController>> waiting_;
   base::RepeatingTimer unloading_;
   base::WeakPtrFactory<SharedTree> weak_factory_{this};
 };

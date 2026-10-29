@@ -44,6 +44,12 @@ std::map<std::string, SharedTree*>& Trees() {
   return *trees;
 }
 
+std::map<tabs::TabHandle, SharedTree::Transit>& Transits() {
+  static base::NoDestructor<std::map<tabs::TabHandle, SharedTree::Transit>>
+      transits;
+  return *transits;
+}
+
 // What a navigation that started in a copy asked for, to do in the live page
 // instead.
 struct Redo {
@@ -163,6 +169,11 @@ bool AtWork(tabs::TabInterface* tab) {
 }
 
 }  // namespace
+
+SharedTree::Transit::Transit() = default;
+SharedTree::Transit::Transit(const Transit&) = default;
+SharedTree::Transit& SharedTree::Transit::operator=(const Transit&) = default;
+SharedTree::Transit::~Transit() = default;
 
 SharedTree::Step::Step() = default;
 SharedTree::Step::Step(Step&&) = default;
@@ -473,6 +484,43 @@ void SharedTree::CloseIfEmpty() {
             }
           },
           weak_factory_.GetWeakPtr()));
+}
+
+// static
+void SharedTree::Depart(const tabs::TabHandle& tab,
+                        const PageId& page,
+                        SharedTree* from) {
+  Transit transit;
+  transit.page = page;
+  transit.from = from;
+  transit.before = from->tree_;
+  Transits()[tab] = std::move(transit);
+}
+
+// static
+std::optional<SharedTree::Transit> SharedTree::Arrive(
+    const tabs::TabHandle& tab) {
+  const auto found = Transits().find(tab);
+  if (found == Transits().end()) {
+    return std::nullopt;
+  }
+  Transit transit = std::move(found->second);
+  Transits().erase(found);
+  return transit;
+}
+
+void SharedTree::WaitToJoin(TabOrganizationController* window) {
+  waiting_.push_back(window->GetWeakPtr());
+}
+
+void SharedTree::JoinWaiting() {
+  std::vector<base::WeakPtr<TabOrganizationController>> waiting;
+  waiting.swap(waiting_);
+  for (const base::WeakPtr<TabOrganizationController>& window : waiting) {
+    if (window) {
+      window->JoinWorkspace();
+    }
+  }
 }
 
 void SharedTree::SetPicture(const PageId& id, gfx::ImageSkia picture) {
