@@ -127,7 +127,9 @@ The page stops softly at the film: scrolling slowly into the pinned stretch sett
 
 Two small round buttons in dark glass sit in the film's bottom-right corner while it shows: pause and play, and sound on and off. Turning sound on carries on from where the film is.
 
-Open: what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
+The film stops on its end card, and the pause button becomes Replay. A real download link sits exactly over the end card's drawn "Download for Mac", placed as a share of the film's size so it lines up at any width.
+
+Open: phone widths, and "Reduce motion" and browsers without scroll-driven animation.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
