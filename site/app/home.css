@@ -15,7 +15,7 @@ html:has(.home) {
   --dark: #1e1b2e;
   --dark2: #4a4760;
   display: block;
-  overflow: hidden;
+  overflow: clip;
   background: var(--night);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -114,7 +114,7 @@ html:has(.home) {
 
 .home .hero {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   text-align: center;
   background:
     radial-gradient(
@@ -237,10 +237,28 @@ html:has(.home) {
     0 -40px 160px rgba(92, 214, 242, 0.25);
 }
 
+/* The hero window, and the film it becomes as the page scrolls */
+
+.home .track {
+  --z: 1;
+  --film-w: calc(1180px * var(--z));
+  --film-h: calc(var(--film-w) * 0.5625);
+  --pin: max(88px, calc(50svh - var(--film-h) / 2));
+  position: relative;
+  margin-top: 70px;
+}
+
+.home .rest {
+  position: absolute;
+  top: calc(44svh - var(--pin));
+  width: 1px;
+  height: 1px;
+}
+
 .home .scene {
   position: relative;
+  z-index: 2;
   height: 760px;
-  margin-top: 70px;
 }
 
 .home .scene .horizon {
@@ -256,6 +274,139 @@ html:has(.home) {
   width: 1180px;
   margin: 0 auto;
   perspective: 2600px;
+  zoom: var(--z);
+}
+
+.home .film {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 3;
+  width: var(--film-w);
+  aspect-ratio: 16 / 9;
+  translate: -50% 0;
+  border-radius: calc(18px * var(--z));
+  overflow: hidden;
+  opacity: 0;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 -30px 140px rgba(139, 124, 255, 0.55),
+    0 60px 140px rgba(0, 0, 0, 0.6);
+}
+
+.home .film video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home .film .cta {
+  position: absolute;
+  left: 32.34%;
+  top: 63.89%;
+  width: 20.26%;
+  height: 7.96%;
+  border-radius: 999px;
+}
+
+.home .film .controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.home .film button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(20, 17, 40, 0.46);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+    0 6px 18px rgba(20, 17, 40, 0.2);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.home .film button:hover {
+  background: rgba(20, 17, 40, 0.66);
+}
+
+.home .film button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.home .film button:focus-visible,
+.home .film .cta:focus-visible,
+.home .play:focus-visible {
+  outline: 2px solid var(--lilac);
+  outline-offset: 2px;
+}
+
+.home .play {
+  position: absolute;
+  left: calc(50% + 590px * var(--z) - 16px);
+  top: calc(740px * var(--z) - 16px);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px 0 6px;
+  translate: -100% -100%;
+  border-radius: 999px;
+  background: var(--dark);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 8px 24px rgba(30, 27, 46, 0.3);
+  color: #fff;
+  font:
+    600 15px / 1 var(--font-home),
+    sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.home .play i {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9ad5, #b9a6ff 50%, #7fe3f7);
+  color: var(--night);
+}
+
+.home .play svg {
+  width: 13px;
+  height: 13px;
+  margin-left: 2px;
+}
+
+.home .play small {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text2);
+}
+
+.home .shown .stage {
+  visibility: hidden;
+}
+
+.home .shown .film {
+  opacity: 1;
+}
+
+.home .shown .play {
+  display: none;
 }
 
 .home .fade {
@@ -279,7 +430,6 @@ html:has(.home) {
   background: linear-gradient(160deg, var(--tint1), var(--tint2));
   color: var(--dark);
   text-align: left;
-  transform: rotateX(16deg);
   transform-origin: 50% 0;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.35),
@@ -1097,8 +1247,8 @@ html:has(.home) {
 /* Narrower screens */
 
 @media (max-width: 1240px) {
-  .home .stage {
-    zoom: 0.8;
+  .home .track {
+    --z: 0.8;
   }
 
   .home .scene {
@@ -1111,8 +1261,8 @@ html:has(.home) {
 }
 
 @media (max-width: 1000px) {
-  .home .stage {
-    zoom: 0.62;
+  .home .track {
+    --z: 0.62;
   }
 
   .home .scene {
@@ -1152,13 +1302,35 @@ html:has(.home) {
     font-size: 18px;
   }
 
-  .home .stage {
-    zoom: 0.3;
+  .home .track {
+    --z: 0.3;
+    --film-w: 100vw;
+    margin-top: 48px;
   }
 
   .home .scene {
     height: 228px;
-    margin-top: 48px;
+  }
+
+  .home .film {
+    border-radius: 0;
+  }
+
+  .home .film .controls {
+    right: 10px;
+    bottom: 10px;
+    gap: 6px;
+  }
+
+  .home .film button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .home .film button::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
 
   .home .scene .horizon {
@@ -1249,15 +1421,45 @@ html:has(.home) {
     animation: enter-lift 1.6s 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
-  @supports (animation-timeline: scroll()) {
+  @supports (animation-timeline: view()) {
+    .home .track {
+      view-timeline: --film block;
+    }
+
+    .home .track::after {
+      content: "";
+      display: block;
+      height: 140svh;
+    }
+
+    .home .scene {
+      position: sticky;
+      top: var(--pin);
+    }
+
     .home .win {
+      transform: rotateX(16deg);
       animation:
         enter-lift 1.6s 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both,
-        face-viewer linear both;
-      animation-timeline: auto, scroll(root);
+        face-viewer linear both,
+        win-out linear both;
+      animation-timeline: auto, scroll(root), --film;
       animation-range:
         normal,
-        0 60vh;
+        0 calc(60vh / var(--z)),
+        cover calc((100svh - var(--pin)) / var(--z)) cover
+        calc((140svh - var(--pin)) / var(--z));
+    }
+
+    .home .film {
+      animation: film-in linear both;
+      animation-timeline: --film;
+      animation-range: cover calc(100svh - var(--pin)) cover
+        calc(140svh - var(--pin));
+    }
+
+    .home .play {
+      display: none;
     }
   }
 }
@@ -1301,5 +1503,19 @@ html:has(.home) {
 @keyframes face-viewer {
   to {
     transform: rotateX(0deg);
+  }
+}
+
+@keyframes win-out {
+  to {
+    height: 664px;
+    opacity: 0;
+    filter: blur(12px);
+  }
+}
+
+@keyframes film-in {
+  to {
+    opacity: 1;
   }
 }

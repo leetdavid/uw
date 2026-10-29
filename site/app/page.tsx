@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Brew } from "./brew";
 import { Dock } from "./dock";
+import { Film } from "./film";
 import { Filmstrip, type Stop } from "./filmstrip";
 import { Favicon } from "./icons";
 import { Sidebar, type SidebarState } from "./sidebar";
@@ -232,12 +233,9 @@ export default function Home() {
           </div>
           <p className="meta">Apple silicon · macOS 13 or later</p>
         </div>
-        <div className="scene">
-          <div className="horizon" />
-          <div className="stage">
-            <HeroWindow />
-          </div>
-        </div>
+        <Film download={DOWNLOAD}>
+          <HeroWindow />
+        </Film>
         <div className="fade" />
       </section>
 
