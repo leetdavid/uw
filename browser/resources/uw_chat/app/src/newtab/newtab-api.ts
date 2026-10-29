@@ -5,7 +5,12 @@ import {
   NewTabHandlerRemote,
   NewTabPageCallbackRouter,
 } from "uw-chat-mojom";
-import type { NewTabBox, NewTabRow, NewTabSections } from "uw-chat-mojom";
+import type {
+  NewTabBox,
+  NewTabRow,
+  NewTabRunningRow,
+  NewTabSections,
+} from "uw-chat-mojom";
 import { SuggestInventory } from "//resources/mojo/components/omnibox/browser/fusebox_action.mojom-webui.js";
 import {
   InputMethod,
@@ -23,6 +28,7 @@ export type {
   AutocompleteResult,
   NewTabBox,
   NewTabRow,
+  NewTabRunningRow,
   NewTabSections,
 };
 

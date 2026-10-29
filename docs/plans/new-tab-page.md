@@ -38,7 +38,7 @@ Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" an
 - Needs you lists steps oldest first, with Review, which opens the chat at its question, or Open page to sign in.
 - Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it takes it off this page; the Inbox keeps the alert. With the sidebar hidden, Inbox › opens the Inbox by the page's top-left corner, and the sidebar stays hidden.
 - Coming up shows the next three runs. Paused chats are left out.
-- Running plays and pauses the mini player's media from the page.
+- Running plays and pauses the mini player's media from the page. As built, a chat's row says "Working" without its current step, and a terminal's row names the program it runs, such as "Running sleep", since a shell does not say when a command started.
 - Tabs shows the organizer's moves and new tasks of the last hour, three at most, each with Undo, and a line saying whether automatic organization is on or paused, with Pause or Resume. With automatic organization off, the section is left out.
 - Setup lists a provider whose key was rejected, a connector that needs sign-in, an update ready to install, and, before any provider is added, "Add an AI provider".
 - A click on a row opens what it names: a watched page's row opens the page, a chat's row the chat, and a running row goes to its tab.

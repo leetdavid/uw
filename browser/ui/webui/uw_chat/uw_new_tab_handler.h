@@ -12,11 +12,15 @@
 #include "base/scoped_observation.h"
 #include "base/task/cancelable_task_tracker.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
+#include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
+#include "services/media_session/public/cpp/media_position.h"
+#include "services/media_session/public/mojom/media_session.mojom.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_index.h"
@@ -27,6 +31,7 @@
 class Profile;
 
 namespace content {
+class WebContents;
 class WebUI;
 }  // namespace content
 
@@ -37,7 +42,9 @@ namespace uw {
 class UwNewTabHandler : public mojom::NewTabHandler,
                         public ChatAlerts::Observer,
                         public ChatIndex::Observer,
-                        public ScheduledChats::Observer {
+                        public ScheduledChats::Observer,
+                        public PictureInPictureWindowManager::Observer,
+                        public media_session::mojom::MediaSessionObserver {
  public:
   UwNewTabHandler(content::WebUI* web_ui,
                   mojo::PendingRemote<mojom::NewTabPage> page,
@@ -60,6 +67,8 @@ class UwNewTabHandler : public mojom::NewTabHandler,
                const std::string& alert_id) override;
   void ShowInbox() override;
   void ShowScheduled() override;
+  void ShowTab(int32_t tab) override;
+  void PlayOrPause(int32_t tab) override;
 
   // ChatAlerts::Observer:
   void OnAlertsChanged() override;
@@ -67,6 +76,23 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   void OnChatsChanged() override;
   // ScheduledChats::Observer:
   void OnScheduleChanged(const std::string& chat_id) override;
+  // PictureInPictureWindowManager::Observer:
+  void OnEnterPictureInPicture() override;
+  void OnExitPictureInPicture() override;
+  // media_session::mojom::MediaSessionObserver:
+  void MediaSessionInfoChanged(
+      media_session::mojom::MediaSessionInfoPtr info) override;
+  void MediaSessionMetadataChanged(
+      const std::optional<media_session::MediaMetadata>& metadata) override;
+  void MediaSessionActionsChanged(
+      const std::vector<media_session::mojom::MediaSessionAction>& actions)
+      override {}
+  void MediaSessionImagesChanged(
+      const base::flat_map<media_session::mojom::MediaSessionImageType,
+                           std::vector<media_session::MediaImage>>& images)
+      override {}
+  void MediaSessionPositionChanged(
+      const std::optional<media_session::MediaPosition>& position) override;
 
   // How a chat that finished out of sight ended, read from its file.
   struct Ending {
@@ -92,6 +118,13 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   void OnRead(const std::string& chat_id, Ending ending);
   // The row leaves Finished: its alert is seen, or its chat read.
   void Remove(const std::string& chat_id, const std::string& alert_id);
+  // Asks each terminal tab whether a program runs in it, while the page
+  // shows. Shells tell no one when a command starts or ends.
+  void Poll();
+  void OnPolled(std::vector<std::pair<int32_t, std::string>> programs);
+  // Follows the media session of the mini player's video, if it is this
+  // profile's.
+  void WatchVideo();
   // Shows `url` in this tab, as a chat that starts with `start` when given.
   void Become(const GURL& url, std::optional<ChatStart> start);
 
@@ -104,6 +137,18 @@ class UwNewTabHandler : public mojom::NewTabHandler,
   std::map<std::string, std::pair<std::string, std::string>> pages_;
   std::map<std::string, Ending> endings_;
   base::CancelableTaskTracker tracker_;
+  base::RepeatingTimer poll_;
+  // The program each busy terminal tab runs, by the tab's handle.
+  std::map<int32_t, std::string> busy_;
+  base::WeakPtr<content::WebContents> video_;
+  bool playing_ = false;
+  std::u16string video_title_;
+  std::optional<media_session::MediaPosition> position_;
+  mojo::Receiver<media_session::mojom::MediaSessionObserver> video_session_{
+      this};
+  base::ScopedObservation<PictureInPictureWindowManager,
+                          PictureInPictureWindowManager::Observer>
+      pictures_{this};
   base::ScopedObservation<ChatAlerts, ChatAlerts::Observer> alerts_{this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_{this};
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer> schedules_{

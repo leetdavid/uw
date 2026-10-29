@@ -8,28 +8,37 @@
 #include <utility>
 #include <vector>
 
+#include "base/barrier_callback.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_list/tab_list_interface.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/singleton_tabs.h"  // nogncheck
 #include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/media_session.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
+#include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "ui/base/page_transition_types.h"
 #include "uw/browser/agent/chat_file.h"
+#include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
@@ -41,6 +50,7 @@ namespace {
 
 constexpr size_t kFinishedRows = 5;
 constexpr size_t kComingUpRows = 3;
+constexpr base::TimeDelta kPollEvery = base::Seconds(2);
 
 // How the chat file at `path` ended, on the chats' sequence.
 UwNewTabHandler::Ending ReadEnding(const base::FilePath& path,
@@ -94,7 +104,13 @@ UwNewTabHandler::UwNewTabHandler(
     alerts_.Observe(alerts);
     index_.Observe(index);
     schedules_.Observe(chats);
+    pictures_.Observe(PictureInPictureWindowManager::GetInstance());
+    WatchVideo();
     SendSections();
+    poll_.Start(
+        FROM_HERE, kPollEvery,
+        base::BindRepeating(&UwNewTabHandler::Poll, base::Unretained(this)));
+    Poll();
   }
 }
 
@@ -181,6 +197,28 @@ void UwNewTabHandler::ShowScheduled() {
   }
 }
 
+void UwNewTabHandler::ShowTab(int32_t tab) {
+  tabs::TabInterface* shown = tabs::TabHandle(tab).Get();
+  if (shown && shown->GetContents()->GetBrowserContext() == profile()) {
+    GoToTab(shown);
+  }
+}
+
+void UwNewTabHandler::PlayOrPause(int32_t tab) {
+  content::WebContents* contents = video_.get();
+  tabs::TabInterface* shown =
+      contents ? tabs::TabInterface::MaybeGetFromContents(contents) : nullptr;
+  if (!shown || shown->GetHandle().raw_value() != tab) {
+    return;
+  }
+  content::MediaSession* session = content::MediaSession::Get(contents);
+  if (playing_) {
+    session->Suspend(content::MediaSession::SuspendType::kUI);
+  } else {
+    session->Resume(content::MediaSession::SuspendType::kUI);
+  }
+}
+
 void UwNewTabHandler::OnAlertsChanged() {
   SendSections();
 }
@@ -190,6 +228,35 @@ void UwNewTabHandler::OnChatsChanged() {
 }
 
 void UwNewTabHandler::OnScheduleChanged(const std::string& chat_id) {
+  SendSections();
+}
+
+void UwNewTabHandler::OnEnterPictureInPicture() {
+  WatchVideo();
+  SendSections();
+}
+
+void UwNewTabHandler::OnExitPictureInPicture() {
+  WatchVideo();
+  SendSections();
+}
+
+void UwNewTabHandler::MediaSessionInfoChanged(
+    media_session::mojom::MediaSessionInfoPtr info) {
+  playing_ = info && info->playback_state ==
+                         media_session::mojom::MediaPlaybackState::kPlaying;
+  SendSections();
+}
+
+void UwNewTabHandler::MediaSessionMetadataChanged(
+    const std::optional<media_session::MediaMetadata>& metadata) {
+  video_title_ = metadata ? metadata->title : std::u16string();
+  SendSections();
+}
+
+void UwNewTabHandler::MediaSessionPositionChanged(
+    const std::optional<media_session::MediaPosition>& position) {
+  position_ = position;
   SendSections();
 }
 
@@ -321,6 +388,46 @@ void UwNewTabHandler::SendSections() {
   coming_up.resize(std::min(coming_up.size(), kComingUpRows));
   sections->coming_up = std::move(coming_up);
 
+  for (const ChatIndex::Entry& entry : entries) {
+    if (entry.state != ChatIndex::State::kRunning &&
+        !(chats->Running(entry.id) && !chats->Waiting(entry.id))) {
+      continue;
+    }
+    auto row = mojom::NewTabRunningRow::New();
+    row->chat_id = entry.id;
+    row->title = entry.title;
+    row->scheduled = chats->Find(entry.id) != nullptr;
+    sections->running.push_back(std::move(row));
+  }
+  for (const auto& [handle, program] : busy_) {
+    if (tabs::TabInterface* tab = tabs::TabHandle(handle).Get()) {
+      auto row = mojom::NewTabRunningRow::New();
+      row->tab = handle;
+      row->title = base::UTF16ToUTF8(tab->GetContents()->GetTitle());
+      row->program = program;
+      sections->running.push_back(std::move(row));
+    }
+  }
+  content::WebContents* video = video_.get();
+  if (tabs::TabInterface* tab =
+          video ? tabs::TabInterface::MaybeGetFromContents(video) : nullptr) {
+    auto row = mojom::NewTabRunningRow::New();
+    row->tab = tab->GetHandle().raw_value();
+    row->title = base::UTF16ToUTF8(video_title_.empty() ? video->GetTitle()
+                                                        : video_title_);
+    row->favicon = FaviconOf(video);
+    row->video = true;
+    row->playing = playing_;
+    if (position_) {
+      row->position = position_->GetPosition().InSecondsF();
+      row->duration = position_->duration().is_inf()
+                          ? 0
+                          : position_->duration().InSecondsF();
+      row->position_time = base::Time::Now().InMillisecondsFSinceUnixEpoch();
+    }
+    sections->running.push_back(std::move(row));
+  }
+
   page_->OnSections(std::move(sections));
 }
 
@@ -383,6 +490,75 @@ void UwNewTabHandler::Remove(const std::string& chat_id,
     }
   } else if (ChatIndex* index = index_.GetSource()) {
     index->MarkRead(chat_id);
+  }
+}
+
+void UwNewTabHandler::Poll() {
+  if (web_ui_->GetWebContents()->GetVisibility() ==
+      content::Visibility::HIDDEN) {
+    return;
+  }
+  std::vector<tabs::TabInterface*> terminals;
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    if (window->GetProfile() != profile() || IsRunWindow(window)) {
+      continue;
+    }
+    for (tabs::TabInterface* tab :
+         TabListInterface::From(window)->GetAllTabs()) {
+      if (TerminalShell::From(tab->GetContents())) {
+        terminals.push_back(tab);
+      }
+    }
+  }
+  const auto answered = base::BarrierCallback<std::pair<int32_t, std::string>>(
+      terminals.size(),
+      base::BindOnce(&UwNewTabHandler::OnPolled, weak_factory_.GetWeakPtr()));
+  // A terminal that closes before its shell answers counts as idle.
+  for (tabs::TabInterface* tab : terminals) {
+    TerminalShell::From(tab->GetContents())
+        ->GetActivity(mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+            base::BindOnce(
+                [](base::RepeatingCallback<void(
+                       std::pair<int32_t, std::string>)> answered,
+                   int32_t handle, ShellHost::Activity activity) {
+                  answered.Run({handle, activity.program});
+                },
+                answered, tab->GetHandle().raw_value()),
+            ShellHost::Activity()));
+  }
+}
+
+void UwNewTabHandler::OnPolled(
+    std::vector<std::pair<int32_t, std::string>> programs) {
+  std::map<int32_t, std::string> busy;
+  for (auto& [handle, program] : programs) {
+    if (!program.empty()) {
+      busy.emplace(handle, std::move(program));
+    }
+  }
+  if (busy != busy_) {
+    busy_ = std::move(busy);
+    SendSections();
+  }
+}
+
+void UwNewTabHandler::WatchVideo() {
+  content::WebContents* contents =
+      PictureInPictureWindowManager::GetInstance()->GetWebContents();
+  if (contents && contents->GetBrowserContext() != profile()) {
+    contents = nullptr;
+  }
+  if (contents == video_.get() && video_session_.is_bound() == !!contents) {
+    return;
+  }
+  video_session_.reset();
+  playing_ = false;
+  video_title_.clear();
+  position_.reset();
+  video_ = contents ? contents->GetWeakPtr() : nullptr;
+  if (contents) {
+    content::MediaSession::Get(contents)->AddObserver(
+        video_session_.BindNewPipeAndPassRemote());
   }
 }
 

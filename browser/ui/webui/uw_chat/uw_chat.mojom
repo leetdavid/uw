@@ -792,8 +792,30 @@ struct NewTabRow {
   ChatSchedule? schedule;
 };
 
-// The sections of the new tab page that come from chats. See
-// docs/plans/new-tab-page.md.
+// A row of Running: a chat at work, a busy terminal, or the mini player's
+// video.
+struct NewTabRunningRow {
+  // A chat's id, or empty for a tab.
+  string chat_id;
+  // The handle of the terminal's or the video's tab, or 0 for a chat.
+  int32 tab;
+  string title;
+  // The video's site's icon as a data: URL, or empty.
+  string favicon;
+  // A chat that runs on a schedule, so its icon is a clock.
+  bool scheduled;
+  // For a terminal: the program that has it.
+  string program;
+  // For the video: whether it plays, where it was, and how long it lasts, in
+  // seconds, and when it was there, in milliseconds since the Unix epoch.
+  bool video;
+  bool playing;
+  double position;
+  double duration;
+  double position_time;
+};
+
+// The sections of the new tab page. See docs/plans/new-tab-page.md.
 struct NewTabSections {
   // Steps waiting for the user, and sign-ins, oldest first.
   array<NewTabRow> needs_you;
@@ -804,6 +826,8 @@ struct NewTabSections {
   // The next runs, soonest first: three at most of `coming_up_count`.
   array<NewTabRow> coming_up;
   int32 coming_up_count;
+  // Chats at work, then busy terminals, then the video.
+  array<NewTabRunningRow> running;
 };
 
 // Links the new tab page to its handler.
@@ -833,13 +857,17 @@ interface NewTabHandler {
   ShowInbox();
   // Goes to the Scheduled page's tab, or shows it in this tab.
   ShowScheduled();
+  // Goes to the tab with the handle `tab`.
+  ShowTab(int32 tab);
+  // Plays or pauses the mini player's video, in the tab `tab`.
+  PlayOrPause(int32 tab);
 };
 
 // The new tab page.
 interface NewTabPage {
   // The box's state: once the page connects, and again whenever it changes.
   OnBox(NewTabBox box);
-  // Once the page connects, and again whenever a chat or run changes. Never
-  // in a private window.
+  // Once the page connects, and again whenever a chat, a run, a terminal, or
+  // the video changes. Never in a private window.
   OnSections(NewTabSections sections);
 };

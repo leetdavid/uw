@@ -14,14 +14,19 @@ import {
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
 import {
+  Activity,
   ArrowUp,
   ChevronRight,
   Clock,
   Flag,
   Globe,
   Hand,
+  Loader2,
+  Pause,
+  Play,
   Search,
   Terminal as TerminalIcon,
+  Video,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -46,6 +51,7 @@ import {
   type AutocompleteResult,
   type NewTabBox,
   type NewTabRow,
+  type NewTabRunningRow,
   type NewTabSections,
 } from "./newtab-api";
 
@@ -521,6 +527,54 @@ function Section({
 // A row: the page's icon, or a clock, terminal, or chat; its title over what
 // it says; and at the end a time or buttons.
 function Row({
+  chat,
+  tab,
+  favicon,
+  icon: Icon,
+  title,
+  under,
+  onOpen,
+  children,
+}: {
+  chat?: string;
+  tab?: number;
+  favicon: string;
+  icon: LucideIcon | typeof AskIcon;
+  title: string;
+  under: ReactNode;
+  onOpen: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-chat={chat || undefined}
+      data-tab={tab || undefined}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          onOpen();
+        }
+      }}
+      className="group flex h-[52px] cursor-default items-center gap-[11px] border-t border-border pr-2.5 pl-3 text-[13px] whitespace-nowrap outline-none first:border-t-0 hover:bg-accent focus-visible:bg-accent"
+    >
+      {favicon ? (
+        <img src={favicon} alt="" className="size-4 shrink-0" />
+      ) : (
+        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <b className="truncate font-medium">{title}</b>
+        <span className="truncate text-[12.5px] text-muted-foreground">{under}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// A row about a chat or a run of it.
+function ChatRow({
   row,
   under,
   onOpen,
@@ -531,31 +585,17 @@ function Row({
   onOpen: () => void;
   children: ReactNode;
 }) {
-  const Icon = row.page ? Globe : row.trigger ? TerminalIcon : row.scheduled ? Clock : AskIcon;
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      data-chat={row.chatId}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          onOpen();
-        }
-      }}
-      className="group flex h-[52px] cursor-default items-center gap-[11px] border-t border-border pr-2.5 pl-3 text-[13px] whitespace-nowrap outline-none first:border-t-0 hover:bg-accent focus-visible:bg-accent"
+    <Row
+      chat={row.chatId}
+      favicon={row.favicon}
+      icon={row.page ? Globe : row.trigger ? TerminalIcon : row.scheduled ? Clock : AskIcon}
+      title={row.title || "New chat"}
+      under={under}
+      onOpen={onOpen}
     >
-      {row.favicon ? (
-        <img src={row.favicon} alt="" className="size-4 shrink-0" />
-      ) : (
-        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      )}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <b className="truncate font-medium">{row.title || "New chat"}</b>
-        <span className="truncate text-[12.5px] text-muted-foreground">{under}</span>
-      </div>
       {children}
-    </div>
+    </Row>
   );
 }
 
@@ -595,7 +635,7 @@ function NeedsYou({ rows }: { rows: NewTabRow[] }) {
             ? newTabHandler.openPage(row.chatId, row.alertId)
             : newTabHandler.openChat(row.chatId, row.alertId);
         return (
-          <Row key={row.alertId || row.chatId} row={row} under={<Said row={row} />} onOpen={onOpen}>
+          <ChatRow key={row.alertId || row.chatId} row={row} under={<Said row={row} />} onOpen={onOpen}>
             <Button
               variant="secondary"
               size="compact"
@@ -608,16 +648,18 @@ function NeedsYou({ rows }: { rows: NewTabRow[] }) {
             >
               {signIn ? "Open page" : "Review"}
             </Button>
-          </Row>
+          </ChatRow>
         );
       })}
     </Section>
   );
 }
 
+// A 28px button that acts in place, such as × and pause.
+const ICON_BUTTON =
+  "grid size-7 shrink-0 place-items-center rounded-[7px] text-muted-foreground outline-none hover:bg-background hover:text-foreground hover:shadow-[0_1px_3px_rgba(30,27,46,.14)] focus-visible:bg-background [&_svg]:size-[15px]";
+
 function Finished({ rows, count }: { rows: NewTabRow[]; count: number }) {
-  const button =
-    "grid size-7 shrink-0 place-items-center rounded-[7px] text-muted-foreground outline-none hover:bg-background hover:text-foreground hover:shadow-[0_1px_3px_rgba(30,27,46,.14)] focus-visible:bg-background [&_svg]:size-[15px]";
   return (
     <Section
       id="newtab-finished"
@@ -627,7 +669,7 @@ function Finished({ rows, count }: { rows: NewTabRow[]; count: number }) {
       link={{ id: "newtab-inbox", name: "Inbox", onClick: () => newTabHandler.showInbox() }}
     >
       {rows.map((row) => (
-        <Row
+        <ChatRow
           key={row.alertId || row.chatId}
           row={row}
           under={<Said row={row} />}
@@ -658,12 +700,12 @@ function Finished({ rows, count }: { rows: NewTabRow[]; count: number }) {
                 event.stopPropagation();
                 newTabHandler.dismiss(row.chatId, row.alertId);
               }}
-              className={button}
+              className={ICON_BUTTON}
             >
               <X aria-hidden />
             </button>
           </span>
-        </Row>
+        </ChatRow>
       ))}
     </Section>
   );
@@ -683,12 +725,109 @@ function ComingUp({ rows, count }: { rows: NewTabRow[]; count: number }) {
       }}
     >
       {rows.map((row) => (
-        <Row key={row.chatId} row={row} under={comingUpText(row)} onOpen={() => openRow(row)}>
+        <ChatRow key={row.chatId} row={row} under={comingUpText(row)} onOpen={() => openRow(row)}>
           <span className="mt-[9px] shrink-0 self-start text-xs text-muted-foreground tabular-nums">
             {row.time ? rowTime(row.time) : "Trigger"}
           </span>
-        </Row>
+        </ChatRow>
       ))}
+    </Section>
+  );
+}
+
+// "12:41", or "1:02:05" past an hour.
+function mediaTime(seconds: number): string {
+  const whole = Math.floor(seconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const rest = String(whole % 60).padStart(2, "0");
+  return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+}
+
+// The time, each second while `on`.
+function useNow(on: boolean): number {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!on) {
+      return;
+    }
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [on]);
+  return now;
+}
+
+// "Playing · 12:41 of 58:20". A playing video moves on from where the browser
+// last said it was.
+function videoText(row: NewTabRunningRow, now: number): string {
+  const state = row.playing ? "Playing" : "Paused";
+  if (!row.positionTime) {
+    return state;
+  }
+  const moved = row.playing ? (now - row.positionTime) / 1000 : 0;
+  const at = row.duration ? Math.min(row.position + moved, row.duration) : row.position + moved;
+  return `${state} · ${mediaTime(at)}${row.duration ? ` of ${mediaTime(row.duration)}` : ""}`;
+}
+
+function Spinner() {
+  return <Loader2 aria-hidden className="mr-[7px] size-[13px] shrink-0 animate-spin text-muted-foreground" />;
+}
+
+function Running({ rows }: { rows: NewTabRunningRow[] }) {
+  const now = useNow(rows.some((row) => row.video && row.playing));
+  return (
+    <Section id="newtab-running" icon={Activity} name="Running" count={rows.length}>
+      {rows.map((row) =>
+        row.chatId ? (
+          <Row
+            key={row.chatId}
+            chat={row.chatId}
+            favicon=""
+            icon={row.scheduled ? Clock : AskIcon}
+            title={row.title || "New chat"}
+            under="Working"
+            onOpen={() => newTabHandler.openChat(row.chatId, "")}
+          >
+            <Spinner />
+          </Row>
+        ) : !row.video ? (
+          <Row
+            key={row.tab}
+            tab={row.tab}
+            favicon=""
+            icon={TerminalIcon}
+            title={row.title}
+            under={`Running ${row.program}`}
+            onOpen={() => newTabHandler.showTab(row.tab)}
+          >
+            <Spinner />
+          </Row>
+        ) : (
+          <Row
+            key={row.tab}
+            tab={row.tab}
+            favicon={row.favicon}
+            icon={Video}
+            title={row.title}
+            under={videoText(row, now)}
+            onOpen={() => newTabHandler.showTab(row.tab)}
+          >
+            <button
+              type="button"
+              data-play-pause={row.tab}
+              title={row.playing ? "Pause" : "Play"}
+              aria-label={row.playing ? "Pause" : "Play"}
+              onClick={(event) => {
+                event.stopPropagation();
+                newTabHandler.playOrPause(row.tab);
+              }}
+              className={ICON_BUTTON}
+            >
+              {row.playing ? <Pause aria-hidden /> : <Play aria-hidden />}
+            </button>
+          </Row>
+        ),
+      )}
     </Section>
   );
 }
@@ -697,7 +836,7 @@ function ComingUp({ rows, count }: { rows: NewTabRow[]; count: number }) {
 // on by itself on the right. A section with nothing to show is left out.
 function Sections({ sections }: { sections: NewTabSections }) {
   const left = sections.needsYou.length > 0 || sections.finished.length > 0;
-  const right = sections.comingUp.length > 0;
+  const right = sections.comingUp.length > 0 || sections.running.length > 0;
   if (!left && !right) {
     return null;
   }
@@ -710,7 +849,10 @@ function Sections({ sections }: { sections: NewTabSections }) {
         )}
       </div>
       <div className="flex min-w-0 flex-col gap-[18px]">
-        {right && <ComingUp rows={sections.comingUp} count={sections.comingUpCount} />}
+        {sections.comingUp.length > 0 && (
+          <ComingUp rows={sections.comingUp} count={sections.comingUpCount} />
+        )}
+        {sections.running.length > 0 && <Running rows={sections.running} />}
       </div>
     </div>
   );

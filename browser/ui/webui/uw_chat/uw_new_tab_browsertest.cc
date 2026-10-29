@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "base/command_line.h"
+#include "base/environment.h"
 #include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/json/json_writer.h"
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
@@ -29,6 +32,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "media/base/media_switches.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
@@ -42,6 +46,7 @@
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/components/ai_providers/providers.h"
@@ -94,6 +99,13 @@ constexpr char kUntil[] = R"(
 // docs/plans/new-tab-page.md.
 class NewTabBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    HeadlessModeBrowserTest::SetUpCommandLine(command_line);
+    // The mini player's test video has sound. Nobody near the Mac should hear
+    // it.
+    command_line->AppendSwitch(switches::kMuteAudio);
+  }
+
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     host_resolver()->AddRule("fully.test", "127.0.0.1");
@@ -415,6 +427,67 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest,
   EXPECT_TRUE(
       base::test::RunUntil([&] { return ActiveUrl() == GURL(kScheduledUrl); }));
   EXPECT_EQ(browser()->tab_strip_model()->count(), tabs);
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningShowsChatsAndBusyTerminals) {
+  base::ScopedTempDir zdotdir;
+  {
+    base::ScopedAllowBlockingForTesting allow_blocking;
+    ASSERT_TRUE(zdotdir.CreateUniqueTempDir());
+  }
+  // zsh finds none of the user's startup files in an empty folder.
+  base::Environment::Create()->SetVar("ZDOTDIR", zdotdir.GetPath().value());
+  OpenTerminalTabRunning(browser(), "sleep 60");
+  content::WebContents* terminal =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  const std::string chat = ChatFile::NewChatId();
+  index()->Update({chat, "Find a tram day pass", base::Time::Now(),
+                   ChatIndex::State::kRunning});
+
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab, base::StrCat({
+                               "const row = await until(() =>"
+                               "    $('#newtab-running [data-chat=\"",
+                               chat,
+                               "\"]'));"
+                               "return row.textContent.includes('Working');",
+                           })));
+  EXPECT_EQ(true, Run(tab, "return !!(await until(() =>"
+                           "    $('#newtab-running [data-tab]')));"));
+  SaveWindowScreenshot(browser(), "new_tab_page_running");
+  // A click on a busy terminal's row goes to its tab.
+  EXPECT_EQ(true, Run(tab,
+                      "const row = await until(() =>"
+                      "    $('#newtab-running [data-tab]'));"
+                      "if (!row.textContent.includes('Running sleep')) {"
+                      "  return row.textContent;"
+                      "}"
+                      "row.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return browser()->tab_strip_model()->GetActiveWebContents() == terminal;
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningPlaysAndPausesTheMiniPlayer) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL(
+                     "/media/picture-in-picture/window-size.html")));
+  content::WebContents* video =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_EQ(true, content::EvalJs(video, "enterPictureInPicture()"));
+  ASSERT_EQ(true, content::EvalJs(video, "video.play().then(() => true)"));
+
+  content::WebContents* tab = OpenNewTab(browser());
+  EXPECT_EQ(true, Run(tab,
+                      "const row = await until(() =>"
+                      "    $('#newtab-running [data-tab]'));"
+                      "await until(() =>"
+                      "    row.textContent.includes('Playing'));"
+                      "row.querySelector('[data-play-pause]').click();"
+                      "return !!(await until(() =>"
+                      "    row.textContent.includes('Paused')));"));
+  EXPECT_EQ(true, content::EvalJs(video, "video.paused"));
 }
 
 }  // namespace

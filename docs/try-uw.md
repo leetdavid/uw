@@ -192,7 +192,11 @@ Expected result: the tab shows uw's logo and one box, `Search or type an address
 
 Then watch a page with the eye in the address bar and let its first run finish. Ask something in a chat and switch to another tab before it answers. Open a new tab.
 
-Expected result: under the box, Finished lists the run's alert and the chat's answer, newest first, and Coming up lists the watched page's next run. Point at a Finished row and click ×: the row goes, and the Inbox still has the alert. Click a row: the page or chat opens in this tab, or uw switches to the tab that already shows it. Inbox › opens the Inbox, and Scheduled › opens the Scheduled page in this tab. A chat waiting for your approval shows under Needs you, and Review goes to it. The Running, Tabs, and Setup sections are not built yet.
+Expected result: under the box, Finished lists the run's alert and the chat's answer, newest first, and Coming up lists the watched page's next run. Point at a Finished row and click ×: the row goes, and the Inbox still has the alert. Click a row: the page or chat opens in this tab, or uw switches to the tab that already shows it. Inbox › opens the Inbox, and Scheduled › opens the Scheduled page in this tab. A chat waiting for your approval shows under Needs you, and Review goes to it.
+
+Then run `sleep 60` in a terminal tab, play a video in the mini player, and open a new tab.
+
+Expected result: Running lists the terminal as `Running sleep` and the video as `Playing` with its time. The video's button pauses it without leaving the page, and a click on a row goes to its tab. The Tabs and Setup sections are not built yet.
 
 ### Chats
 
