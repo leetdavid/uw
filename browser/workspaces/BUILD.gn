@@ -60,9 +60,18 @@ source_set("prefs") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "workspaces_browsertest.mm" ]
+  sources = [
+    "shared_tabs_spike_browsertest.cc",
+    "workspaces_browsertest.mm",
+  ]
   deps = [
     ":workspaces",
+    "//chrome/browser/performance_manager",
+    "//chrome/browser/sessions",
+    "//chrome/browser/tab_group_sync",
+    "//components/saved_tab_groups/public",
+    "//components/sessions",
+    "//components/tab_groups",
     "//base",
     "//chrome/browser",
     "//chrome/browser/autocomplete",
