@@ -12,6 +12,9 @@ The user asked on 2026-10-29. Dragging a tab out of a window and then into anoth
 
 - A workspace has one [tab tree](../CONTEXT.md#language). Every window showing the workspace shows it: the same tasks, Scratchpad, order, nesting, names, colors, and collapsed tasks and branches.
 - Each window keeps its own selected tab.
+- When one window collapses a task or branch that holds another window's selected tab, it folds there too, but that window's selected tab keeps its row under the folder row until the window selects something else. Its page does not change. Agreed on 2026-10-29.
+- Tab search and the command bar list each tab once. Extensions see every window's copy, as unloaded tabs, the way they see a restored tab not loaded yet. None of the [required extensions](../product.md#required-extensions) lists tabs. Agreed on 2026-10-29.
+- Each window keeps its hidden window for every other workspace switched to in it, as today, so switching back stays instant. Agreed on 2026-10-29.
 - Pins stay shared by every window of the profile, as [Pinned tabs](../product.md#pinned-tabs) says.
 - Private windows keep their own tabs and share none.
 
@@ -55,12 +58,6 @@ Proposed by uw on 2026-10-29, tried in the spike, and chosen by the user the sam
 - uw leaves a closed window out of recently closed.
 
 Rejected on 2026-10-29, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
-
-Open questions for T253:
-
-- Whether extensions, tab search, and the command bar see copies, or uw hides them.
-- What a window shows when another window collapses the task that holds its selected tab. Chromium keeps the selection.
-- Whether a hidden partner closes after a while to save its copies, since closing it loses no tabs.
 
 ## Design
 
