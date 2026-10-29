@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <functional>
 #include <utility>
 
 #include "base/auto_reset.h"
 #include "base/barrier_callback.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -35,17 +37,14 @@
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
 
 constexpr size_t kMaxUndoActions = 100;
-
-std::string TaskOf(const tabs::TabInterface* tab) {
-  const std::optional<tab_groups::TabGroupId> group = tab->GetGroup();
-  return group ? group->ToString() : std::string();
-}
 
 bool Has(const std::vector<PageId>& ids, const PageId& id) {
   return std::ranges::find(ids, id) != ids.end();
@@ -69,6 +68,7 @@ TabOrganizationController::TabOrganizationController(
     : HiddenTabs(window->GetUnownedUserDataHost()),
       window_(window),
       tabs_(window->GetTabStripModel()),
+      shared_(base::MakeRefCounted<SharedTree>()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
   tabs_->AddObserver(this);
   Mirror({});
@@ -78,6 +78,146 @@ TabOrganizationController::TabOrganizationController(
 
 TabOrganizationController::~TabOrganizationController() {
   tabs_->RemoveObserver(this);
+  if (joined_) {
+    shared_->Remove(this);
+  }
+}
+
+const PageTree& TabOrganizationController::tree() const {
+  return shared_->tree();
+}
+
+std::string TabOrganizationController::TaskOf(
+    const tabs::TabInterface* tab) const {
+  const std::optional<tab_groups::TabGroupId> group = tab->GetGroup();
+  return group ? KeyOf(*group) : std::string();
+}
+
+std::string TabOrganizationController::KeyOf(
+    const tab_groups::TabGroupId& group) const {
+  const auto key = keys_.find(group);
+  return key == keys_.end() ? group.ToString() : key->second;
+}
+
+// static
+std::string TabOrganizationController::TaskKey(
+    BrowserWindowInterface* window,
+    const tab_groups::TabGroupId& group) {
+  const TabOrganizationController* self = From(window);
+  return self ? self->KeyOf(group) : group.ToString();
+}
+
+void TabOrganizationController::JoinWorkspace() {
+  const WorkspaceWindow* workspace = WorkspaceWindow::From(window_);
+  if (joined_ || !base::FeatureList::IsEnabled(kUwSharedTabs) ||
+      tabs_->closing_all() || !workspace || workspace->workspace().empty()) {
+    return;
+  }
+  scoped_refptr<SharedTree> shared = SharedTree::For(workspace->workspace());
+  shared->Merge(*shared_);
+  shared_ = std::move(shared);
+  shared_->Add(this);
+  joined_ = true;
+  reveals_ = WorkspaceWindow::ObserveReveals(base::BindRepeating(
+      &TabOrganizationController::OnRevealed, base::Unretained(this)));
+  Apply();
+}
+
+void TabOrganizationController::Leave() {
+  shared_->Remove(this);
+  shared_ = base::MakeRefCounted<SharedTree>();
+  joined_ = false;
+  reveals_ = {};
+}
+
+void TabOrganizationController::Follow() {
+  if (dragging_ || tabs_->closing_all()) {
+    return;
+  }
+  if (observing_) {
+    ScheduleOwnApply();
+    return;
+  }
+  Apply();
+}
+
+std::optional<tab_groups::TabGroupVisualData>
+TabOrganizationController::VisualsOf(const std::string& task) const {
+  const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
+  if (!group) {
+    return std::nullopt;
+  }
+  return *tabs_->group_model()->GetTabGroup(*group)->visual_data();
+}
+
+void TabOrganizationController::SetTaskVisuals(
+    const std::string& task,
+    const tab_groups::TabGroupVisualData& visuals) {
+  const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
+  if (!group ||
+      *tabs_->group_model()->GetTabGroup(*group)->visual_data() == visuals) {
+    return;
+  }
+  base::AutoReset<bool> guard(&applying_, true);
+  tabs_->ChangeTabGroupVisuals(*group, visuals, /*is_customized=*/true);
+}
+
+std::unique_ptr<content::WebContents> TabOrganizationController::ReplacePage(
+    tabs::TabInterface* tab,
+    std::unique_ptr<content::WebContents> page) {
+  base::AutoReset<bool> guard(&applying_, true);
+  return tabs_->DiscardWebContents(tab->GetContents(), std::move(page));
+}
+
+// static
+bool TabOrganizationController::IsCopy(const tabs::TabInterface* tab) {
+  return tab && SharedTree::IsCopy(tab->GetContents());
+}
+
+void TabOrganizationController::BringLivePage(tabs::TabInterface* tab) {
+  const std::optional<PageId> id = IdFor(tab);
+  if (joined_ && id) {
+    shared_->BringLivePage(this, *id);
+  }
+}
+
+void TabOrganizationController::BringSelectedPage(bool chosen) {
+  tabs::TabInterface* tab = tabs_->GetActiveTab();
+  const std::optional<PageId> id = IdFor(tab);
+  if (!joined_ || !id || !IsCopy(tab) || WorkspaceWindow::IsHidden(window_)) {
+    return;
+  }
+  const TabOrganizationController* holder = shared_->HolderOf(*id, this);
+  if (!chosen && holder && !WorkspaceWindow::IsHidden(holder->window_)) {
+    return;
+  }
+  shared_->BringLivePage(this, *id);
+}
+
+// A window that comes to the front with a copy selected shows the live page,
+// unless another shown window holds it.
+void TabOrganizationController::OnRevealed(BrowserWindowInterface* window) {
+  if (window == window_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&TabOrganizationController::BringSelectedPage,
+                       weak_factory_.GetWeakPtr(), /*chosen=*/false));
+  }
+}
+
+gfx::ImageSkia TabOrganizationController::PictureOf(
+    const tabs::TabInterface* tab) const {
+  const std::optional<PageId> id = IdFor(tab);
+  return id ? shared_->PictureOf(*id) : gfx::ImageSkia();
+}
+
+base::CallbackListSubscription TabOrganizationController::ObservePictures(
+    base::RepeatingClosure callback) {
+  return pictures_changed_.Add(std::move(callback));
+}
+
+void TabOrganizationController::NotifyPictures() {
+  pictures_changed_.Notify();
 }
 
 bool TabOrganizationController::IsCommand(int command) {
@@ -176,7 +316,7 @@ bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
         {*page}, l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK));
     // The user made the task, so it opens ready for its name.
     if (task) {
-      self->RenameOnItsRow(task->ToString());
+      self->RenameOnItsRow(self->KeyOf(*task));
     }
   }
   return true;
@@ -199,11 +339,11 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
   if (source) {
     if (const std::optional<PageId> parent =
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
-      self->tree_.SetParent(*id, *parent);
+      self->shared_->tree().SetParent(*id, *parent);
     }
   } else if (const std::optional<PageId>& beside =
                  self->active_ == id ? self->previous_active_ : self->active_) {
-    self->tree_.OpenBeside(*id, *beside);
+    self->shared_->tree().OpenBeside(*id, *beside);
   }
   self->RevealSelected();
   self->ScheduleApply();
@@ -234,18 +374,18 @@ void TabOrganizationController::RestoreTab(
     self->restored_parents_[PageId(*id)] = PageId(*parent);
   }
   if (state->FindBool("collapsed").value_or(false)) {
-    self->collapsed_.insert(PageId(*id));
+    self->shared_->collapsed().insert(PageId(*id));
   }
   if (state->FindBool("kept").value_or(false)) {
-    self->kept_[PageId(*id)] = TaskOf(tab);
+    self->shared_->kept()[PageId(*id)] = self->TaskOf(tab);
   }
   if (state->FindBool("held").value_or(false) && parent && !parent->empty()) {
-    self->held_[PageId(*id)] = PageId(*parent);
+    self->shared_->held()[PageId(*id)] = PageId(*parent);
   }
   const std::string* task_name = state->FindString("task_name");
   if (task_name && tab->GetGroup()) {
-    self->generated_names_.try_emplace(TaskOf(tab),
-                                       base::UTF8ToUTF16(*task_name));
+    self->shared_->generated_names().try_emplace(self->TaskOf(tab),
+                                                 base::UTF8ToUTF16(*task_name));
   }
   self->Mirror({});
   self->ScheduleApply();
@@ -271,7 +411,7 @@ tabs::TabInterface* TabOrganizationController::TabFor(const PageId& id) const {
 
 int TabOrganizationController::DepthFor(const tabs::TabInterface* tab) const {
   const std::optional<PageId> id = IdFor(tab);
-  return id ? tree_.DepthOf(*id) : 0;
+  return id ? shared_->tree().DepthOf(*id) : 0;
 }
 
 std::vector<PageId> TabOrganizationController::SelectionFor(
@@ -327,18 +467,20 @@ bool TabOrganizationController::CanExecute(
       return tabs_->SupportsTabGroups();
     case kScratchpad:
       return std::ranges::any_of(roots, [this](const PageId& id) {
-        const Page* page = tree_.Find(id);
+        const Page* page = shared_->tree().Find(id);
         return !page->task.empty() || !page->parent.value().empty();
       });
     case kNest:
-      return roots.size() == 1 && tree_.PreviousSibling(roots.front());
+      return roots.size() == 1 &&
+             shared_->tree().PreviousSibling(roots.front());
     case kOutdent:
       return roots.size() == 1 &&
-             !tree_.Find(roots.front())->parent.value().empty();
+             !shared_->tree().Find(roots.front())->parent.value().empty();
     case kMoveUp:
-      return roots.size() == 1 && tree_.PreviousSibling(roots.front());
+      return roots.size() == 1 &&
+             shared_->tree().PreviousSibling(roots.front());
     case kMoveDown:
-      return roots.size() == 1 && tree_.NextSibling(roots.front());
+      return roots.size() == 1 && shared_->tree().NextSibling(roots.front());
     case kCloseBranch:
       return !Parents(ids).empty();
     case kToggleBranch:
@@ -402,12 +544,12 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::MoveToNewTask(
   const std::string task = tab_groups::TabGroupId::GenerateNew().ToString();
   Record(roots, task);
   LeaveBehind(roots, staying);
-  tree_.MoveToNewTask(roots.front(), task);
+  shared_->tree().MoveToNewTask(roots.front(), task);
   for (size_t i = 1; i < roots.size(); ++i) {
-    tree_.MoveToTask(roots[i], task);
+    shared_->tree().MoveToTask(roots[i], task);
   }
   if (origin == Origin::kOrganizer) {
-    generated_names_[task] = title;
+    shared_->generated_names()[task] = title;
   }
   pending_tasks_[task] = {std::move(title), std::nullopt};
   Apply();
@@ -422,14 +564,14 @@ bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
                                            Origin origin,
                                            const std::vector<PageId>& staying) {
   const std::vector<PageId> roots = Roots(ids);
-  const std::string task = group.ToString();
+  const std::string task = KeyOf(group);
   if (roots.empty() || !GroupFor(task)) {
     return false;
   }
   Record(roots, task);
   LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
-    tree_.MoveToTask(root, task);
+    shared_->tree().MoveToTask(root, task);
   }
   Apply();
   if (origin == Origin::kUser) {
@@ -449,7 +591,7 @@ bool TabOrganizationController::MoveToScratchpad(
   Record(roots, std::string());
   LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
-    tree_.MoveToTask(root, std::string());
+    shared_->tree().MoveToTask(root, std::string());
   }
   Apply();
   if (origin == Origin::kUser) {
@@ -469,22 +611,22 @@ bool TabOrganizationController::ApplyTidy(const std::vector<TidyMove>& moves) {
   Record(tops, std::nullopt);
   std::map<std::u16string, std::string> started;
   for (const TidyMove& move : moves) {
-    if (!tree_.Find(move.top)) {
+    if (!shared_->tree().Find(move.top)) {
       continue;
     }
     LeaveBehind({move.top}, move.staying);
     if (!move.target.task.empty()) {
-      tree_.MoveToTask(move.top, move.target.task);
+      shared_->tree().MoveToTask(move.top, move.target.task);
       continue;
     }
     auto [task, fresh] = started.try_emplace(move.target.new_task);
     if (!fresh) {
-      tree_.MoveToTask(move.top, task->second);
+      shared_->tree().MoveToTask(move.top, task->second);
       continue;
     }
     task->second = tab_groups::TabGroupId::GenerateNew().ToString();
-    tree_.MoveToNewTask(move.top, task->second);
-    generated_names_[task->second] = move.target.new_task;
+    shared_->tree().MoveToNewTask(move.top, task->second);
+    shared_->generated_names()[task->second] = move.target.new_task;
     pending_tasks_[task->second] = {move.target.new_task, std::nullopt};
   }
   Apply();
@@ -493,11 +635,11 @@ bool TabOrganizationController::ApplyTidy(const std::vector<TidyMove>& moves) {
 
 bool TabOrganizationController::Nest(const PageId& id) {
   Record({id});
-  if (!tree_.Nest(id)) {
+  if (!shared_->tree().Nest(id)) {
     undo_.pop_back();
     return false;
   }
-  held_[id] = tree_.Find(id)->parent;
+  shared_->held()[id] = shared_->tree().Find(id)->parent;
   Apply();
   NotifyManualMove({id});
   return true;
@@ -505,8 +647,8 @@ bool TabOrganizationController::Nest(const PageId& id) {
 
 void TabOrganizationController::OpenChild(const PageId& id) {
   if (const std::optional<PageId> page = OpenBlankTab(id)) {
-    tree_.OpenUnder(*page, id);
-    held_[*page] = id;
+    shared_->tree().OpenUnder(*page, id);
+    shared_->held()[*page] = id;
     RevealSelected();
     ScheduleApply();
     ScheduleUpdate();
@@ -515,7 +657,7 @@ void TabOrganizationController::OpenChild(const PageId& id) {
 
 void TabOrganizationController::OpenBelow(const PageId& id) {
   if (const std::optional<PageId> page = OpenBlankTab(id)) {
-    tree_.OpenBeside(*page, id);
+    shared_->tree().OpenBeside(*page, id);
     ScheduleApply();
     ScheduleUpdate();
   }
@@ -535,7 +677,7 @@ std::optional<PageId> TabOrganizationController::OpenBlankTab(
 
 bool TabOrganizationController::Outdent(const PageId& id) {
   Record({id});
-  if (!tree_.Outdent(id)) {
+  if (!shared_->tree().Outdent(id)) {
     undo_.pop_back();
     return false;
   }
@@ -546,7 +688,7 @@ bool TabOrganizationController::Outdent(const PageId& id) {
 
 bool TabOrganizationController::MoveUp(const PageId& id) {
   Record({id});
-  if (!tree_.MoveUp(id)) {
+  if (!shared_->tree().MoveUp(id)) {
     undo_.pop_back();
     return false;
   }
@@ -557,7 +699,7 @@ bool TabOrganizationController::MoveUp(const PageId& id) {
 
 bool TabOrganizationController::MoveDown(const PageId& id) {
   Record({id});
-  if (!tree_.MoveDown(id)) {
+  if (!shared_->tree().MoveDown(id)) {
     undo_.pop_back();
     return false;
   }
@@ -569,7 +711,7 @@ bool TabOrganizationController::MoveDown(const PageId& id) {
 void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
   std::vector<PageId> closing;
   for (const PageId& root : Roots(ids)) {
-    const std::vector<PageId> branch = tree_.BranchOf(root);
+    const std::vector<PageId> branch = shared_->tree().BranchOf(root);
     closing.insert(closing.end(), branch.begin(), branch.end());
   }
   Close(std::move(closing));
@@ -578,7 +720,7 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
 void TabOrganizationController::FindClearable(
     base::OnceCallback<void(std::vector<PageId>)> done) const {
   std::vector<PageId> pages;
-  for (const Page& page : tree_.pages()) {
+  for (const Page& page : shared_->tree().pages()) {
     if (page.task.empty() && !IsKept(page.id)) {
       pages.push_back(page.id);
     }
@@ -625,7 +767,7 @@ void TabOrganizationController::ClearScratchpad() {
         }
         // A tab may have moved or been kept while the shells answered.
         std::erase_if(ids, [&self](const PageId& id) {
-          const Page* page = self->tree_.Find(id);
+          const Page* page = self->shared_->tree().Find(id);
           return !page || !page->task.empty() || self->IsKept(id);
         });
         if (ids.empty()) {
@@ -699,17 +841,21 @@ void TabOrganizationController::PlaceInTask(
         task, tab_groups::TabGroupVisualData(visuals->title(), visuals->color(),
                                              /*is_collapsed=*/false));
   }
-  tree_.MoveToTask(*id, task.ToString());
+  shared_->tree().MoveToTask(*id, KeyOf(task));
   RevealSelected();
   ScheduleApply();
   ScheduleUpdate();
 }
 
+bool TabOrganizationController::IsCollapsed(const PageId& id) const {
+  return shared_->collapsed().contains(id);
+}
+
 bool TabOrganizationController::IsHidden(const PageId& id) const {
-  const Page* page = tree_.Find(id);
-  for (const Page* up = page ? tree_.Find(page->parent) : nullptr; up;
-       up = tree_.Find(up->parent)) {
-    if (collapsed_.contains(up->id)) {
+  const Page* page = shared_->tree().Find(id);
+  for (const Page* up = page ? shared_->tree().Find(page->parent) : nullptr; up;
+       up = shared_->tree().Find(up->parent)) {
+    if (shared_->collapsed().contains(up->id)) {
       return true;
     }
   }
@@ -726,14 +872,14 @@ bool TabOrganizationController::CollapsesBranches(
   const std::vector<PageId> parents = Parents(ids);
   return parents.empty() ||
          std::ranges::any_of(parents, [this](const PageId& id) {
-           return !collapsed_.contains(id);
+           return !shared_->collapsed().contains(id);
          });
 }
 
 bool TabOrganizationController::IsKept(const PageId& id) const {
-  const auto kept = kept_.find(id);
-  const Page* page = tree_.Find(id);
-  return kept != kept_.end() && page && page->task == kept->second;
+  const auto kept = shared_->kept().find(id);
+  const Page* page = shared_->tree().Find(id);
+  return kept != shared_->kept().end() && page && page->task == kept->second;
 }
 
 bool TabOrganizationController::KeepsTabs(
@@ -745,22 +891,22 @@ bool TabOrganizationController::KeepsTabs(
 void TabOrganizationController::ToggleKept(const std::vector<PageId>& ids) {
   if (KeepsTabs(ids)) {
     for (const PageId& id : ids) {
-      if (const Page* page = tree_.Find(id)) {
-        kept_[id] = page->task;
+      if (const Page* page = shared_->tree().Find(id)) {
+        shared_->kept()[id] = page->task;
       }
     }
   } else {
     for (const PageId& id : ids) {
-      kept_.erase(id);
+      shared_->kept().erase(id);
     }
   }
   ScheduleUpdate();
 }
 
 bool TabOrganizationController::IsHeld(const PageId& id) const {
-  const auto held = held_.find(id);
-  const Page* page = tree_.Find(id);
-  return held != held_.end() && page && page->parent == held->second;
+  const auto held = shared_->held().find(id);
+  const Page* page = shared_->tree().Find(id);
+  return held != shared_->held().end() && page && page->parent == held->second;
 }
 
 void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
@@ -770,16 +916,17 @@ void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
   }
   if (!CollapsesBranches(ids)) {
     for (const PageId& id : parents) {
-      collapsed_.erase(id);
+      shared_->collapsed().erase(id);
     }
   } else {
-    collapsed_.insert(parents.begin(), parents.end());
+    shared_->collapsed().insert(parents.begin(), parents.end());
     const std::optional<PageId> selected = IdFor(tabs_->GetActiveTab());
     if (selected && IsHidden(*selected)) {
       PageId top;
-      for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
-           up = tree_.Find(up->parent)) {
-        if (collapsed_.contains(up->id)) {
+      for (const Page* up =
+               shared_->tree().Find(shared_->tree().Find(*selected)->parent);
+           up; up = shared_->tree().Find(up->parent)) {
+        if (shared_->collapsed().contains(up->id)) {
           top = up->id;
         }
       }
@@ -792,15 +939,16 @@ void TabOrganizationController::ToggleBranches(const std::vector<PageId>& ids) {
 
 bool TabOrganizationController::SelectTask(const std::string& task) {
   const auto in_task = [&](const PageId& id) {
-    const Page* page = tree_.Find(id);
+    const Page* page = shared_->tree().Find(id);
     return page && page->task == task;
   };
   auto page = std::ranges::find_if(recent_, in_task);
   std::optional<PageId> target;
   if (page != recent_.end()) {
     target = *page;
-  } else if (auto first = std::ranges::find(tree_.pages(), task, &Page::task);
-             first != tree_.pages().end()) {
+  } else if (auto first =
+                 std::ranges::find(shared_->tree().pages(), task, &Page::task);
+             first != shared_->tree().pages().end()) {
     target = first->id;
   }
   tabs::TabInterface* tab = target ? TabFor(*target) : nullptr;
@@ -813,7 +961,7 @@ bool TabOrganizationController::SelectTask(const std::string& task) {
 
 void TabOrganizationController::Remember(const std::optional<PageId>& id) {
   std::erase_if(recent_, [&](const PageId& page) {
-    return page == id || !tree_.Find(page);
+    return page == id || !shared_->tree().Find(page);
   });
   if (id) {
     recent_.insert(recent_.begin(), *id);
@@ -859,9 +1007,9 @@ void TabOrganizationController::Undo() {
   }
   Snapshot snapshot = std::move(undo_.back());
   undo_.pop_back();
-  const PageTree before = tree_;
-  tree_.Restore(snapshot.tree);
-  for (const std::string& task : tree_.Tasks()) {
+  const PageTree before = shared_->tree();
+  shared_->tree().Restore(snapshot.tree);
+  for (const std::string& task : shared_->tree().Tasks()) {
     const auto visuals = snapshot.tasks.find(task);
     if (!GroupFor(task) && visuals != snapshot.tasks.end()) {
       pending_tasks_[task] = {std::u16string(), visuals->second};
@@ -870,7 +1018,7 @@ void TabOrganizationController::Undo() {
   Apply();
   // A restored placement counts as the user's own.
   std::vector<PageId> restored;
-  for (const Page& page : tree_.pages()) {
+  for (const Page& page : shared_->tree().pages()) {
     const Page* earlier = before.Find(page.id);
     if (earlier &&
         (earlier->task != page.task || earlier->parent != page.parent)) {
@@ -887,7 +1035,7 @@ void TabOrganizationController::BeginTabDrag(bool alone) {
   drag_alone_ = alone;
   drag_selection_.clear();
   drag_carried_.clear();
-  drag_before_ = tree_;
+  drag_before_ = shared_->tree();
   drag_x_.reset();
   drag_levels_ = 0;
 }
@@ -900,7 +1048,7 @@ std::vector<tabs::TabInterface*> TabOrganizationController::DraggedTabs(
     if (!id || drag_alone_) {
       continue;
     }
-    for (const PageId& page : tree_.BranchOf(*id)) {
+    for (const PageId& page : shared_->tree().BranchOf(*id)) {
       if (tabs::TabInterface* in_branch = TabFor(page)) {
         dragged.insert(in_branch);
       }
@@ -960,15 +1108,15 @@ void TabOrganizationController::EndTabDrag() {
   }
   dragging_ = false;
   if (drag_canceled_) {
-    tree_.Restore(drag_before_);
+    shared_->tree().Restore(drag_before_);
     ScheduleUpdate();
   } else {
     for (const PageId& id : drag_carried_) {
-      const Page* now = tree_.Find(id);
+      const Page* now = shared_->tree().Find(id);
       const Page* then = drag_before_.Find(id);
       if (now && then && !now->parent.value().empty() &&
           now->parent != then->parent && !drag_carried_.contains(now->parent)) {
-        held_[id] = now->parent;
+        shared_->held()[id] = now->parent;
       }
     }
   }
@@ -1027,7 +1175,7 @@ void TabOrganizationController::NameTask(const std::string& task,
   }
   const tab_groups::TabGroupVisualData* visuals =
       tabs_->group_model()->GetTabGroup(*group)->visual_data();
-  generated_names_[task] = title;
+  shared_->generated_names()[task] = title;
   tabs_->ChangeTabGroupVisuals(
       *group, tab_groups::TabGroupVisualData(title, visuals->color(),
                                              visuals->is_collapsed()));
@@ -1036,8 +1184,8 @@ void TabOrganizationController::NameTask(const std::string& task,
 
 bool TabOrganizationController::HasGeneratedName(
     const std::string& task) const {
-  const auto generated = generated_names_.find(task);
-  return generated != generated_names_.end() &&
+  const auto generated = shared_->generated_names().find(task);
+  return generated != shared_->generated_names().end() &&
          generated->second == TaskTitle(task);
 }
 
@@ -1052,7 +1200,7 @@ void TabOrganizationController::NameAutomatically(const std::string& task) {
   if (!HasManualName(task)) {
     return;
   }
-  generated_names_[task] = TaskTitle(task);
+  shared_->generated_names()[task] = TaskTitle(task);
   ScheduleUpdate();
 }
 
@@ -1070,8 +1218,25 @@ void TabOrganizationController::OnTabStripModelChanged(
     TabStripModel*,
     const TabStripModelChange& change,
     const TabStripSelectionChange& selection) {
+  if (joined_ && tabs_->closing_all()) {
+    Leave();
+  }
   if (applying_) {
     return;
+  }
+  base::AutoReset<bool> observing(&observing_, true);
+  // A copy the user selects shows the live page. One selected otherwise, as
+  // after the selected tab closed, does so only when no shown window holds it.
+  if (selection.active_tab_changed() &&
+      selection.reason != TabStripModelObserver::CHANGE_REASON_REPLACED &&
+      IsCopy(selection.new_tab)) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            &TabOrganizationController::BringSelectedPage,
+            weak_factory_.GetWeakPtr(),
+            (selection.reason &
+             TabStripModelObserver::CHANGE_REASON_USER_GESTURE) != 0));
   }
   std::set<PageId> moved;
   if (change.type() == TabStripModelChange::kMoved) {
@@ -1090,6 +1255,14 @@ void TabOrganizationController::OnTabStripModelChanged(
     active_ = IdFor(selection.new_tab);
     Remember(active_);
   }
+  // A tab strip may not change while it reports a change, so the window
+  // joins its workspace, and takes in its tabs, right after.
+  if (!joined_ && change.type() == TabStripModelChange::kInserted &&
+      base::FeatureList::IsEnabled(kUwSharedTabs)) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&TabOrganizationController::JoinWorkspace,
+                                  weak_factory_.GetWeakPtr()));
+  }
   ScheduleApply();
 }
 
@@ -1098,14 +1271,30 @@ void TabOrganizationController::OnTabPinnedStateChanged(tabs::TabInterface*,
   if (applying_) {
     return;
   }
+  base::AutoReset<bool> observing(&observing_, true);
   Mirror({});
   ScheduleApply();
 }
 
 void TabOrganizationController::OnTabGroupChanged(
     const TabGroupChange& change) {
-  if (change.type == TabGroupChange::kVisualsChanged) {
-    ScheduleUpdate();
+  if (change.type != TabGroupChange::kVisualsChanged) {
+    return;
+  }
+  if (joined_ && !applying_ &&
+      tabs_->group_model()->ContainsTabGroup(change.group)) {
+    shared_->SetVisuals(
+        this, KeyOf(change.group),
+        *tabs_->group_model()->GetTabGroup(change.group)->visual_data());
+  }
+  ScheduleUpdate();
+}
+
+void TabOrganizationController::OnTabChangedAt(tabs::TabInterface* tab,
+                                               TabChangeType) {
+  const std::optional<PageId> id = IdFor(tab);
+  if (joined_ && !applying_ && id && !IsCopy(tab)) {
+    shared_->ScheduleRefresh(*id);
   }
 }
 
@@ -1118,6 +1307,7 @@ void TabOrganizationController::TabGroupedStateChanged(
   if (applying_) {
     return;
   }
+  base::AutoReset<bool> observing(&observing_, true);
   std::set<PageId> moved;
   if (dragging_ && !drag_carried_.empty()) {
     moved = drag_carried_;
@@ -1133,6 +1323,7 @@ void TabOrganizationController::OnSplitTabChanged(const SplitTabChange&) {
   if (applying_) {
     return;
   }
+  base::AutoReset<bool> observing(&observing_, true);
   Mirror({});
   ScheduleApply();
 }
@@ -1154,7 +1345,7 @@ void TabOrganizationController::NotifyManualMove(
     const std::vector<PageId>& roots) {
   std::vector<PageId> moved;
   for (const PageId& root : roots) {
-    const std::vector<PageId> branch = tree_.BranchOf(root);
+    const std::vector<PageId> branch = shared_->tree().BranchOf(root);
     moved.insert(moved.end(), branch.begin(), branch.end());
   }
   manual_moves_.Notify(moved);
@@ -1163,13 +1354,13 @@ void TabOrganizationController::NotifyManualMove(
 std::vector<PageId> TabOrganizationController::Roots(
     const std::vector<PageId>& ids) const {
   std::vector<PageId> roots;
-  for (const Page& page : tree_.pages()) {
+  for (const Page& page : shared_->tree().pages()) {
     if (!Has(ids, page.id)) {
       continue;
     }
     bool covered = false;
-    for (const Page* up = tree_.Find(page.parent); up && !covered;
-         up = tree_.Find(up->parent)) {
+    for (const Page* up = shared_->tree().Find(page.parent); up && !covered;
+         up = shared_->tree().Find(up->parent)) {
       covered = Has(ids, up->id);
     }
     if (!covered) {
@@ -1183,7 +1374,7 @@ std::vector<PageId> TabOrganizationController::Parents(
     const std::vector<PageId>& ids) const {
   std::vector<PageId> parents = Roots(ids);
   std::erase_if(parents, [this](const PageId& id) {
-    return tree_.BranchOf(id).size() < 2;
+    return shared_->tree().BranchOf(id).size() < 2;
   });
   return parents;
 }
@@ -1193,9 +1384,10 @@ void TabOrganizationController::RevealSelected() {
   if (!selected || !IsHidden(*selected)) {
     return;
   }
-  for (const Page* up = tree_.Find(tree_.Find(*selected)->parent); up;
-       up = tree_.Find(up->parent)) {
-    collapsed_.erase(up->id);
+  for (const Page* up =
+           shared_->tree().Find(shared_->tree().Find(*selected)->parent);
+       up; up = shared_->tree().Find(up->parent)) {
+    shared_->collapsed().erase(up->id);
   }
 }
 
@@ -1204,11 +1396,11 @@ void TabOrganizationController::LeaveBehind(
     const std::vector<PageId>& staying) {
   const auto inside = [&](const PageId& id) {
     return std::ranges::any_of(roots, [&](const PageId& root) {
-      return root != id && Has(tree_.BranchOf(root), id);
+      return root != id && Has(shared_->tree().BranchOf(root), id);
     });
   };
   for (const PageId& id : staying) {
-    while (inside(id) && tree_.Outdent(id)) {
+    while (inside(id) && shared_->tree().Outdent(id)) {
     }
   }
 }
@@ -1220,7 +1412,7 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::GroupFor(
   }
   for (const tab_groups::TabGroupId& group :
        tabs_->group_model()->ListTabGroups()) {
-    if (group.ToString() == task) {
+    if (KeyOf(group) == task) {
       return group;
     }
   }
@@ -1245,28 +1437,32 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   }
   std::erase_if(
       ids_, [&live](const auto& entry) { return !live.contains(entry.first); });
-  Drop drop{.collapsed = collapsed_};
+  Drop drop{.collapsed = shared_->collapsed()};
   if (dragging_ && !drag_carried_.empty()) {
     drop.levels = drag_levels_;
     drop.before = &drag_before_;
   }
-  tree_.Adopt(strip, moved, drop);
-  std::erase_if(opened_, [this](const PageId& id) { return !tree_.Find(id); });
+  shared_->tree().Adopt(strip, moved, drop);
+  std::erase_if(opened_,
+                [this](const PageId& id) { return !shared_->tree().Find(id); });
   LinkRestoredPages();
   RevealSelected();
   ScheduleUpdate();
+  if (joined_) {
+    shared_->Propagate(this);
+  }
 }
 
 void TabOrganizationController::LinkRestoredPages() {
   for (auto it = restored_parents_.begin(); it != restored_parents_.end();) {
-    const Page* child = tree_.Find(it->first);
-    const Page* parent = tree_.Find(it->second);
+    const Page* child = shared_->tree().Find(it->first);
+    const Page* parent = shared_->tree().Find(it->second);
     if (child && !parent) {
       ++it;
       continue;
     }
     if (child && child->task == parent->task) {
-      tree_.SetParent(it->first, it->second);
+      shared_->tree().SetParent(it->first, it->second);
     }
     it = restored_parents_.erase(it);
   }
@@ -1278,15 +1474,54 @@ void TabOrganizationController::Apply() {
   }
   {
     base::AutoReset<bool> guard(&applying_, true);
+    base::WeakPtr<TabOrganizationController> self = weak_factory_.GetWeakPtr();
+    ApplyCopies();
+    // Closing a window's last tab closes the window.
+    if (!self || tabs_->empty()) {
+      return;
+    }
     ApplyTasks();
     ApplyOrder();
   }
   Mirror({});
 }
 
+void TabOrganizationController::ApplyCopies() {
+  if (!joined_) {
+    return;
+  }
+  std::vector<int> gone;
+  for (const auto& [handle, id] : ids_) {
+    const tabs::TabInterface* tab = handle.Get();
+    if (tab && !shared_->tree().Find(id)) {
+      gone.push_back(tabs_->GetIndexOfTab(tab));
+    }
+  }
+  std::ranges::sort(gone, std::greater<>());
+  for (int index : gone) {
+    tabs_->CloseWebContentsAt(index, TabCloseTypes::CLOSE_NONE);
+  }
+  for (const Page& page : shared_->tree().pages()) {
+    if (TabFor(page.id)) {
+      continue;
+    }
+    content::WebContents* source = shared_->PageOf(page.id, this);
+    if (!source) {
+      continue;
+    }
+    std::unique_ptr<content::WebContents> copy = SharedTree::MakeCopy(source);
+    content::WebContents* added = copy.get();
+    tabs_->InsertWebContentsAt(tabs_->count(), std::move(copy),
+                               AddTabTypes::ADD_NONE);
+    if (const tabs::TabInterface* tab = tabs_->GetTabForWebContents(added)) {
+      ids_[tab->GetHandle()] = page.id;
+    }
+  }
+}
+
 void TabOrganizationController::ApplyTasks() {
   std::vector<int> ungroup;
-  for (const Page& page : tree_.pages()) {
+  for (const Page& page : shared_->tree().pages()) {
     const tabs::TabInterface* tab = TabFor(page.id);
     if (tab && page.task.empty() && tab->GetGroup()) {
       ungroup.push_back(tabs_->GetIndexOfTab(tab));
@@ -1297,9 +1532,9 @@ void TabOrganizationController::ApplyTasks() {
     tabs_->RemoveFromGroup(ungroup);
   }
 
-  for (const std::string& task : tree_.Tasks()) {
+  for (const std::string& task : shared_->tree().Tasks()) {
     std::vector<int> indices;
-    for (const Page& page : tree_.pages()) {
+    for (const Page& page : shared_->tree().pages()) {
       const tabs::TabInterface* tab = TabFor(page.id);
       if (tab && page.task == task && TaskOf(tab) != task) {
         indices.push_back(tabs_->GetIndexOfTab(tab));
@@ -1315,6 +1550,18 @@ void TabOrganizationController::ApplyTasks() {
     }
     const auto pending = pending_tasks_.find(task);
     const std::optional<base::Token> token = base::Token::FromString(task);
+    if (joined_ && (pending == pending_tasks_.end() || !token)) {
+      // A window following a task another window made makes a group of its
+      // own, keyed to the task, with the look the other window gave it. Tab
+      // group ids must differ between windows.
+      const tab_groups::TabGroupId group = tabs_->AddToNewGroup(indices);
+      keys_.insert_or_assign(group, task);
+      if (const std::optional<tab_groups::TabGroupVisualData> visuals =
+              shared_->VisualsOf(task, this)) {
+        tabs_->ChangeTabGroupVisuals(group, *visuals, /*is_customized=*/true);
+      }
+      continue;
+    }
     if (pending == pending_tasks_.end() || !token) {
       continue;
     }
@@ -1339,7 +1586,7 @@ void TabOrganizationController::ApplyOrder() {
     }
   }
   int next = tabs_->IndexOfFirstNonPinnedTab();
-  for (const std::string& task : tree_.Tasks()) {
+  for (const std::string& task : shared_->tree().Tasks()) {
     const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
     if (!group) {
       continue;
@@ -1348,7 +1595,7 @@ void TabOrganizationController::ApplyOrder() {
     if (static_cast<int>(native->ListTabs().start()) != next) {
       tabs_->MoveGroupTo(*group, next);
     }
-    for (const Page& page : tree_.pages()) {
+    for (const Page& page : shared_->tree().pages()) {
       const tabs::TabInterface* tab = TabFor(page.id);
       if (!tab || page.task != task || tab->GetGroup() != group) {
         continue;
@@ -1362,7 +1609,7 @@ void TabOrganizationController::ApplyOrder() {
     }
     next = static_cast<int>(native->ListTabs().end());
   }
-  for (const Page& page : tree_.pages()) {
+  for (const Page& page : shared_->tree().pages()) {
     const tabs::TabInterface* tab = TabFor(page.id);
     if (!tab || !page.task.empty() || tab->GetGroup()) {
       continue;
@@ -1377,6 +1624,15 @@ void TabOrganizationController::ApplyOrder() {
 }
 
 void TabOrganizationController::ScheduleApply() {
+  // The other windows follow at once, so none of them reads its strip back
+  // into the tree before it has caught up.
+  if (joined_) {
+    shared_->Propagate(this);
+  }
+  ScheduleOwnApply();
+}
+
+void TabOrganizationController::ScheduleOwnApply() {
   if (apply_pending_) {
     return;
   }
@@ -1396,7 +1652,7 @@ void TabOrganizationController::ApplyWhenIdle() {
 
 void TabOrganizationController::Record(const std::vector<PageId>& roots,
                                        std::optional<std::string> task) {
-  Snapshot snapshot{tree_, {}, {}, std::move(task)};
+  Snapshot snapshot{shared_->tree(), {}, {}, std::move(task)};
   if (const tabs::TabInterface* tab =
           roots.empty() ? nullptr : TabFor(roots.front())) {
     snapshot.tab = tab->GetContents()->GetTitle();
@@ -1405,7 +1661,7 @@ void TabOrganizationController::Record(const std::vector<PageId>& roots,
     for (const tab_groups::TabGroupId& group :
          tabs_->group_model()->ListTabGroups()) {
       snapshot.tasks.emplace(
-          group.ToString(),
+          KeyOf(group),
           *tabs_->group_model()->GetTabGroup(group)->visual_data());
     }
   }
@@ -1416,6 +1672,14 @@ void TabOrganizationController::Record(const std::vector<PageId>& roots,
 }
 
 void TabOrganizationController::ScheduleUpdate() {
+  if (joined_) {
+    shared_->Touch();
+    return;
+  }
+  ScheduleOwnUpdate();
+}
+
+void TabOrganizationController::ScheduleOwnUpdate() {
   if (update_pending_) {
     return;
   }
@@ -1427,30 +1691,35 @@ void TabOrganizationController::ScheduleUpdate() {
 
 void TabOrganizationController::Update() {
   update_pending_ = false;
+  if (tabs_->SupportsTabGroups()) {
+    std::erase_if(keys_, [this](const auto& entry) {
+      return !tabs_->group_model()->ContainsTabGroup(entry.first);
+    });
+  }
   Profile* profile = window_->GetProfile();
   SessionService* service = profile->IsOffTheRecord()
                                 ? nullptr
                                 : SessionServiceFactory::GetForProfile(profile);
-  std::erase_if(generated_names_,
+  std::erase_if(shared_->generated_names(),
                 [this](const auto& entry) { return !GroupFor(entry.first); });
   // A restored parent keeps its collapse until its children are linked.
-  std::erase_if(collapsed_, [this](const PageId& id) {
-    return tree_.BranchOf(id).size() < 2 &&
+  std::erase_if(shared_->collapsed(), [this](const PageId& id) {
+    return shared_->tree().BranchOf(id).size() < 2 &&
            !std::ranges::any_of(
                restored_parents_,
                [&](const auto& link) { return link.second == id; });
   });
   // A kept tab the user moved to another task or to the Scratchpad is let go.
-  std::erase_if(kept_,
+  std::erase_if(shared_->kept(),
                 [this](const auto& entry) { return !IsKept(entry.first); });
   // A held tab the user moved, or whose parent closed, is let go. A restored
   // one waits until it is linked to its parent.
-  std::erase_if(held_, [this](const auto& entry) {
+  std::erase_if(shared_->held(), [this](const auto& entry) {
     return !IsHeld(entry.first) && !restored_parents_.contains(entry.first);
   });
   std::map<PageId, std::string> states;
   for (const auto& [handle, id] : ids_) {
-    const Page* page = tree_.Find(id);
+    const Page* page = shared_->tree().Find(id);
     const tabs::TabInterface* tab = handle.Get();
     content::WebContents* contents = tab ? tab->GetContents() : nullptr;
     if (!page || !contents) {
@@ -1459,7 +1728,7 @@ void TabOrganizationController::Update() {
     base::DictValue state;
     state.Set("id", id.value());
     state.Set("parent", page->parent.value());
-    if (collapsed_.contains(id)) {
+    if (shared_->collapsed().contains(id)) {
       state.Set("collapsed", true);
     }
     if (IsKept(id)) {
@@ -1469,7 +1738,7 @@ void TabOrganizationController::Update() {
       state.Set("held", true);
     }
     if (HasGeneratedName(page->task)) {
-      state.Set("task_name", generated_names_[page->task]);
+      state.Set("task_name", shared_->generated_names()[page->task]);
     }
     std::string& json = states[id];
     json = base::WriteJson(state).value_or(std::string());

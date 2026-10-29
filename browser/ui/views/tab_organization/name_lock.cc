@@ -99,12 +99,12 @@ void NameLock::Refresh() {
   const TabOrganizationController* controller = Controller();
   SetVisible(controller && !prefs_.IsEmpty() &&
              prefs_.prefs()->GetBoolean(kOrganizationEnabledPref) &&
-             controller->HasManualName(group_.ToString()));
+             controller->HasManualName(controller->KeyOf(group_)));
 }
 
 void NameLock::HandBack() {
   if (TabOrganizationController* controller = Controller()) {
-    controller->NameAutomatically(group_.ToString());
+    controller->NameAutomatically(controller->KeyOf(group_));
   }
 }
 
@@ -144,7 +144,9 @@ void NamingSpinner::Refresh() {
   BrowserView* window = WindowOf(this);
   const AutomaticOrganizer* organizer =
       window ? AutomaticOrganizer::From(window->browser()) : nullptr;
-  const bool naming = organizer && organizer->IsNaming(group_.ToString());
+  const bool naming =
+      organizer && organizer->IsNaming(TabOrganizationController::TaskKey(
+                       window->browser(), group_));
   SetVisible(naming);
   if (naming) {
     Start();

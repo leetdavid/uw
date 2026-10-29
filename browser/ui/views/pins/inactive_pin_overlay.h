@@ -19,11 +19,11 @@ namespace uw {
 
 class HazeView;
 
-// Covers the page of a window whose selected pin has its live page in another
-// window, per the design frame "Pins: the live page in another window": a
-// blurred, dimmed picture of the page as it left, with "Open here" in the
-// middle. A click anywhere on it brings the live page here. Owned by
-// EmbedderBrowserWindowFeatures.
+// Covers the page of a window whose selected pin, or selected shared tab, has
+// its live page in another window, per the design frame "Pins: the live page
+// in another window": a blurred, dimmed picture of the page as it left, with
+// "Open here" in the middle. A click anywhere on it brings the live page
+// here. Owned by EmbedderBrowserWindowFeatures.
 class InactivePinOverlay : public TabStripModelObserver,
                            public views::ViewObserver {
  public:
@@ -59,6 +59,7 @@ class InactivePinOverlay : public TabStripModelObserver,
   views::ViewTracker haze_;
   base::ScopedObservation<views::View, views::ViewObserver> contents_{this};
   base::CallbackListSubscription pictures_;
+  base::CallbackListSubscription tab_pictures_;
   ui::ScopedUnownedUserData<InactivePinOverlay> user_data_;
 };
 

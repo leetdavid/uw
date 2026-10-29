@@ -170,7 +170,7 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kNameTask:
       AutomaticOrganizer::From(window)->AskForName(
-          SelectedTask(window)->ToString());
+          TabOrganizationController::TaskKey(window, *SelectedTask(window)));
       break;
     case kConfirmSuggestion:
       AutomaticOrganizer::From(window)->AcceptSuggestion();

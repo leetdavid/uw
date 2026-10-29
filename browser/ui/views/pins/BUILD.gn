@@ -1,5 +1,5 @@
 # A pin's right-click menu rows, its Edit Home URL card, and the hazed view
-# over a pin whose live page is in another window.
+# over a pin or shared tab whose live page is in another window.
 source_set("pins") {
   sources = [
     "home_url_card.cc",
@@ -30,6 +30,7 @@ source_set("pins") {
     "//ui/menus",
     "//url",
     "//uw/browser/pins",
+    "//uw/browser/tab_organization",
     "//uw/browser/ui/look",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/workspaces",

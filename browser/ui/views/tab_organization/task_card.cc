@@ -185,7 +185,8 @@ TaskCard::TaskCard(BrowserWindowInterface* window,
   if (organizer && organizer->CanAskForName()) {
     add(kNameId, vector_icons::kButtonMagicIcon, IDS_UW_NAME_TASK_MAC,
         &TaskCard::Name, 0)
-        ->SetEnabled(!organizer->IsNaming(group.ToString()));
+        ->SetEnabled(!organizer->IsNaming(
+            TabOrganizationController::TaskKey(window, group)));
   }
   AddColors();
   AddChildView(MakeMenuCardSeparator());
@@ -225,7 +226,7 @@ void TaskCard::AddColors() {
 void TaskCard::Rename() {
   TabOrganizationController* controller =
       TabOrganizationController::From(window_);
-  const std::string task = group_.ToString();
+  const std::string task = TabOrganizationController::TaskKey(window_, group_);
   base::WeakPtr<views::Widget> widget = GetWidget()->GetWeakPtr();
   CloseCard(widget);
   if (controller) {
@@ -235,7 +236,7 @@ void TaskCard::Rename() {
 
 void TaskCard::Name() {
   AutomaticOrganizer* organizer = AutomaticOrganizer::From(window_);
-  const std::string task = group_.ToString();
+  const std::string task = TabOrganizationController::TaskKey(window_, group_);
   base::WeakPtr<views::Widget> widget = GetWidget()->GetWeakPtr();
   CloseCard(widget);
   if (organizer) {
@@ -283,7 +284,7 @@ void TaskCard::MoveToNewWindow() {
 void TaskCard::MoveToScratchpad() {
   TabOrganizationController* controller =
       TabOrganizationController::From(window_);
-  const std::string task = group_.ToString();
+  const std::string task = TabOrganizationController::TaskKey(window_, group_);
   base::WeakPtr<views::Widget> widget = GetWidget()->GetWeakPtr();
   if (controller) {
     std::vector<PageId> pages;

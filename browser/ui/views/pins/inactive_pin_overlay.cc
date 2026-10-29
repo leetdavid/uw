@@ -38,6 +38,7 @@
 #include "uw/browser/pins/pin_pages.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
@@ -258,6 +259,11 @@ InactivePinOverlay::InactivePinOverlay(BrowserView* browser_view)
     pictures_ = pages->ObservePictures(base::BindRepeating(
         &InactivePinOverlay::Update, base::Unretained(this)));
   }
+  if (TabOrganizationController* tabs =
+          TabOrganizationController::From(browser_view_->browser())) {
+    tab_pictures_ = tabs->ObservePictures(base::BindRepeating(
+        &InactivePinOverlay::Update, base::Unretained(this)));
+  }
 }
 
 InactivePinOverlay::~InactivePinOverlay() {
@@ -304,8 +310,9 @@ void InactivePinOverlay::Update() {
       browser_view_->browser()->tab_strip_model()->GetActiveTab();
   const PinStore::Pin* pin =
       PinSync::IsPlaceholder(tab) ? PinSync::PinFor(tab) : nullptr;
+  const bool copy = !pin && TabOrganizationController::IsCopy(tab);
   ContentsContainerView* container =
-      pin ? browser_view_->GetActiveContentsContainerView() : nullptr;
+      pin || copy ? browser_view_->GetActiveContentsContainerView() : nullptr;
   HazeView* view = haze();
   if (!container) {
     if (view) {
@@ -325,14 +332,23 @@ void InactivePinOverlay::Update() {
     contents_.Observe(container->contents_view());
   }
   view->SetBoundsRect(container->contents_view()->bounds());
-  view->SetPicture(PinPages::For(browser_view_->browser()->GetProfile())
-                       ->PictureOf(pin->id));
+  view->SetPicture(
+      pin ? PinPages::For(browser_view_->browser()->GetProfile())
+                ->PictureOf(pin->id)
+          : TabOrganizationController::From(browser_view_->browser())
+                ->PictureOf(tab));
   view->SetVisible(true);
 }
 
 void InactivePinOverlay::BringPage() {
-  PinSync::BringLivePage(
-      browser_view_->browser()->tab_strip_model()->GetActiveTab());
+  tabs::TabInterface* tab =
+      browser_view_->browser()->tab_strip_model()->GetActiveTab();
+  if (PinSync::IsPlaceholder(tab)) {
+    PinSync::BringLivePage(tab);
+  } else if (TabOrganizationController* tabs =
+                 TabOrganizationController::From(browser_view_->browser())) {
+    tabs->BringLivePage(tab);
+  }
 }
 
 }  // namespace uw

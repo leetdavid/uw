@@ -46,16 +46,26 @@ The user asked on 2026-10-29. Dragging a tab out of a window and then into anoth
 
 - The first launch merges each workspace's windows into its tree, front window first. Each window's tasks and Scratchpad tabs join it with their nesting. Two tasks with the same name stay separate. Nothing closes, and each window keeps its selected tab.
 
-## How it could work
+## How it works
 
-Proposed by uw on 2026-10-29, tried in the spike, and chosen by the user the same day.
+The user chose copies in each window's tab list on 2026-10-29, after the spike. uw chose the rest for T253 the same day.
 
-- Each window's Chromium tab list holds every tab of its workspace. One window holds a tab's live page and the others hold placeholders, as `PinSync` does for pins with `TabStripModel::DiscardWebContents`.
+- A workspace's tree is a `SharedTree` in `browser/tab_organization`: the page tree, collapsed branches, kept and held tabs, and the names uw gave tasks. Each window's `TabOrganizationController` mirrors its tab strip into it and applies it back, as it did with a tree of its own.
+- A window joins its workspace's tree when its first tab arrives, once its workspace is known, and its own tabs go after the workspace's. Private windows, and every window while the switch is off, keep a tree of their own.
+- When one window changes the tree, every other window on the workspace follows at once. It opens a copy of each page it lacks, closes its tabs for pages that left, and puts its strip in the tree's order and tasks. Windows do not follow during a drag, since Chromium ends a drag when a tab strip gains a tab; the window that drags brings them up to date when the drag ends.
+- Each window keeps its own tab groups and keys each to the tree's task, so one task has a different group id in each window. A rename, a color, or a fold in one window reaches the others.
+- A copy is a page with the live page's history and no renderer, as a pin's placeholder is (`page_copy`). Selecting a copy by click or key moves the live page into it with `TabStripModel::DiscardWebContents` and leaves a copy behind. A copy selected any other way, as after the selected tab closed, takes the live page only when no shown window holds it. A navigation that starts in a copy, such as Reload, runs in the live page instead. Copies take the live page's history, title, and icon a moment after it changes them. `InactivePinOverlay` draws the hazed view over a selected copy.
+- Until T256, a closing window leaves the tree first, so closing it closes no tab in another window. Its live pages go with it, and their copies load from their history when selected.
 - Switching workspace still swaps the window, per [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md). Each hidden partner holds its own workspace's tabs.
-- One page tree and one organizer per workspace, copied into each window's tab groups and indents. A copy moves a task as a whole before it places single tabs, or the task splits.
-- A new window shows first and fills with copies after, the selected tab first: 100 copies take about 0.6 s.
-- Unloading asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, and adds uw's own cases. The spike found it answers for a page in no window, and never unloads a copy.
-- uw leaves a closed window out of recently closed.
+
+Still to build, from the spike:
+
+- One organizer per workspace (T255). A copy moves a task as a whole before it places single tabs, or the task splits.
+- A new window that shows first and fills with copies after, the selected tab first: 100 copies take about 0.6 s.
+- Unloading that asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, plus uw's own cases (T256). The spike found it answers for a page in no window, and never unloads a copy.
+- Leaving a closed window out of recently closed (T256).
+- The pin tests that unpin in one of two windows expect the other window to lose a tab. With shared tabs the unpinned page becomes a regular tab and shows in both, so T254 updates them.
+- A window expands a collapsed branch that hides its own selected tab whenever it reads its strip again, which can undo a fold another window made. T258 keeps the selected row instead, for branches as for tasks.
 
 Rejected on 2026-10-29, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
 

@@ -1139,7 +1139,7 @@ void AutomaticOrganizer::Apply(Request request,
     return;
   }
   // From here on the request is about the page in the task it started.
-  request.task = task->ToString();
+  request.task = controller_->KeyOf(*task);
   request.parent = PageId();
   Send(std::move(request), std::move(client), &AutomaticOrganizer::OnName);
 }

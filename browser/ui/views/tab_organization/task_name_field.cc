@@ -90,7 +90,8 @@ void TaskNameField::Start() {
   if (BrowserView* window = WindowOf(this)) {
     if (AutomaticOrganizer* organizer =
             AutomaticOrganizer::From(window->browser())) {
-      organizer->DropAskedName(group_.ToString());
+      organizer->DropAskedName(
+          TabOrganizationController::TaskKey(window->browser(), group_));
     }
     expand_lock_ = window->tab_strip_view()->GetExpandOnHoverLock(
         ExpandOnHoverLockType::kKeepExpanded);
@@ -115,7 +116,7 @@ void TaskNameField::AddedToWidget() {
       &TaskNameField::OnRenameRequested, base::Unretained(this)));
   // A row shown for a task that asked for its name field starts with it once
   // the row has its place.
-  if (controller->TakeRename(group_.ToString())) {
+  if (controller->TakeRename(controller->KeyOf(group_))) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
         base::BindOnce(&TaskNameField::Start, weak_factory_.GetWeakPtr()));
@@ -157,7 +158,7 @@ TabOrganizationController* TaskNameField::Controller() const {
 
 void TaskNameField::OnRenameRequested() {
   if (TabOrganizationController* controller = Controller();
-      controller && controller->TakeRename(group_.ToString())) {
+      controller && controller->TakeRename(controller->KeyOf(group_))) {
     Start();
   }
 }

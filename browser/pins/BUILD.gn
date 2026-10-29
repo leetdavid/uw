@@ -16,6 +16,7 @@ source_set("pins") {
     "//url",
   ]
   deps = [
+    "//uw/browser/tab_organization:page_copy",
     ":prefs",
     "//chrome/browser/lifetime",
     "//chrome/browser/lifetime:termination_notification",

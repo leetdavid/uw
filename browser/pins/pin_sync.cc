@@ -9,7 +9,6 @@
 #include "base/auto_reset.h"
 #include "base/containers/adapters.h"
 #include "base/functional/bind.h"
-#include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
@@ -24,26 +23,18 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_interface.h"
-#include "components/viz/common/frame_sinks/copy_output_result.h"
-#include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_controller.h"
-#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/reload_type.h"
-#include "content/public/browser/render_widget_host_view.h"
-#include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/referrer.h"
-#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
-#include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/geometry/size.h"
-#include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_skia.h"
 #include "uw/browser/pins/pin_pages.h"
+#include "uw/browser/tab_organization/page_copy.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -140,20 +131,6 @@ void Load(const tabs::TabInterface* tab, const GURL& url) {
                                               std::string());
 }
 
-// A page with `page`'s history and no renderer. With `needs_reload`, it loads
-// that history once it shows.
-std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
-                                                  bool needs_reload) {
-  content::WebContents::CreateParams params(page->GetBrowserContext());
-  params.initially_hidden = true;
-  params.desired_renderer_state =
-      content::WebContents::CreateParams::kNoRendererProcess;
-  std::unique_ptr<content::WebContents> copy =
-      content::WebContents::Create(params);
-  copy->GetController().CopyStateFrom(&page->GetController(), needs_reload);
-  return copy;
-}
-
 // A page to stand in for `page`. It stays unloaded when shown, as a discarded
 // tab does.
 std::unique_ptr<content::WebContents> MakePlaceholder(
@@ -174,46 +151,21 @@ void Wake(content::WebContents* page, std::string id) {
 
 // Keeps a picture of `page` as it looks now, for the hazed view other windows
 // show once it leaves.
-void TakePicture(content::WebContents* page, const std::string& id) {
-  content::RenderWidgetHostView* view = page->GetRenderWidgetHostView();
+void KeepPicture(content::WebContents* page, const std::string& id) {
   PinPages* pages =
       PinPages::For(Profile::FromBrowserContext(page->GetBrowserContext()));
-  if (!view || !pages || !view->IsSurfaceAvailableForCopy() ||
-      page->GetVisibility() != content::Visibility::VISIBLE) {
+  if (!pages) {
     return;
   }
-  view->CopyFromSurface(
-      gfx::Rect(), gfx::Size(), base::TimeDelta(),
-      base::BindPostTaskToCurrentDefault(base::BindOnce(
-          [](base::WeakPtr<PinPages> pages, std::string id, float scale,
-             const content::CopyFromSurfaceResult& result) {
-            if (pages && result.has_value() && !result->bitmap.drawsNothing()) {
-              pages->SetPicture(std::move(id), gfx::ImageSkia::CreateFromBitmap(
-                                                   result->bitmap, scale));
-            }
-          },
-          pages->GetWeakPtr(), id, view->GetDeviceScaleFactor())));
-}
-
-// Whether `a` and `b` show the same history, title, and icon.
-bool SameHistory(content::WebContents* a, content::WebContents* b) {
-  content::NavigationController& one = a->GetController();
-  content::NavigationController& two = b->GetController();
-  if (one.GetEntryCount() != two.GetEntryCount() ||
-      one.GetLastCommittedEntryIndex() != two.GetLastCommittedEntryIndex()) {
-    return false;
-  }
-  content::NavigationEntry* first = one.GetLastCommittedEntry();
-  content::NavigationEntry* second = two.GetLastCommittedEntry();
-  if (!first || !second) {
-    return first == second;
-  }
-  const content::FaviconStatus& icon = first->GetFavicon();
-  const content::FaviconStatus& other = second->GetFavicon();
-  return first->GetURL() == second->GetURL() &&
-         first->GetTitle() == second->GetTitle() && icon.valid == other.valid &&
-         icon.image.AsImageSkia().BackedBySameObjectAs(
-             other.image.AsImageSkia());
+  TakePicture(page, base::BindOnce(
+                        [](base::WeakPtr<PinPages> pages, std::string id,
+                           gfx::ImageSkia picture) {
+                          if (pages) {
+                            pages->SetPicture(std::move(id),
+                                              std::move(picture));
+                          }
+                        },
+                        pages->GetWeakPtr(), id));
 }
 
 void RedoInLivePage(base::WeakPtr<content::WebContents> page, Redo redo) {
@@ -744,7 +696,7 @@ std::unique_ptr<content::WebContents> PinSync::TakeLivePage(
       continue;
     }
     content::WebContents* page = sync->tabs_->GetWebContentsAt(at);
-    TakePicture(page, id);
+    KeepPicture(page, id);
     base::AutoReset<bool> applying(&sync->applying_, true);
     std::unique_ptr<content::WebContents> taken =
         sync->tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
@@ -804,7 +756,7 @@ void PinSync::HoldLivePages() {
       continue;
     }
     const std::string id = mark->id();
-    TakePicture(page, id);
+    KeepPicture(page, id);
     std::unique_ptr<content::WebContents> live =
         tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
     // A page that has not loaded since the restart still waits in Chromium's

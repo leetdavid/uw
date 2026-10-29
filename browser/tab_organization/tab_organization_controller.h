@@ -4,6 +4,7 @@
 #define UW_BROWSER_TAB_ORGANIZATION_TAB_ORGANIZATION_CONTROLLER_H_
 
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -11,12 +12,14 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+#include "ui/gfx/image/image_skia.h"
 #include "uw/browser/tab_organization/hidden_tabs.h"
 #include "uw/components/tab_organization/page_tree.h"
 #include "uw/components/tab_organization/placement.h"
@@ -34,9 +37,13 @@ class SimpleMenuModel;
 
 namespace uw {
 
+class SharedTree;
+
 // Owned by EmbedderBrowserWindowFeatures. Mirrors the window's unpinned tabs
 // into a PageTree and applies tree changes back through TabStripModel. A task
-// is a native tab group; this class never draws one.
+// is a native tab group; this class never draws one. With shared tabs, the
+// tree is its workspace's SharedTree, which every window on the workspace
+// follows, and each window maps its own tab groups to the tree's tasks.
 class TabOrganizationController : public TabStripModelObserver,
                                   public HiddenTabs {
  public:
@@ -83,7 +90,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // has no tab tree, in which case nothing opened.
   static bool OpenNewTask(BrowserWindowInterface* window);
 
-  const PageTree& tree() const { return tree_; }
+  const PageTree& tree() const;
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;
   tabs::TabInterface* TabFor(const PageId& id) const;
   // Nesting level under parent pages. 0 for a top-level or untracked tab.
@@ -151,7 +158,7 @@ class TabOrganizationController : public TabStripModelObserver,
 
   // A collapsed branch hides the tabs under its top page. Collapsing is not
   // an organization action, so undo leaves it alone.
-  bool IsCollapsed(const PageId& id) const { return collapsed_.contains(id); }
+  bool IsCollapsed(const PageId& id) const;
   // True when a collapsed branch hides `id` below its top page.
   bool IsHidden(const PageId& id) const;
   bool IsHidden(const tabs::TabInterface* tab) const override;
@@ -240,7 +247,26 @@ class TabOrganizationController : public TabStripModelObserver,
   base::CallbackListSubscription ObserveManualMoves(
       ManualMoveCallback callback);
 
+  // Whether `tab` holds a copy of a page whose live page is in another
+  // window, or in none.
+  static bool IsCopy(const tabs::TabInterface* tab);
+  // Moves the live page of the copy `tab` holds into it.
+  void BringLivePage(tabs::TabInterface* tab);
+  // The picture of the copy `tab` holds, as its page last left a window, for
+  // the hazed view.
+  gfx::ImageSkia PictureOf(const tabs::TabInterface* tab) const;
+  base::CallbackListSubscription ObservePictures(
+      base::RepeatingClosure callback);
+  bool dragging() const { return dragging_; }
+  // The tree's key for the task `group` shows in this window.
+  std::string KeyOf(const tab_groups::TabGroupId& group) const;
+  // The same for `window`, or `group`'s own id when it has no tree.
+  static std::string TaskKey(BrowserWindowInterface* window,
+                             const tab_groups::TabGroupId& group);
+
  private:
+  friend class SharedTree;
+
   struct Snapshot {
     PageTree tree;
     std::map<std::string, tab_groups::TabGroupVisualData> tasks;
@@ -265,6 +291,35 @@ class TabOrganizationController : public TabStripModelObserver,
                               tabs::TabInterface* tab,
                               int index) override;
   void OnSplitTabChanged(const SplitTabChange& change) override;
+  void OnTabChangedAt(tabs::TabInterface* tab,
+                      TabChangeType change_type) override;
+
+  // The tree's key for the task `tab` is in, empty for the Scratchpad.
+  std::string TaskOf(const tabs::TabInterface* tab) const;
+  // Joins the tree of the window's workspace once the window has a tab, with
+  // shared tabs on.
+  void JoinWorkspace();
+  // Leaves the workspace's tree as the window closes, so closing it closes no
+  // tab in another window.
+  void Leave();
+  // Gives this window a copy of each page it lacks, and closes its tabs for
+  // pages that left the tree.
+  void ApplyCopies();
+  // Brings this window up to date with a tree another window changed.
+  void Follow();
+  std::optional<tab_groups::TabGroupVisualData> VisualsOf(
+      const std::string& task) const;
+  void SetTaskVisuals(const std::string& task,
+                      const tab_groups::TabGroupVisualData& visuals);
+  // Puts `page` in `tab` in place of the page it holds, and returns that.
+  std::unique_ptr<content::WebContents> ReplacePage(
+      tabs::TabInterface* tab,
+      std::unique_ptr<content::WebContents> page);
+  // A selected copy shows the live page instead: always when the user chose
+  // it, and otherwise when no shown window holds it.
+  void BringSelectedPage(bool chosen);
+  void OnRevealed(BrowserWindowInterface* window);
+  void NotifyPictures();
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
@@ -292,18 +347,28 @@ class TabOrganizationController : public TabStripModelObserver,
   void ApplyTasks();
   void ApplyOrder();
   void ScheduleApply();
+  // Applies the tree to this window later, without telling the others.
+  void ScheduleOwnApply();
   void ApplyWhenIdle();
   void RestoreDragSelection(std::vector<tabs::TabHandle> handles);
   // Saves the window for Undo before an action that moves `roots`, into
   // `task` when the action changes their task.
   void Record(const std::vector<PageId>& roots,
               std::optional<std::string> task = std::nullopt);
+  // Has every window on the tree save its tabs and redraw them.
   void ScheduleUpdate();
+  void ScheduleOwnUpdate();
   void Update();
 
   const raw_ptr<BrowserWindowInterface> window_;
   const raw_ptr<TabStripModel> tabs_;
-  PageTree tree_;
+  scoped_refptr<SharedTree> shared_;
+  bool joined_ = false;
+  // This window's tab groups for tasks another window made, each with the
+  // task's key in the tree. A group missing here is keyed by its own id.
+  std::map<tab_groups::TabGroupId, std::string> keys_;
+  base::CallbackListSubscription reveals_;
+  base::RepeatingClosureList pictures_changed_;
   std::map<tabs::TabHandle, PageId> ids_;
   std::optional<PageId> active_;
   std::optional<PageId> previous_active_;
@@ -314,16 +379,6 @@ class TabOrganizationController : public TabStripModelObserver,
   std::map<PageId, PageId> restored_parents_;
   // What the session last saved for each page.
   std::map<PageId, std::string> saved_states_;
-  // The name uw gave each task. It is saved with every page of the task, so
-  // it comes back with the session.
-  std::map<std::string, std::u16string> generated_names_;
-  // Pages whose branch is collapsed. Saved with the session.
-  std::set<PageId> collapsed_;
-  // Kept tabs, each with the task it was kept in. Saved with the session.
-  std::map<PageId, std::string> kept_;
-  // Held tabs, each with the parent it was nested under. Saved with the
-  // session.
-  std::map<PageId, PageId> held_;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;
@@ -331,6 +386,8 @@ class TabOrganizationController : public TabStripModelObserver,
   std::map<std::string, PendingTask> pending_tasks_;
   std::vector<Snapshot> undo_;
   bool applying_ = false;
+  // Set while the tab strip reports a change, when it may not change itself.
+  bool observing_ = false;
   bool apply_pending_ = false;
   bool dragging_ = false;
   bool drag_alone_ = false;
