@@ -125,6 +125,21 @@ Proposed. Product code follows [Architecture](../architecture.md#code-organizati
 - `browser/uw_command/tabs_command.cc` answers `uw tabs`, and `tools_command.cc` adds five tools to `kPageTools`.
 - `command/src/tabs.ts` is `uw tabs`. `steps.ts` and the chat page's `main.tsx` word the step lines.
 
+## Built
+
+T268 was built on 2026-10-30:
+
+- `components/agent/tab_tools.h`: the six tools' schemas, the list the model reads, filters, and ids by any unique start, with `TabToolsTest.*` in unit_tests. The agent's instructions name the tools, and an older `tabs` answer shrinks to one line once a newer one arrives.
+- `browser/agent/user_tabs.h`: `CheckTabStep` and `RunTabTool` find a profile's tabs, check a call, and act through each tree's `TabOrganizationController`. A tab step's check runs before its approval, since a terminal answers whether it is busy only later, so a refused close never asks.
+- `AgentLoop` offers the tools as extra tools and leaves out `select` for a run, which it knows by its report tool.
+- The approval goes to the chat page, the `uw` command, and the notification with the workspace, the tabs, and a rename's names. The chat page draws the steps and cards in `src/tab-steps.tsx`, and serves tab icons from `chrome://favicon2`.
+- `ShowUserTab` and `ShowUserTask` answer a click on a step's chip.
+
+Where T268 differs from the plan:
+
+- A move refused because its tabs are in two windows of one workspace, with shared tabs off, says "they're in different windows".
+- A task chip shows the tab used last in the task, which opens its folder in the sidebar.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board), and each one that users see updates its [Help](help.md) page in the same change.

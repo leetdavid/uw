@@ -54,6 +54,7 @@
 #include "uw/browser/agent/chat_suggestions.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/skill_folders.h"
+#include "uw/browser/agent/user_tabs.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
@@ -274,11 +275,17 @@ int TabOf(const AgentLoop::Step& step) {
 
 mojom::ApprovalPtr PageApproval(const AgentTools::Approval& approval,
                                 bool can_always_allow) {
+  std::vector<mojom::ApprovalTabPtr> tabs;
+  for (const AgentTools::Approval::Tab& tab : approval.tabs) {
+    tabs.push_back(mojom::ApprovalTab::New(tab.title, tab.url));
+  }
   return mojom::Approval::New(
       approval.tab, approval.site, approval.action, approval.reason,
       approval.folder, approval.command, approval.text, approval.keys,
       approval.screen, approval.connector, approval.tool, approval.arguments,
-      can_always_allow, approval.sensitive, approval.file);
+      can_always_allow, approval.sensitive, approval.file, approval.workspace,
+      approval.workspace_icon, std::move(tabs), approval.task,
+      approval.new_name);
 }
 
 }  // namespace
@@ -914,6 +921,16 @@ void UwChatHandler::ReadFile(const std::string& saved,
           },
           CopyNamed(FilesFolder(), saved)),
       std::move(callback));
+}
+
+void UwChatHandler::ShowUserTab(const std::string& id) {
+  RunTabTool(Profile::FromBrowserContext(contents_->GetBrowserContext()),
+             kSelectTool, base::DictValue().Set("tab", id), TabOwners(),
+             base::DoNothing());
+}
+
+void UwChatHandler::ShowUserTask(const std::string& id) {
+  ShowTask(Profile::FromBrowserContext(contents_->GetBrowserContext()), id);
 }
 
 void UwChatHandler::OpenFile(const std::string& saved) {
@@ -1948,6 +1965,7 @@ void UwChatHandler::AskApproval(
   Notify("Waits for your approval",
          !approval.connector.empty()
              ? base::StrCat({approval.action, " in ", approval.connector, "?"})
+         : !approval.workspace.empty() ? base::StrCat({approval.action, "?"})
          : approval.folder.empty()
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",

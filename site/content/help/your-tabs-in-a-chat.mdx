@@ -1,0 +1,42 @@
+---
+title: Your tabs in a chat
+description: Ask the agent to find, file, or close your own tabs. It sees their titles and addresses, never the pages.
+---
+
+## What the agent *can do*
+
+Ask in a chat, such as "Close the flight tabs I don't need any more" or "Put my hotel tabs in a task of their own". The agent can:
+
+- list your tabs in every workspace, by task, with when you last looked at each,
+- show you one of them,
+- move tabs to a task, to a new task, or to the Scratchpad,
+- rename a task,
+- close tabs, or a task with all its tabs.
+
+It sees each tab's title and address, never the page. To read one of your pages, it opens the address in a tab of its own.
+
+Tabs move only within their workspace. The agent never closes a pinned tab or a terminal that is running a command, and never moves a pinned tab.
+
+## When it *asks*
+
+| Mode | Asks before |
+| --- | --- |
+| **Ask first** | Every move, rename, and close. |
+| **Auto** | Closing your tabs. |
+| **Full auto** | Nothing. |
+
+The card names the tabs, such as `Close 5 tabs in Flights?`. Tabs the agent opened itself close without asking. See [Approvals](./approvals.mdx).
+
+## Taking it *back*
+
+A move counts as yours: the organizer leaves those tabs where the agent put them. <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>Z</kbd> undoes it, as for any move. See [Undo a move](./undo-a-move.mdx).
+
+A task the agent names keeps that name, with the lock, as if you typed it. Undo leaves a name alone.
+
+**History → Recently Closed** brings back a tab the agent closed.
+
+## In *the chat*
+
+Each step names the tabs, such as `Moved 2 tabs to a new task, Hotels`. Click a tab in a step to go to it, or a task to see it in the sidebar. The arrow at the end of a step shows the tabs it moved or closed.
+
+A [scheduled chat](./scheduled-chats.mdx) can tidy your tabs too, such as every Friday. It never switches your window to a tab, and a close waits for you in Auto.

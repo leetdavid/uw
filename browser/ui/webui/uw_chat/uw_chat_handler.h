@@ -193,6 +193,8 @@ class UwChatHandler : public mojom::ChatHandler,
                 SaveFileCallback callback) override;
   void ReadFile(const std::string& saved, ReadFileCallback callback) override;
   void OpenFile(const std::string& saved) override;
+  void ShowUserTab(const std::string& id) override;
+  void ShowUserTask(const std::string& id) override;
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;

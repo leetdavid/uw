@@ -114,6 +114,16 @@ base::Value Described(const mojom::Approval& approval) {
   described.Set("canAlwaysAllow", approval.can_always_allow);
   described.Set("sensitive", approval.sensitive);
   described.Set("file", approval.file);
+  described.Set("workspace", approval.workspace);
+  described.Set("workspaceIcon", approval.workspace_icon);
+  base::ListValue tabs;
+  for (const mojom::ApprovalTabPtr& tab : approval.tabs) {
+    tabs.Append(
+        base::DictValue().Set("title", tab->title).Set("url", tab->url));
+  }
+  described.Set("tabs", std::move(tabs));
+  described.Set("task", approval.task);
+  described.Set("newName", approval.new_name);
   return base::Value(std::move(described));
 }
 

@@ -257,6 +257,13 @@ class AgentLoop {
                   size_t index,
                   base::DictValue args,
                   ApprovalAnswer answer);
+  // Checks a tab tool's call against the user's tabs, then runs it or asks
+  // the user, as the chat's mode says. See docs/plans/tab-tools.md.
+  void CheckTabStep(ModelTurn turn, size_t index, base::DictValue args);
+  void OnTabCheck(ModelTurn turn,
+                  size_t index,
+                  base::DictValue args,
+                  AgentTools::TabCheck check);
   void ConfirmSite(AgentTools::Approval approval,
                    base::OnceCallback<void(bool)> done);
   void OnSiteAnswer(base::OnceCallback<void(bool)> done, ApprovalAnswer answer);

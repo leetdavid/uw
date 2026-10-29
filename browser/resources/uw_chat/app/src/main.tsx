@@ -151,6 +151,14 @@ import {
   type TriggerState,
 } from "@/chat-api";
 import { UsageIndicator } from "./usage";
+import {
+  TabApproval,
+  TabApprovalLabel,
+  TabStepLine,
+  declinedTabStep,
+  describeTabStep,
+  isTabTool,
+} from "./tab-steps";
 
 // Fluid's .typeset styles an answer by its plain elements, and Streamdown's
 // own classes would win over it, so prose renders bare. Code blocks keep
@@ -261,10 +269,11 @@ const connectorTool = (tool: string) => {
 
 function declined(step: Step): boolean {
   return (
-    (step.tool === "run" || step.tool === "keys" || !!connectorTool(step.tool)) &&
-    String(JSON.parse(step.result).error ?? "").startsWith(
-      "The user did not approve",
-    )
+    declinedTabStep(step) ||
+    ((step.tool === "run" || step.tool === "keys" || !!connectorTool(step.tool)) &&
+      String(JSON.parse(step.result).error ?? "").startsWith(
+        "The user did not approve",
+      ))
   );
 }
 
@@ -277,6 +286,12 @@ function firstLine(text: string): string {
 // One step in plain words, with what it acted on in bold, as the chat and
 // its tests show it.
 function describe(step: Step): ReactNode {
+  if (isTabTool(step.tool)) {
+    const said = describeTabStep(step);
+    if (said !== null) {
+      return said;
+    }
+  }
   const args = JSON.parse(step.args);
   const result = JSON.parse(step.result);
   const inTab = args.tab ? ` in tab ${args.tab}` : "";
@@ -565,6 +580,13 @@ function StepLine({ step, last }: { step: Step; last: boolean }) {
     );
   }
   const result = JSON.parse(step.result);
+  if (isTabTool(step.tool) && !declined(step) && (!result.error || result.refused)) {
+    return (
+      <TabStepLine step={step} last={last}>
+        <StepText>{describe(step)}</StepText>
+      </TabStepLine>
+    );
+  }
   if (declined(step)) {
     return (
       <ThinkingStep
@@ -1053,11 +1075,12 @@ function ApprovalCard({
   };
   const terminal = Boolean(approval.folder);
   const connector = Boolean(approval.connector);
+  const yourTabs = Boolean(approval.workspace);
   const options = [
     {
       id: "approve",
       title: connector ? "Allow once" : "Approve",
-      description: terminal || connector ? undefined : approval.reason,
+      description: terminal || connector || yourTabs ? undefined : approval.reason,
       menu: connector
         ? [
             { id: "chat", title: "Allow for this chat", description: "Until this chat ends" },
@@ -1080,7 +1103,9 @@ function ApprovalCard({
     <div id="approval">
       <AskUserQuestions
         label={
-          connector ? (
+          yourTabs ? (
+            <TabApprovalLabel approval={approval} />
+          ) : connector ? (
             <span className="flex items-center gap-1.5">
               <Link2 aria-hidden className="size-3.5" />
               {approval.connector} · <span className="font-mono text-xs">{approval.tool}</span>
@@ -1113,7 +1138,9 @@ function ApprovalCard({
                     ? "Run this command?"
                     : "Send keys to the running program?"
                 : `${approval.action}?`,
-            detail: connector ? (
+            detail: yourTabs ? (
+              <TabApproval approval={approval} />
+            ) : connector ? (
               <ConnectorApproval approval={approval} />
             ) : (
               terminal && <TerminalApproval approval={approval} />

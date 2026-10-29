@@ -16,6 +16,7 @@
 #include "base/values.h"
 #include "components/actor/core/task_id.h"
 #include "components/tabs/public/tab_interface.h"
+#include "uw/browser/agent/user_tabs.h"
 #include "uw/components/agent/page_text.h"
 #include "uw/components/agent/trigger.h"
 #include "uw/components/terminal/shell_host.h"
@@ -50,6 +51,8 @@ class TerminalShell;
 //   keys {tab, text, keys} -> {tab, text}
 //   trigger {command, wake, request, tab} -> {}, when the chat takes triggers
 //   stop_trigger {} -> {}
+//   tabs, select, move, rename_task, close, close_task: the user's own tabs;
+//       see uw/components/agent/tab_tools.h
 //
 // An element number comes from the latest read of that tab. The terminal
 // tools work only in terminal tabs the agent opened, which run the user's
@@ -88,6 +91,17 @@ class AgentTools {
     // command check named it.
     bool sensitive = false;
     std::string file;
+    // A change to the user's own tabs: their workspace, the tabs it closes
+    // or moves, and a rename's task with its new name.
+    struct Tab {
+      std::string title;
+      std::string url;
+    };
+    std::string workspace;
+    std::string workspace_icon;
+    std::vector<Tab> tabs;
+    std::string task;
+    std::string new_name;
   };
   // Whether `tool` works in a terminal tab. Outside Ask first, the command
   // check decides whether a terminal step asks.
@@ -100,6 +114,17 @@ class AgentTools {
   std::optional<Approval> ApprovalFor(std::string_view tool,
                                       const base::DictValue& args,
                                       bool every_step = false);
+  // A tab tool's call checked against the user's tabs as they are: the
+  // tool's answer when it does not act, or what it changes of the user's own
+  // tabs, which may need their approval.
+  struct TabCheck {
+    std::optional<base::DictValue> refused;
+    std::optional<Approval> approval;
+    bool closes = false;
+  };
+  void CheckTabStep(std::string_view tool,
+                    const base::DictValue& args,
+                    base::OnceCallback<void(TabCheck)> done);
   // Asks the user whether the agent may act on a site that Chromium marks as
   // sensitive, in the middle of a step, and answers true if they approve.
   // Without one, the engine refuses such a site.
@@ -200,6 +225,9 @@ class AgentTools {
   std::optional<Approval> TerminalApprovalFor(std::string_view tool,
                                               const base::DictValue& args,
                                               bool every_step);
+
+  // The agent's own tabs and the chat's, which the tab tools mark.
+  TabOwners Owners() const;
 
   // The agent's tab that `args` names, or null with `error` set.
   Tab* TabFrom(const base::DictValue& args, std::string& error);

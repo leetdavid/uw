@@ -27,6 +27,10 @@ interface ChatHandler {
   DeleteChat(string id);
   // Goes to the agent's tab `number`.
   ShowTab(int32 number);
+  // Shows one of the user's tabs, or the tab used last in one of their
+  // tasks, by the id a tab tool's step names. See docs/plans/tab-tools.md.
+  ShowUserTab(string id);
+  ShowUserTask(string id);
   // Puts the chat beside the agent's tab `number`, or its latest tab when
   // `number` is 0, in split view; or ends the split when `on` is false.
   SetSideBySide(bool on, int32 number);
@@ -363,6 +367,19 @@ struct Approval {
   // command check named it.
   bool sensitive;
   string file;
+  // A change to the user's own tabs: their workspace and its emoji, the tabs
+  // it closes or moves, and a rename's task with its new name.
+  string workspace;
+  string workspace_icon;
+  array<ApprovalTab> tabs;
+  string task;
+  string new_name;
+};
+
+// One of the user's tabs a step closes or moves.
+struct ApprovalTab {
+  string title;
+  string url;
 };
 
 enum ApprovalChoice {

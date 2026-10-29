@@ -17,6 +17,7 @@ source_set("agent") {
   public_deps = [
     ":chats",
     ":memory_store",
+    ":user_tabs",
     "//base",
     "//components/actor/core:task_id",
     "//components/history/core/browser",
@@ -46,6 +47,34 @@ source_set("agent") {
     "//ui/base",
     "//uw/browser/connectors",
     "//uw/browser/terminal",
+  ]
+}
+
+# The user's tabs in a profile's windows, which the tab tools list and
+# change for chats and the uw command. See docs/plans/tab-tools.md.
+source_set("user_tabs") {
+  sources = [
+    "user_tabs.cc",
+    "user_tabs.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/tabs:public",
+    "//uw/components/agent",
+  ]
+  deps = [
+    ":run_window_mark",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tab_groups",
+    "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//uw/browser/pins",
+    "//uw/browser/tab_organization",
+    "//uw/browser/terminal",
+    "//uw/browser/workspaces",
+    "//uw/components/tab_organization",
   ]
 }
 
@@ -237,6 +266,7 @@ source_set("browser_tests") {
     "quick_check_browsertest.cc",
     "run_window_browsertest.cc",
     "scheduled_chats_browsertest.cc",
+    "tab_tools_browsertest.cc",
   ]
   deps = [
     ":agent",
@@ -279,8 +309,10 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/ai_providers",
     "//uw/browser/ai_providers:test_support",
+    "//uw/browser/pins",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",
+    "//uw/components/agent",
     "//uw/components/ai_providers",
     "//uw/components/terminal",
   ]

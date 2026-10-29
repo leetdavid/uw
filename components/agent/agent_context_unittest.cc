@@ -221,6 +221,31 @@ TEST_F(AgentContextTest, ARereadTabSendsOnlyItsLatestReading) {
   EXPECT_EQ(ToolContents()[2].FindInt("step"), 3);
 }
 
+TEST_F(AgentContextTest, OnlyTheLatestListOfTheUsersTabsStays) {
+  context_.AddUser("Close my flight tabs");
+  const auto list = [](int tabs, std::string_view text) {
+    return base::DictValue()
+        .Set("tabs", tabs)
+        .Set("workspaces", 1)
+        .Set("list", text);
+  };
+  context_.AddResult("call_1", "tabs", base::DictValue(),
+                     list(34, "Personal › Flights"));
+  context_.AddResult("call_2", "tabs", base::DictValue(),
+                     list(29, "Personal › Hotels"));
+
+  const std::string body = Request();
+
+  EXPECT_THAT(body, Not(HasSubstr("Personal › Flights")));
+  EXPECT_THAT(body, HasSubstr("Personal › Hotels"));
+  EXPECT_EQ(*ToolContents()[0].FindString("shortened"),
+            "Step 1 listed 34 of the user's tabs, shortened. Call recall with "
+            "step 1 to see it again.");
+  EXPECT_THAT(
+      *context_.Recall(base::DictValue().Set("step", 1)).FindString("note"),
+      HasSubstr("call tabs again"));
+}
+
 // A reading of another page the tab showed is still true of that page, but a
 // jump within a page is the same page.
 TEST_F(AgentContextTest, AReadingOfAnotherPageInTheTabStays) {

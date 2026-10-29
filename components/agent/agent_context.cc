@@ -11,6 +11,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "uw/components/agent/tab_tools.h"
 #include "uw/components/ai_providers/formats.h"
 
 namespace uw {
@@ -486,6 +487,14 @@ int AgentContext::AddResult(std::string_view call_id,
       }
     }
   }
+  // Only the latest list of the user's tabs stays whole.
+  if (tool == kTabsTool && !result.contains("error")) {
+    for (Result& older : results_) {
+      if (older.tool == kTabsTool && !older.shortened) {
+        Shorten(older);
+      }
+    }
+  }
   messages_.Append(ToolMessage(call_id, result.Clone().Set("step", step)));
   results_.push_back({step, std::string(tool), args.Clone(), result.Clone(),
                       messages_.size() - 1});
@@ -539,6 +548,12 @@ base::DictValue AgentContext::Recall(const base::DictValue& args) const {
                                        base::NumberToString(result.step),
                                        ". Its element numbers cannot be "
                                        "clicked; read the tab again to act."}));
+  }
+  if (result.tool == kTabsTool) {
+    recalled.Set("note", base::StrCat({"The user's tabs as they were at step ",
+                                       base::NumberToString(result.step),
+                                       ". They may have moved or closed since; "
+                                       "call tabs again to act on them."}));
   }
   return recalled;
 }
@@ -930,6 +945,11 @@ void AgentContext::Shorten(Result& result) {
          base::NumberToString(result.args.FindInt("tab").value_or(0)), ", \"",
          title ? *title : "", "\" at ", url ? *url : "", ": ",
          base::NumberToString(text ? text->size() : 0), " characters"});
+  } else if (result.tool == kTabsTool) {
+    line = base::StrCat(
+        {"Step ", step, " listed ",
+         base::NumberToString(result.result.FindInt("tabs").value_or(0)),
+         " of the user's tabs"});
   } else if (result.tool == kPipedTool) {
     const std::string* text = result.result.FindString("text");
     line = base::StrCat({"Step ", step, " was text piped into the uw command: ",

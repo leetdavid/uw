@@ -386,6 +386,30 @@ test("with no terminal, a step that needs approval exits with 3 and leaves the c
   assert.match(err, /uw approve 3f9c2e18 allow/);
 });
 
+test("a close of the user's tabs asks with their titles, and the tab steps print as the chat words them", async () => {
+  const flights = { id: "9c2e41ab", name: "Flights", color: "blue" };
+  const tab = (title: string, url: string) => ({ title, url });
+  const listed = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "tabs", args: {}, result: { tabs: 34, workspaces: 2, list: "" }, text: "" } };
+  const moved = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "move", args: { tabs: ["7d1f", "c33e"], new_task: "Hotels" }, result: { moved: [tab("Memmo Alfama", "https://memmo.test/"), tab("Alfama flat", "https://airbnb.test/")], task: { id: "51be07d2", name: "Hotels", color: "green" }, new: true }, text: "" } };
+  const refused = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "close", args: { tabs: ["e2b9"] }, result: { error: "Didn't close ~/dev/shop-web: a command runs there.", refused: "a command runs there", tab: "~/dev/shop-web" }, text: "" } };
+  const close = {
+    ...SAVE, connector: "", tool: "", arguments: {}, canAlwaysAllow: false,
+    action: "Close 5 tabs in Flights", reason: "Closed tabs come back from History › Recently Closed.",
+    workspace: "Personal", workspaceIcon: "🏠", task: "", newName: "",
+    tabs: [tab("SFO to Lisbon", "https://www.google.com/travel"), tab("Cheap flights", "https://www.skyscanner.com/"),
+      tab("KAYAK", "https://www.kayak.com/"), tab("Expedia", "https://www.expedia.com/"), tab("United", "https://www.united.com/")],
+  };
+  const closed = { method: "chat.step", params: { chat: CHAT_ID, kind: "tool", tool: "close", args: { tabs: ["5b02"] }, result: { closed: close.tabs, task: flights }, text: "" } };
+  await chatUw([listed, moved, refused, { method: "chat.approval", params: { chat: CHAT_ID, approval: close } }], [closed, end("answered", "Closed them.")]);
+  const { exit, err } = await uw(["chat", "-p", "Close my flight tabs"], { terminal: true, ask: async () => "1" });
+  assert.equal(exit, 0);
+  assert.match(err, /Listed 34 tabs in 2 workspaces/);
+  assert.match(err, /Moved 2 tabs to a new task, Hotels/);
+  assert.match(err, /Didn't close ~\/dev\/shop-web: a command runs there/);
+  assert.match(err, /your tabs · Personal\nClose 5 tabs in Flights\?\n {2}SFO to Lisbon {2}google\.com\n {2}Cheap flights {2}skyscanner\.com\n {2}KAYAK {2}kayak\.com\n {2}and 2 more/);
+  assert.match(err, /Closed 5 tabs in Flights/);
+});
+
 test("with a terminal, the card asks here and the answer goes to uw", async () => {
   await chatUw([{ method: "chat.approval", params: { chat: CHAT_ID, approval: SAVE } }], [end("answered", "Filed WEB-412.")]);
   let asked = "";

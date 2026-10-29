@@ -33,6 +33,7 @@
 #include "uw/components/agent/memory_check.h"
 #include "uw/components/agent/run_report.h"
 #include "uw/components/agent/schedule_tool.h"
+#include "uw/components/agent/tab_tools.h"
 
 namespace uw {
 namespace {
@@ -441,6 +442,10 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
                        std::move(turn), index, std::move(asked)));
     return;
   }
+  if (IsTabTool(call.name)) {
+    CheckTabStep(std::move(turn), index, std::move(*args));
+    return;
+  }
   // Full auto still asks the command check about each terminal step.
   const bool terminal = AgentTools::IsTerminalTool(call.name);
   if (approve_ && (mode_ != ApprovalMode::kFullAuto || terminal)) {
@@ -460,6 +465,49 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
     }
   }
   CallTool(std::move(turn), index, std::move(*args));
+}
+
+void AgentLoop::CheckTabStep(ModelTurn turn,
+                             size_t index,
+                             base::DictValue args) {
+  // A run has nobody to show a tab to.
+  if (turn.calls[index].name == kSelectTool && report_) {
+    OnTool(std::move(turn), index, std::move(args),
+           Error("There is no tool called select."));
+    return;
+  }
+  const std::string name = turn.calls[index].name;
+  base::DictValue asked = args.Clone();
+  tools_.CheckTabStep(
+      name, args,
+      base::BindOnce(&AgentLoop::OnTabCheck, weak_factory_.GetWeakPtr(),
+                     std::move(turn), index, std::move(asked)));
+}
+
+void AgentLoop::OnTabCheck(ModelTurn turn,
+                           size_t index,
+                           base::DictValue args,
+                           AgentTools::TabCheck check) {
+  if (stopping_ || steer_) {
+    RunCall(std::move(turn), index);
+    return;
+  }
+  if (check.refused) {
+    OnTool(std::move(turn), index, std::move(args), std::move(*check.refused));
+    return;
+  }
+  // Ask first asks before every change to the user's tabs, and Auto before
+  // closing them.
+  if (approve_ && check.approval &&
+      (mode_ == ApprovalMode::kAskFirst ||
+       (mode_ == ApprovalMode::kAuto && check.closes))) {
+    approve_.Run(
+        std::move(*check.approval),
+        base::BindOnce(&AgentLoop::OnApproval, weak_factory_.GetWeakPtr(),
+                       std::move(turn), index, std::move(args)));
+    return;
+  }
+  CallTool(std::move(turn), index, std::move(args));
 }
 
 void AgentLoop::CheckStep(ModelTurn turn,
@@ -681,6 +729,9 @@ void AgentLoop::UpdateConnectorTools() {
   if (tools_.takes_triggers()) {
     tools.Append(TriggerToolSchema());
     tools.Append(StopTriggerToolSchema());
+  }
+  for (base::Value& tool : TabToolSchemas(/*select=*/!report_)) {
+    tools.Append(std::move(tool));
   }
   if (offered_memory_ != MemoryUse::kOff) {
     for (base::Value& tool :

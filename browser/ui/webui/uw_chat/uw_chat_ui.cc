@@ -5,9 +5,12 @@
 #include <utility>
 
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/grit/uw_chat_resources.h"
 #include "chrome/grit/uw_chat_resources_map.h"
+#include "components/favicon_base/favicon_url_parser.h"
 #include "components/performance_manager/public/decorators/page_live_state_decorator.h"
+#include "content/public/browser/url_data_source.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/browser/web_ui_data_source.h"
@@ -30,6 +33,11 @@ UwChatUI::UwChatUI(content::WebUI* web_ui) : ui::MojoWebUIController(web_ui) {
   // pdf.js reads a PDF in its worker, which the page serves itself.
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::WorkerSrc, "worker-src 'self';");
+  // The icons of the user's tabs in the tab tools' steps.
+  content::URLDataSource::Add(
+      Profile::FromWebUI(web_ui),
+      std::make_unique<FaviconSource>(Profile::FromWebUI(web_ui),
+                                      chrome::FaviconUrlFormat::kFavicon2));
   // Memory saver would end the chat with the page while the agent works.
   performance_manager::PageLiveStateDecorator::SetIsAutoDiscardable(contents,
                                                                     false);

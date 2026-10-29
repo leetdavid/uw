@@ -23,6 +23,12 @@ export interface Approval {
   canAlwaysAllow: boolean;
   sensitive: boolean;
   file: string;
+  /** A change to the user's own tabs: their workspace, the tabs it closes or moves, and a rename. */
+  workspace: string;
+  workspaceIcon: string;
+  tabs: { title: string; url: string }[];
+  task: string;
+  newName: string;
 }
 
 /** A choice of an approval card: what the command sends, what it says, and how long it lasts. */
@@ -70,6 +76,62 @@ function firstLine(text: string): string {
   return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 }
 
+const TAB_VERBS: Record<string, string> = {
+  select: "show", move: "move", rename_task: "rename", close: "close", close_task: "close",
+};
+
+const count = (n: number, one = "tab", many = "tabs") => `${n} ${n === 1 ? one : many}`;
+
+/** What a tab's address says of it: its site, "terminal", or a uw page. */
+function site(url: string): string {
+  try {
+    const { protocol, hostname } = new URL(url);
+    if (protocol === "chrome:") return hostname === "terminal" ? "terminal" : `uw://${hostname}`;
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+type TabValue = { title: string; url: string };
+type TaskValue = { name: string };
+
+/** A step of the tab tools, which list, show, move, and close the user's own tabs. Null for any other step. */
+function describeTabStep(step: Step): Described | null {
+  if (!(step.tool in TAB_VERBS) && step.tool !== "tabs") return null;
+  const { args, result } = step;
+  const error = typeof result.error === "string" ? result.error : "";
+  if (result.refused) {
+    return { what: `Didn't ${TAB_VERBS[step.tool]}${result.tab ? ` ${String(result.tab)}` : ""}: ${String(result.refused)}`, where: "", done: false };
+  }
+  if (error.startsWith("The user did not approve")) {
+    const tabs = Array.isArray(args.tabs) ? args.tabs.length : 0;
+    const what = step.tool === "close_task" || step.tool === "rename_task"
+      ? `Didn't ${TAB_VERBS[step.tool]} the task`
+      : `Didn't ${TAB_VERBS[step.tool]} ${count(tabs)}`;
+    return { what, where: "", done: false };
+  }
+  if (error) return null;
+  const did = (what: string): Described => ({ what, where: "", done: true });
+  const moved = ((result.moved ?? result.closed ?? []) as TabValue[]).length;
+  const task = result.task as TaskValue | undefined;
+  switch (step.tool) {
+    case "tabs":
+      return did(`Listed ${count(Number(result.tabs))} in ${count(Number(result.workspaces), "workspace", "workspaces")}`);
+    case "select": {
+      const tab = result.tab as TabValue;
+      return did(`Switched to ${tab.title || tab.url}`);
+    }
+    case "move":
+      return did(result.scratchpad
+        ? `Moved ${count(moved)} to the Scratchpad`
+        : `Moved ${count(moved)} to ${result.new ? "a new task, " : ""}${task?.name}`);
+    case "rename_task": return did(`Renamed ${String(result.was)} to ${task?.name}`);
+    case "close": return did(task ? `Closed ${count(moved)} in ${task.name}` : `Closed ${count(moved)}`);
+    default: return did(`Closed the task ${task?.name} and its ${count(moved)}`);
+  }
+}
+
 /** One tool step in plain words, and where it happened, such as "tab 1". */
 export interface Described {
   what: string;
@@ -79,6 +141,8 @@ export interface Described {
 }
 
 export function describeStep(step: Step): Described {
+  const tabStep = describeTabStep(step);
+  if (tabStep) return tabStep;
   const { args, result } = step;
   const did = (what: string, where = ""): Described => ({ what, where, done: true });
   const tab = (value: unknown) => `tab ${String(value)}`;
@@ -174,6 +238,23 @@ export function stepLine(step: Step): string {
 export function approvalCard(approval: Approval): Card {
   const connector = Boolean(approval.connector);
   const terminal = Boolean(approval.folder);
+  if (approval.workspace) {
+    const tabs = approval.tabs ?? [];
+    const detail = approval.newName
+      ? [`  ${approval.task} → ${approval.newName}`]
+      : [
+        ...tabs.slice(0, 3).map((tab) => `  ${tab.title || tab.url}  ${site(tab.url)}`),
+        ...(tabs.length > 3 ? [`  and ${tabs.length - 3} more`] : []),
+      ];
+    const label = `your tabs · ${approval.workspace}`;
+    const question = `${approval.action}?`;
+    const choices: Choice[] = [
+      { choice: "allow", title: "Approve" },
+      { choice: "decline", title: "Not this one" },
+      { choice: "stop", title: "Stop the chat" },
+    ];
+    return { label, question, detail, reason: approval.reason, choices, lines: [label, question, ...detail, approval.reason] };
+  }
   const label = connector
     ? `${approval.connector} · ${approval.tool}`
     : terminal

@@ -39,6 +39,7 @@
 #include "url/origin.h"
 #include "url/url_constants.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/components/agent/tab_tools.h"
 
 namespace uw {
 namespace {
@@ -197,6 +198,16 @@ void AgentTools::Call(std::string_view tool,
     std::move(done).Run(stop_trigger_.Run());
     return;
   }
+  if (IsTabTool(tool)) {
+    tabs::TabInterface* chat = chat_.Get();
+    if (!chat) {
+      std::move(done).Run(Error("The chat's tab is closed."));
+      return;
+    }
+    RunTabTool(chat->GetBrowserWindowInterface()->GetProfile(), tool, args,
+               Owners(), std::move(done));
+    return;
+  }
   if (!engine_ || !engine_->GetTask(task_)) {
     std::move(done).Run(Error("Chromium's agent engine is not running."));
     return;
@@ -266,6 +277,50 @@ std::optional<AgentTools::Approval> AgentTools::ApprovalFor(
     base::StrAppend(&approval.action, {" and press Enter"});
   }
   return approval;
+}
+
+void AgentTools::CheckTabStep(std::string_view tool,
+                              const base::DictValue& args,
+                              base::OnceCallback<void(TabCheck)> done) {
+  tabs::TabInterface* chat = chat_.Get();
+  if (!chat) {
+    TabCheck check;
+    check.refused = Error("The chat's tab is closed.");
+    std::move(done).Run(std::move(check));
+    return;
+  }
+  uw::CheckTabStep(
+      chat->GetBrowserWindowInterface()->GetProfile(), tool, args, Owners(),
+      base::BindOnce(
+          [](base::OnceCallback<void(TabCheck)> done, TabStep step) {
+            TabCheck check;
+            check.refused = std::move(step.refused);
+            check.closes = step.closes;
+            if (step.changes_users_tabs) {
+              Approval approval;
+              approval.action = std::move(step.action);
+              approval.reason = std::move(step.reason);
+              approval.workspace = std::move(step.workspace);
+              approval.workspace_icon = std::move(step.workspace_icon);
+              for (const ListedTab& tab : step.tabs) {
+                approval.tabs.push_back({tab.title, tab.url});
+              }
+              approval.task = std::move(step.task);
+              approval.new_name = std::move(step.new_name);
+              check.approval = std::move(approval);
+            }
+            std::move(done).Run(std::move(check));
+          },
+          std::move(done)));
+}
+
+TabOwners AgentTools::Owners() const {
+  TabOwners owners;
+  owners.chat = chat_;
+  for (const auto& [number, tab] : tabs_) {
+    owners.agent[number] = tab.handle;
+  }
+  return owners;
 }
 
 void AgentTools::AskAboutSite(const url::Origin& site,
