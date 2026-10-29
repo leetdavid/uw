@@ -273,6 +273,13 @@ Agreed management, on 2026-10-22:
 - Pause stops runs and triggers. Resuming does not catch up on the paused time.
 - Deleting the chat deletes its schedule. Removing the schedule keeps it as an ordinary chat.
 
+Agreed on 2026-10-29: [Check now](CONTEXT.md#language) starts a run of a scheduled chat at once.
+
+- It is on the strip, on a single watch's card beside Edit, and among a Scheduled page row's hover buttons. A page with several watches has it on each watch's card, not on their list. A chat with only a trigger has none, and the command bar has no Check now command.
+- It hides while a run is under way or waits for approval; "Running now" shows instead.
+- It is an extra run: the schedule's next time stays. Otherwise it is like any run: it notifies per the chat's settings, counts toward the failure pause, and shows in the chat with no mark.
+- On a paused schedule it runs once, and the schedule stays paused.
+
 Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
 
 - It lists each scheduled chat once, in two sections: "Watched pages" first, then "Scheduled chats", which also holds chats with a running trigger, as the filter did. An empty section is left out. The header has Pause all.

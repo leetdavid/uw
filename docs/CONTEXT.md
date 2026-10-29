@@ -221,6 +221,10 @@ _Avoid_: Page watch, watch, routine.
 One time a scheduled chat carries out its request, out of sight, shown as one message in the chat. Underneath, a run is a subagent; say "subagent" only for that mechanism.
 _Avoid_: Check, job, execution.
 
+**Check now**:
+The button that starts a run of a scheduled chat at once, outside its schedule. Its label is the one place "check" stands for a run.
+_Avoid_: Run now, refresh.
+
 **Trigger**:
 A command left running out of sight that wakes its chat once when it ends, or once for each line it prints. In a scheduled chat each wake starts a run.
 _Avoid_: Monitor, watcher, hook.
