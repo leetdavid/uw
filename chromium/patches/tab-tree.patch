@@ -501,6 +501,30 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..8d4abc7e0e7239e3ca665b5f9a47fc30
        </message>
        <message name="IDS_COPIED_TO_CLIPBOARD_TOAST_BODY" desc="Text on a toast notification that is shown when an item has been copied to clipboard.">
          Copied to clipboard
+diff --git a/chrome/browser/autocomplete/tab_matcher_desktop.cc b/chrome/browser/autocomplete/tab_matcher_desktop.cc
+index 0adad2ca2f..1be01934df 100644
+--- a/chrome/browser/autocomplete/tab_matcher_desktop.cc
++++ b/chrome/browser/autocomplete/tab_matcher_desktop.cc
+@@ -12,6 +12,7 @@
+ #include "components/omnibox/common/omnibox_features.h"
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/web_contents_user_data.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+ class AutocompleteClientWebContentsUserData
+@@ -113,6 +114,11 @@ std::vector<content::WebContents*> TabMatcherDesktop::GetOpenWebContents(
+ 
+     TabStripModel* const tab_strip_model = bwi->GetTabStripModel();
+     for (int i = 0; i < tab_strip_model->count(); ++i) {
++      // uw: a tab that shows in several windows is listed once.
++      if (uw::TabOrganizationController::IsListedElsewhere(
++              tab_strip_model->GetTabAtIndex(i))) {
++        continue;
++      }
+       auto* web_contents = tab_strip_model->GetWebContentsAt(i);
+       if (web_contents != active_tab || !exclude_active_tab) {
+         all_tabs.push_back(web_contents);
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 2e7510e..54b0c39 100644
 --- a/chrome/browser/ui/BUILD.gn
@@ -932,6 +956,40 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..2543bacc96f51de5888dfc06c41253fe
    return TabGroupEditorBubbleView::Show(
        browser_view_->browser(), group_id,
        /*anchor_view=*/anchor_view, /*anchor_rect=*/std::nullopt,
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
+index 1107732839..f264a131d6 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
+@@ -304,9 +304,15 @@ void TabStripView::OnTabChanged(const tabs::TabInterface* active_tab) {
+     return;
+   }
+ 
++  // uw: only a newly selected tab opens its folded task. A page that moves
++  // into the selected tab, as when a page shown in several windows comes to
++  // this one, leaves the task folded, with the tab's row kept.
++  const bool newly_selected = active_tab->GetHandle() != uw_selected_;
++  uw_selected_ = active_tab->GetHandle();
++
+   // Expand group if the activated tab is within a collapsed group unless
+   // we are header dragging the collapsed group.
+-  if (active_tab->GetGroup().has_value()) {
++  if (newly_selected && active_tab->GetGroup().has_value()) {
+     TabCollectionNode* group_node = collection_node_->GetNodeForHandle(
+         active_tab->GetBrowserWindowInterface()
+             ->GetTabStripModel()
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.h b/chrome/browser/ui/views/tabs/common/tab_strip_view.h
+index bca3e9acc5..76924802d0 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view.h
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.h
+@@ -134,6 +134,8 @@ class TabStripView final : public views::View,
+   raw_ptr<views::ScrollView> unpinned_tabs_scroll_view_ = nullptr;
+   raw_ptr<UnpinnedTabContainerView> unpinned_tabs_container_view_ = nullptr;
+   bool is_collapsed_ = false;
++  // uw: the tab that was selected when the selection last changed.
++  tabs::TabHandle uw_selected_;
+ 
+   // Used for seek time metrics from the time the mouse enters the tabstrip.
+   std::optional<base::TimeTicks> mouse_entered_tabstrip_time_;
 diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
 index 88df244c596b07dbd0f5049ae59824bc80e47698..098be0d20e8dbc329f76d82664e3b21ae23e1bc0 100644
 --- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
@@ -1052,6 +1110,34 @@ index a06ae504557fd293fc7a8fe01d368539f379dc23..b3dd6cbace3fc32158bd968b7e3094c4
 +  }
    return delegate_->GetContextMenuAccelerator(command_id, accelerator);
  }
+diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+index a58bd71088..82f0a70eb3 100644
+--- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
++++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
+@@ -75,6 +75,7 @@
+ #include "ui/base/models/image_model.h"
+ #include "ui/color/color_provider.h"
+ #include "ui/gfx/image/image_skia.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+ constexpr base::TimeDelta kTabsChangeDelay = base::Milliseconds(50);
+@@ -554,9 +555,12 @@ void TabSearchPageHandler::WalkContainer(
+       // entries during loading and thus has no title/URL. Skip any such
+       // pending tabs. These tabs will be added to the list later on once
+       // loading has finished.
+-      if (tab_interface && tab_interface->GetContents()
+-                               ->GetController()
+-                               .GetLastCommittedEntry()) {
++      // uw: a tab that shows in several windows is listed once.
++      if (tab_interface &&
++          tab_interface->GetContents()
++              ->GetController()
++              .GetLastCommittedEntry() &&
++          !uw::TabOrganizationController::IsListedElsewhere(tab_interface)) {
+         tab_search::mojom::TabPtr tab = GetTab(tab_interface);
+         tab_dedup_keys.insert(DedupKey(tab->url, tab->group_id));
+         window->tabs.push_back(std::move(tab));
 diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
 index 62e11c5a7a4f2d235b97fdaae2abb26a8b9aa053..d498e1538c77f404e259cf12612a146eb3cbffbf 100644
 --- a/chrome/test/BUILD.gn
@@ -1073,7 +1159,7 @@ index 62e11c5a7a4f2d235b97fdaae2abb26a8b9aa053..d498e1538c77f404e259cf12612a146e
        "//chrome/browser/ui/tabs/organizer:unit_tests",
        "//chrome/browser/ui/tabs/saved_tab_groups",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
-index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb78018866b1460f 100644
+index 8eefd99313..0338fb2267 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_group_view_layout.cc
 @@ -22,12 +22,13 @@
@@ -1091,7 +1177,18 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb780188
  constexpr int kGroupHeaderVerticalMargin = 4;
  }  // namespace
  
-@@ -132,13 +133,22 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+@@ -112,6 +113,10 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+           : std::vector<views::View*>();
+ 
+   const bool is_focused = tab_group_view->IsGroupFocused();
++  // uw: a task folded in another window keeps this window's selected row,
++  // just under its header.
++  const int first_row = height;
++  int kept_row = 0;
+ 
+   // Layout children in order. Children will have their preferred height and
+   // fill available width.
+@@ -132,13 +137,29 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
      } else if (!is_focused) {
        child_x = TabGroupView::kTabLeadingPadding;
      }
@@ -1106,6 +1203,13 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb780188
        bounds.set_width(size_bounds.width().value() - bounds.x());
      }
 -    layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
++    if (tab_group_view->IsCollapsed() &&
++        uw::ShowsSelectedTab(tab_group_view->collection_node_, child)) {
++      bounds.set_y(first_row);
++      layouts.child_layouts.emplace_back(child, true, bounds);
++      kept_row = bounds.height() + kTabVerticalPadding;
++      continue;
++    }
 +    if (uw::IsHiddenInBranch(tab_group_view->collection_node_, child)) {
 +      bounds.set_height(0);
 +      layouts.child_layouts.emplace_back(child, false, bounds);
@@ -1115,6 +1219,16 @@ index 8eefd99313a2cf6326b2c1ab9ecc5dbe124b40b2..79c9511a0d1a6b941124b90fbb780188
      height += bounds.height() + kTabVerticalPadding;
      width = std::max(width, bounds.width());
    }
+@@ -172,7 +193,8 @@ views::ProposedLayout TabGroupViewLayout::CalculateVerticalLayout(
+ 
+   layouts.host_size = gfx::Size(
+       width, is_group_collapsed
+-                 ? header_bounds.height() + (2 * kGroupHeaderVerticalMargin)
++                 ? header_bounds.height() + (2 * kGroupHeaderVerticalMargin) +
++                       kept_row
+                  : std::max(height, dragged_view_bottom));
+   return layouts;
+ }
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc
 index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..54741e212b77cb3b3771d997a4899d91e6092d3b 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.cc

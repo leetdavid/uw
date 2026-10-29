@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 #include <algorithm>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 #include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
@@ -24,6 +26,8 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
 #include "components/sessions/core/tab_restore_service.h"
@@ -41,9 +45,12 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "ui/base/base_window.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -105,6 +112,24 @@ void SelectByClick(Browser* window, tabs::TabInterface* tab) {
       window->tab_strip_model()->GetIndexOfTab(tab),
       TabStripUserGestureDetails(
           TabStripUserGestureDetails::GestureType::kMouse));
+}
+
+views::View* FindRow(views::View* view, const tabs::TabInterface* tab) {
+  if (auto* row = views::AsViewClass<TabView>(view);
+      row && row->GetTabInterface() == tab) {
+    return row;
+  }
+  for (views::View* child : view->children()) {
+    if (views::View* row = FindRow(child, tab)) {
+      return row;
+    }
+  }
+  return nullptr;
+}
+
+// The row in `window`'s tab strip that shows `tab`.
+views::View* RowOf(Browser* window, const tabs::TabInterface* tab) {
+  return FindRow(BrowserView::GetBrowserViewForBrowser(window), tab);
 }
 
 bool IsOpen(BrowserWindowInterface* window) {
@@ -551,6 +576,116 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   SelectByClick(fresh, TabAt(fresh, kMail));
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return BlankTabs(first) == 0 && BlankTabs(fresh) == 0; }));
+}
+
+// The command bar's list of open tabs, like tab search, has each page once,
+// though every window shows it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, TabListsShowEachPageOnce) {
+  Browser* first = browser();
+  Open(first, kMail);
+  Open(first, kIssues);
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  SelectByClick(second, TabAt(second, kIssues));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(TabAt(second, kIssues));
+  }));
+
+  std::map<std::string, int> listed;
+  for (const auto& tab : TabMatcherDesktop(nullptr, first->GetProfile())
+                             .GetOpenTabs(nullptr,
+                                          /*exclude_active_tab=*/false)) {
+    ++listed[tab.url.spec()];
+  }
+  EXPECT_EQ(listed[kMail], 1);
+  EXPECT_EQ(listed[kIssues], 1);
+  int total = 0;
+  for (const auto& [url, count] : listed) {
+    total += count;
+  }
+  EXPECT_EQ(total, static_cast<int>(Layout(first).size()));
+}
+
+// A task folded in one window folds in the other, where the selected tab
+// keeps its row, until the user picks another tab in it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AFoldedTaskKeepsTheSelectedRow) {
+  Browser* first = browser();
+  Open(first, kMail);
+  Open(first, kIssues);
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  const std::optional<PageId> mail =
+      ControllerOf(first)->IdFor(TabAt(first, kMail));
+  const std::optional<PageId> issues =
+      ControllerOf(first)->IdFor(TabAt(first, kIssues));
+  ASSERT_TRUE(mail && issues);
+  ASSERT_TRUE(ControllerOf(first)->MoveToNewTask({*mail, *issues}, u"Trip"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return InStep(first, second) && TabAt(second, kIssues)->GetGroup();
+  }));
+  SelectByClick(second, TabAt(second, kIssues));
+
+  TabStripModel* first_tabs = first->tab_strip_model();
+  const tab_groups::TabGroupId task = *TabAt(first, kMail)->GetGroup();
+  const tab_groups::TabGroupVisualData* visuals =
+      first_tabs->group_model()->GetTabGroup(task)->visual_data();
+  first_tabs->ChangeTabGroupVisuals(
+      task, tab_groups::TabGroupVisualData(visuals->title(), visuals->color(),
+                                           /*is_collapsed=*/true));
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  EXPECT_TRUE(second->tab_strip_model()
+                  ->group_model()
+                  ->GetTabGroup(*TabAt(second, kMail)->GetGroup())
+                  ->visual_data()
+                  ->is_collapsed());
+  EXPECT_EQ(second->tab_strip_model()->GetActiveTab(), TabAt(second, kIssues));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const views::View* kept = RowOf(second, TabAt(second, kIssues));
+    const views::View* folded = RowOf(second, TabAt(second, kMail));
+    return kept && kept->GetVisible() && !kept->size().IsEmpty() && folded &&
+           !folded->GetVisible();
+  }));
+  SaveWindowScreenshot(second,
+                       "shared-tabs-folded-task-keeps-the-selected-row");
+
+  SelectByClick(second, TabAt(second, kMail));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return InStep(first, second) && !first_tabs->IsGroupCollapsed(task);
+  }));
+}
+
+// A branch folded in one window stays folded in the other, where the
+// selected tab keeps its row, until the user picks another tab in it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AFoldedBranchKeepsTheSelectedRow) {
+  Browser* first = browser();
+  Open(first, kMail);
+  Open(first, kIssues);
+  Open(first, kIssue);
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  // A tab opened in the background goes right under the selected tab, so
+  // Issue 412 is first, and Issues and Mail nest under it.
+  TabOrganizationController* controller = ControllerOf(first);
+  const std::optional<PageId> issue = controller->IdFor(TabAt(first, kIssue));
+  ASSERT_TRUE(issue);
+  ASSERT_TRUE(controller->Nest(*controller->IdFor(TabAt(first, kIssues))));
+  ASSERT_TRUE(controller->Nest(*controller->IdFor(TabAt(first, kMail))));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return InStep(first, second) &&
+           ControllerOf(second)->DepthFor(TabAt(second, kMail)) == 1;
+  }));
+  SelectByClick(second, TabAt(second, kMail));
+
+  controller->ToggleBranches({*issue});
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ControllerOf(second)->IsCollapsed(*issue); }));
+  EXPECT_FALSE(ControllerOf(second)->IsHidden(TabAt(second, kMail)));
+  EXPECT_TRUE(ControllerOf(second)->IsHidden(TabAt(second, kIssues)));
+
+  SelectByClick(second, TabAt(second, kIssues));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !controller->IsCollapsed(*issue); }));
 }
 
 class SharedTabsOffBrowserTest : public headless::HeadlessModeBrowserTest {};

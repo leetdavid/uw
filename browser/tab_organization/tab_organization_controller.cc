@@ -1035,7 +1035,20 @@ bool TabOrganizationController::IsHidden(const PageId& id) const {
 
 bool TabOrganizationController::IsHidden(const tabs::TabInterface* tab) const {
   const std::optional<PageId> id = IdFor(tab);
-  return id && IsHidden(*id);
+  return id && IsHidden(*id) && !(joined_ && tab == tabs_->GetActiveTab());
+}
+
+// static
+bool TabOrganizationController::IsListedElsewhere(tabs::TabInterface* tab) {
+  const TabOrganizationController* self =
+      tab ? From(tab->GetBrowserWindowInterface()) : nullptr;
+  const std::optional<PageId> id = self ? self->IdFor(tab) : std::nullopt;
+  if (!self || !self->joined_ || !id || !IsCopy(tab)) {
+    return false;
+  }
+  // The live page stands for it, or, with none, the first window's copy.
+  return self->shared_->HolderOf(*id, nullptr) ||
+         self->shared_->windows().front() != self;
 }
 
 bool TabOrganizationController::CollapsesBranches(
@@ -1484,6 +1497,11 @@ void TabOrganizationController::OnTabStripModelChanged(
     }
     active_ = IdFor(selection.new_tab);
     Remember(active_);
+    if (joined_ && (selection.reason &
+                    TabStripModelObserver::CHANGE_REASON_USER_GESTURE)) {
+      RevealSelected();
+      ScheduleUpdate();
+    }
     // Picking another tab uses the window for more than the tab it was
     // opened for, and leaves its blank tab unused.
     if ((selection.reason &
@@ -1727,7 +1745,12 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   std::erase_if(shared_->opened(),
                 [this](const PageId& id) { return !shared_->tree().Find(id); });
   LinkRestoredPages();
-  RevealSelected();
+  // With shared tabs, a branch another window folded stays folded here, and
+  // the selected tab keeps its row instead. It opens when the user selects a
+  // tab in it.
+  if (!joined_) {
+    RevealSelected();
+  }
   ScheduleUpdate();
   if (joined_) {
     shared_->Propagate(this);

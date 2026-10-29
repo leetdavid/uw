@@ -83,6 +83,12 @@ bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child) {
          });
 }
 
+bool ShowsSelectedTab(TabCollectionNode* parent, const views::View* child) {
+  return std::ranges::any_of(
+      TabsShownBy(parent, child),
+      [](const tabs::TabInterface* tab) { return tab->IsActivated(); });
+}
+
 base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,
                                                     views::View* container) {
   TabOrganizationController* controller = ControllerFor(node);

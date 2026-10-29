@@ -265,6 +265,10 @@ class TabOrganizationController : public TabStripModelObserver,
   // Whether `tab` holds a copy of a page whose live page is in another
   // window, or in none.
   static bool IsCopy(const tabs::TabInterface* tab);
+  // Whether lists of open tabs, such as tab search, leave `tab` out because
+  // another tab already stands for its page: the page's live page in another
+  // window, or, when no window holds it, the first window's copy.
+  static bool IsListedElsewhere(tabs::TabInterface* tab);
   // Moves the live page of the copy `tab` holds into it.
   void BringLivePage(tabs::TabInterface* tab);
   // The picture of the copy `tab` holds, as its page last left a window, for

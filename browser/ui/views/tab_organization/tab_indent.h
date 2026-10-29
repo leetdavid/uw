@@ -21,6 +21,10 @@ int TabIndentFor(TabCollectionNode* parent, const views::View* child);
 // a collapsed tab branch hides.
 bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child);
 
+// True when `child`, the view of one of `parent`'s child nodes, shows its
+// window's selected tab. A task folded in another window keeps that row.
+bool ShowsSelectedTab(TabCollectionNode* parent, const views::View* child);
+
 // Lays out `container` and its child views again whenever the window's page
 // tree changes. `container` must own the returned subscription.
 base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,
