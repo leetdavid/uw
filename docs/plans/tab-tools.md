@@ -102,7 +102,18 @@ The tools speak of workspaces, tasks, and tabs, not windows, since every window 
 
 ## Design
 
-T267 draws one frame on the "Agent chats" page of the [canvas](../../AGENTS.md#designs): the step lines, the close and move cards, and `uw tabs list` in the [`uw` command's](uw-command.md#design) terminal look. Nothing is built before the user signs it off.
+Drawn on 2026-10-29 for T267 on the "Agent chats" page of the [canvas](../../AGENTS.md#designs). Their rules are the "Tab tools" section of the canvas guide `uw-command`, since the canvas holds at most 20 guides. Nothing is built before the user signs them off.
+
+- "Tab tools: a close waits for you (Fluid)": a chat that listed the tabs and moved two to a new task, with the close card.
+- "Tab tools: every state (Fluid)": every step line, steps opened, the move, task close, and rename cards, a declined step, the tabs the tools leave alone, a scheduled run's notification, and the `uw chat` card, the `uw mcp serve` text, and `uw tabs list --json`.
+- "Tab tools: uw tabs in the terminal": `list`, `move`, `select`, `rename-task`, and two errors.
+
+uw's proposals in the frames:
+
+- A tab in a step is a chip with its icon and title, and a task a chip with its folder in the task's color. Clicking a tab chip shows the tab; clicking a task chip shows its folder in the sidebar.
+- A refused call shows as "Didn't close ~/dev/shop-web: a command runs there".
+- `uw tabs list` puts pins first and ends with a line counting the tabs and naming the other workspaces.
+- The `--json` fields: id, title, url, workspace, task, parent, selected, kept, pinned, busy, and seen.
 
 ## How it is built
 
