@@ -129,7 +129,9 @@ Two small round buttons in dark glass sit in the film's bottom-right corner whil
 
 The film stops on its end card, and the pause button becomes Replay. A real download link sits exactly over the end card's drawn "Download for Mac", placed as a share of the film's size so it lines up at any width.
 
-Open: phone widths, and "Reduce motion" and browsers without scroll-driven animation.
+On phones the sequence is the same, and the film spreads to the full screen width. Its buttons take 44 px touch areas, and the pin uses screen-height units that ignore Safari's toolbar, so it does not jump as the toolbar hides. A vertical cut of the film for phones is not planned.
+
+Open: "Reduce motion" and browsers without scroll-driven animation.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
