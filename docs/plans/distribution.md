@@ -106,14 +106,24 @@ Decided on 2026-10-29: Chromium's dump-only checks (`DUMP_WILL_BE_CHECK`, `DUMP_
 
 Agreed: one calm page that sells uw, "dawn at night". The approved design is frame `XS-shfv_9t` on the Doop canvas, chosen on 2026-10-28 over a louder poster direction because uw should feel zen. It shows only uw's own interface, never real or made-up websites, and only features that are built.
 
-1. Hero: a night sky. "ur web, ur way" in Instrument Serif, with "ur way" in a pink-to-cyan italic. One line on what uw is, then "Download for Mac" beside the [Homebrew](#homebrew) command, and "Apple silicon · macOS 13 or later". Below, a uw window rises from a glowing horizon: tasks in the sidebar, a video docked at its foot, and the agent asking before it closes tabs.
+1. Hero: a night sky. "ur web, ur way" in Instrument Serif, with "ur way" in a pink-to-cyan italic. One line on what uw is, then "Download for Mac" beside the [Homebrew](#homebrew) command, and "Apple silicon · macOS 13 or later". Below, a uw window rises from a glowing horizon: tasks in the sidebar, a video docked at its foot, and the agent asking before it closes tabs. As the page scrolls, it [becomes the film](#the-window-becomes-the-film).
 2. How it works: the four stops as a filmstrip of small sidebars: the Scratchpad, tabs filed into tasks, a new task being named, and Undo.
 3. Features: glass tiles for the mini player docked in the sidebar, the command bar, the agent, workspaces and themes, watching a page, the terminal, and privacy: the user's own AI provider, and nothing reported without a yes.
 4. A closing section that says the preview is rough, with the download button and the Homebrew command over a second horizon. Then a footer linking releases, GitHub Issues, and the source.
 
 Motion, not built yet: the stars and the horizon glow breathe slowly, the filmstrip lights each stop in turn, sections fade and rise in as they scroll into view, and each tile plays a short loop of its feature while on screen. Buttons respond to hover. With the system's "Reduce motion" setting on, the page holds still, and animations stop while off screen. Each part is reviewed as a recording of the real site before it goes live.
 
-The ad is deferred. It was built as animated HTML from the "Tabs, sorted" storyboard (frame `kSVeaeuYZm`), about 37 s with a scene per feature, and is in the history at commit `8dd05ed`.
+### The window becomes the film
+
+Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The storyboard is Doop frame `d7LslD48S1`. The ad is the animated HTML built from the "Tabs, sorted" storyboard (frame `kSVeaeuYZm`), in the history at commit `8dd05ed`, recorded as a video of about 36 s.
+
+1. The window rises with the page and turns to face the viewer, as it does now.
+2. Once it is flat and centered, it pins in place with its horizon while the page keeps scrolling.
+3. While pinned, its sidebar and chat blur away into the film's first frame, and the frame changes from the window's shape to the film's 16:9.
+4. The film then starts from the beginning, muted, and plays once at normal speed. It does not loop, and scrolling does not move it forward or back.
+5. After about one more screen the page lets go. The film keeps playing as it scrolls away and pauses once it is mostly out of view.
+
+Open: whether the film gets sound, whether the page holds visitors at the film, what shows when it ends, phone widths, "Reduce motion" and browsers without scroll-driven animation, and recording the film again at 2× without the old pause button.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
