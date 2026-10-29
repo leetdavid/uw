@@ -131,7 +131,7 @@ The film stops on its end card, and the pause button becomes Replay. A real down
 
 On phones the sequence is the same, and the film spreads to the full screen width. Its buttons take 44 px touch areas, and the pin uses screen-height units that ignore Safari's toolbar, so it does not jump as the toolbar hides. A vertical cut of the film for phones is not planned.
 
-Open: "Reduce motion" and browsers without scroll-driven animation.
+With "Reduce motion" on, and in browsers without scroll-driven animation such as Firefox, the window shows flat with a Play button in its corner. Nothing turns, pins, or dissolves, and the film never starts on its own. Play swaps the window for the film in place, with the same buttons.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
