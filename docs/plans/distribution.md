@@ -115,7 +115,7 @@ Motion, not built yet: the stars and the horizon glow breathe slowly, the filmst
 
 ### The window becomes the film
 
-Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The storyboard is Doop frame `d7LslD48S1`. The film is take 3 of the ad: 39.6 s at 1920 × 1080, with music and sound effects, rendered from the HyperFrames project in `~/dev/uw-ad`, outside this repo. It remakes the animated HTML ad from commit `8dd05ed`.
+Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The storyboard is Doop frame `d7LslD48S1`, and every state of the film is `Qa-K4grdt1`. The film is take 3 of the ad: 39.6 s at 1920 × 1080, with music and sound effects, rendered from the HyperFrames project in `~/dev/uw-ad`, outside this repo. It remakes the animated HTML ad from commit `8dd05ed`.
 
 1. The window rises with the page and turns to face the viewer, as it does now.
 2. Once it is flat and centered, it pins in place with its horizon while the page keeps scrolling.
