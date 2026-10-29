@@ -266,6 +266,10 @@ _Avoid_: Notification center, alerts panel.
 A conversation with uw's built-in agent, which may browse for the user to answer or carry out a request. Its page is a regular tab, and the tabs the agent opens are child tabs beneath it.
 _Avoid_: Delegated browser task, agent task, run, job.
 
+**Agent's tab**:
+A tab that a chat's agent opened, nested under the chat. It is the only kind of tab the agent reads or acts in; the user's other tabs it can only arrange.
+_Avoid_: Agent tab.
+
 **Private chat**:
 A chat started from a private window. Nothing from it is kept after the private windows close.
 
@@ -310,10 +314,10 @@ A package a service publishes that adds its connector, its skills, or both to uw
 _Avoid_: App, extension, integration.
 
 **Approval**:
-The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program. For a connector, it lets one tool call run, or every call of that tool for the rest of the chat or for good.
+The user's go-ahead for one change an agent wants to make on a site, such as submitting a form, buying, sending, deleting, cancelling, changing account settings, or signing in with a saved password or passkey. Reading, searching, navigating, and filling in fields need none. In a terminal, an approval lets one command run, or one set of keys reach a running program. For a connector, it lets one tool call run, or every call of that tool for the rest of the chat or for good. For the user's own tabs, it lets one call close the tabs it names.
 
 **Approval mode**:
-How much a chat asks before it acts. Ask first asks before every click, typing, terminal command, and connector tool call. Auto, the default, asks before each change on a site, each sign-in, each command the command check finds dangerous, and each connector tool not marked as only reading. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
+How much a chat asks before it acts. Ask first asks before every click, typing, terminal command, connector tool call, and change to the user's tabs. Auto, the default, asks before each change on a site, each sign-in, each command the command check finds dangerous, each connector tool not marked as only reading, and each closing of the user's tabs. Full auto never asks, except before a command that may read a sensitive file, which every mode asks about. A chat keeps its own mode; a mode picked on a new chat before its first message becomes the default for new chats.
 _Avoid_: permission mode, autonomy level.
 
 **Command check**:
@@ -336,7 +340,7 @@ _Avoid_: interrupt, inject.
 An AI agent running outside uw, such as Claude Code or Codex, that the user lets work in uw's tabs.
 
 **`uw` command**:
-What the user types in a terminal, or a script or outside agent runs, to start chats, manage connectors, and change settings in uw. It works only once the user installs it.
+What the user types in a terminal, or a script or outside agent runs, to start chats, arrange tabs, manage connectors, and change settings in uw. It works only once the user installs it.
 _Avoid_: CLI, command-line tool, terminal app.
 
 **Site customization**:
