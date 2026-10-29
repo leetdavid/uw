@@ -344,7 +344,10 @@ vercel link --yes --project uw --scope eslee
 vercel build --prod --yes --scope eslee
 vercel deploy --prebuilt --prod --scope eslee
 cd - && git worktree remove --force /tmp/uw-deploy
+curl -fsS -o /dev/null https://uwbrowser.com/oauth/client.json
 ```
+
+Every uw build signs in to some connectors with [`/oauth/client.json`](site/public/oauth/client.json) as its client ID ([ADR 0023](docs/adr/0023-uw-signs-in-with-a-client-file-on-uwbrowser-com-when-a-server-cant-register-it.md)), so the last line must succeed. On 2026-10-28 a deploy from a checkout older than that file took it offline, and Home Assistant refused uw's sign-in.
 
 [Help](docs/plans/help.md) is MDX in [`site/content/help/`](site/content/help/), served at `/help` by Fumadocs with search, `/llms.txt`, `/llms-full.txt`, and each page's Markdown at its address plus `.md`. Help on `main` can describe features that are not released yet, so deploy the site after a release is published, and before any deploy between releases check that Help describes nothing unreleased. "Was this helpful?" sends its answers to PostHog once the Vercel project has `POSTHOG_PROJECT_TOKEN` and `POSTHOG_PROJECT_REGION`, the same values as in `.env`.
 
