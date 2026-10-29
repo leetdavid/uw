@@ -8,6 +8,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/navigation_predictor/search_engine_preconnector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/safe_browsing/download_protection/download_protection_delegate.h"
 #include "chrome/browser/safe_browsing/download_protection/download_protection_service.h"
@@ -103,6 +104,7 @@ IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
   EXPECT_FALSE(
       base::FeatureList::IsEnabled(network_time::kNetworkTimeServiceQuerying));
   EXPECT_FALSE(base::FeatureList::IsEnabled(omnibox::kAimEnabled));
+  EXPECT_FALSE(base::FeatureList::IsEnabled(features::kPreconnectToSearch));
 }
 
 IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
@@ -186,6 +188,21 @@ IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
   EXPECT_TRUE(Shown("chrome://settings/security", "#safeBrowsingStandard"));
   EXPECT_FALSE(Shown("chrome://settings/security", "#safeBrowsingEnhanced"));
   EXPECT_FALSE(Shown("chrome://settings/syncSetup", "#urlCollectionToggle"));
+}
+
+IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
+                       ThePrivacyGuideSkipsBothRemovedSettings) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://settings/privacy/guide")));
+  EXPECT_EQ(true, content::EvalJs(
+                      browser()->tab_strip_model()->GetActiveWebContents(),
+                      std::string(kFind) + R"((async () => {
+        const steps = (await until('settings-privacy-guide-page'))
+            .privacyGuideStepToComponentsMap_;
+        return !steps.get('msbb').isAvailable() &&
+            !steps.get('safeBrowsing').isAvailable() &&
+            steps.get('cookies').isAvailable();
+      })())"));
 }
 
 }  // namespace

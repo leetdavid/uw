@@ -1,9 +1,12 @@
 diff --git a/chrome/browser/metrics/chrome_feature_list_creator.cc b/chrome/browser/metrics/chrome_feature_list_creator.cc
-index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f80e3f091 100644
+index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..36326c3b7f948a56a48e9333a3509ecf7604d2fc 100644
 --- a/chrome/browser/metrics/chrome_feature_list_creator.cc
 +++ b/chrome/browser/metrics/chrome_feature_list_creator.cc
-@@ -22,6 +22,8 @@
+@@ -20,8 +20,11 @@
+ #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
+ #include "chrome/browser/first_run/first_run.h"
  #include "chrome/browser/metrics/chrome_metrics_services_manager_client.h"
++#include "chrome/browser/navigation_predictor/search_engine_preconnector.h"  // nogncheck
  #include "chrome/browser/prefs/browser_prefs.h"
  #include "chrome/browser/prefs/chrome_pref_service_factory.h"
 +#include "chrome/browser/ui/tabs/features.h"  // nogncheck
@@ -11,7 +14,7 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f
  #include "chrome/common/chrome_paths.h"
  #include "chrome/common/chrome_switches.h"
  #include "chrome/installer/util/initial_preferences.h"
-@@ -29,7 +31,10 @@
+@@ -29,7 +32,10 @@
  #include "components/network_time/network_time_tracker.h"
  #include "components/prefs/json_pref_store.h"
  #include "components/prefs/pref_registry_simple.h"
@@ -22,7 +25,7 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f
  #include "components/variations/pref_names.h"
  #include "components/variations/service/variations_service.h"
  #include "components/variations/variations_crash_keys.h"
-@@ -39,7 +44,9 @@
+@@ -39,7 +45,9 @@
  #include "content/public/common/content_switches.h"
  #include "services/network/public/cpp/network_switches.h"
  #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -32,7 +35,7 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f
  
  #if BUILDFLAG(IS_WIN)
  #include "chrome/installer/util/google_update_settings.h"
-@@ -238,11 +245,37 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
+@@ -238,11 +246,38 @@ void ChromeFeatureListCreator::SetUpFieldTrials() {
  
    variations::VariationsService* variations_service =
        metrics_services_manager_->GetVariationsService();
@@ -64,6 +67,7 @@ index 90e572fe4efe1baa00ca8218dbcb3a5d0ad36ddb..5f93f74803314ab2bb40456bd2ef0a4f
 +  // docs/plans/google-requests.md.
 +  for (const base::Feature* google :
 +       {&autofill::features::debug::kAutofillServerCommunication,
++        &features::kPreconnectToSearch,
 +        &network_time::kNetworkTimeServiceQuerying, &omnibox::kAimEnabled}) {
 +    overrides.emplace_back(std::cref(*google),
 +                           base::FeatureList::OVERRIDE_DISABLE_FEATURE);
