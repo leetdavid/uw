@@ -1701,7 +1701,10 @@ void UwChatHandler::Save() {
   const AgentContext* context =
       agent_ ? &agent_->context() : saved_context_.get();
   ChatIndex* index = index_observation_.GetSource();
-  if (!file_ || !context || (index && index->WasDeleted(id_))) {
+  // A chat made by watching a page has lines, such as its runs', before its
+  // agent starts. A new chat with neither is not kept.
+  if (!file_ || (!context && log_.empty()) ||
+      (index && index->WasDeleted(id_))) {
     return;
   }
   if (updated_.is_null()) {
@@ -1731,8 +1734,10 @@ void UwChatHandler::Save() {
                               .Set("running", Working())
                               .Set("updated", base::TimeToValue(updated_))
                               .Set("log", log_.Clone())
-                              .Set("context", context->ToValue())
                               .Set("tabs", std::move(tabs));
+  if (context) {
+    saved.Set("context", context->ToValue());
+  }
   if (model_) {
     saved.Set("model", ModelValue(*model_));
   }

@@ -2924,6 +2924,64 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
       << " from " << bottom;
 }
 
+// A chat made by watching a page has no agent until the user writes in it.
+// A run that ends while its page is open still stays in its file.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       AWatchedChatOpenBeforeItsAgentKeepsItsRuns) {
+  UseAgentModel();
+  Profile* profile = browser()->GetProfile();
+  const std::string id = ChatFile::NewChatId();
+  const std::string request = "Tell me when the Jarvis desk drops below $500.";
+  ChatIndex::For(profile)->Update(
+      {id, request, base::Time::Now(), ChatIndex::State::kDone});
+  ChatFile(profile->GetPath(), id)
+      .Save(
+          base::DictValue()
+              .Set("version", 1)
+              .Set("title", request)
+              .Set("updated", base::TimeToValue(base::Time::Now()))
+              .Set("log", base::ListValue().Append(base::DictValue()
+                                                       .Set("kind", "user")
+                                                       .Set("text", request))));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), ChatUrl(id)));
+  content::WebContents* chat = tabs()->GetActiveWebContents();
+  WaitForChat(chat);
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "report", base::DictValue()
+                         .Set("found", true)
+                         .Set("message", "Down to $479.")
+                         .Set("values", base::ListValue())))),
+       ScriptedModel::Answer("Reported.")});
+  ScheduledChat watch;
+  watch.schedule.repeat = Schedule::Repeat::kDaily;
+  watch.schedule.hour = 9;
+  watch.request = request;
+  watch.page = "https://www.fully.com/desks/jarvis";
+  watch.provider_id = AgentChoice(*profile->GetPrefs())->provider_id;
+  watch.model = "test-agent";
+  ScheduledChats::For(profile)->Save(id, watch);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(
+               chat,
+               "document.querySelector('.run-message')?.textContent ?? ''")
+               .ExtractString()
+               .find("Down to $479.") != std::string::npos;
+  }));
+
+  base::test::TestFuture<std::optional<base::DictValue>> loaded;
+  ChatFile(profile->GetPath(), id).Load(loaded.GetCallback());
+  std::optional<base::DictValue> saved = loaded.Take();
+  ASSERT_TRUE(saved);
+  const base::ListValue& log = *saved->FindList("log");
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_EQ(*log[0].GetDict().FindString("text"), request);
+  EXPECT_EQ(*log[1].GetDict().FindString("kind"), "run");
+  EXPECT_EQ(*log[1].GetDict().FindString("text"), "Down to $479.");
+  EXPECT_FALSE(saved->Find("context"));
+}
+
 // Primary buttons, and the scheduled chats' accents, take the theme's color,
 // as Chromium's colors do, and change with it.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePrimaryColorFollowsTheTheme) {
