@@ -1,4 +1,3 @@
-import { Instrument_Sans } from "next/font/google";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Brew } from "./brew";
@@ -8,8 +7,6 @@ import { Favicon } from "./icons";
 import { Sidebar, type SidebarState } from "./sidebar";
 import { bike, launch, moved, sorted, tab, trip } from "./tabs";
 import "./home.css";
-
-const sans = Instrument_Sans({ subsets: ["latin"], variable: "--font-home" });
 
 const DOWNLOAD =
   "https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg";
@@ -199,7 +196,7 @@ function HeroWindow() {
 
 export default function Home() {
   return (
-    <main className={`home ${sans.variable}`}>
+    <main className="home">
       <section className="hero">
         <div className="stars" />
         <nav className="nav">

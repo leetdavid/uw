@@ -72,13 +72,7 @@ export default function HelpHome() {
       </div>
       <footer className="help-footer">
         <a className="brand" href="/">
-          <Image
-            src="/logo.svg"
-            alt=""
-            width={30}
-            height={30}
-            style={{ margin: -2 }}
-          />
+          <Image src="/logo.svg" alt="" width={26} height={26} />
           uw
         </a>
         <span>© 2026 uw. Built on Chromium.</span>

@@ -7,13 +7,7 @@ export function SiteNav() {
   return (
     <nav className="nav help-nav">
       <a className="brand" href="/">
-        <Image
-          src="/logo.svg"
-          alt=""
-          width={30}
-          height={30}
-          style={{ margin: -2 }}
-        />
+        <Image src="/logo.svg" alt="" width={30} height={30} />
         uw
       </a>
       <div className="links">

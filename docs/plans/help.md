@@ -105,6 +105,7 @@ Where the build differs from the design:
 - "Was this helpful?" does not remember an answer after the page reloads.
 - On a phone, the Help home's nav shows the logo and Download only.
 - Dark mode takes the night colors of the redesigned home page (`site/app/home.css`): a deep indigo sky, a glowing horizon in place of the darkened dawn, gradient italics, and a white Download button. "Help: dark" on the canvas shows the earlier violet night.
+- Since 2026-10-29, Help also takes the home page's header and type in both looks, at the user's request and without a new design: the full-width nav whose veil fades in as the page scrolls, Instrument Sans, uppercase section labels with a short rule, sans headings with one serif italic word, and the home page's 1248-pixel column. Light mode keeps the dawn colors.
 - `try-uw.md` is not deleted yet: other sessions still add manual tests to it as features land. See [Open questions](#open-questions).
 
 Help went live at `uwbrowser.com/help` on 2026-10-28, before a release, at the user's call: some pages describe things the 2026-10-24 prerelease doesn't have.

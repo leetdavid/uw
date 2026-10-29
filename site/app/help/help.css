@@ -139,42 +139,31 @@ em {
     0 -40px 160px rgba(92, 214, 242, 0.25);
 }
 
-/* The site's nav, fixed above Help */
+/* The site's nav above Help, its veil in Help's background */
 
 .help-nav {
-  position: fixed;
+  --veil: var(--color-fd-background);
   z-index: 40;
 }
 
-.dark .help-nav {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-}
-
-.dark .help-nav .links {
+.help-nav .links {
   color: var(--help-ink2);
 }
 
-.dark .help-nav .links a.on {
-  background: rgba(255, 255, 255, 0.08);
+.help-nav .links a:not(.get):hover,
+.help-nav .links a.on {
   color: var(--color-fd-foreground);
 }
 
 .dark .help-nav .links .get {
   background: #fff;
   color: #1e1b2e;
-  box-shadow: 0 10px 40px rgba(139, 124, 255, 0.45);
-}
-
-.help-nav .links a.on {
-  background: rgba(30, 27, 46, 0.06);
-  color: var(--color-fd-foreground);
 }
 
 @media (min-width: 768px) {
   #nd-docs-layout {
     --fd-banner-height: 92px;
+    --fd-layout-width: min(1248px, 100% - 48px);
     padding-top: 92px;
   }
 }
@@ -185,15 +174,7 @@ em {
   }
 
   #nd-subnav {
-    top: 8px;
-    margin: 8px 12px 0;
     border: 0;
-    border-radius: 999px;
-    background: var(--help-glass);
-    backdrop-filter: blur(18px);
-    box-shadow:
-      inset 0 0 0 1px var(--help-glass-ring),
-      0 8px 24px rgba(30, 27, 46, 0.06);
   }
 }
 
@@ -207,8 +188,8 @@ em {
 /* The section list as a glass card */
 
 #nd-sidebar {
-  inset: 0 0 24px 24px;
-  width: auto;
+  inset: 0 0 24px auto;
+  width: var(--fd-sidebar-width);
   border: 0;
   border-radius: 28px;
   background: var(--help-glass);
@@ -279,23 +260,20 @@ em {
 .help-group {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: fit-content;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--help-ink2);
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--help-glass);
-  backdrop-filter: blur(8px);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-fd-primary);
 }
 
 .help-group::before {
   content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-fd-primary);
+  width: 22px;
+  height: 1.5px;
+  background: currentColor;
 }
 
 #nd-page h1 {
@@ -324,18 +302,28 @@ em {
 }
 
 .prose h2 {
-  font-family: var(--font-serif), Georgia, serif;
-  font-weight: 400;
-  font-size: 40px;
-  line-height: 1.02;
-  letter-spacing: -0.015em;
+  font-weight: 500;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   margin-top: 1.4em;
 }
 
 .prose h3 {
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.prose h2 em,
+.prose h3 em,
+.help-tile h2 em,
+.help-feedback h5 em,
+.help-feedback.done b em {
   font-family: var(--font-serif), Georgia, serif;
   font-weight: 400;
-  font-size: 28px;
+  font-size: 1.12em;
+  letter-spacing: -0.01em;
 }
 
 .prose kbd {
@@ -515,10 +503,10 @@ em {
 
 .help-feedback h5,
 .help-feedback.done b {
-  font-family: var(--font-serif), Georgia, serif;
-  font-weight: 400;
-  font-size: 26px;
+  font-weight: 500;
+  font-size: 22px;
   line-height: 1.1;
+  letter-spacing: -0.02em;
   color: var(--color-fd-foreground);
 }
 
@@ -740,7 +728,7 @@ em {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
-  width: min(1180px, 100% - 40px);
+  width: min(1248px, 100% - 48px);
   margin: -70px auto 0;
 }
 
@@ -754,18 +742,17 @@ em {
 .help-tile .kicker {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--color-fd-primary);
 }
 
 .help-tile h2 {
-  margin-top: 8px;
-  font-family: var(--font-serif), Georgia, serif;
-  font-weight: 400;
-  font-size: 40px;
-  line-height: 1.02;
-  letter-spacing: -0.01em;
+  margin-top: 12px;
+  font-weight: 500;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .help-tile > p {
@@ -852,9 +839,10 @@ em {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  width: min(1080px, 100% - 40px);
-  margin: 0 auto;
-  padding: 56px 0 52px;
+  width: min(1248px, 100% - 48px);
+  margin: 96px auto 0;
+  padding: 34px 0 40px;
+  border-top: 1px solid var(--color-fd-border);
   font-size: 14px;
   color: var(--color-fd-muted-foreground);
 }
@@ -865,7 +853,7 @@ em {
 
 .help-footer nav {
   display: flex;
-  gap: 26px;
+  gap: 28px;
 }
 
 .help-footer nav a {
@@ -881,12 +869,6 @@ em {
 @media (max-width: 767px) {
   .help-home .help-nav {
     display: flex;
-    left: 12px;
-    right: 12px;
-  }
-
-  .help-home .help-nav .links a:not(.get) {
-    display: none;
   }
 }
 
@@ -899,23 +881,11 @@ em {
 }
 
 #nd-page .\@container.grid > a > div p {
-  font-family: var(--font-serif), Georgia, serif;
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 1.1;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   color: var(--color-fd-foreground);
-}
-
-.help-nav:has(~ #nd-docs-layout)::before {
-  content: "";
-  position: absolute;
-  top: -18px;
-  left: -24px;
-  right: -24px;
-  height: 92px;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(var(--color-fd-background) 40%, transparent);
 }
 
 .dark .help-sky,
