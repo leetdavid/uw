@@ -378,7 +378,7 @@ Agreed: require an explicit "Enable Jev tab classification" choice before sendin
 
 Agreed on 2026-10-15 for v2.1: the user saves each [provider](CONTEXT.md#language) once, with its key, and every model choice picks from them: the language model, the decision model, and the agent model. Each chat can switch its model and effort. See the [AI providers plan](plans/ai-providers.md). Agreed on 2026-10-21: every profile shares the same providers, and each profile picks its own models.
 
-Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md).
+Agreed on 2026-10-11: settings also hold an optional decision model beside the language model. It can be Jev, the OpenAI Decisions API, or an endpoint compatible with the OpenAI Decisions API. It decides where a tab goes; the language model names new tasks. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md). Agreed on 2026-10-29, not built yet: this choice becomes the [quick-choice model](CONTEXT.md#language), a decision model or any language model, and its menu lists only real decision models from each provider. See [quick choices](plans/ai-providers.md#quick-choices).
 
 Show the active provider and model. Explain which features a model supports. If it lacks a required capability, offer a supported choice rather than silently switching providers.
 

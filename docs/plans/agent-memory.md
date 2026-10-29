@@ -68,7 +68,7 @@ uw's proposals, accepted with the plan on 2026-10-26:
 - At most 30 core memories. When there are 30, the agent must make one not core before it adds another.
 - A memory is at most 300 characters.
 - A forgotten memory also counts under the answer: "Forgot 1 memory".
-- The memory check goes to the model the command check uses: the decision model, else the language model, else the chat's own model.
+- The memory check goes to the model the command check uses: the [quick-choice model](../CONTEXT.md#language), else the chat's own model.
 - The Memory switch is also `agent.memory` in `uw settings`.
 
 ## Design

@@ -1,8 +1,8 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16. Changed on 2026-10-21: the page moves to `uw://ai/providers`, per the [connectors plan](connectors.md#the-ai-page).
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16. Changed on 2026-10-21: the page moves to `uw://ai/providers`, per the [connectors plan](connectors.md#the-ai-page). Changed on 2026-10-29: [quick choices](#quick-choices), not built yet.
 
-Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss.
+Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss. Quick choices are also **6/10**: probes are new, OpenRouter's System One address is untested, and the organizer must send each request to the right model in its format.
 
 ## Agreed scope
 
@@ -25,6 +25,30 @@ Implementability: **6/10** using the [roadmap convention](roadmap.md#implementab
 - An address is https, or plain http on this Mac or a private network: 10.x, 172.16–31.x, 192.168.x, `*.local`, and 100.64–127.x for Tailscale. Agreed on 2026-10-16.
 - A network proxy needs nothing here: uw's model requests follow the Mac's proxy settings, like the rest of the browser.
 - uw's settings section keeps automatic organization, the thresholds, pause, the tint, and the command bar switch, and links to `uw://providers`. The settings sidebar also lists "AI providers" under uw, with the external-link mark Extensions has; it opens `uw://providers` in a new tab. Agreed on 2026-10-16. The language, decision, and agent model cards leave it.
+
+## Quick choices
+
+Agreed on 2026-10-29; not built yet (T264 to T266). Found when the user added Vercel AI Gateway and OpenAI: the decision model menu offered none of Vercel's 14 decision models and all 51 of OpenAI's models, of which one can decide. Where these rules differ from the scope above, they win.
+
+- **Rows by job.** The Models rows are named for what each model does: "Makes quick choices", "Names tasks", and "Starts chats". "Makes quick choices" is the [quick-choice model](../CONTEXT.md#language), described as "Where each new tab goes, and whether the agent's commands and memories are safe." "Names tasks" is the language model; "Starts chats" is the agent model. An empty choice reads "Same as Names tasks".
+- **Decision models by provider.**
+
+  | Provider | Its decision models | Requests go to |
+  | --- | --- | --- |
+  | Vercel AI Gateway | The models its list marks `"type": "evaluation"` | `<address>/decisions`, in the OpenAI Decisions format |
+  | OpenRouter | Its list at `<address>/models?output_modalities=decisions` | `<address>/systemone`, in the System One format |
+  | OpenAI | The models that answer a probe | `<address>/decisions`, as now |
+  | Jev | Every model | `<address>/systemone`, as now |
+  | Custom, in a decision format | The models that answer a probe | As now |
+
+- **Probes**, per [ADR 0025](../adr/0025-uw-asks-a-provider-which-models-are-decision-models-when-its-list-does-not-say.md). Where a provider's list does not say, uw sends each listed model one decision request: the fixed sentence "uw checks that this model can answer." and one yes-or-no question. An answer makes it a decision model. An error saying the model cannot do decisions makes it not one. Any other failure, such as no network, a rejected key, a rate limit, or a server error, leaves it unknown until uw next lists the models.
+  - uw probes when it lists a provider's models: when the provider is added, when the page opens, and when a model menu opens. It probes only models without a kept answer.
+  - Answers are kept per provider and dropped when its address or key changes. A no is asked again after 7 days. A yes stays until the model leaves the provider's list.
+- **While uw probes.** The quick choices menu shows a spinner and "Checking 51 models…" under the provider's name and fills in as answers come. A provider with none loses its heading. The provider row reads "51 models · checking", then "51 models · 1 decision", the count every provider with decision models shows. A provider's page tags each decision model "Decision model". A failed probe adds no message of its own: the row's status already shows a rejected key.
+- **Menus.** The quick choices menu lists "Decision models" first, by provider, then "Or a language model": "Same as Names tasks", then every language model by provider, with search. With no decision model anywhere, it lists the language models and ends with "Decision models are faster and cheaper for this. Vercel AI Gateway, OpenRouter, OpenAI, and Jev have them." and a link to Add provider. The Names tasks, Starts chats, and chat composer menus leave out the models a provider's list marks as decision models. A model that also writes text, such as OpenAI's `gpt-6-luna`, shows in every menu.
+- **A language model for quick choices.** Its chip carries a gray "Language model" tag. It gets the [classification call](../CONTEXT.md#language) in its own format with thinking off, as the command check does now. The Names tasks model always names new tasks: with a different model in each row, a new task costs one more small call; with the same model, it stays one call.
+- **Test** passes when a decision model answers with a choice, or a language model with a placement uw can read.
+- **Upgrade.** Saved choices stay. A saved decision model choice that is a language model runs as one, with its tag.
 
 ## Design
 
@@ -53,6 +77,9 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 3. T78: the Anthropic Messages and OpenAI Responses formats. Built on 2026-10-16, with the shared code moved to `browser/ai_providers/`. Live calls over each format are for the user to check: the tests play the providers with a local server.
 4. T79: the model catalog, and the model and effort chips in the chat composer. Built on 2026-10-16. What a model kept goes back only to that model, so a switch to another model at the same provider drops it.
 5. T103: proxies and addresses: changeable addresses, the "Each model's own" format, the key headers, and plain http on private networks. Built on 2026-10-16, on T104's catalog lookups by address. A live check through CLIProxyAPI is for the user: the tests play a proxy with a local server.
+6. T264: the design of [quick choices](#quick-choices) on the canvas: the rows by job with each menu, and every state.
+7. T265: decision models by provider: the lists, probes, the counts and tags, and decision models out of the language and agent menus. The tests play the providers; a live OpenRouter decision is for the user to check.
+8. T266: the rows by job and a language model for quick choices, with the other plans, the architecture, and the Help page.
 
 ## Acceptance checks
 
@@ -67,6 +94,11 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 9. Changing OpenAI's address to one that lists no models keeps the old address and says why.
 10. A provider at `http://192.168.1.20:8317/v1` can be added; one at a public `http://` address cannot.
 11. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
+12. With Vercel AI Gateway added, the quick choices menu lists its 14 decision models, and none of them is in the Names tasks, Starts chats, or chat composer menus.
+13. With OpenAI added, uw probes its models once, and the quick choices menu lists `gpt-6-luna` under OpenAI. Listing them again sends no probe until a no is 7 days old.
+14. With OpenRouter added, its decision models are listed, and one places a tab over `/systemone`.
+15. With a language model making quick choices and another naming tasks, the first places a new tab and the second names its task. The chip says "Language model".
+16. With only Anthropic added, the quick choices menu lists its language models, the hint, and Add provider.
 
 ## Open questions
 

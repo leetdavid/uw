@@ -13,6 +13,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
   - **Language model**. Connection modes: Ollama (endpoint, model, no key) and OpenAI-compatible (base URL, model, API key).
 - The decision model decides where a tab goes. With no decision model, the language model decides in one [classification call](../CONTEXT.md#language). uw asks about one tab at a time and acts on the whole [tab branch](#branch-moves).
 - The language model names a task the decision model starts. Without a language model, or when the name is invalid, the task keeps the [provisional name](../CONTEXT.md#language) `New task`.
+- Agreed on 2026-10-29, not built yet: placement goes to the [quick-choice model](../CONTEXT.md#language), which can also be a language model the user picked, and the language model that names tasks always names them. See [quick choices](ai-providers.md#quick-choices).
 - A new task does not wait for its name. Agreed on 2026-10-13, after the user's log showed naming calls of 7 to 21 seconds during which nothing moved.
   - The tabs move at once into a task with the provisional name, placed after every other task. Then uw asks the language model for the name.
   - While it waits, a spinner shows on the task's row. With "Show organizer activity" on, the activity card says "Naming the task", with "Asking <model>" under the tab's title. Changed on 2026-10-15. Before, the card always showed "Asking <model> for a name", which a long model name cut off.
