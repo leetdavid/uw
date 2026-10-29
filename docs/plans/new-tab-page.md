@@ -32,7 +32,7 @@ Below the box, each section is hidden when it has nothing to show, so a quiet da
 
 ## Design
 
-Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" and "New tab page: every state (Fluid)" on the "Agent chats" page of the [canvas](../../AGENTS.md#designs), with the rules in the guide `uw-new-tab-page`. Proposed, awaiting the user's sign-off:
+Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" and "New tab page: every state (Fluid)" on the "Agent chats" page of the [canvas](../../AGENTS.md#designs), with the rules in the guide `uw-new-tab-page`. The user signed them off the same day ("lgtm"), with these choices of uw's:
 
 - The sections sit under the box in two columns: Needs you, Finished, and Setup on the left, which want the user; Coming up, Running, and Tabs on the right, which go on by themselves.
 - Needs you lists steps oldest first, with Review, which opens the chat at its question, or Open page to sign in.
