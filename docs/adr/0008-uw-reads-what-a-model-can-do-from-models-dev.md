@@ -1,6 +1,6 @@
 # uw reads what a model can do from models.dev
 
-Status: agreed on 2026-10-15 for v2.1. Built on 2026-10-16 (T79).
+Status: agreed on 2026-10-15 for v2.1. Built on 2026-10-16 (T79). Since 2026-10-29, [ADR 0025](0025-uw-asks-a-provider-which-models-are-decision-models-when-its-list-does-not-say.md) makes one exception: which models are decision models.
 
 The chat's model picker has to know whether a model calls tools and which effort levels it takes. The first plan tested each model with a few requests the first time it was picked. On 2026-10-15 the user asked to follow OpenCode instead, which never tests a model: it reads the [models.dev](https://models.dev) catalog, a public list of about 8,900 models that records each one's tool calls and effort levels.
 

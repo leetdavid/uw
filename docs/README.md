@@ -59,6 +59,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [ADR 0015: uw reads Claude's and OpenAI's plugin formats](adr/0015-uw-reads-claudes-and-openais-plugin-formats.md): why plugins come from those two directories and which parts uw takes.
 - [ADR 0007: uw speaks three wire formats to language models](adr/0007-uw-speaks-three-wire-formats-to-language-models.md): chat completions, Anthropic Messages, and OpenAI Responses.
 - [ADR 0008: uw reads what a model can do from models.dev](adr/0008-uw-reads-what-a-model-can-do-from-models-dev.md): tool calls and effort levels come from a public catalog, not from testing each model.
+- [ADR 0025: uw asks a provider which models are decision models when its list does not say](adr/0025-uw-asks-a-provider-which-models-are-decision-models-when-its-list-does-not-say.md): why uw sends OpenAI's models one small request each, an exception to ADR 0008.
 
 ### Integrations
 
