@@ -12,6 +12,10 @@
 
 class Profile;
 
+namespace message_center {
+class Notification;
+}
+
 namespace uw {
 
 // Sends the chat `id`'s macOS notification: the chat's `title`, then `what`
@@ -22,6 +26,13 @@ void NotifyAboutChat(Profile* profile,
                      const std::string& title,
                      const std::string& what,
                      const std::string& text);
+// Takes back the chat `id`'s notification, if it still shows.
+void CloseChatNotification(Profile* profile, std::string_view id);
+
+// Whether `notification` stays in Notification Center after uw quits, as a
+// chat's does. A step's, with its buttons, can't be answered then.
+bool StaysAfterQuit(NotificationHandler::Type type,
+                    const message_center::Notification& notification);
 
 // Asks the user to approve an outside agent's step from a notification, with
 // Approve and Not this one: `title`, such as "claude-code waits for your

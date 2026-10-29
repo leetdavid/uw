@@ -206,6 +206,7 @@ source_set("chat_notification") {
     ":chats",
     "//base",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/navigator",
     "//components/tabs:public",
     "//ui/base",
     "//ui/gfx",
@@ -240,6 +241,7 @@ source_set("browser_tests") {
   deps = [
     ":agent",
     ":chat_run",
+    ":chat_tab",
     ":chats",
     ":scheduled_chats",
     ":run_window",

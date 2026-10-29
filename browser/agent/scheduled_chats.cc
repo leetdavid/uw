@@ -479,6 +479,13 @@ void ScheduledChats::OnProfileWillBeDestroyed(Profile* profile) {
   // The chat index and the keep-alive's profile go away with the profile, in
   // no set order, so let go of them first.
   ending_ = true;
+  // A run's step can't be approved after uw quits, so its notification goes
+  // rather than stay.
+  for (const auto& [chat_id, run] : runs_) {
+    if (run.step) {
+      CloseChatNotification(profile_, chat_id);
+    }
+  }
   runs_.clear();
   triggers_.EndAll();
   keep_alive_.reset();

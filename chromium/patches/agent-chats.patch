@@ -76,6 +76,128 @@ index 93437bb2ae097d1b7f8f4beeea1e6d125c3b16c6..94911cda288b6ad74fad71de544d4065
    };
  
    virtual ~NotificationHandler();
+diff --git a/chrome/browser/notifications/mac/notification_platform_bridge_mac.cc b/chrome/browser/notifications/mac/notification_platform_bridge_mac.cc
+index ec0919a5fb6ed0a89b3cf728a98363b5b12f24b3..a3f40bcd0be67e585fe0478630a8355bce1ce881 100644
+--- a/chrome/browser/notifications/mac/notification_platform_bridge_mac.cc
++++ b/chrome/browser/notifications/mac/notification_platform_bridge_mac.cc
+@@ -27,6 +27,7 @@
+ #include "third_party/blink/public/common/notifications/notification_constants.h"
+ #include "ui/message_center/public/cpp/notification.h"
+ #include "ui/message_center/public/cpp/notification_types.h"
++#include "uw/browser/agent/chat_notification.h"
+ 
+ NotificationPlatformBridgeMac::NotificationPlatformBridgeMac(
+     std::unique_ptr<NotificationDispatcherMac> banner_dispatcher,
+@@ -103,11 +104,19 @@ void NotificationPlatformBridgeMac::Display(
+   }
+   dispatcher->DisplayNotification(notification_type, profile, notification);
+   CloseImpl(profile, notification.id(), dispatcher);
++  if ((dispatcher == banner_dispatcher_.get() ||
++       dispatcher == alert_dispatcher_.get()) &&
++      !uw::StaysAfterQuit(notification_type, notification)) {
++    closed_at_shutdown_.insert({notification.id(), GetProfileId(profile),
++                                profile->IsOffTheRecord()});
++  }
+ }
+ 
+ void NotificationPlatformBridgeMac::Close(Profile* profile,
+                                           const std::string& notification_id) {
+   CloseImpl(profile, notification_id);
++  closed_at_shutdown_.erase(
++      {notification_id, GetProfileId(profile), profile->IsOffTheRecord()});
+ }
+ 
+ void NotificationPlatformBridgeMac::CloseImpl(
+@@ -267,8 +276,22 @@ void NotificationPlatformBridgeMac::CloseAllNotificationsForProfile(
+   std::string profile_id = GetProfileId(profile);
+   bool incognito = profile->IsOffTheRecord();
+ 
+-  banner_dispatcher_->CloseNotificationsWithProfileId(profile_id, incognito);
+-  alert_dispatcher_->CloseNotificationsWithProfileId(profile_id, incognito);
++  // uw: a private profile keeps nothing. Any other closes its notifications
++  // one by one, so the ones that stay after uw quits are left.
++  if (incognito) {
++    banner_dispatcher_->CloseNotificationsWithProfileId(profile_id, incognito);
++    alert_dispatcher_->CloseNotificationsWithProfileId(profile_id, incognito);
++  }
++  for (auto it = closed_at_shutdown_.begin();
++       it != closed_at_shutdown_.end();) {
++    if (it->profile_id != profile_id || it->incognito != incognito) {
++      ++it;
++      continue;
++    }
++    banner_dispatcher_->CloseNotificationWithId(*it);
++    alert_dispatcher_->CloseNotificationWithId(*it);
++    it = closed_at_shutdown_.erase(it);
++  }
+ }
+ 
+ NotificationDispatcherMac*
+diff --git a/chrome/browser/notifications/mac/notification_platform_bridge_mac.h b/chrome/browser/notifications/mac/notification_platform_bridge_mac.h
+index e37e8a52360a1702fcd1ac52dad63bd21de24167..5d4a56a51717e20a9cfd03bd2b9bc93a9c9de794 100644
+--- a/chrome/browser/notifications/mac/notification_platform_bridge_mac.h
++++ b/chrome/browser/notifications/mac/notification_platform_bridge_mac.h
+@@ -7,8 +7,10 @@
+ 
+ #include <map>
+ #include <memory>
++#include <set>
+ #include <string>
+ 
++#include "chrome/browser/notifications/mac/notification_dispatcher_mac.h"
+ #include "chrome/browser/notifications/notification_common.h"
+ #include "chrome/browser/notifications/notification_platform_bridge.h"
+ #include "components/webapps/common/web_app_id.h"
+@@ -83,6 +85,10 @@ class NotificationPlatformBridgeMac : public NotificationPlatformBridge {
+   mutable std::map<webapps::AppId, std::unique_ptr<NotificationDispatcherMac>>
+       app_specific_dispatchers_;
+   WebAppDispatcherFactory web_app_dispatcher_factory_;
++
++  // uw: the banners and alerts that close when their profile shuts down. The
++  // rest, such as a chat's, stay in Notification Center after uw quits.
++  std::set<MacNotificationIdentifier> closed_at_shutdown_;
+ };
+ 
+ #endif  // CHROME_BROWSER_NOTIFICATIONS_MAC_NOTIFICATION_PLATFORM_BRIDGE_MAC_H_
+diff --git a/chrome/browser/notifications/mac/notification_platform_bridge_mac_unittest.cc b/chrome/browser/notifications/mac/notification_platform_bridge_mac_unittest.cc
+index 70ed510daea3f62370e2c4189dce0764ecedf183..92783edcdcd390f2a387b0d874971d50aebec25a 100644
+--- a/chrome/browser/notifications/mac/notification_platform_bridge_mac_unittest.cc
++++ b/chrome/browser/notifications/mac/notification_platform_bridge_mac_unittest.cc
+@@ -428,6 +428,34 @@ TEST_F(NotificationPlatformBridgeMacTest,
+   EXPECT_EQ(false, remaining_notification->meta->id->profile->incognito);
+ }
+ 
++// uw: a chat's notification stays in Notification Center after uw quits. A
++// site's goes, and so does a step's, which has buttons.
++TEST_F(NotificationPlatformBridgeMacTest,
++       UwChatNotificationsStayAfterShutdown) {
++  auto bridge = std::make_unique<NotificationPlatformBridgeMac>(
++      CreateBannerDispatcher(), CreateAlertDispatcher(),
++      CreateWebAppDispatcherFactory());
++  std::unique_ptr<Notification> news =
++      CreateBanner("Title", "Context", "https://gmail.com", nullptr, nullptr);
++  std::unique_ptr<Notification> step = CreateBanner(
++      "Title", "Context", "https://gmail.com", "Approve", "Not this one");
++
++  bridge->Display(NotificationHandler::Type::WEB_PERSISTENT, profile(),
++                  Notification("site", *news), /*metadata=*/nullptr);
++  bridge->Display(NotificationHandler::Type::UW_CHAT, profile(),
++                  Notification("uw-chat-1", *news), /*metadata=*/nullptr);
++  bridge->Display(NotificationHandler::Type::UW_CHAT, profile(),
++                  Notification("step", *step), /*metadata=*/nullptr);
++  ASSERT_EQ(3u, banner_dispatcher()->notifications().size());
++
++  bridge->DisplayServiceShutDown(profile());
++
++  const auto& notifications = banner_dispatcher()->notifications();
++  ASSERT_EQ(1u, notifications.size());
++  EXPECT_EQ("uw-chat-1", notifications[0]->meta->id->id);
++  EXPECT_TRUE(alert_dispatcher()->notifications().empty());
++}
++
+ // Regression test for crbug.com/40751657
+ TEST_F(NotificationPlatformBridgeMacTest, TestNullProfileShutdown) {
+   auto bridge = std::make_unique<NotificationPlatformBridgeMac>(
 diff --git a/tools/metrics/histograms/metadata/sql/histograms.xml b/tools/metrics/histograms/metadata/sql/histograms.xml
 index 858751870a6ebfe439b47b3e80e66828d55aaa51..4b17e44059e639186d297b3e5fbe23b2b03a04b7 100644
 --- a/tools/metrics/histograms/metadata/sql/histograms.xml

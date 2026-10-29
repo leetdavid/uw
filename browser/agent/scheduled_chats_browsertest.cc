@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "base/environment.h"
 #include "base/files/file_util.h"
@@ -29,6 +30,7 @@
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/prefs/pref_service.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "net/dns/mock_host_resolver.h"
@@ -40,6 +42,7 @@
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/chat_triggers.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
@@ -364,6 +367,28 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
 
   alerts->Clear();
   EXPECT_TRUE(alerts->alerts().empty());
+}
+
+// Clicked when no tab shows its chat, as after uw restarts, a notification
+// opens the chat.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ClickingANotificationOpensItsChat) {
+  SaveChat();
+  model_.Script(
+      {Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  ASSERT_TRUE(TabsShowingChat(profile(), kChat).empty());
+  ASSERT_EQ(Notifications().size(), 1u);
+
+  notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT,
+                                Notifications()[0].id(), std::nullopt,
+                                std::nullopt);
+
+  const std::vector<tabs::TabInterface*> showing =
+      TabsShowingChat(profile(), kChat);
+  ASSERT_EQ(showing.size(), 1u);
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveTab(), showing[0]);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

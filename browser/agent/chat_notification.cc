@@ -13,13 +13,18 @@
 #include "chrome/browser/notifications/notification_display_service.h"
 #include "chrome/browser/notifications/notification_display_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/models/image_model.h"
+#include "ui/base/page_transition_types.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/gfx/text_elider.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/message_center/public/cpp/notifier_id.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_alerts.h"
+#include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
 
 namespace uw {
@@ -34,6 +39,10 @@ std::map<std::string, StepAnswered>& StepsAsked() {
   return *asked;
 }
 
+std::string ChatNotificationId(std::string_view chat_id) {
+  return base::StrCat({"uw-chat-", chat_id});
+}
+
 }  // namespace
 
 void NotifyAboutChat(Profile* profile,
@@ -45,7 +54,7 @@ void NotifyAboutChat(Profile* profile,
   // Each answer is news, even when it replaces the last one.
   data.renotify = true;
   message_center::Notification notification(
-      message_center::NOTIFICATION_TYPE_SIMPLE, base::StrCat({"uw-chat-", id}),
+      message_center::NOTIFICATION_TYPE_SIMPLE, ChatNotificationId(id),
       base::UTF8ToUTF16(title.empty() ? "Chat" : title),
       gfx::TruncateString(
           base::CollapseWhitespace(base::UTF8ToUTF16(text), false),
@@ -58,6 +67,17 @@ void NotifyAboutChat(Profile* profile,
   notification.set_context_message(base::UTF8ToUTF16(what));
   NotificationDisplayServiceFactory::GetForProfile(profile)->Display(
       NotificationHandler::Type::UW_CHAT, notification, /*metadata=*/nullptr);
+}
+
+void CloseChatNotification(Profile* profile, std::string_view id) {
+  NotificationDisplayServiceFactory::GetForProfile(profile)->Close(
+      NotificationHandler::Type::UW_CHAT, ChatNotificationId(id));
+}
+
+bool StaysAfterQuit(NotificationHandler::Type type,
+                    const message_center::Notification& notification) {
+  return type == NotificationHandler::Type::UW_CHAT &&
+         notification.buttons().empty();
 }
 
 void AskAboutStep(Profile* profile,
@@ -112,6 +132,16 @@ void ChatNotificationHandler::OnClick(
       TabsShowingChat(profile, chat_id);
   if (!showing.empty()) {
     GoToTab(showing[0]);
+  } else if (ChatFile::IsChatId(chat_id)) {
+    // No tab shows the chat, as after uw restarts, so it opens in one.
+    NavigateParams params(profile, ChatUrl(chat_id),
+                          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+    Navigate(&params);
+    if (params.navigated_or_inserted_contents) {
+      GoToTab(tabs::TabInterface::GetFromContents(
+          params.navigated_or_inserted_contents));
+    }
   }
   NotificationDisplayServiceFactory::GetForProfile(profile)->Close(
       NotificationHandler::Type::UW_CHAT, notification_id);

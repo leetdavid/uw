@@ -248,7 +248,7 @@ Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of 
 
 A summary that combines several scheduled chats comes later.
 
-Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue.
+Agreed delivery: keep results and history in uw. Send native macOS notifications. Let users mute notifications per scheduled chat while runs and history continue. Since 2026-10-29 the notifications stay in Notification Center after uw quits, per the [agent chats plan](plans/agent-chats.md#agreed-scope).
 
 Agreed availability: scheduled chats run while the uw app is running, even with all windows closed; confirmed on 2026-10-22, no window needs to be open. Quitting uw stops them. After runs are missed because uw was quit or the Mac was asleep or off, make one [catch-up run](CONTEXT.md#language) when uw can next run. Show the actual run time.
 

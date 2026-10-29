@@ -336,9 +336,15 @@ UwChatHandler::~UwChatHandler() {
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->SetPage(id_, nullptr);
   }
+  Profile* profile =
+      Profile::FromBrowserContext(contents_->GetBrowserContext());
+  // What the chat waited for can't be given once its page is gone, so its
+  // notification goes rather than stay after uw quits.
+  if (approval_answer_ || password_tab_) {
+    CloseChatNotification(profile, id_);
+  }
   // A private chat ends with its page, and keeps none of its files.
-  if (Profile::FromBrowserContext(contents_->GetBrowserContext())
-          ->IsOffTheRecord()) {
+  if (profile->IsOffTheRecord()) {
     files_sequence_->PostTask(
         FROM_HERE,
         base::BindOnce(base::IgnoreResult(&base::DeletePathRecursively),
