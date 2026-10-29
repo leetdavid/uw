@@ -56,7 +56,30 @@ class SharedTree : public base::RefCounted<SharedTree> {
   std::map<std::string, std::u16string>& generated_names() {
     return generated_names_;
   }
+  // Pages opened by a link or a new-tab command in a window on the
+  // workspace, as opposed to restored or dragged in.
+  std::set<PageId>& opened() { return opened_; }
 
+  // What Undo takes back: the tree and the tasks' looks before an action,
+  // the title of the first tab it moved, and the task it moved them into,
+  // empty for the Scratchpad.
+  struct Step {
+    Step();
+    Step(Step&&);
+    Step& operator=(Step&&);
+    ~Step();
+    PageTree tree;
+    std::map<std::string, tab_groups::TabGroupVisualData> tasks;
+    std::u16string tab;
+    std::optional<std::string> task;
+  };
+  // The workspace's actions Undo can take back, the last one last.
+  std::vector<Step>& undo() { return undo_; }
+
+  // The windows on the tree, the first to join first.
+  const std::vector<raw_ptr<TabOrganizationController>>& windows() const {
+    return windows_;
+  }
   void Add(TabOrganizationController* window);
   void Remove(TabOrganizationController* window);
   // Takes in `other`'s pages, after this tree's own in each place.
@@ -111,6 +134,8 @@ class SharedTree : public base::RefCounted<SharedTree> {
   std::map<PageId, std::string> kept_;
   std::map<PageId, PageId> held_;
   std::map<std::string, std::u16string> generated_names_;
+  std::set<PageId> opened_;
+  std::vector<Step> undo_;
   std::vector<raw_ptr<TabOrganizationController>> windows_;
   // The tree as the other windows last followed it.
   PageTree propagated_;

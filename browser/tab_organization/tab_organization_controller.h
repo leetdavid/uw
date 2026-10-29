@@ -93,11 +93,19 @@ class TabOrganizationController : public TabStripModelObserver,
   const PageTree& tree() const;
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;
   tabs::TabInterface* TabFor(const PageId& id) const;
+  // What page `id` shows: its live page in whichever window holds it, or
+  // else this window's tab for it.
+  content::WebContents* PageContents(const PageId& id) const;
+  BrowserWindowInterface* window() const { return window_; }
+  // The windows that share this window's tree, the first to join first.
+  // Only this one when it shares none.
+  std::vector<BrowserWindowInterface*> Windows() const;
   // Nesting level under parent pages. 0 for a top-level or untracked tab.
   int DepthFor(const tabs::TabInterface* tab) const;
-  // True for a tab opened in this window by a link or a new-tab command, as
-  // opposed to one that was restored or dragged in.
-  bool WasOpenedHere(const PageId& id) const { return opened_.contains(id); }
+  // True for a tab opened by a link or a new-tab command, in this window or,
+  // with shared tabs, in another on its workspace, as opposed to one that was
+  // restored or dragged in.
+  bool WasOpenedHere(const PageId& id) const;
   // The selected pages when `context` is selected or null; else `context`.
   std::vector<PageId> SelectionFor(
       const tabs::TabInterface* context = nullptr) const;
@@ -188,7 +196,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // Selects the tab used last in `task`, or in the Scratchpad when `task` is
   // empty. Returns false when it holds no tab.
   bool SelectTask(const std::string& task);
-  bool CanUndo() const { return !undo_.empty(); }
+  bool CanUndo() const;
   void Undo();
   // What Undo would reverse: the title of the first tab the action moved, and
   // the task it went to, or the Scratchpad. `place` is empty for a move
@@ -267,13 +275,6 @@ class TabOrganizationController : public TabStripModelObserver,
  private:
   friend class SharedTree;
 
-  struct Snapshot {
-    PageTree tree;
-    std::map<std::string, tab_groups::TabGroupVisualData> tasks;
-    std::u16string tab;
-    // The task the action moved tabs into; empty for the Scratchpad.
-    std::optional<std::string> task;
-  };
   struct PendingTask {
     std::u16string title;
     std::optional<tab_groups::TabGroupVisualData> visuals;
@@ -382,9 +383,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;
-  std::set<PageId> opened_;
   std::map<std::string, PendingTask> pending_tasks_;
-  std::vector<Snapshot> undo_;
   bool applying_ = false;
   // Set while the tab strip reports a change, when it may not change itself.
   bool observing_ = false;

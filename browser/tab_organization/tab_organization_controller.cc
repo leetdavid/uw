@@ -87,6 +87,37 @@ const PageTree& TabOrganizationController::tree() const {
   return shared_->tree();
 }
 
+bool TabOrganizationController::WasOpenedHere(const PageId& id) const {
+  return shared_->opened().contains(id);
+}
+
+bool TabOrganizationController::CanUndo() const {
+  return !shared_->undo().empty();
+}
+
+content::WebContents* TabOrganizationController::PageContents(
+    const PageId& id) const {
+  if (joined_) {
+    if (content::WebContents* page = shared_->PageOf(id, nullptr)) {
+      return page;
+    }
+  }
+  const tabs::TabInterface* tab = TabFor(id);
+  return tab ? tab->GetContents() : nullptr;
+}
+
+std::vector<BrowserWindowInterface*> TabOrganizationController::Windows()
+    const {
+  if (!joined_) {
+    return {window_};
+  }
+  std::vector<BrowserWindowInterface*> windows;
+  for (const TabOrganizationController* window : shared_->windows()) {
+    windows.push_back(window->window_);
+  }
+  return windows;
+}
+
 std::string TabOrganizationController::TaskOf(
     const tabs::TabInterface* tab) const {
   const std::optional<tab_groups::TabGroupId> group = tab->GetGroup();
@@ -335,7 +366,7 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
   if (!id) {
     return;
   }
-  self->opened_.insert(*id);
+  self->shared_->opened().insert(*id);
   if (source) {
     if (const std::optional<PageId> parent =
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
@@ -636,7 +667,7 @@ bool TabOrganizationController::ApplyTidy(const std::vector<TidyMove>& moves) {
 bool TabOrganizationController::Nest(const PageId& id) {
   Record({id});
   if (!shared_->tree().Nest(id)) {
-    undo_.pop_back();
+    shared_->undo().pop_back();
     return false;
   }
   shared_->held()[id] = shared_->tree().Find(id)->parent;
@@ -678,7 +709,7 @@ std::optional<PageId> TabOrganizationController::OpenBlankTab(
 bool TabOrganizationController::Outdent(const PageId& id) {
   Record({id});
   if (!shared_->tree().Outdent(id)) {
-    undo_.pop_back();
+    shared_->undo().pop_back();
     return false;
   }
   Apply();
@@ -689,7 +720,7 @@ bool TabOrganizationController::Outdent(const PageId& id) {
 bool TabOrganizationController::MoveUp(const PageId& id) {
   Record({id});
   if (!shared_->tree().MoveUp(id)) {
-    undo_.pop_back();
+    shared_->undo().pop_back();
     return false;
   }
   Apply();
@@ -700,7 +731,7 @@ bool TabOrganizationController::MoveUp(const PageId& id) {
 bool TabOrganizationController::MoveDown(const PageId& id) {
   Record({id});
   if (!shared_->tree().MoveDown(id)) {
-    undo_.pop_back();
+    shared_->undo().pop_back();
     return false;
   }
   Apply();
@@ -988,10 +1019,10 @@ base::CallbackListSubscription TabOrganizationController::ObserveRenames(
 
 std::optional<TabOrganizationController::UndoMove>
 TabOrganizationController::NextUndo() const {
-  if (undo_.empty()) {
+  if (shared_->undo().empty()) {
     return std::nullopt;
   }
-  const Snapshot& snapshot = undo_.back();
+  const SharedTree::Step& snapshot = shared_->undo().back();
   UndoMove move{snapshot.tab, {}};
   if (snapshot.task) {
     move.place = snapshot.task->empty()
@@ -1002,11 +1033,11 @@ TabOrganizationController::NextUndo() const {
 }
 
 void TabOrganizationController::Undo() {
-  if (undo_.empty()) {
+  if (shared_->undo().empty()) {
     return;
   }
-  Snapshot snapshot = std::move(undo_.back());
-  undo_.pop_back();
+  SharedTree::Step snapshot = std::move(shared_->undo().back());
+  shared_->undo().pop_back();
   const PageTree before = shared_->tree();
   shared_->tree().Restore(snapshot.tree);
   for (const std::string& task : shared_->tree().Tasks()) {
@@ -1218,9 +1249,6 @@ void TabOrganizationController::OnTabStripModelChanged(
     TabStripModel*,
     const TabStripModelChange& change,
     const TabStripSelectionChange& selection) {
-  if (joined_ && tabs_->closing_all()) {
-    Leave();
-  }
   if (applying_) {
     return;
   }
@@ -1420,6 +1448,11 @@ std::optional<tab_groups::TabGroupId> TabOrganizationController::GroupFor(
 }
 
 void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
+  // A closing window leaves first, before Chromium takes its tabs out of
+  // their tasks and closes them, so it closes no tab in another window.
+  if (joined_ && tabs_->closing_all()) {
+    Leave();
+  }
   std::set<tabs::TabHandle> live;
   std::vector<Page> strip;
   for (int i = 0; i < tabs_->count(); ++i) {
@@ -1443,7 +1476,7 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
     drop.before = &drag_before_;
   }
   shared_->tree().Adopt(strip, moved, drop);
-  std::erase_if(opened_,
+  std::erase_if(shared_->opened(),
                 [this](const PageId& id) { return !shared_->tree().Find(id); });
   LinkRestoredPages();
   RevealSelected();
@@ -1652,7 +1685,9 @@ void TabOrganizationController::ApplyWhenIdle() {
 
 void TabOrganizationController::Record(const std::vector<PageId>& roots,
                                        std::optional<std::string> task) {
-  Snapshot snapshot{shared_->tree(), {}, {}, std::move(task)};
+  SharedTree::Step snapshot;
+  snapshot.tree = shared_->tree();
+  snapshot.task = std::move(task);
   if (const tabs::TabInterface* tab =
           roots.empty() ? nullptr : TabFor(roots.front())) {
     snapshot.tab = tab->GetContents()->GetTitle();
@@ -1665,9 +1700,10 @@ void TabOrganizationController::Record(const std::vector<PageId>& roots,
           *tabs_->group_model()->GetTabGroup(group)->visual_data());
     }
   }
-  undo_.push_back(std::move(snapshot));
-  if (undo_.size() > kMaxUndoActions) {
-    undo_.erase(undo_.begin());
+  std::vector<SharedTree::Step>& undo = shared_->undo();
+  undo.push_back(std::move(snapshot));
+  if (undo.size() > kMaxUndoActions) {
+    undo.erase(undo.begin());
   }
 }
 

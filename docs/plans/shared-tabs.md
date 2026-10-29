@@ -55,12 +55,12 @@ The user chose copies in each window's tab list on 2026-10-29, after the spike. 
 - When one window changes the tree, every other window on the workspace follows at once. It opens a copy of each page it lacks, closes its tabs for pages that left, and puts its strip in the tree's order and tasks. Windows do not follow during a drag, since Chromium ends a drag when a tab strip gains a tab; the window that drags brings them up to date when the drag ends.
 - Each window keeps its own tab groups and keys each to the tree's task, so one task has a different group id in each window. A rename, a color, or a fold in one window reaches the others.
 - A copy is a page with the live page's history and no renderer, as a pin's placeholder is (`page_copy`). Selecting a copy by click or key moves the live page into it with `TabStripModel::DiscardWebContents` and leaves a copy behind. A copy selected any other way, as after the selected tab closed, takes the live page only when no shown window holds it. A navigation that starts in a copy, such as Reload, runs in the live page instead. Copies take the live page's history, title, and icon a moment after it changes them. `InactivePinOverlay` draws the hazed view over a selected copy.
+- One organizer acts for each workspace (T255): the organizer of the first window on it. It asks about every page through the page's live page, wherever that is. The other windows' organizers pass it the title changes and the moves by hand they see, and Name Task, Tidy, and an accepted suggestion. They keep track of what their pages show without asking, so when the first window closes, the next one takes over and asks only about what changes after. Undo and the pages counted as opened here belong to the workspace, and every window's sidebar shows what the organizer did.
 - Until T256, a closing window leaves the tree first, so closing it closes no tab in another window. Its live pages go with it, and their copies load from their history when selected.
 - Switching workspace still swaps the window, per [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md). Each hidden partner holds its own workspace's tabs.
 
 Still to build, from the spike:
 
-- One organizer per workspace (T255). A copy moves a task as a whole before it places single tabs, or the task splits.
 - A new window that shows first and fills with copies after, the selected tab first: 100 copies take about 0.6 s.
 - Unloading that asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, plus uw's own cases (T256). The spike found it answers for a page in no window, and never unloads a copy.
 - Leaving a closed window out of recently closed (T256).

@@ -24,6 +24,7 @@
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_command_line.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -82,6 +83,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/organizer_log.h"
+#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -2712,6 +2714,169 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(link->GetGroup());
   EXPECT_TRUE(organizer()->IsTidying());
+}
+
+// With shared tabs, one organizer asks about the pages of a workspace, through
+// each page's live page, and every window on it shows what it did.
+class SharedTabsOrganizerBrowserTest : public AutomaticOrganizerBrowserTest {
+ public:
+  SharedTabsOrganizerBrowserTest() {
+    features_.InitAndEnableFeature(kUwSharedTabs);
+  }
+
+ protected:
+  // A second window on the workspace, once both windows show every tab.
+  Browser* SecondWindow() {
+    const int count = tabs()->count() + 1;
+    Browser* second = CreateBrowser(browser()->GetProfile());
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return tabs()->count() == count &&
+             second->tab_strip_model()->count() == count;
+    }));
+    return second;
+  }
+
+  // Cmd-clicks a link in `source`, a tab of `window`, to the served page
+  // `name`.
+  tabs::TabInterface* OpenLinkIn(Browser* window,
+                                 tabs::TabInterface* source,
+                                 const std::string& name) {
+    NavigateParams params(window,
+                          embedded_test_server()->GetURL("/page/" + name),
+                          ui::PAGE_TRANSITION_LINK);
+    params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+    params.source_contents = source->GetContents();
+    Navigate(&params);
+    content::WebContents* contents = params.navigated_or_inserted_contents;
+    EXPECT_TRUE(content::WaitForLoadStop(contents));
+    base::RunLoop().RunUntilIdle();
+    return window->tab_strip_model()->GetTabForWebContents(contents);
+  }
+
+  // `window`'s tab for the page `id`.
+  static tabs::TabInterface* TabIn(Browser* window, const PageId& id) {
+    return TabOrganizationController::From(window)->TabFor(id);
+  }
+
+  // The name of the task `tab` is in, in its own window.
+  static std::u16string TaskOf(Browser* window, tabs::TabInterface* tab) {
+    if (!tab || !tab->GetGroup()) {
+      return std::u16string();
+    }
+    return window->tab_strip_model()
+        ->group_model()
+        ->GetTabGroup(*tab->GetGroup())
+        ->visual_data()
+        ->title();
+  }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       APageInTwoWindowsIsAskedAboutOnce) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  Browser* second = SecondWindow();
+
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(link->GetGroup(), task);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return TaskOf(second, TabIn(second, Id(link))) == u"Plan Lisbon trip";
+  }));
+  AutomaticOrganizer::From(second)->DispatchNowForTesting();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Requests().size(), 1u);
+
+  // The second window's sidebar shows the move too.
+  OrganizeBar* other = FindBar(BrowserView::GetBrowserViewForBrowser(second));
+  ASSERT_TRUE(other->card_visible());
+  EXPECT_EQ(other->card()->headline(), u"Moved to Plan Lisbon trip");
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       APageLiveInTheOtherWindowIsAskedAboutThroughIt) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  Browser* second = SecondWindow();
+
+  tabs::TabInterface* link =
+      OpenLinkIn(second, TabIn(second, Id(ungrouped)), "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TaskOf(second, link) == u"Plan Lisbon trip"; }));
+  const PageId id =
+      TabOrganizationController::From(second)->IdFor(link).value();
+  EXPECT_EQ(TabIn(browser(), id)->GetGroup(), task);
+  const std::vector<ModelRequest> requests = Requests();
+  ASSERT_EQ(requests.size(), 1u);
+  // The page text came from the live page, in the second window.
+  EXPECT_NE(requests[0].body.find("Notes about lisbon"), std::string::npos);
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       UndoInTheOtherWindowTakesBackTheMove) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  Browser* second = SecondWindow();
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  ASSERT_EQ(link->GetGroup(), task);
+
+  TabOrganizationController* other = TabOrganizationController::From(second);
+  ASSERT_TRUE(other->CanUndo());
+  other->Undo();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !link->GetGroup() && !TabIn(second, Id(link))->GetGroup();
+  }));
+  EXPECT_EQ(controller()->DepthFor(link), 1);
+  EXPECT_EQ(other->DepthFor(TabIn(second, Id(link))), 1);
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       NameTaskFromTheOtherWindowNamesItEverywhere) {
+  UseLanguageModel();
+  Answer("/v1/chat/completions", ChatAnswer("Plan Lisbon trip"));
+  const tab_groups::TabGroupId task = PausedTask(u"Lisbon");
+  Browser* second = SecondWindow();
+  const PageId first_tab = Id(InitialTab());
+
+  AutomaticOrganizer::From(second)->AskForName(task.ToString());
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return TitleOf(task) == u"Plan Lisbon trip" &&
+           TaskOf(second, TabIn(second, first_tab)) == u"Plan Lisbon trip";
+  }));
+  EXPECT_EQ(Requests().size(), 1u);
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       ANewLeaderAsksOnlyAboutWhatChangesAfter) {
+  const auto [ungrouped, task] = OneTask();
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer(task.ToString(), 0.95));
+  tabs::TabInterface* link = OpenLinkFrom(ungrouped, "lisbon");
+  ASSERT_TRUE(SettleAfter(1));
+  const PageId lisbon = Id(link);
+  Browser* second = SecondWindow();
+
+  // The first window, whose organizer asked, closes. The second one's asks
+  // nothing about what it has already seen.
+  CloseBrowserSynchronously(browser());
+  AutomaticOrganizer* now = AutomaticOrganizer::From(second);
+  now->DispatchNowForTesting();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Requests().size(), 1u);
+
+  // A page opened now is asked about once.
+  OpenLinkIn(second, TabIn(second, lisbon), "hotels");
+  now->DispatchNowForTesting();
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return Requests().size() == 2u && now->pending_requests() == 0; }));
 }
 
 }  // namespace

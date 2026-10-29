@@ -157,14 +157,14 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Each step is reported as an event.
   void Tidy();
   bool CanTidy() const { return CanAskForName(); }
-  bool IsTidying() const { return tidy_ != nullptr; }
+  bool IsTidying() const;
   base::WeakPtr<AutomaticOrganizer> AsWeakPtr();
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
   // or moved since. The acceptance goes to the organizer log as an example
   // the user confirmed.
   void AcceptSuggestion();
-  bool HasSuggestion() const { return suggestion_.has_value(); }
+  bool HasSuggestion() const;
   // Sends requests for changed pages now instead of after the debounce delay.
   void DispatchNowForTesting();
 
@@ -267,6 +267,16 @@ class AutomaticOrganizer : public TabStripModelObserver {
   };
 
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
+
+  // With shared tabs, the organizer of the first window on the workspace
+  // asks about every page of it, through each page's live page. The others
+  // pass it what they see and what they are asked to do, and keep track of
+  // what their pages show without asking, so one can take over when the
+  // first window closes. Null when no window has an organizer.
+  AutomaticOrganizer* Leader() const;
+  // Tells the sidebar of every window on the workspace.
+  void Broadcast(const Event& event);
+  void NotifyNaming();
 
   Profile* profile() const;
   bool Enabled() const;

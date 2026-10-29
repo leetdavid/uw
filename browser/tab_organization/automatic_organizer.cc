@@ -189,6 +189,9 @@ base::CallbackListSubscription AutomaticOrganizer::ObserveEvents(
 }
 
 size_t AutomaticOrganizer::pending_requests() const {
+  if (const AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    return leader->pending_requests();
+  }
   return static_cast<size_t>(
       std::ranges::count_if(
           pages_, [](const auto& entry) { return entry.second.asking; }) +
@@ -200,6 +203,9 @@ size_t AutomaticOrganizer::pending_requests() const {
 }
 
 bool AutomaticOrganizer::IsNaming(const std::string& task) const {
+  if (const AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    return leader->IsNaming(task);
+  }
   return naming_.contains(task);
 }
 
@@ -214,6 +220,10 @@ bool AutomaticOrganizer::CanAskForName() const {
 }
 
 void AutomaticOrganizer::AskForName(const std::string& task) {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->AskForName(task);
+    return;
+  }
   if (!CanAskForName() || IsNaming(task)) {
     return;
   }
@@ -245,6 +255,10 @@ void AutomaticOrganizer::AskForName(const std::string& task) {
 }
 
 void AutomaticOrganizer::DropAskedName(const std::string& task) {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->DropAskedName(task);
+    return;
+  }
   if (asked_names_.erase(task)) {
     UpdateNaming();
   }
@@ -255,13 +269,17 @@ void AutomaticOrganizer::NameFailed(const std::string& task,
   Event event{Event::Kind::kNameFailed, std::move(reason),
               controller_->TaskTitle(task)};
   event.task = task;
-  events_.Notify(event);
+  Broadcast(event);
 }
 
 AutomaticOrganizer::TidyRequest::TidyRequest() = default;
 AutomaticOrganizer::TidyRequest::~TidyRequest() = default;
 
 void AutomaticOrganizer::Tidy() {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->Tidy();
+    return;
+  }
   if (!CanTidy() || IsTidying()) {
     return;
   }
@@ -288,7 +306,7 @@ void AutomaticOrganizer::Tidy() {
   if (tabs.empty()) {
     Event event{Event::Kind::kTidyNothing,
                 l10n_util::GetStringUTF16(IDS_UW_TIDY_NOTHING_DETAIL)};
-    events_.Notify(event);
+    Broadcast(event);
     return;
   }
   std::vector<TidyTask> tasks;
@@ -327,7 +345,7 @@ void AutomaticOrganizer::Tidy() {
                                          base::UTF8ToUTF16(language.model))};
   event.model = base::UTF8ToUTF16(language.model);
   event.tabs = tabs.size();
-  events_.Notify(event);
+  Broadcast(event);
   sender->Send(
       base::BindOnce(&AutomaticOrganizer::OnTidy, weak_factory_.GetWeakPtr()));
 }
@@ -391,7 +409,7 @@ void AutomaticOrganizer::OnTidy(RemoteModelClient::Outcome outcome) {
   if (moves.empty()) {
     Event event{Event::Kind::kTidyNothing,
                 l10n_util::GetStringUTF16(IDS_UW_TIDY_NOTHING_DETAIL)};
-    events_.Notify(event);
+    Broadcast(event);
     return;
   }
 
@@ -413,19 +431,62 @@ void AutomaticOrganizer::OnTidy(RemoteModelClient::Outcome outcome) {
   }
   event.tasks = names.size();
   event.page = base::JoinString(names, u", ");
-  events_.Notify(event);
+  Broadcast(event);
 }
 
 void AutomaticOrganizer::TidyFailed(std::u16string reason) {
   Event event{Event::Kind::kTidyFailed, std::move(reason)};
-  events_.Notify(event);
+  Broadcast(event);
 }
 
 base::WeakPtr<AutomaticOrganizer> AutomaticOrganizer::AsWeakPtr() {
   return weak_factory_.GetWeakPtr();
 }
 
+bool AutomaticOrganizer::IsTidying() const {
+  if (const AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    return leader->IsTidying();
+  }
+  return tidy_ != nullptr;
+}
+
+bool AutomaticOrganizer::HasSuggestion() const {
+  if (const AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    return leader->HasSuggestion();
+  }
+  return suggestion_.has_value();
+}
+
+AutomaticOrganizer* AutomaticOrganizer::Leader() const {
+  for (BrowserWindowInterface* window : controller_->Windows()) {
+    if (AutomaticOrganizer* organizer = From(window)) {
+      return organizer;
+    }
+  }
+  return nullptr;
+}
+
+void AutomaticOrganizer::Broadcast(const Event& event) {
+  for (BrowserWindowInterface* window : controller_->Windows()) {
+    if (AutomaticOrganizer* organizer = From(window)) {
+      organizer->events_.Notify(event);
+    }
+  }
+}
+
+void AutomaticOrganizer::NotifyNaming() {
+  for (BrowserWindowInterface* window : controller_->Windows()) {
+    if (AutomaticOrganizer* organizer = From(window)) {
+      organizer->naming_changed_.Notify();
+    }
+  }
+}
+
 void AutomaticOrganizer::DispatchNowForTesting() {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->DispatchNowForTesting();
+    return;
+  }
   timer_.Stop();
   Dispatch();
 }
@@ -458,6 +519,11 @@ void AutomaticOrganizer::OnConfigChanged() {
 }
 
 void AutomaticOrganizer::Scan() {
+  AutomaticOrganizer* leader = Leader();
+  const bool leads = !leader || leader == this;
+  if (!leads) {
+    leader->Scan();
+  }
   const PageTree& tree = controller_->tree();
   const size_t known = pages_.size() + requests_.size();
   std::erase_if(pages_,
@@ -473,11 +539,11 @@ void AutomaticOrganizer::Scan() {
     UpdateNaming();
     ScheduleSettle();
   }
-  const bool enabled = Enabled();
+  // A window that does not lead tracks its pages without asking.
+  const bool enabled = Enabled() && leads;
   bool due = false;
   for (const Page& page : tree.pages()) {
-    const tabs::TabInterface* tab = controller_->TabFor(page.id);
-    content::WebContents* contents = tab ? tab->GetContents() : nullptr;
+    content::WebContents* contents = controller_->PageContents(page.id);
     if (!contents) {
       continue;
     }
@@ -582,17 +648,18 @@ bool AutomaticOrganizer::ShowsSomethingElse(
 
 void AutomaticOrganizer::NoteAsked(const PageId& page,
                                    Activity& activity) const {
-  const tabs::TabInterface* tab = controller_->TabFor(page);
+  content::WebContents* contents = controller_->PageContents(page);
   const content::NavigationEntry* entry =
-      tab && tab->GetContents()
-          ? tab->GetContents()->GetController().GetLastCommittedEntry()
-          : nullptr;
+      contents ? contents->GetController().GetLastCommittedEntry() : nullptr;
   activity.asked_title = activity.title;
   activity.asked_url = activity.url;
   activity.asked_entry = entry ? entry->GetUniqueID() : 0;
 }
 
 void AutomaticOrganizer::OnManualMove(const std::vector<PageId>& pages) {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->OnManualMove(pages);
+  }
   ++moves_;
   for (const PageId& page : pages) {
     const auto activity = pages_.find(page);
@@ -620,8 +687,7 @@ void AutomaticOrganizer::Dispatch() {
     }
     activity.requested = activity.revision;
     NoteAsked(id, activity);
-    const tabs::TabInterface* tab = controller_->TabFor(id);
-    content::WebContents* contents = tab ? tab->GetContents() : nullptr;
+    content::WebContents* contents = controller_->PageContents(id);
     content::RenderFrameHost* frame =
         contents ? contents->GetPrimaryMainFrame() : nullptr;
     // A terminal tab is described by its title and folder, never by what
@@ -678,8 +744,7 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
                                       std::string excerpt) {
   const Page* page = controller_->tree().Find(id);
   const auto activity = pages_.find(id);
-  const tabs::TabInterface* tab = controller_->TabFor(id);
-  content::WebContents* contents = tab ? tab->GetContents() : nullptr;
+  content::WebContents* contents = controller_->PageContents(id);
   if (!Enabled() || !page || !contents || activity == pages_.end() ||
       activity->second.revision != revision) {
     return false;
@@ -1072,6 +1137,10 @@ void AutomaticOrganizer::CarryOut(const BranchPlacement& group) {
 }
 
 void AutomaticOrganizer::AcceptSuggestion() {
+  if (AutomaticOrganizer* leader = Leader(); leader && leader != this) {
+    leader->AcceptSuggestion();
+    return;
+  }
   if (!suggestion_) {
     return;
   }
@@ -1229,10 +1298,10 @@ void AutomaticOrganizer::Report(Event::Kind kind,
                          LogDetails(request));
     request.logged = true;
   }
-  events_.Notify(Event{kind, base::UTF8ToUTF16(request.context.title),
-                       std::move(detail), request.confidence, request.needed,
-                       base::UTF8ToUTF16(request.decision.model),
-                       request.decision.took});
+  Broadcast(Event{kind, base::UTF8ToUTF16(request.context.title),
+                  std::move(detail), request.confidence, request.needed,
+                  base::UTF8ToUTF16(request.decision.model),
+                  request.decision.took});
 }
 
 std::u16string AutomaticOrganizer::TargetName(const Request& request) const {
@@ -1307,7 +1376,7 @@ void AutomaticOrganizer::UpdateNaming() {
   }
   if (naming != naming_) {
     naming_ = std::move(naming);
-    naming_changed_.Notify();
+    NotifyNaming();
   }
 }
 

@@ -105,6 +105,11 @@ WEB_CONTENTS_USER_DATA_KEY_IMPL(CopyMark);
 
 }  // namespace
 
+SharedTree::Step::Step() = default;
+SharedTree::Step::Step(Step&&) = default;
+SharedTree::Step& SharedTree::Step::operator=(Step&&) = default;
+SharedTree::Step::~Step() = default;
+
 SharedTree::SharedTree() = default;
 
 SharedTree::~SharedTree() {
@@ -151,6 +156,7 @@ void SharedTree::Merge(SharedTree& other) {
   held_.insert(other.held_.begin(), other.held_.end());
   generated_names_.insert(other.generated_names_.begin(),
                           other.generated_names_.end());
+  opened_.insert(other.opened_.begin(), other.opened_.end());
 }
 
 void SharedTree::Propagate(TabOrganizationController* from) {
