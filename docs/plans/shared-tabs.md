@@ -1,6 +1,6 @@
 # Shared tabs
 
-Status: scope agreed with the user on 2026-10-29. The spike, T252, ran the same day; see the [shared tabs spike](../research/shared-tabs-spike.md). How T253 is built waits for the user's choice. Nothing else is built.
+Status: scope agreed with the user on 2026-10-29. The spike, T252, ran the same day; see the [shared tabs spike](../research/shared-tabs-spike.md). The user chose how T253 is built the same day. Nothing else is built.
 
 Implementability: **3/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium gives each window its own tab list, so every window on a workspace holds its own copy of every tab: one live page, and placeholders elsewhere, as [live pins](workspaces.md#how-the-live-pin-page-works) do today. Pins alone scored 4/10. On top of that, the organizer must run once per workspace, a restart must not double tabs, and the first launch merges windows. Up from 2/10 on 2026-10-29, after the spike: a copy costs about what an unloaded tab does, a task stays in step through Chromium's own tab group calls, and Memory Saver's rules work for a page in no window. Extensions, recently closed, tab search, and the command bar still see every copy unless uw hides them.
 
@@ -45,7 +45,7 @@ The user asked on 2026-10-29. Dragging a tab out of a window and then into anoth
 
 ## How it could work
 
-Proposed by uw on 2026-10-29 and tried in the spike. The user has not chosen yet.
+Proposed by uw on 2026-10-29, tried in the spike, and chosen by the user the same day.
 
 - Each window's Chromium tab list holds every tab of its workspace. One window holds a tab's live page and the others hold placeholders, as `PinSync` does for pins with `TabStripModel::DiscardWebContents`.
 - Switching workspace still swaps the window, per [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md). Each hidden partner holds its own workspace's tabs.
@@ -54,7 +54,7 @@ Proposed by uw on 2026-10-29 and tried in the spike. The user has not chosen yet
 - Unloading asks Chromium's `DiscardEligibilityPolicy` which pages it would keep, as Memory Saver does, and adds uw's own cases. The spike found it answers for a page in no window, and never unloads a copy.
 - uw leaves a closed window out of recently closed.
 
-The other way, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
+Rejected on 2026-10-29, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
 
 Open questions for T253:
 
