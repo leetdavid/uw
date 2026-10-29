@@ -173,11 +173,15 @@ A provider that serves other providers' models at its own address, such as CLIPr
 _Avoid_: Gateway, router, relay
 
 **Decision model**:
-A model from a provider that answers a typed question with a choice and a confidence instead of text, such as Jev or a model behind the OpenAI Decisions API. It decides a tab branch's placement and whether a task needs a name, and answers the command check and the memory check. It does not write the name.
+A model from a provider that answers a typed question with a choice and a confidence instead of text, such as Jev or a model behind the OpenAI Decisions API. It is the usual quick-choice model. It never writes text, such as a task's name.
 _Avoid_: Evaluation model, classifier
 
 **Language model**:
-A model from a provider that answers in text. One names new tasks, and does the decision model's work when none is set.
+A model from a provider that answers in text. One names new tasks, and it is the quick-choice model unless another is picked.
+
+**Quick-choice model**:
+The model uw asks for its quick choices: where a tab branch goes, whether a task needs a name, the command check, and the memory check. It is a decision model, or a language model, by default the one that names tasks.
+_Avoid_: Decision slot, classifier model
 
 **Agent model**:
 The language model a new chat starts on. Each chat can switch to another.
