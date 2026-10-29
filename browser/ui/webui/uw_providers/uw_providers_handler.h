@@ -59,6 +59,8 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
                   ListModelsCallback callback) override;
   void ListModelsAt(mojom::NewProviderPtr provider,
                     ListModelsAtCallback callback) override;
+  void WaitForDecisionChecks(const std::string& provider_id,
+                             WaitForDecisionChecksCallback callback) override;
   void AddProvider(mojom::NewProviderPtr provider,
                    AddProviderCallback callback) override;
   void ReplaceKey(const std::string& provider_id,

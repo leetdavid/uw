@@ -3,7 +3,9 @@
 #include "uw/browser/ai_providers/model_lister.h"
 
 #include <algorithm>
+#include <iterator>
 #include <optional>
+#include <set>
 #include <utility>
 
 #include "base/containers/fixed_flat_set.h"
@@ -20,6 +22,7 @@
 #include "net/base/net_errors.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/ai_providers/catalog_store.h"
+#include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 
@@ -60,6 +63,8 @@ RemoteModelClient::KeyHeader KeyHeaderFor(const Provider& provider) {
 
 struct ModelLister::Listing {
   Provider provider;
+  // Until uw has asked what it needs to.
+  std::string key;
   ListingCallback done;
   ModelListing result;
   // Ollama model details still on their way.
@@ -79,6 +84,7 @@ void ModelLister::List(const Provider& provider,
   }
   auto listing = std::make_unique<Listing>();
   listing->provider = provider;
+  listing->key = key;
   listing->done = std::move(done);
   Send(std::make_unique<RemoteModelClient>(
            profile_->GetDefaultStoragePartition()
@@ -130,17 +136,84 @@ void ModelLister::OnList(std::unique_ptr<Listing> listing,
     return;
   }
   listing->result.ok = true;
+  const Provider& provider = listing->provider;
+  const std::set<std::string> deciding =
+      provider.preset == ProviderPreset::kVercelAiGateway
+          ? DecisionModelsIn(outcome.body)
+          : std::set<std::string>();
   for (const std::u16string& name : *names) {
     std::string model = base::UTF16ToUTF8(name);
-    if (ForChat(model)) {
-      const ProviderFormat format =
-          FormatOfModel(listing->provider, model, nullptr);
-      listing->result.models.push_back(
-          {std::move(model), UnknownModelAbilities(listing->provider), format});
+    if (!ForChat(model)) {
+      continue;
     }
+    ListedModel listed{model, UnknownModelAbilities(provider),
+                       FormatOfModel(provider, model, nullptr)};
+    if (deciding.contains(model)) {
+      listed.writes_text = false;
+      listed.decides = Decides::kYes;
+    } else {
+      listed.writes_text = LanguageFormatOf(provider).has_value();
+      listed.decides = provider.preset == ProviderPreset::kJev ? Decides::kYes
+                                                               : Decides::kNo;
+    }
+    listing->result.models.push_back(std::move(listed));
   }
   Listing* raw = listing.get();
   listings_[raw] = std::move(listing);
+  if (raw->provider.preset == ProviderPreset::kOpenRouter) {
+    GURL::Replacements decisions;
+    decisions.SetQueryStr("output_modalities=decisions");
+    Send(std::make_unique<RemoteModelClient>(
+             profile_->GetDefaultStoragePartition()
+                 ->GetURLLoaderFactoryForBrowserProcess(),
+             ModelsUrl(raw->provider.address).ReplaceComponents(decisions),
+             raw->key, std::string(), kProviderTimeout,
+             KeyHeaderFor(raw->provider)),
+         /*post=*/false,
+         base::BindOnce(&ModelLister::OnDecisionList,
+                        weak_factory_.GetWeakPtr(), raw));
+    return;
+  }
+  Describe(raw);
+}
+
+// OpenRouter lists its decision models apart from the others. Without that
+// list, it lists none.
+void ModelLister::OnDecisionList(Listing* listing,
+                                 RemoteModelClient::Outcome outcome) {
+  const std::optional<std::vector<std::u16string>> names =
+      outcome.ok ? ParseModelList(outcome.body) : std::nullopt;
+  std::vector<ListedModel>& models = listing->result.models;
+  for (const std::u16string& name :
+       names.value_or(std::vector<std::u16string>())) {
+    std::string model = base::UTF16ToUTF8(name);
+    auto listed = std::ranges::find(models, model, &ListedModel::name);
+    if (listed == models.end()) {
+      models.push_back({model, UnknownModelAbilities(listing->provider),
+                        FormatOfModel(listing->provider, model, nullptr),
+                        /*writes_text=*/false});
+      listed = std::prev(models.end());
+    }
+    listed->decides = Decides::kYes;
+  }
+  Describe(listing);
+}
+
+void ModelLister::Describe(Listing* raw) {
+  if (DecisionProbes::Asks(raw->provider)) {
+    std::vector<std::string> names;
+    for (const ListedModel& model : raw->result.models) {
+      names.push_back(model.name);
+    }
+    DecisionProbes::Answers answers =
+        DecisionProbes::For(profile_)->Ask(raw->provider, raw->key, names);
+    for (ListedModel& model : raw->result.models) {
+      model.decides = answers.models[model.name];
+    }
+    raw->result.checking = answers.asking;
+  }
+  raw->key.assign(raw->key.size(), '\0');
+  raw->key.clear();
   if (raw->provider.preset == ProviderPreset::kOllama) {
     raw->waiting = raw->result.models.size();
     if (!raw->waiting) {

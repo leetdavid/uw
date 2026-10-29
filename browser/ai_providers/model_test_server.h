@@ -63,7 +63,8 @@ class ModelTestServer {
   explicit ModelTestServer(net::test_server::EmbeddedTestServer* server);
   ~ModelTestServer();
 
-  // Sets the JSON body served at `path`. Other /v1/ paths answer 404.
+  // Sets the JSON body served at `path`, with its query when it has one, as
+  // in /v1/models?output_modalities=decisions. Other /v1/ paths answer 404.
   void Answer(const std::string& path, std::string body);
   // Serves `body` at `path` to a request whose own body holds `text`, such
   // as the title of the tab it is about. Comes before Answer().

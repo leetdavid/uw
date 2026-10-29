@@ -43,6 +43,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
+#include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -154,8 +155,10 @@ mojom::ModelListPtr PageList(ModelListing listing) {
         std::move(model.name), model.abilities.calls_tools,
         model.abilities.sees_images, model.abilities.reads_pdfs,
         std::move(model.abilities.efforts),
-        static_cast<mojom::ProviderFormat>(model.format)));
+        static_cast<mojom::ProviderFormat>(model.format), model.writes_text,
+        static_cast<mojom::Decides>(model.decides)));
   }
+  list->checking = listing.checking;
   return list;
 }
 
@@ -268,6 +271,14 @@ void UwProvidersHandler::ListModelsAt(mojom::NewProviderPtr input,
                base::BindOnce(&PageList).Then(std::move(callback)));
 }
 
+void UwProvidersHandler::WaitForDecisionChecks(
+    const std::string& provider_id,
+    WaitForDecisionChecksCallback callback) {
+  DecisionProbes::For(profile_)->WaitForAnswer(
+      provider_id,
+      mojo::WrapCallbackWithDefaultInvokeIfNotRun(std::move(callback)));
+}
+
 void UwProvidersHandler::AddProvider(mojom::NewProviderPtr input,
                                      AddProviderCallback callback) {
   Provider provider = ProviderFrom(*input);
@@ -295,6 +306,7 @@ void UwProvidersHandler::ReplaceKey(const std::string& provider_id,
       ApiKeyStore().SetKey(KeyAccountFor(provider_id), api_key)) {
     provider->key_account = KeyAccountFor(provider_id);
     UpdateProvider(prefs, *provider);
+    DecisionProbes::For(profile_)->Forget(provider_id);
   }
   std::move(callback).Run();
 }
@@ -330,6 +342,7 @@ void UwProvidersHandler::RemoveProvider(const std::string& provider_id,
                                         RemoveProviderCallback callback) {
   ApiKeyStore().DeleteKey(KeyAccountFor(provider_id));
   uw::RemoveProvider(*profile_->GetPrefs(), provider_id);
+  DecisionProbes::For(profile_)->Forget(provider_id);
   std::move(callback).Run();
 }
 

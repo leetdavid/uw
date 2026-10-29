@@ -138,5 +138,15 @@ TEST_F(ProvidersTest, OpenAiServesBothKindsOfModelAndJevOnlyDecisions) {
   EXPECT_FALSE(DecisionFormatOf(PresetProvider(ProviderPreset::kAnthropic)));
 }
 
+TEST_F(ProvidersTest, GatewaysServeDecisionsInTheirOwnFormats) {
+  const Provider vercel = PresetProvider(ProviderPreset::kVercelAiGateway);
+  EXPECT_EQ(LanguageFormatOf(vercel), ProviderFormat::kChatCompletions);
+  EXPECT_EQ(DecisionFormatOf(vercel), ProviderFormat::kOpenAiDecisions);
+
+  const Provider openrouter = PresetProvider(ProviderPreset::kOpenRouter);
+  EXPECT_EQ(LanguageFormatOf(openrouter), ProviderFormat::kChatCompletions);
+  EXPECT_EQ(DecisionFormatOf(openrouter), ProviderFormat::kSystemOne);
+}
+
 }  // namespace
 }  // namespace uw

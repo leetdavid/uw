@@ -11,7 +11,7 @@ description: Connect uw to the models you already use, such as OpenAI, Anthropic
 
 The key goes to the macOS Keychain. Every profile shares your providers, so you add each one once. For a provider that isn't in the list, use OpenRouter, Vercel AI Gateway, or **Custom**.
 
-Click a provider to see its address, key, format, and models, or to remove it. Each model shows whether it calls tools and which effort levels it takes.
+Click a provider to see its address, key, format, and models, or to remove it. Each model shows whether it calls tools, which effort levels it takes, and whether it makes decisions.
 
 ## Pick *your models*
 
@@ -26,6 +26,20 @@ The page has three model choices:
 Until you pick an agent model, chats use the language model. A chat needs a model that calls tools: in the agent model's menu, one that doesn't is dimmed and says "No tool calls".
 
 When a model has effort levels, a chip beside it picks one. `default` sends no effort, so the provider's own default applies.
+
+## Decision *models*
+
+A decision model answers with a choice instead of text, so it places tabs faster and for less than a language model. The decision model's menu lists only decision models, and the other menus leave them out. The provider list counts them, as in "51 models · 1 decision".
+
+| Provider | Its decision models |
+| --- | --- |
+| **Vercel AI Gateway** | The ones its own list marks, such as `openai/gpt-6-luna-decisions` and `typesafe-ai/jev` |
+| **OpenRouter** | The ones in its list of decision models, such as `liquid/d1` |
+| **OpenAI** | The ones that answer when uw asks, such as `gpt-6-luna` |
+| **Jev** | All of them |
+| **Custom**, in a decision format | The ones that answer when uw asks |
+
+OpenAI's list doesn't say which models make decisions, so uw sends each model one small request the first time it lists them, and says "checking" meanwhile. Each costs a tiny fraction of a cent, and a model that turns it down costs nothing. uw asks a model that turned it down again a week later, and asks again when you change the provider's key.
 
 **Test** beside the language or decision model sends it one small request. It says how long the model took to answer, or why it failed. **Details** shows what uw sent and what came back.
 

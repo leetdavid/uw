@@ -30,6 +30,14 @@ enum ModelSlot {
   kAgent,
 };
 
+// Matches uw::Decides.
+enum Decides {
+  kNo,
+  kYes,
+  // While uw asks the model, or when asking failed.
+  kUnknown,
+};
+
 // A saved provider as the page shows it. Its key never reaches the page.
 struct Provider {
   string id;
@@ -66,6 +74,10 @@ struct Model {
   array<string> efforts;
   // The format requests to it go over.
   ProviderFormat format;
+  // Whether it answers in text, so it can name tasks and run chats.
+  bool writes_text;
+  // As its provider's list says, or as uw found by asking it.
+  Decides decides;
 };
 
 // Matches uw::UpgradeNotice.
@@ -111,6 +123,8 @@ struct ModelList {
   // What went wrong when `ok` is false, in the provider's words when it
   // gave any.
   string error;
+  // True while uw asks the models whether they make decisions.
+  bool checking;
 };
 
 enum TestOutcome {
@@ -271,6 +285,9 @@ interface ProvidersHandler {
   ListModels(string provider_id) => (ModelList list);
   // Lists the models at an address before the provider is added.
   ListModelsAt(NewProvider provider) => (ModelList list);
+  // Returns once the next answer comes about whether one of the provider's
+  // models makes decisions, or at once when uw is asking nothing.
+  WaitForDecisionChecks(string provider_id) => ();
   // Returns the new provider's id, or nothing when its address is not
   // usable.
   AddProvider(NewProvider provider) => (string? id);

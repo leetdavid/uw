@@ -4,6 +4,7 @@
 #define UW_COMPONENTS_TAB_ORGANIZATION_AI_PROTOCOL_H_
 
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -185,6 +186,10 @@ ParseTidyResponse(const std::string& body, size_t tab_count, size_t task_count);
 // result means the endpoint lists no models.
 std::optional<std::vector<std::u16string>> ParseModelList(
     const std::string& body);
+
+// The ids a model list marks as decision models, as Vercel AI Gateway marks
+// them `"type": "evaluation"`.
+std::set<std::string> DecisionModelsIn(const std::string& body);
 
 }  // namespace uw
 

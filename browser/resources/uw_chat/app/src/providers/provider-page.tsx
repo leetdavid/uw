@@ -2,11 +2,12 @@
 // the frame "Providers page: a provider open (Fluid)" on the canvas page
 // "AI providers".
 import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, Loader2, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputField, InputGroup } from "@/components/ui/input-group";
 import { ADDRESS_RULE } from "./add-provider";
 import {
+  Decides,
   ModelSlot,
   ProviderFormat,
   ProviderPreset,
@@ -35,6 +36,15 @@ function abilitiesSource(provider: Provider) {
     return "Tool calls and effort levels come from the models.dev entry at this address, when the catalog has one. Otherwise uw takes each model to call tools, with its format's usual effort levels.";
   }
   return "Tool calls and effort levels come from the models.dev catalog, which uw keeps on this Mac and refreshes once a day.";
+}
+
+// Where the page learns which models make decisions. Per ADR 0025, uw asks
+// each model once where the provider's own list does not say.
+function decisionsSource(provider: Provider) {
+  return provider.preset === ProviderPreset.kOpenAi ||
+    provider.preset === ProviderPreset.kCustom
+    ? "uw asks each model once whether it makes decisions, and asks again after a week for one that didn't."
+    : "Which models make decisions comes from the provider's own list.";
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -273,7 +283,7 @@ export function ProviderPage({
         {shown.map((model) => (
           <div
             key={model.name}
-            className="grid h-[46px] grid-cols-[minmax(0,1fr)_112px_292px] items-center gap-3 border-border pl-4 pr-3 [&+&]:border-t"
+            className="grid min-h-[46px] grid-cols-[minmax(0,1fr)_140px_292px] items-center gap-3 border-border py-1.5 pl-4 pr-3 [&+&]:border-t"
           >
             <span className="flex min-w-0 items-center gap-2 font-medium">
               <span className="truncate">{model.name}</span>
@@ -291,31 +301,47 @@ export function ProviderPage({
                 </span>
               ))}
             </span>
-            {provider.servesLanguage && (
-              <>
-            <span className="flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-muted-foreground">
-              {model.callsTools ? (
-                <Check aria-hidden className="size-3.5 text-success" />
-              ) : (
-                <X aria-hidden className="size-3.5 text-destructive" />
+            <span className="flex flex-col gap-0.5 whitespace-nowrap text-[12.5px] text-muted-foreground">
+              {model.writesText && (
+                <span className="flex items-center gap-1.5">
+                  {model.callsTools ? (
+                    <Check aria-hidden className="size-3.5 text-success" />
+                  ) : (
+                    <X aria-hidden className="size-3.5 text-destructive" />
+                  )}
+                  {model.callsTools ? "Calls tools" : "No tool calls"}
+                </span>
               )}
-              {model.callsTools ? "Calls tools" : "No tool calls"}
-            </span>
-            <span className="flex flex-nowrap gap-1 overflow-hidden">
-              {model.efforts.length ? (
-                model.efforts.map((effort) => (
-                  <i
-                    key={effort}
-                    className="rounded-[5px] bg-muted px-1.5 py-0.5 text-[11.5px] not-italic text-muted-foreground"
-                  >
-                    {effort}
-                  </i>
-                ))
-              ) : (
-                <span className="text-[12px] text-muted-foreground">No effort levels</span>
+              {model.decides === Decides.kYes && (
+                <span className="flex items-center gap-1.5">
+                  <Check aria-hidden className="size-3.5 text-success" />
+                  Makes decisions
+                </span>
+              )}
+              {model.decides === Decides.kUnknown && list?.checking && (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 aria-hidden className="size-3.5 animate-spin" />
+                  Checking decisions…
+                </span>
               )}
             </span>
-              </>
+            {model.writesText ? (
+              <span className="flex flex-nowrap gap-1 overflow-hidden">
+                {model.efforts.length ? (
+                  model.efforts.map((effort) => (
+                    <i
+                      key={effort}
+                      className="rounded-[5px] bg-muted px-1.5 py-0.5 text-[11.5px] not-italic text-muted-foreground"
+                    >
+                      {effort}
+                    </i>
+                  ))
+                ) : (
+                  <span className="text-[12px] text-muted-foreground">No effort levels</span>
+                )}
+              </span>
+            ) : (
+              <span />
             )}
           </div>
         ))}
@@ -329,11 +355,14 @@ export function ProviderPage({
           </button>
         )}
       </div>
-      {provider.servesLanguage && (
-        <p className="mt-2.5 text-[12px] leading-[1.45] text-muted-foreground">
-          {abilitiesSource(provider)}
-        </p>
-      )}
+      <p className="mt-2.5 text-[12px] leading-[1.45] text-muted-foreground">
+        {[
+          provider.servesLanguage && abilitiesSource(provider),
+          provider.servesDecisions && decisionsSource(provider),
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      </p>
     </>
   );
 }

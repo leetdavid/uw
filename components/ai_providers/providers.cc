@@ -265,8 +265,17 @@ std::optional<ProviderFormat> LanguageFormatOf(const Provider& provider) {
 }
 
 std::optional<ProviderFormat> DecisionFormatOf(const Provider& provider) {
-  if (provider.preset == ProviderPreset::kOpenAi) {
-    return ProviderFormat::kOpenAiDecisions;
+  switch (provider.preset) {
+    case ProviderPreset::kOpenAi:
+    case ProviderPreset::kVercelAiGateway:
+      return ProviderFormat::kOpenAiDecisions;
+    case ProviderPreset::kOpenRouter:
+      return ProviderFormat::kSystemOne;
+    case ProviderPreset::kCustom:
+    case ProviderPreset::kAnthropic:
+    case ProviderPreset::kOllama:
+    case ProviderPreset::kJev:
+      break;
   }
   switch (provider.format) {
     case ProviderFormat::kOpenAiDecisions:

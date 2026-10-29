@@ -11,6 +11,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/components/ai_providers/catalog.h"
 #include "uw/components/ai_providers/providers.h"
@@ -24,6 +25,10 @@ struct ListedModel {
   ModelAbilities abilities;
   // The format requests to the model go over.
   ProviderFormat format = ProviderFormat::kChatCompletions;
+  // Whether it answers in text, so it can name tasks and run chats.
+  bool writes_text = true;
+  // As its provider's list says, or as uw found by asking it.
+  Decides decides = Decides::kNo;
 };
 
 struct ModelListing {
@@ -33,10 +38,14 @@ struct ModelListing {
   // What went wrong when `ok` is false, in the provider's words when it gave
   // any.
   std::string error;
+  // True while uw asks the models whether they make decisions.
+  bool checking = false;
 };
 
 // Lists a provider's models as its own list says, with what each can do:
 // from the models.dev catalog, or for Ollama from its own model details.
+// Which make decisions comes from the list where it says, as at Vercel AI
+// Gateway and OpenRouter, or else from DecisionProbes.
 // Destroying the lister drops the requests it has out.
 class ModelLister {
  public:
@@ -60,6 +69,9 @@ class ModelLister {
                   RemoteModelClient::Outcome outcome);
   void OnList(std::unique_ptr<Listing> listing,
               RemoteModelClient::Outcome outcome);
+  void OnDecisionList(Listing* listing, RemoteModelClient::Outcome outcome);
+  // Adds what each model can do, then finishes.
+  void Describe(Listing* listing);
   void OnOllamaModel(Listing* listing,
                      size_t index,
                      RemoteModelClient::Outcome outcome);

@@ -3,6 +3,7 @@
 #include "uw/components/tab_organization/ai_protocol.h"
 
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -204,6 +205,22 @@ TEST_F(AiProtocolTest, ModelListParsesTypeSafeNames) {
             (std::vector<std::u16string>{u"jev-latest", u"jev-preview"}));
 
   EXPECT_FALSE(ParseModelList(R"({"models": [{"id": "no-name"}]})"));
+}
+
+// Cut from the body ai-gateway.vercel.sh returned for GET /v1/models on
+// 2026-10-29.
+TEST_F(AiProtocolTest, DecisionModelsAreTheOnesMarkedEvaluation) {
+  EXPECT_EQ(DecisionModelsIn(
+                R"({"object":"list","data":[)"
+                R"({"id":"anthropic/claude-haiku-5.5","type":"language"},)"
+                R"({"id":"typesafe-ai/jev","type":"evaluation"},)"
+                R"({"id":"openai/text-embedding-3-small","type":"embedding"},)"
+                R"({"id":"openai/gpt-6-luna-decisions","type":"evaluation"},)"
+                R"({"id":"mistral/untyped"}]})"),
+            (std::set<std::string>{"openai/gpt-6-luna-decisions",
+                                   "typesafe-ai/jev"}));
+  EXPECT_TRUE(DecisionModelsIn(R"({"data": [{"id": "gpt-6-luna"}]})").empty());
+  EXPECT_TRUE(DecisionModelsIn("broken").empty());
 }
 
 // The bodies api.typesafe.ai returned on 2026-10-12 for a tab that continues

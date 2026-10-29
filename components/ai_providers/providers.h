@@ -112,7 +112,9 @@ void SetEffort(PrefService& prefs, ModelSlot slot, std::string_view effort);
 // The format of the provider's language and agent models, or nullopt when it
 // serves only decision models.
 std::optional<ProviderFormat> LanguageFormatOf(const Provider& provider);
-// The format of the provider's decision models, or nullopt when it has none.
+// The format of the provider's decision models, or nullopt when it has none:
+// the Decisions format at OpenAI and Vercel AI Gateway, System One at
+// OpenRouter. See docs/plans/ai-providers.md#quick-choices.
 std::optional<ProviderFormat> DecisionFormatOf(const Provider& provider);
 
 }  // namespace uw

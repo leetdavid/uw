@@ -749,4 +749,23 @@ std::optional<std::vector<std::u16string>> ParseModelList(
   return models;
 }
 
+std::set<std::string> DecisionModelsIn(const std::string& body) {
+  std::set<std::string> ids;
+  const std::optional<base::DictValue> parsed =
+      base::JSONReader::ReadDict(body, base::JSON_PARSE_RFC);
+  const base::ListValue* listed = parsed ? parsed->FindList("data") : nullptr;
+  if (!listed) {
+    return ids;
+  }
+  for (const base::Value& item : *listed) {
+    const base::DictValue* entry = item.GetIfDict();
+    const std::string* id = entry ? entry->FindString("id") : nullptr;
+    const std::string* type = entry ? entry->FindString("type") : nullptr;
+    if (id && type && *type == "evaluation") {
+      ids.insert(*id);
+    }
+  }
+  return ids;
+}
+
 }  // namespace uw

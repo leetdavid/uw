@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -163,10 +164,13 @@ std::vector<ModelRequest> ModelTestServer::Requests() {
 
 std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
     const net::test_server::HttpRequest& request) {
-  const std::string path(request.GetURL().path());
-  if (!path.starts_with("/v1/")) {
+  const GURL url = request.GetURL();
+  if (!url.path().starts_with("/v1/")) {
     return nullptr;
   }
+  const std::string path = url.has_query()
+                               ? base::StrCat({url.path(), "?", url.query()})
+                               : std::string(url.path());
   base::AutoLock hold(lock_);
   const auto header = [&request](const std::string& name) {
     const auto found = request.headers.find(name);

@@ -6,6 +6,8 @@ source_set("ai_providers") {
     "api_key_store.h",
     "catalog_store.cc",
     "catalog_store.h",
+    "decision_probes.cc",
+    "decision_probes.h",
     "model_lister.cc",
     "model_lister.h",
     "models.cc",
@@ -39,6 +41,7 @@ source_set("ai_providers") {
     "//net",
     "//services/network/public/cpp",
     "//services/network/public/mojom",
+    "//uw/components/agent",
   ]
 }
 

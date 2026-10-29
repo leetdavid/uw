@@ -9,12 +9,14 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
+#include "base/json/values_util.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -42,6 +44,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/catalog_store.h"
+#include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/connectors/connector_catalog_store.h"
@@ -105,6 +108,27 @@ constexpr char kHelpers[] = R"(
 )";
 
 constexpr char kTwoModels[] = R"({"data":[{"id":"chat-a"},{"id":"chat-b"}]})";
+
+// What uw asks a model to learn whether it decides, and a decision model's
+// answer.
+constexpr char kProbe[] = "uw checks that this model can answer.";
+constexpr char kProbeAnswer[] =
+    R"({"answers":[{"type":"choice","name":"answer","choice":"yes",)"
+    R"("confidence":0.97}]})";
+
+// Opens the menu of `slot`, finds `shown` in it and not `hidden`, and closes
+// it.
+constexpr char kOnlyIn[] = R"(
+  const onlyIn = async (slot, shown, hidden) => {
+    const menu = await openMenu(slot);
+    await until(() => item(shown, menu));
+    const found = !item(hidden, menu);
+    document.dispatchEvent(new KeyboardEvent('keydown',
+        {key: 'Escape', bubbles: true}));
+    await until(() => !document.querySelector('[role="menu"]'));
+    return found;
+  };
+)";
 
 // models.dev's catalog, cut down, and an OpenRouter list of its two models.
 constexpr char kCatalog[] = R"({"openrouter": {"models": {
@@ -355,6 +379,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                        ADecisionModelPassesWhenItAnswersWithAChoice) {
   AddTestServer(ProviderFormat::kOpenAiDecisions);
   models_.Answer("/v1/models", kTwoModels);
+  models_.AnswerAbout("/v1/decisions", kProbe, kProbeAnswer);
   models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
   Open();
 
@@ -369,7 +394,128 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
                       "return true;"));
   Pick("Decision model", "chat-a");
   EXPECT_THAT(Test("Decision model"), HasSubstr("chat-a answered in"));
+  // Asked once each whether chat-a and chat-b decide, then the test.
+  EXPECT_THAT(RequestsTo("/v1/decisions"),
+              ElementsAre("POST Bearer sk-test", "POST Bearer sk-test",
+                          "POST Bearer sk-test"));
+}
+
+// Vercel AI Gateway marks its decision models "evaluation". They make
+// decisions over its Decisions format and write no text.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       VercelsDecisionModelsAreOnlyInTheDecisionMenu) {
+  AddPreset(ProviderPreset::kVercelAiGateway, Address());
+  models_.Answer("/v1/models",
+                 R"({"data":[{"id":"anthropic/claude-haiku-5.5",)"
+                 R"("type":"language"},{"id":"typesafe-ai/jev",)"
+                 R"("type":"evaluation"}]})");
+  models_.Answer("/v1/decisions", DecisionsAnswer("none", 0.9));
+  Open();
+
+  EXPECT_EQ(true, Run(base::StrCat(
+                      {"await until(() => withText('a *', '1 decision'));",
+                       kOnlyIn,
+                       "return onlyIn('Decision model', 'typesafe-ai/jev',"
+                       "    'anthropic/claude-haiku-5.5');"})));
+  EXPECT_EQ(true, Run(base::StrCat(
+                      {kOnlyIn,
+                       "return onlyIn('Language model',"
+                       "    'anthropic/claude-haiku-5.5',"
+                       "    'typesafe-ai/jev');"})));
+  Pick("Decision model", "typesafe-ai/jev");
+  EXPECT_THAT(Test("Decision model"), HasSubstr("typesafe-ai/jev answered in"));
   EXPECT_THAT(RequestsTo("/v1/decisions"), ElementsAre("POST Bearer sk-test"));
+}
+
+// OpenAI's list does not say which models decide, so uw asks each once.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       OpenAisModelsAreAskedOnceWhetherTheyDecide) {
+  const std::string id = AddPreset(ProviderPreset::kOpenAi, Address());
+  models_.Answer("/v1/models",
+                 R"({"data":[{"id":"gpt-6-luna"},{"id":"gpt-6.1-terra"}]})");
+  models_.FailAbout("/v1/decisions", "gpt-6.1-terra", 400,
+                    R"({"error":{"message":"gpt-6.1-terra cannot decide."}})");
+  models_.Answer("/v1/decisions", kProbeAnswer);
+  Open();
+
+  EXPECT_EQ(true, Run(base::StrCat(
+                      {"await until(() => withText('a *', '1 decision'));",
+                       kOnlyIn, "return onlyIn('Decision model', "
+                       "    'gpt-6-luna', 'gpt-6.1-terra');"})));
+  // It writes text too, so it stays in the language menu.
+  EXPECT_EQ(true,
+            Run("const menu = await openMenu('Language model');"
+                "await until(() => item('gpt-6.1-terra', menu));"
+                "return !!item('gpt-6-luna', menu);"));
+  EXPECT_EQ(RequestsTo("/v1/decisions").size(), 2u);
+
+  Open();
+  EXPECT_EQ(true, Run("await until(() => withText('a *', '1 decision'));"
+                      "return true;"));
+  EXPECT_EQ(RequestsTo("/v1/decisions").size(), 2u);
+  SaveWindowScreenshot(browser(), "providers-decisions");
+
+  Open(id);
+  EXPECT_EQ("gpt-6-lunaCalls toolsMakes decisionsNo effort levels",
+            Run("return await until(() => modelRow('gpt-6-luna'));"));
+  SaveWindowScreenshot(browser(), "provider-decisions");
+}
+
+// A model that does not decide is asked again a week later, in case its
+// provider has started to take it.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       AModelThatSaidNoIsAskedAgainAfterAWeek) {
+  const std::string id = AddPreset(ProviderPreset::kOpenAi, Address());
+  const auto no = [](base::TimeDelta ago) {
+    return base::DictValue().Set("decides", false).Set(
+        "at", base::TimeToValue(base::Time::Now() - ago));
+  };
+  base::DictValue kept = base::DictValue()
+                             .Set("gpt-6-luna", no(base::Days(8)))
+                             .Set("gpt-6.1-terra", no(base::Days(1)));
+  prefs().SetDict(kDecisionProbesPref,
+                  base::DictValue().Set(
+                      id, base::DictValue()
+                              .Set("address", Address())
+                              .Set("models", std::move(kept))));
+  models_.Answer("/v1/models",
+                 R"({"data":[{"id":"gpt-6-luna"},{"id":"gpt-6.1-terra"}]})");
+  models_.Answer("/v1/decisions", kProbeAnswer);
+  Open();
+
+  EXPECT_EQ(true, Run("await until(() => withText('a *', '1 decision'));"
+                      "return true;"));
+  std::vector<std::string> asked;
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.path == "/v1/decisions") {
+      asked.push_back(request.body);
+    }
+  }
+  ASSERT_EQ(asked.size(), 1u);
+  EXPECT_THAT(asked[0], HasSubstr(R"("model":"gpt-6-luna")"));
+}
+
+// OpenRouter lists its decision models apart from the others, and takes them
+// over System One.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       OpenRoutersDecisionModelsGoOverSystemOne) {
+  AddPreset(ProviderPreset::kOpenRouter, Address());
+  models_.Answer("/v1/models", R"({"data":[{"id":"maker/talker"}]})");
+  models_.Answer("/v1/models?output_modalities=decisions",
+                 R"({"data":[{"id":"liquid/d1"}]})");
+  models_.Answer("/v1/systemone", SystemOneAnswer("none", 0.9));
+  Open();
+
+  EXPECT_EQ(true, Run(base::StrCat(
+                      {"await until(() => withText('a *', '2 models'));",
+                       kOnlyIn, "return onlyIn('Decision model', "
+                       "    'liquid/d1', 'maker/talker');"})));
+  EXPECT_EQ(true, Run(base::StrCat(
+                      {kOnlyIn, "return onlyIn('Language model', "
+                       "    'maker/talker', 'liquid/d1');"})));
+  Pick("Decision model", "liquid/d1");
+  EXPECT_THAT(Test("Decision model"), HasSubstr("liquid/d1 answered in"));
+  EXPECT_THAT(RequestsTo("/v1/systemone"), ElementsAre("POST Bearer sk-test"));
 }
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,

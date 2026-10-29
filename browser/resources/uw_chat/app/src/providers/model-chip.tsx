@@ -1,9 +1,11 @@
 // A model choice: the provider's icon and the model's name. Its menu groups
-// the models by provider and has a search field. Where a chat runs on the
-// model, one that calls no tools is shown but cannot be picked. See the frame
-// "Chat: model and effort chips (Fluid)" on the canvas page "AI providers".
+// the models by provider and has a search field. It lists the models that
+// write text, or for the decision model only those that make decisions.
+// Where a chat runs on the model, one that calls no tools is shown but cannot
+// be picked. See the frames "Chat: model and effort chips (Fluid)" and "Quick
+// choices: every state (Fluid)" on the canvas page "AI providers".
 import { Fragment, useState, type ReactNode } from "react";
-import { ChevronDown, Gauge, Plug } from "lucide-react";
+import { ChevronDown, Gauge, Loader2, Plug } from "lucide-react";
 import {
   DropdownContent,
   DropdownEmpty,
@@ -15,7 +17,13 @@ import {
 } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
-import type { ModelList, Provider, ProviderPreset } from "./providers-api";
+import {
+  Decides,
+  type Model,
+  type ModelList,
+  type Provider,
+  type ProviderPreset,
+} from "./providers-api";
 import { ProviderIcon } from "./provider-parts";
 
 // How many models a provider shows before the search narrows them.
@@ -29,6 +37,7 @@ export function ModelChip({
   providers,
   lists,
   unset,
+  decisions,
   needsTools,
   gone,
   manage,
@@ -43,6 +52,8 @@ export function ModelChip({
   lists: Record<string, ModelList | undefined>;
   // The row that empties the choice, and what the chip says then.
   unset?: string;
+  // Lists the decision models instead of those that write text.
+  decisions?: boolean;
   // A chat runs on the model, so it has to call tools.
   needsTools?: boolean;
   // The chosen model is no longer offered.
@@ -59,6 +70,8 @@ export function ModelChip({
     ? providers.find((provider) => provider.id === choice.providerId)
     : undefined;
   const needle = query.trim().toLowerCase();
+  const fits = (model: Model) =>
+    decisions ? model.decides === Decides.kYes : model.writesText;
 
   let index = 0;
   let checkedIndex: number | undefined;
@@ -80,10 +93,16 @@ export function ModelChip({
   }
   for (const provider of providers) {
     const list = lists[provider.id];
-    const models = (list?.models ?? []).filter((model) =>
-      model.name.toLowerCase().includes(needle),
+    const models = (list?.models ?? []).filter(
+      (model) => fits(model) && model.name.toLowerCase().includes(needle),
     );
-    if (needle && !models.length) {
+    // How many models uw is still asking whether they make decisions.
+    const checking =
+      decisions && list?.checking
+        ? list.models.filter((model) => model.decides === Decides.kUnknown)
+            .length
+        : 0;
+    if ((needle || (decisions && list?.ok)) && !models.length && !checking) {
       continue;
     }
     rows.push(
@@ -135,6 +154,12 @@ export function ModelChip({
             {models.length - shown.length} more · type to search
           </DropdownEmpty>
         )}
+        {checking > 0 && (
+          <DropdownEmpty className="flex items-center justify-center gap-2">
+            <Loader2 aria-hidden className="size-3 animate-spin" />
+            Checking {checking} model{checking === 1 ? "" : "s"}…
+          </DropdownEmpty>
+        )}
       </Fragment>,
     );
   }
@@ -158,7 +183,8 @@ export function ModelChip({
     );
   }
   const total = providers.reduce(
-    (sum, provider) => sum + (lists[provider.id]?.models.length ?? 0),
+    (sum, provider) =>
+      sum + (lists[provider.id]?.models.filter(fits).length ?? 0),
     0,
   );
 

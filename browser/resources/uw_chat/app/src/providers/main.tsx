@@ -9,7 +9,7 @@ import "@/theme-colors";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "motion/react";
-import { ChevronRight, MessageCircle, Plus } from "lucide-react";
+import { ChevronRight, Loader2, MessageCircle, Plus } from "lucide-react";
 import {
   Banner,
   BannerAction,
@@ -34,6 +34,7 @@ import {
   type PageData,
 } from "./provider-parts";
 import {
+  Decides,
   ModelSlot,
   ProviderFormat,
   TestOutcome,
@@ -167,6 +168,35 @@ function UpgradeBanner({
   );
 }
 
+// "51 models · 1 decision", or "· checking" while uw asks them.
+function ModelCount({ list }: { list?: ModelList }) {
+  if (!list?.ok) {
+    return <span />;
+  }
+  const count = list.models.length;
+  const decides = list.models.filter(
+    (model) => model.decides === Decides.kYes,
+  ).length;
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap text-[12.5px] tabular-nums text-muted-foreground">
+      <span>{`${count} model${count === 1 ? "" : "s"}`}</span>
+      {list.checking ? (
+        <>
+          ·
+          <Loader2 aria-hidden className="size-3 animate-spin" />
+          checking
+        </>
+      ) : (
+        decides > 0 && (
+          <>
+            · <span className="font-medium text-info">{decides} decision</span>
+          </>
+        )
+      )}
+    </span>
+  );
+}
+
 function ProviderStatus({ provider, list }: { provider: Provider; list?: ModelList }) {
   if (!list) {
     return <span className="text-muted-foreground">Listing models…</span>;
@@ -252,6 +282,7 @@ function ProvidersList({
                   )}
                   lists={data.lists}
                   unset={UNSET[slot]}
+                  decisions={slot === ModelSlot.kDecision}
                   needsTools={slot === ModelSlot.kAgent}
                   className="w-full"
                   onPick={async (provider, model) => {
@@ -331,7 +362,7 @@ function ProvidersList({
             <a
               key={provider.id}
               href={`/providers/${encodeURIComponent(provider.id)}`}
-              className="grid h-[54px] grid-cols-[32px_minmax(0,1fr)_128px_92px_132px_16px] items-center gap-3 border-border pl-3 pr-3.5 [&+&]:border-t"
+              className="grid h-[54px] grid-cols-[32px_minmax(0,1fr)_128px_164px_132px_16px] items-center gap-3 border-border pl-3 pr-3.5 [&+&]:border-t"
             >
               <ProviderTile preset={provider.preset} />
               <div className="min-w-0">
@@ -346,11 +377,7 @@ function ProvidersList({
               >
                 {FORMAT_BADGES[provider.format]}
               </span>
-              <span className="text-[12.5px] tabular-nums text-muted-foreground">
-                {list?.ok
-                  ? `${list.models.length} model${list.models.length === 1 ? "" : "s"}`
-                  : ""}
-              </span>
+              <ModelCount list={list} />
               <ProviderStatus provider={provider} list={list} />
               <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
             </a>
@@ -458,6 +485,20 @@ function AiPage() {
     refresh();
   }, [refresh]);
 
+  // Lists a provider's models, and again with each answer while uw asks
+  // which of them make decisions.
+  const listInto = (providerId: string) =>
+    providersHandler.listModels(providerId).then(({ list }) => {
+      setData((now) =>
+        now && { ...now, lists: { ...now.lists, [providerId]: list } },
+      );
+      if (list.checking) {
+        providersHandler
+          .waitForDecisionChecks(providerId)
+          .then(() => listInto(providerId));
+      }
+    });
+
   // Lists the models of each provider that has no list yet; the list says
   // whether it answers.
   const unlisted = data?.providers
@@ -470,11 +511,7 @@ function AiPage() {
         if (!old || providerId in old.lists) {
           return old;
         }
-        providersHandler.listModels(providerId).then(({ list }) =>
-          setData((now) =>
-            now && { ...now, lists: { ...now.lists, [providerId]: list } },
-          ),
-        );
+        listInto(providerId);
         return { ...old, lists: { ...old.lists, [providerId]: undefined } };
       });
     }

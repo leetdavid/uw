@@ -13,6 +13,7 @@
 #include "components/prefs/pref_service.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/components/ai_providers/formats.h"
 
 namespace uw {
@@ -171,6 +172,7 @@ void RegisterModelPrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(kUpgradeNoticePref,
                                 static_cast<int>(UpgradeNotice::kNone));
   RegisterProviderPrefs(registry);
+  DecisionProbes::RegisterPrefs(registry);
 }
 
 void MoveConnectionsToProviders(PrefService* prefs) {
