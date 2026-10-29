@@ -228,7 +228,7 @@ html:has(.home) {
   position: absolute;
   z-index: 1;
   height: 1400px;
-  border-radius: 50%;
+  border-radius: 50% / min(700px, 48.6vw);
   background: radial-gradient(60% 30% at 50% 0%, #3b2d8f, #14113a 60%, #0b0a1a);
   box-shadow:
     0 -2px 0 rgba(255, 255, 255, 0.75),
@@ -1217,7 +1217,6 @@ html:has(.home) {
   left: -40%;
   right: -40%;
   margin-top: 80px;
-  border-radius: 50% / min(700px, 48.6vw);
 }
 
 .home footer {
