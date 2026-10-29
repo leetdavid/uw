@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Pause,
   Play,
+  RefreshCw,
   Sparkles,
   Terminal as TerminalIcon,
   TriangleAlert,
@@ -345,7 +346,8 @@ function NextRun({ row }: { row: ScheduledRow }) {
   return <Cell top={state.next ? dayAndTime(state.next) : "—"} under={repeat} />;
 }
 
-// Open chat and Pause or Resume, which show while the pointer is on a row.
+// Open chat, Check now, and Pause or Resume, which show while the pointer is
+// on a row. Check now hides while a run goes or waits.
 function RowButtons({
   row,
   withChat,
@@ -354,7 +356,8 @@ function RowButtons({
   withChat: boolean;
 }) {
   const id = row.watch.chatId;
-  const paused = row.watch.state.paused;
+  const state = row.watch.state;
+  const paused = state.paused;
   const button =
     "grid size-7 place-items-center rounded-[7px] text-muted-foreground hover:bg-background hover:text-foreground hover:shadow-[0_1px_3px_rgba(30,27,46,.14)] [&_svg]:size-[15px]";
   return (
@@ -372,6 +375,21 @@ function RowButtons({
           }}
         >
           <MessageCircle aria-hidden />
+        </button>
+      )}
+      {row.scheduled && !state.running && !state.waiting && (
+        <button
+          type="button"
+          className={button}
+          data-check-now={id}
+          title="Check now"
+          aria-label="Check now"
+          onClick={(event) => {
+            event.stopPropagation();
+            scheduledHandler.checkNow(id);
+          }}
+        >
+          <RefreshCw aria-hidden />
         </button>
       )}
       {row.scheduled && (
@@ -394,7 +412,7 @@ function RowButtons({
 }
 
 const COLUMNS =
-  "grid grid-cols-[minmax(0,1.25fr)_minmax(0,1.05fr)_128px_148px_136px_60px] items-center gap-x-3.5";
+  "grid grid-cols-[minmax(0,1.25fr)_minmax(0,1.05fr)_128px_148px_136px_88px] items-center gap-x-3.5";
 
 function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
@@ -781,6 +799,7 @@ function OpenWatch({
         onClose();
       }}
       onEdit={() => setEditing(true)}
+      onCheckNow={() => scheduledHandler.checkNow(card.chatId)}
       onStopWatching={() => {
         scheduledHandler.stopWatching(card.chatId);
         onClose();

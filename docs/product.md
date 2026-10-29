@@ -275,7 +275,7 @@ Agreed management, on 2026-10-22:
 
 Agreed on 2026-10-29: [Check now](CONTEXT.md#language) starts a run of a scheduled chat at once.
 
-- It is on the strip, on a single watch's card beside Edit, and among a Scheduled page row's hover buttons. A page with several watches has it on each watch's card, not on their list. A chat with only a trigger has none, and the command bar has no Check now command.
+- It is on the strip, at the end of a single watch's card's last-run line, and among a Scheduled page row's hover buttons. A page with several watches has it on each watch's card, not on their list. A chat with only a trigger has none, and the command bar has no Check now command.
 - It hides while a run is under way or waits for approval; "Running now" shows instead.
 - It is an extra run: the schedule's next time stays. Otherwise it is like any run: it notifies per the chat's settings, counts toward the failure pause, and shows in the chat with no mark.
 - On a paused schedule it runs once, and the schedule stays paused.

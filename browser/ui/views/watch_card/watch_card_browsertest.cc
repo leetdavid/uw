@@ -479,6 +479,41 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, APageCanHaveSeveralWatches) {
 // A headless bubble never draws its page, so the card is shown in a tab to
 // check it against the frames "Watch this page: the card" and "Watch this
 // page: every state".
+// Check now on a watch's card starts a run at once and goes while it runs.
+// The next scheduled run keeps its time.
+IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, CheckNowRunsTheWatch) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url("/desk")));
+  const std::string id = WatchTheDesk();
+  const std::optional<base::Time> next = chats()->NextRunOf(id);
+  ASSERT_TRUE(EyeSays(kWatching));
+  actions::ActionManager::Get()
+      .FindAction(page_actions::kActionUwWatchPage,
+                  BrowserActions::From(browser())->root_action_item())
+      ->InvokeAction();
+  ASSERT_TRUE(card()->page());
+  content::WebContents* page = card()->page();
+  ASSERT_TRUE(Shows(page, "#watch-check-now"));
+
+  const size_t asked = model_.Requests().size();
+  model_.Script({ScriptedModel::Hang()});
+  Click(page, "#watch-check-now");
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats()->Running(id); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(page,
+                           "!document.querySelector('#watch-check-now') && "
+                           "document.querySelector('#watch-last')"
+                           ".textContent.includes('Running now')")
+        .ExtractBool();
+  }));
+  EXPECT_EQ(chats()->NextRunOf(id), next);
+
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() > asked; }));
+  chats()->Stop(id);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
+  EXPECT_TRUE(Shows(page, "#watch-check-now"));
+}
+
 IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, TheCardLooksLikeTheFrames) {
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url("/desk")));
   tabs::TabInterface* desk = browser()->GetActiveTabInterface();

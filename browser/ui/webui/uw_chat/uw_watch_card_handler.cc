@@ -192,6 +192,12 @@ void UwWatchCardHandler::StopWatching(const std::string& chat_id) {
   }
 }
 
+void UwWatchCardHandler::CheckNow(const std::string& chat_id) {
+  if (std::ranges::contains(Watchers(), chat_id)) {
+    observation_.GetSource()->CheckNow(chat_id);
+  }
+}
+
 void UwWatchCardHandler::OpenChat(const std::string& chat_id) {
   tabs::TabInterface* tab = Tab();
   if (tab && std::ranges::contains(Watchers(), chat_id)) {

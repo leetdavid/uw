@@ -297,7 +297,9 @@ RunEffect AfterRun(ScheduledChat& chat,
       effect.what =
           end == RunEnd::kReported ? "Sign in required" : "Couldn't check";
     }
-    if (chat.failures >= kFailuresBeforePause) {
+    // A schedule already paused, such as one checked while paused, stays as
+    // it is and is not paused again.
+    if (chat.failures >= kFailuresBeforePause && !chat.paused) {
       chat.paused = true;
       chat.pause_reason = failure;
       effect.paused = true;

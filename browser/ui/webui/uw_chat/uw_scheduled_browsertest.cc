@@ -429,6 +429,39 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, RowsShowHowTheirRunsWent) {
   }));
 }
 
+// Check now among a row's buttons starts a run at once and goes while it
+// runs. On a paused row it runs once, and the row stays paused.
+IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, CheckNowRunsARowsChat) {
+  const std::string desk = WatchTheDesk();
+  content::WebContents* page = OpenThePage();
+  const std::string check = base::StrCat({"[data-check-now='", desk, "']"});
+  ASSERT_TRUE(Shows(page, check));
+
+  const size_t asked = model_.Requests().size();
+  model_.Script({ScriptedModel::Hang()});
+  Click(page, check);
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats()->Running(desk); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !content::EvalJs(
+                page, content::JsReplace("!!document.querySelector($1)", check))
+                .ExtractBool();
+  }));
+  EXPECT_TRUE(
+      Says(page, base::StrCat({"[data-row='", desk, "']"}), "Running now"));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() > asked; }));
+  chats()->Stop(desk);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Running(desk); }));
+  ASSERT_TRUE(Shows(page, check));
+
+  chats()->SetPaused(desk, true);
+  ScriptARun(479, /*found=*/true);
+  ASSERT_TRUE(Shows(page, check));
+  Click(page, check);
+  EXPECT_TRUE(Says(page, base::StrCat({"[data-row='", desk, "']"}), "$479"));
+  EXPECT_TRUE(chats()->Find(desk)->paused);
+}
+
 IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, TheCommandOpensThePage) {
   chrome::ExecuteCommand(browser(), kShowScheduled);
   EXPECT_TRUE(base::test::RunUntil([&] {

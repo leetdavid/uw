@@ -126,6 +126,10 @@ class ScheduledChats : public base::SupportsUserData::Data,
                       AgentLoop::ApprovalAnswer answer);
   // Ends the run of `chat_id` under way.
   void Stop(const std::string& chat_id);
+  // Starts a run of `chat_id` at once, as Check now does, even while it is
+  // paused. Its schedule keeps its times. Nothing starts while a run of it is
+  // under way.
+  void CheckNow(const std::string& chat_id);
   // Brings the tab a waiting run of `chat_id` waits in next to `chat_tab`,
   // in the user's window.
   void BringWaitingTab(const std::string& chat_id,

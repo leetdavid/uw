@@ -68,6 +68,7 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
   void Watch(const std::string& chat_id,
              mojom::ChatSchedulePtr schedule) override;
   void StopWatching(const std::string& chat_id) override;
+  void CheckNow(const std::string& chat_id) override;
   void OpenChat(const std::string& chat_id) override;
   void Close() override;
 

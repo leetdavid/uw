@@ -426,6 +426,18 @@ void ScheduledChats::Stop(const std::string& chat_id) {
   }
 }
 
+void ScheduledChats::CheckNow(const std::string& chat_id) {
+  const auto chat = chats_.find(chat_id);
+  if (ending_ || chat == chats_.end() || runs_.contains(chat_id)) {
+    return;
+  }
+  const base::Time now = base::Time::Now();
+  chat->second.last = now;
+  Arm(chat_id);
+  Persist();
+  StartRun(chat_id, now);
+}
+
 void ScheduledChats::BringWaitingTab(const std::string& chat_id,
                                      tabs::TabInterface& chat_tab) {
   const auto run = runs_.find(chat_id);

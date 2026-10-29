@@ -167,6 +167,24 @@ TEST(ScheduledChatTest, AStreakOfFailuresTellsOnceAndPausesAtThree) {
   EXPECT_EQ(chat.pause_reason, "fully.com didn't load");
 }
 
+// A check on a paused schedule can fail again without pausing it again.
+TEST(ScheduledChatTest, AFailureOnAPausedScheduleDoesNotPauseItAgain) {
+  ScheduledChat chat = DeskWatch();
+  for (int day = 20; day <= 22; ++day) {
+    AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(day));
+  }
+  ASSERT_TRUE(chat.paused);
+
+  const RunEffect check =
+      AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(23));
+
+  EXPECT_FALSE(check.paused);
+  EXPECT_EQ(check.what, "");
+  EXPECT_TRUE(check.counted);
+  EXPECT_TRUE(chat.paused);
+  EXPECT_EQ(chat.pause_reason, "fully.com didn't load");
+}
+
 TEST(ScheduledChatTest, AModelThatCannotBeReachedNeitherCountsNorEndsAStreak) {
   ScheduledChat chat = DeskWatch();
   AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(19));

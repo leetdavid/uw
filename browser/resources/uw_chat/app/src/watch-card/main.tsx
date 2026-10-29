@@ -119,6 +119,7 @@ function WatchCard() {
           onBack={back}
           onOpenChat={() => watchCardHandler.openChat(selected.chatId)}
           onEdit={() => setShowing({ kind: "edit", chatId: selected.chatId })}
+          onCheckNow={() => watchCardHandler.checkNow(selected.chatId)}
           onStopWatching={() => {
             watchCardHandler.stopWatching(selected.chatId);
             if (watches.length > 1) {

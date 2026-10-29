@@ -2115,6 +2115,12 @@ void UwChatHandler::SetSchedulePaused(bool paused) {
   }
 }
 
+void UwChatHandler::CheckNow() {
+  if (ScheduledChats* chats = schedules_observation_.GetSource()) {
+    chats->CheckNow(id_);
+  }
+}
+
 void UwChatHandler::SetScheduleMuted(bool muted) {
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->SetMuted(id_, muted);

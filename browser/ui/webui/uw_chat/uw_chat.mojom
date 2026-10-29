@@ -99,6 +99,8 @@ interface ChatHandler {
   // Pausing stops runs; resuming does not catch up on the paused time.
   SetSchedulePaused(bool paused);
   SetScheduleMuted(bool muted);
+  // Check now: starts a run at once, outside the schedule's times.
+  CheckNow();
   // Ends the run under way.
   StopRun();
   // Stops the chat's trigger and its command.
@@ -605,6 +607,8 @@ interface WatchCardHandler {
   Watch(string chat_id, ChatSchedule schedule);
   // Removes the schedule of the watch `chat_id`. Its chat stays.
   StopWatching(string chat_id);
+  // Check now: starts a run of the watch `chat_id` at once.
+  CheckNow(string chat_id);
   // Shows the chat `chat_id` and closes the card.
   OpenChat(string chat_id);
   Close();
@@ -676,6 +680,8 @@ interface ScheduledHandler {
   OpenPage(string chat_id);
   OpenChat(string chat_id);
   SetPaused(string chat_id, bool paused);
+  // Check now: starts a run of `chat_id` at once.
+  CheckNow(string chat_id);
   PauseAll(bool paused);
 };
 

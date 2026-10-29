@@ -23,6 +23,7 @@ import {
   Pause,
   Pencil,
   Play,
+  RefreshCw,
   SkipForward,
   Sparkles,
   Square,
@@ -162,6 +163,17 @@ export function ScheduleButtons({
           onClick={onChart}
         >
           Chart
+        </Button>
+      )}
+      {!state.running && !state.waiting && (
+        <Button
+          id="schedule-check-now"
+          variant="ghost"
+          size="compact"
+          leadingIcon={RefreshCw}
+          onClick={() => chatHandler.checkNow()}
+        >
+          Check now
         </Button>
       )}
       <Button

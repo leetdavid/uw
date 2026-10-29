@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  RefreshCw,
   Sparkles,
   Tag,
   TriangleAlert,
@@ -367,11 +368,17 @@ function LastRun({ card }: { card: WatchView }) {
       </>
     );
   }
+  // One line, so that Check now fits at its end.
+  const line = (text: string) => (
+    <span className="min-w-0 truncate" title={text}>
+      {text}
+    </span>
+  );
   if (state.paused && state.pauseReason) {
     return (
       <>
         <TriangleAlert aria-hidden className="size-3.5 shrink-0 text-warning" />
-        {state.pauseReason}
+        {line(state.pauseReason)}
       </>
     );
   }
@@ -379,16 +386,18 @@ function LastRun({ card }: { card: WatchView }) {
     return (
       <>
         <TriangleAlert aria-hidden className="size-3.5 shrink-0 text-warning" />
-        Sign in required on {state.signIn}
+        {line(`Sign in required on ${state.signIn}`)}
       </>
     );
   }
   return (
     <>
       <Check aria-hidden className="size-3.5 shrink-0 text-success" />
-      {state.last
-        ? `Last run ${whenText(state.last)}${state.lastText ? ` · ${state.lastText}` : ""}`
-        : "Not run yet"}
+      {line(
+        state.last
+          ? `Last run ${whenText(state.last)}${state.lastText ? ` · ${state.lastText}` : ""}`
+          : "Not run yet",
+      )}
     </>
   );
 }
@@ -399,6 +408,7 @@ export function Watched({
   onBack,
   onOpenChat,
   onEdit,
+  onCheckNow,
   onStopWatching,
   onAnother,
 }: {
@@ -406,6 +416,7 @@ export function Watched({
   onBack?: () => void;
   onOpenChat: () => void;
   onEdit: () => void;
+  onCheckNow: () => void;
   onStopWatching: () => void;
   onAnother?: () => void;
 }) {
@@ -448,8 +459,20 @@ export function Watched({
           )}
           Runs on {schedule.model.model}
         </li>
-        <li id="watch-last" className="flex items-center gap-2">
+        <li id="watch-last" className="flex min-w-0 items-center gap-2">
           <LastRun card={card} />
+          {!card.state.running && !card.state.waiting && (
+            <Button
+              id="watch-check-now"
+              variant="ghost"
+              size="compact"
+              leadingIcon={RefreshCw}
+              className="-my-1 -mr-2 ml-auto h-6 shrink-0 text-primary hover:bg-primary/[0.08] hover:text-primary"
+              onClick={onCheckNow}
+            >
+              Check now
+            </Button>
+          )}
         </li>
       </ul>
       <div className="mt-1.5 flex items-center gap-2">

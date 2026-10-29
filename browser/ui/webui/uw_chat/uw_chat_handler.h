@@ -145,6 +145,7 @@ class UwChatHandler : public mojom::ChatHandler,
                     DescribePageCallback callback) override;
   void SetSchedulePaused(bool paused) override;
   void SetScheduleMuted(bool muted) override;
+  void CheckNow() override;
   void StopRun() override;
   void StopTrigger() override;
 

@@ -2982,6 +2982,70 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
   EXPECT_FALSE(saved->Find("context"));
 }
 
+// Check now in the chat's header starts a run, and goes while the run does.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       CheckNowRunsTheChatAndHidesMeanwhile) {
+  UseAgentModel();
+  Profile* profile = browser()->GetProfile();
+  const std::string id = ChatFile::NewChatId();
+  const std::string request = "Tell me when the Jarvis desk drops below $500.";
+  ChatIndex::For(profile)->Update(
+      {id, request, base::Time::Now(), ChatIndex::State::kDone});
+  ChatFile(profile->GetPath(), id)
+      .Save(
+          base::DictValue()
+              .Set("version", 1)
+              .Set("title", request)
+              .Set("updated", base::TimeToValue(base::Time::Now()))
+              .Set("log", base::ListValue().Append(base::DictValue()
+                                                       .Set("kind", "user")
+                                                       .Set("text", request))));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), ChatUrl(id)));
+  content::WebContents* chat = tabs()->GetActiveWebContents();
+  WaitForChat(chat);
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "report", base::DictValue()
+                         .Set("found", false)
+                         .Set("message", "Still $549.")
+                         .Set("values", base::ListValue())))),
+       ScriptedModel::Answer("Reported.")});
+  ScheduledChat watch;
+  watch.schedule.repeat = Schedule::Repeat::kDaily;
+  watch.schedule.hour = 9;
+  watch.request = request;
+  watch.page = "https://www.fully.com/desks/jarvis";
+  watch.provider_id = AgentChoice(*profile->GetPrefs())->provider_id;
+  watch.model = "test-agent";
+  ScheduledChats* chats = ScheduledChats::For(profile);
+  chats->Save(id, watch);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats->Running(id); }));
+  const auto shows = [&](std::string_view selector) {
+    return content::EvalJs(chat, content::JsReplace(
+                                     "!!document.querySelector($1)", selector))
+        .ExtractBool();
+  };
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return shows("#schedule-check-now"); }));
+
+  const size_t asked = model_.Requests().size();
+  model_.Script({ScriptedModel::Hang()});
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('#schedule-check-now').click()"));
+  ASSERT_TRUE(base::test::RunUntil([&] { return chats->Running(id); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !shows("#schedule-check-now") && shows("#schedule-stop");
+  }));
+
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() > asked; }));
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('#schedule-stop').click()"));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !chats->Running(id); }));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return shows("#schedule-check-now"); }));
+}
+
 // Primary buttons, and the scheduled chats' accents, take the theme's color,
 // as Chromium's colors do, and change with it.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePrimaryColorFollowsTheTheme) {

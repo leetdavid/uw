@@ -369,6 +369,67 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_TRUE(alerts->alerts().empty());
 }
 
+// Check now runs a schedule at once, as an extra run: its next time stays,
+// and it tells the user what it found like any run.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       CheckNowRunsAtOnceAndKeepsTheNextTime) {
+  SaveChat();
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  const std::optional<base::Time> next = chats()->NextRunOf(kChat);
+  ASSERT_TRUE(next);
+
+  model_.Script(
+      {Report(true, "Down to $479."), ScriptedModel::Answer("Done.")});
+  chats()->CheckNow(kChat);
+  EXPECT_TRUE(chats()->Running(kChat));
+  const base::ListValue lines = LinesAfterTheRun();
+
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[1].GetDict().FindString("text"), "Down to $479.");
+  EXPECT_EQ(chats()->NextRunOf(kChat), next);
+  ChatAlerts* alerts = ChatAlerts::For(profile());
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
+}
+
+// On a paused schedule, Check now runs once and leaves it paused.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       CheckNowLeavesAPausedScheduleAsItIs) {
+  SaveChat();
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  chats()->SetPaused(kChat, true);
+
+  chats()->CheckNow(kChat);
+  const base::ListValue lines = LinesAfterTheRun();
+
+  EXPECT_EQ(lines.size(), 2u);
+  EXPECT_TRUE(chats()->Find(kChat)->paused);
+  EXPECT_FALSE(chats()->NextRunOf(kChat));
+}
+
+// Only one run of a chat goes at a time, so Check now starts nothing while a
+// run is under way.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       CheckNowStartsNothingWhileARunGoes) {
+  SaveChat();
+  model_.Script({ScriptedModel::Hang()});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_TRUE(chats()->Running(kChat));
+
+  chats()->CheckNow(kChat);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !model_.Requests().empty(); }));
+  chats()->Stop(kChat);
+  const base::ListValue lines = LinesAfterTheRun();
+
+  ASSERT_EQ(lines.size(), 1u);
+  EXPECT_EQ(*lines[0].GetDict().FindString("end"), "stopped");
+  EXPECT_EQ(model_.Requests().size(), 1u);
+}
+
 // Clicked when no tab shows its chat, as after uw restarts, a notification
 // opens the chat.
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

@@ -9,7 +9,7 @@ description: Have the agent check a page or run a request on a schedule, and fin
 2. Under **Watch for**, pick **Price drops**, **Back in stock**, **New items**, or **Anything worth knowing**, or write what you want to hear about. **Price drops** can take an **Only below** price.
 3. Set how often it checks, and click **Watch**.
 
-The first check runs at once, and the eye fills in. Click it again to see the latest value and a chart of the last 14 days, open the chat, change the watch, or **Stop watching**. **Watch for something else** watches the same page again in a new chat. With several watches, the eye says how many, such as "Watching this page for 2 things".
+The first check runs at once, and the eye fills in. Click it again to see the latest value and a chart of the last 14 days, open the chat, change the watch, or **Stop watching**. **Check now**, at the end of the last-run line, checks again right away. **Watch for something else** watches the same page again in a new chat. With several watches, the eye says how many, such as "Watching this page for 2 things".
 
 You can also ask in a chat, such as "tell me when this desk drops below $500". The agent fills in the card, and nothing runs until you click **Watch**.
 
@@ -26,7 +26,9 @@ Each run starts fresh with the chat's request and what earlier runs found, and a
 | **Change alerts** | When a run finds what you asked to hear about. Turn on **Even when nothing changes** to hear after every run. This is the default. |
 | **Regular updates** | After every run, with what it found. |
 
-Under the chat's title, **Edit** changes the schedule, **Pause** stops the runs, and **Mute** stops the notifications while runs go on. Three failed runs in a row pause the schedule, and uw tells you why.
+Under the chat's title, **Check now** runs it right away, **Edit** changes the schedule, **Pause** stops the runs, and **Mute** stops the notifications while runs go on. Three failed runs in a row pause the schedule, and uw tells you why.
+
+A check is an extra run: the next run keeps its time. It works on a paused schedule too, which stays paused. Otherwise it is like any run, so it notifies you the same way.
 
 Notifications stay in Notification Center after you quit uw. Click one to open its chat.
 
@@ -37,7 +39,7 @@ Runs happen while uw is open, even with no windows. They open their own tabs out
 Go to `uw://scheduled`, or click **See all scheduled** in the Inbox. It lists your watched pages, then your other scheduled chats, with when each last ran, how that went, and when it runs next.
 
 - Click a watched page to open it, or to go to its tab. Click any other row to open its chat.
-- Point at a row for **Open chat** and **Pause** or **Resume**. **Pause all** is at the top.
+- Point at a row for **Open chat**, **Check now**, and **Pause** or **Resume**. **Pause all** is at the top.
 - **Watch a page** takes an address, so the page need not be open. **New scheduled chat** takes a request.
 
 ## The *Inbox*

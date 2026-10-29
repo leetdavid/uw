@@ -171,6 +171,12 @@ void UwScheduledHandler::SetPaused(const std::string& chat_id, bool paused) {
   }
 }
 
+void UwScheduledHandler::CheckNow(const std::string& chat_id) {
+  if (ScheduledChats* chats = schedules_.GetSource()) {
+    chats->CheckNow(chat_id);
+  }
+}
+
 void UwScheduledHandler::PauseAll(bool paused) {
   if (ScheduledChats* chats = schedules_.GetSource()) {
     chats->SetAllPaused(paused);
