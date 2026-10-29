@@ -208,6 +208,7 @@ export class Release {
     const framework = join(app, "Contents/Frameworks/Sparkle.framework");
     this.step(["cp", "-cR", join(sparkle, "Sparkle.framework"), join(app, "Contents/Frameworks")], directory);
     rmSync(join(framework, "Versions/B/XPCServices"), { recursive: true, force: true });
+    rmSync(join(framework, "XPCServices"), { force: true });
     for (const part of ["Versions/B/Autoupdate", "Versions/B/Updater.app", ""]) {
       this.step(["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", join(framework, part)],
         directory);
