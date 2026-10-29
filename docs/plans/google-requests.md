@@ -18,6 +18,7 @@ Found on 2026-10-28 by running the built app headless with a new profile, in nor
 | Address-bar stats on searches | `www.google.com/search` | A Google search from the address bar or the command bar. `gs_lcrp` lists the suggestions shown and the one picked; `oq` is the text typed before picking. | Yes | Both stripped. The search is unchanged. |
 | "Make searches and browsing better" | Several Google services | Only when turned on. Sends the addresses of visited pages. | No | Removed. |
 | "Enhanced protection" | `safebrowsing.google.com` | Only when turned on. Sends the address of every visited page. | No | Removed. |
+| Chromium's new tab page | `www.google.com`, `www.gstatic.com`, `ogads-pa.clients6.google.com`, `play.google.com/log` | A new tab page opened in a normal window. Google's account bar logged to `play.google.com/log`, and doodles reported when shown. | No | Replaced by uw's own [new tab page](new-tab-page.md) (T49), which asks Google nothing. |
 
 The two removed settings are gone from Settings, the Privacy Guide, and Chromium's prompts to turn on Enhanced protection, and they stay off whatever a profile or policy says. Neither works without a Google API key.
 
@@ -27,7 +28,6 @@ The two removed settings are gone from Settings, the Privacy Guide, and Chromium
 | --- | --- | --- | --- |
 | Google searches | `www.google.com` | The user searches with Google. | The user asked for it. Google is the default search engine. |
 | Search suggestions | `www.google.com/complete/search` | Typing in the address bar of a normal window. Never in private windows; the command bar never sends typing. | Part of searching with Google. |
-| Chromium's new tab page | `www.google.com`, `www.gstatic.com`, `ogads-pa.clients6.google.com`, `play.google.com/log` | A new tab page opens in a normal window. Google's account bar logs to `play.google.com/log`, and doodles report when shown. | Accepted until uw's own [new tab page](new-tab-page.md) replaces it. |
 | Component updater | `update.googleapis.com`, `*.gvt1.com` | At launch, then every few hours. Sends the browser version and the components it has. | It carries certificate revocation lists, data for sites' trial features, and the on-device model behind search suggestions in private windows. |
 | Push messaging | `android.clients.google.com`, `mtalk.google.com` | When a feature or a site registers for push. | Websites' notifications need it. |
 | Sign-in check | `accounts.google.com/ListAccounts` | At launch, from the normal profile, with its Google cookies. | It carries no browsing. Turning off Chromium's Google sign-in could change how Google's own sign-in pages behave. |

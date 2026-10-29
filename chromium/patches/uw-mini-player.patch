@@ -164,7 +164,7 @@ index a40f9064b4cd44a43ab40d717b97445454af131a..4644f86c804d15a5651f3a3e875559e9
  
  bool PictureInPictureBrowserFrameView::IsEditingOrEmpty() const {
 diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
-index 92aca7476b3fae0e3302d71b71d12cff7450d89c..13303c399be7ed4a7a1756832492bdf4fb9b3f5d 100644
+index 92aca7476b3fae0e3302d71b71d12cff7450d89c..7144eea9475bfccc16ad0a5c65785743158f53fa 100644
 --- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
 +++ b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
 @@ -303,6 +303,12 @@ void BrowserWebContentsDelegate::ExitPictureInPicture() {
@@ -180,6 +180,20 @@ index 92aca7476b3fae0e3302d71b71d12cff7450d89c..13303c399be7ed4a7a1756832492bdf4
  content::KeyboardEventProcessingResult
  BrowserWebContentsDelegate::PreHandleKeyboardEvent(
      content::WebContents* source,
+@@ -900,6 +906,13 @@ bool BrowserWebContentsDelegate::ShouldFocusLocationBarByDefault(
+       return false;
+     }
+ 
++    // uw: uw's new tab page puts the focus in its own box. See
++    // docs/plans/new-tab-page.md.
++    if (url.SchemeIs(content::kChromeUIScheme) &&
++        url.host() == chrome::kChromeUINewTabPageHost) {
++      return false;
++    }
++
+     if ((url.SchemeIs(content::kChromeUIScheme) &&
+          url.host() == chrome::kChromeUINewTabHost) ||
+         (virtual_url.SchemeIs(content::kChromeUIScheme) &&
 diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h
 index 72ad58b279814e1ca8d86a925e690bcf2a4f65d5..8d993a18786e3dcc84c3a22297098e7c09482b4b 100644
 --- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.h

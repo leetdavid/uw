@@ -740,3 +740,36 @@ interface InboxPage {
   // connects, and again whenever either changes.
   OnAlerts(array<InboxAlert> alerts, int32 scheduled, bool frosted);
 };
+
+// What uw's new tab page shows around its box. See
+// docs/plans/new-tab-page.md.
+struct NewTabBox {
+  // A private window's page shows only the box, without the Once chip.
+  bool private_window;
+  // Ask works once a provider serves the agent model.
+  bool can_ask;
+};
+
+// Links the new tab page to its handler.
+interface NewTabHandlerFactory {
+  CreateNewTabHandler(pending_remote<NewTabPage> page,
+                      pending_receiver<NewTabHandler> handler);
+};
+
+// Browser side. Only the new tab page can reach it.
+interface NewTabHandler {
+  // A new schedule card's settings, as on the Scheduled page.
+  NewSchedule() => (ScheduleState state);
+  // Turns this tab into a chat whose first message is `text`, on the model
+  // picked, or on the agent model when `provider_id` is empty.
+  Ask(string text, string provider_id, string model);
+  // Turns this tab into a chat whose first message is `schedule.request`,
+  // saved with its schedule, which runs at once.
+  AskOnSchedule(ChatSchedule schedule);
+};
+
+// The new tab page.
+interface NewTabPage {
+  // The box's state: once the page connects, and again whenever it changes.
+  OnBox(NewTabBox box);
+};

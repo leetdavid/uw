@@ -1,5 +1,5 @@
 // Builds the uw://chat, uw://ai, and uw://scheduled pages, the watch card,
-// and the Inbox for Chromium's build: checks their types, bundles their
+// the Inbox, and the new tab page for Chromium's build: checks their types, bundles their
 // scripts, writes their stylesheet, and puts them in one folder with the
 // pages' HTML, icons, and fonts. GN runs it with Chromium's node from the
 // build directory:
@@ -61,6 +61,7 @@ const bundled = await esbuild.build({
     scheduled: join(app, "src/scheduled/main.tsx"),
     watch_card: join(app, "src/watch-card/main.tsx"),
     inbox: join(app, "src/inbox/main.tsx"),
+    newtab: join(app, "src/newtab/main.tsx"),
     problems: join(app, "src/problems/main.ts"),
   },
   outdir: out,
@@ -122,6 +123,10 @@ for (const file of [
   "scheduled.html",
   "watch_card.html",
   "inbox.html",
+  "newtab.html",
+  "logo-light.svg",
+  "logo-dark.svg",
+  "tab-plus.svg",
   "favicon.svg",
   "plug.svg",
   "clock.svg",

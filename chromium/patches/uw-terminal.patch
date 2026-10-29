@@ -1,13 +1,14 @@
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..03064d62c27e2dc756eba05d73d14797ea124d8f 100644
+index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..4c6442012af44c24b92276a13e177ed95f1eec03 100644
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -69,6 +69,14 @@
+@@ -69,6 +69,15 @@
  #include "extensions/buildflags/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "ui/webui/buildflags.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_chat_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
++#include "uw/browser/ui/webui/uw_chat/uw_new_tab_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 +#include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
 +#include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
@@ -17,7 +18,18 @@ index 8e1786d0f63bff2faabab8b7fc4beee50d7c8e52..03064d62c27e2dc756eba05d73d14797
  
  #if BUILDFLAG(ENABLE_WEBUI_NTP)
  #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
-@@ -401,6 +409,14 @@ void RegisterChromeWebUIConfigs() {
+@@ -319,7 +328,9 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<WebRtcLogsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<RegionalCapabilitiesInternalsUIConfig>());
+ #if BUILDFLAG(ENABLE_WEBUI_NTP)
+-  map.AddWebUIConfig(std::make_unique<NewTabPageUIConfig>());
++  // uw: uw's new tab page takes the address of Chromium's. See
++  // docs/plans/new-tab-page.md.
++  map.AddWebUIConfig(std::make_unique<uw::UwNewTabUIConfig>());
+ #endif  // BUILDFLAG(ENABLE_WEBUI_NTP)
+ 
+ #if BUILDFLAG(ENABLE_WEBUI_CERTIFICATE_VIEWER)
+@@ -401,6 +412,14 @@ void RegisterChromeWebUIConfigs() {
    map.AddWebUIConfig(std::make_unique<WebuiGalleryUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIJsErrorUIConfig>());
    map.AddWebUIConfig(std::make_unique<WebUIToolbarConfig>());

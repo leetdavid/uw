@@ -1261,9 +1261,18 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   UpdateScheduledRuns();
   SendSchedule();
   OnChatsChanged();
-  if (start_) {
-    page_->OnAsk(start_->text);
+  if (!start_) {
+    return;
   }
+  const PrefService& prefs = *Profile::FromBrowserContext(
+                                  contents_->GetBrowserContext())
+                                  ->GetPrefs();
+  if (!start_->model.empty() && FindProvider(prefs, start_->provider_id)) {
+    ask_after_model_ = true;
+    SetModel(start_->provider_id, start_->model);
+    return;
+  }
+  page_->OnAsk(start_->text);
 }
 
 bool UwChatHandler::Start() {
@@ -1406,6 +1415,12 @@ void UwChatHandler::OnModelFormat(const std::string& provider_id,
                                   std::optional<ProviderFormat> format) {
   model_ = ModelChoice{provider_id, model, format, std::string()};
   OnModelChanged();
+  if (ask_after_model_) {
+    ask_after_model_ = false;
+    if (start_) {
+      page_->OnAsk(start_->text);
+    }
+  }
 }
 
 void UwChatHandler::SetEffort(const std::string& effort) {

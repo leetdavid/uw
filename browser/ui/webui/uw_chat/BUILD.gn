@@ -20,6 +20,10 @@ source_set("uw_chat") {
     "uw_inbox_handler.h",
     "uw_inbox_ui.cc",
     "uw_inbox_ui.h",
+    "uw_new_tab_handler.cc",
+    "uw_new_tab_handler.h",
+    "uw_new_tab_ui.cc",
+    "uw_new_tab_ui.h",
     "uw_scheduled_handler.cc",
     "uw_scheduled_handler.h",
     "uw_scheduled_ui.cc",
@@ -49,9 +53,11 @@ source_set("uw_chat") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/webui:favicon_source",
     "//chrome/browser/ui/webui:webui_util",
     "//chrome/common:constants",
     "//components/favicon/content",
+    "//components/omnibox/browser:mojo_bindings",
     "//components/favicon/core",
     "//components/favicon_base",
     "//components/history/core/browser",
@@ -81,7 +87,9 @@ source_set("uw_chat") {
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/terminal",
     "//uw/browser/ui/glass",
+    "//uw/browser/ui/webui/uw_command_bar",
     "//uw/components/agent",
+    "//uw/components/ai_providers",
   ]
 }
 
@@ -91,6 +99,7 @@ source_set("browser_tests") {
   sources = [
     "uw_chat_browsertest.cc",
     "uw_inbox_browsertest.cc",
+    "uw_new_tab_browsertest.cc",
     "uw_scheduled_browsertest.cc",
   ]
   data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]

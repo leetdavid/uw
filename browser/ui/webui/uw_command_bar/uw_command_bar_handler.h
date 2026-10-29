@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "chrome/browser/ui/webui/searchbox/realbox_handler.h"
+#include "ui/base/window_open_disposition.h"
 
 namespace uw {
 
@@ -23,6 +24,12 @@ class UwCommandBarHandler : public RealboxHandler {
   // Empties the page, and readies it for a shell command when `shell`, as a
   // typed ">" does.
   void Reset(bool shell);
+
+  // Where a picked row opens: a new tab from the command bar, this tab from
+  // the new tab page.
+  void SetDisposition(WindowOpenDisposition disposition) {
+    disposition_ = disposition;
+  }
 
   // searchbox::mojom::PageHandler:
   void OpenAutocompleteMatch(uint8_t line,
@@ -48,6 +55,9 @@ class UwCommandBarHandler : public RealboxHandler {
       bool shift_key,
       bool via_keyboard) override;
   bool OmitsAsynchronousMatches() const override;
+
+ private:
+  WindowOpenDisposition disposition_ = WindowOpenDisposition::NEW_FOREGROUND_TAB;
 };
 
 }  // namespace uw

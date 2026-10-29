@@ -111,7 +111,7 @@ WindowOpenDisposition UwCommandBarHandler::ComputeWindowOpenDisposition(
     bool meta_key,
     bool shift_key,
     bool via_keyboard) {
-  return WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  return disposition_;
 }
 
 bool UwCommandBarHandler::OmitsAsynchronousMatches() const {

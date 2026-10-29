@@ -398,8 +398,11 @@ class UwChatHandler : public mojom::ChatHandler,
   // The message that could not be sent because the chat had no agent, for
   // Try again.
   std::optional<Message> unsent_;
-  // What the command bar opened this chat with, until it is asked.
+  // What the command bar or the new tab page opened this chat with, until it
+  // is asked.
   std::optional<ChatStart> start_;
+  // The start picked a model, so the chat is asked once the model is set.
+  bool ask_after_model_ = false;
   // Tells the agent about the tab handed to it, before the first message.
   std::string handed_over_;
   // The skill the agent asked to save, and its answer.

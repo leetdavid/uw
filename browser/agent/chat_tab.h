@@ -50,6 +50,10 @@ struct ChatStart {
   tabs::TabHandle tab;
   // The uw command started it. See docs/plans/uw-command.md#chats.
   bool from_terminal = false;
+  // The model the new tab page's model chip picked, or empty for the agent
+  // model.
+  std::string provider_id;
+  std::string model;
 };
 
 // Gives the chat `chat` will show what it starts with, for TakeChatStart.

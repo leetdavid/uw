@@ -1,0 +1,81 @@
+diff --git a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+index 8d9dc814999fb57d5f789089325ee754ceca1280..0174e6042c37cd5adc79fff804820295a355708c 100644
+--- a/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
++++ b/chrome/browser/chrome_browser_interface_binders_webui_parts_desktop.cc
+@@ -236,6 +236,7 @@
+ #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
+ #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
+ #include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
++#include "uw/browser/ui/webui/uw_chat/uw_new_tab_ui.h"
+ #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker.mojom.h"
+ #include "uw/browser/ui/webui/uw_theme_picker/uw_theme_picker_ui.h"
+ #include "uw/browser/ui/webui/uw_chat/uw_watch_card_ui.h"
+@@ -387,13 +388,15 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+                                          uw::UwChatUI>(map);
+   RegisterWebUIControllerInterfaceBinder<
+       uw::mojom::ProvidersHandler, uw::UwProvidersUI, uw::UwChatUI,
+-      uw::UwWatchCardUI, uw::UwScheduledUI>(map);
++      uw::UwWatchCardUI, uw::UwScheduledUI, uw::UwNewTabUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::WatchCardHandlerFactory,
+                                          uw::UwWatchCardUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::ScheduledHandlerFactory,
+                                          uw::UwScheduledUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::InboxHandlerFactory,
+                                          uw::UwInboxUI>(map);
++  RegisterWebUIControllerInterfaceBinder<uw::mojom::NewTabHandlerFactory,
++                                         uw::UwNewTabUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::ThemePickerHandlerFactory,
+                                          uw::UwThemePickerUI>(map);
+   RegisterWebUIControllerInterfaceBinder<uw::mojom::CalculatorHandler,
+@@ -401,7 +404,8 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+   RegisterWebUIControllerInterfaceBinder<
+       uw::mojom::ProblemReporter, uw::UwChatUI, uw::UwWatchCardUI,
+       uw::UwProvidersUI, uw::UwTerminalUI, uw::UwCommandBarUI,
+-      uw::UwThemePickerUI, uw::UwScheduledUI, uw::UwInboxUI>(map);
++      uw::UwThemePickerUI, uw::UwScheduledUI, uw::UwInboxUI,
++      uw::UwNewTabUI>(map);
+ #endif
+ 
+ #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+@@ -437,7 +441,7 @@ void PopulateChromeWebUIFrameBindersPartsDesktop(
+   RegisterWebUIControllerInterfaceBinder<searchbox::mojom::PageHandlerFactory,
+                                          NewTabPageUI, OmniboxPopupUI,
+                                          OmniboxEverywhereUI,
+-                                         uw::UwCommandBarUI>(map);
++                                         uw::UwCommandBarUI, uw::UwNewTabUI>(map);
+ 
+   RegisterWebUIControllerInterfaceBinder<
+       omnibox_everywhere_debug::mojom::PageHandlerFactory, OmniboxEverywhereUI>(
+diff --git a/chrome/browser/search/search.cc b/chrome/browser/search/search.cc
+index 621d90a7410a4be975d3a8ff936f495b310670cf..2b000d59dbad7b2014e7b188a31d293c390ef003 100644
+--- a/chrome/browser/search/search.cc
++++ b/chrome/browser/search/search.cc
+@@ -164,6 +164,13 @@ struct NewTabURLDetails {
+       : url(url), state(state) {}
+ 
+   static NewTabURLDetails ForProfile(Profile* profile) {
++    // uw: every profile, private ones too, gets uw's new tab page, whatever
++    // the search engine. See docs/plans/new-tab-page.md.
++    if (profile) {
++      return NewTabURLDetails(chrome::ChromeUINewTabPageURLAsGURL(),
++                              NEW_TAB_URL_VALID);
++    }
++
+     // Incognito and Guest profiles have their own New Tab.
+     // This function may also be called by other off-the-record profiles that
+     // can exceptionally open a browser window.
+@@ -411,12 +418,10 @@ bool HandleNewTabURLReverseRewrite(GURL* url,
+     return false;
+   }
+ 
+-  // Do nothing in incognito.
++  // uw: private windows show uw's new tab page too, with an empty address
++  // bar.
+   Profile* profile = Profile::FromBrowserContext(browser_context);
+   DCHECK(profile);
+-  if (profile->IsOffTheRecord()) {
+-    return false;
+-  }
+ 
+   if (IsInstantNTPURL(*url, profile)) {
+     *url = chrome::ChromeUINewTabURLAsGURL();
