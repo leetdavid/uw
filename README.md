@@ -63,15 +63,15 @@ uw looks and works like Arc, built on Chromium.
 
 The [board](docs/plans/roadmap.md#board) tracks each piece, and [Try the current build](docs/try-uw.md) lists what to test and the known gaps. [Verification status](#verification-status) records what has been built and tested. The [product docs](docs/README.md) describe where uw is going.
 
-## Try a test build
+## Try a preview
 
-[Download uw 153.0.8010.53-1](https://github.com/leetdavid/uw/releases/download/153.0.8010.53-1/uw-153.0.8010.53-1-macos-arm64.zip) for Macs with Apple silicon on macOS 13 or later. [Releases](https://github.com/leetdavid/uw/releases) lists every build. The first signed preview, v0.1.0, will also install with Homebrew: `brew install --cask leetdavid/uw/uw`.
+[Download uw](https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg) for Macs with Apple silicon on macOS 13 or later, or install it with Homebrew:
 
-Test builds are not signed by Apple, so macOS blocks the first launch:
+```sh
+brew install --cask leetdavid/uw/uw
+```
 
-1. Open the zip and move `uw.app` to Applications.
-2. Open uw. macOS refuses to open it. Close the message.
-3. In System Settings, open Privacy & Security, scroll down, and click Open Anyway next to uw.
+Previews from v0.1.0 on are signed and notarized, so they open like any Mac app. [Releases](https://github.com/leetdavid/uw/releases) lists every build.
 
 To build uw yourself, read on.
 
@@ -311,14 +311,16 @@ Previews are built on the owner's Mac, as the [distribution plan](docs/plans/dis
 - A `notarytool` keychain profile named `uw-notary`, made with `xcrun notarytool store-credentials uw-notary`.
 - `gh` signed in to GitHub.
 - Sparkle's update-signing key in the login keychain, made once with Sparkle's `generate_keys`. Keep a backup: without it, installed copies can never update.
-- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, an organization token of the `eslee` Sentry organization, for uploading symbols; and PostHog's `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`). The release reads only these three entries, from the environment first.
+- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, a Sentry token that can write to the `eslee` organization's `uw` project, for uploading symbols; and PostHog's `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`). The release reads only these three entries, from the environment first.
 - A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
 
-Push `main`, then run:
+Push `main`, then run the release while you are at the Mac. Notarization comes last, hours into a full build, and `notarytool` can't read its saved login while the screen is locked:
 
 ```sh
 pnpm run release 0.1.0
 ```
+
+Add `--sha <commit>` to release an earlier commit on GitHub's `main`. A rerun of a version that failed is quick, since the build and the Sentry upload are already done.
 
 It checks out GitHub's `main` in the release worktree, builds and smoke-tests it with symbols (`--symbols`), and uploads the dSYMs to Sentry with the pinned `sentry-cli`. It writes the version, the update feed's address, and where [problem reports](docs/plans/distribution.md#problem-reports) go into the app bundle. It adds the pinned Sparkle framework, which only releases carry ([ADR 0019](docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)). It then signs and notarizes the app and its DMG with Chromium's `sign_chrome.py`, an upstream Python tool. Sparkle and the `uw` command's program are signed first; the program gets the one entitlement it needs, `allow-jit`. Sparkle's `generate_appcast` signs the DMG with the update key in the login keychain and writes `appcast.xml`. Last, it creates a draft GitHub release with `uw-macos-arm64.dmg`, `appcast.xml`, and draft notes. Review the notes on GitHub and publish the draft there. Then [deploy the website](#website), so Help matches the release.
 
