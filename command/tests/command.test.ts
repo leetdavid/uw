@@ -576,3 +576,69 @@ test("mcp serve leaves a step to uw's notification when the client can't ask", a
   assert.equal((await serving).exit, 0);
   assert.equal((await uw(["mcp", "serve", "--mode", "sometimes"])).exit, 2);
 });
+
+const LISTED = (id: string, title: string, url: string, extra: object = {}) => ({
+  id, title, url, place: "Personal › Scratchpad", workspace: "Personal", task: null, parent: null, depth: 0,
+  selected: false, kept: false, pinned: false, busy: false, seen: null, ...extra,
+});
+
+function tabsUw(): Promise<void> {
+  const flights = { id: "9c2e41ab", name: "Flights" };
+  const inFlights = { place: "Personal › Flights", task: flights };
+  return fakeUw((method, params) => {
+    if (method === "tabs.list") {
+      return { result: { workspace: "Personal", others: [{ workspace: "Work", tabs: 21 }], tabs: [
+        LISTED("f0e3a6c1", "Gmail", "https://mail.google.com/", { place: "Pinned", workspace: "", pinned: true }),
+        LISTED("3f9a1c07", "TAP Air Portugal – Manage booking", "https://www.flytap.com/manage", { ...inFlights, selected: true }),
+        LISTED("18a7e0b2", "SFO to LIS · KAYAK", "https://www.kayak.com/", { ...inFlights, depth: 1, parent: "3f9a1c07", seen: new Date(Date.now() - 6 * 86400000).toISOString() }),
+        LISTED("e2b9f604", "~/dev/shop-web", "chrome://terminal/", { busy: true }),
+      ] } };
+    }
+    if (method === "tabs.move") {
+      return { result: { moved: [{ id: "7d1f2a90", title: "Memmo", url: "https://memmo.test/" }], task: { id: "51be07d2", name: String(params.new_task), color: "green" }, new: true } };
+    }
+    if (method === "tabs.close") return { error: { code: 1, message: "didn't close e2b9f604 (~/dev/shop-web): a command runs there" } };
+    if (method === "tabs.select") return { error: { code: 2, message: "3f9a matches 2 tabs: 3f9a1c07 (Personal), 3f9a77e2 (Work)" } };
+    return { error: { code: -32601, message: `uw has no method ${method}.` } };
+  });
+}
+
+test("uw tabs list draws the workspace's tree and names the others", async () => {
+  await tabsUw();
+  const { exit, out } = await uw(["tabs", "list"]);
+  assert.equal(exit, 0);
+  assert.deepEqual(requests.at(-1), { method: "tabs.list", params: {} });
+  const lines = out.split("\n");
+  assert.equal(lines[0], "Pinned");
+  assert.match(lines[1]!, /^ {2}f0e3a6c1 {2}Gmail +mail\.google\.com$/);
+  assert.match(lines[2]!, /^Personal › Flights +task 9c2e41ab$/);
+  assert.match(lines[3]!, /^ {2}3f9a1c07 {2}TAP Air Portugal – Manage booking +flytap\.com +selected$/);
+  assert.match(lines[4]!, /^ {4}18a7e0b2 {2}SFO to LIS · KAYAK +kayak\.com +6 days ago$/);
+  assert.match(lines[6]!, /^ {2}e2b9f604 {2}~\/dev\/shop-web +terminal +busy$/);
+  assert.equal(lines[7], "3 tabs in Personal. Work has 21: uw tabs list --workspace Work");
+});
+
+test("uw tabs move starts a task, and a refusal says why with its exit code", async () => {
+  await tabsUw();
+  const moved = await uw(["tabs", "move", "7d1f", "--new-task", "Hotels"]);
+  assert.equal(moved.exit, 0);
+  assert.deepEqual(requests.at(-1), { method: "tabs.move", params: { tabs: ["7d1f"], new_task: "Hotels" } });
+  assert.equal(moved.out, "Moved 1 tab to a new task, Hotels (task 51be07d2).\n");
+
+  const busy = await uw(["tabs", "close", "e2b9f604"]);
+  assert.equal(busy.exit, 1);
+  assert.equal(busy.err, "uw: didn't close e2b9f604 (~/dev/shop-web): a command runs there\n");
+  const several = await uw(["tabs", "select", "3f9a"]);
+  assert.equal(several.exit, 2);
+  assert.match(several.err, /^uw: 3f9a matches 2 tabs: 3f9a1c07 \(Personal\), 3f9a77e2 \(Work\)/);
+});
+
+test("uw tabs checks its arguments before reaching uw", async () => {
+  const both = await uw(["tabs", "move", "7d1f", "--scratchpad", "--task", "9c2e"]);
+  assert.equal(both.exit, 2);
+  assert.match(both.err, /one of --task, --new-task, or --scratchpad/);
+  assert.equal((await uw(["tabs", "close"])).exit, 2);
+  assert.equal((await uw(["tabs", "shuffle"])).exit, 2);
+  assert.equal(requests.length, 0);
+  assert.match((await uw(["tabs", "--help"])).out, /Examples:\n {2}uw tabs list --query flights/);
+});

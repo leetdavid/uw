@@ -59,12 +59,18 @@ void CheckTabStep(Profile* profile,
 // Shows the tab used last in the task `task` names, as select shows a tab.
 void ShowTask(Profile* profile, std::string_view task);
 
-// Runs a tab tool on `profile`'s tabs and answers as the tool does.
+// Every tab of `profile`, as the tabs tool lists them, for the uw command.
+void ListUserTabs(Profile* profile,
+                  base::OnceCallback<void(std::vector<ListedTab>)> done);
+
+// Runs a tab tool on `profile`'s tabs and answers as the tool does. With
+// `bring_forward`, as for the uw command, select brings uw in front too.
 void RunTabTool(Profile* profile,
                 std::string_view tool,
                 const base::DictValue& args,
                 const TabOwners& owners,
-                base::OnceCallback<void(base::DictValue)> done);
+                base::OnceCallback<void(base::DictValue)> done,
+                bool bring_forward = false);
 
 }  // namespace uw
 

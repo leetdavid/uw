@@ -38,6 +38,10 @@ void HandleCommand(CommandRequest request,
     RunMemoryCommand(std::move(request), std::move(reply));
     return;
   }
+  if (request.method.starts_with("tabs.")) {
+    RunTabsCommand(std::move(request), std::move(reply));
+    return;
+  }
   if (request.method.starts_with("tools.")) {
     RunToolsCommand(std::move(request), std::move(reply),
                     std::move(connection));

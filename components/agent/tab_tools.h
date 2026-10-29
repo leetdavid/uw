@@ -42,8 +42,9 @@ struct ListedTab {
   // The task's id and name. Empty in the Scratchpad and for a pin.
   std::string task_id;
   std::string task;
-  // Levels under parent tabs.
+  // Levels under parent tabs, and the parent's id, empty at the top.
   int depth = 0;
+  std::string parent;
   bool pinned = false;
   bool selected = false;
   bool kept = false;
@@ -98,6 +99,10 @@ struct TabRefusal {
   std::string reason;
   // The tab it is about, or the id it could not find.
   std::string tab;
+  // The short id of the tab it is about, and for an id that names several
+  // tabs, each of them with its workspace, as "3f9a1c07 (Personal)".
+  std::string id;
+  std::vector<std::string> matches;
 };
 base::DictValue RefusalResult(std::string_view tool, const TabRefusal& refusal);
 

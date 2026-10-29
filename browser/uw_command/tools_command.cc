@@ -36,6 +36,7 @@
 #include "uw/browser/uw_command/command_workspace.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/components/agent/agent_protocol.h"
+#include "uw/components/agent/tab_tools.h"
 #include "uw/components/uw_command/command_messages.h"
 
 namespace uw {
@@ -47,14 +48,26 @@ namespace {
 constexpr auto kPageTools = std::to_array<std::string_view>(
     {"open", "navigate", "read", "click", "type"});
 
-// The page tools as MCP describes a tool: a name, a description, and the
-// JSON Schema of its arguments.
+// Whether an outside agent may call `tool`: a page tool, or a tab tool but
+// select, since nobody asked to be taken to a tab. See
+// docs/plans/tab-tools.md#who-gets-the-tools.
+bool Offered(std::string_view tool) {
+  return std::ranges::contains(kPageTools, tool) ||
+         (IsTabTool(tool) && tool != kSelectTool);
+}
+
+// The page and tab tools as MCP describes a tool: a name, a description, and
+// the JSON Schema of its arguments.
 base::ListValue PageTools() {
   base::ListValue tools;
-  for (const base::Value& schema : AgentToolSchemas()) {
+  base::ListValue schemas = AgentToolSchemas();
+  for (base::Value& schema : TabToolSchemas(/*select=*/false)) {
+    schemas.Append(std::move(schema));
+  }
+  for (const base::Value& schema : schemas) {
     const base::DictValue* function = schema.GetDict().FindDict("function");
     const std::string* name = function ? function->FindString("name") : nullptr;
-    if (!name || !std::ranges::contains(kPageTools, *name)) {
+    if (!name || !Offered(*name)) {
       continue;
     }
     tools.Append(
@@ -70,8 +83,12 @@ base::DictValue Error(std::string_view text) {
   return base::DictValue().Set("error", text);
 }
 
-// A page step's approval as the command reads a chat's.
+// A page or tab step's approval as the command reads a chat's.
 base::DictValue Described(const AgentTools::Approval& approval) {
+  base::ListValue tabs;
+  for (const AgentTools::Approval::Tab& tab : approval.tabs) {
+    tabs.Append(base::DictValue().Set("title", tab.title).Set("url", tab.url));
+  }
   return base::DictValue()
       .Set("tab", approval.tab)
       .Set("site", approval.site)
@@ -86,7 +103,12 @@ base::DictValue Described(const AgentTools::Approval& approval) {
       .Set("arguments", base::DictValue())
       .Set("canAlwaysAllow", false)
       .Set("sensitive", false)
-      .Set("file", "");
+      .Set("file", "")
+      .Set("workspace", approval.workspace)
+      .Set("workspaceIcon", approval.workspace_icon)
+      .Set("tabs", std::move(tabs))
+      .Set("task", approval.task)
+      .Set("newName", approval.new_name);
 }
 
 ApprovalMode ModeFrom(const std::string* name, const PrefService& prefs) {
@@ -195,6 +217,12 @@ class ToolSession {
       Done(Error("uw couldn't open a tab for the agent."));
       return;
     }
+    if (IsTabTool(step_->tool)) {
+      tools_->CheckTabStep(
+          step_->tool, step_->args,
+          base::BindOnce(&ToolSession::OnTabCheck, weak_factory_.GetWeakPtr()));
+      return;
+    }
     if (mode_ != ApprovalMode::kFullAuto) {
       if (std::optional<AgentTools::Approval> approval = tools_->ApprovalFor(
               step_->tool, step_->args,
@@ -225,6 +253,23 @@ class ToolSession {
     tools_->Call(
         step_->tool, step_->args,
         base::BindOnce(&ToolSession::Done, weak_factory_.GetWeakPtr()));
+  }
+
+  // Ask first asks before every change to the user's tabs, and Auto before
+  // closing them, as in a chat.
+  void OnTabCheck(AgentTools::TabCheck check) {
+    if (check.refused) {
+      Done(std::move(*check.refused));
+      return;
+    }
+    if (check.approval && (mode_ == ApprovalMode::kAskFirst ||
+                           (mode_ == ApprovalMode::kAuto && check.closes))) {
+      Ask(std::move(*check.approval),
+          base::BindOnce(&ToolSession::OnStepAnswer,
+                         weak_factory_.GetWeakPtr()));
+      return;
+    }
+    Run();
   }
 
   void OnStepAnswer(bool approved, std::string note) {
@@ -437,7 +482,7 @@ void RunToolsCommand(CommandRequest request,
   }
   if (request.method == "tools.call") {
     const std::string* tool = request.params.FindString("tool");
-    if (!tool || !std::ranges::contains(kPageTools, *tool)) {
+    if (!tool || !Offered(*tool)) {
       std::move(reply).Run(
           CommandError(request.id, kCommandUsage,
                        base::StrCat({"uw mcp serve has no tool called ",

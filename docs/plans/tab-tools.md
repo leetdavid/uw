@@ -1,6 +1,6 @@
 # Tab tools
 
-Status: scope agreed on 2026-10-29 in a grilling session. T267, the design, was signed off by the user on 2026-10-30, and T268 started the same day.
+Status: scope agreed on 2026-10-29 in a grilling session. T267, the design, was signed off by the user on 2026-10-30. T268, T269, and T270 were built the same day and are in review.
 
 Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). The tab tree already moves and closes tabs as one undoable action, page ids already outlast a restart, and chats, the [`uw` command](uw-command.md), and `uw mcp serve` already add tools the same way. The risks: [shared tabs](shared-tabs.md) are being built at the same time, a new kind of approval card has to show in four places, and the tools reach every window of a profile while a chat's tools today hang off its own tab.
 
@@ -134,6 +134,11 @@ T268 was built on 2026-10-30:
 - `AgentLoop` offers the tools as extra tools and leaves out `select` for a run, which it knows by its report tool.
 - The approval goes to the chat page, the `uw` command, and the notification with the workspace, the tabs, and a rename's names. The chat page draws the steps and cards in `src/tab-steps.tsx`, and serves tab icons from `chrome://favicon2`.
 - `ShowUserTab` and `ShowUserTask` answer a click on a step's chip.
+
+T269 and T270 were built on 2026-10-30:
+
+- `browser/uw_command/tabs_command.cc` answers `tabs.list` with each tab's object and a count of the other workspaces' tabs, and `tabs.select`, `tabs.move`, `tabs.rename-task`, `tabs.close`, and `tabs.close-task` through `RunTabTool`. A refusal over an id that names no tab or several is wrong usage, exit 2; any other refusal is exit 1. `command/src/tabs.ts` prints them as the frame draws them.
+- `uw mcp serve` lists the tab tools but `select` beside the page tools, and checks a tab step with `CheckTabStep` before it asks, as a chat does. The client's question lists the tabs.
 
 Where T268 differs from the plan:
 

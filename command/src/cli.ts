@@ -10,6 +10,7 @@ import { VERSION, reach, type Place, type Reach } from "./launch.ts";
 import { MEMORY } from "./memory.ts";
 import { output, type Output, type Streams } from "./output.ts";
 import { SETTINGS } from "./settings.ts";
+import { TABS } from "./tabs.ts";
 import type { Screen } from "./tui.ts";
 
 export const HELP = `uw: run uw's agent, manage its connectors, and change uw's settings from a terminal.
@@ -25,6 +26,7 @@ Commands:
   mcp serve     Give an outside agent, such as Claude Code, uw's page tools
   memory        List and forget what uw's agent remembers about you
   settings      List, read, and change uw's settings
+  tabs          List, show, move, and close your tabs, and rename tasks
 
 Options:
   --workspace <name>  The workspace a command applies to. Default: the one used last.
@@ -39,6 +41,7 @@ Examples:
   uw mcp add --transport http linear https://mcp.linear.app/mcp
   claude mcp add uw -- uw mcp serve
   uw settings list
+  uw tabs list --query flights
 
 Run uw <command> --help for a command's options.
 `;
@@ -79,7 +82,7 @@ export interface Input {
 
 const COMMANDS: Record<string, Command> = {
   chat: CHAT, chats: CHATS, approve: APPROVE, settings: SETTINGS, connectors: CONNECTORS, mcp: CONNECTORS,
-  memory: MEMORY,
+  memory: MEMORY, tabs: TABS,
 };
 
 /** Parses a command's options, with --json and --help, which every command takes. */

@@ -1,0 +1,39 @@
+---
+title: Tabs from the terminal
+description: List, show, move, and close your tabs, and rename tasks, with uw tabs.
+---
+
+## List *your tabs*
+
+```bash title="Terminal"
+uw tabs list
+```
+
+The list shows your pinned tabs, then each task of the workspace you used last, then its Scratchpad. Each tab has an id, such as `3f9a1c07`, its site, and when you last looked at it. Tabs nested under another are indented.
+
+- `--query "words"` keeps the tabs whose title or address holds every word.
+- `--workspace Work` lists another workspace. The last line names the others.
+- `--json` prints each tab with its id, title, address, task, and parent.
+
+## Move, close, *and rename*
+
+```bash title="Terminal"
+uw tabs move 7d1f2a90 c33e8b15 --new-task "Hotels in Lisbon"
+uw tabs move 5b02 --scratchpad
+uw tabs rename-task 51be "Lisbon stays"
+uw tabs close 5b02e7c4 d94c1a38
+uw tabs close-task 9c2e
+uw tabs select a81d
+```
+
+Any unique start of an id works, also after uw restarts, and in any workspace of the same profile. Moving or closing a tab takes the tabs under it along. `--task <id>` moves tabs into a task you already have.
+
+These are your own commands, so nothing asks first. A move counts as yours, and <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>Z</kbd> in uw undoes it. **History → Recently Closed** brings back a closed tab. `uw tabs select` brings uw in front with the tab showing.
+
+Tabs move only within their workspace. uw never closes a pinned tab or a terminal that is running a command, and says why:
+
+```text
+uw: didn't close e2b9f604 (~/dev/shop-web): a command runs there
+```
+
+The command exits with `1` when uw won't act, and with `2` when an id matches no tab or several. See also [Your tabs in a chat](./your-tabs-in-a-chat.mdx).

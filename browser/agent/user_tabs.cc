@@ -24,6 +24,7 @@
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
+#include "ui/base/base_window.h"
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
@@ -244,6 +245,7 @@ std::vector<UserTab> ListTabs(Profile* profile, const TabOwners& owners) {
         }
       }
       tab.listed.depth = tree.tree().DepthOf(page.id);
+      tab.listed.parent = page.parent.value();
       tab.listed.selected = selected.contains(page.id);
       tab.listed.kept = tree.IsKept(page.id);
       if (const auto found = numbers.find(page.id); found != numbers.end()) {
@@ -402,7 +404,8 @@ base::expected<Plan, base::DictValue> PlanOf(std::string_view tool,
     std::set<size_t> all;
     for (size_t root : plan.roots) {
       if (tabs[root].listed.pinned) {
-        return refuse(TabRefusal{"it's a pinned tab", TitleOf(tabs[root])});
+        return refuse(TabRefusal{"it's a pinned tab", TitleOf(tabs[root]),
+                                 ShortId(tabs[root].listed.id)});
       }
       for (size_t i : BranchOf(tabs, root)) {
         all.insert(i);
@@ -447,10 +450,12 @@ base::expected<Plan, base::DictValue> PlanOf(std::string_view tool,
   // Closing.
   for (size_t i : plan.tabs) {
     if (tabs[i].listed.busy) {
-      return refuse(TabRefusal{"a command runs there", TitleOf(tabs[i])});
+      return refuse(TabRefusal{"a command runs there", TitleOf(tabs[i]),
+                               ShortId(tabs[i].listed.id)});
     }
     if (tabs[i].listed.chat) {
-      return refuse(TabRefusal{"it's this chat's own tab", TitleOf(tabs[i])});
+      return refuse(TabRefusal{"it's this chat's own tab", TitleOf(tabs[i]),
+                               ShortId(tabs[i].listed.id)});
     }
   }
   return plan;
@@ -528,8 +533,9 @@ base::ListValue Values(const std::vector<UserTab>& tabs,
   return values;
 }
 
-// Shows page `id` in `window`'s tab for it.
-void ShowIn(const PageId& id, BrowserWindowInterface* window) {
+// Shows page `id` in `window`'s tab for it, and with `forward`, brings
+// the window and uw in front.
+void ShowIn(const PageId& id, bool forward, BrowserWindowInterface* window) {
   TabOrganizationController* tree =
       window ? TabOrganizationController::From(window) : nullptr;
   tabs::TabInterface* tab = tree ? tree->TabFor(id) : nullptr;
@@ -541,11 +547,16 @@ void ShowIn(const PageId& id, BrowserWindowInterface* window) {
   if (TabOrganizationController::IsCopy(tab)) {
     tree->BringLivePage(tab);
   }
+  if (forward) {
+    window->GetWindow()->Show();
+    window->GetWindow()->Activate();
+  }
 }
 
 base::DictValue Select(Profile* profile,
                        const std::vector<UserTab>& tabs,
-                       const Plan& plan) {
+                       const Plan& plan,
+                       bool forward) {
   const UserTab& tab = tabs[plan.tabs.front()];
   base::DictValue result = base::DictValue().Set("tab", TabValue(tab.listed));
   if (tab.listed.pinned) {
@@ -566,6 +577,10 @@ base::DictValue Select(Profile* profile,
         model->ActivateTabAt(i);
         if (PinSync::IsPlaceholder(each)) {
           PinSync::BringLivePage(each);
+        }
+        if (forward) {
+          front->GetWindow()->Show();
+          front->GetWindow()->Activate();
         }
         return result;
       }
@@ -595,7 +610,7 @@ base::DictValue Select(Profile* profile,
         return true;
       });
   if (shown) {
-    ShowIn(tab.page, shown);
+    ShowIn(tab.page, forward, shown);
     return result;
   }
   WorkspaceWindow* workspace = hidden ? WorkspaceWindow::From(hidden) : nullptr;
@@ -606,8 +621,9 @@ base::DictValue Select(Profile* profile,
       partner = each;
     }
   }
-  if (!partner || !partner->Switch(workspace->workspace(),
-                                   base::BindOnce(&ShowIn, tab.page))) {
+  if (!partner ||
+      !partner->Switch(workspace->workspace(),
+                       base::BindOnce(&ShowIn, tab.page, forward))) {
     return Error("uw can't switch to that workspace now.");
   }
   return result;
@@ -616,9 +632,10 @@ base::DictValue Select(Profile* profile,
 base::DictValue Act(Profile* profile,
                     std::string_view tool,
                     const std::vector<UserTab>& tabs,
-                    const Plan& plan) {
+                    const Plan& plan,
+                    bool forward) {
   if (tool == kSelectTool) {
-    return Select(profile, tabs, plan);
+    return Select(profile, tabs, plan, forward);
   }
   const UserTab& first = tabs[plan.task           ? *plan.task
                               : plan.tabs.empty() ? 0
@@ -754,20 +771,31 @@ void ShowTask(Profile* profile, std::string_view task) {
                 plan.tabs = {i};
               }
             }
-            Select(profile, tabs, plan);
+            Select(profile, tabs, plan, /*forward=*/false);
           },
           profile, std::string(task)));
+}
+
+void ListUserTabs(Profile* profile,
+                  base::OnceCallback<void(std::vector<ListedTab>)> done) {
+  FindTabs(
+      profile, TabOwners(),
+      base::BindOnce(
+          [](base::OnceCallback<void(std::vector<ListedTab>)> done,
+             std::vector<UserTab> tabs) { std::move(done).Run(Listed(tabs)); },
+          std::move(done)));
 }
 
 void RunTabTool(Profile* profile,
                 std::string_view tool,
                 const base::DictValue& args,
                 const TabOwners& owners,
-                base::OnceCallback<void(base::DictValue)> done) {
+                base::OnceCallback<void(base::DictValue)> done,
+                bool bring_forward) {
   FindTabs(profile, owners,
            base::BindOnce(
                [](Profile* profile, std::string tool, base::DictValue args,
-                  base::OnceCallback<void(base::DictValue)> done,
+                  bool forward, base::OnceCallback<void(base::DictValue)> done,
                   std::vector<UserTab> tabs) {
                  if (tool == kTabsTool) {
                    const TabFilter filter = TabFilterFrom(args);
@@ -782,11 +810,12 @@ void RunTabTool(Profile* profile,
                  }
                  base::expected<Plan, base::DictValue> plan =
                      PlanOf(tool, args, tabs);
-                 std::move(done).Run(plan.has_value()
-                                         ? Act(profile, tool, tabs, *plan)
-                                         : std::move(plan.error()));
+                 std::move(done).Run(
+                     plan.has_value() ? Act(profile, tool, tabs, *plan, forward)
+                                      : std::move(plan.error()));
                },
-               profile, std::string(tool), args.Clone(), std::move(done)));
+               profile, std::string(tool), args.Clone(), bring_forward,
+               std::move(done)));
 }
 
 }  // namespace uw

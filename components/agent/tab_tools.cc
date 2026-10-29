@@ -128,10 +128,16 @@ base::expected<size_t, TabRefusal> FindOne(const std::vector<ListedTab>& tabs,
   if (found.empty()) {
     return base::unexpected(TabRefusal{"no tab has that id", start});
   }
-  return base::unexpected(
-      TabRefusal{base::StrCat({"it matches ",
-                               base::NumberToString(found.size()), " tabs"}),
-                 start});
+  TabRefusal several{
+      base::StrCat(
+          {"it matches ", base::NumberToString(found.size()), " tabs"}),
+      start};
+  for (size_t i : found) {
+    several.matches.push_back(base::StrCat(
+        {ShortId(tabs[i].id), " (",
+         tabs[i].pinned ? std::string("Pinned") : tabs[i].workspace, ")"}));
+  }
+  return base::unexpected(std::move(several));
 }
 
 }  // namespace
@@ -324,12 +330,24 @@ base::DictValue RefusalResult(std::string_view tool,
                                 : tool == kSelectTool     ? "show"
                                 : tool == kRenameTaskTool ? "rename"
                                                           : "close";
-  return base::DictValue()
-      .Set("error",
-           base::StrCat({"Didn't ", verb, refusal.tab.empty() ? "" : " ",
-                         refusal.tab, ": ", refusal.reason, "."}))
-      .Set("refused", refusal.reason)
-      .Set("tab", refusal.tab);
+  base::DictValue result =
+      base::DictValue()
+          .Set("error",
+               base::StrCat({"Didn't ", verb, refusal.tab.empty() ? "" : " ",
+                             refusal.tab, ": ", refusal.reason, "."}))
+          .Set("refused", refusal.reason)
+          .Set("tab", refusal.tab);
+  if (!refusal.id.empty()) {
+    result.Set("id", refusal.id);
+  }
+  if (!refusal.matches.empty()) {
+    base::ListValue matches;
+    for (const std::string& match : refusal.matches) {
+      matches.Append(match);
+    }
+    result.Set("matches", std::move(matches));
+  }
+  return result;
 }
 
 base::expected<std::vector<size_t>, TabRefusal> FindTabs(

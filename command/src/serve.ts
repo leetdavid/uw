@@ -92,8 +92,8 @@ async function serve({ channel }: Context, asked: object, input: Input): Promise
 
 /** A step that waits, as uw's card asks it. */
 function question(approval: Approval): string {
-  const { label, question: asked, reason } = approvalCard(approval);
-  return [`uw · ${label}`, asked, reason].filter(Boolean).join("\n");
+  const { label, question: asked, detail, reason } = approvalCard(approval);
+  return [`uw · ${label}`, asked, ...detail.map((line) => line.trim()), reason].filter(Boolean).join("\n");
 }
 
 function answerOf(responses: Record<string, unknown> | undefined): { choice: string; note?: string } {

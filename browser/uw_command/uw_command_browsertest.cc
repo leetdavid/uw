@@ -35,6 +35,7 @@
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
@@ -42,6 +43,7 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -57,10 +59,13 @@
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_theme.h"
+#include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/agent/tab_tools.h"
 #include "uw/components/ai_providers/providers.h"
 #include "uw/components/uw_command/command_settings.h"
 
@@ -361,6 +366,45 @@ IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, MemoryListsAndForgets) {
   EXPECT_EQ(Ask("memory.forget", forget).FindIntByDottedPath("error.code"), 1);
 }
 
+// uw tabs lists a workspace's tabs, moves one to a new task without asking,
+// and refuses an id that names no tab. See docs/plans/tab-tools.md.
+IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, TabsListMoveAndRefuse) {
+  content::WebContents* page = chrome::AddAndReturnTabAt(
+      browser(), GURL("data:text/html,<title>Memmo Alfama</title>"), -1,
+      /*foreground=*/false);
+  ASSERT_TRUE(content::WaitForLoadStop(page));
+  const std::string workspace =
+      WorkspaceList::Get()
+          .Find(WorkspaceWindow::From(browser())->workspace())
+          ->name;
+  const std::string where =
+      base::StrCat({R"({"workspace":")", workspace, "\""});
+
+  base::DictValue listed = Ask("tabs.list", where + "}");
+  const base::ListValue* tabs = listed.FindListByDottedPath("result.tabs");
+  ASSERT_TRUE(tabs) << listed;
+  std::string id;
+  for (const base::Value& tab : *tabs) {
+    if (*tab.GetDict().FindString("title") == "Memmo Alfama") {
+      id = *tab.GetDict().FindString("id");
+      EXPECT_EQ(*tab.GetDict().FindString("place"),
+                base::StrCat({workspace, " › Scratchpad"}));
+    }
+  }
+  ASSERT_EQ(id.size(), 8u) << listed;
+
+  base::DictValue moved = Ask(
+      "tabs.move",
+      base::StrCat({where, R"(,"tabs":[")", id, R"("],"new_task":"Hotels"})"}));
+  EXPECT_EQ(moved.FindBoolByDottedPath("result.new"), true) << moved;
+  EXPECT_EQ(*moved.FindStringByDottedPath("result.task.name"), "Hotels");
+
+  base::DictValue refused = Ask("tabs.close", R"({"tabs":["zzzz"]})");
+  EXPECT_EQ(refused.FindIntByDottedPath("error.code"), 2);
+  EXPECT_EQ(*refused.FindStringByDottedPath("error.message"),
+            "didn't close zzzz: no tab has that id");
+}
+
 IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, MistakesAreWrongUsage) {
   base::DictValue refused = Ask(
       "settings.set", R"({"name":"theme.grain","value":"140"})");
@@ -378,7 +422,7 @@ IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, MistakesAreWrongUsage) {
       *nowhere.FindStringByDottedPath("error.message"),
       "No workspace is called Elsewhere. Workspaces: "));
 
-  EXPECT_EQ(Ask("tabs.list").FindIntByDottedPath("error.code"), -32601);
+  EXPECT_EQ(Ask("pins.list").FindIntByDottedPath("error.code"), -32601);
 }
 
 IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, ACurrencyNeedsRates) {
@@ -959,8 +1003,9 @@ IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
     names.push_back(*tool.GetDict().FindString("name"));
     EXPECT_TRUE(tool.GetDict().FindDict("inputSchema"));
   }
-  EXPECT_EQ(names, (std::vector<std::string>{"open", "navigate", "read",
-                                             "click", "type"}));
+  EXPECT_EQ(names, (std::vector<std::string>{
+                       "open", "navigate", "read", "click", "type", "tabs",
+                       "move", "rename_task", "close", "close_task"}));
   EXPECT_TRUE(replies[1].FindStringByDottedPath("result.workspace"))
       << replies[1];
   EXPECT_EQ(replies[2].FindIntByDottedPath("result.result.tab"), 1)
@@ -970,6 +1015,43 @@ IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
   EXPECT_FALSE(Shown(Url("/article")));
   // The tabs close once the command goes.
   EXPECT_TRUE(base::test::RunUntil([] { return !RunWindowOpen(); }));
+}
+
+// An outside agent lists the user's tabs and closes one after the client
+// approves, as a chat's agent does in Auto. It has no select. See
+// docs/plans/tab-tools.md#who-gets-the-tools.
+IN_PROC_BROWSER_TEST_F(UwCommandToolsBrowserTest,
+                       AnOutsideAgentClosesTheUsersTabsOnceApproved) {
+  content::WebContents* page = chrome::AddAndReturnTabAt(
+      browser(), GURL("data:text/html,<title>Memmo Alfama</title>"), -1,
+      /*foreground=*/false);
+  ASSERT_TRUE(content::WaitForLoadStop(page));
+  tabs::TabInterface* tab =
+      browser()->tab_strip_model()->GetTabForWebContents(page);
+  const std::string id =
+      ShortId(TabOrganizationController::From(browser())->IdFor(tab)->value());
+  const int before = browser()->tab_strip_model()->count();
+
+  std::vector<base::DictValue> replies =
+      Replies({Start(), Call("tabs", base::DictValue().Set("query", "memmo")),
+               Call("select", base::DictValue().Set("tab", id)),
+               Call("close", base::DictValue().Set(
+                                 "tabs", base::ListValue().Append(id))),
+               Answer("allow", "")});
+  ASSERT_EQ(replies.size(), 5u);
+  EXPECT_EQ(replies[1].FindIntByDottedPath("result.result.tabs"), 1)
+      << replies[1];
+  EXPECT_EQ(replies[2].FindIntByDottedPath("error.code"), 2) << replies[2];
+  const base::DictValue* waiting =
+      replies[3].FindDictByDottedPath("result.waiting.approval");
+  ASSERT_TRUE(waiting) << replies[3];
+  EXPECT_EQ(*waiting->FindString("action"), "Close 1 tab in the Scratchpad");
+  EXPECT_EQ(*(*waiting->FindList("tabs"))[0].GetDict().FindString("title"),
+            "Memmo Alfama");
+  EXPECT_EQ(replies[4].FindListByDottedPath("result.result.closed")->size(), 1u)
+      << replies[4];
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return browser()->tab_strip_model()->count() == before - 1; }));
 }
 
 // A step that changes something asks the client, and waits in the user's

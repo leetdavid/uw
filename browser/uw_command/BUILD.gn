@@ -16,10 +16,12 @@ source_set("uw_command") {
     "command_workspace.h",
     "memory_command.cc",
     "settings_command.cc",
+    "tabs_command.cc",
     "tools_command.cc",
   ]
   public_deps = [ "//base" ]
   deps = [
+    "//base:i18n",
     "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles:profile_manager",
@@ -43,6 +45,7 @@ source_set("uw_command") {
     "//uw/browser/agent:memory_store",
     "//uw/browser/agent:run_window",
     "//uw/browser/agent:run_window_mark",
+    "//uw/browser/agent:user_tabs",
     "//uw/browser/connectors",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/ui/webui/uw_chat",
@@ -88,8 +91,10 @@ source_set("browser_tests") {
     "//uw/browser/ui/webui/uw_chat",
     "//uw/components/ai_providers",
     "//uw/browser/connectors",
+    "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/workspaces",
+    "//uw/components/agent",
     "//uw/components/uw_command",
   ]
   data_deps = [ "//uw/browser/connectors:uw_fake_mcp_server" ]

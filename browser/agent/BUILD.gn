@@ -70,6 +70,7 @@ source_set("user_tabs") {
     "//components/tab_groups",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",
+    "//ui/base",
     "//uw/browser/pins",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",

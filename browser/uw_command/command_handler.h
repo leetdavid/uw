@@ -39,6 +39,10 @@ void RunChatCommand(CommandRequest request,
 // docs/plans/agent-memory.md#the-uw-command.
 void RunMemoryCommand(CommandRequest request, CommandReply reply);
 
+// uw tabs: list, show, move, and close the user's tabs, and rename tasks,
+// without approvals. See docs/plans/tab-tools.md#who-gets-the-tools.
+void RunTabsCommand(CommandRequest request, CommandReply reply);
+
 // uw mcp serve: the page tools an outside agent uses, out of sight, with the
 // user's approval. See docs/plans/uw-command.md#the-tool-server.
 void RunToolsCommand(CommandRequest request,
