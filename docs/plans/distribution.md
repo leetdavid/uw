@@ -115,7 +115,7 @@ Motion, not built yet: the stars and the horizon glow breathe slowly, the filmst
 
 ### The window becomes the film
 
-Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The storyboard is Doop frame `d7LslD48S1`. The ad is the animated HTML built from the "Tabs, sorted" storyboard (frame `kSVeaeuYZm`), in the history at commit `8dd05ed`, recorded as a video of about 36 s.
+Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The storyboard is Doop frame `d7LslD48S1`. The film is take 3 of the ad: 39.6 s at 1920 × 1080, with music and sound effects, rendered from the HyperFrames project in `~/dev/uw-ad`, outside this repo. It remakes the animated HTML ad from commit `8dd05ed`.
 
 1. The window rises with the page and turns to face the viewer, as it does now.
 2. Once it is flat and centered, it pins in place with its horizon while the page keeps scrolling.
@@ -123,7 +123,7 @@ Agreed on 2026-10-29: the hero window turns into the ad as the page scrolls. The
 4. The film then starts from the beginning, muted, and plays once at normal speed. It does not loop, and scrolling does not move it forward or back.
 5. After about one more screen the page lets go. The film keeps playing as it scrolls away and pauses once it is mostly out of view.
 
-Open: whether the film gets sound, whether the page holds visitors at the film, what shows when it ends, phone widths, "Reduce motion" and browsers without scroll-driven animation, and recording the film again at 2× without the old pause button.
+Open: the sound button, whether the page holds visitors at the film, what shows when it ends, phone widths, and "Reduce motion" and browsers without scroll-driven animation.
 
 No email list or pricing yet. Help is its own plan: [Help](help.md).
 
