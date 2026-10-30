@@ -359,10 +359,12 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
 }
 
 // While the sidebar hides, it slides out at its full width, so its rows never
-// squeeze.
+// squeeze. The window buttons hide meanwhile, so the toolbar keeps to the page
+// card's edge and leaves no room for them.
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
                        HidingSlidesTheSidebarAtFullWidth) {
   StageSidebar();
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
   VerticalTabStripRegionView* sidebar = Sidebar();
   const int width = sidebar->uncollapsed_width();
   tabs::VerticalTabStripStateController* state =
@@ -371,8 +373,13 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return SidebarAnimating() && sidebar->x() < 0; }));
   EXPECT_EQ(sidebar->width(), width);
-  EXPECT_TRUE(base::test::RunUntil(
-      [&] { return state->IsCollapsed() && !SidebarAnimating(); }));
+  bool toolbar_left_the_page = false;
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    toolbar_left_the_page |= InWindow(view->toolbar()).x() !=
+                             InWindow(view->multi_contents_view()).x();
+    return state->IsCollapsed() && !SidebarAnimating();
+  }));
+  EXPECT_FALSE(toolbar_left_the_page);
 }
 
 // Esc sends the card away, though something keeps it in, until the pointer
