@@ -42,6 +42,8 @@ The aesthetics should be like Arc browser. The canvas style guide `uw-arc-style`
 
 ## Managing the kanban
 
+Tickets are moving to the Linear project [uw browser](https://linear.app/eslee/project/uw-browser-a018fc02c9bf) (team `eslee`, key `T`). Reach it through the `linear-eslee` MCP server. Once the board is migrated, Linear is the source of truth for tickets. Until then, use the board.
+
 The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Keep its status column current.
 
 - Set a ticket to `in progress` when work starts, `in review` when the change is ready to verify, and `done` once it is verified.
