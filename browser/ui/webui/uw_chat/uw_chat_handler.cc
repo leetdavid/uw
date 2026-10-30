@@ -1367,12 +1367,13 @@ bool UwChatHandler::Start() {
     }
   }
   saved_tabs_.clear();
-  // The tab the user asked from, from the command bar, is the agent's tab 1.
+  // The page the user handed over with a "@" in the command bar is the
+  // agent's tab 1.
   if (start_) {
-    if (tabs::TabInterface* asked_from = start_->tab.Get()) {
-      agent_->tools().Adopt(1, *asked_from);
-      content::WebContents* page = asked_from->GetContents();
-      handed_over_ = base::StrCat({"I asked this from tab 1, \"",
+    if (tabs::TabInterface* handed = start_->tab.Get()) {
+      agent_->tools().Adopt(1, *handed);
+      content::WebContents* page = handed->GetContents();
+      handed_over_ = base::StrCat({"I'm asking about tab 1, \"",
                                    base::UTF16ToUTF8(page->GetTitle()),
                                    "\" at ", page->GetLastCommittedURL().spec(),
                                    ". Read tab 1 first.\n\n"});

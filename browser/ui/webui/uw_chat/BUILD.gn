@@ -149,6 +149,7 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization:ai_connection",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
+    "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/update:pending_update",
     "//uw/components/agent",

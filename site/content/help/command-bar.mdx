@@ -25,7 +25,8 @@ Type a site search keyword and press <kbd>Tab</kbd> to search that site, as in C
 
 ## Ask uw or *run a command*
 
-- <kbd>Cmd</kbd> <kbd>Return</kbd> asks uw. A [chat](./chats.mdx) opens with your text as its first message, and the agent gets the tab you were on as its tab 1.
+- <kbd>Cmd</kbd> <kbd>Return</kbd> asks uw. A [chat](./chats.mdx) opens with your text as its first message.
+- To ask about the page you're on, type `@` first. A chip shows the page's icon and title, and <kbd>Return</kbd> asks uw with that page as the agent's tab 1. The agent reads it first and can act in it, with the same approvals as in its own tabs. <kbd>Backspace</kbd> in the empty field removes the chip. On a chat, a terminal, or a uw page, `@` is just text. In uw 0.1.3 and later; before, <kbd>Cmd</kbd> <kbd>Return</kbd> always handed over the tab you were on.
 - <kbd>Option</kbd> <kbd>Return</kbd> runs the text as a shell command in a new [terminal tab](./terminal-tabs.mdx).
 - Type `>` first, or open the panel with <kbd>Cmd</kbd> <kbd>Shift</kbd> <kbd>P</kbd>, and <kbd>Return</kbd> runs the text as a shell command the same way.
 

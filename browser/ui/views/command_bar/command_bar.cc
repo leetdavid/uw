@@ -113,9 +113,16 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
   }
 
   // CommandBarActions:
-  void AskUw(const std::string& text) override { bar_->AskUw(text); }
+  void AskUw(const std::string& text) override { bar_->Ask(text, nullptr); }
+  void AskAboutPage(const std::string& text) override {
+    bar_->Ask(text, bar_->SelectedPage());
+  }
   void RunInTerminal(const std::string& text) override {
     bar_->RunInTerminal(text);
+  }
+  content::WebContents* SelectedPage() override {
+    tabs::TabInterface* page = bar_->SelectedPage();
+    return page ? page->GetContents() : nullptr;
   }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
@@ -338,12 +345,18 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
   }
 }
 
-void CommandBar::AskUw(const std::string& text) {
-  tabs::TabInterface* asked_from = window_->GetTabStripModel()->GetActiveTab();
+tabs::TabInterface* CommandBar::SelectedPage() {
+  tabs::TabInterface* tab = window_->GetTabStripModel()->GetActiveTab();
+  return tab && tab->GetContents()->GetLastCommittedURL().SchemeIsHTTPOrHTTPS()
+             ? tab
+             : nullptr;
+}
+
+void CommandBar::Ask(const std::string& text, tabs::TabInterface* page) {
   if (bubble_) {
     bubble_->CloseUI();
   }
-  AskInNewChat(window_, asked_from, text);
+  AskInNewChat(window_, page, text);
   PlaceInTask();
 }
 

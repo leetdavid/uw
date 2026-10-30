@@ -33,8 +33,12 @@ class CommandBarActions {
  public:
   // Cmd+Return: asks uw in a new chat.
   virtual void AskUw(const std::string& text) = 0;
+  // Return after a "@": asks uw in a new chat about the selected page.
+  virtual void AskAboutPage(const std::string& text) = 0;
   // Option+Return, or Return after a ">": runs it in a new terminal.
   virtual void RunInTerminal(const std::string& text) = 0;
+  // The selected tab's contents when it shows a web page, or null.
+  virtual content::WebContents* SelectedPage() = 0;
 
  protected:
   virtual ~CommandBarActions() = default;
@@ -101,6 +105,8 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void CopyAnswer(const std::string& text) override;
   void Close() override;
   void IsFrosted(IsFrostedCallback callback) override;
+  void GetSelectedPage(GetSelectedPageCallback callback) override;
+  void AskAboutPage(const std::string& text) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
   std::unique_ptr<ProblemReporter> problem_reporter_;

@@ -803,6 +803,16 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
 
   Type("");
   PressInField("Backspace");
+  Type("@");
+  ASSERT_TRUE(Eventually([&] { return !Chip().empty(); }));
+  Type("what is this page about");
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
+                           bar()->page()->GetNativeView()),
+                       "command-bar-page");
+
+  Type("");
+  PressInField("Backspace");
   for (auto [text, name] :
        {std::pair{"20 kg * 10 m/s/s / 5W", "command-bar-calculator"},
         std::pair{"10 kg + 5 m", "command-bar-no-answer"},
@@ -862,6 +872,33 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AShellCommandRunsOnReturn) {
 
   EXPECT_TRUE(
       Eventually([&] { return MarkerText() == "ran"; }, base::Seconds(10)));
+}
+
+// A "@" in an empty field turns into the chip of the web page behind the
+// command bar, and the text no longer lists rows. Backspace in the empty field
+// takes the chip away. Off a web page, the "@" stays typed text.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnAtTakesThePageBehindIt) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("@");
+  Settle();
+  EXPECT_EQ("", Chip());
+  EXPECT_EQ("@", Field());
+  PressInField("Escape");
+
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL("/title2.html")));
+  Type("@");
+  ASSERT_TRUE(Eventually([&] { return Chip() == "Title Of Awesomeness"; }));
+  EXPECT_EQ("", Field());
+  Type("what is this");
+  Settle();
+  EXPECT_EQ(0, Rows());
+
+  Type("");
+  PressInField("Backspace");
+  EXPECT_EQ("", Chip());
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,

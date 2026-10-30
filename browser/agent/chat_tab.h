@@ -60,7 +60,7 @@ struct ChatStart {
 void SetChatStart(content::WebContents* chat, ChatStart start);
 
 // Opens a chat in front where a blank new tab would open, asks it `text`, and
-// hands it `tab`, the tab the user was on, as the agent's tab 1.
+// hands it `tab`, if any, as the agent's tab 1.
 void AskInNewChat(BrowserWindowInterface* window,
                   tabs::TabInterface* tab,
                   const std::string& text);

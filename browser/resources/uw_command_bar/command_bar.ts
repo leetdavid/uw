@@ -9,6 +9,7 @@ import {Calculator} from './calculator.js';
 import type {Calculation, Ink, MathJsLibrary} from './calculator.js';
 import {TimeMath} from './time.js';
 import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
+import type {SelectedPage} from './uw_command_bar.mojom-webui.js';
 
 // mathjs, which command_bar.html loads first.
 declare const math: MathJsLibrary;
@@ -69,6 +70,8 @@ let calculation: Calculation|null = null;
 let pendingReturn = false;
 // After a `>` or Cmd+Shift+P, the text is a shell command.
 let shell = false;
+// After a `@`, the text is a question about this page.
+let page: SelectedPage|null = null;
 
 const keywords = new KeywordModeManager({
   onKeywordModelChanged: showChip,
@@ -85,12 +88,20 @@ const keywords = new KeywordModeManager({
 
 function showChip() {
   const keyword = keywords.isInKeywordMode;
-  chip.hidden = !shell && !keyword;
+  chip.hidden = !shell && !page && !keyword;
   chip.classList.toggle('shell', shell);
-  chip.textContent =
-      shell ? '>' : (keywords.inputKeywordModel?.displayText ?? '');
-  field.placeholder = shell ? 'Type a shell command' : PLACEHOLDER;
+  chip.classList.toggle('page', !!page);
+  if (page) {
+    chip.replaceChildren(favicon(page.url), text('', page.title));
+  } else {
+    chip.textContent =
+        shell ? '>' : (keywords.inputKeywordModel?.displayText ?? '');
+  }
+  field.placeholder = shell ? 'Type a shell command' :
+      page                  ? 'Ask about this page' :
+                              PLACEHOLDER;
   keys.classList.toggle('shell', shell);
+  keys.classList.toggle('page', !!page);
 }
 
 function svgIcon(id: string): SVGSVGElement {
@@ -108,12 +119,16 @@ function icon(match: AutocompleteMatch): HTMLElement {
     box.append(svgIcon('search'));
     return box;
   }
+  box.append(favicon(match.destinationUrl));
+  return box;
+}
+
+function favicon(url: string): HTMLImageElement {
   const image = document.createElement('img');
   image.alt = '';
   image.src = 'chrome://favicon2/?size=16&scaleFactor=2x&pageUrl=' +
-      encodeURIComponent(match.destinationUrl);
-  box.append(image);
-  return box;
+      encodeURIComponent(url);
+  return image;
 }
 
 function text(className: string, value: string): HTMLElement {
@@ -170,7 +185,7 @@ function draw(element: HTMLElement, ink: Ink[]) {
 
 // Time math first, and math for text with nothing about time in it.
 function workOut(): Calculation|null {
-  if (shell || !typed) {
+  if (shell || page || !typed) {
     return null;
   }
   const timed = timeMath.calculate(typed);
@@ -281,7 +296,7 @@ function setField(value: string) {
 }
 
 function show(result: AutocompleteResult) {
-  if (shell || result.input !== typed) {
+  if (shell || page || result.input !== typed) {
     return;
   }
   shownFor = typed;
@@ -354,7 +369,7 @@ function query(preventInlineAutocomplete: boolean) {
       completed.slice(typed.length) :
       '';
   paint();
-  if (shell) {
+  if (shell || page) {
     return;
   }
   if (!typed && !keywords.isInKeywordMode) {
@@ -390,15 +405,63 @@ function sendText(key: {metaKey?: boolean, altKey?: boolean}) {
       /*viaKeyboard=*/ true);
 }
 
+// Asks uw about the selected page in a new chat.
+function askAboutPage() {
+  const words = field.value.trim();
+  if (words) {
+    calculatorHandler.askAboutPage(words);
+  }
+}
+
+// The `>` and `@` chips take the text away from the rows and the calculator.
+function leaveRows() {
+  calculate();
+  keywords.exit();
+  showRows(false);
+  handler.stopAutocomplete(/*clearResult=*/ true);
+}
+
 function setShell(on: boolean) {
   shell = on;
   if (on) {
-    calculate();
-    keywords.exit();
-    showRows(false);
-    handler.stopAutocomplete(/*clearResult=*/ true);
+    leaveRows();
   }
   showChip();
+}
+
+function setPage(selected: SelectedPage|null) {
+  page = selected;
+  if (page) {
+    leaveRows();
+  }
+  showChip();
+}
+
+// A `@` in an empty field asks about the selected page, when it is a web page.
+// Off one, it stays typed text.
+async function startPageQuestion() {
+  const {page: selected} = await calculatorHandler.getSelectedPage();
+  if (!selected || shell || page || !field.value.startsWith('@')) {
+    query(/*preventInlineAutocomplete=*/ false);
+    return;
+  }
+  setField(field.value.slice(1));
+  typed = field.value;
+  completion = '';
+  paint();
+  setPage(selected);
+}
+
+// Kept text with a `@` chip follows the tab selected now.
+async function refreshPage() {
+  if (!page) {
+    return;
+  }
+  const {page: selected} = await calculatorHandler.getSelectedPage();
+  setPage(selected);
+  if (!selected) {
+    query(/*preventInlineAutocomplete=*/ true);
+  }
 }
 
 function clear() {
@@ -410,6 +473,7 @@ function clear() {
   calculate();
   keywords.exit();
   setShell(false);
+  setPage(null);
   showRows(false);
   handler.stopAutocomplete(/*clearResult=*/ true);
 }
@@ -422,6 +486,10 @@ field.addEventListener('input', event => {
     typed = '';
     paint();
     setShell(true);
+    return;
+  }
+  if (!shell && !page && field.value === '@' && !keywords.isInKeywordMode) {
+    startPageQuestion();
     return;
   }
   if (!shell &&
@@ -462,12 +530,17 @@ field.addEventListener('keydown', event => {
     if (shell && !field.value) {
       event.preventDefault();
       setShell(false);
+    } else if (page && !field.value) {
+      event.preventDefault();
+      setPage(null);
     } else if (keywords.handleBackspace(field)) {
       event.preventDefault();
     }
   } else if (event.key === 'Enter') {
     event.preventDefault();
-    if (event.metaKey) {
+    if (page) {
+      askAboutPage();
+    } else if (event.metaKey) {
       sendText({metaKey: true});
     } else if (event.altKey || shell) {
       sendText({altKey: true});
@@ -523,6 +596,7 @@ window.addEventListener('focus', () => {
   refreshFrost();
   refreshCurrencies();
   refreshClock();
+  refreshPage();
 });
 window.addEventListener('blur', () => field.blur());
 // Moving the caret off the end of what was typed drops the completion.

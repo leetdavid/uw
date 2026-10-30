@@ -10,6 +10,12 @@ struct ExchangeRates {
   map<string, double> per_euro;
 };
 
+// The web page selected behind the command bar, which a typed "@" asks about.
+struct SelectedPage {
+  string title;
+  string url;
+};
+
 // What the command bar's page asks of its window.
 interface CalculatorHandler {
   // The last rates uw downloaded, if any, and the currency a bare amount
@@ -25,4 +31,9 @@ interface CalculatorHandler {
   // Whether the bar is frosted glass this time it shows: its window's glass
   // is on.
   IsFrosted() => (bool frosted);
+  // The page selected behind the command bar, or null when the selected tab
+  // does not show a web page.
+  GetSelectedPage() => (SelectedPage? page);
+  // Asks `text` in a new chat, with the selected page handed to the agent.
+  AskAboutPage(string text);
 };

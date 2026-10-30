@@ -80,6 +80,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/components/agent/schedule.h"
@@ -643,6 +644,38 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
 
   std::string Form() {
     return embedded_https_test_server().GetURL("shop.test", "/form").spec();
+  }
+
+  // Types `text` in the command bar's field, as typing does.
+  void TypeInCommandBar(std::string_view text) {
+    content::WebContents* bar = CommandBar::From(browser())->page();
+    ASSERT_TRUE(content::WaitForLoadStop(bar));
+    ASSERT_TRUE(content::ExecJs(bar, content::JsReplace(R"(
+        const field = document.querySelector('#field');
+        field.value = $1;
+        field.dispatchEvent(new Event('input'));
+    )",
+                                                        text)));
+  }
+
+  // Presses Return in the command bar's field, with `with`, such as
+  // "metaKey", held.
+  void ReturnInCommandBar(std::string_view with = "") {
+    ASSERT_TRUE(content::ExecJs(
+        CommandBar::From(browser())->page(),
+        content::JsReplace("document.querySelector('#field').dispatchEvent("
+                           "new KeyboardEvent('keydown', {key: 'Enter', [$1]: "
+                           "true, bubbles: true}))",
+                           with.empty() ? "none" : with)));
+  }
+
+  // The chat the command bar opened in front.
+  content::WebContents* AskedChat() {
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return tabs()->GetActiveWebContents()->GetVisibleURL().host() ==
+             kChatHost;
+    }));
+    return tabs()->GetActiveWebContents();
   }
 
   ScriptedModel model_{*embedded_test_server()};
@@ -1948,10 +1981,28 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatSwitchesModelAndEffort) {
 
 // A chat whose provider was removed says so, and sends nothing until the
 // user picks another model.
-// Cmd+Return in the command bar opens a chat that asks the typed text, with
-// the tab it was asked from handed to the agent as tab 1.
-IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
-                       AChatAskedFromTheCommandBarHasItsTab) {
+// Cmd+Return in the command bar opens a chat that asks the typed text and
+// starts clean: the tab the user was on is not handed to the agent.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, CmdReturnInTheCommandBarHandsNoTab) {
+  UseAgentModel();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(Form())));
+  model_.Script({ScriptedModel::Answer("A tour.")});
+
+  TypeInCommandBar("What is this page for?");
+  ReturnInCommandBar("metaKey");
+  WaitForChat(AskedChat());
+
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return model_.Requests().size() == 1; }));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::HasSubstr("What is this page for?"));
+  EXPECT_THAT(model_.Requests()[0],
+              ::testing::Not(::testing::HasSubstr("asking about tab 1")));
+}
+
+// A "@" in the command bar hands the page behind it to the new chat's agent
+// as tab 1, which it reads first.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAtInTheCommandBarHandsThePageOver) {
   UseAgentModel();
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(Form())));
   tabs::TabInterface* asked_from = tabs()->GetActiveTab();
@@ -1960,14 +2011,25 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
            ScriptedModel::Call("read", base::DictValue().Set("tab", 1)))),
        ScriptedModel::Answer("It books a tour.")});
 
-  AskInNewChat(browser(), asked_from, "What is this page for?");
-  content::WebContents* chat = tabs()->GetActiveWebContents();
+  TypeInCommandBar("@");
+  EXPECT_EQ(content::EvalJs(CommandBar::From(browser())->page(),
+                            "new Promise(resolve => {"
+                            "  const chip = document.querySelector('#chip');"
+                            "  const check = () => chip.hidden"
+                            "      ? setTimeout(check, 20)"
+                            "      : resolve(chip.textContent);"
+                            "  check();"
+                            "})"),
+            "Book a tour");
+  TypeInCommandBar("What is this page for?");
+  ReturnInCommandBar();
+  content::WebContents* chat = AskedChat();
   WaitForChat(chat);
 
   ASSERT_TRUE(
       base::test::RunUntil([&] { return model_.Requests().size() == 2; }));
   EXPECT_THAT(model_.Requests()[0],
-              ::testing::HasSubstr("I asked this from tab 1"));
+              ::testing::HasSubstr("I'm asking about tab 1"));
   EXPECT_THAT(model_.Requests()[0], ::testing::HasSubstr(Form()));
   EXPECT_THAT(model_.Requests()[0],
               ::testing::HasSubstr("What is this page for?"));

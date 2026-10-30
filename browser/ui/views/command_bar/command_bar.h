@@ -24,6 +24,10 @@ struct OpenURLParams;
 class WebContents;
 }  // namespace content
 
+namespace tabs {
+class TabInterface;
+}
+
 namespace uw {
 
 // A uw command number for Cmd+Shift+P, which opens the command bar ready for a
@@ -69,9 +73,11 @@ class CommandBar : public views::WidgetObserver {
   // Opens a row picked in the command bar: in a new tab where Cmd+T's blank
   // tab goes, or in the open tab it names. Then closes the command bar.
   void OpenPicked(const content::OpenURLParams& params);
-  // Closes the command bar and asks `text` in a new chat, with the selected
-  // tab handed to the agent.
-  void AskUw(const std::string& text);
+  // The selected tab when it shows a web page, or null.
+  tabs::TabInterface* SelectedPage();
+  // Closes the command bar and asks `text` in a new chat, with `page`, if
+  // any, handed to the agent.
+  void Ask(const std::string& text, tabs::TabInterface* page);
   // Closes the command bar and runs `text` in a new terminal.
   void RunInTerminal(const std::string& text);
   // Moves the tab just opened to the end of the task the command bar was

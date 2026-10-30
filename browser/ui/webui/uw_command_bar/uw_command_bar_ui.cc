@@ -161,6 +161,24 @@ void UwCommandBarUI::IsFrosted(IsFrostedCallback callback) {
   std::move(callback).Run(data && data->frosted);
 }
 
+void UwCommandBarUI::GetSelectedPage(GetSelectedPageCallback callback) {
+  CommandBarActions* actions = GetCommandBarActions(web_ui()->GetWebContents());
+  content::WebContents* page = actions ? actions->SelectedPage() : nullptr;
+  if (!page) {
+    std::move(callback).Run(nullptr);
+    return;
+  }
+  std::move(callback).Run(mojom::SelectedPage::New(
+      base::UTF16ToUTF8(page->GetTitle()), page->GetLastCommittedURL().spec()));
+}
+
+void UwCommandBarUI::AskAboutPage(const std::string& text) {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->AskAboutPage(text);
+  }
+}
+
 void UwCommandBarUI::CreatePageHandler(
     mojo::PendingRemote<searchbox::mojom::Page> page,
     mojo::PendingReceiver<searchbox::mojom::PageHandler> handler) {
