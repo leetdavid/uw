@@ -108,7 +108,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
         {children != null && children !== "" && (
           <div
             className={cn(
-              "whitespace-pre-wrap break-words",
+              "max-w-full whitespace-pre-wrap break-words",
               compact ? "py-1.5" : "py-2",
               typeClass("subtitle", compact ? "compact" : "default"),
               // User keeps the bubble chrome (rounded fill + horizontal padding);

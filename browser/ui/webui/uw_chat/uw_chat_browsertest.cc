@@ -1051,6 +1051,40 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
             *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
 }
 
+// A table wider than its answer scrolls on its own. The answer's text still
+// wraps inside the message, and the list never scrolls sideways.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AWideTableScrollsOnItsOwn) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer(
+      "| Car | Typical asking price | Notes |\n| --- | --- | --- |\n"
+      "| Toyota 86 / Subaru BRZ (2012-14) | 65k-100k (2012 median ~75k) | "
+      "Best all-round value: rear-wheel drive, 200hp, six-speed manual or "
+      "automatic, cheap Toyota parts, and an owners' club that knows every "
+      "common fault |\n\n"
+      "There are only about 20 listings in the sports car category under "
+      "HK$100k, so the market exists but it is thin and driven by condition. "
+      "The same model and year ranged from HK$35k to HK$105k.")});
+  content::WebContents* chat = OpenChat();
+  Ask(chat, "Find a sports car");
+  SaveWindowScreenshot(browser(), "wide-table");
+  EXPECT_EQ("text wraps, table scrolls, list still",
+            content::EvalJs(
+                chat,
+                "new Promise(resolve => requestAnimationFrame(() => {"
+                "  const answer = document.querySelector('.answer');"
+                "  const table = answer.querySelector('.typeset-scroll');"
+                "  const list = answer.closest('main');"
+                "  resolve(["
+                "    answer.offsetWidth <= list.firstElementChild.clientWidth"
+                "        ? 'text wraps' : 'text runs past the list',"
+                "    table.scrollWidth > table.clientWidth"
+                "        ? 'table scrolls' : 'table fits',"
+                "    list.scrollWidth > list.clientWidth"
+                "        ? 'list scrolls' : 'list still',"
+                "  ].join(', '));"
+                "}))"));
+}
+
 // A key hint: while Cmd is held on a link in an answer, a label by the
 // pointer says a click opens it in the background. Otherwise the link's
 // tooltip names Cmd.
