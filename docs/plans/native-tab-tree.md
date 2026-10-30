@@ -11,7 +11,7 @@ The design is on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), 
 - A task is a native Chromium tab group. Chromium supplies its header, collapse, rename, color, drag, and session restore.
 - Ungrouped regular tabs are the [Scratchpad](../product.md#scratchpad). They carry a "Scratchpad" label and stay below every task. Changed on 2026-10-13.
 - Tasks are listed in the order they were started. A new task comes after every other task. Agreed on 2026-10-13.
-- A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch. "New tab below" and "New child tab" in a tab's right-click menu go by that tab: see [New child tab](keyboard-and-mouse.md#new-child-tab).
+- A link opened in a new tab becomes a child of its source tab. A blank new tab opens as a sibling below the active tab's branch. A [link from another app](../product.md#automatic-tab-organization) opens at the top of the Scratchpad. "New tab below" and "New child tab" in a tab's right-click menu go by that tab: see [New child tab](keyboard-and-mouse.md#new-child-tab).
 - Child tabs are indented 16px per level and follow their parent in tab order. A child lives in its parent's task.
 - Closing a tab moves its children up one level. "Close branch" closes the tab and everything under it.
 - Tab menu commands: "New child tab", "Move to new task", "Move to Scratchpad", "Nest under previous tab", "Move up one level", "Close branch".
@@ -65,7 +65,7 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 ## Acceptance checks
 
 1. Ungrouped tabs show under "Scratchpad", below every task. `TabOrganizationControllerBrowserTest.ScratchpadLabelSitsAboveUngroupedTabs` checks where the label sits.
-2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level.
+2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level. A link from another app appears selected at the top of the Scratchpad, outside every task, whatever tab was active; several at once keep their order.
 3. Closing a parent keeps its children open, one level up, in the same order.
 4. "Move to new task" moves the tab and its descendants into a new tab group placed after every other task. `TabOrganizationControllerBrowserTest.ANewTaskComesAfterEveryOtherTask` checks it.
 5. "Move to Scratchpad" ungroups the branch, detaches it from its parent, and puts it at the end of the Scratchpad.
