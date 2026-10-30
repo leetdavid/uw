@@ -18,6 +18,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/test/ui_controls.h"
@@ -67,6 +68,36 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, first_,
                                                          second_, other_}));
     ASSERT_EQ(controller()->DepthFor(first_), 1);
+  }
+
+  // A task holding a parent and its child, so the branch is the whole task,
+  // and a Scratchpad tab, selected.
+  void StageTask() {
+    parent_ = tabs()->GetTabAtIndex(0);
+    first_ = OpenLinkFrom(parent_);
+    chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+    other_ = tabs()->GetActiveTab();
+    task_ = tabs()->AddToNewGroup(
+        {tabs()->GetIndexOfTab(parent_), tabs()->GetIndexOfTab(first_)});
+    Wait(base::Milliseconds(500));
+    ASSERT_EQ(controller()->DepthFor(first_), 1);
+    ASSERT_EQ(other_->GetGroup(), std::nullopt);
+    ASSERT_EQ(tabs()->GetActiveTab(), other_);
+  }
+
+  // Presses on `tab`'s row with `modifiers` held, moves the pointer `dy`
+  // down, a little past where a drag starts, and lets go.
+  void PressAndNudge(const tabs::TabInterface* tab, int dy, int modifiers) {
+    ui_controls::EnableUIControls();
+    const gfx::Point from = RowOf(tab)->GetBoundsInScreen().CenterPoint();
+    MoveMouse(from);
+    PressMouse(ui_controls::DOWN, modifiers);
+    for (int step = 1; step <= 4; ++step) {
+      MoveMouse(gfx::Point(from.x(), from.y() + dy * step / 4));
+      Wait(base::Milliseconds(20));
+    }
+    PressMouse(ui_controls::UP, modifiers);
+    Wait(base::Milliseconds(500));
   }
 
   std::vector<tabs::TabInterface*> Order() {
@@ -172,6 +203,7 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
   raw_ptr<tabs::TabInterface> first_ = nullptr;
   raw_ptr<tabs::TabInterface> second_ = nullptr;
   raw_ptr<tabs::TabInterface> other_ = nullptr;
+  std::optional<tab_groups::TabGroupId> task_;
 };
 
 // A dragged parent takes its children with it, still nested under it, and
@@ -304,6 +336,44 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{parent_, first_, second_,
                                                        other_}));
   EXPECT_EQ(controller()->DepthFor(second_), 0);
+}
+
+// A parent whose branch is its whole task drags within the task. Moving the
+// branch moves every tab of the task, which Chromium takes as moving the task
+// itself, so the task must not also be where the tabs go.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_ABranchThatFillsItsTaskDragsWithinIt) {
+  StageTask();
+  PressAndNudge(parent_, 8, ui_controls::kNoAccelerator);
+  EXPECT_EQ(parent_->GetGroup(), task_);
+  EXPECT_EQ(first_->GetGroup(), task_);
+  EXPECT_EQ(controller()->DepthFor(first_), 1);
+}
+
+// A Cmd-click that turns into a small drag, on a branch that fills its task,
+// keeps the task.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_ACmdClickDragOnABranchThatFillsItsTask) {
+  StageTask();
+  PressAndNudge(parent_, 8, ui_controls::kCommand);
+  EXPECT_EQ(parent_->GetGroup(), task_);
+  EXPECT_EQ(first_->GetGroup(), task_);
+  EXPECT_EQ(controller()->DepthFor(first_), 1);
+  EXPECT_EQ(tabs()->count(), 3);
+}
+
+// The same with a task of one tab, which the Cmd-click selects whole.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_ACmdClickDragIntoATaskOfOneTab) {
+  parent_ = tabs()->GetTabAtIndex(0);
+  chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+  other_ = tabs()->GetActiveTab();
+  task_ = tabs()->AddToNewGroup({tabs()->GetIndexOfTab(parent_)});
+  Wait(base::Milliseconds(500));
+  ASSERT_EQ(tabs()->GetActiveTab(), other_);
+  PressAndNudge(parent_, 8, ui_controls::kCommand);
+  EXPECT_EQ(parent_->GetGroup(), task_);
+  EXPECT_EQ(tabs()->count(), 2);
 }
 
 }  // namespace

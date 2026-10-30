@@ -1546,6 +1546,52 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_EQ(controller()->DepthFor(second), 0);
 }
 
+// A parent whose branch is its whole task moves within the task, as
+// Chromium's drag moves it when the pointer enters the task. Every tab of the
+// task moves then, and the task is where they go. Another selected tab joins
+// the task.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ABranchThatFillsItsTaskMovesWithinIt) {
+  tabs::TabInterface* parent = InitialTab();
+  tabs::TabInterface* child = OpenLinkFrom(parent);
+  tabs::TabInterface* other = NewTab();
+  const tab_groups::TabGroupId task = tabs()->AddToNewGroup(
+      {tabs()->GetIndexOfTab(parent), tabs()->GetIndexOfTab(child)});
+  base::RunLoop().RunUntilIdle();
+  ASSERT_EQ(controller()->DepthFor(child), 1);
+  ASSERT_EQ(Strip(), (std::vector<PageId>{Id(parent), Id(child), Id(other)}));
+
+  // Moves what a drag of `tab` takes, with `also` selected, into the task.
+  const auto drag = [&](tabs::TabInterface* tab,
+                        std::vector<tabs::TabInterface*> also) {
+    controller()->BeginTabDrag(/*alone=*/false);
+    also.push_back(tab);
+    ui::ListSelectionModel selection;
+    for (const tabs::TabInterface* each : controller()->DraggedTabs(also)) {
+      selection.AddIndexToSelection(tabs()->GetIndexOfTab(each));
+    }
+    selection.set_active(tabs()->GetIndexOfTab(tab));
+    selection.set_anchor(tabs()->GetIndexOfTab(tab));
+    tabs()->SetSelectionFromModel(selection);
+    tabs()->MoveSelectedTabsTo(tabs()->GetIndexOfTab(parent), task);
+    controller()->EndTabDrag();
+    base::RunLoop().RunUntilIdle();
+  };
+
+  drag(parent, {});
+  EXPECT_EQ(Strip(), (std::vector<PageId>{Id(parent), Id(child), Id(other)}));
+  EXPECT_EQ(parent->GetGroup(), task);
+  EXPECT_EQ(child->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(child), 1);
+
+  drag(parent, {other});
+  EXPECT_EQ(parent->GetGroup(), task);
+  EXPECT_EQ(child->GetGroup(), task);
+  EXPECT_EQ(other->GetGroup(), task);
+  EXPECT_EQ(controller()->DepthFor(child), 1);
+  ExpectStripMatchesTree();
+}
+
 // Moving a drag's pointer sideways nests the dragged tab deeper or shallower
 // where it is. A drop under a new parent nests it by hand. With the switch
 // off, sideways does nothing.

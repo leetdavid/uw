@@ -1839,7 +1839,7 @@ index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..bdcf2716a55ceb93087e497014193110
        ":tab_model",
        ":tab_strip",
 diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
-index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442feb4963696 100644
+index 48140cb488e51ca30e55afcd492861b94dec6278..53e9d421ab3138d1994d7f29c31434d268e615a5 100644
 --- a/chrome/browser/ui/tabs/tab_strip_model.cc
 +++ b/chrome/browser/ui/tabs/tab_strip_model.cc
 @@ -117,6 +117,7 @@
@@ -1886,6 +1886,29 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442fe
        return i;
      }
    }
+@@ -4929,6 +4933,13 @@ void TabStripModel::MoveTabsToIndexImpl(
+ 
+   static constexpr tabs::TabCollection::TypeEnumSet kRetainCollectionTypes = {
+       tabs::TabCollection::Type::SPLIT, tabs::TabCollection::Type::GROUP};
++  // uw: tabs moving into a group join it one by one, as in
++  // MoveTabsAndSetPropertiesImpl(). A dragged branch can hold every tab of its
++  // task, and kept whole, the task would move into itself.
++  const tabs::TabCollection::TypeEnumSet retain_collection_types =
++      group.has_value()
++          ? tabs::TabCollection::TypeEnumSet{tabs::TabCollection::Type::SPLIT}
++          : kRetainCollectionTypes;
+ 
+   const int pinned_tab_count = IndexOfFirstNonPinnedTab();
+   const bool pin = IsTabPinned(tab_indices[0]);
+@@ -4947,7 +4958,7 @@ void TabStripModel::MoveTabsToIndexImpl(
+       tab_indices, destination_index,
+       base::BindOnce(&tabs::TabStripCollection::MoveTabsRecursive,
+                      base::Unretained(contents_data_.get()), tab_indices,
+-                     destination_index, group, pin, kRetainCollectionTypes));
++                     destination_index, group, pin, retain_collection_types));
+ }
+ 
+ void TabStripModel::TabGroupStateChanged(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
 index e8d8cb4facb9428bab15389a8fb137ada0982a21..8cbf6b357ecb61284c66b00531e5d314a698c2b5 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
