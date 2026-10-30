@@ -275,8 +275,12 @@ A conversation with uw's built-in agent, which may browse for the user to answer
 _Avoid_: Delegated browser task, agent task, run, job.
 
 **Agent's tab**:
-A tab that a chat's agent opened, nested under the chat. It is the only kind of tab the agent reads or acts in; the user's other tabs it can only arrange.
+A tab that a chat's agent opened, nested under the chat. With a handed tab, it is the only kind of tab the agent reads or acts in; the user's other tabs it can only arrange.
 _Avoid_: Agent tab.
+
+**Handed tab**:
+The web page the user hands a new chat's agent by starting the command bar's text with `@`. The agent reads and acts in it as in its own tabs, and it stays where it is.
+_Avoid_: Attached tab, mentioned tab, context tab.
 
 **Private chat**:
 A chat started from a private window. Nothing from it is kept after the private windows close.

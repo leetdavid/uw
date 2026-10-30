@@ -29,7 +29,7 @@ Later: nesting and outdenting, keeping, collapsing, Tidy and Clear, pins, and mo
 
 ### Arrange only
 
-The tools see each tab's title, address, task, place in the tree, and when the user last looked at it. They never see page text. `read`, `click`, and `type` still work only in the agent's own tabs. To read one of the user's pages, the agent opens its address in a tab of its own. Working in a tab of the user's stays with "giving the agent a tab", in v2.1 of the [agent chats plan](agent-chats.md#releases).
+The tools see each tab's title, address, task, place in the tree, and when the user last looked at it. They never see page text. `read`, `click`, and `type` still work only in the agent's own tabs and a [handed tab](../CONTEXT.md#language). To read one of the user's pages, the agent opens its address in a tab of its own. Working in a tab of the user's stays with "giving the agent a tab", in v2.1 of the [agent chats plan](agent-chats.md#releases).
 
 ### Approvals
 

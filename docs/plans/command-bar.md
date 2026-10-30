@@ -59,11 +59,13 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 | Key | What it does |
 | --- | --- |
 | Return | Runs the selected row. |
-| Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message. The tab that was selected is handed to the agent as its tab 1: the agent is told it is the page the user asked from, reads it first, and can act in it with the usual approvals. The tab stays where it is. The chat opens in front, where a blank new tab would. Changed on 2026-10-16: before, the tab was only attached. |
+| Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message. The chat opens in front, where a blank new tab would. No tab is handed over; a `@` does that. Changed on 2026-10-31 at the user's request: from 2026-10-16, the selected tab was always handed over. |
 | Option+Return | Runs the text as a shell command in a new terminal tab, which opens in front where a blank new tab would. Changed on 2026-10-16: before, in this task's terminal. |
 | Tab | Turns the completion after the caret into typed text, as in Chromium's address bar. With no completion, on a site search keyword such as `gh`, it starts that site search. |
 
-- Cmd+K on the text offers "Add to <chat>" for a chat that is already open, "Ask without this tab", and "Ask in the background", which opens the chat without selecting it.
+- A `@` typed in an empty field, on a tab that shows a web page, turns into a chip with the page's icon and title. The text is then a question about that page: the rows and the calculator hide, and Return, Cmd+Return, and Option+Return all ask it in a new chat with the page as a [handed tab](../CONTEXT.md#language). The agent is told it is the page the user asked about, reads it first as its tab 1, and can act in it with the usual approvals. Backspace in an empty field removes the chip. Agreed on 2026-10-31.
+- `@` means the tab selected behind the command bar. When kept text opens again over another tab, the chip shows that tab, or goes when it is not a web page. On a chat, a terminal, a uw page, or the new tab page, `@` stays typed text, so Chromium's `@` shortcuts still work there.
+- Cmd+K on the text offers "Add to <chat>" for a chat that is already open, and "Ask in the background", which opens the chat without selecting it.
 - Cmd+K on the text offers "Run in a new terminal" and "Run and stay here", which runs it without leaving the current tab.
 - A `>` at the start of the field marks a shell command, and Return runs it as Option+Return does. Cmd+Shift+P puts it there. Typing `>` in an empty field does the same, and Backspace in an empty field removes it.
 - Ctrl+Return keeps Chromium's meaning: it adds `www.` and `.com` to the typed word and opens it.
@@ -72,7 +74,7 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 
 ### Models
 
-- Text typed in the command bar reaches a model only when the user asks for one: a translation row, Ask uw, or Cmd+Return. Nothing is sent while typing.
+- Text typed in the command bar reaches a model only when the user asks for one: a translation row, Ask uw, Cmd+Return, or Return after a `@`. Nothing is sent while typing.
 
 ### Aliases and recorded keys
 
@@ -154,7 +156,8 @@ These examples are typed in Hong Kong at 6:24 PM on Tuesday, Oct 20, 2026:
 - What uw learns from picks, aliases, and the default currency are profile prefs. Recorded keys are the same in every profile. A history deletion clears what uw learned.
 - Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
 - The page handles Escape, so the browser holds it with the other keys typed right after Cmd+T, and the page asks the browser to close. When the panel closes for any reason but losing focus, the browser has the page forget its text through the same `SetInputText`.
-- Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed. The chat's agent adopts the selected tab as tab 1, as it adopts its own tabs after a restart.
+- Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed.
+- For `@`, the page asks its window for the selected page over `uw_command_bar.mojom` (`GetSelectedPage`), which answers for an http or https tab only, and sends the text back with `AskAboutPage`. The chat's agent adopts that tab as tab 1, as it adopts its own tabs after a restart.
 - Option+Return writes the text and a Return to the shell through the one function every byte to the shell passes, per the [terminal tab design](terminal-tab.md#design).
 - The math library is pinned to an exact version in `package.json`, like ghostty-web. mathjs 15.2.0, agreed on 2026-10-17. It has units and lets uw add each currency as a unit. The rates are fetched by the browser process: `ExchangeRates` downloads the bank's daily file, reads it with Chromium's data decoder, and keeps it in profile prefs. The page asks for them over `uw_command_bar.mojom`, which also copies an answer and closes the command bar.
 - Time math uses Temporal, which uw's Chromium ships, and no other library. uw reads the times, dates, places, and timestamps itself; the city list and the abbreviation table sit beside `calculator.ts`. The browser passes the Mac's time zone and 24-hour setting to the page, as it passes the default currency, because the page's `Intl` does not see the Mac's 24-hour switch. Tests run Node with `--harmony-temporal`, in one process, because Node's test runner does not pass that flag to the files it starts.
@@ -168,7 +171,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 2. T98: the command bar opens what is picked, in the design's look, from Chromium's instant results. Added on 2026-10-16 so Cmd+T opens pages before T61.
 3. T99: addresses complete inline, Tab takes the completion, and Return opens the completed address. Added on 2026-10-16.
 4. T82: Option+Return, `>`, and Cmd+Shift+P run the text in a new terminal.
-5. T81: Cmd+Return sends the text to a new chat, with the selected tab handed to the agent.
+5. T81: Cmd+Return sends the text to a new chat. T282 later gave the selected page to it only after a `@`.
 6. T66: math, units, currency, and the default currency setting.
 7. T143: time and time zones. Added on 2026-10-21.
 8. T156: the arrow keys put a row's text in the field, and filled text is muted. Added on 2026-10-22.
@@ -194,7 +197,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 9. Cmd+Shift+A shows open and recently closed tabs only.
 10. Cmd+T, Cmd+L, Cmd+Shift+A, and Cmd+Shift+P work with a terminal tab selected.
 11. A test model server receives no request while text is typed, and one request when a translation row is picked or Cmd+Return is pressed.
-12. Cmd+Return opens a chat in front, with the text as its first message and the selected tab as the agent's tab 1, which the agent can read.
+12. Cmd+Return opens a chat in front, with the text as its first message and no tab handed over. After a `@` on a web page, Return does the same with that page as the agent's tab 1, which the agent can read. On `about:blank`, `@` stays text.
 13. Option+Return runs the text in a new terminal and selects it. Cmd+Shift+P opens the command bar with `>`, and Return runs the text the same way.
 14. An alias runs its command. A key recorded from the result menu shows in the Keyboard shortcuts section and runs its command after a restart.
 15. `2*(3+4)` shows `14` first. `100 usd in eur` uses the day's rate and shows its date. `10 HKD + 10 EUR to USD` adds both at the day's rates. `20 kg * 10 m/s/s / 5W` shows 40 s/m, `100 W * 3h` shows 300 Wh, `90 min to h` shows 1.5 h, `1/2 cup to tsp` shows 25 tsp, and `10m *` shows 10 m. `10 kg` shows pounds, and `10 usd` shows the default currency.
