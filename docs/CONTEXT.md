@@ -266,6 +266,10 @@ _Avoid_: Notification, when meaning the kept copy.
 The list of alerts, opened from a button at the top of the sidebar.
 _Avoid_: Notification center, alerts panel.
 
+**Scheduled page**:
+The page that lists every scheduled chat, watched pages first, with when each last ran and runs next.
+_Avoid_: Scheduled filter, schedules list.
+
 **Chat**:
 A conversation with uw's built-in agent, which may browse for the user to answer or carry out a request. Its page is a regular tab, and the tabs the agent opens are child tabs beneath it.
 _Avoid_: Delegated browser task, agent task, run, job.

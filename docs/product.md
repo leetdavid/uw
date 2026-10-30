@@ -286,7 +286,7 @@ Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Schedul
 - It lists each scheduled chat once, in two sections: "Watched pages" first, then "Scheduled chats", which also holds chats with a running trigger, as the filter did. An empty section is left out. The header has Pause all.
 - A watched page's row shows the page's icon and title, what it watches for, how the value moved over the past 30 days, the latest value, the last run, and the next run. The last run reads Waiting for approval, Sign in required, Paused, or Didn't finish when one applies. The title and icon come from an open tab of the page, else from history, else the site.
 - A click on a watched page's row opens the page, or goes to its tab if one is open. A click on any other row opens the chat. On hover, a watched page's row offers Open chat, and every row Pause or Resume. Edit, Mute, Stop watching, and Delete stay on the chat page and the watch card.
-- The Inbox's "See all" and the "Show Scheduled" command open it.
+- The Inbox's "See all", the chat page's Scheduled, and the "Show Scheduled" command open it.
 - Its header has Pause all, New scheduled chat, and Watch a page, two more ways to set one up. Watch a page opens the watch card with an Address field above "Watch for"; the page need not be open. An address already watched shows a note with Open, such as "Watched for price drops · Open", and can still be watched for something else. New scheduled chat opens the schedule card with a Request field; saving makes a chat whose first message is the request. Both run at once when saved, and the page stays open.
 
 Agreed on 2026-10-30: the Watched pages table shows how each watch's first [tracked value](CONTEXT.md#language), the one under Latest, moved.
@@ -295,6 +295,11 @@ Agreed on 2026-10-30: the Watched pages table shows how each watch's first [trac
 - A number is a line, from a watch's second run. A dashed line marks a "Price drops below" price when that price is no further below the line's low than the line's own span. A yes or no value is a strip, green for yes and gray for no, as in the chat's chart. A text value is a dot for each change. A run that didn't finish leaves a dotted stretch, and a paused watch is dotted from its last run to now. A change of unit starts the line again.
 - Under the value is what it was before its last change, such as "was $999 until yesterday" or "was No until Oct 24", with "today", "yesterday", or the date. A value that never changed says since when, such as "Since Oct 29". The words and the line are green when the value moved the way a "Watch for" chip hopes: down on Price drops, to yes on Back in stock. A watch in the user's own words stays gray.
 - Pointing at the trend shows the nearest run, such as "Oct 23 · $900", with the alert price on a "Price drops below" watch. A click still opens the page.
+
+Agreed on 2026-10-31: the chat page and the Scheduled page link to each other.
+
+- The chat page's chat list has Scheduled, with a clock, under New chat. It goes to the window's Scheduled page, or opens it in a new tab, and the chat stays in its tab. Private windows leave it out, since they have no scheduled chats.
+- The Scheduled page has Back to chat above its title. As on `uw://ai`, it goes to the chat tab used last in the window, or opens a new chat when the window has none.
 
 Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
 
