@@ -655,8 +655,13 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, LeavingAMutedVideoOpensNothing) {
 // Under 10,000 square pixels on the page, as Blink measures, a video stays.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, LeavingASmallVideoOpensNothing) {
   OpenPlayingVideo();
-  ASSERT_TRUE(content::ExecJs(video_, "video.style.width = '80px';"
-                                      "video.style.height = '53px';"));
+  // Until the new size is painted, Blink answers with the size it last
+  // measured, so the tab switch waits for a frame painted after the change.
+  ASSERT_TRUE(content::ExecJs(video_, R"(
+    video.style.width = '80px';
+    video.style.height = '53px';
+    new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)));)"));
   chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
   Settle();
   EXPECT_FALSE(Bool("isInPictureInPicture()"));
