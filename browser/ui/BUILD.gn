@@ -13,13 +13,17 @@ source_set("ui") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "uw_url_rewrite_browsertest.cc" ]
+  sources = [
+    "page_clipboard_browsertest.cc",
+    "uw_url_rewrite_browsertest.cc",
+  ]
   deps = [
     ":ui",
     "//base",
     "//chrome/app:command_ids",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/ui",
+    "//chrome/browser/ui/views/tabs/common:impl",
     "//chrome/common",
     "//chrome/test:test_support",
     "//content/public/common",
@@ -28,8 +32,10 @@ source_set("browser_tests") {
     "//net:test_support",
     "//testing/gmock",
     "//testing/gtest",
+    "//ui/base:test_support",
     "//ui/base/clipboard",
     "//ui/base/clipboard:clipboard_test_support",
+    "//ui/gfx/geometry",
     "//ui/touch_selection",
     "//ui/views",
     "//url",
