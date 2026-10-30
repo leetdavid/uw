@@ -49,6 +49,9 @@ namespace {
 
 constexpr size_t kMaxUndoActions = 100;
 
+TabOrganizationController::LinksFromAnotherApp* g_links_from_another_app =
+    nullptr;
+
 bool Has(const std::vector<PageId>& ids, const PageId& id) {
   return std::ranges::find(ids, id) != ids.end();
 }
@@ -509,6 +512,15 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
       self->shared_->tree().SetParent(*id, *parent);
     }
+  } else if (LinksFromAnotherApp* links = g_links_from_another_app) {
+    if (!links->last_ ||
+        !self->shared_->tree().OpenBeside(*id, *links->last_)) {
+      self->shared_->tree().OpenAtTopOfScratchpad(*id);
+    }
+    links->last_ = id;
+    // The next link reads the strip back into the tree as it opens, so the
+    // strip takes this place at once.
+    self->Apply();
   } else if (const std::optional<PageId>& beside =
                  self->active_ == id ? self->previous_active_ : self->active_) {
     self->shared_->tree().OpenBeside(*id, *beside);
@@ -517,6 +529,12 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
   self->ScheduleApply();
   self->ScheduleUpdate();
 }
+
+TabOrganizationController::LinksFromAnotherApp::LinksFromAnotherApp()
+    : current_(&g_links_from_another_app, this) {}
+
+TabOrganizationController::LinksFromAnotherApp::~LinksFromAnotherApp() =
+    default;
 
 void TabOrganizationController::RestoreTab(
     BrowserWindowInterface* window,

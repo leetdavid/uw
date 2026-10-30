@@ -78,6 +78,7 @@ source_set("browser_tests") {
   sources = [
     "automatic_organizer_browsertest.cc",
     "branch_drag_browsertest.mm",
+    "links_from_other_apps_browsertest.mm",
     "mouse_actions_browsertest.mm",
     "shared_tabs_browsertest.cc",
     "shared_tabs_drag_browsertest.cc",
@@ -94,6 +95,7 @@ source_set("browser_tests") {
     "//base",
     "//chrome:strings",
     "//chrome/browser",
+    "//chrome/browser:app_controller_mac",
     "//chrome/browser:global_keyboard_shortcuts_mac",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles/keep_alive",

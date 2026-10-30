@@ -272,6 +272,17 @@ bool PageTree::OpenBeside(const PageId& id, const PageId& active) {
   return true;
 }
 
+bool PageTree::OpenAtTopOfScratchpad(const PageId& id) {
+  if (!Find(id)) {
+    return false;
+  }
+  std::vector<Page> branch = Detach(id);
+  const size_t top =
+      std::ranges::find(pages_, std::string(), &Page::task) - pages_.begin();
+  Attach(std::move(branch), std::string(), PageId(), top);
+  return true;
+}
+
 bool PageTree::OpenUnder(const PageId& id, const PageId& parent) {
   const Page* target = Find(parent);
   if (!Find(id) || !target || Has(BranchOf(id), parent)) {

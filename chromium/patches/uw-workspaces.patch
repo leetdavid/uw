@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
-index 51af775d30ce385bde20b47f84fbc43009cc1dd0..330f802d31b19a06c6d2cb83a424a4f3b6b55526 100644
+index 51af775d30ce385bde20b47f84fbc43009cc1dd0..80ad27e3ddc3e87e1d33f507d4a4686b31bc51d0 100644
 --- a/chrome/browser/app_controller_mac.mm
 +++ b/chrome/browser/app_controller_mac.mm
-@@ -1963,16 +1963,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+@@ -151,6 +151,7 @@
+ #include "ui/menus/cocoa/menu_controller.h"
+ #include "ui/native_theme/native_theme.h"
+ #include "url/gurl.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+ 
+@@ -1963,16 +1964,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
    NSMenu* mainMenu = [NSApp mainMenu];
    NSMenuItem* profileMenu = [mainMenu itemWithTag:kMacProfileMainMenuId];
  
@@ -22,6 +30,15 @@ index 51af775d30ce385bde20b47f84fbc43009cc1dd0..330f802d31b19a06c6d2cb83a424a4f3
  }
  
  - (void)initShareMenu {
+@@ -2677,6 +2671,8 @@ void OpenStartupTabsInBrowserWithProfile(const StartupTabs& tabs,
+       first_run::IsChromeFirstRun() ? chrome::startup::IsFirstRun::kYes
+                                     : chrome::startup::IsFirstRun::kNo;
+   StartupBrowserCreatorImpl launch(base::FilePath(), dummy, first_run);
++  // uw: links from another app open at the top of the Scratchpad.
++  uw::TabOrganizationController::LinksFromAnotherApp links_from_another_app;
+   launch.OpenTabsInBrowser(browser->GetBrowserForMigrationOnly(),
+                            chrome::startup::IsProcessStartup::kNo, tabs,
+                            StartupBrowserCreatorImpl::TabOverWrite::kNo);
 diff --git a/chrome/browser/sessions/BUILD.gn b/chrome/browser/sessions/BUILD.gn
 index c8d07e45c8bfa88e2e63bab68f14ffe3f02ad456..fbeef2e0873119888726fc625e3bdebbbfb8cffb 100644
 --- a/chrome/browser/sessions/BUILD.gn

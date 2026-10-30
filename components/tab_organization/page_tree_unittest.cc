@@ -104,6 +104,20 @@ TEST(PageTreeTest, BlankNewTabOpensBelowTheActiveBranch) {
   EXPECT_FALSE(tree.OpenBeside(Id("new"), Id("unknown")));
 }
 
+TEST(PageTreeTest, ALinkFromAnotherAppOpensAtTheTopOfTheScratchpad) {
+  PageTree tree = Seed();
+  std::vector<Page> strip = Strip(tree);
+  strip.push_back(P("link"));
+  tree.Adopt(strip, {});
+  ASSERT_EQ(Render(tree).back(), "link@-");
+
+  EXPECT_TRUE(tree.OpenAtTopOfScratchpad(Id("link")));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "gliner@models", "ollama@models", "link@-",
+                                 "news@-", "  show@-", "weather@-"}));
+  EXPECT_FALSE(tree.OpenAtTopOfScratchpad(Id("unknown")));
+}
+
 TEST(PageTreeTest, LinkOpensAsLastChildWithoutBreakingOtherLinks) {
   PageTree tree = Seed();
   std::vector<Page> strip = Strip(tree);

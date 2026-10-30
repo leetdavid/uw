@@ -89,6 +89,8 @@ class PageTree {
 
   // A blank new tab: sibling directly below `active`'s branch.
   bool OpenBeside(const PageId& id, const PageId& active);
+  // A link from another app: the first top-level page of the Scratchpad.
+  bool OpenAtTopOfScratchpad(const PageId& id);
   // A link opened in a new tab, or a restored link: last child of `parent`.
   bool SetParent(const PageId& id, const PageId& parent);
   // A blank tab from "New child tab": first child of `parent`.

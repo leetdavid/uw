@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "base/auto_reset.h"
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
@@ -83,6 +84,20 @@ class TabOrganizationController : public TabStripModelObserver,
   static void DidOpenTab(BrowserWindowInterface* window,
                          content::WebContents* page,
                          content::WebContents* source);
+  // While one lives, the tabs that open are links from another app. They open
+  // at the top of the Scratchpad in the order they come.
+  class LinksFromAnotherApp {
+   public:
+    LinksFromAnotherApp();
+    LinksFromAnotherApp(const LinksFromAnotherApp&) = delete;
+    LinksFromAnotherApp& operator=(const LinksFromAnotherApp&) = delete;
+    ~LinksFromAnotherApp();
+
+   private:
+    friend class TabOrganizationController;
+    base::AutoReset<LinksFromAnotherApp*> current_;
+    std::optional<PageId> last_;
+  };
   static void RestoreTab(BrowserWindowInterface* window,
                          content::WebContents* page,
                          const std::map<std::string, std::string>& extra_data);

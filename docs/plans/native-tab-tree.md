@@ -65,7 +65,7 @@ Automatic organization builds on these stages. See [Automatic organization](auto
 ## Acceptance checks
 
 1. Ungrouped tabs show under "Scratchpad", below every task. `TabOrganizationControllerBrowserTest.ScratchpadLabelSitsAboveUngroupedTabs` checks where the label sits.
-2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level. A link from another app appears selected at the top of the Scratchpad, outside every task, whatever tab was active; several at once keep their order.
+2. A link opened in a new tab is indented under its source. A blank new tab appears directly below the active tab's branch at the same level. A link from another app appears selected at the top of the Scratchpad, outside every task, whatever tab was active; several at once keep their order. `LinksFromOtherAppsBrowserTest.ALinkFromAnotherAppOpensAtTheTopOfTheScratchpad` checks it.
 3. Closing a parent keeps its children open, one level up, in the same order.
 4. "Move to new task" moves the tab and its descendants into a new tab group placed after every other task. `TabOrganizationControllerBrowserTest.ANewTaskComesAfterEveryOtherTask` checks it.
 5. "Move to Scratchpad" ungroups the branch, detaches it from its parent, and puts it at the end of the Scratchpad.
