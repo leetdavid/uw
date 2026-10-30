@@ -155,6 +155,30 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 - Elsewhere in the window, a double-click on space that drags the window still does what macOS's "Double-click a window's title bar" setting says. A double-click below the tabs did too until T58.
 - The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
 
+### Key hints
+
+Agreed on 2026-10-30, when the user asked that holding Option on a tab's close button show that its children close too: "so users can discover features like this". The rule holds for every uw click or drag that a held key changes, now and later.
+
+- While the pointer is on the target and the key is held, the target shows a [key hint](../CONTEXT.md#language): the other result, before the click.
+- The hint follows the key. Pressing or releasing it shows or hides the hint at once, without moving the pointer. Switching to another app or window hides it.
+- A mouse action switched off in uw's settings shows no hint, and its tooltip names no key.
+- Where the target already has a tooltip, its tooltip names the key, so the hint can be found. [Help](help.md) names every one.
+
+| Held on | Hint |
+| --- | --- |
+| Option, a tab's close button, when the tab has tabs under it | The tab's row and every row under it take a light tint of the close color, and the × turns that color. A collapsed parent's count of hidden tabs turns it too. The tooltip "Close tab" becomes "Close this tab and the 3 tabs under it". |
+| Option, the rest of a parent tab's row | The rows under it fade to half, since a drag would move the tab alone. The row's tooltip reads "Drag to move this tab alone. The 3 tabs under it stay." An Option-drag keeps them faded until the drop. |
+| Option, the floating sidebar's green window button | The full-screen arrows become a +, as macOS draws its own, and a click zooms the window. |
+| Cmd, a link in a chat's answer | A label by the pointer: "Open in the background". |
+| Cmd, an address a terminal tab printed | The address underlines and the pointer becomes a hand, as in Ghostty. Without Cmd it looks like text, since a plain click does not open it. |
+
+Tooltips that name the key:
+
+- A parent tab's close button: "Close tab" and a second line, "Option-click to close the 3 tabs under it too". A tab with nothing under it keeps the one line.
+- A link in a chat's answer: "Cmd-click to open in the background".
+
+The command bar's Cmd+Return and Option+Return are typed keys with labels of their own, and Chromium's own clicks with keys stay Chromium's.
+
 ### Menu of empty sidebar space
 
 Right-clicking empty space in the sidebar shows a menu with `Theme…`, which opens the [theme picker](themes.md). Built in T96.
@@ -189,6 +213,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - The mouse switches are profile prefs read by the views they change.
 - The empty space below the tabs drags the window, so macOS, not the views, gets its clicks. While macOS hands out the second click of a double-click, the space counts as the views' instead, and Chromium's double-click-to-zoom never sees it.
 - "New child tab" is a `TabOrganizationController::Command`. The page tree places the new tab as the first child.
+- Proposed for key hints: macOS sends a lone Option or Cmd press as a modifier change, not a key event, so each window watches modifier changes with an AppKit event monitor and tells the views that show a hint. The tab rows read it in `tab-tree.patch`'s hooks, and the floating window buttons repaint their glyph.
 - uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
 
@@ -209,6 +234,9 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 11. T88: the new button. Design first.
 12. T90: Ctrl+Cmd+N for New task and Shift+Ctrl+Cmd+N for Move to new task.
 13. T122: the Keyboard shortcuts section. Design first.
+14. T274: the [key hints](#key-hints) design.
+15. T275: key hints in the sidebar and on the window buttons, with the key watcher. Implementability 5/10: the × is Chromium's, and one row's hover tints other rows.
+16. T276: key hints in the chat page and terminal tabs. Implementability 7/10.
 
 T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
@@ -242,6 +270,8 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 13. Ctrl+Cmd+N opens a new task, Shift+Ctrl+Cmd+N moves the selected branch to a new task, and Ctrl+Cmd+P does nothing.
 14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults. `MenuKeysBrowserTest` and `UwShortcutsPageBrowserTest` check this.
 15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tasks menu.
+
+16. [Key hints](#key-hints): with Option held on a parent's ×, the branch's rows tint and the tooltip names the count. Releasing Option clears it without moving the pointer, and so does switching apps. A tab with no children, and an action switched off, show nothing. The rows under a parent fade with Option held elsewhere on its row. The floating green button shows a + with Option held. A chat link shows "Open in the background" with Cmd held, and a terminal address underlines only with Cmd held.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
