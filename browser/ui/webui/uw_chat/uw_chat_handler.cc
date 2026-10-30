@@ -954,6 +954,7 @@ void UwChatHandler::OpenFile(const std::string& saved) {
                         net::FilePathToFileURL(path),
                         ui::PAGE_TRANSITION_LINK);
   params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  params.source_contents = contents_.get();
   Navigate(&params);
 }
 

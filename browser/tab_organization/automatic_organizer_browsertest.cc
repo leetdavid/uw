@@ -76,6 +76,7 @@
 #include "ui/views/widget/widget_delegate.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/models.h"
@@ -2064,6 +2065,39 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(controller()->IsHeld(Id(ideas)));
   EXPECT_EQ(controller()->DepthFor(ideas), 0);
+}
+
+// A tab opened from a chat, or from a tab under one, is held as a child
+// nested by hand is. Once the chat closes, the tabs right under it are
+// ordinary tabs again, and the tabs under those still go with them.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       TabsOpenedFromAChatStayUnderItUntilItCloses) {
+  const auto [chat, task] = OneTask();
+  ASSERT_TRUE(content::NavigateToURL(chat->GetContents(), ChatUrl()));
+  UseDecisionModel(ProviderFormat::kSystemOne);
+  Answer("/v1/systemone", SystemOneAnswer(task.ToString(), 0.99));
+  tabs::TabInterface* page = OpenLinkFrom(chat, "lisbon");
+  tabs::TabInterface* deeper = OpenLinkFrom(page, "hotels");
+  OpenLinkFrom(tabs()->GetTabAtIndex(0), "beach");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_FALSE(RequestAbout("beach").empty());
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_TRUE(controller()->IsHeld(Id(page)));
+  EXPECT_TRUE(controller()->IsHeld(Id(deeper)));
+  EXPECT_FALSE(page->GetGroup());
+  EXPECT_EQ(controller()->DepthFor(deeper), 2);
+
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(chat),
+                             TabCloseTypes::CLOSE_NONE);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(controller()->IsHeld(Id(page)));
+  EXPECT_TRUE(controller()->IsHeld(Id(deeper)));
+  Browse(page, "radar");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_FALSE(RequestAbout("radar").empty());
+  EXPECT_EQ(Requests().size(), 2u);
+  EXPECT_EQ(page->GetGroup(), task);
+  EXPECT_EQ(deeper->GetGroup(), task);
 }
 
 // A pinned tab is not in the tab tree, so the organizer leaves it alone.

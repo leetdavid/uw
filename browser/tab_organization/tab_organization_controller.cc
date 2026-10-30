@@ -34,11 +34,13 @@
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/url_constants.h"
 #include "ui/base/base_window.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/list_selection_model.h"
 #include "ui/menus/simple_menu_model.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/terminal/terminal_shell.h"
@@ -63,6 +65,20 @@ int LevelsMoved(int dx) {
   const int levels =
       (std::abs(dx) + kIndentPerLevel - kDeadZone) / kIndentPerLevel;
   return dx < 0 ? -levels : levels;
+}
+
+// True when `id` is a chat's page or sits under one.
+bool InChatBranch(const TabOrganizationController& controller,
+                  const PageId& id) {
+  for (const Page* page = controller.tree().Find(id); page;
+       page = controller.tree().Find(page->parent)) {
+    content::WebContents* contents = controller.PageContents(page->id);
+    const GURL url = contents ? contents->GetVisibleURL() : GURL();
+    if (url.SchemeIs(content::kChromeUIScheme) && url.host() == kChatHost) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -516,6 +532,11 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
     if (const std::optional<PageId> parent =
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
       self->shared_->tree().SetParent(*id, *parent);
+      // A tab opened from a chat, or from a tab under one, stays with its
+      // parent as a child nested by hand does.
+      if (InChatBranch(*self, *parent)) {
+        self->shared_->held()[*id] = self->shared_->tree().Find(*id)->parent;
+      }
     }
   } else if (LinksFromAnotherApp* links = g_links_from_another_app) {
     if (!links->last_ ||
