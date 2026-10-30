@@ -68,6 +68,20 @@ base::DictValue SavedRun(base::Time time,
                                                   .Set("number", *price)));
 }
 
+// A run's line as a chat file keeps it, after it reported `value`, such as
+// a yes or no or a text.
+base::DictValue SavedValue(base::Time time, base::DictValue value) {
+  return base::DictValue()
+      .Set("kind", "run")
+      .Set("time", base::TimeToValue(time))
+      .Set("steps", base::ListValue())
+      .Set("end", "reported")
+      .Set("found", false)
+      .Set("what", "")
+      .Set("text", "Checked.")
+      .Set("values", base::ListValue().Append(std::move(value)));
+}
+
 class ScheduledPageBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   void SetUpOnMainThread() override {
@@ -403,7 +417,7 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, RowsShowHowTheirRunsWent) {
     return base::StrCat({"[data-row='", id, "']"});
   };
   ASSERT_TRUE(Says(page, row(desk), "$479"));
-  EXPECT_TRUE(Says(page, row(desk), "Down $70, was $549"));
+  EXPECT_TRUE(Says(page, row(desk), "was $549 until"));
   EXPECT_TRUE(Says(page, row(desk), "Change alert"));
   EXPECT_TRUE(Says(page, row(desk), "Price drops below $500"));
   EXPECT_TRUE(Says(page, row(large), "Didn't finish"));
@@ -427,6 +441,97 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, RowsShowHowTheirRunsWent) {
     return !chats()->Find(desk)->paused && !chats()->Find(large)->paused &&
            !chats()->Find(news)->paused;
   }));
+}
+
+// The Past 30 days trend beside each watched page's latest value: a line
+// with its alert price, dotted across a run that didn't finish, a strip for
+// yes or no, and a dot for each change of a text, with what each value was
+// before its last change. Green only where a Watch for chip hopes it moved.
+IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, TrendsShowHowValuesMoved) {
+  const std::string desk = WatchTheDesk();
+  ScheduledChat stock;
+  stock.request = "Tell me when the desk is back in stock.";
+  stock.page = Url("/desk?size=large").spec();
+  stock.watch_for = "Back in stock";
+  const std::string large = Start(stock);
+  ScheduledChat models;
+  models.request = "Tell me when a new model makes the top 10.";
+  models.page = Url("/desk?models").spec();
+  models.watch_for = "new model in top 10";
+  const std::string top = Start(models);
+
+  const base::Time now = base::Time::Now();
+  base::ListValue desk_runs;
+  desk_runs.Append(SavedRun(now - base::Days(20), 549));
+  desk_runs.Append(SavedRun(now - base::Days(10), std::nullopt));
+  desk_runs.Append(SavedRun(now - base::Days(5), 529));
+  desk_runs.Append(SavedRun(now - base::Days(1), 479, /*found=*/true));
+  SetRuns(desk, std::move(desk_runs));
+  const auto in_stock = [](bool yes) {
+    return base::DictValue().Set("name", "in_stock").Set("yes", yes);
+  };
+  base::ListValue large_runs;
+  large_runs.Append(SavedValue(now - base::Days(8), in_stock(false)));
+  large_runs.Append(SavedValue(now - base::Days(3), in_stock(true)));
+  SetRuns(large, std::move(large_runs));
+  const auto newest = [](std::string_view model) {
+    return base::DictValue().Set("name", "newest").Set("text", model);
+  };
+  base::ListValue top_runs;
+  top_runs.Append(SavedValue(now - base::Days(6), newest("Kimi K3")));
+  top_runs.Append(SavedValue(now - base::Days(4), newest("Kimi K3")));
+  top_runs.Append(SavedValue(now - base::Days(2), newest("Gemini 4 Carbon")));
+  SetRuns(top, std::move(top_runs));
+  chats()->SetPaused(large, true);
+
+  content::WebContents* page = OpenThePage();
+  const auto row = [](const std::string& id) {
+    return base::StrCat({"[data-row='", id, "']"});
+  };
+  const auto in_row = [&](const std::string& id, std::string_view selector) {
+    return base::StrCat({row(id), " ", selector});
+  };
+  const auto count = [&](std::string_view selector) {
+    return content::EvalJs(
+               page, content::JsReplace(
+                         "document.querySelectorAll($1).length", selector))
+        .ExtractInt();
+  };
+
+  // The desk fell below $500 on a Price drops watch: a green line with the
+  // alert price, dotted across the run that didn't finish.
+  ASSERT_TRUE(Shows(page, in_row(desk, "[data-trend=number]")));
+  EXPECT_TRUE(Shows(page, in_row(desk, "[data-alert]")));
+  EXPECT_TRUE(Shows(page, in_row(desk, "[data-gap]")));
+  EXPECT_TRUE(Shows(page, in_row(desk, "svg.text-success")));
+  EXPECT_TRUE(Says(page, row(desk), "was $529 until yesterday"));
+  EXPECT_TRUE(Says(page, row(desk), "Price drops below $500"));
+
+  // Back in stock, then paused: a strip of no then yes, dotted after.
+  ASSERT_TRUE(Shows(page, in_row(large, "[data-trend=yes]")));
+  EXPECT_TRUE(Shows(page, in_row(large, "[data-span=no]")));
+  EXPECT_TRUE(Shows(page, in_row(large, "[data-span=yes]")));
+  EXPECT_TRUE(Shows(page, in_row(large, "[data-gap]")));
+  EXPECT_TRUE(Says(page, in_row(large, "span.text-success"), "was No until"));
+
+  // A text in the user's own words: one change, and no green.
+  ASSERT_TRUE(Shows(page, in_row(top, "[data-trend=text]")));
+  EXPECT_EQ(1, count(in_row(top, "[data-change]")));
+  EXPECT_TRUE(Says(page, row(top), "was Kimi K3 until"));
+  EXPECT_EQ(0, count(in_row(top, ".text-success")));
+
+  // Pointing at the desk's run of 5 days ago, 25 days into the 30.
+  ASSERT_TRUE(content::ExecJs(
+      page,
+      content::JsReplace(
+          "const trend = document.querySelector($1);"
+          "const box = trend.getBoundingClientRect();"
+          "trend.dispatchEvent(new PointerEvent('pointermove', {bubbles: true,"
+          "  clientX: box.left + 3 + 130 * 25 / 30, clientY: box.top + 15}));",
+          in_row(desk, "[data-trend]"))));
+  EXPECT_TRUE(Says(page, in_row(desk, "[role=status]"), "$529"));
+  EXPECT_TRUE(Says(page, in_row(desk, "[role=status]"), "Alerts below $500"));
+  SaveWindowScreenshot(browser(), "scheduled-trends");
 }
 
 // Check now among a row's buttons starts a run at once and goes while it

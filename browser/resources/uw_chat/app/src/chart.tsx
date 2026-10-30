@@ -59,7 +59,7 @@ export interface Series {
   points: Point[];
 }
 
-function didNotFinish(line: Step): boolean {
+export function didNotFinish(line: Step): boolean {
   const run = line.run!;
   return (
     run.end === RunEnd.kFailed ||

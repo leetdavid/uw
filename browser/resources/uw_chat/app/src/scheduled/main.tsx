@@ -35,9 +35,7 @@ import {
   type ChatSchedule,
   type ScheduleState,
   type Step,
-  type TrackedValue,
 } from "../chat-api";
-import { numberText } from "../chart";
 import { repeatText, ScheduleRows, WATCH_CHIPS } from "../schedule";
 import {
   useModels,
@@ -53,6 +51,7 @@ import {
   type ScheduledRow,
   type WatchAddress,
 } from "./scheduled-api";
+import { Change, dateText, daysFromToday, latestOf, Trend } from "./trend";
 
 const AMBER = "text-[#B4580A] dark:text-warning";
 
@@ -60,18 +59,6 @@ function clockText(ms: number): string {
   return new Date(ms).toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
-  });
-}
-
-function daysFromToday(ms: number): number {
-  const day = new Date(ms).setHours(0, 0, 0, 0);
-  return Math.round((day - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
-}
-
-function dateText(ms: number): string {
-  return new Date(ms).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
   });
 }
 
@@ -98,60 +85,6 @@ function watchIcon(watchFor: string): LucideIcon {
     WATCH_CHIPS.find((chip) => watchFor.startsWith(chip.label))?.icon ??
     Sparkles
   );
-}
-
-function sameValue(a: TrackedValue, b: TrackedValue): boolean {
-  return a.number === b.number && a.yes === b.yes && a.text === b.text;
-}
-
-function shownValue(value: TrackedValue): string {
-  if (value.number !== null) {
-    return numberText(value.number, value.unit);
-  }
-  if (value.yes !== null) {
-    return value.yes ? "Yes" : "No";
-  }
-  return value.text ?? "";
-}
-
-// The first value a watch's runs track, as it stands, and how it changed: a
-// number by how much since the value before it, anything else since when.
-function latestOf(
-  runs: Step[],
-  watchFor: string,
-): { value: string; change: string; good: boolean } | null {
-  const reported = runs.filter(
-    (line) => line.run?.end === RunEnd.kReported && !line.run.counted,
-  );
-  const name = reported.find((line) => line.run!.values.length)?.run!
-    .values[0]!.name;
-  if (!name) {
-    return null;
-  }
-  const points = reported.flatMap((line) => {
-    const value = line.run!.values.find((each) => each.name === name);
-    return value ? [{ time: line.run!.time, value }] : [];
-  });
-  const last = points.at(-1)!;
-  let start = points.length - 1;
-  while (start > 0 && sameValue(points[start - 1]!.value, last.value)) {
-    start--;
-  }
-  const before = start > 0 ? points[start - 1]!.value : null;
-  if (last.value.number !== null && before?.number != null) {
-    const change = last.value.number - before.number;
-    const unit = last.value.unit;
-    return {
-      value: shownValue(last.value),
-      change: `${change < 0 ? "Down" : "Up"} ${numberText(Math.abs(change), unit)}, was ${numberText(before.number, unit)}`,
-      good: change < 0 && watchFor.startsWith("Price drops"),
-    };
-  }
-  return {
-    value: shownValue(last.value),
-    change: `Since ${dateText(points[start]!.time)}`,
-    good: false,
-  };
 }
 
 function Cell({
@@ -383,15 +316,15 @@ function RowButtons({
 }
 
 const COLUMNS =
-  "grid grid-cols-[minmax(0,1.25fr)_minmax(0,1.05fr)_128px_148px_136px_88px] items-center gap-x-3.5";
+  "grid grid-cols-[minmax(0,1fr)_136px_182px_148px_136px_88px] items-center gap-x-3.5";
 
 function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border">
+    <div className="rounded-xl border border-border">
       <div
         className={cn(
           COLUMNS,
-          "h-8 bg-muted/40 pr-2.5 pl-3.5 text-[11.5px] font-medium text-muted-foreground",
+          "h-8 rounded-t-[11px] bg-muted/40 pr-2.5 pl-3.5 text-[11.5px] font-medium text-muted-foreground",
         )}
       >
         {head.map((label, index) => (
@@ -424,7 +357,7 @@ function Row({
       data-row={row.watch.chatId}
       className={cn(
         COLUMNS,
-        "group h-[54px] cursor-default border-t border-border pr-2.5 pl-3.5 text-[13px] whitespace-nowrap outline-none hover:bg-accent focus-visible:bg-accent",
+        "group h-[54px] cursor-default border-t border-border pr-2.5 pl-3.5 text-[13px] whitespace-nowrap outline-none last:rounded-b-[11px] hover:bg-accent focus-visible:bg-accent",
       )}
       onClick={onClick}
       onKeyDown={(event) => {
@@ -445,7 +378,10 @@ function WatchedRow({ row }: { row: ScheduledRow }) {
   const Icon = watchIcon(schedule.watchFor);
   return (
     <Row row={row} onClick={() => scheduledHandler.openPage(watch.chatId)}>
-      <div className="flex min-w-0 items-center gap-[11px]">
+      <div
+        className="flex min-w-0 items-center gap-[11px]"
+        title={[row.pageTitle, schedule.page].filter(Boolean).join("\n")}
+      >
         {row.favicon ? (
           <img src={row.favicon} alt="" className="size-4 shrink-0" />
         ) : (
@@ -453,24 +389,27 @@ function WatchedRow({ row }: { row: ScheduledRow }) {
         )}
         <Cell
           top={row.pageTitle || schedule.page.replace(/^https?:\/\//, "")}
-          under={row.host}
+          under={
+            <>
+              <Icon aria-hidden className="text-primary" />
+              <span className="truncate">
+                {schedule.watchFor || schedule.request}
+              </span>
+            </>
+          }
         />
       </div>
-      <span className="flex min-w-0 items-center gap-[7px] text-muted-foreground">
-        <Icon aria-hidden className="size-3.5 shrink-0 text-primary" />
-        <span className="truncate">
-          {schedule.watchFor || schedule.request}
-        </span>
-      </span>
+      <Trend
+        runs={watch.runs}
+        watchFor={schedule.watchFor}
+        paused={watch.state.paused}
+        good={latest?.good ?? false}
+      />
       {latest ? (
         <Cell
           top={latest.value}
           className="text-sm font-semibold tabular-nums"
-          under={
-            <span className={cn(latest.good && "text-success")}>
-              {latest.change}
-            </span>
-          }
+          under={<Change latest={latest} />}
         />
       ) : (
         <Cell top="—" className="text-muted-foreground" />
@@ -937,7 +876,7 @@ function ScheduledPage() {
       ? rows.find((row) => row.watch.chatId === open.chatId)
       : undefined;
   return (
-    <main className="mx-auto flex max-w-[1020px] flex-col px-10 py-7">
+    <main className="mx-auto flex max-w-[1060px] flex-col px-10 py-7">
       <header className="flex items-center gap-2">
         <div className="mr-auto">
           <h1 className="text-[22px] font-semibold tracking-[-0.012em]">
@@ -987,7 +926,7 @@ function ScheduledPage() {
             </span>
           </h2>
           <Table
-            head={["Page", "Watching for", "Latest", "Last run", "Next run", ""]}
+            head={["Page", "Past 30 days", "Latest", "Last run", "Next run", ""]}
           >
             {watched.map((row) => (
               <WatchedRow key={row.watch.chatId} row={row} />
