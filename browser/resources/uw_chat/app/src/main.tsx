@@ -839,13 +839,15 @@ function when(updated: number): string {
 
 // Every saved chat, the one the user last wrote to first. A click goes to the
 // chat's tab or reopens it; the browser does that, so the list works the same
-// in every chat tab.
+// in every chat tab. A private window has no scheduled chats, so no Scheduled.
 function ChatList({
   chats,
   current,
+  privateWindow,
 }: {
   chats: ChatSummary[];
   current: string;
+  privateWindow: boolean;
 }) {
   const [query, setQuery] = useState("");
   const wanted = query.trim().toLowerCase();
@@ -870,6 +872,17 @@ function ChatList({
               New chat
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {!privateWindow && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                id="show-scheduled"
+                icon={Clock}
+                onClick={() => chatHandler.showScheduled()}
+              >
+                Scheduled
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
         <SidebarInput
           aria-label="Search chats"
@@ -2130,7 +2143,11 @@ function Chat() {
   );
   return (
     <SidebarProvider persist={false} width="15rem" className="h-full">
-      <ChatList chats={chats} current={chatId} />
+      <ChatList
+        chats={chats}
+        current={chatId}
+        privateWindow={memory === ChatMemory.kPrivate}
+      />
       <SidebarInset className="flex h-full flex-row">
       <div className={cn("flex min-w-0 flex-1 flex-col", !title && "justify-center")}>
       {agentTabs.length > 0 && (

@@ -57,6 +57,7 @@ class UwScheduledHandler : public mojom::ScheduledHandler,
   void SetPaused(const std::string& chat_id, bool paused) override;
   void CheckNow(const std::string& chat_id) override;
   void PauseAll(bool paused) override;
+  void ShowChat() override;
 
   // ScheduledChats::Observer:
   void OnScheduleChanged(const std::string& chat_id) override;

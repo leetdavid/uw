@@ -23,6 +23,8 @@ interface ChatHandler {
   OpenChat(string id);
   // Opens a new chat in a tab of its own.
   NewChat();
+  // Goes to the window's uw://scheduled tab, or opens one.
+  ShowScheduled();
   // Deletes the chat `id` and closes its tab.
   DeleteChat(string id);
   // Goes to the agent's tab `number`.
@@ -700,6 +702,9 @@ interface ScheduledHandler {
   // Check now: starts a run of `chat_id` at once.
   CheckNow(string chat_id);
   PauseAll(bool paused);
+  // Back to chat: goes to the window's chat tab used last, or opens a new
+  // chat.
+  ShowChat();
 };
 
 // The Scheduled page.

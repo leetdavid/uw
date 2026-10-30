@@ -188,6 +188,20 @@ class ScheduledPageBrowserTest : public headless::HeadlessModeBrowserTest {
     return page;
   }
 
+  // Opens a new chat in `window` and returns its page once it holds the chat.
+  content::WebContents* OpenAChat(Browser* window) {
+    OpenChatTab(window);
+    content::WebContents* chat =
+        window->tab_strip_model()->GetActiveWebContents();
+    EXPECT_TRUE(content::WaitForLoadStop(chat));
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return !content::EvalJs(chat, "document.body.dataset.chatId ?? ''")
+                  .ExtractString()
+                  .empty();
+    }));
+    return chat;
+  }
+
   bool Shows(content::WebContents* page, std::string_view selector) {
     return base::test::RunUntil([&] {
       return content::EvalJs(
@@ -371,7 +385,8 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, RowsOpenTheirPageAndChat) {
   const int count = tabs->count();
   Click(page, row);
   ASSERT_TRUE(base::test::RunUntil([&] {
-    return tabs->GetActiveWebContents()->GetVisibleURL() == Url("/desk");
+    return tabs->GetActiveWebContents()->GetLastCommittedURL() ==
+           Url("/desk");
   }));
   EXPECT_EQ(tabs->count(), count + 1);
   const int desk = tabs->active_index();
@@ -574,6 +589,62 @@ IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, TheCommandOpensThePage) {
                ->tab_strip_model()
                ->GetActiveWebContents()
                ->GetVisibleURL() == GURL(kScheduledUrl);
+  }));
+}
+
+// Scheduled under New chat opens the page, and then goes back to its tab.
+IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, TheChatPageOpensThePage) {
+  content::WebContents* chat = OpenAChat(browser());
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int chat_tab = tabs->active_index();
+  ASSERT_TRUE(Shows(chat, "#show-scheduled"));
+  SaveWindowScreenshot(browser(), "chat-scheduled-link");
+
+  const int count = tabs->count();
+  Click(chat, "#show-scheduled");
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs->GetActiveWebContents()->GetVisibleURL() == GURL(kScheduledUrl);
+  }));
+  EXPECT_EQ(tabs->count(), count + 1);
+  const int scheduled = tabs->active_index();
+  tabs->ActivateTabAt(chat_tab);
+  Click(chat, "#show-scheduled");
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return tabs->active_index() == scheduled; }));
+  EXPECT_EQ(tabs->count(), count + 1);
+}
+
+// Back to chat opens a new chat when the window has none, and otherwise goes
+// to the chat tab used last.
+IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest,
+                       BackToChatGoesToTheChatUsedLast) {
+  content::WebContents* page = OpenThePage();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int scheduled = tabs->active_index();
+  ASSERT_TRUE(Shows(page, "#back-to-chat"));
+  SaveWindowScreenshot(browser(), "scheduled-back-to-chat");
+
+  const int count = tabs->count();
+  Click(page, "#back-to-chat");
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs->GetActiveWebContents()->GetVisibleURL().host() == "chat";
+  }));
+  EXPECT_EQ(tabs->count(), count + 1);
+  const int chat = tabs->active_index();
+  tabs->ActivateTabAt(scheduled);
+  Click(page, "#back-to-chat");
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return tabs->active_index() == chat; }));
+  EXPECT_EQ(tabs->count(), count + 1);
+}
+
+// A private window has no scheduled chats, so its chat page has no Scheduled.
+IN_PROC_BROWSER_TEST_F(ScheduledPageBrowserTest, NoScheduledInAPrivateWindow) {
+  content::WebContents* chat = OpenAChat(CreateIncognitoBrowser());
+  ASSERT_TRUE(Shows(chat, "#new-chat"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !content::EvalJs(chat, "!!document.querySelector('#show-scheduled')")
+                .ExtractBool();
   }));
 }
 

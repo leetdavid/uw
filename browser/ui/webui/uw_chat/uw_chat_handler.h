@@ -116,6 +116,7 @@ class UwChatHandler : public mojom::ChatHandler,
   void TryAgain() override;
   void OpenChat(const std::string& id) override;
   void NewChat() override;
+  void ShowScheduled() override;
   void DeleteChat(const std::string& id) override;
   void ShowTab(int32_t number) override;
   void SetSideBySide(bool on, int32_t number) override;

@@ -877,6 +877,16 @@ function ScheduledPage() {
       : undefined;
   return (
     <main className="mx-auto flex max-w-[1060px] flex-col px-10 py-7">
+      <Button
+        id="back-to-chat"
+        variant="ghost"
+        size="compact"
+        leadingIcon={MessageCircle}
+        className="-mt-2 mb-1.5 -ml-2 self-start"
+        onClick={() => scheduledHandler.showChat()}
+      >
+        Back to chat
+      </Button>
       <header className="flex items-center gap-2">
         <div className="mr-auto">
           <h1 className="text-[22px] font-semibold tracking-[-0.012em]">

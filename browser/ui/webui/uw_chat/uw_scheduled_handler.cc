@@ -183,6 +183,20 @@ void UwScheduledHandler::PauseAll(bool paused) {
   }
 }
 
+void UwScheduledHandler::ShowChat() {
+  tabs::TabInterface* own =
+      tabs::TabInterface::MaybeGetFromContents(web_ui_->GetWebContents());
+  if (!own) {
+    return;
+  }
+  BrowserWindowInterface* window = own->GetBrowserWindowInterface();
+  if (tabs::TabInterface* chat = LastChatTab(window)) {
+    GoToTab(chat);
+  } else {
+    OpenChatTab(window);
+  }
+}
+
 void UwScheduledHandler::OnScheduleChanged(const std::string& chat_id) {
   if (!Listed(chat_id)) {
     runs_.erase(chat_id);

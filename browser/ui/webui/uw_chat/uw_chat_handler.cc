@@ -59,11 +59,13 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
+#include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/attachment.h"
 #include "uw/components/agent/schedule_tool.h"
 #include "chrome/browser/platform_util.h"  // nogncheck
+#include "chrome/browser/ui/singleton_tabs.h"  // nogncheck
 #include "mojo/public/cpp/base/big_buffer.h"
 #include "net/base/filename_util.h"
 #include "net/base/mime_util.h"
@@ -1021,6 +1023,13 @@ void UwChatHandler::NewChat() {
   if (tabs::TabInterface* chat =
           tabs::TabInterface::MaybeGetFromContents(contents_)) {
     OpenChatTab(chat->GetBrowserWindowInterface());
+  }
+}
+
+void UwChatHandler::ShowScheduled() {
+  if (tabs::TabInterface* chat =
+          tabs::TabInterface::MaybeGetFromContents(contents_)) {
+    ShowSingletonTab(chat->GetBrowserWindowInterface(), GURL(kScheduledUrl));
   }
 }
 
