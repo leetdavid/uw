@@ -179,7 +179,7 @@ Tooltips that name the key:
 
 The command bar's Cmd+Return and Option+Return are typed keys with labels of their own, and Chromium's own clicks with keys stay Chromium's.
 
-The design is the frames "Key hints: Option on a tab's ×" and "Key hints: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-30 for T274. Their rules are the "Key hints" section of the canvas guide `uw-keyboard-shortcuts`. Proposed in them: the chat link's label is white text on the dark text color, by the pointer.
+The design is the frames "Key hints: Option on a tab's ×" and "Key hints: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-30 for T274 and signed off by the user the same day, the chat link's label included. Their rules are the "Key hints" section of the canvas guide `uw-keyboard-shortcuts`.
 
 ### Menu of empty sidebar space
 
