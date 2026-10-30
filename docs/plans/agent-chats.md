@@ -106,6 +106,8 @@ Added on 2026-10-28 for T237: "Scheduled page (Fluid)", "Scheduled page: watch a
 
 Added on 2026-10-28 for T243 and T244: "Watch from a chat: the card (Fluid)", "Several watches: the eye's card", and "Watch from a chat and several watches: every state", on the canvas page with the "Watch this page" frames, draw the chat's card with a page and a chip, the agent's message, a page with several watches, the eye's list, a watch opened from it, and "Watch for something else". Their rules are in the canvas guide `uw-scheduled-chats`. The user signed them off the same day.
 
+Added on 2026-10-31 for T278: "Scheduled links: the chat page (Fluid)" and "Scheduled links: the Scheduled page (Fluid)" draw Scheduled under New chat in the chat page's list and Back to chat above the Scheduled page's title, per [Scheduled chats](../product.md#scheduled-chats). Their rules are the "Scheduled links" section of the canvas guide `uw-scheduled-page-and-inbox`. The user approved them before they were drawn.
+
 How the chat is built:
 
 - **Engine.** Chromium's agent engine, `chrome/browser/actor`, compiled into uw and on by default on macOS. uw creates tasks and sends tool requests to it directly, without Gemini's panel. The [spike](../research/agent-engine-spike.md) showed this works in a background tab. The engine acts only on `https` pages. uw turns off the engine's Gemini-only pieces: the toolbar task icon, the take-over button, the overlay over the agent's tab, and the "Gemini is working" toast. The task icon brought Gemini's button with it, and clicking that button aborted uw on 2026-10-15. The blue icon on the agent's tab stays.
