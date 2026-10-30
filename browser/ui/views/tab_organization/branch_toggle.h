@@ -4,14 +4,16 @@
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_BRANCH_TOGGLE_H_
 
 #include "base/callback_list.h"
+#include "base/functional/callback.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/label.h"
 
 namespace views {
+class Button;
 struct ProposedLayout;
-}
+}  // namespace views
 
 namespace uw {
 
@@ -61,14 +63,24 @@ class HiddenCount : public views::Label {
   ~HiddenCount() override;
 
   void SetCount(int count);
+  // In the close color while an Option-click on the row's close button would
+  // close the hidden tabs too.
+  void SetWarning(bool warning);
 
   // views::Label:
   void OnThemeChanged() override;
+
+ private:
+  bool warning_ = false;
 };
 
-// Adds a BranchToggle, a HiddenCount, a ChatMark, a KeptMark, and a SplitMark
-// to `row`, the vertical tab row of `tab`.
-void AddBranchControls(views::View* row, tabs::TabHandle tab);
+// Adds a BranchToggle, a HiddenCount, a ChatMark, a KeptMark, a SplitMark,
+// and a KeyHint to `row`, the vertical tab row of `tab`, whose close button
+// is `close`. `update_colors` has the row recolor its close button.
+void AddBranchControls(views::View* row,
+                       tabs::TabHandle tab,
+                       views::Button* close,
+                       base::RepeatingClosure update_colors);
 
 // Adds the controls of the row that holds `icon` and `title` to `layout`,
 // the row's layout. The toggle covers the icon while the row is `hovered`.

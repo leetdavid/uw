@@ -11,6 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -303,6 +304,65 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
       "clicks", [](const std::string& text) { return text.ends_with('x'); });
   EXPECT_EQ(clicks.find("\x1b[<8;"), std::string::npos) << clicks;
   EXPECT_EQ(tabs->count(), count + 1);
+}
+
+// A key hint: an address underlines, and the pointer becomes a hand, only
+// while Cmd is held, since only a Cmd-click opens it.
+IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
+                       AnAddressUnderlinesOnlyWhileCmdIsHeld) {
+  content::WebContents* terminal = OpenTerminal();
+  Type(
+      u"printf '\\033[2J\\033[Hhttps://example.com/link\\n"
+      u"\\033]0;link\\007' && cat\r");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return terminal->GetTitle() == u"link";
+  })) << terminal->GetTitle();
+  const auto hand = [&] {
+    return content::EvalJs(terminal,
+                           "document.body.classList.contains('cmd-link')")
+        .ExtractBool();
+  };
+  const auto cmd = [&](bool held) {
+    ASSERT_TRUE(content::ExecJs(
+        terminal,
+        base::StrCat({"window.dispatchEvent(new KeyboardEvent('",
+                      held ? "keydown" : "keyup", "', {key: 'Meta', metaKey: ",
+                      held ? "true" : "false", "}));"})));
+  };
+  const auto cursor = [&] {
+    return content::EvalJs(
+               terminal,
+               "getComputedStyle(document.querySelector('#terminal canvas'))"
+               "    .cursor")
+        .ExtractString();
+  };
+
+  // The link is in the first row. The move has no Cmd, so it goes first.
+  // ghostty-web sets its own pointer once it has found the address under it.
+  content::SimulateMouseEvent(terminal, blink::WebInputEvent::Type::kMouseMove,
+                              gfx::Point(40, 14));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(terminal,
+                           "document.querySelector('#terminal').style.cursor")
+               .ExtractString() == "pointer";
+  }));
+  EXPECT_FALSE(hand());
+  EXPECT_EQ(cursor(), "text");
+
+  cmd(true);
+  EXPECT_TRUE(base::test::RunUntil(hand));
+  EXPECT_EQ(cursor(), "pointer");
+
+  cmd(false);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !hand(); }));
+  EXPECT_EQ(cursor(), "text");
+
+  // Switching to another window lets go of the key.
+  cmd(true);
+  EXPECT_TRUE(base::test::RunUntil(hand));
+  ASSERT_TRUE(
+      content::ExecJs(terminal, "window.dispatchEvent(new Event('blur'));"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !hand(); }));
 }
 
 // A program that asks for the mouse gets the wheel as mouse buttons, also on

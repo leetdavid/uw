@@ -25,6 +25,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/views/tab_organization/kept_mark.h"
+#include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/tab_organization/split_mark.h"
 
 namespace uw {
@@ -158,20 +159,39 @@ void HiddenCount::SetCount(int count) {
   GetViewAccessibility().SetName(hint);
 }
 
+void HiddenCount::SetWarning(bool warning) {
+  if (warning == warning_) {
+    return;
+  }
+  warning_ = warning;
+  SetFontList(font_list().DeriveWithWeight(
+      warning_ ? gfx::Font::Weight::SEMIBOLD : gfx::Font::Weight::NORMAL));
+  if (GetWidget()) {
+    OnThemeChanged();
+  }
+}
+
 void HiddenCount::OnThemeChanged() {
   Label::OnThemeChanged();
-  SetEnabledColor(SkColorSetA(TextColor(this), kCountAlpha));
+  SetEnabledColor(warning_ ? CloseHintColor(this)
+                           : SkColorSetA(TextColor(this), kCountAlpha));
 }
 
 BEGIN_METADATA(HiddenCount)
 END_METADATA
 
-void AddBranchControls(views::View* row, tabs::TabHandle tab) {
+void AddBranchControls(views::View* row,
+                       tabs::TabHandle tab,
+                       views::Button* close,
+                       base::RepeatingClosure update_colors) {
   row->AddChildView(std::make_unique<HiddenCount>());
   row->AddChildView(std::make_unique<BranchToggle>(tab));
   row->AddChildView(std::make_unique<ChatMark>(tab));
   row->AddChildView(std::make_unique<KeptMark>(tab));
   row->AddChildView(std::make_unique<SplitMark>(tab));
+  // Last, so its tint covers the row.
+  row->AddChildView(
+      std::make_unique<KeyHint>(tab, close, std::move(update_colors)));
 }
 
 void LayOutBranchControls(views::View* icon,
@@ -184,7 +204,8 @@ void LayOutBranchControls(views::View* icon,
   ChatMark* mark = ChildOfClass<ChatMark>(row);
   KeptMark* kept = ChildOfClass<KeptMark>(row);
   SplitMark* split = ChildOfClass<SplitMark>(row);
-  if (!toggle || !count || !mark || !kept || !split) {
+  KeyHint* hint = ChildOfClass<KeyHint>(row);
+  if (!toggle || !count || !mark || !kept || !split || !hint) {
     return;
   }
   views::ChildLayout* icon_layout = layout.GetLayoutFor(icon);
@@ -253,6 +274,7 @@ void LayOutBranchControls(views::View* icon,
   layout.child_layouts.push_back({mark, show_mark, mark_bounds});
   layout.child_layouts.push_back({kept, show_kept, kept_bounds});
   layout.child_layouts.push_back({split, show_split, split_bounds});
+  layout.child_layouts.push_back({hint, true, gfx::Rect(layout.host_size)});
 }
 
 }  // namespace uw

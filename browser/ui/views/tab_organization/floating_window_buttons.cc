@@ -22,6 +22,7 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/window_buttons.h"
+#include "uw/browser/ui/views/tab_organization/modifier_keys.h"
 
 namespace uw {
 namespace {
@@ -54,10 +55,13 @@ Look LookOf(WindowButton button) {
   }
 }
 
+// With `zooms`, as while Option is held, the green button's glyph is a +,
+// as macOS draws its own.
 void PaintGlyph(gfx::Canvas* canvas,
                 WindowButton button,
                 const gfx::PointF& c,
-                SkColor color) {
+                SkColor color,
+                bool zooms) {
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
   flags.setColor(color);
@@ -79,6 +83,16 @@ void PaintGlyph(gfx::Canvas* canvas,
                        gfx::PointF(c.x() + 3.5f, c.y()), flags);
       break;
     case WindowButton::kZoom: {
+      if (zooms) {
+        flags.setStyle(cc::PaintFlags::kStroke_Style);
+        flags.setStrokeWidth(1.4f);
+        flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
+        canvas->DrawLine(gfx::PointF(c.x() - 3.5f, c.y()),
+                         gfx::PointF(c.x() + 3.5f, c.y()), flags);
+        canvas->DrawLine(gfx::PointF(c.x(), c.y() - 3.5f),
+                         gfx::PointF(c.x(), c.y() + 3.5f), flags);
+        break;
+      }
       // Two corners pointing out, as macOS's full-screen glyph.
       SkPath path = SkPathBuilder()
                         .moveTo(c.x() - 3, c.y() - 3)
@@ -109,6 +123,10 @@ class FloatingWindowButtons::Light : public views::Button {
     GetViewAccessibility().SetName(
         l10n_util::GetStringUTF16(LookOf(button).name));
     SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
+    if (button_ == WindowButton::kZoom) {
+      keys_ = ModifierKeys::Get().Observe(
+          base::BindRepeating(&Light::SchedulePaint, base::Unretained(this)));
+    }
   }
   Light(const Light&) = delete;
   Light& operator=(const Light&) = delete;
@@ -144,7 +162,8 @@ class FloatingWindowButtons::Light : public views::Button {
     flags.setColor(look.rim);
     canvas->DrawCircle(center, radius, flags);
     if (owner_->hovered()) {
-      PaintGlyph(canvas, button_, center, look.glyph);
+      PaintGlyph(canvas, button_, center, look.glyph,
+                 ModifierKeys::Get().option());
     }
   }
 
@@ -155,6 +174,7 @@ class FloatingWindowButtons::Light : public views::Button {
 
   const raw_ptr<FloatingWindowButtons> owner_;
   const WindowButton button_;
+  base::CallbackListSubscription keys_;
 };
 
 BEGIN_METADATA(FloatingWindowButtons, Light)

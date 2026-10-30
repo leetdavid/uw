@@ -167,7 +167,7 @@ Agreed on 2026-10-30, when the user asked that holding Option on a tab's close b
 | Held on | Hint |
 | --- | --- |
 | Option, a tab's close button, when the tab has tabs under it | The tab's row and every row under it take a light tint of the close color, and the × turns that color. A collapsed parent's count of hidden tabs turns it too. The tooltip "Close tab" becomes "Close this tab and the 3 tabs under it". |
-| Option, the rest of a parent tab's row | The rows under it fade to half, since a drag would move the tab alone. The row's tooltip reads "Drag to move this tab alone. The 3 tabs under it stay." An Option-drag keeps them faded until the drop. |
+| Option, the rest of a parent tab's row | The rows under it fade to half, since a drag would move the tab alone. The row's tooltip reads "Drag to move this tab alone." and a second line, "The 3 tabs under it stay." An Option-drag keeps them faded until the drop. |
 | Option, the floating sidebar's green window button | The full-screen arrows become a +, as macOS draws its own, and a click zooms the window. |
 | Cmd, a link in a chat's answer | A label by the pointer: "Open in the background". |
 | Cmd, an address a terminal tab printed | The address underlines and the pointer becomes a hand, as in Ghostty. Without Cmd it looks like text, since a plain click does not open it. |
@@ -180,6 +180,8 @@ Tooltips that name the key:
 The command bar's Cmd+Return and Option+Return are typed keys with labels of their own, and Chromium's own clicks with keys stay Chromium's.
 
 The design is the frames "Key hints: Option on a tab's ×" and "Key hints: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-30 for T274 and signed off by the user the same day, the chat link's label included. Their rules are the "Key hints" section of the canvas guide `uw-keyboard-shortcuts`.
+
+Built on 2026-10-30: the sidebar and the window buttons in T275, and chats and terminal tabs in T276. `MouseActionsBrowserTest.OptionOnAParentsCloseButtonTintsItsBranch`, `ALoneTabOrTheSwitchOffShowsNoHint`, and `OptionOnAParentsRowFadesTheTabsThatStay`, `UwChatBrowserTest.CmdOnAnAnswersLinkShowsWhatAClickDoes`, and `UwTerminalBrowserTest.AnAddressUnderlinesOnlyWhileCmdIsHeld` pass. `WindowScreenshotBrowserTest.OptionTurnsTheGreenButtonsArrowsIntoAPlus` checks the green button. The tests set the held keys directly. The × keeps Chromium's stroke width and changes only its color. Not tried: real Option and Cmd presses in a real window.
 
 ### Menu of empty sidebar space
 
@@ -215,7 +217,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - The mouse switches are profile prefs read by the views they change.
 - The empty space below the tabs drags the window, so macOS, not the views, gets its clicks. While macOS hands out the second click of a double-click, the space counts as the views' instead, and Chromium's double-click-to-zoom never sees it.
 - "New child tab" is a `TabOrganizationController::Command`. The page tree places the new tab as the first child.
-- Proposed for key hints: macOS sends a lone Option or Cmd press as a modifier change, not a key event, so each window watches modifier changes with an AppKit event monitor and tells the views that show a hint. The tab rows read it in `tab-tree.patch`'s hooks, and the floating window buttons repaint their glyph.
+- Key hints: macOS sends a lone Option or Cmd press as a modifier change, not a key event, so `ModifierKeys` watches modifier changes with one AppKit event monitor for the app and lets go of both keys when uw leaves the front. Each tab row has a `KeyHint` view over it, added by `tab-tree.patch`'s hooks, which tints or fades the row and keeps the tooltips. It fades the row's parts, since Chromium's layout gives a row a layer of its own to animate it and then destroys it. Chromium's row shows hover cards, not tooltips, so the parent row's Option tooltip is the hint view's. The floating window buttons repaint their glyph. The chat page and terminal tabs read Cmd from their own key and mouse events.
 - uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
 

@@ -1887,31 +1887,43 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..c217b9d051a8cd90e04f6c629f2442fe
      }
    }
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
-index e8d8cb4facb9428bab15389a8fb137ada0982a21..ec0207b7a887066ecb08f2767090779cc24f0122 100644
+index e8d8cb4facb9428bab15389a8fb137ada0982a21..8cbf6b357ecb61284c66b00531e5d314a698c2b5 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
-@@ -90,6 +90,9 @@
+@@ -90,6 +90,10 @@
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
  #include "ui/views/view_utils.h"
 +#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/ui/views/tab_organization/branch_toggle.h"
++#include "uw/browser/ui/views/tab_organization/key_hint.h"
 +#include "uw/browser/ui/views/tab_organization/mouse_actions.h"
  
  namespace {
  constexpr int kFocusRingInset = 0.0f;
-@@ -344,6 +347,10 @@ TabView::TabView(TabCollectionNode* collection_node)
+@@ -344,6 +348,12 @@ TabView::TabView(TabCollectionNode* collection_node)
      }
    }
  
 +  if (orientation_ == TabStripOrientation::kVertical) {
-+    uw::AddBranchControls(this, tab->GetHandle());
++    uw::AddBranchControls(
++        this, tab->GetHandle(), close_button_,
++        base::BindRepeating(&TabView::UpdateColors, base::Unretained(this)));
 +  }
 +
    title_->SetProperty(views::kElementIdentifierKey, kVerticalTabTitleElementId);
    SetProperty(views::kElementIdentifierKey, kTabElementId);
    // Layout manager must be set after child views are created because the
-@@ -616,13 +623,18 @@ void TabView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -471,6 +481,8 @@ void TabView::UpdateHovered(bool hovered) {
+   }
+ 
+   hovered_ = hovered;
++  // uw: a held Option shows what a click or drag on the row would do.
++  uw::SetRowHovered(this, hovered_);
+   if (hover_controller_ && !split_) {
+     if (hovered_) {
+       hover_controller_->SetSubtleOpacityScale(radial_highlight_opacity_);
+@@ -616,13 +628,18 @@ void TabView::OnMouseReleased(const ui::MouseEvent& event) {
    auto* controller = collection_node_->GetController();
    base::WeakPtr<TabView> self = weak_ptr_factory_.GetWeakPtr();
    if (event.IsOnlyMiddleMouseButton()) {
@@ -1931,7 +1943,7 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..ec0207b7a887066ecb08f2767090779c
    }
    // Cancel the initialized drag (noop if not started). This is considered
    // a cancel because the drag handler assumes mouse capture when the drag
-@@ -1012,7 +1024,12 @@ void TabView::OnTabStateChanged() {
+@@ -1012,7 +1029,12 @@ void TabView::OnTabStateChanged() {
    int index = tab_strip_model->GetIndexOfTab(tab);
    CHECK(index != TabStripModel::kNoTab);
  
@@ -1945,7 +1957,17 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..ec0207b7a887066ecb08f2767090779c
    split_ = tab->IsSplit();
    pinned_ = tab->IsPinned();
  
-@@ -1150,6 +1167,11 @@ void TabView::UpdateContrastRatioValues() {
+@@ -1129,6 +1151,9 @@ void TabView::UpdateColors() {
+   }
+   TabStyle::TabColors colors = tab_styling()->CalculateTargetColors();
+   title_->SetEnabledColor(colors.foreground_color);
++  // uw: the × of a branch an Option-click would close is in the close color.
++  colors.foreground_color =
++      uw::CloseButtonColor(this, colors.foreground_color);
+   close_button_->SetColors(colors);
+   alert_indicator_->OnParentTabButtonColorChanged();
+ 
+@@ -1150,6 +1175,11 @@ void TabView::UpdateContrastRatioValues() {
  void TabView::CloseButtonPressed(const ui::Event& event) {
    CHECK(collection_node_);
  

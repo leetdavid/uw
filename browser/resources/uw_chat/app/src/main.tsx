@@ -151,6 +151,7 @@ import {
   type TriggerState,
 } from "@/chat-api";
 import { UsageIndicator } from "./usage";
+import { AnswerLink, LinkHint } from "./key-hint";
 import {
   TabApproval,
   TabApprovalLabel,
@@ -200,9 +201,7 @@ const ANSWER_PARTS: Components = {
   // text.
   a: ({ node: _node, href, children }) =>
     href && /^https?:\/\//i.test(href) ? (
-      <a href={href} target="_blank">
-        {children}
-      </a>
+      <AnswerLink href={href}>{children}</AnswerLink>
     ) : (
       <span>{children}</span>
     ),
@@ -2372,6 +2371,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
       <Chat />
+      <LinkHint />
     </MotionConfig>
   </StrictMode>,
 );

@@ -21,6 +21,18 @@
         }
       }
 
+      /* ghostty-web turns the pointer into a hand on any address; it is a
+         hand only while Cmd is held, when a click opens it. */
+      #terminal,
+      #terminal canvas {
+        cursor: text !important;
+      }
+
+      body.cmd-link #terminal,
+      body.cmd-link #terminal canvas {
+        cursor: pointer !important;
+      }
+
       #terminal {
         box-sizing: border-box;
         caret-color: transparent;

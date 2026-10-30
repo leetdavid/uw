@@ -37,12 +37,15 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/skia_conversions.h"
+#include "ui/gfx/skia_util.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/interaction/element_tracker_views.h"
@@ -57,6 +60,7 @@
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 #include "uw/browser/ui/views/tab_organization/floating_window_buttons.h"
+#include "uw/browser/ui/views/tab_organization/modifier_keys.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_bar.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
@@ -348,6 +352,36 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
                        TheFloatingSidebarSlidesInOverThePage) {
   StageSidebar();
   CheckTheFloatingSidebar("sidebar-floating");
+}
+
+// Option on the card's green button turns its full-screen arrows into a +,
+// as macOS draws its own, since an Option-click zooms the window instead.
+// See docs/plans/keyboard-and-mouse.md#key-hints.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       OptionTurnsTheGreenButtonsArrowsIntoAPlus) {
+  StageSidebar();
+  HideSidebar();
+  std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
+  views::View* buttons = Sidebar()->floating_sidebar()->window_buttons();
+  buttons->OnMouseEntered(ui::MouseEvent(
+      ui::EventType::kMouseEntered, gfx::Point(), gfx::Point(),
+      ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  const gfx::Rect green = InWindow(buttons->children().back());
+  const auto glyph = [&] {
+    SkBitmap button;
+    EXPECT_TRUE(CaptureWindow(browser()).extractSubset(
+        &button, gfx::RectToSkIRect(green)));
+    return button;
+  };
+  const SkBitmap arrows = glyph();
+
+  ModifierKeys::Get().SetForTesting(/*option=*/true, /*command=*/false);
+  const SkBitmap plus = glyph();
+  SaveWindowScreenshot(browser(), "key-hint-zoom");
+  EXPECT_FALSE(gfx::BitmapsAreEqual(arrows, plus));
+
+  ModifierKeys::Get().SetForTesting(/*option=*/false, /*command=*/false);
+  EXPECT_TRUE(gfx::BitmapsAreEqual(glyph(), arrows));
 }
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,

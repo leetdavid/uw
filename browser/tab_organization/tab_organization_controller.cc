@@ -315,6 +315,11 @@ TabOrganizationController::ObserveCommandBarRequests(
   return command_bar_requests_.Add(std::move(callback));
 }
 
+base::CallbackListSubscription TabOrganizationController::ObserveDrags(
+    base::RepeatingClosure callback) {
+  return drags_.Add(std::move(callback));
+}
+
 base::WeakPtr<TabOrganizationController>
 TabOrganizationController::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
@@ -1240,6 +1245,7 @@ void TabOrganizationController::BeginTabDrag(bool alone) {
   drag_before_ = shared_->tree();
   drag_x_.reset();
   drag_levels_ = 0;
+  drags_.Notify();
 }
 
 std::vector<tabs::TabInterface*> TabOrganizationController::DraggedTabs(
@@ -1315,6 +1321,7 @@ void TabOrganizationController::EndTabDrag() {
     return;
   }
   dragging_ = false;
+  drags_.Notify();
   if (drag_canceled_) {
     shared_->tree().Restore(drag_before_);
     ScheduleUpdate();

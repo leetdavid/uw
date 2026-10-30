@@ -91,6 +91,44 @@ terminal.open(document.querySelector<HTMLElement>('#terminal')!);
 fit.fit();
 fit.observeResize();
 
+// A key hint: an address the shell printed underlines, and the pointer
+// becomes a hand, only while Cmd is held, as in Ghostty, since only a
+// Cmd-click opens it. ghostty-web would mark it under the pointer anyway. See
+// docs/plans/keyboard-and-mouse.md#key-hints.
+const linkRenderer = terminal.renderer!;
+const showLinkRange = linkRenderer.setHoveredLinkRange.bind(linkRenderer);
+const showHyperlink = linkRenderer.setHoveredHyperlinkId.bind(linkRenderer);
+let hoveredRange: Parameters<typeof showLinkRange>[0] = null;
+let hoveredHyperlink = 0;
+let cmdHeld = false;
+function showLink() {
+  showLinkRange(cmdHeld ? hoveredRange : null);
+  showHyperlink(cmdHeld ? hoveredHyperlink : 0);
+  document.body.classList.toggle(
+      'cmd-link', cmdHeld && (hoveredRange !== null || hoveredHyperlink > 0));
+}
+linkRenderer.setHoveredLinkRange = (range) => {
+  hoveredRange = range;
+  showLink();
+};
+linkRenderer.setHoveredHyperlinkId = (id: number) => {
+  hoveredHyperlink = id;
+  showLink();
+};
+function holdCmd(held: boolean) {
+  if (held !== cmdHeld) {
+    cmdHeld = held;
+    showLink();
+  }
+}
+for (const type of ['keydown', 'keyup', 'mousemove'] as const) {
+  window.addEventListener(
+      type, (event: KeyboardEvent|MouseEvent) => holdCmd(event.metaKey),
+      {capture: true});
+}
+// Switching to another app or window lets go of the key.
+window.addEventListener('blur', () => holdCmd(false));
+
 // The tab is named after what the shell sets, otherwise after its folder.
 let folder = '';
 let shellTitle = '';

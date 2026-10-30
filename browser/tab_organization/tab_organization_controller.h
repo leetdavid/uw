@@ -298,6 +298,10 @@ class TabOrganizationController : public TabStripModelObserver,
   base::CallbackListSubscription ObserveCommandBarRequests(
       base::RepeatingClosure callback);
   bool dragging() const { return dragging_; }
+  // A drag of a parent that leaves its branch behind, as with Option held.
+  bool dragging_alone() const { return dragging_ && drag_alone_; }
+  // Runs as a drag begins and ends.
+  base::CallbackListSubscription ObserveDrags(base::RepeatingClosure callback);
   // The tree's key for the task `group` shows in this window.
   std::string KeyOf(const tab_groups::TabGroupId& group) const;
   // The same for `window`, or `group`'s own id when it has no tree.
@@ -418,6 +422,7 @@ class TabOrganizationController : public TabStripModelObserver,
   base::CallbackListSubscription reveals_;
   base::RepeatingClosureList pictures_changed_;
   base::RepeatingClosureList command_bar_requests_;
+  base::RepeatingClosureList drags_;
   // This window's copies of pages whose tab came here from another window.
   // They are no page of this window's, and close.
   std::set<tabs::TabHandle> leaving_;

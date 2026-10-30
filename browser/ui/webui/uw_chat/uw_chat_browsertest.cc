@@ -54,12 +54,14 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -1047,6 +1049,66 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
   ASSERT_TRUE(tree);
   EXPECT_EQ(tree->tree().Find(*tree->IdFor(tabs()->GetActiveTab()))->parent,
             *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
+}
+
+// A key hint: while Cmd is held on a link in an answer, a label by the
+// pointer says a click opens it in the background. Otherwise the link's
+// tooltip names Cmd.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       CmdOnAnAnswersLinkShowsWhatAClickDoes) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Answer("[Book it](" + Form() + ")")});
+  content::WebContents* chat = OpenChat();
+  Ask(chat, "Find a tour");
+  const auto title = [&] {
+    return content::EvalJs(chat, "document.querySelector('.answer a').title")
+        .ExtractString();
+  };
+  const auto hint = [&] {
+    return content::EvalJs(chat,
+                           "document.getElementById('link-hint')"
+                           "    ?.textContent ?? ''")
+        .ExtractString();
+  };
+  const auto cmd = [&](bool held) {
+    ASSERT_TRUE(content::ExecJs(
+        chat,
+        base::StrCat({"window.dispatchEvent(new KeyboardEvent('",
+                      held ? "keydown" : "keyup", "', {key: 'Meta', metaKey: ",
+                      held ? "true" : "false", "}));"})));
+  };
+  EXPECT_EQ(title(), "Cmd-click to open in the background");
+
+  // The pointer on the link, in the page's own coordinates.
+  const gfx::Point link =
+      CenterOf(chat, "document.querySelector('.answer a')") -
+      chat->GetRenderWidgetHostView()->GetViewBounds().OffsetFromOrigin();
+  content::SimulateMouseEvent(chat, blink::WebInputEvent::Type::kMouseMove,
+                              link);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(chat,
+                           "document.querySelector('.answer a:hover') !== null")
+        .ExtractBool();
+  }));
+  EXPECT_EQ(hint(), "");
+
+  cmd(true);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return hint() == "Open in the background";
+  })) << hint();
+  EXPECT_EQ(title(), "");
+  SaveWindowScreenshot(browser(), "link-hint");
+
+  cmd(false);
+  EXPECT_TRUE(base::test::RunUntil([&] { return hint().empty(); }));
+  EXPECT_EQ(title(), "Cmd-click to open in the background");
+
+  // Switching to another window lets go of the key.
+  cmd(true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !hint().empty(); }));
+  ASSERT_TRUE(
+      content::ExecJs(chat, "window.dispatchEvent(new Event('blur'));"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return hint().empty(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TabCardsShowTheAgentsTabs) {

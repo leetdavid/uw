@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,7 @@
 #include "content/public/test/browser_test.h"
 #include "testing/gtest_mac.h"
 #include "ui/base/hit_test.h"
+#include "ui/compositor/layer.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
@@ -46,6 +48,8 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
+#include "uw/browser/ui/views/tab_organization/key_hint.h"
+#include "uw/browser/ui/views/tab_organization/modifier_keys.h"
 #include "uw/browser/ui/views/tab_organization/task_name_field.h"
 
 // The event macOS is handing out, as NSApp.currentEvent reports it.
@@ -80,6 +84,7 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   void TearDownOnMainThread() override {
+    ModifierKeys::Get().SetForTesting(false, false);
     SetArguments(arguments_);
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
@@ -178,6 +183,51 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
     }
     return nullptr;
   }
+
+  // The row of `tab`, and the key hint on it.
+  TabView* TabRowOf(tabs::TabInterface* tab) {
+    for (TabView* row : Shown<TabView>()) {
+      if (row->GetTabInterface() == tab) {
+        return row;
+      }
+    }
+    return nullptr;
+  }
+  KeyHint* HintOf(tabs::TabInterface* tab) {
+    TabView* row = TabRowOf(tab);
+    for (views::View* child : row ? row->children() : views::View::Views()) {
+      if (auto* hint = views::AsViewClass<KeyHint>(child)) {
+        return hint;
+      }
+    }
+    return nullptr;
+  }
+  KeyHint::Shown ShownOn(tabs::TabInterface* tab) {
+    KeyHint* hint = HintOf(tab);
+    return hint ? hint->shown() : KeyHint::Shown::kNone;
+  }
+  // The opacities of the parts of the row of `tab`, a part without a layer
+  // at 1.
+  std::set<float> OpacitiesOn(tabs::TabInterface* tab) {
+    std::set<float> opacities;
+    for (views::View* part : TabRowOf(tab)->children()) {
+      if (!views::IsViewClass<KeyHint>(part)) {
+        opacities.insert(part->layer() ? part->layer()->opacity() : 1.0f);
+      }
+    }
+    return opacities;
+  }
+  // The pointer on the close button of `tab`, or on the rest of its row.
+  void PointAtClose(tabs::TabInterface* tab) {
+    CloseButtonOf(tab)->SetState(views::Button::STATE_HOVERED);
+  }
+  void PointAtRow(tabs::TabInterface* tab) {
+    static_cast<views::View*>(TabRowOf(tab))
+        ->OnMouseEntered(ui::MouseEvent(
+            ui::EventType::kMouseEntered, gfx::Point(), gfx::Point(),
+            ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE));
+  }
+  void HoldOption(bool held) { ModifierKeys::Get().SetForTesting(held, false); }
 
   // The row of `task`.
   views::View* RowOf(const tab_groups::TabGroupId& task) {
@@ -483,6 +533,92 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
   Settle();
   EXPECT_FALSE(tabs()->IsGroupCollapsed(task));
   EXPECT_EQ(tabs()->GetActiveTab()->GetGroup(), task);
+}
+
+// Option on a parent's close button tints the rows an Option-click would
+// close, and names them in the tooltip. See
+// docs/plans/keyboard-and-mouse.md#key-hints.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       OptionOnAParentsCloseButtonTintsItsBranch) {
+  const Tree tree = OpenTree();
+  PointAtClose(tree.a);
+  views::Button* close = CloseButtonOf(tree.a);
+  EXPECT_EQ(close->GetTooltipText(),
+            u"Close tab\nOption-click to close the 2 tabs under it too");
+  EXPECT_EQ(ShownOn(tree.a), KeyHint::Shown::kNone);
+
+  HoldOption(true);
+  for (tabs::TabInterface* tab : {tree.a.get(), tree.b.get(), tree.c.get()}) {
+    EXPECT_EQ(ShownOn(tab), KeyHint::Shown::kCloses);
+  }
+  EXPECT_EQ(ShownOn(tree.d), KeyHint::Shown::kNone);
+  EXPECT_EQ(close->GetTooltipText(), u"Close this tab and the 2 tabs under it");
+  EXPECT_NE(CloseButtonColor(TabRowOf(tree.a), SK_ColorBLACK), SK_ColorBLACK);
+  SaveWindowScreenshot(browser(), "key-hint-close");
+
+  // Letting go takes it away at once, with no pointer move.
+  HoldOption(false);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
+  EXPECT_EQ(CloseButtonColor(TabRowOf(tree.a), SK_ColorBLACK), SK_ColorBLACK);
+
+  // So does switching to another app with Option still down.
+  HoldOption(true);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kCloses);
+  [NSNotificationCenter.defaultCenter
+      postNotificationName:NSApplicationDidResignActiveNotification
+                    object:NSApp];
+  EXPECT_FALSE(ModifierKeys::Get().option());
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
+}
+
+// A tab with nothing under it, or the switch off, shows no hint.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       ALoneTabOrTheSwitchOffShowsNoHint) {
+  const Tree tree = OpenTree();
+  HoldOption(true);
+  PointAtClose(tree.d);
+  EXPECT_EQ(ShownOn(tree.d), KeyHint::Shown::kNone);
+  EXPECT_EQ(CloseButtonOf(tree.d)->GetTooltipText(), u"Close tab");
+
+  prefs()->SetBoolean(kOptionClickClosesBranchPref, false);
+  PointAtClose(tree.a);
+  EXPECT_EQ(ShownOn(tree.a), KeyHint::Shown::kNone);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
+  EXPECT_EQ(CloseButtonOf(tree.a)->GetTooltipText(), u"Close tab");
+}
+
+// Option on the rest of a parent's row fades the tabs a drag would leave
+// behind, and an Option-drag keeps them faded until the drop.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       OptionOnAParentsRowFadesTheTabsThatStay) {
+  const Tree tree = OpenTree();
+  PointAtRow(tree.a);
+  HoldOption(true);
+  EXPECT_EQ(ShownOn(tree.a), KeyHint::Shown::kNone);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kStays);
+  EXPECT_EQ(ShownOn(tree.c), KeyHint::Shown::kStays);
+  EXPECT_EQ(OpacitiesOn(tree.b), std::set<float>{0.5f});
+  EXPECT_EQ(OpacitiesOn(tree.a), std::set<float>{1.0f});
+  views::View* row = TabRowOf(tree.a);
+  views::View* tooltip =
+      row->GetTooltipHandlerForPoint(row->GetLocalBounds().CenterPoint());
+  ASSERT_TRUE(tooltip);
+  EXPECT_EQ(tooltip->GetRenderedTooltipText({}),
+            u"Drag to move this tab alone.\nThe 2 tabs under it stay.");
+  SaveWindowScreenshot(browser(), "key-hint-stays");
+
+  HoldOption(false);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
+  EXPECT_EQ(HintOf(tree.a)->GetTooltipText(), u"");
+  HoldOption(true);
+
+  controller()->BeginTabDrag(/*alone=*/true);
+  HoldOption(false);
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kStays);
+  controller()->EndTabDrag();
+  Settle();
+  EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
+  EXPECT_EQ(OpacitiesOn(tree.b), std::set<float>{1.0f});
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
