@@ -8,8 +8,7 @@ Implementability: **4/10** for v2.0 using the [roadmap convention](roadmap.md#im
 
 - A [chat](../CONTEXT.md#language) is a conversation with uw's built-in agent. Its page, `uw://chat`, is a regular tab.
 - The agent opens its tabs as child tabs of the chat tab, in the same window. They load in the background and never take the user's selection or keyboard focus. The user can click one to watch or step in.
-- While a chat runs, its tab and its child tabs move only together. After it finishes they are ordinary child tabs.
-- Every tab is a tab: the organizer may move a chat tab like any other.
+- The organizer never files a chat or the tabs it opened on its own; they stay together under the chat, whether it runs or not, until the user moves them. See [Branch moves](automatic-organization.md#branch-moves). Agreed on 2026-10-31 as T281. Before, the organizer could move a chat tab like any other, and the agent's tabs became ordinary child tabs once the chat finished.
 - The agent asks for [approval](../CONTEXT.md#language) before each change on a site and each sign-in, in the default [approval mode](../CONTEXT.md#language), Auto; see the modes added on 2026-10-16. Page text never counts as the user's instruction.
 - From T47 until T48 landed on 2026-10-15, chats ran without approvals, on test sites only. Approvals now gate every change.
 - Settings get an "Agent model" connection beside the decision and language models. Until the user saves one, chats use the language model's connection. Its test asks the model to open a page and passes only when it calls a tool. A check for images waits until the agent sends screenshots; changed on 2026-10-15, since the agent reads pages as text for now. In v2.1 the agent model moves to `uw://providers`, and each chat can switch its model and effort; see the [AI providers plan](ai-providers.md).
@@ -201,7 +200,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 17. T106: images in a message, drawn on the canvas first.
 18. T107: stop, steer, and queue.
 19. T49: the [new tab page](new-tab-page.md), with its Ask box. The [command bar](command-bar.md)'s "Ask uw" row, T63, starts a chat too. Agreed on 2026-10-14: both stay.
-20. T50: Chats list in the sidebar, collapsing a chat's child tabs, and the organizer moving a running chat's tabs only together. Until then the organizer may file the agent's tabs on their own. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
+20. T50: Chats list in the sidebar, and collapsing a chat's child tabs. T281 took over the organizer's part on 2026-10-31. A chat's child tabs are a [tab branch](../CONTEXT.md#language), so this uses the branch collapse of T57 in the [keyboard and mouse plan](keyboard-and-mouse.md#branches-with-the-mouse).
 21. Scheduled chats, agreed on 2026-10-22, in this order: T147, the chat page design; T148, a window that is never shown; T149, the scheduler; T51, scheduled chats; T150, watch this page; T151, tracked values and charts; T152, the agent filling in the card; T153, triggers. Added on 2026-10-28: T243, the agent watching a page; T244, several watches on one page. See the [board](roadmap.md#board).
 22. T52: private chats.
 23. The [Scheduled page and the Inbox](../product.md#scheduled-chats), agreed on 2026-10-28: T237, the design; T238, the Scheduled page; T239, keeping alerts; T240, the Inbox button and pop-up. Implementability **6/10**: the page and the alerts reuse the watch card's and the chat page's parts, but the button goes into Chromium's vertical tab strip top, which `uw-look.patch` already changes, and into the floating sidebar.
@@ -210,7 +209,7 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 
 1. A request typed in the Ask box opens a chat tab. The agent's tabs appear under it and never take the selection or focus.
 2. A change on a site and a sign-in wait for Approve. A page that tells the agent to skip approval does not get its way.
-3. A chat tab moved by the organizer or by hand takes its running child tabs with it.
+3. A chat tab moved by hand or by Tidy takes its child tabs with it, and the organizer never moves them on its own.
 4. The Chats list shows a running chat with a spinner and a finished, unread one with a dot.
 5. A scheduled chat runs on time while uw is open, waits and notifies at an approval, and runs once to catch up after a miss.
 6. A private chat leaves no chat, history, or screenshot behind after its windows close.
