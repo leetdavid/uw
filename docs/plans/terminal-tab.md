@@ -26,14 +26,15 @@ Agreed on 2026-10-31 as T36, to be built with the [close button on a task's row]
 
 - A terminal is busy while any program other than its shell has it. herdr, vim, and htop count, not only builds and servers.
 - One dialog asks before any close that would end a busy terminal: closing the tab, Close Other Tabs, Close Tabs Below, Close Branch, Close Task, closing the window, and quitting uw.
-- Its title names the close: "Close this tab?", "Close this task?", "Close this window?", or "Quit uw?". It lists each running command with its terminal's title, such as `pnpm dev` in shop-web.
+- Its title names the close: "Close this tab?", "Close 4 tabs?" for a branch and the other closes of several tabs, "Close this task?", "Close this window?", or "Quit uw?". It lists each busy terminal by its title, with the running program's name as macOS reports it: `pnpm dev` shows as `node`. A window's list names each terminal's task, and quitting's names its workspace.
 - Two buttons: one in the close color that names the close, such as Close Task, which Return picks, and Cancel, which Esc picks. There is no "Don't ask again".
 - A command that ends while the dialog is open leaves it open. The answer still applies.
 - Quitting lists the busy terminals of every window and workspace, hidden ones too.
 - With [shared tabs](shared-tabs.md) on, closing a window closes no tabs, so it does not ask.
 - Cmd+Shift+T brings a closed terminal back with a new shell. The command does not run again.
 - Unchanged: Clear leaves busy terminals open, and the agent's `close` and `close_task` tools and `uw tabs close` refuse them, per the [tab tools plan](tab-tools.md#agreed-scope).
-- The dialog's design goes on the canvas page "Keyboard and mouse" for the user's sign-off.
+- While it asks about a task, the task's rows stay tinted as under the × of its row.
+- The design is the frames "Busy terminal warning: the dialog" and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31. They wait for the user's sign-off.
 
 ## Non-goals
 

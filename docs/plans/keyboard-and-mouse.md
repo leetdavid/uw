@@ -192,7 +192,7 @@ Agreed on 2026-10-31 as T284. Closing a task took two clicks from outside it: Ct
 - While the pointer is on the ×, the task's row and every tab row in it take the close color at 10%, as a [key hint](#key-hints) does. A collapsed task tints its row alone.
 - Tooltip: "Close task and its 4 tabs", or "Close task and its tab" for one.
 - The narrow sidebar and horizontal tabs have no ×. It has no switch in settings.
-- The design is the frames "Close task in one click: the ×" and "Close task in one click: five ways" on the canvas page "Keyboard and mouse", drawn on 2026-10-31. The user picked the × from the five ways the same day.
+- The design is the frames "Close task in one click: the ×", "Close task in one click: five ways", and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31, with their rules in the canvas guide `uw-keyboard-shortcuts`. The user picked the × from the five ways the same day. The every-state frame waits for sign-off.
 
 ### Menu of empty sidebar space
 
