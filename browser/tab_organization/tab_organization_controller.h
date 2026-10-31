@@ -111,6 +111,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // Opens a new tab in a new task of its own. Returns false when `window`
   // has no tab tree, in which case nothing opened.
   static bool OpenNewTask(BrowserWindowInterface* window);
+  // Closes the selected tab's task, as CloseTask does. Returns false when
+  // `window` has no tab tree, in which case nothing closed.
+  static bool CloseSelectedTask(BrowserWindowInterface* window);
 
   const PageTree& tree() const;
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;
@@ -170,7 +173,8 @@ class TabOrganizationController : public TabStripModelObserver,
   bool MoveDown(const PageId& id);
   void CloseBranches(const std::vector<PageId>& ids);
   // Closes `task` and its tabs. A task that holds every tab leaves a blank
-  // tab behind, so the window stays.
+  // tab behind, so the window stays. While a program runs in one of its
+  // terminals, the user is asked first.
   void CloseTask(const tab_groups::TabGroupId& task);
   // The Scratchpad's tabs that Clear closes: all but kept tabs and terminals
   // running a command. Each terminal's shell is asked, so `done` runs later.
@@ -315,6 +319,9 @@ class TabOrganizationController : public TabStripModelObserver,
     std::u16string title;
     std::optional<tab_groups::TabGroupVisualData> visuals;
   };
+
+  // CloseTask, once nothing needs asking or the user agreed.
+  void CloseTaskNow(const tab_groups::TabGroupId& task);
 
   void OnTabStripModelChanged(
       TabStripModel* model,

@@ -662,7 +662,7 @@ const TEST_SUITES = {
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
     "UwOrganizationPageBrowserTest.*", "MenuKeysBrowserTest.*", "ReleaseVersionBrowserTest.*", "UpdateBrowserTest.*", "ProblemReportsBrowserTest.*", "GoogleRequestsBrowserTest.*", "CodecsBrowserTest.*", "UwShortcutsPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "PageClipboardBrowserTest.*", "UwTerminalBrowserTest.*",
-    "UwTerminalMenuBrowserTest.*",
+    "UwTerminalMenuBrowserTest.*", "BusyTerminalWarningBrowserTest.*",
     "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "RunWindowBrowserTest.*", "ChatRunBrowserTest.*", "ScheduledChatsBrowserTest.*", "ScheduledPageBrowserTest.*", "InboxBrowserTest.*", "WatchCardBrowserTest.*", "AgentLoopBrowserTest.*",
     "UwChatBrowserTest.*", "TaskKeysBrowserTest.*", "LinksFromOtherAppsBrowserTest.*", "CommandBarBrowserTest.*", "CommandBarRatesBrowserTest.*", "CommandBarTwoScreensBrowserTest.*",
     "UwProvidersBrowserTest.*", "ConnectorsBrowserTest.*", "PinsBrowserTest.*",

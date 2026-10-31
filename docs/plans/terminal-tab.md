@@ -36,6 +36,13 @@ Agreed on 2026-10-31 as T36, to be built with the [close button on a task's row]
 - While it asks about a task, the task's rows stay tinted as under the × of its row.
 - The design is the frames "Busy terminal warning: the dialog" and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31 and signed off by the user the same day.
 
+How it is built:
+
+- Each window has a `CloseWarning` (`browser/ui/views/terminal`), registered as the window's `CloseGuard` (`browser/terminal/close_guard`), the small interface Chromium's code reaches. It asks each terminal's shell what runs there through `FindBusyTerminals`, which Clear uses too, and shows a browser-modal dialog with Cancel and a red close button.
+- Four hooks hold a close until the answer. `TabStripModel::CloseTabs` holds every close the user asked for (`tab-tree.patch`). `TabOrganizationController::CloseTask` holds a task's close before it adds the blank tab a window keeps, and Ctrl+Cmd+W goes through it. `UnloadController::HandleBeforeClose` holds a window's close, with the hidden windows of its other workspaces (`uw-live-pins.patch`). `BrowserCloseManager` holds a quit after the pages' own questions (`uw-busy-terminals.patch`).
+- A close with no terminal among its tabs stays synchronous. One with a terminal waits for the shells' answer, a few milliseconds, even when none is busy.
+- Browser tests run with `--test-type`, where the dialog stays off unless a test turns it on with `CloseWarning::AskInTestsForTesting`, so a test that ends with a program running still quits.
+
 ## Non-goals
 
 - uw's models reading or typing in a terminal the user opened. Changed on 2026-10-20: the agent runs commands in terminal tabs it opens under its chat, per the [agent chats plan](agent-chats.md#agreed-scope). Before, no model read or typed in any terminal.

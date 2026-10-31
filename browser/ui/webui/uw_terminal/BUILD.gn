@@ -48,6 +48,7 @@ source_set("browser_tests") {
     "//base",
     "//base/test:test_support",
     "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/lifetime",
     "//chrome/browser/ui",
     "//chrome/browser/ui/tab_contents",
     "//chrome/test:test_support",
@@ -65,6 +66,8 @@ source_set("browser_tests") {
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/terminal",
+    "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/ui/views/terminal",
     "//uw/components/terminal",
   ]
 }

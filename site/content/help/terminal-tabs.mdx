@@ -25,6 +25,10 @@ To run one command in a new terminal tab, type it in the [command bar](./command
 
 A terminal tab sits in tasks and nests like any other tab. [Automatic organization](./automatic-organization.mdx) files it by its title and folder, never by what the shell printed.
 
-<Callout type="warning">
-  Closing a terminal tab ends its shell and anything running in it.
-</Callout>
+## Close *a terminal*
+
+Closing a terminal tab ends its shell. If a program is still running in it, such as a dev server, vim, or herdr, uw asks first and names the program. Click **Close Tab** to stop it, or **Cancel** to keep it.
+
+uw asks the same way before you close several tabs, a task, or a window that holds such a terminal, and before you quit. One question names every program that would stop. A terminal at its prompt closes without a question.
+
+<kbd>Cmd</kbd> <kbd>Shift</kbd> <kbd>T</kbd> brings a closed terminal back with a new shell. The program doesn't run again.

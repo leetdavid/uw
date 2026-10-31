@@ -46,6 +46,7 @@ source_set("tab_organization") {
     "//uw/browser/agent:chat_tab",
     "//uw/browser/ai_providers",
     "//uw/browser/terminal",
+    "//uw/browser/terminal:close_guard",
     "//uw/browser/workspaces",
   ]
 }

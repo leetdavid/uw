@@ -266,6 +266,15 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
     return nullptr;
   }
 
+  TaskRowCloseButton* CloseOn(views::View* row) {
+    for (views::View* child : row->children()) {
+      if (auto* close = views::AsViewClass<TaskRowCloseButton>(child)) {
+        return close;
+      }
+    }
+    return nullptr;
+  }
+
   void OptionClick(views::Button* button) {
     ui::MouseEvent click(ui::EventType::kMouseReleased, gfx::Point(),
                          gfx::Point(), ui::EventTimeForNow(),
@@ -533,6 +542,70 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
   Settle();
   EXPECT_FALSE(tabs()->IsGroupCollapsed(task));
   EXPECT_EQ(tabs()->GetActiveTab()->GetGroup(), task);
+}
+
+// The × on a task's row shows with its menu button, after it, and has no
+// switch. See docs/plans/keyboard-and-mouse.md#close-button-on-a-tasks-row.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       TheTaskRowCloseButtonShowsWithTheMenuButton) {
+  const Tree tree = OpenTree();
+  const tab_groups::TabGroupId task = TaskOf({tree.a});
+  views::View* row = RowOf(task);
+  TaskRowCloseButton* close = CloseOn(row);
+  ASSERT_TRUE(close);
+  EXPECT_FALSE(close->GetVisible());
+
+  row->GetFocusManager()->SetKeyboardAccessible(true);
+  row->RequestFocus();
+  ASSERT_TRUE(row->HasFocus());
+  EXPECT_TRUE(close->GetVisible());
+  EXPECT_EQ(row->children()[row->GetIndexOf(close).value() - 1]->GetProperty(
+                views::kElementIdentifierKey),
+            kTabGroupEditorBubbleButtonElementId);
+
+  prefs()->SetBoolean(kTaskRowNewTabPref, false);
+  tree.d->GetContents()->Focus();
+  row->RequestFocus();
+  EXPECT_TRUE(close->GetVisible());
+  EXPECT_FALSE(PlusOn(row)->GetVisible());
+}
+
+// The pointer on the × tints the task's row and every tab in it, and the
+// tooltip counts them. A click closes the task, with the selected tab in the
+// Scratchpad.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       TheTaskRowCloseButtonTintsAndClosesTheTask) {
+  const Tree tree = OpenTree();
+  const tab_groups::TabGroupId task = TaskOf({tree.a});
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(tree.d));
+  Settle();
+  views::View* row = RowOf(task);
+  TaskRowCloseButton* close = CloseOn(row);
+  // A focused row shows its buttons, as the pointer on it does.
+  row->GetFocusManager()->SetKeyboardAccessible(true);
+  row->RequestFocus();
+  ASSERT_TRUE(close->GetVisible());
+  EXPECT_EQ(TaskRowFill(row), SK_ColorTRANSPARENT);
+
+  close->SetState(views::Button::STATE_HOVERED);
+  EXPECT_TRUE(IsTaskCloseHinted(browser(), task));
+  EXPECT_NE(TaskRowFill(row), SK_ColorTRANSPARENT);
+  for (tabs::TabInterface* tab : {tree.a.get(), tree.b.get(), tree.c.get()}) {
+    EXPECT_TRUE(HintOf(tab)->in_closing_task());
+  }
+  EXPECT_FALSE(HintOf(tree.d)->in_closing_task());
+  EXPECT_EQ(close->GetRenderedTooltipText({}), u"Close task and its 3 tabs");
+  SaveWindowScreenshot(browser(), "task-row-close");
+
+  close->SetState(views::Button::STATE_NORMAL);
+  EXPECT_FALSE(IsTaskCloseHinted(browser(), task));
+  EXPECT_EQ(TaskRowFill(row), SK_ColorTRANSPARENT);
+  EXPECT_FALSE(HintOf(tree.a)->in_closing_task());
+
+  Click(close);
+  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 1; }));
+  EXPECT_FALSE(tabs()->group_model()->ContainsTabGroup(task));
+  EXPECT_EQ(tabs()->GetActiveTab(), tree.d.get());
 }
 
 // Option on a parent's close button tints the rows an Option-click would

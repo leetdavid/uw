@@ -3,13 +3,18 @@
 #ifndef UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_KEY_HINT_H_
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_KEY_HINT_H_
 
+#include <optional>
+
 #include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/view.h"
+
+class BrowserWindowInterface;
 
 namespace views {
 class Button;
@@ -42,6 +47,7 @@ class KeyHint : public views::View {
   ~KeyHint() override;
 
   Shown shown() const { return shown_; }
+  bool in_closing_task() const { return in_closing_task_; }
   // The pointer is on the row, as Chromium's tab view keeps it.
   void SetRowHovered(bool hovered);
   // The color of the close button's ×: the close color while an
@@ -65,6 +71,8 @@ class KeyHint : public views::View {
   const base::RepeatingClosure update_colors_;
   Shown shown_ = Shown::kNone;
   bool source_ = false;
+  // The row's task would close: SetTaskCloseHint.
+  bool in_closing_task_ = false;
   base::CallbackListSubscription keys_;
   base::CallbackListSubscription hints_;
   base::CallbackListSubscription tree_;
@@ -75,6 +83,21 @@ class KeyHint : public views::View {
 // The close color, for the hint's tint and the ×: red on a light sidebar,
 // and a lighter red on a dark one.
 SkColor CloseHintColor(const views::View* view);
+
+// The task a close would end, whose row and tab rows take the close color:
+// while the pointer is on the × of its row, and while the user is asked
+// whether to close it. `asking` says which; either one draws it. `on`
+// false clears it if it is still `task`. The hint follows its window, not
+// the task's copies in other windows.
+void SetTaskCloseHint(bool asking,
+                      BrowserWindowInterface* window,
+                      const tab_groups::TabGroupId& task,
+                      bool on);
+bool IsTaskCloseHinted(BrowserWindowInterface* window,
+                       const tab_groups::TabGroupId& task);
+// Tells `changed` whenever a hint might have changed.
+base::CallbackListSubscription ObserveCloseHints(
+    base::RepeatingClosure changed);
 
 // Hooks for Chromium's vertical tab row, in tab-tree.patch.
 void SetRowHovered(views::View* row, bool hovered);

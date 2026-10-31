@@ -3,6 +3,7 @@
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "components/prefs/pref_service.h"
+#include "components/sessions/core/session_id.h"
 #include "ui/base/class_property.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_provider.h"
@@ -50,6 +52,18 @@ struct Pointer {
 Pointer& Hovered() {
   static Pointer pointer;
   return pointer;
+}
+
+// The task SetTaskCloseHint draws, by its window's session, for the pointer
+// and for the question.
+struct TaskHint {
+  SessionID window = SessionID::InvalidValue();
+  std::optional<tab_groups::TabGroupId> task;
+};
+TaskHint& TaskHintFor(bool asking) {
+  static TaskHint pointer;
+  static TaskHint question;
+  return asking ? question : pointer;
 }
 
 // The parent an Option-drag moves alone, until the drop.
@@ -217,7 +231,7 @@ SkColor KeyHint::CloseColor(SkColor color) const {
 }
 
 void KeyHint::OnPaint(gfx::Canvas* canvas) {
-  if (shown_ == Shown::kCloses) {
+  if (shown_ == Shown::kCloses || in_closing_task_) {
     canvas->FillRect(GetLocalBounds(),
                      SkColorSetA(CloseHintColor(this), kTintAlpha));
   }
@@ -266,11 +280,16 @@ void KeyHint::Update() {
                                      base::NumberToString16(under),
                                      u" tabs under it stay."}));
 
-  if (shown == shown_ && source == source_) {
+  const std::optional<tab_groups::TabGroupId> task = tab->GetGroup();
+  const bool in_closing_task =
+      task && IsTaskCloseHinted(tab->GetBrowserWindowInterface(), *task);
+  if (shown == shown_ && source == source_ &&
+      in_closing_task == in_closing_task_) {
     return;
   }
   shown_ = shown;
   source_ = source;
+  in_closing_task_ = in_closing_task;
   SetFaded(shown_ == Shown::kStays);
   SchedulePaint();
   update_colors_.Run();
@@ -304,6 +323,34 @@ void KeyHint::SetFaded(bool faded) {
 
 BEGIN_METADATA(KeyHint)
 END_METADATA
+
+void SetTaskCloseHint(bool asking,
+                      BrowserWindowInterface* window,
+                      const tab_groups::TabGroupId& task,
+                      bool on) {
+  TaskHint& hint = TaskHintFor(asking);
+  const bool shown = hint.task == task && hint.window == window->GetSessionID();
+  if (on == shown) {
+    return;
+  }
+  hint = on ? TaskHint{window->GetSessionID(), task} : TaskHint();
+  Rows().Notify();
+}
+
+bool IsTaskCloseHinted(BrowserWindowInterface* window,
+                       const tab_groups::TabGroupId& task) {
+  return window && std::ranges::any_of(
+                       std::array{false, true}, [window, &task](bool asking) {
+                         const TaskHint& hint = TaskHintFor(asking);
+                         return hint.task == task &&
+                                hint.window == window->GetSessionID();
+                       });
+}
+
+base::CallbackListSubscription ObserveCloseHints(
+    base::RepeatingClosure changed) {
+  return Rows().Add(std::move(changed));
+}
 
 void SetRowHovered(views::View* row, bool hovered) {
   if (KeyHint* hint = ChildOfClass<KeyHint>(row)) {

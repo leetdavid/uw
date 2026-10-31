@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/auto_reset.h"
-#include "base/barrier_callback.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
@@ -43,7 +42,8 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/shared_tree.h"
-#include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/terminal/busy_terminals.h"
+#include "uw/browser/terminal/close_guard.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -514,6 +514,19 @@ bool TabOrganizationController::OpenNewTask(BrowserWindowInterface* window) {
   return true;
 }
 
+bool TabOrganizationController::CloseSelectedTask(
+    BrowserWindowInterface* window) {
+  TabOrganizationController* self = From(window);
+  if (!self) {
+    return false;
+  }
+  if (const std::optional<tab_groups::TabGroupId> task =
+          self->tabs_->GetTabGroupForTab(self->tabs_->active_index())) {
+    self->CloseTask(*task);
+  }
+  return true;
+}
+
 void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
                                            content::WebContents* page,
                                            content::WebContents* source) {
@@ -931,43 +944,34 @@ void TabOrganizationController::CloseBranches(const std::vector<PageId>& ids) {
 
 void TabOrganizationController::FindClearable(
     base::OnceCallback<void(std::vector<PageId>)> done) const {
-  std::vector<PageId> pages;
+  std::vector<std::pair<PageId, content::WebContents*>> pages;
+  std::vector<content::WebContents*> contents;
   for (const Page& page : shared_->tree().pages()) {
     if (page.task.empty() && !IsKept(page.id)) {
-      pages.push_back(page.id);
+      tabs::TabInterface* tab = TabFor(page.id);
+      pages.emplace_back(page.id, tab ? tab->GetContents() : nullptr);
+      if (tab) {
+        contents.push_back(tab->GetContents());
+      }
     }
   }
-  const auto answered = base::BarrierCallback<std::optional<PageId>>(
-      pages.size(), base::BindOnce(
-                        [](base::OnceCallback<void(std::vector<PageId>)> done,
-                           std::vector<std::optional<PageId>> answers) {
-                          std::vector<PageId> clearable;
-                          for (std::optional<PageId>& answer : answers) {
-                            if (answer) {
-                              clearable.push_back(std::move(*answer));
-                            }
-                          }
-                          std::move(done).Run(std::move(clearable));
-                        },
-                        std::move(done)));
-  for (const PageId& id : pages) {
-    tabs::TabInterface* tab = TabFor(id);
-    TerminalShell* shell =
-        tab ? TerminalShell::From(tab->GetContents()) : nullptr;
-    if (!shell) {
-      answered.Run(id);
-      continue;
-    }
-    // A terminal is running a command while a program other than its shell
-    // has it.
-    shell->GetActivity(base::BindOnce(
-        [](base::RepeatingCallback<void(std::optional<PageId>)> answered,
-           PageId id, ShellHost::Activity activity) {
-          answered.Run(activity.program.empty() ? std::optional(std::move(id))
-                                                : std::nullopt);
-        },
-        answered, id));
-  }
+  FindBusyTerminals(
+      contents,
+      base::BindOnce(
+          [](std::vector<std::pair<PageId, content::WebContents*>> pages,
+             base::OnceCallback<void(std::vector<PageId>)> done,
+             std::vector<BusyTerminal> busy) {
+            std::vector<PageId> clearable;
+            for (auto& [id, page] : pages) {
+              if (!std::ranges::any_of(busy, [page](const BusyTerminal& b) {
+                    return b.page.get() == page;
+                  })) {
+                clearable.push_back(std::move(id));
+              }
+            }
+            std::move(done).Run(std::move(clearable));
+          },
+          std::move(pages), std::move(done)));
 }
 
 void TabOrganizationController::ClearScratchpad() {
@@ -1018,6 +1022,21 @@ void TabOrganizationController::Close(std::vector<PageId> ids) {
 void TabOrganizationController::CloseTask(const tab_groups::TabGroupId& task) {
   if (!tabs_->SupportsTabGroups() ||
       !tabs_->group_model()->ContainsTabGroup(task)) {
+    return;
+  }
+  CloseGuard* guard = CloseGuard::Get(window_->GetUnownedUserDataHost());
+  if (guard &&
+      guard->HoldTask(task,
+                      base::BindOnce(&TabOrganizationController::CloseTaskNow,
+                                     weak_factory_.GetWeakPtr(), task))) {
+    return;
+  }
+  CloseTaskNow(task);
+}
+
+void TabOrganizationController::CloseTaskNow(
+    const tab_groups::TabGroupId& task) {
+  if (!tabs_->group_model()->ContainsTabGroup(task)) {
     return;
   }
   if (tabs_->count() - tabs_->IndexOfFirstNonPinnedTab() ==

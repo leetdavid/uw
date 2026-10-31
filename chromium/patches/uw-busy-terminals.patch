@@ -1,0 +1,39 @@
+diff --git a/chrome/browser/lifetime/browser_close_manager.cc b/chrome/browser/lifetime/browser_close_manager.cc
+index 520ae57b748b4d23309bc92863f5bcfbadda4c9b..8bef804fd4462b5e3626a89e935bccf4ca4f8cb8 100644
+--- a/chrome/browser/lifetime/browser_close_manager.cc
++++ b/chrome/browser/lifetime/browser_close_manager.cc
+@@ -30,6 +30,7 @@
+ #include "chrome/browser/ui/unload_controller.h"
+ #include "chrome/common/buildflags.h"
+ #include "content/public/browser/web_contents.h"
++#include "uw/browser/terminal/close_guard.h"  // nogncheck
+ 
+ #if BUILDFLAG(ENABLE_CHROME_NOTIFICATIONS)
+ #include "chrome/browser/notifications/notification_ui_manager.h"
+@@ -135,6 +136,26 @@ void BrowserCloseManager::OnBrowserReportCloseable(bool proceed) {
+ 
+ void BrowserCloseManager::CheckForDownloadsInProgress() {
+ #if BUILDFLAG(IS_MAC)
++  // uw: quitting while a terminal runs a program asks first, over the window
++  // used last.
++  uw::CloseGuard* guard = nullptr;
++  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
++      [&guard](BrowserWindowInterface* window) {
++        guard = uw::CloseGuard::Get(window->GetUnownedUserDataHost());
++        return !guard;
++      });
++  if (guard &&
++      guard->HoldQuit(base::BindOnce(
++          [](scoped_refptr<BrowserCloseManager> self, bool quit) {
++            if (quit) {
++              self->CloseBrowsers();
++            } else {
++              self->CancelBrowserClose();
++            }
++          },
++          base::WrapRefCounted(this)))) {
++    return;
++  }
+   // Mac has its own in-progress downloads prompt in app_controller_mac.mm.
+   CloseBrowsers();
+ #else

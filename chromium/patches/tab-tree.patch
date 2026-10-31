@@ -600,10 +600,10 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide
 diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
-index 03bffe23f1fa5f2937f092facb2254fc222985b1..2d398abf14cd37736cb72e69ea2c11dda7c2949b 100644
+index 03bffe23f1fa5f2937f092facb2254fc222985b1..7b3ad1a4b3ba0e2d988aa8b433d3e6b55b7261d6 100644
 --- a/chrome/browser/ui/browser_window/internal/BUILD.gn
 +++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
-@@ -58,6 +58,17 @@ source_set("internal") {
+@@ -58,6 +58,18 @@ source_set("internal") {
      public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
      deps += [
@@ -616,16 +616,17 @@ index 03bffe23f1fa5f2937f092facb2254fc222985b1..2d398abf14cd37736cb72e69ea2c11dd
 +      "//uw/browser/ui/views/command_bar",
 +      "//uw/browser/ui/views/page_colors",
 +      "//uw/browser/ui/views/pins",
++      "//uw/browser/ui/views/terminal",
 +      "//uw/browser/ui/views/watch_card",
 +      "//uw/browser/workspaces",
        "//chrome/browser:global_features",
        "//chrome/browser/actor/ui",
        "//chrome/browser/actor/ui/task_list_bubble:controller",
 diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec79d62c34 100644
+index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..1060ad8df8266a3d2bc9ad369ac4887d6e09f827 100644
 --- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
 +++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
-@@ -4,8 +4,21 @@
+@@ -4,8 +4,22 @@
  
  #include "chrome/browser/ui/browser_window/public/embedder_browser_window_features.h"
  
@@ -640,6 +641,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec
 +#include "uw/browser/tab_organization/automatic_organizer.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
 +#include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
++#include "uw/browser/ui/views/terminal/close_warning.h"
 +#include "uw/browser/ui/views/command_bar/command_bar.h"
 +#include "uw/browser/ui/views/page_colors/page_colors.h"
 +#include "uw/browser/ui/views/watch_card/watch_card.h"
@@ -647,7 +649,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec
  
  DEFINE_USER_DATA(EmbedderBrowserWindowFeatures);
  
-@@ -21,19 +34,57 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+@@ -21,19 +35,58 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
  }
  
  void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
@@ -665,6 +667,7 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec
 +      automatic_organizer_ = std::make_unique<uw::AutomaticOrganizer>(
 +          browser, tab_organization_.get());
 +      command_bar_ = std::make_unique<uw::CommandBar>(browser);
++      close_warning_ = std::make_unique<uw::CloseWarning>(browser);
 +      pin_sync_ = std::make_unique<uw::PinSync>(browser);
 +      if (!browser->GetProfile()->IsOffTheRecord()) {
 +        workspace_window_ = std::make_unique<uw::WorkspaceWindow>(browser);
@@ -710,10 +713,10 @@ index a2c0889f7003c1f1b70c76beb1e6b481d8ac649e..4ada2dfb2210d8b32b71fe54569f27ec
 +  watch_card_.reset();
  }
 diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..29088b6d4f197e157969c0ed53130aa07d504404 100644
+index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..18405c1ddd7f255c5b4114ceba32f1f4a8989992 100644
 --- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
 +++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
-@@ -7,6 +7,19 @@
+@@ -7,6 +7,20 @@
  
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
  
@@ -721,6 +724,7 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..29088b6d4f197e157969c0ed53130aa0
 +
 +namespace uw {
 +class AutomaticOrganizer;
++class CloseWarning;
 +class CommandBar;
 +class InactivePinOverlay;
 +class PageColors;
@@ -733,13 +737,14 @@ index 67af5a42c04eec3fec5364b13d7715fac7bf5e68..29088b6d4f197e157969c0ed53130aa0
  class BrowserView;
  class BrowserWindowInterface;
  
-@@ -44,6 +57,14 @@ class EmbedderBrowserWindowFeatures {
+@@ -44,6 +58,15 @@ class EmbedderBrowserWindowFeatures {
  
   private:
    // Embedder-specific feature members:
 +  std::unique_ptr<uw::TabOrganizationController> tab_organization_;
 +  std::unique_ptr<uw::AutomaticOrganizer> automatic_organizer_;
 +  std::unique_ptr<uw::CommandBar> command_bar_;
++  std::unique_ptr<uw::CloseWarning> close_warning_;
 +  std::unique_ptr<uw::PageColors> page_colors_;
 +  std::unique_ptr<uw::InactivePinOverlay> inactive_pins_;
 +  std::unique_ptr<uw::PinSync> pin_sync_;
@@ -1502,7 +1507,7 @@ index ab919030ae2fbd70240f192e1a7060776530523a..010e796cd8cdcb2b907f6618585d767d
    if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||
        (state == tabs::VerticalTabStripCollapseState::kExpanded &&
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5e13d4957 100644
+index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b7bd5b8d91e5814c3914835782fe94e0f8a39b42 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -143,6 +143,15 @@
@@ -1555,7 +1560,15 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5
        base::RecordAction(base::UserMetricsAction("CloseTabByKey"));
        CloseTab(browser_);
        break;
-@@ -1397,7 +1417,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1392,12 +1412,16 @@ void BrowserCommandController::HandleCommandWithDisposition(
+                                     TabGroupShortcut::kFocusPrevTabGroup);
+       break;
+     case IDC_CLOSE_TAB_GROUP:
+-      CloseTabGroup(browser_);
++      if (!uw::TabOrganizationController::CloseSelectedTask(browser_)) {
++        CloseTabGroup(browser_);
++      }
+       base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kCloseTabGroup);
        break;
      case IDC_CREATE_NEW_TAB_GROUP:
@@ -1566,7 +1579,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kCreateNewTabGroup);
        break;
-@@ -1406,6 +1428,20 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1406,6 +1430,20 @@ void BrowserCommandController::HandleCommandWithDisposition(
        base::UmaHistogramEnumeration("TabGroups.Shortcuts",
                                      TabGroupShortcut::kAddNewTabToGroup);
        break;
@@ -1587,7 +1600,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5
      case IDC_GROUP_UNGROUPED_TABS:
        GroupAllUngroupedTabs(browser_);
        base::RecordAction(
-@@ -1731,6 +1767,19 @@ void BrowserCommandController::InitCommandState() {
+@@ -1731,6 +1769,19 @@ void BrowserCommandController::InitCommandState() {
    command_updater_->UpdateCommandEnabled(IDC_GROUP_UNGROUPED_TABS, true);
    command_updater_->UpdateCommandEnabled(IDC_ADD_NEW_TAB_RECENT_GROUP, true);
    command_updater_->UpdateCommandEnabled(IDC_UNFOCUS_TAB_GROUP, true);
@@ -1607,7 +1620,7 @@ index 3f62ffd338d63016d1c2b6c2c9f3aa0be3be4e94..b249c5229c46bedec8a3a4c606d1c0f5
  
    // Omnibox commands
    command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
-@@ -1749,7 +1798,8 @@ void BrowserCommandController::InitCommandState() {
+@@ -1749,7 +1800,8 @@ void BrowserCommandController::InitCommandState() {
    UpdateTabRestoreCommandState();
    command_updater_->UpdateCommandEnabled(IDC_EXIT, true);
    command_updater_->UpdateCommandEnabled(IDC_NAME_WINDOW, true);
@@ -1827,30 +1840,32 @@ index fd63fdec82640fdb42de8388dfd691900f706674..de6d2b8a3a374b430515b061dd7fe4fd
        [content_view addSubview:background_view_
                      positioned:NSWindowBelow
 diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
-index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..bdcf2716a55ceb93087e497014193110297ec2f9 100644
+index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..00d347983ef842fec5873c33b8e4123b0e8f4531 100644
 --- a/chrome/browser/ui/tabs/BUILD.gn
 +++ b/chrome/browser/ui/tabs/BUILD.gn
-@@ -320,6 +320,7 @@ if (!is_android) {
+@@ -320,6 +320,8 @@ if (!is_android) {
      ]
  
      deps = [
 +      "//uw/browser/tab_organization:hidden_tabs",
++      "//uw/browser/terminal:close_guard",
        ":tab_group",
        ":tab_model",
        ":tab_strip",
 diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
-index 48140cb488e51ca30e55afcd492861b94dec6278..53e9d421ab3138d1994d7f29c31434d268e615a5 100644
+index 48140cb488e51ca30e55afcd492861b94dec6278..29eecec28c90f6c4477a18eacd27e5b5830ba260 100644
 --- a/chrome/browser/ui/tabs/tab_strip_model.cc
 +++ b/chrome/browser/ui/tabs/tab_strip_model.cc
-@@ -117,6 +117,7 @@
+@@ -117,6 +117,8 @@
  #include "ui/base/models/list_selection_model.h"
  #include "ui/base/page_transition_types.h"
  #include "ui/gfx/range/range.h"
 +#include "uw/browser/tab_organization/hidden_tabs.h"
++#include "uw/browser/terminal/close_guard.h"
  
  using base::UserMetricsAction;
  using content::WebContents;
-@@ -1514,7 +1515,14 @@ bool TabStripModel::IsTabPinned(int index) const {
+@@ -1514,7 +1516,14 @@ bool TabStripModel::IsTabPinned(int index) const {
  
  bool TabStripModel::IsTabCollapsed(int index) const {
    std::optional<tab_groups::TabGroupId> group = GetTabGroupForTab(index);
@@ -1866,7 +1881,7 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..53e9d421ab3138d1994d7f29c31434d2
  }
  
  bool TabStripModel::IsGroupCollapsed(
-@@ -3459,17 +3467,13 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
+@@ -3459,17 +3468,13 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
      const gfx::Range& block_tab_range) const {
    // Check tabs from the end of the block.
    for (int i = block_tab_range.end(); i < count(); ++i) {
@@ -1886,7 +1901,49 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..53e9d421ab3138d1994d7f29c31434d2
        return i;
      }
    }
-@@ -4929,6 +4933,13 @@ void TabStripModel::MoveTabsToIndexImpl(
+@@ -3814,6 +3819,41 @@ void TabStripModel::CloseTabs(base::span<content::WebContents* const> items,
+     return;
+   }
+ 
++  // uw: a close the user asked for waits while a terminal among the tabs
++  // runs a program and uw asks whether to stop it. Cancelling leaves the
++  // tabs' tasks as they were, though ExecuteCloseTabsCommand() marked them
++  // closing.
++  BrowserWindowInterface* window =
++      GetTabForWebContents(filtered_items[0])->GetBrowserWindowInterface();
++  uw::CloseGuard* guard =
++      window ? uw::CloseGuard::Get(window->GetUnownedUserDataHost()) : nullptr;
++  if ((close_types & TabCloseTypes::CLOSE_USER_GESTURE) && guard &&
++      guard->HoldTabs(
++          filtered_items,
++          base::BindOnce(
++              [](base::WeakPtr<TabStripModel> model, uint32_t close_types,
++                 bool close, std::vector<content::WebContents*> pages) {
++                if (!model || pages.empty()) {
++                  return;
++                }
++                if (close) {
++                  model->CloseTabs(pages, close_types);
++                  return;
++                }
++                for (content::WebContents* page : pages) {
++                  const std::optional<tab_groups::TabGroupId> group =
++                      model->GetTabGroupForTab(
++                          model->GetIndexOfWebContents(page));
++                  if (group) {
++                    model->group_model()->GetTabGroup(*group)->SetGroupIsClosing(
++                        false);
++                  }
++                }
++              },
++              weak_factory_.GetWeakPtr(), close_types))) {
++    return;
++  }
++
+   const bool closing_all = static_cast<int>(filtered_items.size()) == count();
+   base::WeakPtr<TabStripModel> ref = weak_factory_.GetWeakPtr();
+   if (closing_all) {
+@@ -4929,6 +4969,13 @@ void TabStripModel::MoveTabsToIndexImpl(
  
    static constexpr tabs::TabCollection::TypeEnumSet kRetainCollectionTypes = {
        tabs::TabCollection::Type::SPLIT, tabs::TabCollection::Type::GROUP};
@@ -1900,7 +1957,7 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..53e9d421ab3138d1994d7f29c31434d2
  
    const int pinned_tab_count = IndexOfFirstNonPinnedTab();
    const bool pin = IsTabPinned(tab_indices[0]);
-@@ -4947,7 +4958,7 @@ void TabStripModel::MoveTabsToIndexImpl(
+@@ -4947,7 +4994,7 @@ void TabStripModel::MoveTabsToIndexImpl(
        tab_indices, destination_index,
        base::BindOnce(&tabs::TabStripCollection::MoveTabsRecursive,
                       base::Unretained(contents_data_.get()), tab_indices,

@@ -3,7 +3,11 @@
 #ifndef UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_MOUSE_ACTIONS_H_
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_MOUSE_ACTIONS_H_
 
+#include <string>
+
+#include "base/callback_list.h"
 #include "components/tab_groups/tab_group_id.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/label_button.h"
 
@@ -46,6 +50,13 @@ bool TakesDoubleClickBelowTabs(BrowserWindowInterface* window);
 bool OpenTabOnDoubleClick(BrowserWindowInterface* window,
                           const ui::MouseEvent& event);
 
+// Shows the "+" and the × on a task's `row` while its menu button shows, the
+// "+" unless its switch is off.
+void ShowTaskRowButtons(views::View* row, bool menu_shown);
+// The fill of a task's `row`: the close color while a close of its task is
+// hinted, otherwise none.
+SkColor TaskRowFill(const views::View* row);
+
 // The "+" on a task's row in the wide sidebar, just before the row's menu
 // button and shown with it. It opens the command bar for the task, or a blank
 // tab at the task's end while the command bar is off.
@@ -58,10 +69,6 @@ class TaskRowNewTabButton : public views::LabelButton {
   TaskRowNewTabButton& operator=(const TaskRowNewTabButton&) = delete;
   ~TaskRowNewTabButton() override;
 
-  // Shows the "+" on `row` while its menu button shows, unless the switch is
-  // off.
-  static void ShowWithMenu(views::View* row, bool menu_shown);
-
   // views::LabelButton:
   void OnThemeChanged() override;
 
@@ -69,6 +76,41 @@ class TaskRowNewTabButton : public views::LabelButton {
   void Open();
 
   const tab_groups::TabGroupId task_;
+};
+
+// The × on a task's row in the wide sidebar, just after the row's menu button
+// and shown with it. It closes the task and its tabs, as Close Task does.
+// While the pointer is on it, the task's row and its tab rows take the close
+// color. It has no switch. See
+// docs/plans/keyboard-and-mouse.md#close-button-on-a-tasks-row.
+class TaskRowCloseButton : public views::LabelButton {
+  METADATA_HEADER(TaskRowCloseButton, views::LabelButton)
+
+ public:
+  explicit TaskRowCloseButton(const tab_groups::TabGroupId& task);
+  TaskRowCloseButton(const TaskRowCloseButton&) = delete;
+  TaskRowCloseButton& operator=(const TaskRowCloseButton&) = delete;
+  ~TaskRowCloseButton() override;
+
+  const tab_groups::TabGroupId& task() const { return task_; }
+
+  // views::LabelButton:
+  void AddedToWidget() override;
+  void RemovedFromWidget() override;
+  void VisibilityChanged(views::View* starting_from, bool is_visible) override;
+  void OnThemeChanged() override;
+  void StateChanged(ButtonState old_state) override;
+  std::u16string GetRenderedTooltipText(const gfx::Point& point) const override;
+
+ private:
+  void Close();
+  // Hints the close while the pointer is on the ×.
+  void UpdateHint();
+  // Fills the row for the hint.
+  void UpdateRow();
+
+  const tab_groups::TabGroupId task_;
+  base::CallbackListSubscription hints_;
 };
 
 }  // namespace uw

@@ -27,6 +27,7 @@ aggregate_vector_icons("uw_vector_icons") {
     "palette.icon",
     "smile.icon",
     "sparkles.icon",
+    "terminal.icon",
     "user.icon",
   ]
 }

@@ -1,6 +1,8 @@
 # Opening a terminal tab, telling one from a page tab, and reaching its shell.
 source_set("terminal") {
   sources = [
+    "busy_terminals.cc",
+    "busy_terminals.h",
     "terminal_shell.cc",
     "terminal_shell.h",
     "terminal_tab.cc",
@@ -14,5 +16,19 @@ source_set("terminal") {
     "//ui/base/clipboard:file_info",
     "//url",
     "//uw/components/terminal",
+  ]
+}
+
+# The question a close asks while a terminal runs a program. Chromium's tab
+# strip, window close, and quit reach it without depending on its views.
+source_set("close_guard") {
+  sources = [
+    "close_guard.cc",
+    "close_guard.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/tab_groups",
+    "//ui/base/unowned_user_data",
   ]
 }

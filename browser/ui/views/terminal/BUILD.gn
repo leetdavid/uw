@@ -1,0 +1,30 @@
+# The question a close asks while a terminal tab runs a program. See
+# docs/plans/terminal-tab.md#busy-terminal-warning.
+source_set("terminal") {
+  sources = [
+    "close_warning.cc",
+    "close_warning.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/tab_groups",
+    "//uw/browser/terminal",
+    "//uw/browser/terminal:close_guard",
+  ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/lifetime",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/constrained_window",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/color",
+    "//ui/gfx",
+    "//ui/views",
+    "//uw/browser/ui/vector_icons",
+    "//uw/browser/ui/views/tab_organization",
+    "//uw/browser/workspaces",
+  ]
+}

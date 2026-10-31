@@ -9,20 +9,27 @@
 #include <string>
 
 #include "base/functional/bind.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/color/color_provider.h"
 #include "ui/events/event.h"
 #include "ui/gfx/color_utils.h"
@@ -30,6 +37,7 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/view_utils.h"
@@ -37,11 +45,20 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
+#include "uw/browser/ui/views/tab_organization/key_hint.h"
 
 namespace uw {
 namespace {
 
 constexpr int kIconSize = 16;
+// The ×, the size of a tab's.
+constexpr int kCloseIconSize = 14;
+// Chromium's task row's corners.
+constexpr int kRowRadius = 8;
+// The close color, under the rows a click on the × closes and on the × under
+// the pointer.
+constexpr SkAlpha kRowTint = 0x1A;
+constexpr float kCloseHighlight = 0.14f;
 
 BrowserView* WindowOf(const views::View* view) {
   const views::Widget* widget = view->GetWidget();
@@ -52,6 +69,31 @@ BrowserView* WindowOf(const views::View* view) {
 
 bool IsOn(BrowserWindowInterface* window, const char* pref) {
   return window && window->GetProfile()->GetPrefs()->GetBoolean(pref);
+}
+
+// The look of the row's menu button.
+void LikeTheMenuButton(views::LabelButton* button) {
+  button->SetHasInkDropActionOnClick(true);
+  auto highlight =
+      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
+  highlight->set_use_contents_bounds(true);
+  views::HighlightPathGenerator::Install(button, std::move(highlight));
+  views::InkDrop::Get(button)->SetMode(views::InkDropHost::InkDropMode::ON);
+  views::InkDrop::Get(button)->SetHighlightOpacity(0.2f);
+  views::InkDrop::Get(button)->SetVisibleOpacity(0.08f);
+  button->SetFocusBehavior(views::View::FocusBehavior::ACCESSIBLE_ONLY);
+  views::FocusRing::Install(button);
+  button->SetVisible(false);
+}
+
+template <typename T>
+T* ChildOfClass(const views::View* row) {
+  for (views::View* child : row->children()) {
+    if (T* found = views::AsViewClass<T>(child)) {
+      return found;
+    }
+  }
+  return nullptr;
 }
 
 // True while the second click of a double-click is down or coming up. Only
@@ -127,32 +169,28 @@ TaskRowNewTabButton::TaskRowNewTabButton(const tab_groups::TabGroupId& task)
   const std::u16string hint = l10n_util::GetStringUTF16(IDS_UW_NEW_TAB_IN_TASK);
   SetTooltipText(hint);
   GetViewAccessibility().SetName(hint);
-  // The look of the row's menu button.
-  SetHasInkDropActionOnClick(true);
-  auto highlight =
-      std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
-  highlight->set_use_contents_bounds(true);
-  views::HighlightPathGenerator::Install(this, std::move(highlight));
-  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
-  views::InkDrop::Get(this)->SetHighlightOpacity(0.2f);
-  views::InkDrop::Get(this)->SetVisibleOpacity(0.08f);
-  SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
-  views::FocusRing::Install(this);
-  SetVisible(false);
+  LikeTheMenuButton(this);
 }
 
 TaskRowNewTabButton::~TaskRowNewTabButton() = default;
 
-// static
-void TaskRowNewTabButton::ShowWithMenu(views::View* row, bool menu_shown) {
+void ShowTaskRowButtons(views::View* row, bool menu_shown) {
   BrowserView* window = WindowOf(row);
-  const bool shown =
-      menu_shown && window && IsOn(window->browser(), kTaskRowNewTabPref);
-  for (views::View* child : row->children()) {
-    if (views::IsViewClass<TaskRowNewTabButton>(child)) {
-      child->SetVisible(shown);
-    }
+  if (auto* plus = ChildOfClass<TaskRowNewTabButton>(row)) {
+    plus->SetVisible(menu_shown && window &&
+                     IsOn(window->browser(), kTaskRowNewTabPref));
   }
+  if (auto* close = ChildOfClass<TaskRowCloseButton>(row)) {
+    close->SetVisible(menu_shown);
+  }
+}
+
+SkColor TaskRowFill(const views::View* row) {
+  const TaskRowCloseButton* close = ChildOfClass<TaskRowCloseButton>(row);
+  BrowserView* window = WindowOf(row);
+  return close && window && IsTaskCloseHinted(window->browser(), close->task())
+             ? SkColorSetA(CloseHintColor(row), kRowTint)
+             : SK_ColorTRANSPARENT;
 }
 
 void TaskRowNewTabButton::OnThemeChanged() {
@@ -177,6 +215,101 @@ void TaskRowNewTabButton::Open() {
 }
 
 BEGIN_METADATA(TaskRowNewTabButton)
+END_METADATA
+
+TaskRowCloseButton::TaskRowCloseButton(const tab_groups::TabGroupId& task)
+    : LabelButton(base::BindRepeating(&TaskRowCloseButton::Close,
+                                      base::Unretained(this))),
+      task_(task) {
+  GetViewAccessibility().SetName(u"Close task");
+  LikeTheMenuButton(this);
+  views::InkDrop::Get(this)->SetHighlightOpacity(kCloseHighlight);
+}
+
+TaskRowCloseButton::~TaskRowCloseButton() = default;
+
+void TaskRowCloseButton::AddedToWidget() {
+  LabelButton::AddedToWidget();
+  hints_ = ObserveCloseHints(base::BindRepeating(&TaskRowCloseButton::UpdateRow,
+                                                 base::Unretained(this)));
+}
+
+void TaskRowCloseButton::RemovedFromWidget() {
+  hints_ = {};
+  if (BrowserView* window = WindowOf(this)) {
+    SetTaskCloseHint(false, window->browser(), task_, false);
+  }
+  LabelButton::RemovedFromWidget();
+}
+
+void TaskRowCloseButton::VisibilityChanged(views::View* starting_from,
+                                           bool is_visible) {
+  LabelButton::VisibilityChanged(starting_from, is_visible);
+  UpdateHint();
+}
+
+void TaskRowCloseButton::OnThemeChanged() {
+  LabelButton::OnThemeChanged();
+  const SkColor color =
+      GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive);
+  const SkColor close = CloseHintColor(this);
+  views::InkDrop::Get(this)->SetBaseColor(close);
+  const gfx::VectorIcon& icon = features::IsRoundedIconsEnabled()
+                                    ? kCloseWeight500CustomIcon
+                                    : kCloseTabChromeRefreshOldIcon;
+  SetImageModel(STATE_NORMAL,
+                ui::ImageModel::FromVectorIcon(icon, color, kCloseIconSize));
+  for (ButtonState state : {STATE_HOVERED, STATE_PRESSED}) {
+    SetImageModel(state,
+                  ui::ImageModel::FromVectorIcon(icon, close, kCloseIconSize));
+  }
+  UpdateRow();
+}
+
+void TaskRowCloseButton::StateChanged(ButtonState old_state) {
+  LabelButton::StateChanged(old_state);
+  UpdateHint();
+}
+
+std::u16string TaskRowCloseButton::GetRenderedTooltipText(
+    const gfx::Point& point) const {
+  BrowserView* window = WindowOf(this);
+  TabStripModel* tabs = window ? window->browser()->tab_strip_model() : nullptr;
+  if (!tabs || !tabs->group_model() ||
+      !tabs->group_model()->ContainsTabGroup(task_)) {
+    return std::u16string();
+  }
+  const int count = tabs->group_model()->GetTabGroup(task_)->tab_count();
+  return count == 1 ? u"Close task and its tab"
+                    : base::StrCat({u"Close task and its ",
+                                    base::NumberToString16(count), u" tabs"});
+}
+
+void TaskRowCloseButton::Close() {
+  BrowserView* window = WindowOf(this);
+  if (TabOrganizationController* controller =
+          window ? TabOrganizationController::From(window->browser())
+                 : nullptr) {
+    controller->CloseTask(task_);
+  }
+}
+
+void TaskRowCloseButton::UpdateHint() {
+  if (BrowserView* window = WindowOf(this)) {
+    SetTaskCloseHint(false, window->browser(), task_,
+                     IsDrawn() && (GetState() == STATE_HOVERED ||
+                                   GetState() == STATE_PRESSED));
+  }
+}
+
+void TaskRowCloseButton::UpdateRow() {
+  if (GetWidget()) {
+    parent()->SetBackground(
+        views::CreateRoundedRectBackground(TaskRowFill(parent()), kRowRadius));
+  }
+}
+
+BEGIN_METADATA(TaskRowCloseButton)
 END_METADATA
 
 }  // namespace uw

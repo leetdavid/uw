@@ -34,19 +34,20 @@ index 5582ae1d0febd9ad2d9ecc9d62c64390b89fb992..f739184700bb5e3a5125e1579e7eac8e
  // LINT.ThenChange(/tools/metrics/histograms/metadata/profile/enums.xml)
  
 diff --git a/chrome/browser/ui/unload_controller.cc b/chrome/browser/ui/unload_controller.cc
-index e5cd22968a6d8569e1853a1926f0c187adc56fba..fe28338306287e27371659b4b5422c2ba4592051 100644
+index e5cd22968a6d8569e1853a1926f0c187adc56fba..479a7cd3d248530d2635e2c3fd9b033520970f6e 100644
 --- a/chrome/browser/ui/unload_controller.cc
 +++ b/chrome/browser/ui/unload_controller.cc
-@@ -47,6 +47,8 @@
+@@ -47,6 +47,9 @@
  #include "content/public/browser/render_view_host.h"
  #include "content/public/browser/web_contents.h"
  #include "extensions/buildflags/buildflags.h"
 +#include "uw/browser/pins/pin_sync.h"
 +#include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/terminal/close_guard.h"
  
  #if BUILDFLAG(ENABLE_EXTENSIONS)
  #include "chrome/browser/profiles/profile.h"
-@@ -106,6 +108,16 @@ const UnloadController* UnloadController::From(
+@@ -106,6 +109,23 @@ const UnloadController* UnloadController::From(
  }
  
  bool UnloadController::HandleBeforeClose() {
@@ -59,11 +60,18 @@ index e5cd22968a6d8569e1853a1926f0c187adc56fba..fe28338306287e27371659b4b5422c2b
 +  if (uw::TabOrganizationController::KeepsWindow(browser_)) {
 +    return false;
 +  }
++  // uw: while a terminal in the window runs a program, uw asks first, and
++  // closes the window again once the user agrees.
++  if (uw::CloseGuard* guard =
++          uw::CloseGuard::Get(browser_->GetUnownedUserDataHost());
++      guard && guard->HoldWindow()) {
++    return false;
++  }
 +
    const auto get_closing_status =
        [this]() -> BrowserWindowInterface::ClosingStatus {
      // If `force_skip_warning_user_` is true, then we should immediately
-@@ -172,6 +184,10 @@ void UnloadController::OnWindowClosing() {
+@@ -172,6 +192,10 @@ void UnloadController::OnWindowClosing() {
        (browser_type == BrowserWindowInterface::Type::TYPE_APP) ||
        (browser_type == BrowserWindowInterface::Type::TYPE_APP_POPUP);
  #endif

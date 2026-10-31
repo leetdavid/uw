@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -18,10 +20,14 @@
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/lifetime/application_lifetime_desktop.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/browser/render_widget_host.h"
@@ -45,11 +51,18 @@
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/vector2d.h"
+#include "ui/views/controls/label.h"
+#include "ui/views/view_utils.h"
+#include "ui/views/widget/widget.h"
+#include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/browser/ui/views/tab_organization/key_hint.h"
+#include "uw/browser/ui/views/terminal/close_warning.h"
 #include "uw/components/terminal/shell_quote.h"
 
 namespace uw {
@@ -535,6 +548,209 @@ IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest,
     return tabs->GetIndexOfWebContents(idle) == TabStripModel::kNoTab;
   }));
   EXPECT_NE(tabs->GetIndexOfWebContents(busy), TabStripModel::kNoTab);
+}
+
+// Closing a terminal that runs a program asks first, however it closes. See
+// docs/plans/terminal-tab.md#busy-terminal-warning.
+class BusyTerminalWarningBrowserTest : public UwTerminalBrowserTest {
+ protected:
+  void SetUpOnMainThread() override {
+    UwTerminalBrowserTest::SetUpOnMainThread();
+    CloseWarning::AskInTestsForTesting(true);
+  }
+
+  void TearDownOnMainThread() override {
+    CloseWarning::AskInTestsForTesting(false);
+    UwTerminalBrowserTest::TearDownOnMainThread();
+  }
+
+  TabStripModel* tabs() { return browser()->tab_strip_model(); }
+  TabOrganizationController* controller() {
+    return TabOrganizationController::From(browser());
+  }
+  bool IsOpen(content::WebContents* page) {
+    return tabs()->GetIndexOfWebContents(page) != TabStripModel::kNoTab;
+  }
+  void CloseTab(content::WebContents* page) {
+    tabs()->CloseWebContentsAt(tabs()->GetIndexOfWebContents(page),
+                               TabCloseTypes::CLOSE_USER_GESTURE |
+                                   TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
+  }
+
+  // A terminal tab running `sleep 60`.
+  content::WebContents* OpenBusyTerminal() {
+    content::WebContents* terminal = OpenTerminal();
+    Type(u"sleep 60\r");
+    TerminalShell* shell = TerminalShell::From(terminal);
+    EXPECT_TRUE(shell);
+    bool asking = false;
+    bool running = false;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      if (!asking) {
+        asking = true;
+        shell->GetActivity(
+            base::BindLambdaForTesting([&](ShellHost::Activity activity) {
+              running = activity.program == "sleep";
+              asking = false;
+            }));
+      }
+      return running;
+    }));
+    return terminal;
+  }
+
+  views::Widget* Dialog() {
+    views::Widget* dialog = nullptr;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      dialog = CloseWarning::DialogForTesting(browser());
+      return dialog != nullptr;
+    }));
+    return dialog;
+  }
+  std::u16string TitleOf(views::Widget* dialog) {
+    return dialog->widget_delegate()->GetWindowTitle();
+  }
+  // Whether the dialog shows a label reading `text`.
+  bool Shows(views::Widget* dialog, std::u16string_view text) {
+    const std::function<bool(views::View*)> find = [&](views::View* view) {
+      auto* label = views::AsViewClass<views::Label>(view);
+      if (label && label->GetText() == text) {
+        return true;
+      }
+      return std::ranges::any_of(view->children(), find);
+    };
+    return find(dialog->GetRootView());
+  }
+  // Presses the close button or Cancel, and waits until the answer has run.
+  void Answer(views::Widget* dialog, bool close) {
+    views::DialogDelegate* delegate =
+        dialog->widget_delegate()->AsDialogDelegate();
+    if (close) {
+      delegate->AcceptDialog();
+    } else {
+      delegate->CancelDialog();
+    }
+    EXPECT_TRUE(base::test::RunUntil(
+        [&] { return !CloseWarning::DialogForTesting(browser()); }));
+    base::RunLoop().RunUntilIdle();
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ClosingABusyTerminalAsksFirst) {
+  content::WebContents* busy = OpenBusyTerminal();
+  CloseTab(busy);
+  views::Widget* dialog = Dialog();
+  ASSERT_TRUE(dialog);
+  EXPECT_EQ(TitleOf(dialog), u"Close this tab?");
+  EXPECT_TRUE(Shows(dialog, u"sleep"));
+  SaveWidgetScreenshot(dialog, "busy-terminal-tab");
+  Answer(dialog, false);
+  EXPECT_TRUE(IsOpen(busy));
+
+  CloseTab(busy);
+  Answer(Dialog(), true);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !IsOpen(busy); }));
+}
+
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       AnIdleTerminalClosesWithoutAsking) {
+  content::WebContents* idle = OpenTerminal();
+  CloseTab(idle);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !IsOpen(idle); }));
+  EXPECT_FALSE(CloseWarning::DialogForTesting(browser()));
+}
+
+// Closing several tabs counts them all and names only the busy one.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ClosingSeveralTabsCountsThem) {
+  content::WebContents* page = contents();
+  content::WebContents* idle = OpenTerminal();
+  content::WebContents* busy = OpenBusyTerminal();
+  tabs()->ExecuteCloseTabsCommand(base::BindLambdaForTesting([&] {
+                                    return std::vector<tabs::TabInterface*>{
+                                        tabs()->GetTabForWebContents(idle),
+                                        tabs()->GetTabForWebContents(busy)};
+                                  }),
+                                  false);
+  views::Widget* dialog = Dialog();
+  EXPECT_EQ(TitleOf(dialog), u"Close 2 tabs?");
+  Answer(dialog, true);
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !IsOpen(idle) && !IsOpen(busy); }));
+  EXPECT_TRUE(IsOpen(page));
+}
+
+// Closing a task asks, with its rows tinted while it does, and closes the
+// task once the user agrees.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ClosingATaskWithABusyTerminalAsksFirst) {
+  content::WebContents* page = contents();
+  content::WebContents* busy = OpenBusyTerminal();
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask(
+          {*controller()->IdFor(tabs()->GetTabForWebContents(busy))},
+          u"Build shop-web");
+  ASSERT_TRUE(task);
+  tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(page));
+  controller()->CloseTask(*task);
+  views::Widget* dialog = Dialog();
+  EXPECT_EQ(TitleOf(dialog), u"Close this task?");
+  EXPECT_TRUE(IsTaskCloseHinted(browser(), *task));
+  SaveWindowScreenshot(browser(), "busy-terminal-task");
+  Answer(dialog, true);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !tabs()->group_model()->ContainsTabGroup(*task); }));
+  EXPECT_FALSE(IsTaskCloseHinted(browser(), *task));
+  EXPECT_TRUE(IsOpen(page));
+}
+
+// Ctrl+Cmd+W asks before it adds the blank tab a window keeps, so Cancel
+// leaves the window as it was.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       CtrlCmdWAsksBeforeAddingABlankTab) {
+  content::WebContents* page = contents();
+  content::WebContents* busy = OpenBusyTerminal();
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask(
+          {*controller()->IdFor(tabs()->GetTabForWebContents(busy))},
+          u"Build shop-web");
+  ASSERT_TRUE(task);
+  CloseTab(page);
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 1; }));
+
+  chrome::ExecuteCommand(browser(), IDC_CLOSE_TAB_GROUP);
+  views::Widget* dialog = Dialog();
+  EXPECT_EQ(TitleOf(dialog), u"Close this task?");
+  Answer(dialog, false);
+  EXPECT_EQ(tabs()->count(), 1);
+  EXPECT_TRUE(tabs()->group_model()->ContainsTabGroup(*task));
+}
+
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ClosingTheWindowAsksFirst) {
+  OpenBusyTerminal();
+  const int count = tabs()->count();
+  chrome::CloseWindow(browser());
+  views::Widget* dialog = Dialog();
+  EXPECT_EQ(TitleOf(dialog), u"Close this window?");
+  EXPECT_TRUE(Shows(dialog, u"Scratchpad"));
+  SaveWidgetScreenshot(dialog, "busy-terminal-window");
+  Answer(dialog, false);
+  EXPECT_EQ(tabs()->count(), count);
+}
+
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest, QuittingAsksFirst) {
+  OpenBusyTerminal();
+  const int count = tabs()->count();
+  chrome::CloseAllBrowsersAndQuit();
+  views::Widget* dialog = Dialog();
+  EXPECT_EQ(TitleOf(dialog), u"Quit uw?");
+  SaveWidgetScreenshot(dialog, "busy-terminal-quit");
+  Answer(dialog, false);
+  EXPECT_TRUE(
+      base::test::RunUntil([] { return !browser_shutdown::IsTryingToQuit(); }));
+  EXPECT_EQ(tabs()->count(), count);
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, TheAddressCarriesNoCommand) {

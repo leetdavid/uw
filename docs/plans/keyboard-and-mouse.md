@@ -232,6 +232,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - Key hints: macOS sends a lone Option or Cmd press as a modifier change, not a key event, so `ModifierKeys` watches modifier changes with one AppKit event monitor for the app and lets go of both keys when uw leaves the front. Each tab row has a `KeyHint` view over it, added by `tab-tree.patch`'s hooks, which tints or fades the row and keeps the tooltips. It fades the row's parts, since Chromium's layout gives a row a layer of its own to animate it and then destroys it. Chromium's row shows hover cards, not tooltips, so the parent row's Option tooltip is the hint view's. The floating window buttons repaint their glyph. The chat page and terminal tabs read Cmd from their own key and mouse events.
 - uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
+- The task row's × is `TaskRowCloseButton` in `mouse_actions`, added after the menu button by `uw-look.patch` and shown with it. It runs `TabOrganizationController::CloseTask`, as the task's menu and middle-click do, and Ctrl+Cmd+W does through `CloseSelectedTask`. Under the pointer it sets the task's close hint in `key_hint`: each tab row's `KeyHint` paints the tint, and the row's fill comes from `TaskRowFill`, which the patch also asks when Chromium repaints the row.
 
 ## Stages
 
