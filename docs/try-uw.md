@@ -147,6 +147,14 @@ The [placement rules](plans/automatic-organization.md#placement-rules) and the [
 
 Arrange a few tabs, quit uw, and launch it again with "Continue where you left off" set at `chrome://settings/onStartup`. Check that groups and tab order return. This is a trial, not a guarantee.
 
+### More than one window
+
+Press Cmd+N. Expected result: the new window shows the same tasks and tabs, in the same order, and opens the command bar over a blank tab; pick another tab and the blank tab goes. On a workspace of many tabs it shows at once and fills in a moment later. Open, move, nest, rename, and close tabs in one window: the other follows at once.
+
+Select a tab in the second window that the first one shows. Expected result: the page moves there with anything typed into it, and the first window shows it dimmed with `Open here`, which brings it back.
+
+Close one of the windows: no tab closes. Close the last one, then press Cmd+N or click uw in the Dock: every tab is back, and a page playing sound or a terminal running a program kept running. Quit and launch again: each window comes back with its selected tab, and no tab is doubled. Drag a tab onto the desktop and back: the window it opened closes, and the tab is where it was. Launch with `--disable-features=UwSharedTabs` to give each window its own tabs again.
+
 ### Themes
 
 Open the theme picker from View → Theme…, from `Theme…` in the menu of empty space in the sidebar, or from the `Theme` row at `uw://settings/uwOrganization`.

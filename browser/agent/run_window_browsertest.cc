@@ -39,6 +39,7 @@
 #include "uw/browser/agent/agent_tools.h"
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -115,7 +116,11 @@ IN_PROC_BROWSER_TEST_F(RunWindowBrowserTest,
                              KeepAliveRestartOption::DISABLED);
   ScopedProfileKeepAlive profile_keep_alive(
       profile_, ProfileKeepAliveOrigin::kBrowserWindow);
-  CloseBrowserSynchronously(browser());
+  // The last window hides with its tabs, so no window shows.
+  BrowserWindowInterface* last = browser();
+  last->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(last)->keeper(); }));
 
   tabs::TabInterface* run_tab = StartRun();
   ASSERT_TRUE(run_tab);
@@ -129,9 +134,11 @@ IN_PROC_BROWSER_TEST_F(RunWindowBrowserTest,
   EXPECT_EQ(tools_->OpenTabs().at(tab)->GetBrowserWindowInterface(), window);
   EXPECT_FALSE(window->GetWindow()->IsVisible());
   EXPECT_FALSE(TabOrganizationController::From(window));
-  EXPECT_FALSE(GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser());
-  EXPECT_FALSE(
-      ProfileBrowserCollection::GetForProfile(profile_)->FindTabbedBrowser());
+  EXPECT_NE(GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser(),
+            window);
+  EXPECT_NE(
+      ProfileBrowserCollection::GetForProfile(profile_)->FindTabbedBrowser(),
+      window);
 
   // A window the user opens now is theirs, with uw's features, and the one
   // they used last.

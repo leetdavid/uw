@@ -26,6 +26,7 @@
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
@@ -38,6 +39,7 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "ui/base/base_window.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
@@ -46,6 +48,7 @@
 #include "uw/browser/agent/chat_triggers.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -489,7 +492,11 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {
                                KeepAliveRestartOption::DISABLED);
     ScopedProfileKeepAlive profile_keep_alive(
         profile, ProfileKeepAliveOrigin::kBrowserWindow);
-    CloseBrowserSynchronously(browser());
+    // The last window hides with its tabs, so no window shows.
+    BrowserWindowInterface* last = browser();
+    last->GetWindow()->Close();
+    ASSERT_TRUE(base::test::RunUntil(
+        [&] { return WorkspaceWindow::From(last)->keeper(); }));
     chats->Save(kChat, DeskWatch(provider));
   }
   ASSERT_TRUE(base::test::RunUntil([&] { return !chats->Running(kChat); }));

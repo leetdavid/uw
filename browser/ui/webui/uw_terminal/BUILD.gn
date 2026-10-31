@@ -52,6 +52,7 @@ source_set("browser_tests") {
     "//chrome/browser/ui",
     "//chrome/browser/ui/tab_contents",
     "//chrome/test:test_support",
+    "//components/tabs:public",
     "//content/public/browser",
     "//content/public/common",
     "//content/test:test_support",
@@ -68,6 +69,7 @@ source_set("browser_tests") {
     "//uw/browser/terminal",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/ui/views/terminal",
+    "//uw/browser/workspaces",
     "//uw/components/terminal",
   ]
 }

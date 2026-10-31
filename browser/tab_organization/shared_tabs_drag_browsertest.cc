@@ -8,7 +8,6 @@
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
@@ -16,12 +15,14 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "ui/base/base_window.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
@@ -29,9 +30,9 @@
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
-#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 
 namespace uw {
 namespace {
@@ -40,12 +41,10 @@ constexpr char kMail[] = "data:text/html,<title>Mail</title>";
 constexpr char kIssues[] = "data:text/html,<title>Issues</title>";
 constexpr char kIssue[] = "data:text/html,<title>Issue 412</title>";
 
-// Drags tabs between windows with a real mouse. A headless window takes no
-// drags, so these need a real one. Run them with `pnpm run window-tests`.
+// Drags tabs between windows, and clicks, with a real mouse. A headless window
+// takes no drags and no picture of a page, so these need a real one. Run them
+// with `pnpm run window-tests`.
 class SharedTabsDragBrowserTest : public headless::HeadlessModeBrowserTest {
- public:
-  SharedTabsDragBrowserTest() { features_.InitAndEnableFeature(kUwSharedTabs); }
-
  protected:
   tabs::TabInterface* Open(const char* url) {
     content::WebContents* page =
@@ -159,9 +158,6 @@ class SharedTabsDragBrowserTest : public headless::HeadlessModeBrowserTest {
         FROM_HERE, wait.QuitClosure(), delay);
     wait.Run();
   }
-
- private:
-  base::test::ScopedFeatureList features_;
 };
 
 // Dragging a tab out to the desktop opens a window on its workspace that
@@ -215,6 +211,51 @@ IN_PROC_BROWSER_TEST_F(SharedTabsDragBrowserTest,
   SaveWindowScreenshot(first, "shared-tabs-dragged-back");
   EXPECT_EQ(CountOf(first, kIssues), 1);
   EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(first, kIssues)));
+}
+
+// The window a page left shows a picture of the page, hazed, with "Open
+// here", and a click on it brings the page back.
+IN_PROC_BROWSER_TEST_F(SharedTabsDragBrowserTest,
+                       MANUAL_TheHazedViewShowsThePageAndAClickBringsItBack) {
+  Browser* first = browser();
+  Place(first, gfx::Rect(0, 40, 500, 600));
+  tabs::TabInterface* mail = Open(kMail);
+  const auto pick = [](Browser* window, tabs::TabInterface* tab) {
+    window->tab_strip_model()->ActivateTabAt(
+        window->tab_strip_model()->GetIndexOfTab(tab),
+        TabStripUserGestureDetails(
+            TabStripUserGestureDetails::GestureType::kMouse));
+  };
+  pick(first, mail);
+  Wait(base::Milliseconds(500));
+
+  Browser* second = CreateBrowser(first->GetProfile());
+  Place(second, gfx::Rect(510, 40, 500, 600));
+  ASSERT_TRUE(base::test::RunUntil([&] { return TabAt(second, kMail); }));
+  pick(second, TabAt(second, kMail));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return TabOrganizationController::IsCopy(mail) &&
+           InactivePinOverlay::From(first)->GetShownView();
+  }));
+  EXPECT_FALSE(
+      TabOrganizationController::From(first)->PictureOf(mail).isNull());
+  Wait(base::Milliseconds(500));
+  SaveWindowScreenshot(first, "shared-tabs-hazed-view");
+
+  ui_controls::EnableUIControls();
+  first->GetWindow()->Activate();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return first->GetWindow()->IsActive(); }));
+  MoveMouse(InactivePinOverlay::From(first)
+                ->GetShownView()
+                ->GetBoundsInScreen()
+                .CenterPoint());
+  PressMouse(ui_controls::DOWN);
+  PressMouse(ui_controls::UP);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(mail) &&
+           !InactivePinOverlay::From(first)->GetShownView();
+  }));
 }
 
 }  // namespace

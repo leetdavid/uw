@@ -313,6 +313,7 @@ source_set("browser_tests") {
     "//uw/browser/pins",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",
+    "//uw/browser/workspaces",
     "//uw/components/agent",
     "//uw/components/ai_providers",
     "//uw/components/terminal",

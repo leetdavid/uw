@@ -15,13 +15,13 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -35,9 +35,10 @@
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
-#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_shell.h"
+#include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -356,14 +357,23 @@ IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest,
-                       AnIdThatIsNotUniqueOrTabsInTwoWindowsAreRefused) {
+                       AnIdThatIsNotUniqueOrTabsInTwoWorkspacesAreRefused) {
   tabs::TabInterface* here = Open("Here");
-  Browser* second = CreateBrowser(browser()->GetProfile());
-  tabs::TabInterface* there = Open("There", second);
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string reading =
+      list.Add("Reading", std::string(list.UnusedIcon()),
+               browser()->GetProfile()->GetBaseName());
+  BrowserWindowInterface* shown = nullptr;
+  WorkspaceWindow::From(browser())->Switch(
+      reading, base::BindLambdaForTesting(
+                   [&](BrowserWindowInterface* window) { shown = window; }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return shown; }));
+  tabs::TabInterface* there =
+      Open("There", shown->GetBrowserForMigrationOnly());
 
   const base::DictValue moved =
       Call(kMoveTool, Tabs({IdOf(here), IdOf(there)}).Set("new_task", "Both"));
-  EXPECT_EQ(*moved.FindString("refused"), "they're in different windows");
+  EXPECT_EQ(*moved.FindString("refused"), "they're in different workspaces");
 
   const base::DictValue none =
       Call(kSelectTool, base::DictValue().Set("tab", "zz"));
@@ -454,16 +464,8 @@ IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest, ARunHasNoSelect) {
   EXPECT_NE(tabs()->GetActiveTab(), kayak);
 }
 
-class SharedTabToolsBrowserTest : public TabToolsBrowserTest {
- public:
-  SharedTabToolsBrowserTest() { features_.InitAndEnableFeature(kUwSharedTabs); }
-
- private:
-  base::test::ScopedFeatureList features_;
-};
-
 // Every window on a workspace shows its tabs, and the list names each once.
-IN_PROC_BROWSER_TEST_F(SharedTabToolsBrowserTest, EachTabIsListedOnce) {
+IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest, EachTabIsListedOnce) {
   Open("Alpha");
   Browser* second = CreateBrowser(browser()->GetProfile());
   ASSERT_TRUE(base::test::RunUntil(

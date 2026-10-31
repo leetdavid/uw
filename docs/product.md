@@ -339,7 +339,7 @@ Agreed: use [automatic tab organization](#automatic-tab-organization) to help tr
 
 Agreed on 2026-10-21: [workspaces](CONTEXT.md#language) work as Arc's spaces. The user swipes between them in the sidebar, each has its own theme, and several can share one [profile](CONTEXT.md#language)'s logins and history. Switching replaces the window with its partner for that workspace. Tasks still organize the tabs inside a workspace. The [workspaces plan](plans/workspaces.md) has the details.
 
-Agreed on 2026-10-29, not built: every window showing a workspace shows its tabs, as in Arc, with one live page per tab that moves to the window that selects it, as pins do. Closing a window closes no tabs. The [shared tabs plan](plans/shared-tabs.md) has the details, and [ADR 0024](adr/0024-a-workspaces-tabs-show-in-every-window.md) the reasons.
+Agreed on 2026-10-29, and built and on by default since 2026-10-31, not yet verified in daily use: every window showing a workspace shows its tabs, as in Arc, with one live page per tab that moves to the window that selects it, as pins do. Closing a window closes no tabs. The [shared tabs plan](plans/shared-tabs.md) has the details, and [ADR 0024](adr/0024-a-workspaces-tabs-show-in-every-window.md) the reasons.
 
 Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
 

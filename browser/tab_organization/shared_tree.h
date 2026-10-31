@@ -29,8 +29,8 @@ namespace uw {
 
 class TabOrganizationController;
 
-// Shows a workspace's tabs in every window on it. Off until the last stage of
-// the shared tabs plan, T254.
+// Shows a workspace's tabs in every window on it. Turned off, each window
+// keeps tabs of its own, as in Chromium.
 BASE_DECLARE_FEATURE(kUwSharedTabs);
 
 // The tab tree of one workspace and what goes with it: collapsed branches,
@@ -87,8 +87,9 @@ class SharedTree : public base::RefCounted<SharedTree> {
   }
   void Add(TabOrganizationController* window);
   void Remove(TabOrganizationController* window);
-  // Takes in `other`'s pages, after this tree's own in each place.
-  void Merge(SharedTree& other);
+  // Takes in `other`'s pages, after this tree's own in each place, or before
+  // them with `other_first`.
+  void Merge(SharedTree& other, bool other_first);
 
   // Brings every other window up to date with the tree once it has changed,
   // unless a drag is under way: Chromium ends a drag when a tab strip gains
@@ -135,8 +136,9 @@ class SharedTree : public base::RefCounted<SharedTree> {
   // sight, or unsaved input, and busy terminals and tabs the agent works in.
   void UnloadIdlePages();
   // Once the workspace has no tab left besides pins, closes every window on
-  // it.
-  void CloseIfEmpty();
+  // it, unless the last tab was `pinned`: the windows stay with their pins,
+  // as in Chrome.
+  void CloseIfEmpty(bool pinned);
 
   // A tab that leaves a window for another, as in a drag, keeps its page: the
   // window it leaves notes it, and the window it reaches takes it.

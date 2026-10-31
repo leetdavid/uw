@@ -35,7 +35,7 @@
 
 namespace uw {
 
-BASE_FEATURE(kUwSharedTabs, base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kUwSharedTabs, base::FEATURE_ENABLED_BY_DEFAULT);
 
 namespace {
 
@@ -119,19 +119,20 @@ class CopyMark : public content::WebContentsUserData<CopyMark>,
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(CopyMark);
 
-// Whether the live page in `tab` is at work: the agent works in it, or Memory
-// Saver would keep it for sound, the mini player, capture, devices,
-// notifications, a title or icon that changes out of sight, unsaved input,
-// an extension that asks, or DevTools.
-bool AtWork(tabs::TabInterface* tab) {
+// Whether the agent works in `tab`.
+bool AgentWorksIn(tabs::TabInterface* tab) {
+  actor::ActorKeyedService* agent =
+      actor::ActorKeyedService::Get(tab->GetContents()->GetBrowserContext());
+  return agent && agent->IsActiveOnTab(*tab);
+}
+
+// Whether Memory Saver would keep the live page in `tab` for sound, the mini
+// player, capture, devices, notifications, a title or icon that changes out
+// of sight, unsaved input, an extension or a page that asks, or DevTools.
+bool KeptByMemorySaver(tabs::TabInterface* tab) {
   using performance_manager::policies::CannotDiscardReason;
   using performance_manager::policies::DiscardEligibilityPolicy;
   content::WebContents* page = tab->GetContents();
-  if (actor::ActorKeyedService* agent =
-          actor::ActorKeyedService::Get(page->GetBrowserContext());
-      agent && agent->IsActiveOnTab(*tab)) {
-    return true;
-  }
   base::WeakPtr<performance_manager::PageNode> node =
       performance_manager::PerformanceManager::GetPrimaryPageNodeForWebContents(
           page);
@@ -208,13 +209,15 @@ void SharedTree::Remove(TabOrganizationController* window) {
   std::erase(windows_, window);
 }
 
-void SharedTree::Merge(SharedTree& other) {
+void SharedTree::Merge(SharedTree& other, bool other_first) {
+  const PageTree* first = other_first ? &other.tree_ : &tree_;
+  const PageTree* second = other_first ? &tree_ : &other.tree_;
   std::vector<Page> pages;
   for (bool in_task : {true, false}) {
-    for (const PageTree* from : {&tree_, &other.tree_}) {
+    for (const PageTree* from : {first, second}) {
       for (const Page& page : from->pages()) {
         if (page.task.empty() != in_task &&
-            (from == &tree_ || !tree_.Find(page.id))) {
+            (from == first || !first->Find(page.id))) {
           pages.push_back(page);
         }
       }
@@ -338,6 +341,11 @@ void SharedTree::BringLivePage(TabOrganizationController* window,
     TakePicture(live, base::BindOnce(&SharedTree::SetPicture,
                                      weak_factory_.GetWeakPtr(), id));
     window->ReplacePage(here, holder->ReplacePage(there, MakeCopy(live)));
+    // A page that has not loaded since the restart, as one a hidden window
+    // held, loads once it shows.
+    if (!WorkspaceWindow::IsHidden(window->window()) && here->IsActivated()) {
+      live->GetController().LoadIfNecessary();
+    }
     return;
   }
   // No window holds it, so the copy loads its history and becomes it.
@@ -390,6 +398,9 @@ void SharedTree::HandOver(TabOrganizationController* from) {
   if (!to) {
     return;
   }
+  // A window still filling in takes a copy of every page first, while
+  // `from` can still give them.
+  to->FillNow();
   for (const Page& page : tree_.pages()) {
     const tabs::TabInterface* tab = from->TabFor(page.id);
     if (tab && !IsCopy(tab->GetContents())) {
@@ -417,10 +428,12 @@ void SharedTree::UnloadIdlePages() {
       if (!tab || IsCopy(tab->GetContents())) {
         continue;
       }
-      if (AtWork(tab)) {
+      // A terminal says itself whether a command runs in it. Memory Saver
+      // keeps every terminal, which uw marks not to be discarded.
+      TerminalShell* shell = TerminalShell::From(tab->GetContents());
+      if (AgentWorksIn(tab) || (!shell && KeptByMemorySaver(tab))) {
         at_work = true;
-      } else if (TerminalShell* shell =
-                     TerminalShell::From(tab->GetContents())) {
+      } else if (shell) {
         at_work = true;
         shell->GetActivity(base::BindOnce(
             [](base::WeakPtr<SharedTree> self, PageId id,
@@ -453,9 +466,13 @@ void SharedTree::UnloadTerminal(const PageId& id, bool busy) {
   holder->ReplacePage(tab, MakeCopy(tab->GetContents()));
 }
 
-void SharedTree::CloseIfEmpty() {
+void SharedTree::CloseIfEmpty(bool pinned) {
   if (!tree_.pages().empty()) {
     had_pages_ = true;
+    return;
+  }
+  if (pinned) {
+    had_pages_ = false;
     return;
   }
   if (!had_pages_ || std::ranges::any_of(windows_, [](const auto& window) {

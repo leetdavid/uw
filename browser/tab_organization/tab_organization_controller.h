@@ -16,6 +16,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "components/sessions/core/session_id.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
@@ -38,6 +39,7 @@ class SimpleMenuModel;
 
 namespace uw {
 
+class SavedGroupsWait;
 class SharedTree;
 
 // Owned by EmbedderBrowserWindowFeatures. Mirrors the window's unpinned tabs
@@ -98,9 +100,13 @@ class TabOrganizationController : public TabStripModelObserver,
     base::AutoReset<LinksFromAnotherApp*> current_;
     std::optional<PageId> last_;
   };
-  static void RestoreTab(BrowserWindowInterface* window,
-                         content::WebContents* page,
-                         const std::map<std::string, std::string>& extra_data);
+  // Takes back what the session saved for a restored tab. A tab that held a
+  // copy comes back as one before it loads, and the page it returns stands in
+  // for `page`.
+  static content::WebContents* RestoreTab(
+      BrowserWindowInterface* window,
+      content::WebContents* page,
+      const std::map<std::string, std::string>& extra_data);
   // Asked before `window` closes. With shared tabs, another window on its
   // workspace takes the window's live pages, and the window closes. The last
   // window on the workspace keeps the workspace's tabs instead: it hides, and
@@ -343,12 +349,24 @@ class TabOrganizationController : public TabStripModelObserver,
   // Joins the tree of the window's workspace once the window has a tab, with
   // shared tabs on.
   void JoinWorkspace();
+  // Whether Chromium's saved tab groups have loaded. Until then they miss
+  // changes to tab groups, and at launch they put back their older copy of
+  // each group, so a window joins its workspace only after.
+  bool SavedGroupsLoaded();
+  void OnSavedGroupsLoaded();
   // Leaves the workspace's tree as the window closes, so closing it closes no
   // tab in another window.
   void Leave();
   // Gives this window a copy of each page it lacks, and closes its tabs for
-  // pages that left the tree.
+  // pages that left the tree. A window that just joined shows first and fills
+  // in a slice at a time.
   void ApplyCopies();
+  // Fills in every copy the window still lacks at once, as before it takes
+  // the pages of a window that closes.
+  void FillNow();
+  // `strip` with the pages the window has yet to copy, while it fills in,
+  // each after the page it follows in the tree.
+  std::vector<Page> WithPagesToCopy(std::vector<Page> strip);
   // Brings this window up to date with a tree another window changed.
   void Follow();
   std::optional<tab_groups::TabGroupVisualData> VisualsOf(
@@ -423,6 +441,8 @@ class TabOrganizationController : public TabStripModelObserver,
   const raw_ptr<TabStripModel> tabs_;
   scoped_refptr<SharedTree> shared_;
   bool joined_ = false;
+  bool saved_groups_loaded_ = false;
+  std::unique_ptr<SavedGroupsWait> saved_groups_wait_;
   // This window's tab groups for tasks another window made, each with the
   // task's key in the tree. A group missing here is keyed by its own id.
   std::map<tab_groups::TabGroupId, std::string> keys_;
@@ -442,6 +462,12 @@ class TabOrganizationController : public TabStripModelObserver,
   // it may be unused.
   std::optional<PageId> unused_blank_;
   std::map<tabs::TabHandle, PageId> ids_;
+  // Set while the window fills in after it joined, with the pages it has had
+  // a tab for since. A page in the tree it does not know is one still to
+  // copy.
+  bool filling_ = false;
+  bool fill_now_ = false;
+  std::set<PageId> known_;
   std::optional<PageId> active_;
   std::optional<PageId> previous_active_;
   // Pages in the order they were last selected, most recent first.
@@ -449,8 +475,11 @@ class TabOrganizationController : public TabStripModelObserver,
   // Parent links from session restore or another window, kept until both
   // pages are in this window.
   std::map<PageId, PageId> restored_parents_;
-  // What the session last saved for each page.
-  std::map<PageId, std::string> saved_states_;
+  // What the session last saved for each tab. A tab whose page is replaced,
+  // as when a live page moves, has a new session id and saves again.
+  std::map<SessionID, std::string> saved_states_;
+  // Set once the session brings back one of the window's tabs.
+  bool restored_ = false;
   // Pages first seen since the last update. Chromium groups a new tab as it
   // inserts it, which is not a move the user made.
   std::set<PageId> fresh_;
@@ -458,6 +487,8 @@ class TabOrganizationController : public TabStripModelObserver,
   bool applying_ = false;
   // Set while the tab strip reports a change, when it may not change itself.
   bool observing_ = false;
+  // Set while the tab strip reports a tab pinned or unpinned.
+  bool pinning_ = false;
   bool apply_pending_ = false;
   bool dragging_ = false;
   bool drag_alone_ = false;

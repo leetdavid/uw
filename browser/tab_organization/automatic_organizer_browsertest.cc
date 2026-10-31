@@ -24,7 +24,6 @@
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_command_line.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -84,7 +83,6 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/organizer_log.h"
-#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -2821,11 +2819,6 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
 // With shared tabs, one organizer asks about the pages of a workspace, through
 // each page's live page, and every window on it shows what it did.
 class SharedTabsOrganizerBrowserTest : public AutomaticOrganizerBrowserTest {
- public:
-  SharedTabsOrganizerBrowserTest() {
-    features_.InitAndEnableFeature(kUwSharedTabs);
-  }
-
  protected:
   // A second window on the workspace, once both windows show every tab.
   Browser* SecondWindow() {
@@ -2871,9 +2864,6 @@ class SharedTabsOrganizerBrowserTest : public AutomaticOrganizerBrowserTest {
         ->visual_data()
         ->title();
   }
-
- private:
-  base::test::ScopedFeatureList features_;
 };
 
 IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,

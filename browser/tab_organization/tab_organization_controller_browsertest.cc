@@ -19,10 +19,7 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
-#include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
-#include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/sessions/session_restore_test_helper.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/sessions/session_service_test_helper.h"
@@ -38,6 +35,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
@@ -46,8 +44,6 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "components/keep_alive_registry/keep_alive_types.h"
-#include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/prefs/pref_service.h"
 #include "components/saved_tab_groups/public/saved_tab_group.h"
 #include "components/saved_tab_groups/public/saved_tab_group_tab.h"
@@ -84,6 +80,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/scratchpad_heading.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
+#include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
 namespace {
@@ -297,7 +294,7 @@ class TabOrganizationControllerBrowserTest
         shape += "*";
       }
       if (const std::optional<tab_groups::TabGroupId> group = tab->GetGroup()) {
-        const std::string task = group->ToString();
+        const std::string task = controller()->KeyOf(*group);
         shape += "@" + base::UTF16ToUTF8(controller()->TaskTitle(task)) +
                  (controller()->HasGeneratedName(task) ? "/uw" : "/you");
       }
@@ -1053,7 +1050,9 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   tabs::TabInterface* grandchild = OpenLinkFrom(child);
   Collapse(child);
   Collapse(page);
-  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(grandchild));
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(grandchild),
+                        TabStripUserGestureDetails(
+                            TabStripUserGestureDetails::GestureType::kMouse));
   EXPECT_FALSE(controller()->IsCollapsed(Id(page)));
   EXPECT_FALSE(controller()->IsCollapsed(Id(child)));
   EXPECT_FALSE(controller()->IsHidden(Id(grandchild)));
@@ -1317,17 +1316,18 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
       ->ResetFromCurrentBrowsers();
   base::RunLoop().RunUntilIdle();
 
+  // The last window hides with the tree, and a new one shows it again.
   Profile* profile = browser()->GetProfile();
-  ScopedKeepAlive keep_alive(KeepAliveOrigin::SESSION_RESTORE,
-                             KeepAliveRestartOption::DISABLED);
-  ScopedProfileKeepAlive profile_keep_alive(
-      profile, ProfileKeepAliveOrigin::kBrowserWindow);
-  CloseBrowserSynchronously(browser());
-  SessionRestoreTestHelper restore;
-  SessionServiceTestHelper(profile).SetForceBrowserNotAliveWithNoWindows(true);
+  BrowserWindowInterface* last = browser();
+  last->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(last)->keeper(); }));
   chrome::NewEmptyWindow(profile);
-  restore.Wait();
-  ASSERT_EQ(GlobalBrowserCollection::GetInstance()->GetSize(), 1u);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return GlobalBrowserCollection::GetInstance()->GetSize() == 1u &&
+           GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser() !=
+               last;
+  }));
   SetBrowser(GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser());
   EXPECT_TRUE(base::test::RunUntil([&] {
     return TreeShape() == kRestoredTree;

@@ -10,24 +10,43 @@
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_future.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/actor/actor_keyed_service.h"
+#include "chrome/browser/actor/actor_task.h"
+#include "chrome/browser/actor/enterprise_policy_checker.h"
 #include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "chrome/browser/ui/webui/metrics_reporter/mock_metrics_reporter.h"
+#include "chrome/browser/ui/webui/tab_search/tab_search.mojom.h"
+#include "chrome/browser/ui/webui/tab_search/tab_search_page_handler.h"
+#include "chrome/browser/ui/webui/tab_search/tab_search_ui.h"
+#include "chrome/browser/ui/webui/webui_embedding_context.h"
+#include "chrome/common/actor.mojom.h"
+#include "chrome/test/base/ui_test_utils.h"
+#include "components/actor/core/task_source_info.h"
+#include "components/actor/public/mojom/actor_types.mojom.h"
+#include "components/performance_manager/performance_manager_tab_helper.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
 #include "components/sessions/core/tab_restore_service.h"
@@ -40,11 +59,19 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "content/public/test/test_web_ui.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "mojo/public/cpp/bindings/pending_remote.h"
+#include "mojo/public/cpp/bindings/receiver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/base_window.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/events/keycodes/dom/dom_key.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
 #include "url/gurl.h"
@@ -160,10 +187,96 @@ int BlankTabs(Browser* window) {
   return blank;
 }
 
+// How many of `window`'s tabs show `url`.
+int Count(Browser* window, const char* url) {
+  int count = 0;
+  for (int i = 0; i < window->tab_strip_model()->count(); ++i) {
+    if (window->tab_strip_model()->GetWebContentsAt(i)->GetLastCommittedURL() ==
+        GURL(url)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+// How many tabs of `windows` hold the live page of `url`, not a copy.
+int LivePages(const std::vector<Browser*>& windows, const char* url) {
+  int live = 0;
+  for (Browser* window : windows) {
+    for (int i = 0; i < window->tab_strip_model()->count(); ++i) {
+      tabs::TabInterface* tab = window->tab_strip_model()->GetTabAtIndex(i);
+      if (tab->GetContents()->GetLastCommittedURL() == GURL(url) &&
+          !TabOrganizationController::IsCopy(tab)) {
+        ++live;
+      }
+    }
+  }
+  return live;
+}
+
+// `profile`'s windows that show.
+std::vector<Browser*> ShownWindows(Profile* profile) {
+  std::vector<Browser*> shown;
+  for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+    if (window->GetProfile() == profile && window->GetWindow()->IsVisible()) {
+      shown.push_back(window->GetBrowserForMigrationOnly());
+    }
+  }
+  return shown;
+}
+
+// The window of `windows` whose selected tab shows `url`, or null.
+Browser* Selecting(const std::vector<Browser*>& windows, const char* url) {
+  for (Browser* window : windows) {
+    content::WebContents* selected =
+        window->tab_strip_model()->GetActiveWebContents();
+    if (selected && selected->GetLastCommittedURL() == GURL(url)) {
+      return window;
+    }
+  }
+  return nullptr;
+}
+
+// The windows' tabs, with each one's page id and whether it holds a copy, for
+// a failure message.
+std::string Layouts(const std::vector<Browser*>& windows) {
+  std::string text;
+  for (Browser* window : windows) {
+    text += "window:\n";
+    TabStripModel* tabs = window->tab_strip_model();
+    for (int i = 0; i < tabs->count(); ++i) {
+      tabs::TabInterface* tab = tabs->GetTabAtIndex(i);
+      const std::optional<PageId> id = ControllerOf(window)->IdFor(tab);
+      text += base::StringPrintf(
+          "  %s %s%s\n",
+          tab->GetContents()->GetLastCommittedURL().spec().c_str(),
+          id ? id->value().c_str() : "-",
+          TabOrganizationController::IsCopy(tab) ? " copy" : "");
+    }
+  }
+  return text;
+}
+
+// A tab search page that only listens.
+class QuietTabSearchPage : public tab_search::mojom::Page {
+ public:
+  mojo::PendingRemote<tab_search::mojom::Page> Remote() {
+    return receiver_.BindNewPipeAndPassRemote();
+  }
+
+  // tab_search::mojom::Page:
+  void HostWindowChanged() override {}
+  void TabsChanged(tab_search::mojom::ProfileDataPtr) override {}
+  void TabUpdated(tab_search::mojom::TabUpdateInfoPtr) override {}
+  void TabsRemoved(tab_search::mojom::TabsRemovedInfoPtr) override {}
+  void TabUnsplit() override {}
+
+ private:
+  mojo::Receiver<tab_search::mojom::Page> receiver_{this};
+};
+
 class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
  public:
-  SharedTabsBrowserTest() { features_.InitAndEnableFeature(kUwSharedTabs); }
-
   void SetUpOnMainThread() override {
     headless::HeadlessModeBrowserTest::SetUpOnMainThread();
     // A page that counts in its title, as a timer does.
@@ -199,6 +312,16 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
         base::test::RunUntil([&] { return page->GetTitle() != title; }));
   }
 
+  // Chromium's saved tab groups miss a task named before they load, and at
+  // the next launch put their copy, without the name, back. A user is never
+  // that quick, so tests that restart wait.
+  void WaitForSavedGroups() {
+    tab_groups::TabGroupSyncServiceInitializedObserver(
+        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+            browser()->GetProfile()))
+        .Wait();
+  }
+
   tabs::TabInterface* Open(Browser* window,
                            const char* url,
                            bool select = false) {
@@ -208,9 +331,6 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
     base::RunLoop().RunUntilIdle();
     return window->tab_strip_model()->GetTabForWebContents(page);
   }
-
- private:
-  base::test::ScopedFeatureList features_;
 };
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, WindowsOnAWorkspaceShowOneTree) {
@@ -426,6 +546,57 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   }));
 }
 
+// The last window keeps live the pages still at work, as Memory Saver would:
+// one that plays sound, one with unsaved input, and one the agent works in.
+// A page doing nothing unloads.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       TheLastWindowKeepsPagesAtWorkLive) {
+  Profile* profile = browser()->GetProfile();
+  CreateIncognitoBrowser(profile);
+  Browser* first = browser();
+  tabs::TabInterface* mail = Open(first, kMail);
+  tabs::TabInterface* playing = Open(first, kIssues);
+  tabs::TabInterface* agent = Open(first, kIssue);
+  tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
+
+  // Typed into, as a user types.
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(),
+                              "document.getElementById('f').focus()"));
+  content::SimulateKeyPress(notes->GetContents(),
+                            ui::DomKey::FromCharacter('a'), ui::DomCode::US_A,
+                            ui::VKEY_A, false, false, false, false);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    base::WeakPtr<performance_manager::PageNode> node =
+        performance_manager::PerformanceManager::
+            GetPrimaryPageNodeForWebContents(notes->GetContents());
+    return node && (node->HadUserEdits() || node->HadFormInteraction());
+  }));
+  // Sound, as Chromium hears it. Tests play none.
+  performance_manager::PerformanceManagerTabHelper::FromWebContents(
+      playing->GetContents())
+      ->OnAudioStateChanged(true);
+  actor::ActorKeyedService* agents = actor::ActorKeyedService::Get(profile);
+  const actor::TaskId task = agents->CreateTask(
+      actor::TaskSourceInfo(actor::TaskSourceInfo::Client::kExperimentalActor,
+                            std::nullopt),
+      actor::GetNullEnterprisePolicyChecker());
+  base::test::TestFuture<actor::mojom::ActionResultPtr> added;
+  agents->GetTask(task)->AddTab(agent->GetHandle(),
+                                /*stop_task_on_detach=*/true,
+                                added.GetCallback());
+  ASSERT_EQ(added.Get()->code, actor::mojom::ActionResultCode::kOk);
+
+  first->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(first)->keeper(); }));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabOrganizationController::IsCopy(mail); }));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(playing));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(notes));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(agent));
+  agents->ResetForTesting();
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        TheLastTabClosesEveryWindowOnTheWorkspace) {
   Profile* profile = browser()->GetProfile();
@@ -578,6 +749,71 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
       [&] { return BlankTabs(first) == 0 && BlankTabs(fresh) == 0; }));
 }
 
+// A new window on a workspace with many tabs shows at once and fills in with
+// copies after, a slice at a time, while every page keeps its place.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ANewWindowFillsInAfterItShows) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  constexpr int kPages = 40;
+  for (int i = 0; i < kPages; ++i) {
+    chrome::AddTabAt(
+        first,
+        GURL(base::StringPrintf("data:text/html,<title>Page %d</title>", i)),
+        -1, false);
+  }
+  TabStripModel* tabs = first->tab_strip_model();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (int i = 0; i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetLastCommittedURL().is_empty()) {
+        return false;
+      }
+    }
+    return true;
+  }));
+  // The rows of the pages opened here, leaving out the new window's blank
+  // tab.
+  const auto pages = [](Browser* window) {
+    std::vector<std::string> rows = Layout(window);
+    std::erase_if(rows, [](const std::string& row) {
+      return !row.starts_with("data:") && !row.starts_with("about:blank");
+    });
+    return rows;
+  };
+  const std::vector<std::string> before = pages(first);
+  const auto copies = [](Browser* window) {
+    int copies = 0;
+    for (int i = 0; i < window->tab_strip_model()->count(); ++i) {
+      copies += TabOrganizationController::IsCopy(
+          window->tab_strip_model()->GetTabAtIndex(i));
+    }
+    return copies;
+  };
+
+  // The window joins as soon as it has its blank tab, takes in a first
+  // slice of copies, and gives way to the next task.
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::ExecuteCommand(first, IDC_NEW_WINDOW);
+  Browser* fresh = NewWindow(known);
+  ASSERT_TRUE(fresh);
+  int first_slice = -1;
+  base::RunLoop next_task;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindLambdaForTesting([&] {
+        first_slice = copies(fresh);
+        next_task.Quit();
+      }));
+  next_task.Run();
+  EXPECT_GT(first_slice, 0);
+  EXPECT_LT(first_slice, static_cast<int>(before.size()));
+  EXPECT_EQ(pages(first), before);
+
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return copies(fresh) == static_cast<int>(before.size()) &&
+           InStep(first, fresh);
+  })) << Layouts({first, fresh});
+}
+
 // The command bar's list of open tabs, like tab search, has each page once,
 // though every window shows it.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, TabListsShowEachPageOnce) {
@@ -604,6 +840,29 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, TabListsShowEachPageOnce) {
     total += count;
   }
   EXPECT_EQ(total, static_cast<int>(Layout(first).size()));
+
+  // Tab search asks Chromium's handler, which leaves out the same copies.
+  std::unique_ptr<content::WebContents> host = content::WebContents::Create(
+      content::WebContents::CreateParams(first->GetProfile()));
+  content::TestWebUI web_ui;
+  web_ui.set_web_contents(host.get());
+  webui::SetBrowserWindowInterface(host.get(), first);
+  TabSearchUI controller(&web_ui);
+  QuietTabSearchPage page;
+  testing::NiceMock<MockMetricsReporter> metrics;
+  TabSearchPageHandler handler(
+      mojo::PendingReceiver<tab_search::mojom::PageHandler>(), page.Remote(),
+      &web_ui, &controller, &metrics);
+  base::test::TestFuture<tab_search::mojom::ProfileDataPtr> data;
+  handler.GetProfileData(data.GetCallback());
+  std::map<std::string, int> searched;
+  for (const auto& window : data.Get()->windows) {
+    for (const auto& tab : window->tabs) {
+      ++searched[tab->url.spec()];
+    }
+  }
+  EXPECT_EQ(searched[kMail], 1);
+  EXPECT_EQ(searched[kIssues], 1);
 }
 
 // A task folded in one window folds in the other, where the selected tab
@@ -688,7 +947,238 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
       base::test::RunUntil([&] { return !controller->IsCollapsed(*issue); }));
 }
 
-class SharedTabsOffBrowserTest : public headless::HeadlessModeBrowserTest {};
+// After a restart, each window comes back with its selected tab and each page
+// once, its live page in one window and a copy in the other.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       PRE_EachWindowComesBackWithItsSelectedTab) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(first, GURL(kMail)));
+  Open(first, kIssues);
+  Open(first, kNotes);
+  TabOrganizationController* controller = ControllerOf(first);
+  ASSERT_TRUE(
+      controller->MoveToNewTask({*controller->IdFor(TabAt(first, kMail)),
+                                 *controller->IdFor(TabAt(first, kIssues))},
+                                u"Trip"));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(second, kNotes) && InStep(first, second); }));
+  SelectByClick(first, TabAt(first, kMail));
+  SelectByClick(second, TabAt(second, kIssues));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(TabAt(first, kMail)) &&
+           !TabOrganizationController::IsCopy(TabAt(second, kIssues)) &&
+           InStep(first, second);
+  }));
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       EachWindowComesBackWithItsSelectedTab) {
+  Profile* profile = browser()->GetProfile();
+  Browser* on_mail = nullptr;
+  Browser* on_issues = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::vector<Browser*> windows = ShownWindows(profile);
+    on_mail = Selecting(windows, kMail);
+    on_issues = Selecting(windows, kIssues);
+    return windows.size() == 2u && on_mail && on_issues &&
+           on_mail != on_issues && InStep(on_mail, on_issues);
+  })) << Layouts(ShownWindows(profile));
+  EXPECT_EQ(WorkspaceWindow::From(on_mail)->workspace(),
+            WorkspaceWindow::From(on_issues)->workspace());
+  for (const char* url : {kMail, kIssues, kNotes}) {
+    EXPECT_EQ(Count(on_mail, url), 1) << url;
+    EXPECT_EQ(Count(on_issues, url), 1) << url;
+    EXPECT_EQ(LivePages({on_mail, on_issues}, url), 1) << url;
+  }
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(on_mail, kMail)));
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(on_issues, kIssues)));
+
+  // The task is still one task: renamed in one window, it changes in both.
+  for (Browser* window : {on_mail, on_issues}) {
+    EXPECT_NE(Layout(window)[0].find(" Trip "), std::string::npos);
+  }
+  on_issues->tab_strip_model()->ChangeTabGroupVisuals(
+      *TabAt(on_issues, kMail)->GetGroup(),
+      tab_groups::TabGroupVisualData(u"Lisbon",
+                                     tab_groups::TabGroupColorId::kGreen));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return InStep(on_mail, on_issues) &&
+           Layout(on_mail)[0].find(" Lisbon ") != std::string::npos;
+  })) << Layouts({on_mail, on_issues});
+}
+
+// A window closed as the last on its workspace keeps the workspace's tabs,
+// hidden. After a restart it stays hidden while another window shows, and the
+// next window to show the workspace takes them.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       PRE_AKeptWindowStaysHiddenAfterARestart) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(first, GURL(kMail)));
+  Open(first, kIssues);
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal = list.Add(
+      "Personal", std::string(list.UnusedIcon()), profile->GetBaseName());
+  BrowserWindowInterface* partner = nullptr;
+  WorkspaceWindow::From(first)->Switch(
+      personal,
+      base::BindOnce([](BrowserWindowInterface** partner,
+                        BrowserWindowInterface* shown) { *partner = shown; },
+                     &partner));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return partner && partner->GetWindow()->IsVisible() &&
+           !first->GetWindow()->IsVisible();
+  }));
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::ExecuteCommand(partner->GetBrowserForMigrationOnly(), IDC_NEW_WINDOW);
+  ASSERT_TRUE(base::test::RunUntil([&] { return NewWindow(known); }));
+
+  // Closing the partner closes its group, and the first window is the last
+  // on its workspace.
+  partner->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !IsOpen(partner) && WorkspaceWindow::From(first)->keeper();
+  }));
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AKeptWindowStaysHiddenAfterARestart) {
+  BrowserWindowInterface* kept = nullptr;
+  BrowserWindowInterface* shown = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    kept = shown = nullptr;
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      const WorkspaceWindow* workspace = WorkspaceWindow::From(window);
+      if (workspace && workspace->keeper()) {
+        kept = window;
+      } else if (workspace && window->GetWindow()->IsVisible()) {
+        shown = window;
+      }
+    }
+    return kept && shown && TabAt(kept->GetBrowserForMigrationOnly(), kMail);
+  }));
+  EXPECT_FALSE(kept->GetWindow()->IsVisible());
+  const std::string work = WorkspaceWindow::From(kept)->workspace();
+  EXPECT_NE(WorkspaceWindow::From(shown)->workspace(), work);
+
+  BrowserWindowInterface* opened = nullptr;
+  WorkspaceWindow::From(shown)->Switch(
+      work,
+      base::BindOnce([](BrowserWindowInterface** opened,
+                        BrowserWindowInterface* window) { *opened = window; },
+                     &opened));
+  Browser* window = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    window = opened ? opened->GetBrowserForMigrationOnly() : nullptr;
+    return window && !IsOpen(kept) && TabAt(window, kMail) &&
+           TabAt(window, kIssues);
+  }));
+  SelectByClick(window, TabAt(window, kIssues));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    tabs::TabInterface* issues = TabAt(window, kIssues);
+    return !TabOrganizationController::IsCopy(issues) &&
+           issues->GetContents()->GetTitle() == u"Issues";
+  }));
+}
+
+// `window`'s layout without the blank tab a test opens at launch.
+std::vector<std::string> LayoutAfterLaunch(Browser* window) {
+  std::vector<std::string> rows = Layout(window);
+  std::erase_if(rows, [](const std::string& row) {
+    return row.starts_with("about:blank ");
+  });
+  return rows;
+}
+
+// The first launch with shared tabs, after a session saved without them.
+class SharedTabsFirstLaunchBrowserTest : public SharedTabsBrowserTest {
+ public:
+  SharedTabsFirstLaunchBrowserTest() {
+    if (GetTestPreCount() > 0) {
+      off_.InitAndDisableFeature(kUwSharedTabs);
+    }
+  }
+
+ private:
+  base::test::ScopedFeatureList off_;
+};
+
+IN_PROC_BROWSER_TEST_F(SharedTabsFirstLaunchBrowserTest,
+                       PRE_TheFirstLaunchMergesEachWorkspacesWindows) {
+  WaitForSavedGroups();
+  Browser* back = browser();
+  Profile* profile = back->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(back, GURL(kMail)));
+  Open(back, kIssues, /*select=*/true);
+  ASSERT_TRUE(ControllerOf(back)->MoveToNewTask(
+      {*ControllerOf(back)->IdFor(TabAt(back, kMail))}, u"Trip"));
+  Browser* front = CreateBrowser(profile);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(front, GURL(kNotes)));
+  Open(front, kIssue, /*select=*/true);
+  ASSERT_TRUE(ControllerOf(front)->MoveToNewTask(
+      {*ControllerOf(front)->IdFor(TabAt(front, kNotes))}, u"Trip"));
+  EXPECT_FALSE(TabAt(back, kNotes));
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+// Each window's tasks and Scratchpad tabs join the workspace's tree, the
+// window in front first. Two tasks of one name stay apart, and nothing loads
+// twice.
+IN_PROC_BROWSER_TEST_F(SharedTabsFirstLaunchBrowserTest,
+                       TheFirstLaunchMergesEachWorkspacesWindows) {
+  Profile* profile = browser()->GetProfile();
+  Browser* back = nullptr;
+  Browser* front = nullptr;
+  // Each window holds the live pages it had.
+  const auto holds = [](Browser* window, const char* url) {
+    return TabAt(window, url) &&
+           !TabOrganizationController::IsCopy(TabAt(window, url));
+  };
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::vector<Browser*> windows = ShownWindows(profile);
+    back = front = nullptr;
+    for (Browser* window : windows) {
+      back = holds(window, kMail) ? window : back;
+      front = holds(window, kNotes) ? window : front;
+    }
+    return windows.size() == 2u && back && front && back != front &&
+           LayoutAfterLaunch(back).size() == 4u && InStep(back, front);
+  })) << Layouts(ShownWindows(profile));
+  // The launch opened its blank tab in front, so only the window behind still
+  // shows the tab it had selected.
+  EXPECT_EQ(back->tab_strip_model()->GetActiveTab(), TabAt(back, kIssues));
+  const std::vector<std::string> merged = {
+      std::string(kNotes) + " Trip 0", std::string(kMail) + " Trip 0",
+      std::string(kIssue) + " - 0", std::string(kIssues) + " - 0"};
+  EXPECT_EQ(LayoutAfterLaunch(back), merged);
+  EXPECT_NE(TabAt(back, kNotes)->GetGroup(), TabAt(back, kMail)->GetGroup());
+  for (const char* url : {kMail, kIssues, kNotes, kIssue}) {
+    EXPECT_EQ(LivePages({back, front}, url), 1) << url;
+  }
+}
+
+class SharedTabsOffBrowserTest : public headless::HeadlessModeBrowserTest {
+ public:
+  SharedTabsOffBrowserTest() { features_.InitAndDisableFeature(kUwSharedTabs); }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
 
 // Close Task and Clear leave a blank tab instead of closing a window's last
 // tabs. Pins do not count.

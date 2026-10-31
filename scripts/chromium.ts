@@ -670,6 +670,8 @@ const TEST_SUITES = {
     "AgentCheckBrowserTest.*", "AgentLanguageCheckBrowserTest.*", "AgentTerminalBrowserTest.*", "CommandBarForATaskBrowserTest.*",
     "MouseActionsBrowserTest.*", "PageColorsBrowserTest.*", "ThemePickerBrowserTest.*", "UndoShortcutBrowserTest.*",
     "UwChatDarkModeBrowserTest.*", "UwChatSensitiveSiteBrowserTest.*", "UwChatTerminalBrowserTest.*", "WorkspaceSwipeBrowserTest.*",
+    "SharedTabsBrowserTest.*", "SharedTabsFirstLaunchBrowserTest.*", "SharedTabsOffBrowserTest.*", "SharedTabsOrganizerBrowserTest.*",
+    "WorkspacesOffBrowserTest.*", "BusyTerminalWarningOffBrowserTest.*",
     "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*", "UwCommandSectionBrowserTest.*",
     "UwCommandConnectorsBrowserTest.*", "UwCommandChatBrowserTest.*",
   ],

@@ -1,6 +1,6 @@
 # Shared tabs
 
-Status: scope agreed with the user on 2026-10-29. The spike, T252, ran the same day; see the [shared tabs spike](../research/shared-tabs-spike.md). The user chose how T253 is built the same day. Nothing else is built.
+Status: scope agreed with the user on 2026-10-29. The spike, T252, ran the same day; see the [shared tabs spike](../research/shared-tabs-spike.md). The user chose how T253 is built the same day. T253 and T255 to T258 were built on 2026-10-29 and 2026-10-30, and T254 on 2026-10-31, which turned shared tabs on.
 
 Implementability: **3/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium gives each window its own tab list, so every window on a workspace holds its own copy of every tab: one live page, and placeholders elsewhere, as [live pins](workspaces.md#how-the-live-pin-page-works) do today. Pins alone scored 4/10. On top of that, the organizer must run once per workspace, a restart must not double tabs, and the first launch merges windows. Up from 2/10 on 2026-10-29, after the spike: a copy costs about what an unloaded tab does, a task stays in step through Chromium's own tab group calls, and Memory Saver's rules work for a page in no window. Extensions, recently closed, tab search, and the command bar still see every copy unless uw hides them.
 
@@ -64,11 +64,16 @@ The user chose copies in each window's tab list on 2026-10-29, after the spike. 
 - Tab search and the command bar's list of open tabs show each page once: its live page, or the first window's copy when no window holds it. Both ask `TabOrganizationController::IsListedElsewhere` (`tab-tree.patch`). Extensions still see every copy (T258).
 - A task or branch folded in one window folds in every window, but each window's selected tab keeps its row: under the task's header, or in its place in the branch. Picking a hidden tab in a folded branch opens the branch in every window, as picking a tab in a folded task opens the task. In `tab-tree.patch`, Chromium's `TabGroupViewLayout` draws the kept row, and its `TabStripView` no longer opens a task when a page moves into the selected tab, as when the live page comes to this window, since that is not a pick (T258).
 - Switching workspace still swaps the window, per [ADR 0009](../adr/0009-switching-workspace-swaps-the-window.md). Each hidden partner holds its own workspace's tabs.
+- A window that joins shows first and fills in with copies after, a slice of about one frame at a time, from the top of the tree. Its selected tab is its own and shows at once. Until it has them all, the pages it has yet to copy keep their place in the tree. Filling 100 copies took about 0.6 s at once in the spike.
+- Pinning a workspace's last tab besides pins leaves its windows open with their pins, as in Chrome. Closing or moving that tab closes them.
+- Memory Saver keeps every terminal and chat, since uw marks them not to be discarded. So the last window on a workspace asks a terminal's shell instead: an idle terminal unloads, and a busy one stays. A chat stays.
 
-Still to build, from the spike:
+uw chose how restarts work for T254 on 2026-10-31:
 
-- A new window that shows first and fills with copies after, the selected tab first: 100 copies take about 0.6 s.
-- Some pin and workspace tests expect the old behavior, so T254 updates them for the switch: unpinning in one of two windows, where the unpinned page now becomes a regular tab in both; closing the last window, which now keeps the window hidden, as in `TabOrganizationControllerBrowserTest.TheTreeComesBackInANewWindowAfterTheLastOneCloses`; and closing a window that Cmd+Shift+T brings back, when closing now keeps the tabs.
+- Each tab saves its page's id in the session file, as before. A copy also saves that it is one, and a restart brings it back as a copy before it loads, so each page loads in one window. A window's tab group for a task another window made saves that task's key, so the task is still one task after a restart.
+- A copy never loads, so Chromium's session would not learn its history. uw hands the session each copy as it is inserted. Without that, a window came back without its copies, and Chromium's saved tab groups, which still held them, reloaded the task's tabs at launch to match, loading pages into the wrong tabs.
+- Chromium's saved tab groups miss changes made to a group before they load, and at launch put their older copy of each open group back, name and tabs. So at launch a window joins its workspace only once they have loaded. A task named in the first moment after launch still loses its name at the next launch; that is Chromium's, with shared tabs or without.
+- At launch, each window joins with the tabs it saved, the window in front first. A page two windows saved keeps one place, and a window whose selected tab came back as a copy takes the live page if no shown window holds it.
 
 Rejected on 2026-10-29, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.
 
@@ -88,7 +93,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 6. T258: tab search and the command bar listing each tab once, and a folded task keeping another window's selected row.
 7. T254: restarts, the first-launch merge, and the switch turned on.
 
-Until T254, shared tabs are behind the Chromium feature `UwSharedTabs`, off by default, so each stage can land without changing the user's browsing. Tests turn it on.
+Shared tabs are behind the Chromium feature `UwSharedTabs`. It was off until T254, so each stage could land without changing the user's browsing, and has been on by default since 2026-10-31. Turned off, each window keeps tabs of its own, as in Chromium.
 
 ## Acceptance checks
 

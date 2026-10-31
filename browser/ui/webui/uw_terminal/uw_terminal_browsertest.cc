@@ -19,6 +19,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -26,10 +27,12 @@
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
@@ -40,6 +43,7 @@
 #include "third_party/blink/public/common/input/web_mouse_wheel_event.h"
 #include "third_party/blink/public/common/page/drag_operation.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/base_window.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/clipboard/clipboard_buffer.h"
 #include "ui/base/clipboard/file_info.h"
@@ -57,12 +61,14 @@
 #include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/terminal/close_warning.h"
+#include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/terminal/shell_quote.h"
 
 namespace uw {
@@ -727,7 +733,41 @@ IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
   EXPECT_TRUE(tabs()->group_model()->ContainsTabGroup(*task));
 }
 
+// With shared tabs, closing the last window closes no tab, so nothing asks:
+// the window hides, a terminal that runs a program goes on, and an idle one
+// unloads.
 IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ClosingTheLastWindowLeavesABusyTerminalRunning) {
+  content::WebContents* idle = OpenTerminal();
+  content::WebContents* busy = OpenBusyTerminal();
+  tabs::TabInterface* busy_tab = tabs::TabInterface::GetFromContents(busy);
+  tabs::TabInterface* idle_tab = tabs::TabInterface::GetFromContents(idle);
+  BrowserWindowInterface* window = browser();
+
+  window->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(window)->keeper(); }));
+  EXPECT_FALSE(CloseWarning::DialogForTesting(window));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabOrganizationController::IsCopy(idle_tab); }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(TabOrganizationController::IsCopy(busy_tab));
+  EXPECT_EQ(busy_tab->GetContents(), busy);
+}
+
+// With shared tabs off, closing a window closes its tabs, so uw asks first.
+class BusyTerminalWarningOffBrowserTest
+    : public BusyTerminalWarningBrowserTest {
+ public:
+  BusyTerminalWarningOffBrowserTest() {
+    features_.InitAndDisableFeature(kUwSharedTabs);
+  }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningOffBrowserTest,
                        ClosingTheWindowAsksFirst) {
   OpenBusyTerminal();
   const int count = tabs()->count();

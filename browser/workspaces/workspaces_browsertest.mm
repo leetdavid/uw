@@ -15,6 +15,7 @@
 #include "base/strings/sys_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/tab_matcher_desktop.h"
@@ -73,6 +74,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -852,7 +854,18 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, PrivateWindowsHaveNoWorkspace) {
   EXPECT_FALSE(CanRunWindowCommand(incognito, kNextWorkspace));
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+// With shared tabs off, closing a window closes its tabs, and Cmd+Shift+T
+// brings its group back. With them on, closing a window closes no tab, as
+// SharedTabsBrowserTest shows.
+class WorkspacesOffBrowserTest : public WorkspacesBrowserTest {
+ public:
+  WorkspacesOffBrowserTest() { features_.InitAndDisableFeature(kUwSharedTabs); }
+
+ private:
+  base::test::ScopedFeatureList features_;
+};
+
+IN_PROC_BROWSER_TEST_F(WorkspacesOffBrowserTest,
                        ClosingAWindowClosesItsWorkspacesUntilCmdShiftT) {
   const std::string personal = WorkspaceWindow::From(browser())->workspace();
   const std::string reading = AddWorkspace("Reading", profile());
@@ -885,7 +898,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
 }
 
 // Including a window of it that closed before it went.
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+IN_PROC_BROWSER_TEST_F(WorkspacesOffBrowserTest,
                        CmdShiftTDoesNotBringBackADeletedWorkspace) {
   const std::string personal = WorkspaceWindow::From(browser())->workspace();
   const std::string reading = AddWorkspace("Reading", profile());
@@ -909,7 +922,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
 }
 
 // As when the workspace went while its profile was not loaded.
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+IN_PROC_BROWSER_TEST_F(WorkspacesOffBrowserTest,
                        AWindowOfAGoneWorkspaceComesBackOnItsOwn) {
   const std::string personal = WorkspaceWindow::From(browser())->workspace();
   const std::string reading = AddWorkspace("Reading", profile());

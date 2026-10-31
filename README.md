@@ -44,6 +44,7 @@ uw looks and works like Arc, built on Chromium.
 - Tabs are always vertical, in a sidebar tinted with a theme you pick.
 - Workspaces keep work and personal browsing apart. Switch from the foot of the sidebar, or swipe.
 - Pinned tabs sit as tiles at the top of the sidebar, shared by every window.
+- Every window on a workspace shows its tabs. A page runs in one window at a time, and closing a window closes none of its tabs.
 - Dark mode is true black.
 - Pages can be dark in a light window, or light in a dark one.
 - On macOS 26 and later, two theme sliders bring in Liquid Glass. Transparency lets the desktop show through the window. Glass turns pinned tabs and the sidebar's buttons to glass, and frosts menus and cards.

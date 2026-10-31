@@ -61,6 +61,7 @@
 #include "url/gurl.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/pins/home_url_card.h"
 #include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
@@ -280,8 +281,9 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   // Unpins the restored kMail in a window that shows, with `unpin`. The live
-  // page stays a regular tab in the window that holds it, every other window
-  // loses its copy, and no window gains a tab.
+  // page stays a regular tab in the window that holds it, which every window
+  // on its workspace shows. Every other window loses its copy, and no window
+  // gains a tab.
   void UnpinAfterARestart(base::FunctionRef<void(TabStripModel*)> unpin) {
     std::vector<BrowserWindowInterface*> windows;
     ASSERT_TRUE(base::test::RunUntil([&] {
@@ -306,13 +308,37 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
 
     EXPECT_TRUE(store()->pins().empty());
     EXPECT_TRUE(AllShow(windows, {}));
-    int keeping = 0;
+    std::string kept_on;
     for (BrowserWindowInterface* window : windows) {
-      const int count = window->GetTabStripModel()->count();
-      EXPECT_TRUE(count == before[window] || count == before[window] - 1);
-      keeping += count == before[window];
+      if (HasRegularTab(window, GURL(kMail), /*live=*/true)) {
+        kept_on = WorkspaceWindow::From(window)->workspace();
+      }
     }
-    EXPECT_EQ(keeping, 1);
+    ASSERT_FALSE(kept_on.empty());
+    for (BrowserWindowInterface* window : windows) {
+      const bool on_its_workspace =
+          WorkspaceWindow::From(window)->workspace() == kept_on;
+      EXPECT_EQ(window->GetTabStripModel()->count(),
+                before[window] - (on_its_workspace ? 0 : 1));
+      EXPECT_EQ(HasRegularTab(window, GURL(kMail), /*live=*/false),
+                on_its_workspace);
+    }
+  }
+
+  // Whether `window` has a regular tab showing `url`, holding its live page
+  // or, without `live`, either the page or a copy of it.
+  static bool HasRegularTab(BrowserWindowInterface* window,
+                            const GURL& url,
+                            bool live) {
+    TabStripModel* tabs = window->GetTabStripModel();
+    for (int i = tabs->IndexOfFirstNonPinnedTab(); i < tabs->count(); ++i) {
+      if (tabs->GetWebContentsAt(i)->GetLastCommittedURL() == url &&
+          (!live ||
+           !TabOrganizationController::IsCopy(tabs->GetTabAtIndex(i)))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   views::View* TileOf(const tabs::TabInterface* tab) {
@@ -345,13 +371,16 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, UnpinningRemovesItEverywhere) {
   const int second_before = second->tab_strip_model()->count();
 
   // Unpinned in a window that only has a placeholder: the live page stays a
-  // regular tab in the window that holds it.
+  // regular tab in the window that holds it, and the other window shows it as
+  // it shows every regular tab on the workspace.
   second->tab_strip_model()->SetTabPinned(0, false);
 
   EXPECT_TRUE(ShowsPins(browser(), {}));
   EXPECT_TRUE(ShowsPins(second, {}));
-  EXPECT_TRUE(base::test::RunUntil(
-      [&] { return second->tab_strip_model()->count() == second_before - 1; }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return second->tab_strip_model()->count() == second_before &&
+           HasRegularTab(second, GURL(kMail), /*live=*/false);
+  }));
   EXPECT_EQ(browser()->tab_strip_model()->count(), tabs_before);
   EXPECT_NE(browser()->tab_strip_model()->GetIndexOfWebContents(page),
             TabStripModel::kNoTab);
@@ -368,8 +397,10 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, UnpinningTheLivePageKeepsItThere) {
   browser()->tab_strip_model()->SetTabPinned(0, false);
 
   EXPECT_TRUE(ShowsPins(second, {}));
-  EXPECT_TRUE(base::test::RunUntil(
-      [&] { return second->tab_strip_model()->count() == second_before - 1; }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return second->tab_strip_model()->count() == second_before &&
+           HasRegularTab(second, GURL(kMail), /*live=*/false);
+  }));
   EXPECT_EQ(browser()->tab_strip_model()->count(), tabs_before);
   EXPECT_NE(browser()->tab_strip_model()->GetIndexOfWebContents(page),
             TabStripModel::kNoTab);
@@ -434,7 +465,11 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowAfterTheLastOneGetsThePage) {
   const std::string state = StateOf(page);
   base::WeakPtr<content::WebContents> alive = page->GetWeakPtr();
 
-  CloseBrowserSynchronously(browser());
+  // The last window hides, keeping its tabs, and its pin page outlives it.
+  BrowserWindowInterface* last = browser();
+  last->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(last)->keeper(); }));
 
   ASSERT_TRUE(alive);
   Browser* next = CreateBrowser(profile);

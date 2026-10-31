@@ -563,7 +563,7 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1
    if (initially_hidden) {
      raw_web_contents->WasHidden();
    } else {
-@@ -285,15 +291,20 @@ WebContents* AddRestoredTab(
+@@ -285,15 +291,21 @@ WebContents* AddRestoredTab(
      const std::map<std::string, std::string>& extra_data,
      bool from_session_restore,
      std::optional<bool> is_active_browser) {
@@ -583,19 +583,20 @@ index c8e946c19e0bfdc5d932532a7413ce5ce861283b..f9907cbd316051b87ae9b208a9d62fc1
 +  WebContents* restored =
 +      AddRestoredTabImpl(std::move(web_contents), browser, tab_index, group,
 +                         select, pin, from_session_restore, is_active_browser);
-+  uw::TabOrganizationController::RestoreTab(browser, restored, extra_data);
++  restored =
++      uw::TabOrganizationController::RestoreTab(browser, restored, extra_data);
 +  return uw::PinSync::RestoreTab(browser, restored, extra_data);
  }
  
  WebContents* ReplaceRestoredTab(
-@@ -319,6 +330,10 @@ WebContents* ReplaceRestoredTab(
+@@ -319,6 +331,10 @@ WebContents* ReplaceRestoredTab(
        insertion_index + 1, std::move(web_contents),
        AddTabTypes::ADD_ACTIVE | AddTabTypes::ADD_INHERIT_OPENER,
        tab_strip->GetTabGroupForTab(insertion_index));
 +  raw_web_contents =
 +      uw::PinSync::RestoreTab(browser, raw_web_contents, extra_data);
-+  uw::TabOrganizationController::RestoreTab(browser, raw_web_contents,
-+                                            extra_data);
++  raw_web_contents = uw::TabOrganizationController::RestoreTab(
++      browser, raw_web_contents, extra_data);
  
    if (from_session_restore) {
      // Indicate that the tab is created by session restore. This is used to hide

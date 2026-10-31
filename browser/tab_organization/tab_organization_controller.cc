@@ -12,8 +12,10 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
 #include "base/token.h"
 #include "base/uuid.h"
 #include "base/values.h"
@@ -21,15 +23,18 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
@@ -82,6 +87,31 @@ bool InChatBranch(const TabOrganizationController& controller,
 }
 
 }  // namespace
+
+// Tells a window once Chromium's saved tab groups have loaded, at once when
+// they already have.
+class SavedGroupsWait : public tab_groups::TabGroupSyncService::Observer {
+ public:
+  SavedGroupsWait(tab_groups::TabGroupSyncService* service,
+                  base::OnceClosure loaded)
+      : loaded_(std::move(loaded)) {
+    observation_.Observe(service);
+  }
+  ~SavedGroupsWait() override = default;
+
+  // tab_groups::TabGroupSyncService::Observer:
+  void OnInitialized() override {
+    if (loaded_) {
+      std::move(loaded_).Run();
+    }
+  }
+
+ private:
+  base::OnceClosure loaded_;
+  base::ScopedObservation<tab_groups::TabGroupSyncService,
+                          tab_groups::TabGroupSyncService::Observer>
+      observation_{this};
+};
 
 DEFINE_USER_DATA(TabOrganizationController);
 
@@ -163,7 +193,8 @@ std::string TabOrganizationController::TaskKey(
 void TabOrganizationController::JoinWorkspace() {
   const WorkspaceWindow* workspace = WorkspaceWindow::From(window_);
   if (joined_ || !base::FeatureList::IsEnabled(kUwSharedTabs) ||
-      tabs_->closing_all() || !workspace || workspace->workspace().empty()) {
+      tabs_->closing_all() || !workspace || workspace->workspace().empty() ||
+      !SavedGroupsLoaded()) {
     return;
   }
   scoped_refptr<SharedTree> shared = SharedTree::For(workspace->workspace());
@@ -182,10 +213,17 @@ void TabOrganizationController::JoinWorkspace() {
       blank = only;
     }
   }
-  shared->Merge(*shared_);
+  // At launch, each window joins with the tabs the session brought back, the
+  // window in front first.
+  shared->Merge(
+      *shared_,
+      /*other_first=*/restored_ &&
+          GlobalBrowserCollection::GetInstance()->GetLastActiveBrowser() ==
+              window_);
   shared_ = std::move(shared);
   shared_->Add(this);
   joined_ = true;
+  filling_ = true;
   unused_blank_ = blank;
   // A window opened by moving tabs out of another, as by dragging them out,
   // puts them back in their place in the tree.
@@ -199,6 +237,11 @@ void TabOrganizationController::JoinWorkspace() {
   if (blank && !WorkspaceWindow::IsHidden(window_)) {
     command_bar_requests_.Notify();
   }
+  // A copy the window came back with selected shows its live page, unless
+  // another shown window holds it.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&TabOrganizationController::BringSelectedPage,
+                                weak_factory_.GetWeakPtr(), /*chosen=*/false));
   // A window kept for the workspace's tabs closes once another one shows
   // them. Its live pages go to that window first.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -228,10 +271,34 @@ void TabOrganizationController::JoinWorkspace() {
                      weak_factory_.GetWeakPtr()));
 }
 
+bool TabOrganizationController::SavedGroupsLoaded() {
+  if (!saved_groups_loaded_ && !saved_groups_wait_) {
+    tab_groups::TabGroupSyncService* service =
+        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+            window_->GetProfile());
+    if (!service) {
+      return true;
+    }
+    saved_groups_wait_ = std::make_unique<SavedGroupsWait>(
+        service, base::BindOnce(&TabOrganizationController::OnSavedGroupsLoaded,
+                                weak_factory_.GetWeakPtr()));
+  }
+  return saved_groups_loaded_;
+}
+
+void TabOrganizationController::OnSavedGroupsLoaded() {
+  saved_groups_loaded_ = true;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&TabOrganizationController::JoinWorkspace,
+                                weak_factory_.GetWeakPtr()));
+}
+
 void TabOrganizationController::Leave() {
   shared_->Remove(this);
   shared_ = base::MakeRefCounted<SharedTree>();
   joined_ = false;
+  filling_ = false;
+  known_.clear();
   reveals_ = {};
 }
 
@@ -271,7 +338,11 @@ std::unique_ptr<content::WebContents> TabOrganizationController::ReplacePage(
     tabs::TabInterface* tab,
     std::unique_ptr<content::WebContents> page) {
   base::AutoReset<bool> guard(&applying_, true);
-  return tabs_->DiscardWebContents(tab->GetContents(), std::move(page));
+  std::unique_ptr<content::WebContents> replaced =
+      tabs_->DiscardWebContents(tab->GetContents(), std::move(page));
+  // The page has a session id of its own, under which the tab saves again.
+  ScheduleOwnUpdate();
+  return replaced;
 }
 
 // static
@@ -575,14 +646,14 @@ TabOrganizationController::LinksFromAnotherApp::LinksFromAnotherApp()
 TabOrganizationController::LinksFromAnotherApp::~LinksFromAnotherApp() =
     default;
 
-void TabOrganizationController::RestoreTab(
+content::WebContents* TabOrganizationController::RestoreTab(
     BrowserWindowInterface* window,
     content::WebContents* page,
     const std::map<std::string, std::string>& extra_data) {
   TabOrganizationController* self = From(window);
   const auto saved = extra_data.find(kSessionKey);
   if (!self || !page || saved == extra_data.end()) {
-    return;
+    return page;
   }
   const std::optional<base::DictValue> state =
       base::JSONReader::ReadDict(saved->second, base::JSON_PARSE_RFC);
@@ -591,9 +662,23 @@ void TabOrganizationController::RestoreTab(
   if (!tab || tab->IsPinned() || !id ||
       !base::Uuid::ParseLowercase(*id).is_valid() ||
       self->TabFor(PageId(*id))) {
-    return;
+    return page;
   }
+  self->restored_ = true;
   self->ids_[tab->GetHandle()] = PageId(*id);
+  // Each window keys its own tab group to the task it shows.
+  const std::string* task = state->FindString("task");
+  if (task && tab->GetGroup() && *task != tab->GetGroup()->ToString()) {
+    self->keys_.insert_or_assign(*tab->GetGroup(), *task);
+  }
+  // A copy comes back as one, so the page loads in one window only.
+  if (state->FindBool("copy").value_or(false) &&
+      base::FeatureList::IsEnabled(kUwSharedTabs)) {
+    std::unique_ptr<content::WebContents> copy = SharedTree::MakeCopy(page);
+    content::WebContents* stand_in = copy.get();
+    self->ReplacePage(tab, std::move(copy));
+    page = stand_in;
+  }
   const std::string* parent = state->FindString("parent");
   if (parent && !parent->empty()) {
     self->restored_parents_[PageId(*id)] = PageId(*parent);
@@ -614,6 +699,7 @@ void TabOrganizationController::RestoreTab(
   }
   self->Mirror({});
   self->ScheduleApply();
+  return page;
 }
 
 std::optional<PageId> TabOrganizationController::IdFor(
@@ -1598,6 +1684,7 @@ void TabOrganizationController::OnTabPinnedStateChanged(tabs::TabInterface*,
     return;
   }
   base::AutoReset<bool> observing(&observing_, true);
+  base::AutoReset<bool> pinning(&pinning_, true);
   Mirror({});
   ScheduleApply();
 }
@@ -1801,6 +1888,7 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   }
   std::erase_if(
       ids_, [&live](const auto& entry) { return !live.contains(entry.first); });
+  strip = WithPagesToCopy(std::move(strip));
   Drop drop{.collapsed = shared_->collapsed()};
   if (dragging_ && !drag_carried_.empty()) {
     drop.levels = drag_levels_;
@@ -1818,8 +1906,8 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   }
   ScheduleUpdate();
   if (joined_) {
+    shared_->CloseIfEmpty(/*pinned=*/pinning_);
     shared_->Propagate(this);
-    shared_->CloseIfEmpty();
   }
 }
 
@@ -1856,6 +1944,41 @@ void TabOrganizationController::Apply() {
   Mirror({});
 }
 
+void TabOrganizationController::FillNow() {
+  if (!filling_) {
+    return;
+  }
+  base::AutoReset<bool> now(&fill_now_, true);
+  Apply();
+}
+
+std::vector<Page> TabOrganizationController::WithPagesToCopy(
+    std::vector<Page> strip) {
+  if (!filling_) {
+    return strip;
+  }
+  for (const Page& page : strip) {
+    known_.insert(page.id);
+  }
+  std::vector<Page> pages;
+  auto next = strip.begin();
+  for (const Page& page : shared_->tree().pages()) {
+    if (!known_.contains(page.id)) {
+      pages.push_back({page.id, page.task, PageId()});
+      continue;
+    }
+    const auto at = std::find_if(next, strip.end(), [&](const Page& known) {
+      return known.id == page.id;
+    });
+    if (at != strip.end()) {
+      pages.insert(pages.end(), next, at + 1);
+      next = at + 1;
+    }
+  }
+  pages.insert(pages.end(), next, strip.end());
+  return pages;
+}
+
 void TabOrganizationController::ApplyCopies() {
   if (!joined_) {
     return;
@@ -1871,6 +1994,8 @@ void TabOrganizationController::ApplyCopies() {
   for (int index : gone) {
     tabs_->CloseWebContentsAt(index, TabCloseTypes::CLOSE_NONE);
   }
+  constexpr base::TimeDelta kFillSlice = base::Milliseconds(16);
+  const base::TimeTicks start = base::TimeTicks::Now();
   for (const Page& page : shared_->tree().pages()) {
     if (TabFor(page.id)) {
       continue;
@@ -1879,6 +2004,11 @@ void TabOrganizationController::ApplyCopies() {
     if (!source) {
       continue;
     }
+    if (filling_ && !fill_now_ && base::TimeTicks::Now() - start > kFillSlice) {
+      ScheduleOwnApply();
+      return;
+    }
+    known_.insert(page.id);
     std::unique_ptr<content::WebContents> copy = SharedTree::MakeCopy(source);
     content::WebContents* added = copy.get();
     tabs_->InsertWebContentsAt(tabs_->count(), std::move(copy),
@@ -1886,7 +2016,17 @@ void TabOrganizationController::ApplyCopies() {
     if (const tabs::TabInterface* tab = tabs_->GetTabForWebContents(added)) {
       ids_[tab->GetHandle()] = page.id;
     }
+    // The session learns a tab's history as it loads, which a copy never
+    // does, so it is told at once. Chromium's saved tab groups would
+    // otherwise reload the task's tabs to match at launch.
+    if (SessionService* service =
+            SessionServiceFactory::GetForProfileIfExisting(
+                window_->GetProfile())) {
+      service->TabRestored(added, /*pinned=*/false);
+    }
   }
+  filling_ = false;
+  known_.clear();
 }
 
 void TabOrganizationController::ApplyTasks() {
@@ -2091,7 +2231,7 @@ void TabOrganizationController::Update() {
   std::erase_if(shared_->held(), [this](const auto& entry) {
     return !IsHeld(entry.first) && !restored_parents_.contains(entry.first);
   });
-  std::map<PageId, std::string> states;
+  std::map<SessionID, std::string> states;
   for (const auto& [handle, id] : ids_) {
     const Page* page = shared_->tree().Find(id);
     const tabs::TabInterface* tab = handle.Get();
@@ -2102,6 +2242,13 @@ void TabOrganizationController::Update() {
     base::DictValue state;
     state.Set("id", id.value());
     state.Set("parent", page->parent.value());
+    if (IsCopy(tab)) {
+      state.Set("copy", true);
+    }
+    if (const std::optional<tab_groups::TabGroupId> group = tab->GetGroup();
+        group && KeyOf(*group) != group->ToString()) {
+      state.Set("task", KeyOf(*group));
+    }
     if (shared_->collapsed().contains(id)) {
       state.Set("collapsed", true);
     }
@@ -2114,13 +2261,13 @@ void TabOrganizationController::Update() {
     if (HasGeneratedName(page->task)) {
       state.Set("task_name", shared_->generated_names()[page->task]);
     }
-    std::string& json = states[id];
+    const SessionID tab_id = sessions::SessionTabHelper::IdForTab(contents);
+    std::string& json = states[tab_id];
     json = base::WriteJson(state).value_or(std::string());
-    const auto saved = saved_states_.find(id);
+    const auto saved = saved_states_.find(tab_id);
     if (service && (saved == saved_states_.end() || saved->second != json)) {
-      service->AddTabExtraData(window_->GetSessionID(),
-                               sessions::SessionTabHelper::IdForTab(contents),
-                               kSessionKey, json);
+      service->AddTabExtraData(window_->GetSessionID(), tab_id, kSessionKey,
+                               json);
     }
   }
   saved_states_ = std::move(states);
