@@ -1,6 +1,6 @@
 # Terminal tab
 
-Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval. The [busy terminal warning](#busy-terminal-warning), T36, was agreed on 2026-10-31 and waits for its design.
+Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval. The [busy terminal warning](#busy-terminal-warning), T36, was agreed and its design signed off on 2026-10-31.
 
 Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started on a pseudo-terminal behaves.
 
@@ -34,7 +34,7 @@ Agreed on 2026-10-31 as T36, to be built with the [close button on a task's row]
 - Cmd+Shift+T brings a closed terminal back with a new shell. The command does not run again.
 - Unchanged: Clear leaves busy terminals open, and the agent's `close` and `close_task` tools and `uw tabs close` refuse them, per the [tab tools plan](tab-tools.md#agreed-scope).
 - While it asks about a task, the task's rows stay tinted as under the × of its row.
-- The design is the frames "Busy terminal warning: the dialog" and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31. They wait for the user's sign-off.
+- The design is the frames "Busy terminal warning: the dialog" and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31 and signed off by the user the same day.
 
 ## Non-goals
 
