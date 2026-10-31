@@ -101,3 +101,5 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Architecture](architecture.md): technical direction and decisions still to make.
 - [Chromium code organization research](research/chromium-organization-research.md): Brave and Helium source layouts, patch workflows, and maintenance tradeoffs.
 - [Chromium customization layouts](research/chromium-customization-layouts.md): an earlier, shorter pass over the same Brave and Helium layouts.
+- [Windows plan](plans/windows.md): proposed, not agreed. What a Windows build and its distribution would take, and the decisions that come first.
+- [Windows port audit](research/windows-port-audit.md): what is Mac-only in uw's tooling, code, and patches, and the Windows options for building, signing, installing, and updating.
