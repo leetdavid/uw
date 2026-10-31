@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/test/test_future.h"
@@ -15,6 +16,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -176,6 +178,33 @@ IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysWhatWentWrong) {
               HasSubstr("http or https"));
   EXPECT_EQ(*Call("fly", base::DictValue()).FindString("error"),
             "There is no tool called fly.");
+}
+
+// Closing a task asks on each page the agent works in. The second page's
+// question used to replace the first one's, whose "stay" then reached the tab
+// strip in the middle of the close (crash at tab_strip_model.cc:144).
+IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest,
+                       ClosingATaskAsksOnEachPageTheAgentWorksIn) {
+  Open("/article");
+  Open("/form");
+  std::vector<tabs::TabHandle> pages;
+  std::vector<int> all;
+  for (int i = 0; i < tabs()->count(); ++i) {
+    if (tabs()->GetTabAtIndex(i) != chat_) {
+      pages.push_back(tabs()->GetTabAtIndex(i)->GetHandle());
+    }
+    all.push_back(i);
+  }
+  ASSERT_EQ(pages.size(), 2u);
+  const tab_groups::TabGroupId task = tabs()->AddToNewGroup(all);
+  chat_ = nullptr;
+
+  TabOrganizationController::From(browser())->CloseTask(task);
+
+  for (const tabs::TabHandle& page : pages) {
+    ASSERT_TRUE(page.Get());
+    EXPECT_FALSE(page.Get()->CanShowModalUI());
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysSafeBrowsingMustBeOn) {
