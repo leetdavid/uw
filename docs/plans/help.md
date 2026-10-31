@@ -17,7 +17,7 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 
 - Help is how-to pages for people using a release of uw. It describes only what is built and released.
 - The pages are MDX in `site/`, served at `uwbrowser.com/help` by [Fumadocs](https://www.fumadocs.dev/docs/integrations/llms), from the same Vercel project as the home page. Fumadocs gives search, `llms.txt`, `llms-full.txt`, and each page's Markdown at its address plus `.md`.
-- English only. There is one version, for the latest release. A page notes the version a feature arrived in when it is later than 0.1.0, such as "In uw 0.3 and later".
+- English only. There is one version, for the latest release. Pages don't say which version a feature arrived in: older releases aren't supported for now. Changed on 2026-10-31 at the user's request: before, a page noted the version for a feature later than 0.1.0.
 - The first pages come from the "What works now" sections of [Try the current build](../try-uw.md), reworded for someone using a release instead of a dev build. Then `try-uw.md` is deleted: "Start uw" moves to the README's [Using your local build](../../README.md#using-your-local-build), and its links point to Help.
 - The pages look like the rest of the site.
 - From Fumadocs, a page has headings with links, code blocks with a title and a copy button, info and warning callouts, tables, tabs, steps, and figures that zoom when clicked. Search lists chosen pages before anything is typed. A narrow screen gets Fumadocs' top bar, a sidebar that slides out, and "On this page" as a dropdown.
