@@ -79,6 +79,7 @@ source_set("browser_tests") {
     "//chrome/test:test_support",
     "//components/omnibox/browser",
     "//components/prefs",
+    "//components/viz/common",
     "//content/test:test_support",
     "//skia",
     "//testing/gtest",

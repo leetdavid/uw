@@ -4,12 +4,14 @@
 
 #import <AppKit/AppKit.h>
 
+#include <memory>
 #include <string>
 #include <utility>
 
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -30,6 +32,8 @@
 #include "components/omnibox/browser/autocomplete_controller.h"
 #include "components/omnibox/browser/autocomplete_input.h"
 #include "components/prefs/pref_service.h"
+#include "components/viz/common/frame_sinks/copy_output_request.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
@@ -180,6 +184,36 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheFrameTurnsToGlassWithTheTheme) {
   SetLook(0, 0);
   ASSERT_FALSE(ShowsGlass(browser()));
   EXPECT_TRUE(frame->fills_bounds_opaquely());
+}
+
+// A page in fullscreen, such as a YouTube video, moves the toolbar into a
+// window of its own, and the frame still paints the glass around the page.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheFramePaintsAroundAFullscreenPage) {
+  if (!MacCanShowGlass()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  browser()->GetWindow()->Activate();
+  SetLook(kFullTransparency / 2, 0);
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsGlass(browser()); }));
+
+  ui_test_utils::FullscreenWaiter fullscreen(browser(),
+                                             {.tab_fullscreen = true});
+  ASSERT_TRUE(
+      content::ExecJs(browser()->tab_strip_model()->GetActiveWebContents(),
+                      "document.documentElement.requestFullscreen()"));
+  fullscreen.Wait();
+  BrowserView* const browser_view =
+      BrowserView::GetBrowserViewForBrowser(browser());
+  ASSERT_NE(browser_view->toolbar()->GetWidget(), browser_view->GetWidget());
+
+  browser_view->GetWidget()->non_client_view()->frame_view()->SchedulePaint();
+  base::test::TestFuture<std::unique_ptr<viz::CopyOutputResult>> painted;
+  browser_view->GetWidget()->GetLayer()->RequestCopyOfOutput(
+      std::make_unique<viz::CopyOutputRequest>(
+          viz::CopyOutputRequest::ResultFormat::RGBA,
+          viz::CopyOutputRequest::ResultDestination::kSystemMemory,
+          painted.GetCallback()));
+  EXPECT_FALSE(painted.Take()->IsEmpty());
 }
 
 // A menu uw frosts lays Chromium's menu color over frosted glass while the

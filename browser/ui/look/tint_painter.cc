@@ -108,16 +108,18 @@ SkAlpha AlphaOf(float amount) {
 // Where the page card is laid out in `view`, leaving out any transform on the
 // toolbar or the page themselves, such as the page's nudge as a workspace
 // switch fades in. A view drawn mid-nudge keeps its drawing after the nudge
-// ends.
+// ends. A part in another widget, such as the toolbar in macOS fullscreen, is
+// not in the card.
 gfx::RectF PageCardIn(const views::View* view,
                       const views::View* toolbar,
                       const views::View* page) {
-  const auto laid_out = [view](const views::View* part) {
-    return views::View::ConvertRectToTarget(part->parent(), view,
-                                            gfx::RectF(part->bounds()));
-  };
-  gfx::RectF card = laid_out(toolbar);
-  card.Union(laid_out(page));
+  gfx::RectF card;
+  for (const views::View* part : {toolbar, page}) {
+    if (part->GetWidget() == view->GetWidget()) {
+      card.Union(views::View::ConvertRectToTarget(part->parent(), view,
+                                                  gfx::RectF(part->bounds())));
+    }
+  }
   return card;
 }
 
