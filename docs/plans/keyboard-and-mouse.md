@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The [close button on a task's row](#close-button-on-a-tasks-row), T284, was agreed on 2026-10-31. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -183,6 +183,17 @@ The design is the frames "Key hints: Option on a tab's ×" and "Key hints: every
 
 Built on 2026-10-30: the sidebar and the window buttons in T275, and chats and terminal tabs in T276. `MouseActionsBrowserTest.OptionOnAParentsCloseButtonTintsItsBranch`, `ALoneTabOrTheSwitchOffShowsNoHint`, and `OptionOnAParentsRowFadesTheTabsThatStay`, `UwChatBrowserTest.CmdOnAnAnswersLinkShowsWhatAClickDoes`, and `UwTerminalBrowserTest.AnAddressUnderlinesOnlyWhileCmdIsHeld` pass. `WindowScreenshotBrowserTest.OptionTurnsTheGreenButtonsArrowsIntoAPlus` checks the green button. The tests set the held keys directly. The × keeps Chromium's stroke width and changes only its color. Not tried: real Option and Cmd presses in a real window.
 
+### Close button on a task's row
+
+Agreed on 2026-10-31 as T284. Closing a task took two clicks from outside it: Ctrl+Cmd+W closes only the selected tab's task, and middle-click needs a mouse.
+
+- An × at the right end of a task's row, in line with the tabs' close buttons, after the "+" and the menu button. It shows when they do: while the pointer is on the row, while the task's menu is open, or while the task holds the selected tab.
+- A click runs Close task, as the task's menu, Ctrl+Cmd+W, and middle-click do. Those stay. A busy terminal in the task asks first, per the [busy terminal warning](terminal-tab.md#busy-terminal-warning).
+- While the pointer is on the ×, the task's row and every tab row in it take the close color at 10%, as a [key hint](#key-hints) does. A collapsed task tints its row alone.
+- Tooltip: "Close task and its 4 tabs", or "Close task and its tab" for one.
+- The narrow sidebar and horizontal tabs have no ×. It has no switch in settings.
+- The design is the frames "Close task in one click: the ×" and "Close task in one click: five ways" on the canvas page "Keyboard and mouse", drawn on 2026-10-31. The user picked the × from the five ways the same day.
+
 ### Menu of empty sidebar space
 
 Right-clicking empty space in the sidebar shows a menu with `Theme…`, which opens the [theme picker](themes.md). Built in T96.
@@ -242,6 +253,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 14. T274: the [key hints](#key-hints) design.
 15. T275: key hints in the sidebar and on the window buttons, with the key watcher. Implementability 5/10: the × is Chromium's, and one row's hover tints other rows.
 16. T276: key hints in the chat page and terminal tabs. Implementability 7/10.
+17. T284: the [close button on a task's row](#close-button-on-a-tasks-row), with T36, the busy terminal warning. Design first. Implementability 8/10 for the button; T36 is 5/10.
 
 T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
@@ -277,6 +289,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tasks menu.
 
 16. [Key hints](#key-hints): with Option held on a parent's ×, the branch's rows tint and the tooltip names the count. Releasing Option clears it without moving the pointer, and so does switching apps. A tab with no children, and an action switched off, show nothing. The rows under a parent fade with Option held elsewhere on its row. The floating green button shows a + with Option held. A chat link shows "Open in the background" with Cmd held, and a terminal address underlines only with Cmd held.
+17. [Close button on a task's row](#close-button-on-a-tasks-row): with a Scratchpad tab selected, the pointer on a task's row shows its ×, and a click closes the task and its tabs. With the pointer on the ×, the task's rows tint and the tooltip counts its tabs. Cmd+Shift+T brings the task back. A task with a busy terminal asks first.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 

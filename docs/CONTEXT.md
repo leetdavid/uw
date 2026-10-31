@@ -85,7 +85,7 @@ A regular tab that shows a shell instead of a web page.
 _Avoid_: Console, shell tab.
 
 **Busy terminal**:
-A terminal tab whose shell is running a command.
+A terminal tab where a program other than its shell is running, such as a build, a server, herdr, or vim.
 
 **uw page**:
 A page that is part of the browser, such as settings. Its address starts with `uw://`.

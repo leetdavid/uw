@@ -1,6 +1,6 @@
 # Terminal tab
 
-Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval.
+Status: scope agreed on 2026-10-14. The [spike](#spike) ran the same day and passed. Its [findings](../research/terminal-spike.md) are in. The shell host and the page, T33 and T34, were approved and built the same day. T35 to T38 still wait for approval. The [busy terminal warning](#busy-terminal-warning), T36, was agreed on 2026-10-31 and waits for its design.
 
 Implementability: **6/10** for the first version, using the [roadmap convention](roadmap.md#implementability-estimates). It is uw's first page of its own outside settings. ghostty-web is at 0.4.0, and the spike found [gaps in its JavaScript](../research/terminal-spike.md#gaps-uw-has-to-cover) that uw's page has to cover. The close warning touches four of Chromium's closing paths. The spike removed two risks: WebAssembly runs under the page's policy with one change, and a shell started on a pseudo-terminal behaves.
 
@@ -15,10 +15,25 @@ The decision to draw with ghostty-web is recorded in [ADR 0004](../adr/0004-the-
 - Cmd shortcuts keep their browser meaning, with Cmd-C and Cmd-V as copy and paste. Ctrl and Option combinations go to the shell, and Option acts as Alt. uw keeps Ctrl+Tab and Ctrl+\`. Shift+Enter sends what Option+Enter does, so Claude Code starts a new line instead of sending the prompt. Changed on 2026-10-15. Before, it sent Enter.
 - The tab's title is the one the shell sets, otherwise the folder's name. The terminal resizes with the window.
 - Cmd-click on an `http` or `https` address the shell printed opens it as a child tab of the terminal tab. A Cmd-click is uw's, as Cmd keys are: a program that asks for the mouse, such as herdr, never sees it. Other clicks go to such a program, and the page opens no link for them. herdr opens a link on Ctrl-click, through `open`, so it lands at the top of the Scratchpad as any [link from another app](../product.md#automatic-tab-organization) does. Changed on 2026-10-19: from 2026-10-16 a Cmd-click went to the program alone, as in Ghostty, but herdr ignores it, so nothing opened. Before that, the page opened the link and also passed the click on, and the user saw two tabs.
-- Closing a [busy terminal](../CONTEXT.md#language) asks first. This covers closing the tab, closing its branch or task, closing the window, and quitting uw. One dialog names every command that would be killed. An idle shell closes without a question, and closing the tab kills the shell.
+- Closing a [busy terminal](../CONTEXT.md#language) asks first. This covers closing the tab, closing its branch or task, closing the window, and quitting uw. One dialog names every command that would be killed. An idle shell closes without a question, and closing the tab kills the shell. See [Busy terminal warning](#busy-terminal-warning).
 - After a restart, a terminal tab comes back in its place in the tab tree with a new shell. uw never reruns a command. The shell starts the first time the tab is shown. Its folder, command history, and scrollback come back with T37: see [Later stages](#later-stages). Changed on 2026-10-18: before, only the folder came back, and scrollback was a non-goal.
 - A "Terminal" section on uw's settings page sets the font, its size, and a theme from a short built-in list. The default theme follows light and dark mode.
 - Memory saver never discards a terminal tab.
+
+## Busy terminal warning
+
+Agreed on 2026-10-31 as T36, to be built with the [close button on a task's row](keyboard-and-mouse.md#close-button-on-a-tasks-row), when the user asked that closing a task ask first while a command runs in it.
+
+- A terminal is busy while any program other than its shell has it. herdr, vim, and htop count, not only builds and servers.
+- One dialog asks before any close that would end a busy terminal: closing the tab, Close Other Tabs, Close Tabs Below, Close Branch, Close Task, closing the window, and quitting uw.
+- Its title names the close: "Close this tab?", "Close this task?", "Close this window?", or "Quit uw?". It lists each running command with its terminal's title, such as `pnpm dev` in shop-web.
+- Two buttons: one in the close color that names the close, such as Close Task, which Return picks, and Cancel, which Esc picks. There is no "Don't ask again".
+- A command that ends while the dialog is open leaves it open. The answer still applies.
+- Quitting lists the busy terminals of every window and workspace, hidden ones too.
+- With [shared tabs](shared-tabs.md) on, closing a window closes no tabs, so it does not ask.
+- Cmd+Shift+T brings a closed terminal back with a new shell. The command does not run again.
+- Unchanged: Clear leaves busy terminals open, and the agent's `close` and `close_task` tools and `uw tabs close` refuse them, per the [tab tools plan](tab-tools.md#agreed-scope).
+- The dialog's design goes on the canvas page "Keyboard and mouse" for the user's sign-off.
 
 ## Non-goals
 
