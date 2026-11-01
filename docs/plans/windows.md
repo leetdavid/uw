@@ -1,8 +1,8 @@
 # Windows
 
-Proposed on 2026-11-01, and being agreed one decision at a time. [Product](../product.md#minimum-usable-version) targets macOS first; this plan says what a Windows version of uw would take and which decisions come first. The findings and sources are in the [Windows port audit](../research/windows-port-audit.md).
+Agreed on 2026-11-01, apart from signing. Stage 1 starts now; later stages wait for their own go-ahead. [Product](../product.md#minimum-usable-version) targets macOS first; this plan says what a Windows version of uw would take and which decisions come first. The findings and sources are in the [Windows port audit](../research/windows-port-audit.md).
 
-Implementability: **3/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score. Chromium already builds, installs, and updates on Windows, and much of uw's code is portable. The terminal, the codecs, the keys, and glass each need Windows code of their own, and every later feature has to be built and checked twice.
+Implementability: **3/10** for the whole plan and **4/10** for the first preview, stages 1 to 4, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score. Chromium already builds, installs, and updates on Windows, and much of uw's code is portable. The terminal, the codecs, the keys, and glass each need Windows code of their own, and every later feature has to be built and checked twice.
 
 ## Agreed
 
@@ -13,6 +13,9 @@ Implementability: **3/10** for the whole plan, using the [roadmap convention](ro
 - Updates, agreed on 2026-11-01: a small fetcher of uw's own. Once a day it reads a feed on the latest GitHub release, downloads the installer, checks its signature, and runs it silently. Chromium's "Relaunch to update" then appears, as on the Mac, with `enable_update_notifications` on. WinSparkle was turned down: it always shows its own window when it finds an update, and the Mac's updater windows never show ([ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)).
 - Signing, agreed on 2026-11-01: none until stage 4. Stages 1 to 3 run only in the owner's VM.
 - Codecs, agreed on 2026-11-01: the Mac's [codecs rule](distribution.md#codecs) holds. Windows uw plays H.264 and AAC through Media Foundation, Windows' own licensed decoders, and ships no FFmpeg H.264 or AAC. Windows "N" editions need Microsoft's Media Feature Pack.
+- First preview, agreed on 2026-11-01: it leaves out glass, the workspace swipe, and the terminal tab, which take the most Windows-only code. The `uw` command ships in it. The three follow in stage 5.
+- Keyboard shortcuts, agreed on 2026-11-01: uw follows Arc for Windows. Cmd becomes Ctrl and Option becomes Alt. Ctrl+S hides the sidebar, Ctrl+Alt+← and → and Alt+1 to 9 switch workspaces, and Ctrl+1 to 9 still go to a tab. Shortcuts Arc doesn't have are drawn on the Doop canvas and signed off. Which shortcuts a terminal tab hands to uw is decided with stage 5.
+- Install identity, agreed on 2026-11-01: uw sits under a company folder, as Chrome sits under `Google\Chrome`: `%LOCALAPPDATA%\uwbrowser\uw\Application` for the app, `%LOCALAPPDATA%\uwbrowser\uw\User Data` for profiles, and `HKCU\Software\uwbrowser\uw` in the registry. AppUserModelID `uwbrowser.uw`, ProgID prefix `uwHTML`, launch scheme `uwbrowser`, and CLSIDs of its own. Like the bundle ID, none of it can change once people install uw.
 
 ## Open decisions
 
@@ -21,19 +24,16 @@ Each has a proposed default.
 | Decision | Options | Proposed |
 | --- | --- | --- |
 | Signing, by stage 4 | Azure Artifact Signing, a CA certificate, or unsigned | Artifact Signing if the owner lives in the US or Canada; an individual-validated certificate otherwise |
-| Keys | A Windows key list | Designed on the Doop canvas. Ctrl+letter belongs to programs in a terminal tab, so the Mac's "must include Cmd" rule can't carry over |
-| First preview's features | Everything, or a smaller set | Leave out glass, the swipe, and the terminal at first. Those three take the most Windows-only code |
-| Install identity | Folder, registry key, AppUserModelID, ProgID, and CLSIDs | `uw` for the folder and registry key, AppUserModelID `uwbrowser.uw`, and new CLSIDs. Like the bundle ID, it can't change after people install |
 
 ## Stages
 
 | Stage | Score | What it takes |
 | --- | --- | --- |
 | 1. Builds for Windows | 6/10 | uw's build commands run on Linux and cross-build Windows uw on the workstation. Platform splits for the five `assert(is_mac)` targets and the `.mm` files, wide-string path fixes, and stubs for glass, window buttons, the swipe, the terminal, and the `uw` command. Done when `chrome`, `browser_tests`, and `mini_installer` build on the workstation, and the installer installs uw in the Windows VM |
-| 2. Runs on Windows | 5/10 | uw's install identity, icons, and strings. Keys saved with `OSCryptAsync`. Windows keys and menu items. Crash reports to Sentry. Done when the installer from stage 1 installs uw in the VM, and uw's browser tests pass there |
+| 2. Runs on Windows | 5/10 | uw's install identity, icons, and strings. Provider keys and sign-in tokens saved with `OSCryptAsync`. Arc's Windows shortcuts and menu items. Crash reports to Sentry. The `uw` command over a named pipe, packaged as `uw.exe` and put on the user's `PATH` without an admin prompt (6/10). Done when the installer from stage 1 installs uw in the VM, and uw's browser tests pass there |
 | 3. Plays video | 3/10 | AAC and H.264 through Media Foundation, with a software decoder for H.264, and WebRTC's H.264. Done when the sites the Mac checks play in the VM, with the GPU on and off |
 | 4. Ships | 5/10 | Signing, a Windows path in `pnpm run release`, updates, the website's download button, Help pages with Windows keys, and a winget package. Done when a preview installs from the website, and updates itself to the next |
-| 5. Matches the Mac | 3/10 | The terminal through ConPTY, the `uw` command over a named pipe, the mini player's dock-or-float choice, hidden workspace windows and the swipe, and glass through Mica |
+| 5. Matches the Mac | 3/10 | The terminal through ConPTY, the mini player's dock-or-float choice, hidden workspace windows and the swipe, and glass through Mica |
 
 ## Testing
 
