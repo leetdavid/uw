@@ -7,8 +7,8 @@ import type { TestContext } from "node:test";
 import { BuildError } from "../scripts/chromium.ts";
 import type { CommandOptions, Runtime } from "../scripts/chromium.ts";
 import {
-  CRASH_REPORT_URL, DMG, FEED_URL, NOTARY_PROFILE, Release, SENTRY_CLI_SHA256, SPARKLE_PUBLIC_KEY,
-  SPARKLE_SHA256, TEAM_ID, draftNotes, newer, posthogKeys,
+  CRASH_REPORT_URL, DMG, FEED_URL, NOTARY_PROFILE, POSTHOG_HOST, Release, SENTRY_CLI_SHA256,
+  SPARKLE_PUBLIC_KEY, SPARKLE_SHA256, TEAM_ID, draftNotes, newer, posthogKey,
 } from "../scripts/release.ts";
 
 const SHA = "c".repeat(40);
@@ -53,7 +53,7 @@ function fixture(t: TestContext, {
   };
   const runtime: Runtime = {
     run, start: () => {},
-    env: { PATH: "/usr/bin", POSTHOG_PROJECT_TOKEN: "phc_test", POSTHOG_PROJECT_REGION: "US", SENTRY_TOKEN: token }, platform: "darwin", arch: "arm64", nodeVersion: "24.13.0",
+    env: { PATH: "/usr/bin", POSTHOG_PROJECT_TOKEN: "phc_test", SENTRY_TOKEN: token }, platform: "darwin", arch: "arm64", nodeVersion: "24.13.0",
     memoryBytes: 64 * 1024 ** 3, freeBytes: () => 0, addresses: () => [], log: () => {},
   };
   const release = (version = "0.1.0") =>
@@ -91,7 +91,7 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
     ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
     ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
     ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", "phc_test"],
-    ["UWPostHogHost", "-string", "https://us.i.posthog.com"],
+    ["UWPostHogHost", "-string", POSTHOG_HOST],
   ]);
   const cli = join(worktree, ".chromium/releases/sentry-cli-3.8.2");
   const upload = calls.find(({ command }) => command[0] === cli);
@@ -153,15 +153,14 @@ test("a sentry-cli download that does not match its checksum is refused", (t) =>
   assert.deepEqual(find("node scripts/chromium.ts"), []);
 });
 
-test("PostHog's token and region come from the environment or else .env", (t) => {
+test("PostHog's token comes from the environment or else .env", (t) => {
   const dir = mkdtempSync(join(tmpdir(), "uw-env-test-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, ".env");
-  writeFileSync(file, "ANTHROPIC_API_KEY=secret\nPOSTHOG_PROJECT_TOKEN=phc_file\nPOSTHOG_PROJECT_REGION=EU   \n");
-  assert.deepEqual(posthogKeys({}, file), { key: "phc_file", host: "https://eu.i.posthog.com" });
-  assert.deepEqual(posthogKeys({ POSTHOG_PROJECT_TOKEN: "phc_env" }, file), { key: "phc_env", host: "https://eu.i.posthog.com" });
-  assert.throws(() => posthogKeys({}, join(dir, "missing")), /POSTHOG_PROJECT_TOKEN/);
-  assert.throws(() => posthogKeys({ POSTHOG_PROJECT_TOKEN: "phc_x", POSTHOG_PROJECT_REGION: "asia" }, join(dir, "missing")), /US or EU/);
+  writeFileSync(file, "ANTHROPIC_API_KEY=secret\nPOSTHOG_PROJECT_TOKEN=phc_file   \n");
+  assert.equal(posthogKey({}, file), "phc_file");
+  assert.equal(posthogKey({ POSTHOG_PROJECT_TOKEN: "phc_env" }, file), "phc_env");
+  assert.throws(() => posthogKey({}, join(dir, "missing")), /POSTHOG_PROJECT_TOKEN/);
 });
 
 test("the notes list the changes since the previous release", (t) => {

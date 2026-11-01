@@ -335,7 +335,7 @@ Previews are built on the owner's Mac, as the [distribution plan](docs/plans/dis
 - A `notarytool` keychain profile named `uw-notary`, made with `xcrun notarytool store-credentials uw-notary`.
 - `gh` signed in to GitHub.
 - Sparkle's update-signing key in the login keychain, made once with Sparkle's `generate_keys`. Keep a backup: without it, installed copies can never update.
-- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, a Sentry token that can write to the `eslee` organization's `uw` project, for uploading symbols; and PostHog's `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`). The release reads only these three entries, from the environment first.
+- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, a Sentry token that can write to the `eslee` organization's `uw` project, for uploading symbols; and PostHog's `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`), which the site also uses. The release reads only `SENTRY_TOKEN` and `POSTHOG_PROJECT_TOKEN`, from the environment first. Releases send problem reports to PostHog through its managed reverse proxy at `e.uwbrowser.com`, a CNAME in the domain's Vercel DNS. Keep the proxy off the apex: `uwbrowser.com` must point at Vercel.
 - A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
 
 Push `main`, then run the release while you are at the Mac. Notarization comes last, hours into a full build, and `notarytool` can't read its saved login while the screen is locked:

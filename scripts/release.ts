@@ -15,12 +15,13 @@ export const SPARKLE_PUBLIC_KEY = "tUSDZsx93uVKuL7o7d/RMObl4n5XFcTn/G5SHNENRZk="
 export const SENTRY_CLI_VERSION = "3.8.2";
 export const SENTRY_CLI_SHA256 = "c80d92b6d34eb64fe7402f56cc7968fbb15aab1c763254ad428b55cc98ec7dcf";
 // Crash reports go to the Sentry project eslee/uw, and uw's pages report problems
-// to PostHog. Both addresses are public in every release. See
-// docs/plans/distribution.md, "Problem reports".
+// to PostHog through its managed proxy on uwbrowser.com. Both addresses are public
+// in every release. See docs/plans/distribution.md, "Problem reports".
 export const SENTRY_ORG = "eslee";
 export const SENTRY_PROJECT = "uw";
 export const CRASH_REPORT_URL =
   "https://o4512323831070720.ingest.us.sentry.io/api/4512323876618240/minidump/?sentry_key=47ca5329021071c1a1fd038b8a1ec13e";
+export const POSTHOG_HOST = "https://e.uwbrowser.com";
 const REPOSITORY = "https://github.com/leetdavid/uw";
 export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
 const BRANCH = "origin/main";
@@ -50,13 +51,11 @@ export function envValue(env: NodeJS.ProcessEnv, name: string, envFile = join(RE
   return "";
 }
 
-/** PostHog's project token and region. */
-export function posthogKeys(env: NodeJS.ProcessEnv, envFile?: string): { key: string; host: string } {
+/** PostHog's project token. */
+export function posthogKey(env: NodeJS.ProcessEnv, envFile?: string): string {
   const key = envValue(env, "POSTHOG_PROJECT_TOKEN", envFile);
-  const region = envValue(env, "POSTHOG_PROJECT_REGION", envFile).toLowerCase();
   if (!/^phc_\w+$/.test(key)) throw new BuildError("Set POSTHOG_PROJECT_TOKEN to PostHog's project token (phc_...) in .env");
-  if (region !== "us" && region !== "eu") throw new BuildError("Set POSTHOG_PROJECT_REGION to US or EU in .env");
-  return { key, host: `https://${region}.i.posthog.com` };
+  return key;
 }
 
 export function newer(version: string, than: string): boolean {
@@ -171,7 +170,7 @@ export class Release {
     const identity = this.identity();
     this.capture(["xcrun", "notarytool", "history", "--keychain-profile", NOTARY_PROFILE], REPO, NETWORK_TIMEOUT);
     this.capture(["gh", "auth", "status"]);
-    const posthog = posthogKeys(this.runtime.env, this.options.envFile);
+    const posthogToken = posthogKey(this.runtime.env, this.options.envFile);
     const sentryToken = this.sentryToken();
     const cli = this.sentryCli();
 
@@ -199,8 +198,8 @@ export class Release {
       ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],
       ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
       ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
-      ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", posthog.key],
-      ["UWPostHogHost", "-string", posthog.host],
+      ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", posthogToken],
+      ["UWPostHogHost", "-string", POSTHOG_HOST],
     ] as const) {
       this.step(["plutil", "-replace", key, type, value, plist], directory);
     }
