@@ -103,4 +103,5 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Chromium customization layouts](research/chromium-customization-layouts.md): an earlier, shorter pass over the same Brave and Helium layouts.
 - [Windows plan](plans/windows.md): Windows uw, cross-built on Linux and installed with Chromium's own installer, and what the first preview leaves out.
 - [ADR 0026: Windows uw updates with a fetcher of its own behind Chromium's relaunch button](adr/0026-windows-uw-updates-with-a-fetcher-of-its-own-behind-chromiums-relaunch-button.md): why not WinSparkle, Velopack, or Chromium Updater.
+- [ADR 0027: Windows uw numbers its releases from Chromium's version](adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md): why Windows releases are 153.0.8010.5301 and not 0.1.1.
 - [Windows port audit](research/windows-port-audit.md): what is Mac-only in uw's tooling, code, and patches, and the Windows options for building, signing, installing, and updating.
