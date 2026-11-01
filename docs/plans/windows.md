@@ -1,17 +1,20 @@
 # Windows
 
-Proposed on 2026-11-01. Nothing here is agreed. [Product](../product.md#minimum-usable-version) targets macOS first; this plan says what a Windows version of uw would take and which decisions come first. The findings and sources are in the [Windows port audit](../research/windows-port-audit.md).
+Proposed on 2026-11-01, and being agreed one decision at a time. [Product](../product.md#minimum-usable-version) targets macOS first; this plan says what a Windows version of uw would take and which decisions come first. The findings and sources are in the [Windows port audit](../research/windows-port-audit.md).
 
 Implementability: **3/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score. Chromium already builds, installs, and updates on Windows, and much of uw's code is portable. The terminal, the codecs, the keys, and glass each need Windows code of their own, and every later feature has to be built and checked twice.
 
-## Decisions
+## Agreed
 
-Each has a proposed default. None is agreed.
+- When, agreed on 2026-11-01: stage 1 starts now. Later stages wait for their own go-ahead.
+- Build host, agreed on 2026-11-01: the owner's Linux workstation, `workstation` on Tailscale, cross-builds Windows uw in a Chromium checkout of its own. Linux to Windows is the cross build Chromium's own CI tests. A Windows 11 x64 VM under KVM on the same machine packages Visual Studio and the Windows SDK once, and runs uw and its tests at full speed. The Mac and the home server were turned down: the Mac is short of disk and would test under Arm emulation, and the server has 31 GB of RAM.
+
+## Open decisions
+
+Each has a proposed default.
 
 | Decision | Options | Proposed |
 | --- | --- | --- |
-| When | Now, after the Mac previews settle, or not planned | The owner's call. Stage 1 is cheap and keeps new code from adding Mac-only parts |
-| Build host | Cross build on the Mac, a Windows PC, or a cloud VM | Cross build on the Mac, in its own output folder. A Windows 11 VM on the Mac packages the toolchain once and runs uw |
 | Processors | x64, Arm64, or both | x64 only, as the Mac is Apple silicon only. Arm64 Windows runs it under emulation |
 | Signing | Azure Artifact Signing, a CA certificate, or unsigned | Artifact Signing if the owner lives in the US or Canada; an individual-validated certificate otherwise |
 | Installer | Chromium's `mini_installer`, Velopack, Inno Setup, or MSIX | `mini_installer`: it already installs per user, registers the browser, and swaps in updates at relaunch |
@@ -25,7 +28,7 @@ Each has a proposed default. None is agreed.
 
 | Stage | Score | What it takes |
 | --- | --- | --- |
-| 1. Builds for Windows | 6/10 | A `--target win` cross build in `out/uw-win`. Platform splits for the five `assert(is_mac)` targets and the `.mm` files, wide-string path fixes, and stubs for glass, window buttons, the swipe, the terminal, and the `uw` command. Done when `chrome`, `browser_tests`, and `mini_installer` build on the Mac |
+| 1. Builds for Windows | 6/10 | uw's build commands run on Linux and cross-build Windows uw on the workstation. Platform splits for the five `assert(is_mac)` targets and the `.mm` files, wide-string path fixes, and stubs for glass, window buttons, the swipe, the terminal, and the `uw` command. Done when `chrome`, `browser_tests`, and `mini_installer` build on the workstation, and the installer installs uw in the Windows VM |
 | 2. Runs on Windows | 5/10 | uw's install identity, icons, and strings. Keys saved with `OSCryptAsync`. Windows keys and menu items. Crash reports to Sentry. Done when the installer from stage 1 installs uw in the VM, and uw's browser tests pass there |
 | 3. Plays video | 3/10 | AAC and H.264 through Media Foundation, with a software decoder for H.264, and WebRTC's H.264. Done when the sites the Mac checks play in the VM, with the GPU on and off |
 | 4. Ships | 5/10 | Signing, a Windows path in `pnpm run release`, updates, the website's download button, Help pages with Windows keys, and a winget package. Done when a preview installs from the website, and updates itself to the next |
@@ -33,7 +36,7 @@ Each has a proposed default. None is agreed.
 
 ## Testing
 
-Tests run in a Windows 11 VM on the Mac, as the Mac's real-window tests run in Tart, so nothing opens on the owner's screen. Tart can't run Windows, so the VM needs Parallels or another host. `pnpm run google-check` runs on Windows too before a release.
+Tests run in the Windows 11 VM on the workstation, as the Mac's real-window tests run in Tart, so nothing opens on the owner's screen. `pnpm run google-check` runs on Windows too before a release.
 
 ## Open questions
 
