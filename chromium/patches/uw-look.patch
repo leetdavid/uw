@@ -39,10 +39,18 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
-index d0f0f711eaa58b43837d69c62dbe5e15301dea95..9e9417d0de42ca66b4e66be791503d95ba7b07c9 100644
+index d0f0f711eaa58b43837d69c62dbe5e15301dea95..d8a31e8d7015a9dfcec7052865cb2dc011bae728 100644
 --- a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
-@@ -145,7 +145,6 @@ void BrowserCaptionButtonContainer::OnWindowControlsOverlayEnabledChanged() {
+@@ -16,6 +16,7 @@
+ #include "chrome/browser/win/titlebar_config.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/compositor/layer.h"
+ #include "ui/strings/grit/ui_strings.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/layout/flex_layout.h"
+@@ -145,7 +146,6 @@ void BrowserCaptionButtonContainer::OnWindowControlsOverlayEnabledChanged() {
      SetPaintToLayer();
    } else {
      SetBackground(nullptr);
@@ -50,7 +58,7 @@ index d0f0f711eaa58b43837d69c62dbe5e15301dea95..9e9417d0de42ca66b4e66be791503d95
    }
    UpdateButtonToolTipsForWindowControlsOverlay();
  }
-@@ -174,12 +173,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
+@@ -174,12 +174,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
  
    UpdateButtons();
  
