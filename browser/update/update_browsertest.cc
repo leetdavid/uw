@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/version.h"
 #include "base/version_info/version_info.h"
@@ -10,9 +11,12 @@
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/updater/updater.h"
 #include "chrome/browser/upgrade_detector/build_state.h"
+#include "chrome/browser/upgrade_detector/upgrade_detector.h"
+#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "uw/browser/update/pending_update.h"
 #include "uw/browser/update/sparkle_updater.h"
@@ -58,6 +62,13 @@ IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, DownloadedUpdateAsksForRelaunch) {
   EXPECT_EQ(installs_, 0);
 }
 
+IN_PROC_BROWSER_TEST_F(UpdateBrowserTest,
+                       DownloadedUpdateShowsRelaunchToUpdate) {
+  DownloadUpdate();
+
+  EXPECT_TRUE(UpgradeDetector::GetInstance()->is_upgrade_available());
+}
+
 IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, RelaunchHandsTheInstallToSparkle) {
   DownloadUpdate();
 
@@ -66,6 +77,21 @@ IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, RelaunchHandsTheInstallToSparkle) {
   EXPECT_EQ(installs_, 1);
   EXPECT_TRUE(local_state().GetBoolean(prefs::kWasRestarted));
   EXPECT_FALSE(local_state().GetBoolean(prefs::kRestartLastSessionOnShutdown));
+}
+
+class OldBuildBrowserTest : public UpdateBrowserTest {
+ protected:
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    UpdateBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitchASCII(switches::kSimulateOutdated, "2020-01-01");
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(OldBuildBrowserTest, AnOldBuildIsNotCalledOutOfDate) {
+  content::RunAllTasksUntilIdle();
+
+  EXPECT_FALSE(UpgradeDetector::GetInstance()->is_outdated_install());
+  EXPECT_FALSE(UpgradeDetector::GetInstance()->is_outdated_install_no_au());
 }
 
 }  // namespace

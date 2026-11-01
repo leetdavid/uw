@@ -437,6 +437,26 @@ index d449bc0..a9c3ed6 100644
    return version_info::GetVersion();
  }
  
+diff --git a/chrome/browser/upgrade_detector/upgrade_detector_impl.cc b/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
+index 75e155bf95..0a506c267f 100644
+--- a/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
++++ b/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
+@@ -481,13 +481,8 @@ void UpgradeDetectorImpl::Init() {
+   }
+ 
+ #if BUILDFLAG(ENABLE_UPDATE_NOTIFICATIONS)
+-  // Start checking for outdated builds sometime after startup completes.
+-  content::GetUIThreadTaskRunner({base::TaskPriority::BEST_EFFORT})
+-      ->PostTask(
+-          FROM_HERE,
+-          base::BindOnce(&UpgradeDetectorImpl::StartOutdatedBuildDetector,
+-                         weak_factory_.GetWeakPtr()));
+-
++  // uw: no outdated-build check. Its bubble sends people to Chrome's download
++  // page.
+   auto* const build_state = g_browser_process->GetBuildState();
+   build_state->AddObserver(this);
+   installed_version_poller_.emplace(build_state);
 diff --git a/components/crash/core/app/crashpad_mac.mm b/components/crash/core/app/crashpad_mac.mm
 index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366ddedc9bcd33 100644
 --- a/components/crash/core/app/crashpad_mac.mm
