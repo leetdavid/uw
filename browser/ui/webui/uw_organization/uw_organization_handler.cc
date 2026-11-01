@@ -326,7 +326,7 @@ namespace {
 
 mojom::CommandStatePtr CommandStateOf(mojom::CommandProblem problem,
                                       bool installed) {
-  return mojom::CommandState::New(installed, CommandLink().value(), problem);
+  return mojom::CommandState::New(installed, CommandLink().AsUTF8Unsafe(), problem);
 }
 
 mojom::CommandProblem ProblemOf(CommandInstall result) {

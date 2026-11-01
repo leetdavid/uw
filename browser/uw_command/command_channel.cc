@@ -66,7 +66,7 @@ void CommandChannel::Start() {
   if (!base::PathService::Get(chrome::DIR_USER_DATA, &user_data)) {
     return;
   }
-  const base::FilePath socket = user_data.Append(kCommandSocketName);
+  const base::FilePath socket = user_data.AppendASCII(kCommandSocketName);
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock()},
       base::BindOnce(

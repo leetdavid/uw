@@ -239,7 +239,7 @@ std::optional<ConnectorConfig> FromMcpRemote(const ConnectorConfig& local) {
   if (local.remote()) {
     return std::nullopt;
   }
-  const std::string runner = base::FilePath(local.command).BaseName().value();
+  const std::string runner = base::FilePath::FromUTF8Unsafe(local.command).BaseName().AsUTF8Unsafe();
   std::span<const std::string> args(local.args);
   const bool installed = runner == "mcp-remote";
   if (runner == "pnpm" || runner == "yarn") {

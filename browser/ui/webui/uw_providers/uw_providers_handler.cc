@@ -16,9 +16,11 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -1019,7 +1021,11 @@ void UwProvidersHandler::OpenConnectorInTerminal(const std::string& name) {
   }
   base::EnvironmentMap environment;
   for (const auto& [key, value] : Connectors::Get().Environment(name)) {
+#if BUILDFLAG(IS_WIN)
+    environment[base::UTF8ToWide(key)] = base::UTF8ToWide(value);
+#else
     environment[key] = value;
+#endif
   }
   OpenTerminalTabRunning(tab->GetBrowserWindowInterface(), command,
                          std::move(environment));

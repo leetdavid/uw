@@ -318,9 +318,9 @@ std::string AgentTools::FolderOf(int number) const {
     return "~";
   }
   if (home.AppendRelativePath(folder, &inside)) {
-    return base::StrCat({"~/", inside.value()});
+    return base::StrCat({"~/", inside.AsUTF8Unsafe()});
   }
-  return folder.value();
+  return folder.AsUTF8Unsafe();
 }
 
 TerminalShell* AgentTools::ShellOf(int number) const {

@@ -984,9 +984,10 @@ std::string Connectors::CommandLine(std::string_view name) const {
   if (!info || info->config.remote()) {
     return std::string();
   }
-  std::vector<base::FilePath> words = {base::FilePath(info->config.command)};
+  std::vector<base::FilePath> words = {
+      base::FilePath::FromUTF8Unsafe(info->config.command)};
   for (const std::string& arg : info->config.args) {
-    words.push_back(base::FilePath(arg));
+    words.push_back(base::FilePath::FromUTF8Unsafe(arg));
   }
   return QuotePathsForShell(words);
 }

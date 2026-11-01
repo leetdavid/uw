@@ -52,7 +52,7 @@ base::FilePath SaveImage(const std::vector<uint8_t>& png) {
   if (!base::CreateNewTempDirectory("uw-paste", &folder)) {
     return base::FilePath();
   }
-  const base::FilePath path = folder.Append("image.png");
+  const base::FilePath path = folder.AppendASCII("image.png");
   return base::WriteFile(path, png) ? path : base::FilePath();
 }
 

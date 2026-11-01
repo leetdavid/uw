@@ -298,7 +298,7 @@ void AutomaticOrganizer::Tidy() {
     const auto parent = numbers.find(page.parent);
     tabs.push_back({base::UTF16ToUTF8(activity->second.title),
                     activity->second.url.spec(),
-                    activity->second.folder.value(),
+                    activity->second.folder.AsUTF8Unsafe(),
                     parent == numbers.end() ? 0 : parent->second});
     numbers[page.id] = tabs.size();
     request->tabs.push_back(page.id);

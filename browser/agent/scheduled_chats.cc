@@ -265,7 +265,7 @@ void ScheduledChats::Save(const std::string& chat_id, ScheduledChat chat) {
   const ChatTriggers::Trigger* running = triggers_.Find(chat_id);
   if (running && !chat.trigger.empty() && running->command == chat.trigger) {
     chat.trigger_wake = std::string(NameOf(running->wake));
-    chat.trigger_folder = running->folder.value();
+    chat.trigger_folder = running->folder.AsUTF8Unsafe();
     triggers_.MakeLasting(chat_id);
   } else if (!is_new && !chat.trigger.empty() &&
              chat.trigger == saved->second.trigger) {
@@ -775,7 +775,7 @@ void ScheduledChats::StartLastingTrigger(const std::string& chat_id) {
   trigger.command = chat.trigger;
   trigger.wake = TriggerWakeNamed(chat.trigger_wake);
   trigger.request = chat.request;
-  trigger.folder = base::FilePath(chat.trigger_folder);
+  trigger.folder = base::FilePath::FromUTF8Unsafe(chat.trigger_folder);
   trigger.lasting = true;
   std::ignore = triggers_.Start(chat_id, std::move(trigger));
 }

@@ -99,8 +99,8 @@ base::FilePath StartCopy(const base::FilePath& folder, std::string_view name) {
   base::FilePath base = base::FilePath::FromUTF8Unsafe(name).BaseName();
   if (base.empty() || base.value() == base::FilePath::kCurrentDirectory ||
       base.value() == base::FilePath::kParentDirectory ||
-      base.value() == "/") {
-    base = base::FilePath("file");
+      base.value() == FILE_PATH_LITERAL("/")) {
+    base = base::FilePath(FILE_PATH_LITERAL("file"));
   }
   if (!base::CreateDirectory(folder)) {
     return base::FilePath();
