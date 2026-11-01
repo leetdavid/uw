@@ -4,16 +4,13 @@
 
 #include "chrome/grit/uw_chat_resources.h"
 
-#include <CoreFoundation/CoreFoundation.h>
-
 #include <memory>
 #include <utility>
 
-#include "base/apple/scoped_cftyperef.h"
 #include "base/memory/raw_ptr.h"
-#include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/supports_user_data.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/grit/uw_command_bar_resources.h"
@@ -30,6 +27,16 @@
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_handler.h"
 
+#if BUILDFLAG(IS_MAC)
+#include <CoreFoundation/CoreFoundation.h>
+
+#include "base/apple/scoped_cftyperef.h"
+#include "base/strings/sys_string_conversions.h"
+#else
+#include "base/i18n/time_formatting.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
+#endif
+
 namespace uw {
 namespace {
 
@@ -44,8 +51,9 @@ struct FrostedData : base::SupportsUserData::Data {
   bool frosted = false;
 };
 
+#if BUILDFLAG(IS_MAC)
 // The system's zone is read again each time, so a change of zone shows.
-std::string MacTimeZone() {
+std::string SystemTimeZone() {
   CFTimeZoneResetSystem();
   base::apple::ScopedCFTypeRef<CFTimeZoneRef> zone(CFTimeZoneCopySystem());
   return base::SysCFStringRefToUTF8(CFTimeZoneGetName(zone.get()));
@@ -53,7 +61,7 @@ std::string MacTimeZone() {
 
 // The Mac's short time format follows its 24-hour switch: an H or a k in it
 // is a 24-hour hour.
-bool MacUsesTwentyFourHours() {
+bool UsesTwentyFourHours() {
   base::apple::ScopedCFTypeRef<CFLocaleRef> locale(CFLocaleCopyCurrent());
   base::apple::ScopedCFTypeRef<CFDateFormatterRef> formatter(
       CFDateFormatterCreate(kCFAllocatorDefault, locale.get(),
@@ -63,6 +71,19 @@ bool MacUsesTwentyFourHours() {
       base::SysCFStringRefToUTF8(CFDateFormatterGetFormat(formatter.get()));
   return format.find_first_of("Hk") != std::string::npos;
 }
+#else
+std::string SystemTimeZone() {
+  std::unique_ptr<icu::TimeZone> zone(icu::TimeZone::detectHostTimeZone());
+  icu::UnicodeString id;
+  std::string name;
+  zone->getID(id).toUTF8String(name);
+  return name;
+}
+
+bool UsesTwentyFourHours() {
+  return base::GetHourClockType() == base::k24HourClock;
+}
+#endif
 
 }  // namespace
 
@@ -138,7 +159,7 @@ void UwCommandBarUI::GetCurrencies(GetCurrenciesCallback callback) {
 }
 
 void UwCommandBarUI::GetClock(GetClockCallback callback) {
-  std::move(callback).Run(MacTimeZone(), MacUsesTwentyFourHours());
+  std::move(callback).Run(SystemTimeZone(), UsesTwentyFourHours());
 }
 
 void UwCommandBarUI::CopyAnswer(const std::string& text) {

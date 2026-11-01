@@ -14,12 +14,12 @@ source_set("look") {
     "tint_color_mixer.h",
     "tint_painter.cc",
     "tint_painter.h",
+    "window_buttons.h",
   ]
   if (is_mac) {
-    sources += [
-      "window_buttons.h",
-      "window_buttons_mac.mm",
-    ]
+    sources += [ "window_buttons_mac.mm" ]
+  } else {
+    sources += [ "window_buttons_stub.cc" ]
   }
   public_deps = [ "//uw/components/look" ]
   deps = [
@@ -42,12 +42,12 @@ source_set("look") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [
-    "readme_screenshots_browsertest.cc",
-    "tint_browsertest.cc",
-  ]
+  sources = [ "tint_browsertest.cc" ]
   if (is_mac) {
-    sources += [ "window_buttons_browsertest.mm" ]
+    sources += [
+      "readme_screenshots_browsertest.cc",
+      "window_buttons_browsertest.mm",
+    ]
   }
   deps = [
     ":look",

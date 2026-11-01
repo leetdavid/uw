@@ -2,21 +2,17 @@
 
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 
-#include <CoreFoundation/CoreFoundation.h>
-
 #include <algorithm>
 #include <utility>
 #include <vector>
 
-#include "base/apple/foundation_util.h"
-#include "base/apple/scoped_cftyperef.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
-#include "base/strings/sys_string_conversions.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/storage_partition.h"
@@ -26,6 +22,21 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+
+#if BUILDFLAG(IS_MAC)
+#include <CoreFoundation/CoreFoundation.h>
+
+#include "base/apple/foundation_util.h"
+#include "base/apple/scoped_cftyperef.h"
+#include "base/strings/sys_string_conversions.h"
+#else
+#include <iterator>
+#include <string_view>
+
+#include "base/strings/utf_string_conversions.h"
+#include "third_party/icu/source/common/unicode/ucurr.h"
+#include "third_party/icu/source/common/unicode/uloc.h"
+#endif
 
 namespace uw {
 namespace {
@@ -64,12 +75,25 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
 
 }  // namespace
 
+#if BUILDFLAG(IS_MAC)
 std::string RegionCurrency() {
   base::apple::ScopedCFTypeRef<CFLocaleRef> locale(CFLocaleCopyCurrent());
   const CFStringRef code = base::apple::CFCast<CFStringRef>(
       CFLocaleGetValue(locale.get(), kCFLocaleCurrencyCode));
   return code ? base::SysCFStringRefToUTF8(code) : "USD";
 }
+#else
+std::string RegionCurrency() {
+  UErrorCode status = U_ZERO_ERROR;
+  char16_t code[4] = {};
+  const int32_t length =
+      ucurr_forLocale(uloc_getDefault(), code, std::size(code), &status);
+  if (U_FAILURE(status) || length != 3) {
+    return "USD";
+  }
+  return base::UTF16ToUTF8(std::u16string_view(code, 3));
+}
+#endif
 
 // static
 ExchangeRates* ExchangeRates::For(Profile* profile) {

@@ -42,4 +42,10 @@ source_set("uw_command_bar") {
     "//uw/browser/resources/uw_command_bar:resources",
     "//uw/browser/tab_organization:ai_connection",
   ]
+  if (!is_mac) {
+    deps += [
+      "//base:i18n",
+      "//third_party/icu",
+    ]
+  }
 }

@@ -13,6 +13,8 @@ source_set("glass") {
       "AppKit.framework",
       "QuartzCore.framework",
     ]
+  } else {
+    sources += [ "glass_stub.cc" ]
   }
   public_deps = [
     "//base",
@@ -45,15 +47,17 @@ source_set("prefs") {
 
 source_set("test_support") {
   testonly = true
-  sources = [
-    "glass_screenshot.h",
-    "glass_screenshot.mm",
-  ]
-  frameworks = [
-    "AppKit.framework",
-    "QuartzCore.framework",
-    "ScreenCaptureKit.framework",
-  ]
+  if (is_mac) {
+    sources = [
+      "glass_screenshot.h",
+      "glass_screenshot.mm",
+    ]
+    frameworks = [
+      "AppKit.framework",
+      "QuartzCore.framework",
+      "ScreenCaptureKit.framework",
+    ]
+  }
   deps = [
     "//base",
     "//chrome/browser/ui",

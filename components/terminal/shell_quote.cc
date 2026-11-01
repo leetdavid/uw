@@ -19,7 +19,7 @@ std::string QuotePathsForShell(const std::vector<base::FilePath>& paths) {
   std::vector<std::string> words;
   for (const base::FilePath& path : paths) {
     std::string word;
-    for (char c : path.value()) {
+    for (char c : path.AsUTF8Unsafe()) {
       if (kSpecial.find(c) != std::string_view::npos) {
         word += '\\';
       }

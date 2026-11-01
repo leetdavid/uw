@@ -14,6 +14,7 @@
 #include "base/files/file_path.h"
 #include "base/files/scoped_file.h"
 #include "base/process/process.h"
+#include "build/build_config.h"
 
 namespace uw {
 
@@ -45,7 +46,9 @@ class ShellHost {
 
   // Readable when the shell has written output, and writable when it can
   // take more input. Reads and writes never block.
+#if BUILDFLAG(IS_POSIX)
   int terminal_fd() const { return terminal_.get(); }
+#endif
 
   // Sends `bytes` to the shell as if typed and returns how many the terminal
   // took. It takes fewer when the shell is not reading fast enough.
@@ -81,9 +84,11 @@ class ShellHost {
   base::ProcessId pid() const { return shell_.Pid(); }
 
  private:
+#if BUILDFLAG(IS_POSIX)
   ShellHost(base::ScopedFD terminal, base::Process shell);
 
   base::ScopedFD terminal_;
+#endif
   base::Process shell_;
 };
 

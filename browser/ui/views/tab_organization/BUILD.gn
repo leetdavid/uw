@@ -34,6 +34,7 @@ source_set("tab_organization") {
     "problem_reports_card.h",
     "scratchpad_heading.cc",
     "scratchpad_heading.h",
+    "second_click.h",
     "split_mark.cc",
     "split_mark.h",
     "tab_indent.cc",
@@ -44,7 +45,6 @@ source_set("tab_organization") {
     "task_name_field.h",
     "tint_style.cc",
     "tint_style.h",
-    "second_click.h",
     "window_commands.cc",
     "window_commands.h",
   ]

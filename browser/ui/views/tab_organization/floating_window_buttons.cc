@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "base/functional/bind.h"
+#include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/grit/generated_resources.h"
@@ -26,6 +27,12 @@
 
 namespace uw {
 namespace {
+
+#if BUILDFLAG(IS_MAC)
+constexpr int kZoomName = IDS_ENTER_FULLSCREEN_MAC;
+#else
+constexpr int kZoomName = IDS_APP_ACCNAME_MAXIMIZE;
+#endif
 
 // macOS's size and spacing of its window buttons.
 constexpr int kDiameter = 14;
@@ -51,7 +58,7 @@ Look LookOf(WindowButton button) {
               SkColorSetRGB(0x99, 0x57, 0x00), IDS_APP_ACCNAME_MINIMIZE};
     case WindowButton::kZoom:
       return {SkColorSetRGB(0x28, 0xC8, 0x40), SkColorSetRGB(0x1A, 0xAB, 0x29),
-              SkColorSetRGB(0x00, 0x65, 0x00), IDS_ENTER_FULLSCREEN_MAC};
+              SkColorSetRGB(0x00, 0x65, 0x00), kZoomName};
   }
 }
 

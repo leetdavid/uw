@@ -78,6 +78,11 @@ source_set("mini_player") {
       "Cocoa.framework",
       "CoreGraphics.framework",
     ]
+  } else {
+    sources += [
+      "app_activity_stub.cc",
+      "dock_cover_stub.cc",
+    ]
   }
 }
 

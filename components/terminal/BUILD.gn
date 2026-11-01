@@ -6,20 +6,31 @@ source_set("terminal") {
     "shell_host.h",
     "shell_quote.cc",
     "shell_quote.h",
-    "shell_session.cc",
     "shell_session.h",
   ]
+  if (is_mac) {
+    sources += [ "shell_host_mac.cc" ]
+  } else {
+    sources += [ "shell_host_stub.cc" ]
+  }
+  if (is_posix) {
+    sources += [ "shell_session.cc" ]
+  } else {
+    sources += [ "shell_session_stub.cc" ]
+  }
   public_deps = [ "//base" ]
   deps = [ "//base:i18n" ]
 }
 
 source_set("unit_tests") {
   testonly = true
-  sources = [
-    "shell_host_unittest.cc",
-    "shell_quote_unittest.cc",
-    "shell_session_unittest.cc",
-  ]
+  sources = [ "shell_quote_unittest.cc" ]
+  if (is_mac) {
+    sources += [
+      "shell_host_unittest.cc",
+      "shell_session_unittest.cc",
+    ]
+  }
   deps = [
     ":terminal",
     "//base",
