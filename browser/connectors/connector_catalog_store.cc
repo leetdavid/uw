@@ -116,7 +116,8 @@ void ConnectorCatalogStore::SetUpForTesting(
   store.waiting_plugins_.clear();
   store.plugins_read_.clear();
   store.plugins_running_ = 0;
-  store.file_ = folder.AppendASCII(kFileName);
+  store.file_ =
+      folder.empty() ? base::FilePath() : folder.AppendASCII(kFileName);
   store.registry_ = registry;
   store.raw_ = raw;
   store.loader_ = std::move(loader);
@@ -341,6 +342,9 @@ void ConnectorCatalogStore::OnDownloaded(int id,
 }
 
 void ConnectorCatalogStore::Save() {
+  if (file_.empty()) {
+    return;
+  }
   files_->PostTask(FROM_HERE,
                    base::BindOnce(&WriteSaved, file_, catalog_.ToJson()));
 }
