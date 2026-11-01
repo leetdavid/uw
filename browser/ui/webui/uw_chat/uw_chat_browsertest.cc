@@ -186,7 +186,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     SetAgentsSkillsFolderForTesting(AgentsSkills());
     // Connectors live in the test's own folder, and start through sh.
     Connectors::SetUpForTesting(home_.GetPath().AppendASCII("connectors"),
-                                base::FilePath("/bin/sh"));
+                                base::FilePath(FILE_PATH_LITERAL("/bin/sh")));
     notifications_ = std::make_unique<NotificationDisplayServiceTester>(
         browser()->GetProfile());
   }
@@ -532,7 +532,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(base::PathService::Get(base::DIR_EXE, &program));
     ConnectorConfig fake;
     fake.name = "fake";
-    fake.command = program.AppendASCII("uw_fake_mcp_server").value();
+    fake.command = program.AppendASCII("uw_fake_mcp_server").AsUTF8Unsafe();
     std::vector<ConnectorConfig> added;
     added.push_back(std::move(fake));
     ASSERT_TRUE(Connectors::Get().Add(std::move(added)).has_value());
@@ -2308,7 +2308,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AttachedFilesGoWithTheMessage) {
   EXPECT_THAT(requests[0],
               ::testing::HasSubstr(base::StrCat(
                   {"File 1: budget.csv (text/csv, 9 bytes), saved at ",
-                   folder.AppendASCII("budget.csv").value()})));
+                   folder.AppendASCII("budget.csv").AsUTF8Unsafe()})));
   EXPECT_THAT(requests[0], ::testing::HasSubstr("Flat,980"));
   EXPECT_THAT(requests[0],
               ::testing::HasSubstr("File 2: TAP-booking.pdf (application/pdf, "));
@@ -2317,7 +2317,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AttachedFilesGoWithTheMessage) {
   EXPECT_THAT(requests[0],
               ::testing::HasSubstr(base::StrCat(
                   {"File 3: export.zip (application/zip, 8 bytes), saved at ",
-                   folder.AppendASCII("export.zip").value(),
+                   folder.AppendASCII("export.zip").AsUTF8Unsafe(),
                    ". Open it from its path."})));
   EXPECT_EQ(content::EvalJs(chat,
                             "[...document.querySelectorAll('.sent-files "
@@ -2588,7 +2588,7 @@ class UwChatTerminalBrowserTest : public UwChatBrowserTest {
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
     // zsh finds none of the user's startup files in an empty folder.
-    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().AsUTF8Unsafe());
   }
 
   // The state the chat tab's row shows: the mark of the one row that shows

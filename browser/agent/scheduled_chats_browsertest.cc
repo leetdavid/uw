@@ -581,7 +581,7 @@ class ScheduledChatTriggersBrowserTest : public ScheduledChatsBrowserTest {
     ScheduledChatsBrowserTest::SetUpOnMainThread();
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
-    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().AsUTF8Unsafe());
   }
 
   void TearDownOnMainThread() override {

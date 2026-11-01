@@ -575,7 +575,7 @@ class AgentTerminalBrowserTest : public AgentLoopBrowserTest {
     ASSERT_TRUE(zdotdir_.CreateUniqueTempDir());
     // zsh finds none of the user's startup files in an empty folder, so the
     // tests do not depend on them.
-    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().value());
+    base::Environment::Create()->SetVar("ZDOTDIR", zdotdir_.GetPath().AsUTF8Unsafe());
   }
 
   static base::ListValue Run(base::DictValue args) {

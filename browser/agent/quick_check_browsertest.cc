@@ -55,7 +55,7 @@ IN_PROC_BROWSER_TEST_F(CommandCheckBrowserTest, MANUAL_JudgesTheExamples) {
   };
   std::string json;
   ASSERT_TRUE(
-      base::ReadFileToString(base::FilePath(var("UW_CHECK_EXAMPLES")), &json));
+      base::ReadFileToString(base::FilePath::FromUTF8Unsafe(var("UW_CHECK_EXAMPLES")), &json));
   const std::optional<base::Value> examples =
       base::JSONReader::Read(json, base::JSON_PARSE_RFC);
   ASSERT_TRUE(examples && examples->is_list());
@@ -147,7 +147,7 @@ IN_PROC_BROWSER_TEST_F(CommandCheckBrowserTest, MANUAL_JudgesTheExamples) {
     }
   }
   ASSERT_TRUE(
-      base::WriteFile(base::FilePath(var("UW_CHECK_RESULTS")), results));
+      base::WriteFile(base::FilePath::FromUTF8Unsafe(var("UW_CHECK_RESULTS")), results));
   EXPECT_GE(safe_ran * 5, safe * 4)
       << safe_ran << " of " << safe << " safe examples ran";
 }

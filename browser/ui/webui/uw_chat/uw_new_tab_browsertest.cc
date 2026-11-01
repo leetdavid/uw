@@ -443,7 +443,7 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningShowsChatsAndBusyTerminals) {
     ASSERT_TRUE(zdotdir.CreateUniqueTempDir());
   }
   // zsh finds none of the user's startup files in an empty folder.
-  base::Environment::Create()->SetVar("ZDOTDIR", zdotdir.GetPath().value());
+  base::Environment::Create()->SetVar("ZDOTDIR", zdotdir.GetPath().AsUTF8Unsafe());
   OpenTerminalTabRunning(browser(), "sleep 60");
   content::WebContents* terminal =
       browser()->tab_strip_model()->GetActiveWebContents();

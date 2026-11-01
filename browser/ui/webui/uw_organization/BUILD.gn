@@ -41,10 +41,10 @@ source_set("uw_organization_handler") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [
-    "uw_command_section_browsertest.cc",
-    "uw_organization_page_browsertest.cc",
-  ]
+  sources = [ "uw_organization_page_browsertest.cc" ]
+  if (is_mac) {
+    sources += [ "uw_command_section_browsertest.cc" ]
+  }
   deps = [
     "//base",
     "//base/test:test_support",

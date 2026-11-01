@@ -111,7 +111,7 @@ class ProblemReportsBrowserTest : public headless::HeadlessModeBrowserTest {
         AnswerFile());
   }
 
-  base::FilePath AnswerFile() { return folder_.GetPath().Append("answer"); }
+  base::FilePath AnswerFile() { return folder_.GetPath().AppendASCII("answer"); }
 
   std::optional<ProblemReportsAnswer> SavedAnswer() {
     ProblemReports::Get().FlushForTesting();

@@ -94,7 +94,7 @@ void Save(base::FunctionRef<SkBitmap()> pixels, const std::string& name) {
   ASSERT_TRUE(png);
   base::ScopedAllowBlockingForTesting allow_blocking;
   ASSERT_TRUE(base::WriteFile(
-      base::FilePath(*folder).AppendASCII(name + ".png"), *png));
+      base::FilePath::FromUTF8Unsafe(*folder).AppendASCII(name + ".png"), *png));
 }
 
 }  // namespace

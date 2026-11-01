@@ -168,7 +168,7 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(home_.CreateUniqueTempDir());
     SetAgentsSkillsFolderForTesting(AgentsSkills());
     Connectors::SetUpForTesting(home_.GetPath().AppendASCII("connectors"),
-                                base::FilePath("/bin/sh"));
+                                base::FilePath(FILE_PATH_LITERAL("/bin/sh")));
   }
 
   void TearDownOnMainThread() override {
@@ -1019,7 +1019,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheSkillsSectionSaysWhoStarts) {
 std::string FakeServer() {
   base::FilePath program;
   EXPECT_TRUE(base::PathService::Get(base::DIR_EXE, &program));
-  return program.AppendASCII("uw_fake_mcp_server").value();
+  return program.AppendASCII("uw_fake_mcp_server").AsUTF8Unsafe();
 }
 
 // A registry with a server that asks for a sign-in and one that needs a key,

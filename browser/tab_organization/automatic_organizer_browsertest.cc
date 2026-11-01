@@ -27,6 +27,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
@@ -1404,6 +1405,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_EQ(TitleOf(*task), u"Plan Lisbon trip");
 }
 
+#if BUILDFLAG(IS_MAC)
 // Every test and every scripted run of the app passes --use-mock-keychain.
 // Such a run keeps its keys in memory: it neither reads nor replaces a key
 // the user saved in the Keychain, which every profile on the Mac shares.
@@ -1432,6 +1434,7 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_TRUE(keys.DeleteKey(account));
   EXPECT_FALSE(keys.GetKey(account));
 }
+#endif  // BUILDFLAG(IS_MAC)
 
 // A tab that no longer matches the name of its task has either left the task
 // or shows that the task has outgrown the name. The decision model says
