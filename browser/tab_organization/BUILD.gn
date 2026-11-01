@@ -83,7 +83,6 @@ source_set("browser_tests") {
   sources = [
     "automatic_organizer_browsertest.cc",
     "shared_tabs_browsertest.cc",
-    "shared_tabs_drag_browsertest.cc",
     "tab_organization_controller_browsertest.cc",
     "window_screenshot_browsertest.cc",
   ]
@@ -142,6 +141,7 @@ source_set("browser_tests") {
       "branch_drag_browsertest.mm",
       "links_from_other_apps_browsertest.mm",
       "mouse_actions_browsertest.mm",
+      "shared_tabs_drag_browsertest.cc",
       "sidebar_menus_browsertest.mm",
       "task_keys_browsertest.mm",
       "undo_shortcut_browsertest.mm",

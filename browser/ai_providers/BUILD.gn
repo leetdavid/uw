@@ -53,8 +53,12 @@ source_set("test_support") {
     "model_test_server.cc",
     "model_test_server.h",
     "scoped_memory_keychain.h",
-    "scoped_memory_keychain.mm",
   ]
+  if (is_mac) {
+    sources += [ "scoped_memory_keychain.mm" ]
+  } else {
+    sources += [ "scoped_memory_keychain_stub.cc" ]
+  }
   deps = [
     "//base",
     "//crypto",

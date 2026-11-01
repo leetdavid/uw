@@ -13,10 +13,10 @@ source_set("ui") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [
-    "page_clipboard_browsertest.cc",
-    "uw_url_rewrite_browsertest.cc",
-  ]
+  sources = [ "uw_url_rewrite_browsertest.cc" ]
+  if (is_mac) {
+    sources += [ "page_clipboard_browsertest.cc" ]
+  }
   deps = [
     ":ui",
     "//base",
