@@ -2,23 +2,16 @@
 
 #include "uw/browser/connectors/connectors.h"
 
-#include <fcntl.h>
-#include <poll.h>
-#include <signal.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <array>
 #include <utility>
 
 #include "base/files/file_util.h"
 #include "base/files/important_file_writer.h"
-#include "base/files/scoped_file.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/path_service.h"
-#include "base/posix/eintr_wrapper.h"
 #include "base/process/kill.h"
 #include "base/process/launch.h"
 #include "base/strings/strcat.h"
@@ -26,15 +19,26 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/common/chrome_paths.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/connectors/local_transport.h"
 #include "uw/browser/connectors/remote_transport.h"
-#include "uw/components/connectors/shell_environment.h"
 #include "uw/components/terminal/shell_host.h"
 #include "uw/components/terminal/shell_quote.h"
+
+#if BUILDFLAG(IS_POSIX)
+#include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include "base/files/scoped_file.h"
+#include "base/posix/eintr_wrapper.h"
+#include "uw/components/connectors/shell_environment.h"
+#endif
 
 namespace uw {
 namespace {
@@ -46,7 +50,9 @@ constexpr base::TimeDelta kCallTimeout = base::Minutes(10);
 // before it shows as failed.
 constexpr int kRestarts = 1;
 // How long the user's shell may take to read their startup files.
+#if BUILDFLAG(IS_POSIX)
 constexpr base::TimeDelta kEnvironmentLimit = base::Seconds(10);
+#endif
 // How much of a failed connector's log its page shows.
 constexpr size_t kLogLines = 8;
 
@@ -128,6 +134,7 @@ base::FilePath UserShell() {
   return ShellHost::ForUser().shell;
 }
 
+#if BUILDFLAG(IS_POSIX)
 // The environment the user's terminal has: what `shell` holds as an
 // interactive login shell, once it has read their startup files. Nothing
 // when it fails or takes longer than kEnvironmentLimit. Blocks.
@@ -180,6 +187,12 @@ std::optional<base::EnvironmentMap> ReadShellEnvironment(base::FilePath shell) {
   base::EnsureProcessTerminated(std::move(process));
   return environment;
 }
+#else
+// Windows gives uw the user's environment, so programs start with uw's own.
+std::optional<base::EnvironmentMap> ReadShellEnvironment(base::FilePath shell) {
+  return base::EnvironmentMap();
+}
+#endif
 
 // The last lines of a connector's log.
 std::vector<std::string> LogTail(base::FilePath log) {

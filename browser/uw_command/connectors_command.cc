@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/values.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"

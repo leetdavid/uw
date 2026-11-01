@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "cc/paint/paint_flags.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "ui/color/color_provider.h"

@@ -13,9 +13,13 @@ source_set("connectors") {
     "mcp.h",
     "oauth.cc",
     "oauth.h",
-    "shell_environment.cc",
-    "shell_environment.h",
   ]
+  if (is_posix) {
+    sources += [
+      "shell_environment.cc",
+      "shell_environment.h",
+    ]
+  }
   public_deps = [
     "//base",
     "//url",
@@ -36,8 +40,10 @@ source_set("unit_tests") {
     "connector_tools_unittest.cc",
     "mcp_unittest.cc",
     "oauth_unittest.cc",
-    "shell_environment_unittest.cc",
   ]
+  if (is_posix) {
+    sources += [ "shell_environment_unittest.cc" ]
+  }
   deps = [
     ":connectors",
     "//base",

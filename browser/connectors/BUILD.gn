@@ -7,7 +7,6 @@ source_set("connectors") {
     "connector_catalog_store.h",
     "connectors.cc",
     "connectors.h",
-    "local_transport.cc",
     "local_transport.h",
     "mcp_client.cc",
     "mcp_client.h",
@@ -16,6 +15,11 @@ source_set("connectors") {
     "sign_in.cc",
     "sign_in.h",
   ]
+  if (is_posix) {
+    sources += [ "local_transport.cc" ]
+  } else {
+    sources += [ "local_transport_stub.cc" ]
+  }
   public_deps = [
     "//base",
     "//content/public/browser",

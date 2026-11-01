@@ -176,9 +176,13 @@ source_set("scheduled_chats") {
     "chat_triggers.h",
     "scheduled_chats.cc",
     "scheduled_chats.h",
-    "trigger_process.cc",
     "trigger_process.h",
   ]
+  if (is_posix) {
+    sources += [ "trigger_process.cc" ]
+  } else {
+    sources += [ "trigger_process_stub.cc" ]
+  }
   public_deps = [
     ":agent",
     ":chat_run",

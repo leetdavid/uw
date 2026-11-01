@@ -4,6 +4,8 @@
 
 #include <utility>
 
+#include "net/socket/stream_socket.h"
+
 // The command talks to uw over a Unix socket, which only POSIX systems have.
 // Windows gets a named pipe; see docs/plans/windows.md.
 
