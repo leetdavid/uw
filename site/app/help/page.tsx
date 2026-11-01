@@ -80,6 +80,7 @@ export default function HelpHome() {
           <a href={`${repo}/releases`}>Releases</a>
           <a href={`${repo}/issues/new`}>Report an issue</a>
           <a href={repo}>Source</a>
+          <a href="/help/privacy">Privacy</a>
         </nav>
       </footer>
     </main>

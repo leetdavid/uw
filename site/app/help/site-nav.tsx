@@ -17,7 +17,12 @@ export function SiteNav() {
           Help
         </a>
         <a href={repo}>GitHub</a>
-        <a className="get" href={DOWNLOAD}>
+        <a
+          className="get"
+          href={DOWNLOAD}
+          data-event="download_click"
+          data-place="nav"
+        >
           Download
         </a>
       </div>

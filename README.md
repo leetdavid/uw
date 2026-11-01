@@ -335,7 +335,7 @@ Previews are built on the owner's Mac, as the [distribution plan](docs/plans/dis
 - A `notarytool` keychain profile named `uw-notary`, made with `xcrun notarytool store-credentials uw-notary`.
 - `gh` signed in to GitHub.
 - Sparkle's update-signing key in the login keychain, made once with Sparkle's `generate_keys`. Keep a backup: without it, installed copies can never update.
-- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, a Sentry token that can write to the `eslee` organization's `uw` project, for uploading symbols; and PostHog's `POSTHOG_PROJECT_TOKEN=phc_...` and `POSTHOG_PROJECT_REGION=US` (or `EU`), which the site also uses. The release reads only `SENTRY_TOKEN` and `POSTHOG_PROJECT_TOKEN`, from the environment first. Releases send problem reports to PostHog through its managed reverse proxy at `e.uwbrowser.com`, a CNAME in the domain's Vercel DNS. Keep the proxy off the apex: `uwbrowser.com` must point at Vercel.
+- In the repo's git-ignored `.env`: `SENTRY_TOKEN`, a Sentry token that can write to the `eslee` organization's `uw` project, for uploading symbols; and PostHog's project token, `POSTHOG_PROJECT_TOKEN=phc_...`. The release reads both, from the environment first. Releases send problem reports to PostHog through its managed reverse proxy at `e.uwbrowser.com`, a CNAME in the domain's Vercel DNS. Keep the proxy off the apex: `uwbrowser.com` must point at Vercel.
 - A release worktree at `~/dev/uw-release` with its own synced `.chromium`, apart from the shared one.
 
 Push `main`, then run the release while you are at the Mac. Notarization comes last, hours into a full build, and `notarytool` can't read its saved login while the screen is locked:
@@ -375,7 +375,7 @@ curl -fsS -o /dev/null https://uwbrowser.com/oauth/client.json
 
 Every uw build signs in to some connectors with [`/oauth/client.json`](site/public/oauth/client.json) as its client ID ([ADR 0023](docs/adr/0023-uw-signs-in-with-a-client-file-on-uwbrowser-com-when-a-server-cant-register-it.md)), so the last line must succeed. On 2026-10-28 a deploy from a checkout older than that file took it offline, and Home Assistant refused uw's sign-in.
 
-[Help](docs/plans/help.md) is MDX in [`site/content/help/`](site/content/help/), served at `/help` by Fumadocs with search, `/llms.txt`, `/llms-full.txt`, and each page's Markdown at its address plus `.md`. Help on `main` can describe features that are not released yet, so deploy the site after a release is published, and before any deploy between releases check that Help describes nothing unreleased. "Was this helpful?" sends its answers to PostHog once the Vercel project has `POSTHOG_PROJECT_TOKEN` and `POSTHOG_PROJECT_REGION`, the same values as in `.env`.
+[Help](docs/plans/help.md) is MDX in [`site/content/help/`](site/content/help/), served at `/help` by Fumadocs with search, `/llms.txt`, `/llms-full.txt`, and each page's Markdown at its address plus `.md`. Help on `main` can describe features that are not released yet, so deploy the site after a release is published, and before any deploy between releases check that Help describes nothing unreleased. The site's [website analytics](docs/plans/distribution.md#website-analytics) and "Was this helpful?" send to PostHog only when the Vercel project's Production environment has `NEXT_PUBLIC_POSTHOG_KEY`, the same token as `POSTHOG_PROJECT_TOKEN` in `.env`. Previews and `next dev` send nothing.
 
 ## CI
 

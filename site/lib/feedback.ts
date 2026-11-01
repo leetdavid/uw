@@ -7,12 +7,11 @@ export interface Feedback {
 }
 
 export async function sendFeedback({ page, helpful, note }: Feedback) {
-  const key = process.env.POSTHOG_PROJECT_TOKEN;
-  const region = process.env.POSTHOG_PROJECT_REGION?.toLowerCase();
-  if (!key || (region !== "us" && region !== "eu")) return;
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!key) return;
   if (!page.startsWith("/help/") || page.length > 200) return;
 
-  await fetch(`https://${region}.i.posthog.com/i/v0/e/`, {
+  await fetch("https://e.uwbrowser.com/i/v0/e/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

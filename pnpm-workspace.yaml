@@ -3,8 +3,10 @@ packages:
   - command
   - site
 
-# These ship prebuilt binaries for macOS; their install scripts are not needed.
+# These need no install scripts: esbuild, @parcel/watcher, and sharp ship
+# prebuilt binaries for macOS, and core-js's only prints a message.
 allowBuilds:
   esbuild: false
   "@parcel/watcher": false
   sharp: false
+  core-js: false

@@ -50,7 +50,7 @@ function copyBySelection() {
   return copied;
 }
 
-export function Brew() {
+export function Brew({ place }: { place: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -68,6 +68,8 @@ export function Brew() {
       type="button"
       className="brew"
       onClick={copy}
+      data-event="homebrew_copy"
+      data-place={place}
       aria-label={copied ? "Copied" : `Copy ${COMMAND}`}
     >
       <code>

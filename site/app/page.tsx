@@ -131,9 +131,14 @@ function DownloadIcon() {
   );
 }
 
-function Download() {
+function Download({ place }: { place: string }) {
   return (
-    <a className="btn" href={DOWNLOAD}>
+    <a
+      className="btn"
+      href={DOWNLOAD}
+      data-event="download_click"
+      data-place={place}
+    >
       <DownloadIcon />
       Download for Mac
     </a>
@@ -210,7 +215,12 @@ export default function Home() {
             <a href="#features">Features</a>
             <a href="/help">Help</a>
             <a href={REPO}>GitHub</a>
-            <a className="get" href={DOWNLOAD}>
+            <a
+              className="get"
+              href={DOWNLOAD}
+              data-event="download_click"
+              data-place="nav"
+            >
               Download
             </a>
           </div>
@@ -228,8 +238,8 @@ export default function Home() {
             agent that asks before it acts.
           </p>
           <div className="cta">
-            <Download />
-            <Brew />
+            <Download place="hero" />
+            <Brew place="hero" />
           </div>
           <p className="meta">Apple silicon · macOS 13 or later</p>
         </div>
@@ -496,8 +506,8 @@ export default function Home() {
           Try it and tell us what you think.
         </p>
         <div className="cta">
-          <Download />
-          <Brew />
+          <Download place="closing" />
+          <Brew place="closing" />
         </div>
         <div className="horizon" />
         <footer>
@@ -510,6 +520,7 @@ export default function Home() {
             <a href={`${REPO}/releases`}>Releases</a>
             <a href={`${REPO}/issues/new`}>Report an issue</a>
             <a href={REPO}>Source</a>
+            <a href="/help/privacy">Privacy</a>
           </nav>
         </footer>
       </section>

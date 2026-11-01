@@ -79,6 +79,13 @@ Decided on 2026-11-01:
 - It goes live in the usual site deploy after the next release, so Help describes nothing unreleased. T289 on the [board](roadmap.md#board).
 - Help's [Privacy](https://uwbrowser.com/help/privacy) page has a section on what the website collects, and the home page's and Help home's footers link to it.
 
+Built on 2026-11-01: `site/instrumentation-client.ts` starts `posthog-js` and sends a click on any element with `data-event` as that event, with its `data-place`: `download_click` from the nav, hero, film, and closing, and `homebrew_copy` from the hero and closing.
+
+Found while building it, with `posthog-js` 1.444.0:
+
+- With `cookieless_mode: "always"`, `posthog-js` ignores consent, so its `respect_dnt` option does nothing. The site reads `navigator.doNotTrack` and `navigator.globalPrivacyControl` itself and never starts PostHog when either is on.
+- `posthog-js` drops events from automated browsers, including any with `navigator.webdriver` set, and marks visits to `localhost` as test users.
+
 ## Keys in public builds
 
 Agreed: public previews carry none of the owner's org-only sign-in app keys from [ADR 0014](../adr/0014-uw-signs-in-with-its-own-apps-kept-out-of-the-repo.md). `pnpm run release` refuses to build when they are set. Previews have no one-click GitHub, Slack, or Google sign-in; the owner's own builds keep it.

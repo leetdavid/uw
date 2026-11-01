@@ -172,7 +172,12 @@ export function Film({
             onEnded={() => setEnded(true)}
           />
           {ended && (
-            <a className="cta" href={download}>
+            <a
+              className="cta"
+              href={download}
+              data-event="download_click"
+              data-place="film"
+            >
               <span className="sr-only">Download uw for Mac</span>
             </a>
           )}
