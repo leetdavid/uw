@@ -1,17 +1,17 @@
 # uw's own version in a release build. See docs/plans/distribution.md.
 
-assert(is_mac)
-
 source_set("release_version") {
-  sources = [
-    "release_version.h",
-    "release_version_mac.mm",
-  ]
+  sources = [ "release_version.h" ]
+  if (is_mac) {
+    sources += [ "release_version_mac.mm" ]
+    frameworks = [ "Foundation.framework" ]
+  } else {
+    sources += [ "release_version_stub.cc" ]
+  }
   deps = [
     "//base",
     "//base/version_info",
   ]
-  frameworks = [ "Foundation.framework" ]
 }
 
 source_set("report_issue") {

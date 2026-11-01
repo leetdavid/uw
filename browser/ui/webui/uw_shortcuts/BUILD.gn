@@ -2,8 +2,6 @@
 # keys are the app's, in local state, not a profile's.
 import("//mojo/public/tools/bindings/mojom.gni")
 
-assert(is_mac)
-
 mojom("mojo_bindings") {
   sources = [ "uw_shortcuts.mojom" ]
   webui_module_path = "/"

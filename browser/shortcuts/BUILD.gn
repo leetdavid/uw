@@ -1,8 +1,6 @@
 # The keys of uw's commands of the menu bar, which the user can change for the
 # whole app. See ADR 0011.
 
-assert(is_mac)
-
 source_set("prefs") {
   sources = [
     "menu_keys.cc",
@@ -12,7 +10,12 @@ source_set("prefs") {
 }
 
 source_set("shortcuts") {
-  sources = [ "menu_keys_mac.mm" ]
+  if (is_mac) {
+    sources = [ "menu_keys_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  } else {
+    sources = [ "menu_keys_stub.cc" ]
+  }
   public_deps = [ ":prefs" ]
   deps = [
     "//base",
@@ -25,7 +28,6 @@ source_set("shortcuts") {
     "//uw/browser/terminal",
     "//uw/browser/workspaces",
   ]
-  frameworks = [ "AppKit.framework" ]
 }
 
 source_set("browser_tests") {

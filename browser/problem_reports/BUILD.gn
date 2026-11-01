@@ -2,8 +2,6 @@
 # said Yes. See docs/plans/distribution.md, "Problem reports".
 import("//mojo/public/tools/bindings/mojom.gni")
 
-assert(is_mac)
-
 mojom("mojo_bindings") {
   sources = [ "problem_reporter.mojom" ]
   webui_module_path = "/"
@@ -15,10 +13,14 @@ source_set("consent") {
     "answer_file.cc",
     "answer_file.h",
     "release_keys.h",
-    "release_keys_mac.mm",
   ]
+  if (is_mac) {
+    sources += [ "release_keys_mac.mm" ]
+    frameworks = [ "Foundation.framework" ]
+  } else {
+    sources += [ "release_keys_stub.cc" ]
+  }
   deps = [ "//base" ]
-  frameworks = [ "Foundation.framework" ]
 }
 
 source_set("problem_reports") {

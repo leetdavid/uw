@@ -1,7 +1,5 @@
 # Sparkle updates behind Chromium's relaunch button. See ADR 0019.
 
-assert(is_mac)
-
 # Kept apart from Sparkle, so Chromium's updater stub can ask about a pending
 # update without pulling in browser code.
 source_set("pending_update") {
@@ -13,17 +11,19 @@ source_set("pending_update") {
 }
 
 source_set("update") {
-  sources = [
-    "sparkle_updater.h",
-    "sparkle_updater.mm",
-  ]
   public_deps = [ ":pending_update" ]
-  deps = [
-    "//base",
-    "//chrome/browser:browser_process",
-    "//chrome/browser/upgrade_detector",
-  ]
-  frameworks = [ "Foundation.framework" ]
+  if (is_mac) {
+    sources = [
+      "sparkle_updater.h",
+      "sparkle_updater.mm",
+    ]
+    deps = [
+      "//base",
+      "//chrome/browser:browser_process",
+      "//chrome/browser/upgrade_detector",
+    ]
+    frameworks = [ "Foundation.framework" ]
+  }
 }
 
 source_set("browser_tests") {
