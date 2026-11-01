@@ -49,7 +49,7 @@ ShellHost::Options UserShell(int columns,
 // Each pasted image gets a folder of its own, so its name can stay plain.
 base::FilePath SaveImage(const std::vector<uint8_t>& png) {
   base::FilePath folder;
-  if (!base::CreateNewTempDirectory("uw-paste", &folder)) {
+  if (!base::CreateNewTempDirectory(FILE_PATH_LITERAL("uw-paste"), &folder)) {
     return base::FilePath();
   }
   const base::FilePath path = folder.AppendASCII("image.png");
