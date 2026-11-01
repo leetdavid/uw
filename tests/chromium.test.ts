@@ -36,6 +36,7 @@ class Fixture {
   xcodeReady = true;
   metalReady = true;
   curlReady = true;
+  fuseReady = true;
   sdk = "26.5";
   filesystem = "apfs";
   bootstrapSucceeds = true;
@@ -49,11 +50,11 @@ class Fixture {
   guestBuild = "26A434";
   failWindowTests = false;
 
-  constructor(t: TestContext) {
-    this.layout = layoutAt(join(temporary(t), "checkout"));
+  constructor(t: TestContext, platform = "darwin", arch = "arm64", env: NodeJS.ProcessEnv = {}) {
+    this.layout = layoutAt(join(temporary(t), "checkout"), platform);
     this.runtime = {
-      platform: "darwin", arch: "arm64", nodeVersion: "24.13.0", memoryBytes: 16 * GIB,
-      env: {}, freeBytes: () => this.free, log: (line) => this.messages.push(line),
+      platform, arch, nodeVersion: "24.13.0", memoryBytes: 16 * GIB,
+      env, freeBytes: () => this.free, log: (line) => this.messages.push(line),
       run: (command, options = {}) => this.execute(command, options),
       start: (command) => this.started.push(command),
       addresses: () => [{ address: "192.168.1.5", netmask: "255.255.255.0" }, { address: "192.168.64.1", netmask: "255.255.255.0" }],
@@ -79,6 +80,10 @@ class Fixture {
     if ((program === "git" || program === "curl") && operation === "--version") {
       if (program === "curl" && !this.curlReady) throw new BuildError("curl unavailable");
       return `${program} fixture version`;
+    }
+    if (program === "fusermount") {
+      if (!this.fuseReady) throw new BuildError("FUSE unavailable");
+      return "fusermount version: 2.9.9";
     }
     if (program === "xcodebuild") {
       if (!this.xcodeReady) throw new BuildError("Xcode unavailable");
@@ -404,9 +409,41 @@ test("build --symbols keeps the symbols a release sends to Sentry", (t) => {
   f.browser.build(2, true);
   const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
   const args = gen.find((arg) => arg.startsWith("--args="))!;
-  assert.match(args, /^symbol_level = 1\nenable_dsyms = true$/m);
+  assert.match(args, /^symbol_level = 1$/m);
+  assert.match(args, /^enable_dsyms = true$/m);
+  assert.match(args, /^use_system_xcode = true$/m);
   assert.doesNotMatch(args, /symbol_level = 0/);
   assert.throws(() => withSymbols("is_debug = false\n"), /symbol_level = 0/);
+});
+
+test("a Linux host cross-builds Windows uw with the packaged toolchain", (t) => {
+  const toolchain = temporary(t);
+  writeFileSync(join(toolchain, "abc123.zip"), "packaged toolchain fixture");
+  const f = new Fixture(t, "linux", "x64",
+    { DEPOT_TOOLS_WIN_TOOLCHAIN_BASE_URL: toolchain, GYP_MSVS_HASH_3bfcb536c8: "abc123" });
+  assert.equal(f.browser.doctor(), true);
+  assert.equal(f.calls.some(({ command }) => ["xcodebuild", "xcrun", "diskutil"].includes(command[0]!)), false);
+  f.browser.sync(2);
+  assert.match(readFileSync(join(f.layout.root, ".gclient"), "utf8"), /^target_os = \['win'\]$/m);
+  f.calls.length = 0;
+  f.browser.build(2, true);
+  const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
+  const args = gen.find((arg) => arg.startsWith("--args="))!;
+  assert.match(args, /^target_os = "win"$/m);
+  assert.match(args, /^target_cpu = "x64"$/m);
+  assert.match(args, /^symbol_level = 1$/m);
+  assert.doesNotMatch(args, /use_system_xcode|use_lld|enable_dsyms/);
+  assert.equal(basename(f.layout.binary), "chrome.exe");
+});
+
+test("a Linux host without the packaged Windows toolchain or FUSE fails its checks", (t) => {
+  const f = new Fixture(t, "linux", "x64");
+  f.fuseReady = false;
+  assert.equal(f.browser.doctor(), false);
+  for (const label of ["Windows toolchain", "FUSE"]) {
+    assert.ok(f.messages.some((line) => line.startsWith(`FAIL ${label}:`)));
+  }
+  assert.throws(() => f.browser.sync(2), /Preflight failed/);
 });
 
 test("smoke requires the executed JavaScript result and cleans up on failure", (t) => {

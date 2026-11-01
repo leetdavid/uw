@@ -4,7 +4,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  accessSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync,
+  accessSync, appendFileSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync,
   readdirSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync,
 } from "node:fs";
 import { homedir, networkInterfaces, tmpdir, totalmem } from "node:os";
@@ -69,6 +69,9 @@ export interface Runtime {
   log: (message: string) => void;
 }
 
+type Report = (name: string, ok: boolean, detail: string) => void;
+type Probe = (name: string, operation: () => string, hint: string) => void;
+
 export class BuildError extends Error {
   readonly exitCode: number;
 
@@ -125,11 +128,12 @@ export function checkoutPath(value: string): string {
   return path;
 }
 
-export function layoutAt(root: string): Layout {
+// A Mac builds uw for macOS; a Linux host cross-builds it for Windows.
+export function layoutAt(root: string, platform: string = process.platform): Layout {
   const normalized = checkoutPath(root);
   return {
     root: normalized, tools: join(normalized, "depot_tools"), source: join(normalized, "src"),
-    binary: join(normalized, "src", OUTPUT, "uw.app/Contents/MacOS/uw"),
+    binary: join(normalized, "src", OUTPUT, platform === "darwin" ? "uw.app/Contents/MacOS/uw" : "chrome.exe"),
   };
 }
 
@@ -260,14 +264,27 @@ export class Chromium {
       try { report(name, true, operation()); } catch { report(name, false, hint); }
     };
     report("Node.js", atLeast(this.runtime.nodeVersion, "24.13.0"), this.runtime.nodeVersion);
-    report("Platform", this.runtime.platform === "darwin", `${this.runtime.platform} ${this.runtime.arch}`);
-    if (this.runtime.platform !== "darwin") return false;
-    report("Architecture", ["arm64", "x64"].includes(this.runtime.arch), this.runtime.arch);
+    const mac = this.runtime.platform === "darwin";
+    report("Platform", mac || this.runtime.platform === "linux", `${this.runtime.platform} ${this.runtime.arch}`);
+    if (!mac && this.runtime.platform !== "linux") return false;
+    report("Architecture", (mac ? ["arm64", "x64"] : ["x64"]).includes(this.runtime.arch), this.runtime.arch);
     for (const tool of ["git", "curl"]) {
       probe(tool, () => this.capture([tool, "--version"]).split("\n")[0] ?? "",
         `${tool} is not usable on PATH; check \`${tool} --version\` in your shell`);
     }
     this.runtime.log(`Checkout: ${this.layout.root}`);
+    if (mac) this.doctorMac(report, probe);
+    else this.doctorWindowsCross(report, probe);
+    const existing = nearestExisting(this.layout.root);
+    const free = this.runtime.freeBytes(existing) / GIB;
+    const required = existsSync(join(this.layout.source, "DEPS")) ? 50 : 100;
+    report("Free disk", free >= required, `${free.toFixed(1)} GiB at ${existing}; required >= ${required} GiB`);
+    if (mac) this.checkApfs(existing, report);
+    report("Memory", true, `${(this.runtime.memoryBytes / GIB).toFixed(0)} GiB; start with --jobs 2 on a 16 GiB machine`);
+    return failures === 0;
+  }
+
+  private doctorMac(report: Report, probe: Probe): void {
     probe("Xcode", () => {
       const version = this.capture(["xcodebuild", "-version"]);
       this.capture(["xcodebuild", "-checkFirstLaunchStatus"]);
@@ -279,10 +296,24 @@ export class Chromium {
     } catch { report("macOS SDK", false, "xcrun could not locate a usable macOS SDK"); }
     probe("Metal compiler", () => this.capture(["xcrun", "metal", "--version"]).split("\n")[0] ?? "",
       "install the Metal Toolchain with `xcodebuild -downloadComponent MetalToolchain`");
-    const existing = nearestExisting(this.layout.root);
-    const free = this.runtime.freeBytes(existing) / GIB;
-    const required = existsSync(join(this.layout.source, "DEPS")) ? 50 : 100;
-    report("Free disk", free >= required, `${free.toFixed(1)} GiB at ${existing}; required >= ${required} GiB`);
+  }
+
+  // Chromium's cross build reads Visual Studio and the Windows SDK from a zip
+  // packaged once on a Windows machine, and mounts it case-insensitively with
+  // FUSE. See .chromium/src/docs/win_cross.md.
+  private doctorWindowsCross(report: Report, probe: Probe): void {
+    const base = this.runtime.env.DEPOT_TOOLS_WIN_TOOLCHAIN_BASE_URL ?? "";
+    const zips = Object.entries(this.runtime.env)
+      .filter(([key, value]) => key.startsWith("GYP_MSVS_HASH_") && value)
+      .map(([, value]) => join(base, `${value}.zip`));
+    const zip = base ? zips.find((path) => existsSync(path)) : undefined;
+    report("Windows toolchain", zip !== undefined, zip ??
+      "package Visual Studio and the Windows SDK on a Windows machine, then set DEPOT_TOOLS_WIN_TOOLCHAIN_BASE_URL and GYP_MSVS_HASH_<hash>; see README.md");
+    probe("FUSE", () => this.capture(["fusermount", "-V"]).split("\n")[0] ?? "",
+      "install FUSE; Chromium mounts the Windows SDK with ciopfs");
+  }
+
+  private checkApfs(existing: string, report: Report): void {
     try {
       const device = this.capture(["df", "-P", existing]).split("\n").at(-1)?.split(/\s+/)[0];
       if (!device) throw new BuildError("df returned no filesystem");
@@ -290,8 +321,6 @@ export class Chromium {
       const filesystem = this.capture(["plutil", "-extract", "FilesystemType", "raw", "-o", "-", "--", "-"], { input: plist });
       report("Filesystem", filesystem === "apfs", `${filesystem} on ${device}; APFS required`);
     } catch { report("Filesystem", false, "could not verify the checkout volume with diskutil/plutil"); }
-    report("Memory", true, `${(this.runtime.memoryBytes / GIB).toFixed(0)} GiB; start with --jobs 2 on a 16 GiB Mac`);
-    return failures === 0;
   }
 
   requireHost(): void {
@@ -418,6 +447,7 @@ export class Chromium {
     accessSync(interpreter, constants.X_OK);
     if (!existsSync(config)) {
       this.run([join(this.layout.tools, "gclient"), "config", "--name", "src", "--unmanaged", CHROMIUM_URL], this.layout.root);
+      if (this.runtime.platform !== "darwin") appendFileSync(config, "target_os = ['win']\n");
       writeFileSync(join(this.layout.root, CONFIG_SEAL), this.configHash());
     }
     const knownRoots = [...previousRoots, ...this.dependencyRoots()];
@@ -448,12 +478,20 @@ export class Chromium {
     this.requireJobsForMemory(jobs);
     this.prepare();
     const gnArgs = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
-    const args = (symbols ? withSymbols(gnArgs) : gnArgs) +
-      (this.runtime.arch === "arm64" ? "\nuse_lld = false\n" : "");
+    const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols)].join("\n");
     this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args}`, "--fail-on-unused-args"], this.layout.source);
     this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome"], this.layout.source);
     if (!existsSync(this.layout.binary)) throw new BuildError(`Build returned successfully but ${this.layout.binary} is missing`);
     this.runtime.log(`Built ${this.layout.binary}`);
+  }
+
+  hostArgs(symbols: boolean): string[] {
+    if (this.runtime.platform !== "darwin") return ['target_os = "win"', 'target_cpu = "x64"'];
+    return [
+      "use_system_xcode = true",
+      ...(this.runtime.arch === "arm64" ? ["use_lld = false"] : []),
+      ...(symbols ? ["enable_dsyms = true"] : []),
+    ];
   }
 
   smoke(timeout: number): void {
@@ -679,7 +717,7 @@ const TEST_SUITES = {
 
 const descriptions = {
   root: "Print the resolved checkout path without creating it.",
-  doctor: "Check the macOS host without creating a checkout or downloading sources.",
+  doctor: "Check the Mac, or the Linux host for Windows builds, without creating a checkout or downloading sources.",
   sync: "Download pinned Chromium and dependencies, then apply uw patches; refuse local source edits.",
   prepare: "Apply the ordered uw patches to a synced checkout without downloading or compiling.",
   build: "Prepare uw customizations, generate build files, and compile the chrome target.",
@@ -695,7 +733,7 @@ function help(command?: keyof typeof descriptions): string {
     "  --checkout-dir PATH  Dedicated root; defaults to UW_CHROMIUM_ROOT or .chromium/\n" +
     (takesJobs(command) ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
     (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
-    (command === "build" ? "  --symbols            Keep symbols and dSYMs for crash reports, as releases do\n" : "") +
+    (command === "build" ? "  --symbols            Keep symbols for crash reports, as releases do\n" : "") +
     (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs uw's MANUAL_ tests\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
@@ -716,11 +754,11 @@ function splitPassedArgs(args: readonly string[]): [string[], string[]] {
   return [own, passed];
 }
 
-// Releases keep line tables and dSYMs so Sentry can read their crash reports.
-// See docs/plans/distribution.md, "Build flags".
+// Releases keep line tables so Sentry can read their crash reports. A Mac
+// build adds dSYMs. See docs/plans/distribution.md, "Build flags".
 export function withSymbols(args: string): string {
   if (!/^symbol_level = 0$/m.test(args)) throw new BuildError("chromium/args.gn must set symbol_level = 0 for --symbols to replace");
-  return args.replace(/^symbol_level = 0$/m, "symbol_level = 1\nenable_dsyms = true");
+  return args.replace(/^symbol_level = 0$/m, "symbol_level = 1");
 }
 
 function takesJobs(command?: string): boolean {

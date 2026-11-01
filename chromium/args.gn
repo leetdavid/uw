@@ -22,6 +22,5 @@ disable_fieldtrial_testing_config = true
 # docs/adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md.
 enable_update_notifications = true
 symbol_level = 0
-use_system_xcode = true
 use_remoteexec = false
 use_siso = true

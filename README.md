@@ -155,6 +155,25 @@ Use `--checkout-dir PATH` instead of `UW_CHROMIUM_ROOT` if preferred. Each comma
 pnpm run build --help
 ```
 
+## Building for Windows
+
+Windows uw is cross-built on an x86-64 Linux host, per the [Windows plan](docs/plans/windows.md). It doesn't build yet: T288 on the [board](docs/plans/roadmap.md#board) tracks it.
+
+The Linux host needs Node.js and pnpm as above, Git, curl, FUSE (`fusermount`), and Visual Studio 2026 with the Windows SDK 10.0.28000, packaged once on a Windows machine with depot_tools:
+
+```bat
+python depot_tools\win_toolchain\package_from_installed.py 2026 -w 10.0.28000.0
+```
+
+Copy the zip it makes to the Linux host, and point Chromium's tools at it. `3bfcb536c8` is `TOOLCHAIN_HASH` in Chromium's `build/vs_toolchain.py`, which can change when Chromium updates.
+
+```sh
+export DEPOT_TOOLS_WIN_TOOLCHAIN_BASE_URL=/path/to/the/zip/folder
+export GYP_MSVS_HASH_3bfcb536c8=<the zip's name without .zip>
+```
+
+Then `pnpm run doctor`, `sync`, and `build` work as on a Mac, and `build` makes `out/uw/chrome.exe`. `smoke` and the tests run only on a Mac for now.
+
 ## Using your local build
 
 After a successful build, launch the application with a separate development profile:
