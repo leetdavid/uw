@@ -8,6 +8,10 @@ Implementability: **3/10** for the whole plan, using the [roadmap convention](ro
 
 - When, agreed on 2026-11-01: stage 1 starts now. Later stages wait for their own go-ahead.
 - Build host, agreed on 2026-11-01: the owner's Linux workstation, `workstation` on Tailscale, cross-builds Windows uw in a Chromium checkout of its own. Linux to Windows is the cross build Chromium's own CI tests. A Windows 11 x64 VM under KVM on the same machine packages Visual Studio and the Windows SDK once, and runs uw and its tests at full speed. The Mac and the home server were turned down: the Mac is short of disk and would test under Arm emulation, and the server has 31 GB of RAM.
+- Processors, agreed on 2026-11-01: x64 only, as the Mac is Apple silicon only. Windows on Arm runs it under emulation.
+- Installer, agreed on 2026-11-01: Chromium's `mini_installer`. Chrome ships on it, so it needs the least upkeep: uw changes only names, IDs, and icons. It installs per user without an admin prompt, registers uw as a browser, and swaps in an update at relaunch.
+- Updates, agreed on 2026-11-01: a small fetcher of uw's own. Once a day it reads a feed on the latest GitHub release, downloads the installer, checks its signature, and runs it silently. Chromium's "Relaunch to update" then appears, as on the Mac, with `enable_update_notifications` on. WinSparkle was turned down: it always shows its own window when it finds an update, and the Mac's updater windows never show ([ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md)).
+- Signing, agreed on 2026-11-01: none until stage 4. Stages 1 to 3 run only in the owner's VM.
 
 ## Open decisions
 
@@ -15,10 +19,7 @@ Each has a proposed default.
 
 | Decision | Options | Proposed |
 | --- | --- | --- |
-| Processors | x64, Arm64, or both | x64 only, as the Mac is Apple silicon only. Arm64 Windows runs it under emulation |
-| Signing | Azure Artifact Signing, a CA certificate, or unsigned | Artifact Signing if the owner lives in the US or Canada; an individual-validated certificate otherwise |
-| Installer | Chromium's `mini_installer`, Velopack, Inno Setup, or MSIX | `mini_installer`: it already installs per user, registers the browser, and swaps in updates at relaunch |
-| Updates | WinSparkle, a small fetcher of uw's own, or none | WinSparkle, if its window can stay hidden, as Sparkle's does on the Mac; a fetcher of uw's own otherwise |
+| Signing, by stage 4 | Azure Artifact Signing, a CA certificate, or unsigned | Artifact Signing if the owner lives in the US or Canada; an individual-validated certificate otherwise |
 | Codecs | Media Foundation, or FFmpeg's H.264 and AAC | Media Foundation, so the Mac's [codecs rule](distribution.md#codecs) holds |
 | Keys | A Windows key list | Designed on the Doop canvas. Ctrl+letter belongs to programs in a terminal tab, so the Mac's "must include Cmd" rule can't carry over |
 | First preview's features | Everything, or a smaller set | Leave out glass, the swipe, and the terminal at first. Those three take the most Windows-only code |
@@ -41,5 +42,4 @@ Tests run in the Windows 11 VM on the workstation, as the Mac's real-window test
 ## Open questions
 
 - Whether a cross-built uw reports crashes. `win_cross.md` says no; the build files suggest yes.
-- Whether WinSparkle can check and download without showing its window.
 - How much of a Windows 11 VM's x64 emulation the tests can take.
