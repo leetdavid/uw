@@ -61,46 +61,48 @@ source_set("prefs") {
   deps = [ "//components/prefs" ]
 }
 
-source_set("browser_tests") {
-  testonly = true
-  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "workspaces_browsertest.mm" ]
-  deps = [
-    ":workspaces",
-    "//base",
-    "//chrome/browser",
-    "//chrome/browser/autocomplete",
-    "//chrome/browser/extensions:test_support",
-    "//chrome/browser:global_keyboard_shortcuts_mac",
-    "//chrome/browser/headless:browser_tests",
-    "//chrome/browser/profiles:profile",
-    "//chrome/browser/profiles:profile_test_util",
-    "//chrome/browser/ui",
-    "//chrome/browser/ui/browser_window",
-    "//chrome/browser/ui/extensions:test_support",
-    "//chrome/browser/ui/navigator",
-    "//chrome/browser/ui:test_support",
-    "//chrome/test:test_support",
-    "//components/tabs:public",
-    "//components/performance_manager",
-    "//components/prefs",
-    "//content/public/browser",
-    "//content/test:test_support",
-    "//extensions:test_support",
-    "//extensions/common",
-    "//net:test_support",
-    "//skia",
-    "//testing/gtest",
-    "//ui/base",
-    "//ui/compositor",
-    "//ui/events:test_support",
-    "//ui/gfx/geometry",
-    "//ui/native_theme",
-    "//url",
-    "//uw/browser/tab_organization",
-    "//uw/browser/tab_organization:test_support",
-    "//uw/browser/ui/views/tab_organization",
-    "//uw/components/ai_providers",
-    "//uw/components/look",
-  ]
+if (is_mac) {
+  source_set("browser_tests") {
+    testonly = true
+    defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+    sources = [ "workspaces_browsertest.mm" ]
+    deps = [
+      ":workspaces",
+      "//base",
+      "//chrome/browser",
+      "//chrome/browser/autocomplete",
+      "//chrome/browser/extensions:test_support",
+      "//chrome/browser:global_keyboard_shortcuts_mac",
+      "//chrome/browser/headless:browser_tests",
+      "//chrome/browser/profiles:profile",
+      "//chrome/browser/profiles:profile_test_util",
+      "//chrome/browser/ui",
+      "//chrome/browser/ui/browser_window",
+      "//chrome/browser/ui/extensions:test_support",
+      "//chrome/browser/ui/navigator",
+      "//chrome/browser/ui:test_support",
+      "//chrome/test:test_support",
+      "//components/tabs:public",
+      "//components/performance_manager",
+      "//components/prefs",
+      "//content/public/browser",
+      "//content/test:test_support",
+      "//extensions:test_support",
+      "//extensions/common",
+      "//net:test_support",
+      "//skia",
+      "//testing/gtest",
+      "//ui/base",
+      "//ui/compositor",
+      "//ui/events:test_support",
+      "//ui/gfx/geometry",
+      "//ui/native_theme",
+      "//url",
+      "//uw/browser/tab_organization",
+      "//uw/browser/tab_organization:test_support",
+      "//uw/browser/ui/views/tab_organization",
+      "//uw/components/ai_providers",
+      "//uw/components/look",
+    ]
+  }
 }

@@ -82,15 +82,9 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "automatic_organizer_browsertest.cc",
-    "branch_drag_browsertest.mm",
-    "links_from_other_apps_browsertest.mm",
-    "mouse_actions_browsertest.mm",
     "shared_tabs_browsertest.cc",
     "shared_tabs_drag_browsertest.cc",
-    "sidebar_menus_browsertest.mm",
     "tab_organization_controller_browsertest.cc",
-    "task_keys_browsertest.mm",
-    "undo_shortcut_browsertest.mm",
     "window_screenshot_browsertest.cc",
   ]
   deps = [
@@ -101,8 +95,6 @@ source_set("browser_tests") {
     "//chrome:strings",
     "//chrome/browser",
     "//chrome/browser/actor",
-    "//chrome/browser:app_controller_mac",
-    "//chrome/browser:global_keyboard_shortcuts_mac",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/sessions",
     "//chrome/browser/sessions:test_support",
@@ -145,6 +137,20 @@ source_set("browser_tests") {
     "//uw/browser/workspaces",
     "//uw/components/ai_providers",
   ]
+  if (is_mac) {
+    sources += [
+      "branch_drag_browsertest.mm",
+      "links_from_other_apps_browsertest.mm",
+      "mouse_actions_browsertest.mm",
+      "sidebar_menus_browsertest.mm",
+      "task_keys_browsertest.mm",
+      "undo_shortcut_browsertest.mm",
+    ]
+    deps += [
+      "//chrome/browser:app_controller_mac",
+      "//chrome/browser:global_keyboard_shortcuts_mac",
+    ]
+  }
 }
 
 source_set("test_support") {
