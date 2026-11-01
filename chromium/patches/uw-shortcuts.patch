@@ -192,6 +192,55 @@ diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
      "//uw/browser/tab_organization:ai_connection",
      "//uw/browser/workspaces:prefs",
    ]
+diff --git a/chrome/browser/ui/accelerator_table.cc b/chrome/browser/ui/accelerator_table.cc
+index 532ec4748b88583654ef9a79771de9b6ebebdbe5..dc2de2e75cf4cb5bb906d7d1791610ef7b0afa2e 100644
+--- a/chrome/browser/ui/accelerator_table.cc
++++ b/chrome/browser/ui/accelerator_table.cc
+@@ -30,6 +30,11 @@
+ #include "chrome/browser/global_keyboard_shortcuts_mac.h"
+ #endif
+ 
++#if BUILDFLAG(IS_WIN)
++#include "uw/browser/tab_organization/commands.h"  // nogncheck
++#include "uw/browser/tab_organization/tab_organization_controller.h"  // nogncheck
++#endif
++
+ // Android chrome shortcuts are implemented in KeyboardShortcuts.java.
+ static_assert(!BUILDFLAG(IS_ANDROID));
+ 
+@@ -74,7 +79,32 @@ const AcceleratorMapping kAcceleratorMap[] = {
+     {ui::VKEY_R, ui::EF_PLATFORM_ACCELERATOR, IDC_RELOAD},
+     {ui::VKEY_R, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR,
+      IDC_RELOAD_BYPASSING_CACHE},
++#if BUILDFLAG(IS_WIN)
++    // uw: Ctrl+S hides and shows the sidebar, as in Arc for Windows, and Save
++    // Page As has no key.
++    {ui::VKEY_S, ui::EF_PLATFORM_ACCELERATOR,
++     IDC_TOGGLE_VERTICAL_TABS_COLLAPSE},
++    // uw: Arc for Windows' keys for uw's commands. See docs/plans/windows.md.
++    {ui::VKEY_W, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
++     uw::TabOrganizationController::kCloseBranch},
++    {ui::VKEY_Z, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
++     uw::TabOrganizationController::kUndo},
++    {ui::VKEY_RIGHT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
++     uw::kNextWorkspace},
++    {ui::VKEY_LEFT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
++     uw::kPreviousWorkspace},
++    {ui::VKEY_1, ui::EF_ALT_DOWN, uw::kGoToWorkspace1},
++    {ui::VKEY_2, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 1},
++    {ui::VKEY_3, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 2},
++    {ui::VKEY_4, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 3},
++    {ui::VKEY_5, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 4},
++    {ui::VKEY_6, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 5},
++    {ui::VKEY_7, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 6},
++    {ui::VKEY_8, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 7},
++    {ui::VKEY_9, ui::EF_ALT_DOWN, uw::kGoToWorkspace1 + 8},
++#else
+     {ui::VKEY_S, ui::EF_PLATFORM_ACCELERATOR, IDC_SAVE_PAGE},
++#endif
+     {ui::VKEY_9, ui::EF_PLATFORM_ACCELERATOR, IDC_SELECT_LAST_TAB},
+     {ui::VKEY_NUMPAD9, ui::EF_PLATFORM_ACCELERATOR, IDC_SELECT_LAST_TAB},
+ #if BUILDFLAG(IS_LINUX)
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm

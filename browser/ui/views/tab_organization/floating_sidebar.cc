@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "base/numerics/safe_conversions.h"
+#include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -187,7 +188,10 @@ void FloatingSidebar::Layout() {
   const bool floating = hidden && Amount() > 0.0;
   PlaceActivityCard(hidden && !floating);
   card_->SetVisible(floating);
+#if BUILDFLAG(IS_MAC)
+  // Windows keeps its own window buttons at the top right.
   window_buttons_->SetVisible(floating);
+#endif
   ListenForEsc(floating);
   const gfx::Rect card = CardBounds();
   UpdateBlur(card, floating);

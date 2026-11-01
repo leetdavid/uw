@@ -36,8 +36,34 @@ diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleSignature</key>
+diff --git a/chrome/app/chrome_dll.rc b/chrome/app/chrome_dll.rc
+index 02e08e0d4904342e50d3af2e6465cbc0f8bc1c6b..f1e14914dee67b1315cc921a16117444336daf19 100644
+--- a/chrome/app/chrome_dll.rc
++++ b/chrome/app/chrome_dll.rc
+@@ -174,7 +174,7 @@ IDR_X005_BETA       ICON                        "theme\google_chrome\win\chrome_
+ #elif BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+ IDR_MAINFRAME       ICON                        "theme\google_chrome\google_chrome_for_testing\win\chrome.ico"
+ #else
+-IDR_MAINFRAME       ICON                        "theme\chromium\win\chromium.ico"
++IDR_MAINFRAME       ICON                        "../../uw/browser/branding/win/uw.ico"
+ #endif
+ 
+ // We include these resources because all ICON types need to be in the
+diff --git a/chrome/app/chrome_exe.rc b/chrome/app/chrome_exe.rc
+index 7d8d4c39f798834fd6f7cfa1845f56515c2c338f..bf5637b3aaed5b1ad9fb8127fcd544410adf38c9 100644
+--- a/chrome/app/chrome_exe.rc
++++ b/chrome/app/chrome_exe.rc
+@@ -56,7 +56,7 @@ IDR_SXS                 ICON       "theme\\google_chrome\\win\\chrome_sxs.ico"
+ #elif BUILDFLAG(GOOGLE_CHROME_FOR_TESTING_BRANDING)
+ IDR_MAINFRAME           ICON       "theme\\google_chrome\\google_chrome_for_testing\\win\\chrome.ico"
+ #else
+-IDR_MAINFRAME           ICON       "theme\\chromium\\win\\chromium.ico"
++IDR_MAINFRAME           ICON       "../../uw/browser/branding/win/uw.ico"
+ #endif
+ 
+ // Start a naming scheme to keep icons in order. A leading X is used to keep
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
-index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d5185253378182a1e0e6 100644
+index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd1a01b58d 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
 @@ -294,15 +294,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
@@ -59,7 +85,17 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
        </message>
        <if expr="is_win">
          <message name="IDS_SXS_SHORTCUT_NAME" desc="Unused in Chromium builds" translateable="false">
-@@ -320,7 +320,7 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
+@@ -312,15 +312,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
+         <message name="IDS_SHORTCUT_NAME_DEV" desc="Unused in Chromium builds" translateable="false">
+         </message>
+         <message name="IDS_PRODUCT_DESCRIPTION" desc="Browser description">
+-          Chromium is a web browser that runs webpages and applications with lightning speed. It's fast, stable, and easy to use. Browse the web more safely with malware and phishing protection built into Chromium.
++          uw is a web browser that runs webpages and applications with lightning speed. It's fast, stable, and easy to use. Browse the web more safely with malware and phishing protection built into uw.
+         </message>
+         <message name="IDS_WELCOME_TO_CHROME" desc="Welcoming text announced via screen readers the first time Chrome is launched at the conclusion of installation.">
+-          Welcome to Chromium; new browser window opened
++          Welcome to uw; new browser window opened
+         </message>
        </if>
        <if expr="is_macosx or is_linux">
          <message name="IDS_FIRST_RUN_DIALOG_WINDOW_TITLE" desc="Window title of First Run dialog on Mac and Linux, displayed in title bar">
@@ -68,6 +104,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
          </message>
        </if>
        <if expr="is_linux">
+@@ -424,7 +424,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+             <ph name="LINE_BREAK">&lt;br&gt;</ph>
+             • Delete cookies and other temporary site data
+             <ph name="LINE_BREAK">&lt;br&gt;</ph>
+-            • Reset Chromium shortcuts
++            • Reset uw shortcuts
+             <ph name="LINE_BREAKS">&lt;br&gt;&lt;br&gt;</ph>
+             Bookmarks, history, and saved passwords won't be affected.
+         </message>
 @@ -452,7 +452,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
            </then>
            <else>
@@ -86,7 +131,34 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
            </message>
          </else>
        </if>
-@@ -576,7 +576,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+@@ -552,22 +552,22 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+       </if>
+       <if expr="is_win">
+         <message name="IDS_WIN_XP_VISTA_OBSOLETE" desc="A message displayed on an at-launch infobar and about:help warning the user that the computer they are using is no longer supported.">
+-          Chromium may not function correctly because it is no longer supported on Windows XP or Windows Vista
++          uw may not function correctly because it is no longer supported on Windows XP or Windows Vista
+         </message>
+       </if>
+       <if expr="is_win">
+         <message name="IDS_WIN_7_OBSOLETE" desc="A message displayed on an at-launch infobar and about:help warning the user that the computer they are using will soon be or is already unsupported.">
+-                    To get future Chromium updates, you'll need Windows 10 or later. This computer is using Windows 7.
++                    To get future uw updates, you'll need Windows 10 or later. This computer is using Windows 7.
+         </message>
+       </if>
+       <if expr="is_win">
+         <message name="IDS_WIN_8_OBSOLETE" desc="A message displayed on an at-launch infobar and about:help warning the user that the computer they are using will soon be or is already unsupported.">
+-                    To get future Chromium updates, you'll need Windows 10 or later. This computer is using Windows 8.
++                    To get future uw updates, you'll need Windows 10 or later. This computer is using Windows 8.
+         </message>
+       </if>
+       <if expr="is_win">
+         <message name="IDS_WIN_8_1_OBSOLETE" desc="A message displayed on an at-launch infobar and about:help warning the user that the computer they are using will soon be or is already unsupported.">
+-                    To get future Chromium updates, you'll need Windows 10 or later. This computer is using Windows 8.1.
++                    To get future uw updates, you'll need Windows 10 or later. This computer is using Windows 8.1.
+         </message>
+       </if>
+       <if expr="is_linux">
+@@ -576,12 +576,12 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
          </message>
        </if>
        <message name="IDS_ACCNAME_APP" desc="The accessible name for the app menu." translateable="false">
@@ -95,6 +167,183 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
        </message>
        <!-- Hung Browser Detector -->
        <if expr="is_win">
+         <message name="IDS_BROWSER_HUNGBROWSER_MESSAGE" desc="Content of the dialog box shown when the browser is hung">
+-          Chromium is unresponsive. Relaunch now?
++          uw is unresponsive. Relaunch now?
+         </message>
+       </if>
+       <!-- General app failure messages -->
+@@ -597,13 +597,13 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+       <!-- Uninstall messages -->
+       <if expr="is_win">
+         <message name="IDS_UNINSTALL_CLOSE_APP" desc="Message to user when uninstall detects other app instance running">
+-          Please close all Chromium windows and try again.
++          Please close all uw windows and try again.
+         </message>
+         <message name="IDS_UNINSTALL_VERIFY" desc="Message to confirm user wants to uninstall">
+-          Are you sure you want to uninstall Chromium?
++          Are you sure you want to uninstall uw?
+         </message>
+         <message name="IDS_UNINSTALL_CHROME" desc="The title of the Chromium uninstall dialog.">
+-          Uninstall Chromium
++          Uninstall uw
+         </message>
+       </if>
+       <!-- Default Browser messages -->
+@@ -615,19 +615,19 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+       </message>
+       <if expr="is_win">
+         <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_PAGE_TITLE" desc="Title of the default browser visual guided setter page.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_HEADER_TITLE" desc="Header text of the default browser visual guided setter.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_CONTENT_TITLE" desc="Content title of the default browser visual guided setter.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_CONTENT_DESCRIPTION" desc="Body text of the default browser visual guided setter.">
+-          Keep your passwords, bookmarks, and history perfectly synced across devices by setting Chromium as your default browser.
++          Keep your passwords, bookmarks, and history perfectly synced across devices by setting uw as your default browser.
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_INSTRUCTION_STEP_2" desc="Instruction step 2 of the default browser visual guided setter. $1 is the bold button name.">
+-          Click <ph name="BEGIN_BOLD">&lt;strong&gt;</ph>Yes<ph name="END_BOLD">&lt;/strong&gt;</ph> in the Windows notification to pin Chromium to your taskbar for quick access.
++          Click <ph name="BEGIN_BOLD">&lt;strong&gt;</ph>Yes<ph name="END_BOLD">&lt;/strong&gt;</ph> in the Windows notification to pin uw to your taskbar for quick access.
+         </message>
+       </if>
+       <if expr="use_titlecase">
+@@ -705,55 +705,55 @@ Chromium is unable to recover your settings.
+       </if>
+       <if expr="is_win">
+         <message name="IDS_PASSWORDS_PAGE_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before revealing plaintext passwords on the password page.">
+-          Chromium is trying to show passwords. Type your Windows password to allow this.
++          uw is trying to show passwords. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_PASSWORDS_PAGE_COPY_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before copying plaintext passwords into the clipboard.">
+-          Chromium is trying to copy passwords. Type your Windows password to allow this.
++          uw is trying to copy passwords. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_PASSWORDS_PAGE_EDIT_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before editing plaintext passwords on the password page.">
+-          Chromium is trying to edit passwords. Type your Windows password to allow this.
++          uw is trying to edit passwords. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_PASSWORDS_PAGE_EXPORT_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before exporting passwords to a file.">
+-          Chromium wants to export your passwords. Type your Windows password to allow this.
++          uw wants to export your passwords. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_PASSWORDS_PAGE_DELETE_ALL_DATA_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before deleting all data from Google Password Manager.">
+-          Chromium wants to delete your Password Manager data. Type your Windows password to allow this.
++          uw wants to delete your Password Manager data. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_PASSWORDS_PAGE_IMPORT_AUTHENTICATION_PROMPT" desc="Text for the dialog box that prompts the user for their OS account password before overriding passwords during Import.">
+-          Chromium is trying to replace existing passwords. Type your Windows password to allow this.
++          uw is trying to replace existing passwords. Type your Windows password to allow this.
+         </message>
+         <message name="IDS_INSTALL_HIGHER_VERSION" desc="Error displayed when higher version already exists.">
+-          This computer already has a more recent version of Chromium. If the software is not working, please uninstall Chromium and try again.
++          This computer already has a more recent version of uw. If the software is not working, please uninstall uw and try again.
+         </message>
+         <message name="IDS_INSTALL_FAILED" desc="Error displayed if installation fails due to some unknown error.">
+-          Installation failed due to unspecified error. If Chromium is currently running, please close it and try again.
++          Installation failed due to unspecified error. If uw is currently running, please close it and try again.
+         </message>
+         <message name="IDS_SAME_VERSION_REPAIR_FAILED" desc="Error displayed if installation fails due to Chrome running.">
+-          Can not install the same Chromium version that is currently running. Please close Chromium and try again.
++          Can not install the same uw version that is currently running. Please close uw and try again.
+         </message>
+         <message name="IDS_INSTALL_OS_NOT_SUPPORTED" desc="Error displayed if OS is not supported">
+-          Chromium requires Windows 10 or higher.
++          uw requires Windows 10 or higher.
+         </message>
+         <message name="IDS_INSTALL_OS_ERROR" desc="Error displayed when any Windows API call fails and we do not have more specific information.">
+-          An operating system error occurred during installation. Please download Chromium again.
++          An operating system error occurred during installation. Please download uw again.
+         </message>
+         <message name="IDS_INSTALL_SINGLETON_ACQUISITION_FAILED" desc="Error displayed when the installer cannot run because another installer is already running.">
+-          Another operation on Chromium is in progress. Please try again later.
++          Another operation on uw is in progress. Please try again later.
+         </message>
+         <message name="IDS_INSTALL_TEMP_DIR_FAILED" desc="Error displayed when we fail to create temporary directory during installation.">
+           The installer couldn't create a temporary directory. Please check for free disk space and permission to install software.
+         </message>
+         <message name="IDS_INSTALL_UNCOMPRESSION_FAILED" desc="Error when when we can not uncompress installation archive.">
+-          The installer failed to uncompress archive. Please download Chromium again.
++          The installer failed to uncompress archive. Please download uw again.
+         </message>
+         <message name="IDS_INSTALL_INVALID_ARCHIVE" desc="Error displayed when we can not open the installation archive.">
+-          The installer archive is corrupted or invalid. Please download Chromium again.
++          The installer archive is corrupted or invalid. Please download uw again.
+         </message>
+         <message name="IDS_INSTALL_INSUFFICIENT_RIGHTS" desc="Error displayed when a non admin user tries to attempt system level install/uninstall.">
+           You do not have appropriate rights for system-level install. Try running the installer again as Administrator.
+         </message>
+         <message name="IDS_INSTALL_EXISTING_VERSION_LAUNCHED" desc="A message shown to users who try to install Chrome in their user profile directory when their computer already has Chrome installed for all users. In this case, the installer silently launches the existing version of Chrome for all users rather than installing a second version of Chrome.">
+-          Chromium is already installed for all users on your computer.
++          uw is already installed for all users on your computer.
+         </message>
+         <message name="IDS_ELEVATION_SERVICE_DESCRIPTION"
+                  desc="The description of the Windows elevation service. Displayed in the Windows Services management console.">
+@@ -784,10 +784,10 @@ Chromium is unable to recover your settings.
+           Uninstall
+         </message>
+         <message name="IDS_PIN_INFOBAR_TEXT" desc="Text to show in an infobar when Chromium is not pinned to the taskbar.">
+-          Pin Chromium to your taskbar to get to it quickly anytime
++          Pin uw to your taskbar to get to it quickly anytime
+         </message>
+         <message name="IDS_PIN_INFOBAR_BUTTON" desc="Label for the button on an infobar offering to pin Chromium to the taskbar. Pins Chromium when clicked.">
+-          Pin Chromium
++          Pin uw
+         </message>
+       </if>
+       <if expr="is_macosx">
+@@ -802,34 +802,34 @@ Chromium is unable to recover your settings.
+             <!-- Pin InfoBar Experimental strings -->
+       <if expr="is_win">
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_1" translateable="false" desc="Message text for the experimental pin infobar version 1 on Windows">
+-          Open Chromium with one click. Pin it for faster access.
++          Open uw with one click. Pin it for faster access.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_2" translateable="false" desc="Message text for the experimental pin infobar version 2 on Windows">
+-          Launch the web faster. Pin Chromium to your taskbar.
++          Launch the web faster. Pin uw to your taskbar.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_3" translateable="false" desc="Message text for the experimental pin infobar version 3 on Windows">
+-          Keep Chromium within reach anytime you browse.
++          Keep uw within reach anytime you browse.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_BUTTON_3" translateable="false" desc="Button text for the experimental pin infobar version 3 on Windows">
+-          Pin Chromium Now
++          Pin uw Now
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_4" translateable="false" desc="Message text for the experimental pin infobar version 4 on Windows">
+-          Optimize your workflow. Add Chromium to your taskbar.
++          Optimize your workflow. Add uw to your taskbar.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_6" translateable="false" desc="Message text for the experimental pin infobar version 6 on Windows">
+-          Simplify your startup. Pin Chromium to your taskbar.
++          Simplify your startup. Pin uw to your taskbar.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_BUTTON_8" translateable="false" desc="Button text for the experimental pin infobar version 8 on Windows">
+-          Pin Chromium
++          Pin uw
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_9" translateable="false" desc="Message text for the experimental pin infobar version 9 on Windows">
+-          For a better desktop experience, pin Chromium to your taskbar.
++          For a better desktop experience, pin uw to your taskbar.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_MESSAGE_10" translateable="false" desc="Message text for the experimental pin infobar version 10 on Windows">
+-          Start browsing instantly. Pin Chromium to your taskbar.
++          Start browsing instantly. Pin uw to your taskbar.
+         </message>
+         <message name="IDS_PIN_INFOBAR_EXPERIMENTAL_BUTTON_10" translateable="false" desc="Button text for the experimental pin infobar version 10 on Windows">
+-          Pin Chromium
++          Pin uw
+         </message>
+       </if>
+       <if expr="is_macosx">
 @@ -1147,7 +1147,7 @@ Chromium is unable to recover your settings.
            </then>
            <else>
@@ -137,6 +386,24 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
        </message>
        <if expr="not use_titlecase">
          <message name="IDS_PROFILE_MENU_SIGN_OUT_WHEN_SIGNIN_PENDING" desc="The text label of the Sign out of Chromium button in the Profile Menu when the user is in sign in pending state.">
+@@ -1762,7 +1762,7 @@ Chromium is unable to recover your settings.
+       <!-- Windows firewall rule strings. -->
+       <if expr="is_win">
+         <message name="IDS_INBOUND_MDNS_RULE_NAME" desc="The name of the firewall rule allowing inbound mDNS traffic.">
+-          Chromium (mDNS-In)
++          uw (mDNS-In)
+         </message>
+         <message name="IDS_INBOUND_MDNS_RULE_NAME_BETA" desc="Unused in Chromium builds" translateable="false">
+         </message>
+@@ -1771,7 +1771,7 @@ Chromium is unable to recover your settings.
+         <message name="IDS_INBOUND_MDNS_RULE_NAME_DEV" desc="Unused in Chromium builds" translateable="false">
+         </message>
+         <message name="IDS_INBOUND_MDNS_RULE_DESCRIPTION" desc="The description of the firewall rule allowing inbound mDNS traffic.">
+-          Inbound rule for Chromium to allow mDNS traffic.
++          Inbound rule for uw to allow mDNS traffic.
+         </message>
+         <message name="IDS_INBOUND_MDNS_RULE_DESCRIPTION_BETA" desc="Unused in Chromium builds" translateable="false">
+         </message>
 @@ -2013,7 +2013,7 @@ Chromium is unable to recover your settings.
  
        <!-- Side panel strings -->
@@ -146,6 +413,64 @@ index a741f89bf54c65b3b188def7b03270015356debe..30e84570b24141e9fd19d51852533781
        </message>
  
        <!-- History Strings -->
+@@ -2456,7 +2456,7 @@ Chromium is unable to recover your settings.
+       <!-- Native notifications for Windows 10 -->
+       <if expr="is_win">
+         <message name="IDS_WIN_NOTIFICATION_SETTINGS_CONTEXT_MENU_ITEM_NAME" desc="The name of the button in Windows Notification Center which leads to Chrome notification settings.">
+-          Go to Chromium notification settings
++          Go to uw notification settings
+         </message>
+       </if>
+       <!-- Relaunch notification bubble and dialog. -->
+@@ -2756,16 +2756,16 @@ Chromium is unable to recover your settings.
+       <!--Launch On Startup-->
+       <if expr="is_win">
+         <message name="IDS_SETTINGS_FOREGROUND_LAUNCH_ON_STARTUP_LABEL" desc="Label for settings toggle button that enables or disables opening Chromium on system startup">
+-          Launch Chromium when Windows starts
++          Launch uw when Windows starts
+         </message>
+         <message name="IDS_SETTINGS_FOREGROUND_LAUNCH_ON_STARTUP_SUB_LABEL" desc="Sub label for settings toggle button that enables or disables opening Chromium on system startup">
+-          Launch Chromium automatically to begin browsing instantly.
++          Launch uw automatically to begin browsing instantly.
+         </message>
+         <message name="IDS_STARTUP_LAUNCH_INFOBAR_OPT_IN_TITLE" desc="Title of the infobar shown to ask the user if they want to allow Chromium to launch when windows starts.">
+-          Begin browsing instantly: Chromium can now launch when Windows starts.
++          Begin browsing instantly: uw can now launch when Windows starts.
+         </message>
+         <message name="IDS_STARTUP_LAUNCH_INFOBAR_OPT_OUT_TITLE" desc="Title of the infobar shown to inform the user that Chromium now starts automatically when Windows starts.">
+-          Chromium now launches when Windows starts so you can begin browsing instantly. You can turn this off in settings.
++          uw now launches when Windows starts so you can begin browsing instantly. You can turn this off in settings.
+         </message>
+       </if>
+ 
+@@ -2788,7 +2788,7 @@ Chromium is unable to recover your settings.
+       <!-- ChromiumUpdater Strings -->
+       <if expr="is_win">
+         <message name="IDS_FRIENDLY_COMPANY_NAME" desc="Company name" translateable="false">
+-          Chromium
++          uw
+         </message>
+         <message name="IDS_NO_UPDATE_RESPONSE" desc="Updater response for no updates when handling install result.">
+           No update is available
+@@ -3028,15 +3028,15 @@ Chromium is unable to recover your settings.
+         <!--Windows service strings.-->
+         <message name="IDS_UPDATER_SERVICE_DISPLAY_NAME"
+                  desc="The name of the Windows service. Displayed in the Windows Services management console.">
+-          Chromium Updater Service
++          uw Updater Service
+         </message>
+         <message name="IDS_INTERNAL_UPDATER_SERVICE_DISPLAY_NAME"
+                  desc="The name of the internal Windows service. Displayed in the Windows Services management console.">
+-          Chromium Updater Internal Service
++          uw Updater Internal Service
+         </message>
+         <message name="IDS_UPDATER_SERVICE_DESCRIPTION"
+                  desc="The description of the Windows service. Displayed in the Windows Services management console.">
+-          Keeps your Chromium software up to date. If this service is disabled or stopped, your Chromium software will not be kept up to date, meaning security vulnerabilities that may arise cannot be fixed and features may not work. This service uninstalls itself when there is no Chromium software using it.
++          Keeps your uw software up to date. If this service is disabled or stopped, your uw software will not be kept up to date, meaning security vulnerabilities that may arise cannot be fixed and features may not work. This service uninstalls itself when there is no uw software using it.
+         </message>
+       </if>
+ 
 diff --git a/chrome/app/settings_chromium_strings.grdp b/chrome/app/settings_chromium_strings.grdp
 --- a/chrome/app/settings_chromium_strings.grdp
 +++ b/chrome/app/settings_chromium_strings.grdp
@@ -220,3 +545,168 @@ index 4c523d4..c524fc1 100644
    return l10n_util::GetStringFUTF16(
        IDS_SETTINGS_ABOUT_PAGE_BROWSER_VERSION,
        base::UTF8ToUTF16(version_info::GetVersionNumber()),
+diff --git a/chrome/install_static/chromium_install_modes.h b/chrome/install_static/chromium_install_modes.h
+index a6d969df56d13d94eaa968934f909d6fd23b5f2f..2618654acf017007cee7a9e41a83065cef4bfe25 100644
+--- a/chrome/install_static/chromium_install_modes.h
++++ b/chrome/install_static/chromium_install_modes.h
+@@ -17,11 +17,11 @@ namespace install_static {
+ 
+ // The brand-specific company name to be included as a component of the install
+ // and user data directory paths. May be empty if no such dir is to be used.
+-inline constexpr wchar_t kCompanyPathName[] = L"";
++inline constexpr wchar_t kCompanyPathName[] = L"uwbrowser";
+ 
+ // The brand-specific product name to be included as a component of the install
+ // and user data directory paths.
+-inline constexpr wchar_t kProductPathName[] = L"Chromium";
++inline constexpr wchar_t kProductPathName[] = L"uw";
+ 
+ // The brand-specific safe browsing client name.
+ inline constexpr char kSafeBrowsingName[] = "chromium";
+@@ -54,28 +54,30 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+         .logo_suffix = L"",  // No logo suffix for the primary install mode.
+         .app_guid =
+             L"",  // Empty app_guid since no integration with Google Update.
+-        .base_app_name = L"Chromium",              // A distinct base_app_name.
+-        .base_app_id = L"Chromium",                // A distinct base_app_id.
+-        .browser_prog_id_prefix = L"ChromiumHTM",  // Browser ProgID prefix.
++        // uw: its own names and IDs, so it never collides with an installed
++        // Chromium. None of them can change once people install uw. See
++        // docs/plans/windows.md.
++        .base_app_name = L"uw",               // A distinct base_app_name.
++        .base_app_id = L"uwbrowser.uw",       // A distinct base_app_id.
++        .browser_prog_id_prefix = L"uwHTML",  // Browser ProgID prefix.
+         .browser_prog_id_description =
+-            L"Chromium HTML Document",  // Browser ProgID description.
+-        .direct_launch_url_scheme = "chromium",
+-        .pdf_prog_id_prefix = L"ChromiumPDF",  // PDF ProgID prefix.
++            L"uw HTML Document",  // Browser ProgID description.
++        .direct_launch_url_scheme = "uwbrowser",
++        .pdf_prog_id_prefix = L"uwPDF",  // PDF ProgID prefix.
+         .pdf_prog_id_description =
+-            L"Chromium PDF Document",  // PDF ProgID description.
++            L"uw PDF Document",  // PDF ProgID description.
+         .active_setup_guid =
+-            L"{7D2B3E1D-D096-4594-9D8F-A6667F12E0AC}",  // Active Setup
+-                                                        // GUID.
+-        .toast_activator_clsid = {0x635EFA6F,
+-                                  0x08D6,
+-                                  0x4EC9,
+-                                  {0xBD, 0x14, 0x8A, 0x0F, 0xDE, 0x97, 0x51,
+-                                   0x59}},  // Toast Activator CLSID.
+-        .elevator_clsid = {0xD133B120,
+-                           0x6DB4,
+-                           0x4D6B,
+-                           {0x8B, 0xFE, 0x83, 0xBF, 0x8C, 0xA1, 0xB1,
+-                            0xB0}},  // Elevator CLSID.
++            L"{572F1957-9ED7-44C0-B191-9D6DF238CDF6}",  // Active Setup GUID.
++        .toast_activator_clsid = {0x43DA30EF,
++                                  0x76BC,
++                                  0x430C,
++                                  {0xAB, 0x20, 0x67, 0xD2, 0xA1, 0xC4, 0x95,
++                                   0xE8}},  // Toast Activator CLSID.
++        .elevator_clsid = {0x06E3995C,
++                           0xABB4,
++                           0x4799,
++                           {0xA5, 0xFC, 0x60, 0x24, 0x7A, 0x9D, 0x78,
++                            0x07}},  // Elevator CLSID.
+         .elevator_iid = {0xbb19a0e5,
+                          0xc6,
+                          0x4966,
+@@ -83,11 +85,11 @@ inline constexpr auto kInstallModes = std::to_array<InstallConstants>({
+                           0x3a}},  // IElevator IID and TypeLib
+         // {BB19A0E5-00C6-4966-94B2-5AFEC6FED93A}.
+         .old_elevator_iids = {},
+-        .tracing_service_clsid = {0x83f69367,
+-                                  0x442d,
+-                                  0x447f,
+-                                  {0x8b, 0xcc, 0x0e, 0x3f, 0x97, 0xbe, 0x9c,
+-                                   0xf2}},  // SystemTraceSession CLSID.
++        .tracing_service_clsid = {0xFFF01E24,
++                                  0xE420,
++                                  0x4DDB,
++                                  {0x9F, 0xA1, 0xC8, 0x4B, 0x3E, 0xBB, 0xE2,
++                                   0xA9}},  // SystemTraceSession CLSID.
+         .tracing_service_iid = {0xe0b03e2d,
+                                 0x7682,
+                                 0x4d83,
+diff --git a/chrome/install_static/install_modes.cc b/chrome/install_static/install_modes.cc
+index bdd057bf4a266f30a3d9d93eef1ebcc1853bcf83..dd346fb65d77b0f1792f4b65a5bd05a4cf83e895 100644
+--- a/chrome/install_static/install_modes.cc
++++ b/chrome/install_static/install_modes.cc
+@@ -26,7 +26,14 @@ std::wstring GetClientStateMediumKeyPathForApp(const wchar_t* app_guid) {
+ }
+ #else
+ std::wstring GetUnregisteredKeyPathForProduct() {
+-  return std::wstring(L"Software\\").append(kProductPathName);
++  // uw: the key sits in the company's folder, as the install and data folders
++  // do.
++  std::wstring path(L"Software\\");
++  if constexpr (*kCompanyPathName) {
++    path.append(kCompanyPathName);
++    path.push_back(L'\\');
++  }
++  return path.append(kProductPathName);
+ }
+ #endif
+ 
+diff --git a/chrome/installer/mini_installer/mini_installer.rc b/chrome/installer/mini_installer/mini_installer.rc
+index fff6a53c69130651cafd844a76a5d0e882689d56..0866867685a82ca580144fbe30aabb6e2ba2a52f 100644
+--- a/chrome/installer/mini_installer/mini_installer.rc
++++ b/chrome/installer/mini_installer/mini_installer.rc
+@@ -29,7 +29,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+ 
+ // Icon with lowest ID value placed first to ensure application icon
+ // remains consistent on all systems.
+-IDI_MINI_INSTALLER      ICON                    "mini_installer.ico"
++IDI_MINI_INSTALLER      ICON                    "../../../uw/browser/branding/win/uw.ico"
+ 
+ #ifdef APSTUDIO_INVOKED
+ /////////////////////////////////////////////////////////////////////////////
+diff --git a/chrome/installer/mini_installer/mini_installer_constants.cc b/chrome/installer/mini_installer/mini_installer_constants.cc
+index c2a03ccbb64608add5c92e12da8985ea6fc4963d..d9a2c854cfab37546108f49d6be4ca839f4c55e3 100644
+--- a/chrome/installer/mini_installer/mini_installer_constants.cc
++++ b/chrome/installer/mini_installer/mini_installer_constants.cc
+@@ -67,12 +67,13 @@ const wchar_t kCleanupRegistryKey[] = L"Software\\Chrome for Testing";
+ #else
+ // The path to the key containing each app's Clients registry key.
+ // No trailing slash on this one because the app's GUID is not appended.
+-const wchar_t kClientsKeyBase[] = L"Software\\Chromium";
++// uw: the same key as install_static's, in the company's folder.
++const wchar_t kClientsKeyBase[] = L"Software\\uwbrowser\\uw";
+ // The path to the key containing each app's Client State registry key.
+ // No trailing slash on this one because the app's GUID is not appended.
+-const wchar_t kClientStateKeyBase[] = L"Software\\Chromium";
++const wchar_t kClientStateKeyBase[] = L"Software\\uwbrowser\\uw";
+ // The path to the key in which kCleanupRegistryValue is found.
+-const wchar_t kCleanupRegistryKey[] = L"Software\\Chromium";
++const wchar_t kCleanupRegistryKey[] = L"Software\\uwbrowser\\uw";
+ #endif
+ 
+ }  // namespace mini_installer
+diff --git a/chrome/installer/setup/setup.rc b/chrome/installer/setup/setup.rc
+index 920109c69cea5b2ae48a75ce07570ed72b55348b..4d1d1670ffafe2fbfd8108d8060c1f8216e7b2ac 100644
+--- a/chrome/installer/setup/setup.rc
++++ b/chrome/installer/setup/setup.rc
+@@ -54,7 +54,7 @@ END
+ 
+ // Icon with lowest ID value placed first to ensure application icon
+ // remains consistent on all systems.
+-IDI_SETUP               ICON                    "setup.ico"
++IDI_SETUP               ICON                    "../../../uw/browser/branding/win/uw.ico"
+ #endif    // English (U.S.) resources
+ /////////////////////////////////////////////////////////////////////////////
+ 
+diff --git a/components/components_chromium_strings.grd b/components/components_chromium_strings.grd
+index 154a93064247c70fbcb1c3096005f58050aaf87c..7e85f3f86eea0c8b6e6d0351dc8c5da8afbfc961 100644
+--- a/components/components_chromium_strings.grd
++++ b/components/components_chromium_strings.grd
+@@ -305,7 +305,7 @@
+ 
+       <!-- Session Crash -->
+       <message name="IDS_SESSION_CRASHED_VIEW_MESSAGE" desc="Message shown when the last session didn't exit cleanly.">
+-        Chromium didn't shut down correctly.
++        uw didn't shut down correctly.
+       </message>
+ 
+       <!-- Device Chooser Prompt -->

@@ -160,6 +160,32 @@ index 613157ec0fb54699a48b501f874473c38df1c809..3a3d26133e04a0dc7d250ac5b06954bc
    DCHECK(prefs_map_.find(pref_service) == prefs_map_.end());
    std::unique_ptr<PrefChangeRegistrar> registrar =
        std::make_unique<PrefChangeRegistrar>();
+diff --git a/chrome/browser/ui/startup/infobar_utils.cc b/chrome/browser/ui/startup/infobar_utils.cc
+index d7ebcfb01b316351d8fe0ee962710d482eb47314..54f7bee1763189fa20e8986b43f3cf7fa9f4412d 100644
+--- a/chrome/browser/ui/startup/infobar_utils.cc
++++ b/chrome/browser/ui/startup/infobar_utils.cc
+@@ -194,19 +194,8 @@ void AddInfoBarsIfNecessary(BrowserWindowInterface* browser,
+   infobars::ContentInfoBarManager* infobar_manager =
+       infobars::ContentInfoBarManager::FromWebContents(web_contents);
+ 
+-  if (!google_apis::HasAPIKeyConfigured()) {
+-    if (infobars::IsInfoBarMigrated(
+-            infobars::InfoBarDelegate::GOOGLE_API_KEYS_INFOBAR_DELEGATE)) {
+-      if (auto* manager =
+-              infobars::BrowserInfoBarManager::From(g_browser_process)) {
+-        manager->Show(
+-            tabs::TabInterface::GetFromContents(web_contents),
+-            infobars::InfoBarDelegate::GOOGLE_API_KEYS_INFOBAR_DELEGATE);
+-      }
+-    } else {
+-      GoogleApiKeysInfoBarDelegate::Create(infobar_manager);
+-    }
+-  }
++  // uw: uw has no Google API keys on purpose, so it never says they are
++  // missing. See docs/plans/google-requests.md.
+ 
+   if (ObsoleteSystem::IsObsoleteNowOrSoon()) {
+     PrefService* local_state = g_browser_process->local_state();
 diff --git a/components/omnibox/browser/aim_eligibility_service.cc b/components/omnibox/browser/aim_eligibility_service.cc
 index 5e1a8533f2737458845b454ccf1a1825c897532e..8fdc413468207f237d0a7ea58b7be6d36d0e13b4 100644
 --- a/components/omnibox/browser/aim_eligibility_service.cc

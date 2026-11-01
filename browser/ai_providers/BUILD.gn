@@ -20,10 +20,14 @@ source_set("ai_providers") {
     "remote_model_client.h",
   ]
   if (is_mac) {
-    # macOS Keychain storage. The first release targets macOS desktop.
+    # macOS Keychain storage.
     sources += [ "api_key_store_mac.mm" ]
+  } else if (is_win) {
+    # Files encrypted with DPAPI for the Windows user.
+    sources += [ "api_key_store_win.cc" ]
+    libs = [ "crypt32.lib" ]
   } else {
-    # In-memory fallback so non-macOS builds link. Secrets never leave the
+    # In-memory fallback so other builds link. Secrets never leave the
     # process and never touch disk.
     sources += [ "api_key_store_stub.cc" ]
   }
@@ -45,6 +49,9 @@ source_set("ai_providers") {
     "//services/network/public/mojom",
     "//uw/components/agent",
   ]
+  if (is_win) {
+    deps += [ "//chrome/common:constants" ]
+  }
 }
 
 source_set("test_support") {
