@@ -30,7 +30,7 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 
 - `uwbrowser.com/api/mcp` serves Help over MCP's Streamable HTTP, with Fumadocs' tools to list, search, and read pages. Any agent can add it.
 - The address never changes, since builds of uw carry it ([ADR 0021](../adr/0021-the-agent-reads-help-from-uwbrowser-com-through-a-connector.md)).
-- It records nothing: no PostHog events and no saved searches. Vercel's standard request logs are all there is. Help's web pages count visits in PostHog as the home page does.
+- It records nothing: no PostHog events and no saved searches. Vercel's standard request logs are all there is. Help's web pages count visits in PostHog as the home page does, per [Website analytics](distribution.md#website-analytics).
 
 ### In uw
 

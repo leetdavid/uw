@@ -64,6 +64,21 @@ Agreed: the website is `uwbrowser.com`, registered through Vercel. The app's bun
 
 Agreed: a Next.js app in `site/`, a package in this repo's pnpm workspace, deployed by Vercel to `uwbrowser.com`. It uses no ESLint or Prettier. The download button links to `https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg`, so every release names its DMG the same and the site needs no change per release.
 
+### Website analytics
+
+Agreed: the website uses PostHog for visits and download clicks.
+
+Decided on 2026-11-01:
+
+- The site stores nothing on the visitor's device and shows no consent banner. PostHog's cookieless mode counts daily unique visitors from a hash of the IP address and browser that PostHog resets every day, so it cannot follow one visitor across days.
+- It sends page views, page leaves, and two events: a click on a Download for Mac button, and a click on a Homebrew copy button, each with where on the site it was. Nothing else: no autocapture and no session replay.
+- A browser that sends Do Not Track or Global Privacy Control sends nothing. Help's "Was this helpful?" still sends, since the visitor chooses to.
+- Only the production deploy sends. Vercel previews and local development send nothing. Routes without a page, such as the [MCP route](help.md#the-mcp-route), `.md` pages, and `llms.txt`, record nothing.
+- It sends through `e.uwbrowser.com`, the PostHog managed proxy that [problem reports](#problem-reports) use. Help's "Was this helpful?" does too.
+- The key is one Vercel variable, `NEXT_PUBLIC_POSTHOG_KEY`, set for Production only, so previews and local development have none.
+- It goes live in the usual site deploy after the next release, so Help describes nothing unreleased. T289 on the [board](roadmap.md#board).
+- Help's [Privacy](https://uwbrowser.com/help/privacy) page has a section on what the website collects, and the home page's and Help home's footers link to it.
+
 ## Keys in public builds
 
 Agreed: public previews carry none of the owner's org-only sign-in app keys from [ADR 0014](../adr/0014-uw-signs-in-with-its-own-apps-kept-out-of-the-repo.md). `pnpm run release` refuses to build when they are set. Previews have no one-click GitHub, Slack, or Google sign-in; the owner's own builds keep it.
@@ -78,8 +93,6 @@ With the user's consent, uw also sends problem reports:
 - uw's own React pages, such as the chat, settings, and organizer pages, send rage clicks, dead clicks, and JavaScript errors to PostHog. Text fields are masked, there is no session replay, and websites are never watched.
 
 On first run uw asks "Send crash reports and problem reports to help fix uw?" with Yes and No and nothing pre-selected. One switch in settings changes the answer. Crash dumps can hold page contents, so they are sent only after a Yes.
-
-The website uses PostHog for visits and download clicks.
 
 Found so far, at Chromium 153 on 2026-10-27:
 

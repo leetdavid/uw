@@ -365,3 +365,7 @@ _Avoid_: Test build, beta, nightly.
 **Problem report**:
 What uw sends, only with the user's consent, to help fix it: a native crash report, or a rage click, dead click, or JavaScript error on one of uw's own pages. Never anything from a website the user visits.
 _Avoid_: Telemetry, analytics, tracking.
+
+**Website analytics**:
+What uwbrowser.com counts about its own visitors: page visits and clicks on its download and Homebrew buttons. It stores nothing on the visitor's device. The browser never sends it.
+_Avoid_: Telemetry, tracking, site stats.
