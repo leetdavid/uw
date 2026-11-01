@@ -25,6 +25,7 @@
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/version.h"
+#include "build/build_config.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -272,6 +273,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
                       view.y() + std::lround(at[1].GetDouble() * scale));
   }
 
+#if BUILDFLAG(IS_MAC)
   // Moves the real mouse, and clicks it. Chromium asks macOS where the
   // pointer is and which button is held, so the events go through
   // ui_controls, which answers for macOS. A move reaches a page only when
@@ -295,6 +297,7 @@ class UwChatBrowserTest : public headless::HeadlessModeBrowserTest {
       done.Run();
     }
   }
+#endif  // BUILDFLAG(IS_MAC)
 
   content::WebContents* OpenChat() {
     chrome::ExecuteCommand(browser(), kNewChatCommand);
@@ -2412,6 +2415,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheIndicatorShowsContextAndCost) {
   EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
 }
 
+#if BUILDFLAG(IS_MAC)
 // With a real mouse and keys: hovering the indicator says what it holds, a
 // click opens the card, hovering a bar says what its message cost, and Escape
 // or a click outside closes the card. Run with `pnpm run window-tests`.
@@ -2474,6 +2478,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
                  "    '.answer p').firstChild), text))(new Range())"));
   EXPECT_EQ(Until(chat, "!document.getElementById('usage-card')"), true);
 }
+#endif  // BUILDFLAG(IS_MAC)
 
 // A model the catalog lists without image input gets an image by its path,
 // and the composer says so.
