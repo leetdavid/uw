@@ -17,11 +17,6 @@ NSWindow* NSWindowOf(BrowserWindowInterface* window) {
 
 }  // namespace
 
-void WorkspaceWindow::SetHidden(bool hidden) {
-  hidden_ = hidden;
-  SetContentsHidden(hidden);
-}
-
 void WorkspaceWindow::SetContentsHidden(bool hidden) {
   NSWindowOf(window_).contentView.hidden = hidden;
 }

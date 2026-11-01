@@ -2,8 +2,6 @@
 
 #include "uw/browser/ui/views/tab_organization/mouse_actions.h"
 
-#import <AppKit/AppKit.h>
-
 #include <memory>
 #include <optional>
 #include <string>
@@ -46,6 +44,7 @@
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
+#include "uw/browser/ui/views/tab_organization/second_click.h"
 
 namespace uw {
 namespace {
@@ -94,16 +93,6 @@ T* ChildOfClass(const views::View* row) {
     }
   }
   return nullptr;
-}
-
-// True while the second click of a double-click is down or coming up. Only
-// the event macOS is handing out says so: the window asks where the click
-// goes before any view sees it.
-bool IsSecondClick() {
-  NSEvent* event = NSApp.currentEvent;
-  return (event.type == NSEventTypeLeftMouseDown ||
-          event.type == NSEventTypeLeftMouseUp) &&
-         event.clickCount == 2;
 }
 
 }  // namespace

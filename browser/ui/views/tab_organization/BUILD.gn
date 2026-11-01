@@ -18,10 +18,10 @@ source_set("tab_organization") {
     "key_hint.h",
     "menu_card_row.cc",
     "menu_card_row.h",
+    "modifier_keys.cc",
     "modifier_keys.h",
-    "modifier_keys.mm",
+    "mouse_actions.cc",
     "mouse_actions.h",
-    "mouse_actions.mm",
     "name_lock.cc",
     "name_lock.h",
     "new_button.cc",
@@ -44,9 +44,21 @@ source_set("tab_organization") {
     "task_name_field.h",
     "tint_style.cc",
     "tint_style.h",
+    "second_click.h",
     "window_commands.cc",
     "window_commands.h",
   ]
+  if (is_mac) {
+    sources += [
+      "modifier_keys_mac.mm",
+      "second_click_mac.mm",
+    ]
+  } else {
+    sources += [
+      "modifier_keys_stub.cc",
+      "second_click_stub.cc",
+    ]
+  }
   public_deps = [
     "//base",
     "//ui/menus",

@@ -10,6 +10,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
+#include "build/build_config.h"
 
 namespace net {
 class StreamSocket;
@@ -53,7 +54,9 @@ class CommandSocket {
 
   const Received received_;
   const Closed closed_;
+#if BUILDFLAG(IS_POSIX)
   std::unique_ptr<net::UnixDomainServerSocket> server_;
+#endif
   std::unique_ptr<net::StreamSocket> accepted_;
   std::map<int, std::unique_ptr<Connection>> connections_;
   int next_connection_ = 1;

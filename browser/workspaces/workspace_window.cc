@@ -742,6 +742,11 @@ void WorkspaceWindow::RevealOrphans() {
   }
 }
 
+void WorkspaceWindow::SetHidden(bool hidden) {
+  hidden_ = hidden;
+  SetContentsHidden(hidden);
+}
+
 void WorkspaceWindow::Keep() {
   if (!hidden_) {
     for (WorkspaceWindow* partner : Partners()) {

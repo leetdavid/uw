@@ -8,8 +8,6 @@ source_set("uw_command") {
     "command_handler.cc",
     "command_handler.h",
     "command_install.h",
-    "command_install.mm",
-    "command_socket.cc",
     "command_socket.h",
     "connectors_command.cc",
     "command_workspace.cc",
@@ -19,6 +17,16 @@ source_set("uw_command") {
     "tabs_command.cc",
     "tools_command.cc",
   ]
+  if (is_mac) {
+    sources += [ "command_install.mm" ]
+  } else {
+    sources += [ "command_install_stub.cc" ]
+  }
+  if (is_posix) {
+    sources += [ "command_socket.cc" ]
+  } else {
+    sources += [ "command_socket_stub.cc" ]
+  }
   public_deps = [ "//base" ]
   deps = [
     "//base:i18n",

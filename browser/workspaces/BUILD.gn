@@ -8,9 +8,13 @@ source_set("workspaces") {
     "workspace_window.h",
     "workspace_theme.cc",
     "workspace_theme.h",
-    "workspace_window_mac.mm",
   ]
-  frameworks = [ "AppKit.framework" ]
+  if (is_mac) {
+    sources += [ "workspace_window_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  } else {
+    sources += [ "workspace_window_stub.cc" ]
+  }
   public_deps = [
     "//base",
     "//chrome/browser/profiles:profile_util",

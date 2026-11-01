@@ -13,13 +13,17 @@ source_set("workspaces") {
     "workspace_cards.h",
     "workspace_swipe.cc",
     "workspace_swipe.h",
-    "workspace_swipe_mac.mm",
     "workspace_switcher.cc",
     "workspace_switcher.h",
     "workspace_text.cc",
     "workspace_text.h",
   ]
-  frameworks = [ "AppKit.framework" ]
+  if (is_mac) {
+    sources += [ "workspace_swipe_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  } else {
+    sources += [ "workspace_swipe_stub.cc" ]
+  }
   public_deps = [
     "//base",
     "//ui/base/unowned_user_data",

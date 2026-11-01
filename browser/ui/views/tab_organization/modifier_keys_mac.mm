@@ -4,8 +4,6 @@
 
 #import <AppKit/AppKit.h>
 
-#include "base/no_destructor.h"
-
 namespace uw {
 
 namespace {
@@ -19,12 +17,6 @@ bool HasCommand(NSEventModifierFlags flags) {
 }
 
 }  // namespace
-
-// static
-ModifierKeys& ModifierKeys::Get() {
-  static base::NoDestructor<ModifierKeys> keys;
-  return *keys;
-}
 
 ModifierKeys::ModifierKeys() {
   ModifierKeys* self = this;
@@ -52,26 +44,6 @@ ModifierKeys::ModifierKeys() {
   if (NSApp.active) {
     Set(HasOption(NSEvent.modifierFlags), HasCommand(NSEvent.modifierFlags));
   }
-}
-
-ModifierKeys::~ModifierKeys() = default;
-
-base::CallbackListSubscription ModifierKeys::Observe(
-    base::RepeatingClosure changed) {
-  return observers_.Add(std::move(changed));
-}
-
-void ModifierKeys::SetForTesting(bool option, bool command) {
-  Set(option, command);
-}
-
-void ModifierKeys::Set(bool option, bool command) {
-  if (option == option_ && command == command_) {
-    return;
-  }
-  option_ = option;
-  command_ = command;
-  observers_.Notify();
 }
 
 }  // namespace uw
