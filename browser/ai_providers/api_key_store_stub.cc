@@ -17,13 +17,13 @@
 namespace uw {
 namespace {
 
-std::mutex& KeyMutex() {
-  static base::NoDestructor<std::mutex> mutex;
-  return *mutex;
-}
+struct Keys {
+  std::mutex mutex;
+  std::map<std::string, std::string> by_account;
+};
 
-std::map<std::string, std::string>& KeyMap() {
-  static base::NoDestructor<std::map<std::string, std::string>> keys;
+Keys& Store() {
+  static base::NoDestructor<Keys> keys;
   return *keys;
 }
 
@@ -36,23 +36,26 @@ bool ApiKeyStore::SetKey(const std::string& account, const std::string& key) {
   if (account.empty() || key.empty()) {
     return false;
   }
-  std::lock_guard<std::mutex> lock(KeyMutex());
-  KeyMap()[account] = key;
+  Keys& keys = Store();
+  std::lock_guard<std::mutex> lock(keys.mutex);
+  keys.by_account[account] = key;
   return true;
 }
 
 std::optional<std::string> ApiKeyStore::GetKey(const std::string& account) {
-  std::lock_guard<std::mutex> lock(KeyMutex());
-  auto it = KeyMap().find(account);
-  if (it == KeyMap().end()) {
+  Keys& keys = Store();
+  std::lock_guard<std::mutex> lock(keys.mutex);
+  auto it = keys.by_account.find(account);
+  if (it == keys.by_account.end()) {
     return std::nullopt;
   }
   return it->second;
 }
 
 bool ApiKeyStore::DeleteKey(const std::string& account) {
-  std::lock_guard<std::mutex> lock(KeyMutex());
-  return KeyMap().erase(account) > 0;
+  Keys& keys = Store();
+  std::lock_guard<std::mutex> lock(keys.mutex);
+  return keys.by_account.erase(account) > 0;
 }
 
 }  // namespace uw
