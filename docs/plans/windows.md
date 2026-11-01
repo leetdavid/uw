@@ -6,7 +6,7 @@ Implementability: **3/10** for the whole plan and **4/10** for the first preview
 
 ## Agreed
 
-- When, agreed on 2026-11-01: stage 1 starts now. Later stages wait for their own go-ahead.
+- When, agreed on 2026-11-01: stage 1 starts now. Later stages wait for their own go-ahead. Stage 1 was done the same day, as T286 to T288.
 - Build host, agreed on 2026-11-01: the owner's Linux workstation, `workstation` on Tailscale, cross-builds Windows uw in a Chromium checkout of its own. Linux to Windows is the cross build Chromium's own CI tests. A Windows 11 x64 VM on the same machine packages Visual Studio and the Windows SDK once, and runs uw and its tests at full speed. The VM runs in Docker with [dockur/windows](https://github.com/dockur/windows), so the workstation needs no `sudo` and no system packages, and it uses Microsoft's free 90-day Windows 11 Enterprise evaluation. When the evaluation runs out, the VM is installed again from the same setup. The Mac and the home server were turned down: the Mac is short of disk and would test under Arm emulation, and the server has 31 GB of RAM.
 - Processors, agreed on 2026-11-01: x64 only, as the Mac is Apple silicon only. Windows on Arm runs it under emulation.
 - Installer, agreed on 2026-11-01: Chromium's `mini_installer`. Chrome ships on it, so it needs the least upkeep: uw changes only names, IDs, and icons. It installs per user without an admin prompt, registers uw as a browser, and swaps in an update at relaunch.
