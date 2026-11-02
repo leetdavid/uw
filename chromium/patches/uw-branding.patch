@@ -63,7 +63,7 @@ index 7d8d4c39f798834fd6f7cfa1845f56515c2c338f..bf5637b3aaed5b1ad9fb8127fcd54441
  
  // Start a naming scheme to keep icons in order. A leading X is used to keep
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
-index a741f89bf54c65b3b188def7b03270015356debe..05ef9c9d4344867a12454a7abe450f7305186e8a 100644
+index a741f89bf54c65b3b188def7b03270015356debe..978c55a178a935b96e6d0866fdff0aa2754a95c9 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
 @@ -294,15 +294,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
@@ -492,6 +492,39 @@ index a741f89bf54c65b3b188def7b03270015356debe..05ef9c9d4344867a12454a7abe450f73
          </message>
          <message name="IDS_INBOUND_MDNS_RULE_DESCRIPTION_BETA" desc="Unused in Chromium builds" translateable="false">
          </message>
+@@ -1945,25 +1945,25 @@ Chromium is unable to recover your settings.
+ 
+       <!-- Desktop Capture -->
+       <message name="IDS_DESKTOP_MEDIA_PICKER_SOURCE_TYPE_TAB" desc="Text for the button on the window picker dialog, clicking which takes one to tab sharing">
+-        Chromium Tab
++        uw Tab
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_SCREEN_PERMISSION_TEXT_MAC" desc="Instructive text for how to enable screen recording on Mac when trying to share a screen." >
+-        To share your screen, allow screen recording for Chromium in System Settings
++        To share your screen, allow screen recording for uw in System Settings
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_SCREEN_PERMISSION_TEXT_PERIOD_MAC" desc="Instructive text for how to enable screen recording on Mac when trying to share a screen, ending with period to allow a supplementary text to follow." >
+-        To share your screen, allow screen recording for Chromium in System Settings.
++        To share your screen, allow screen recording for uw in System Settings.
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_WINDOW_PERMISSION_TEXT_MAC" desc="Instructive text for how to enable screen recording on Mac when trying to share a window." >
+-        To share your window, allow screen recording for Chromium in System Settings
++        To share your window, allow screen recording for uw in System Settings
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_WINDOW_PERMISSION_TEXT_PERIOD_MAC" desc="Instructive text for how to enable screen recording on Mac when trying to share a window, ending with period to allow a supplementary text to follow." >
+-        To share your window, allow screen recording for Chromium in System Settings.
++        To share your window, allow screen recording for uw in System Settings.
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_PERMISSION_RESTART_TEXT_MAC" desc="Supplementary text about the need to restart Chrome, displayed below the message about enabling screen-recording permissions on Mac when those permissions are missing." >
+-        You'll then need to restart Chromium.
++        You'll then need to restart uw.
+       </message>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_SYSTEM_AUDIO_PERMISSION_TEXT_MAC" desc="Instructive text for how to enable system audio capture on Mac." >
+-        To share system audio, open System Settings and allow 'System Audio Recording Only' for Chromium. You'll then need to restart Chromium.
++        To share system audio, open System Settings and allow 'System Audio Recording Only' for uw. You'll then need to restart uw.
+       </message>
+ 
+       <!-- Runtime permission strings -->
 @@ -2013,7 +2013,7 @@ Chromium is unable to recover your settings.
  
        <!-- Side panel strings -->
@@ -510,6 +543,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..05ef9c9d4344867a12454a7abe450f73
          </message>
        </if>
        <!-- Relaunch notification bubble and dialog. -->
+@@ -2522,7 +2522,7 @@ Chromium is unable to recover your settings.
+         </message>
+       </if>
+       <message name="IDS_DESKTOP_MEDIA_PICKER_TITLE_WEB_CONTENTS_ONLY" desc="Title for the window picker dialog shown when desktop capture of a tab is requested by an app.">
+-        Share a Chromium tab
++        Share a uw tab
+       </message>
+       <!-- Idle timeout bubble. -->
+       <if expr="toolkit_views">
 @@ -2639,7 +2639,7 @@ Chromium is unable to recover your settings.
  
          <!-- Default Browser Promo -->
