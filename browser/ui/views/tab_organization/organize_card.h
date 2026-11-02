@@ -70,9 +70,11 @@ class OrganizeCard : public views::View {
   void Run(int command);
   void RunAndClose(int command);
   void OpenProviders();
+  void OnWindowClosed(BrowserWindowInterface* window);
 
   const raw_ptr<OrganizeBar> bar_;
-  const raw_ptr<BrowserWindowInterface> window_;
+  raw_ptr<BrowserWindowInterface> window_;
+  base::CallbackListSubscription window_closed_;
   PrefChangeRegistrar prefs_;
   base::CallbackListSubscription tree_subscription_;
   base::RepeatingTimer countdown_;

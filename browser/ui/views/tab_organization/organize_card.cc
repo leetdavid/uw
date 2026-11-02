@@ -161,6 +161,8 @@ OrganizeCard::OrganizeCard(OrganizeBar* bar, BrowserWindowInterface* window)
     tree_subscription_ = controller->Observe(base::BindRepeating(
         &OrganizeCard::ScheduleRebuild, base::Unretained(this)));
   }
+  window_closed_ = window->RegisterBrowserDidClose(base::BindRepeating(
+      &OrganizeCard::OnWindowClosed, base::Unretained(this)));
   countdown_.Start(
       FROM_HERE, kCountdownStep,
       base::BindRepeating(&OrganizeCard::UpdateStatus, base::Unretained(this)));
@@ -391,8 +393,23 @@ void OrganizeCard::RunAndClose(int command) {
 }
 
 void OrganizeCard::OpenProviders() {
-  ShowAiProviders(window_);
+  if (window_) {
+    ShowAiProviders(window_);
+  }
   GetWidget()->Close();
+}
+
+// The card can outlive its window while both close, so it stops rebuilding
+// before the window goes.
+void OrganizeCard::OnWindowClosed(BrowserWindowInterface* window) {
+  weak_factory_.InvalidateWeakPtrs();
+  countdown_.Stop();
+  prefs_.RemoveAll();
+  tree_subscription_ = {};
+  window_ = nullptr;
+  if (GetWidget()) {
+    GetWidget()->Close();
+  }
 }
 
 BEGIN_METADATA(OrganizeCard)

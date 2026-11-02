@@ -220,7 +220,9 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->pause_mode = static_cast<int32_t>(ReadPauseState(prefs));
   state->thresholds = CurrentThresholds();
   state->can_show_glass = CanShowGlass();
+  // Without glass, as on Windows, the pref is never registered.
   state->glass_behind =
+      state->can_show_glass &&
       g_browser_process->local_state()->GetBoolean(kGlassBehindPref);
   state->command_bar = prefs->GetBoolean(kCommandBarEnabledPref);
   state->currency = prefs->GetString(kCommandBarCurrencyPref);
@@ -263,7 +265,9 @@ void UwOrganizationHandler::OpenThemePicker() {
 
 void UwOrganizationHandler::SetGlassBehind(bool on,
                                            SetGlassBehindCallback callback) {
-  g_browser_process->local_state()->SetBoolean(kGlassBehindPref, on);
+  if (CanShowGlass()) {
+    g_browser_process->local_state()->SetBoolean(kGlassBehindPref, on);
+  }
   std::move(callback).Run();
 }
 
@@ -326,7 +330,8 @@ namespace {
 
 mojom::CommandStatePtr CommandStateOf(mojom::CommandProblem problem,
                                       bool installed) {
-  return mojom::CommandState::New(installed, CommandLink().AsUTF8Unsafe(), problem);
+  return mojom::CommandState::New(installed, CommandLink().AsUTF8Unsafe(),
+                                  problem);
 }
 
 mojom::CommandProblem ProblemOf(CommandInstall result) {
