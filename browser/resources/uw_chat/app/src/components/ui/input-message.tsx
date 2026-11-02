@@ -1013,6 +1013,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       (e: React.MouseEvent<HTMLDivElement>) => {
         if (!clickToFocus || disabled) return;
         const target = e.target as HTMLElement;
+        // React passes a portaled menu's presses up to here. Taking focus
+        // from the menu would close it before the click picks its row.
+        if (!e.currentTarget.contains(target)) return;
         if (target === textareaRef.current) return;
         if (
           target.closest(

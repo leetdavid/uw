@@ -826,6 +826,17 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
   }
 }
 
+// The footer names the Mac's keys, and offers the terminal, which runs on the
+// Mac only so far. Windows names Ctrl and offers no terminal.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TheFooterNamesTheMacsKeys) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  EXPECT_EQ("Cmd", content::EvalJs(bar()->page(),
+                                   "document.querySelector('#askKey')"
+                                   ".textContent.trim()"));
+  EXPECT_EQ(true, content::EvalJs(bar()->page(),
+                                  "!!document.querySelector('#terminalKey')"));
+}
+
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdReturnAsksInANewChat) {
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
   Press(ui::VKEY_T, NSEventModifierFlagCommand);

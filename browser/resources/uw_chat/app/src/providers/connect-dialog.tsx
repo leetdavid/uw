@@ -7,6 +7,7 @@ import { Braces, Check, Globe, KeyRound, Loader2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { isMac } from "//resources/js/platform.js";
 import {
   siAtlassian,
   siFigma,
@@ -255,7 +256,7 @@ function EntryRow({
           <div className="flex items-center gap-2">
             <span className="mr-auto flex items-center gap-1.5 text-xs text-muted-foreground">
               <KeyRound aria-hidden className="size-3.5" />
-              Goes to Keychain
+              {isMac ? "Goes to Keychain" : "Saved encrypted"}
             </span>
             <Button variant="ghost" size="compact" onClick={() => setAsking(false)}>
               Cancel

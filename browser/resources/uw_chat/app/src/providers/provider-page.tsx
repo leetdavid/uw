@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Check, ChevronLeft, Loader2, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputField, InputGroup } from "@/components/ui/input-group";
+import { isMac } from "//resources/js/platform.js";
 import { ADDRESS_RULE } from "./add-provider";
 import {
   Decides,
@@ -249,7 +250,7 @@ export function ProviderPage({
               {provider.hasKey && (
                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-success">
                   <Check aria-hidden className="size-3.5" />
-                  In Keychain
+                  {isMac ? "In Keychain" : "Saved"}
                 </span>
               )}
               {provider.preset !== ProviderPreset.kOllama && (

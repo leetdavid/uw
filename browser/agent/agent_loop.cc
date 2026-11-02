@@ -726,7 +726,7 @@ void AgentLoop::UpdateConnectorTools() {
   if (schedule_card_) {
     tools.Append(ScheduleToolSchema());
   }
-  if (tools_.takes_triggers()) {
+  if (kAgentHasTerminal && tools_.takes_triggers()) {
     tools.Append(TriggerToolSchema());
     tools.Append(StopTriggerToolSchema());
   }

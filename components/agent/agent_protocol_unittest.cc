@@ -47,9 +47,23 @@ TEST(AgentProtocolTest, DescribesEveryTool) {
     EXPECT_FALSE(function.FindString("description")->empty());
     EXPECT_EQ(*function.FindDict("parameters")->FindString("type"), "object");
   }
-  EXPECT_EQ(names, (std::vector<std::string>{
-                       "open", "navigate", "read", "click", "type", "run",
-                       "screen", "keys", "skill", "save_skill", "recall"}));
+  std::vector<std::string> expected = {"open", "navigate", "read", "click",
+                                       "type"};
+  if (kAgentHasTerminal) {
+    expected.insert(expected.end(), {"run", "screen", "keys"});
+  }
+  expected.insert(expected.end(), {"skill", "save_skill", "recall"});
+  EXPECT_EQ(names, expected);
+}
+
+// Without a terminal, the agent hears of no terminal and no Mac.
+TEST(AgentProtocolTest, TellsOfTheTerminalOnlyWhereThereIsOne) {
+  const std::string instructions =
+      *AgentInstructions().FindString("content");
+
+  EXPECT_EQ(instructions.find("terminal") != std::string::npos,
+            kAgentHasTerminal);
+  EXPECT_EQ(instructions.find("Mac") != std::string::npos, kAgentHasTerminal);
 }
 
 TEST(AgentProtocolTest, FindsTheMessageInAnErrorResponse) {

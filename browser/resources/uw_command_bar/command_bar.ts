@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 import {KeywordModeManager} from '//resources/cr_components/searchbox/keyword_mode_manager.js';
+import {isMac} from '//resources/js/platform.js';
 import {SuggestInventory} from '//resources/mojo/components/omnibox/browser/fusebox_action.mojom-webui.js';
 import type {AutocompleteMatch, AutocompleteResult} from '//resources/mojo/components/omnibox/browser/searchbox.mojom-webui.js';
 import {InputMethod, PageCallbackRouter, PageHandlerFactory, PageHandlerRemote} from '//resources/mojo/components/omnibox/browser/searchbox.mojom-webui.js';
@@ -27,6 +28,15 @@ const answer = document.querySelector<HTMLElement>('#answer')!;
 const answerName = document.querySelector<HTMLElement>('#answerName')!;
 const arrowIcon = document.querySelector<SVGUseElement>('#arrowIcon')!;
 const note = document.querySelector<HTMLElement>('#calcNote')!;
+
+// Arc for Windows' keys: Ctrl for Cmd. Terminal tabs run a shell on the Mac
+// only so far, so elsewhere the bar offers no terminal. See
+// docs/plans/windows.md.
+const hasTerminal = isMac;
+if (!isMac) {
+  document.querySelector('#askKey')!.firstChild!.textContent = 'Ctrl ';
+  document.querySelector('#terminalKey')!.remove();
+}
 
 const router = new PageCallbackRouter();
 const handler = new PageHandlerRemote();
@@ -481,7 +491,8 @@ function clear() {
 router.autocompleteResultChanged.addListener(show);
 
 field.addEventListener('input', event => {
-  if (!shell && field.value === '>' && !keywords.isInKeywordMode) {
+  if (hasTerminal && !shell && field.value === '>' &&
+      !keywords.isInKeywordMode) {
     field.value = '';
     typed = '';
     paint();
@@ -540,9 +551,9 @@ field.addEventListener('keydown', event => {
     event.preventDefault();
     if (page) {
       askAboutPage();
-    } else if (event.metaKey) {
+    } else if (isMac ? event.metaKey : event.ctrlKey) {
       sendText({metaKey: true});
-    } else if (event.altKey || shell) {
+    } else if (hasTerminal && (event.altKey || shell)) {
       sendText({altKey: true});
     } else if (selected === -1) {
       copyAnswer();

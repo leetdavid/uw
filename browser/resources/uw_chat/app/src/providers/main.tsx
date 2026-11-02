@@ -8,6 +8,7 @@ import "@/trusted-types";
 import "@/theme-colors";
 import { StrictMode, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { isMac } from "//resources/js/platform.js";
 import { MotionConfig } from "motion/react";
 import { ChevronRight, Loader2, MessageCircle, Plus } from "lucide-react";
 import {
@@ -198,6 +199,10 @@ function ModelCount({ list }: { list?: ModelList }) {
   );
 }
 
+// The Mac keeps keys in the Keychain, and Windows in files encrypted for the
+// Windows user.
+const KEY_SAVED = isMac ? "Key in Keychain" : "Key saved";
+
 function ProviderStatus({ provider, list }: { provider: Provider; list?: ModelList }) {
   if (!list) {
     return <span className="text-muted-foreground">Listing models…</span>;
@@ -207,7 +212,7 @@ function ProviderStatus({ provider, list }: { provider: Provider; list?: ModelLi
     <span className="flex min-w-0 items-center gap-[7px] text-[12.5px] text-muted-foreground">
       <i className={`size-[7px] shrink-0 rounded-full ${dot}`} />
       <span className="truncate" title={list.ok ? undefined : list.error}>
-        {!list.ok ? list.error : provider.hasKey ? "Key in Keychain" : "No key"}
+        {!list.ok ? list.error : provider.hasKey ? KEY_SAVED : "No key"}
       </span>
     </span>
   );
@@ -401,8 +406,11 @@ function ProvidersList({
         })}
       </div>
       <p className="mt-2.5 text-[12px] text-muted-foreground">
-        Keys stay in the macOS Keychain. Each feature sends its requests only to
-        the provider of the model it uses.
+        {isMac
+          ? "Keys stay in the macOS Keychain."
+          : "Keys stay on this PC, encrypted for your Windows account."}{" "}
+        Each feature sends its requests only to the provider of the model it
+        uses.
       </p>
       <AddProviderDialog
         open={adding}

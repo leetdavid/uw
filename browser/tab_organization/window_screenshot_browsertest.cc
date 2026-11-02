@@ -8,6 +8,7 @@
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -76,6 +77,14 @@ namespace {
 // Stages the sidebar with nested tabs and one task for a screenshot.
 class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  WindowScreenshotBrowserTest() {
+#if !BUILDFLAG(IS_MAC)
+    // Elsewhere browser tests draw nothing unless asked to, and these tests
+    // save and compare the window's pixels.
+    EnablePixelOutput();
+#endif
+  }
+
   tabs::TabInterface* OpenLinkFrom(tabs::TabInterface* source,
                                    const std::string& title) {
     NavigateParams params(browser(),
@@ -255,21 +264,30 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
         [&] { return state->IsCollapsed() && !SidebarAnimating(); }));
   }
 
+  // Whether the hidden sidebar's card has stopped all the way in, or all the
+  // way out left of the window.
+  bool CardIn() {
+    return Sidebar()->floating_sidebar()->CardBounds().x() ==
+               kHiddenSidebarEdge &&
+           !SidebarAnimating();
+  }
+  bool CardOut() {
+    return Sidebar()->floating_sidebar()->CardBounds().right() <= 0 &&
+           !SidebarAnimating();
+  }
+
   // Brings the hidden sidebar's card in, as the pointer resting on the
   // window's edge does, and keeps it in.
   std::unique_ptr<ExpandOnHoverLock> FloatSidebarIn() {
     std::unique_ptr<ExpandOnHoverLock> lock =
         Sidebar()->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepExpanded);
-    EXPECT_TRUE(base::test::RunUntil([&] {
-      return Sidebar()->floating_sidebar()->window_buttons()->GetVisible() &&
-             !SidebarAnimating();
-    }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return CardIn(); }));
     return lock;
   }
 
   // The card floats in over the page, which keeps its place, with uw's
-  // window buttons at its top left and its rows as wide as the shown
-  // sidebar's.
+  // window buttons at its top left on the Mac and its rows as wide as the
+  // shown sidebar's.
   void CheckTheFloatingSidebar(const std::string& screenshot) {
     HideSidebar();
     BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
@@ -296,10 +314,7 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
     lock.reset();
     std::unique_ptr<ExpandOnHoverLock> out =
         sidebar->GetExpandOnHoverLock(ExpandOnHoverLockType::kForceCollapse);
-    EXPECT_TRUE(base::test::RunUntil([&] {
-      return !sidebar->floating_sidebar()->window_buttons()->GetVisible() &&
-             !SidebarAnimating();
-    }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return CardOut(); }));
     EXPECT_FALSE(sidebar->HitTestPoint(
         gfx::Point(kHiddenSidebarEdge + 40, sidebar->height() / 2)));
   }
@@ -354,6 +369,7 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   CheckTheFloatingSidebar("sidebar-floating");
 }
 
+#if BUILDFLAG(IS_MAC)
 // Option on the card's green button turns its full-screen arrows into a +,
 // as macOS draws its own, since an Option-click zooms the window instead.
 // See docs/plans/keyboard-and-mouse.md#key-hints.
@@ -383,6 +399,7 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   ModifierKeys::Get().SetForTesting(/*option=*/false, /*command=*/false);
   EXPECT_TRUE(gfx::BitmapsAreEqual(glyph(), arrows));
 }
+#endif  // BUILDFLAG(IS_MAC)
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
                        TheFloatingSidebarInDarkMode) {
@@ -426,10 +443,7 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, EscSendsTheCardAway) {
   ASSERT_FALSE(Sidebar()->Contains(view->GetFocusManager()->GetFocusedView()));
   EXPECT_TRUE(view->GetFocusManager()->ProcessAccelerator(
       ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE)));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return !Sidebar()->floating_sidebar()->window_buttons()->GetVisible() &&
-           !SidebarAnimating();
-  }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return CardOut(); }));
 }
 
 // Run with pnpm run window-tests. macOS draws its window buttons only in a
@@ -480,8 +494,11 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   EXPECT_EQ(menu.GetCommandIdAt(6), kNewWorkspaceCommand);
   ui::Accelerator key;
   ASSERT_TRUE(menu.GetAcceleratorForCommandId(IDC_CREATE_NEW_TAB_GROUP, &key));
+  // Windows has no agreed key for New task yet.
+#if BUILDFLAG(IS_MAC)
   EXPECT_EQ(key, ui::Accelerator(ui::VKEY_N,
                                  ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN));
+#endif
 
 }
 

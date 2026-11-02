@@ -586,6 +586,9 @@ void UwChatHandler::SendAttached(const std::string& text,
   UpdateConnectors();
   if (std::optional<std::pair<Skill, std::string>> started = UserSkill(text)) {
     preparing_ = true;
+    // Copied first: a call's arguments may run in any order, and the skill
+    // moves into the reply.
+    base::FilePath skill_file = started->first.file;
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE, {base::MayBlock()},
         base::BindOnce(
@@ -596,7 +599,7 @@ void UwChatHandler::SendAttached(const std::string& text,
               }
               return text;
             },
-            started->first.file),
+            std::move(skill_file)),
         base::BindOnce(&UwChatHandler::SendStartedSkill,
                        weak_factory_.GetWeakPtr(), text, std::move(files),
                        std::move(started->first), std::move(started->second)));

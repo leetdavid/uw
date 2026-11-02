@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/values.h"
+#include "build/build_config.h"
 
 // The agent's side of an OpenAI-compatible chat-completions conversation:
 // the messages uw sends and the tool calls a model answers with.
@@ -29,6 +30,10 @@ struct ModelTurn {
   // request to the same provider. See uw/components/ai_providers/formats.h.
   std::string kept;
 };
+
+// Whether the agent runs commands: run, screen, keys, and trigger. Terminal
+// tabs run a shell on the Mac only so far; see docs/plans/windows.md.
+inline constexpr bool kAgentHasTerminal = BUILDFLAG(IS_MAC);
 
 // The tools of browser/agent/agent_tools.h, and recall, as a model is told
 // about them.

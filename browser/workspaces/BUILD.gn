@@ -12,6 +12,8 @@ source_set("workspaces") {
   if (is_mac) {
     sources += [ "workspace_window_mac.mm" ]
     frameworks = [ "AppKit.framework" ]
+  } else if (is_win) {
+    sources += [ "workspace_window_win.cc" ]
   } else {
     sources += [ "workspace_window_stub.cc" ]
   }

@@ -12,6 +12,7 @@
 
 #include "base/environment.h"
 #include "base/numerics/safe_conversions.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -85,6 +86,14 @@ int Roughness(const SkBitmap& window, int x, int y) {
 
 class TintBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  TintBrowserTest() {
+#if !BUILDFLAG(IS_MAC)
+    // Elsewhere browser tests draw nothing unless asked to, and these tests
+    // read the window's pixels.
+    EnablePixelOutput();
+#endif
+  }
+
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     // The chat page lists skills: none from the user's own folder.
@@ -180,7 +189,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarAndFrameDrawOneGradient) {
   theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   const SkBitmap window = CaptureWindow(browser());
   BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
-  const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+  const gfx::Rect bounds = view->GetWidget()->GetClientAreaBoundsInScreen();
   const float scale = static_cast<float>(window.width()) / bounds.width();
   const int seam =
       base::ClampRound((view->vertical_tab_strip_region_view_for_testing()
@@ -206,7 +215,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, ThePageCardHasFourRoundCorners) {
   theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   const SkBitmap window = CaptureWindow(browser());
   BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
-  const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+  const gfx::Rect bounds = view->GetWidget()->GetClientAreaBoundsInScreen();
   const float scale = static_cast<float>(window.width()) / bounds.width();
   gfx::Rect card = view->toolbar()->GetBoundsInScreen();
   card.Union(view->multi_contents_view()->GetBoundsInScreen());
@@ -244,7 +253,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheBlackCardHasAGrayEdge) {
   theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   const SkBitmap window = CaptureWindow(browser());
   BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
-  const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+  const gfx::Rect bounds = view->GetWidget()->GetClientAreaBoundsInScreen();
   const float scale = static_cast<float>(window.width()) / bounds.width();
   gfx::Rect card = view->toolbar()->GetBoundsInScreen();
   card.Union(view->multi_contents_view()->GetBoundsInScreen());
@@ -352,7 +361,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarTabsLetTheThemeShowThrough) {
     EXPECT_EQ(Color(kColorNewTabButtonCRBackgroundFrameActive), fill);
 
     const SkBitmap window = CaptureWindow(browser());
-    const gfx::Rect bounds = view->GetWidget()->GetWindowBoundsInScreen();
+    const gfx::Rect bounds = view->GetWidget()->GetClientAreaBoundsInScreen();
     const float scale = static_cast<float>(window.width()) / bounds.width();
     const auto color_at = [&](int x, int y) {
       return window.getColor(base::ClampRound((x - bounds.x()) * scale),

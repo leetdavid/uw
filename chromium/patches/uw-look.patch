@@ -76,10 +76,45 @@ index d0f0f711eaa58b43837d69c62dbe5e15301dea95..d8a31e8d7015a9dfcec7052865cb2dc0
  }
  
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 207ea26540d4d90e9f8398d6185179ed175fc03e..6d8196e6f35b6d8ce94d6dbf910ffc36849b54dc 100644
+index 207ea26540d4d90e9f8398d6185179ed175fc03e..b093c6f258755a0f5a2ed049a3ec4799a974aa97 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-@@ -727,6 +727,13 @@ void BrowserFrameViewWin::LayoutTitleBar() {
+@@ -25,6 +25,7 @@
+ #include "chrome/browser/ui/views/frame/browser_caption_button_container_win.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/minimize_button_metrics_win.h"
++#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/tabs/new_tab_button.h"
+ #include "chrome/browser/ui/views/tabs/tab.h"
+@@ -59,6 +60,8 @@
+ #include "ui/views/widget/widget_observer.h"
+ #include "ui/views/win/hwnd_util.h"
+ #include "ui/views/window/client_view.h"
++#include "uw/browser/ui/look/tint_painter.h"
++#include "uw/browser/workspaces/workspace_theme.h"
+ 
+ std::array<HICON, BrowserFrameViewWin::kThrobberIconCount>
+     BrowserFrameViewWin::throbber_icons_;
+@@ -463,6 +466,17 @@ bool BrowserFrameViewWin::IsMaximized() const {
+ 
+ void BrowserFrameViewWin::OnPaint(gfx::Canvas* canvas) {
+   TRACE_EVENT0("views.frame", "BrowserFrameViewWin::OnPaint");
++  BrowserView* const browser_view = GetBrowserView();
++  if (browser_view->ShouldDrawVerticalTabStrip()) {
++    // uw: the theme fills the window around the page card, with its grain and
++    // the card's edge, as BrowserFrameViewMac paints it.
++    uw::PaintTint(canvas, this, browser_view,
++                  GetFrameColor(BrowserFrameActiveState::kUseCurrent),
++                  uw::ThemeOfWindow(browser_view->browser()));
++    uw::PaintPageCardEdge(canvas, this, browser_view->toolbar(),
++                          browser_view->multi_contents_view());
++    return;
++  }
+   PaintTitlebar(canvas);
+ }
+ 
+@@ -727,6 +741,13 @@ void BrowserFrameViewWin::LayoutTitleBar() {
    }
  }
  
@@ -105,6 +140,52 @@ index e731b2c4c161f1fae16606e07892bc7adf2771cc..409b1b07ce9269ea246a14c7b2f0a20c
    gfx::Rect GetWindowBoundsForClientBounds(
        const gfx::Rect& client_bounds) const override;
    int NonClientHitTest(const gfx::Point& point) override;
+diff --git a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+index 49786bd90d798fe094a8066cd02658d47a724776..aec7047f5bd6cec73409438bd38f9cf4e2c495f3 100644
+--- a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
++++ b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+@@ -48,6 +48,7 @@
+ #include "ui/gfx/image/image_family.h"
+ #include "ui/gfx/win/icon_util.h"
+ #include "ui/gfx/win/msg_util.h"
++#include "ui/views/context_menu_controller.h"
+ #include "ui/views/controls/menu/native_menu_win.h"
+ 
+ class VirtualDesktopHelper
+@@ -438,6 +439,33 @@ bool BrowserDesktopWindowTreeHostWin::PreHandleMSG(UINT message,
+         return true;
+       }
+       break;
++    case WM_NCRBUTTONDOWN:
++    case WM_NCRBUTTONUP: {
++      // uw: a right-click where the window drags, on the sidebar's empty
++      // space or above the page card, shows uw's sidebar menu, as on the Mac.
++      // Alt+Space still shows the window menu.
++      if (w_param != HTCAPTION || !browser_view_ || !browser_view_->browser() ||
++          !browser_view_->ShouldDrawVerticalTabStrip()) {
++        break;
++      }
++      views::View* const sidebar = browser_view_->tab_strip_view();
++      views::ContextMenuController* const menu =
++          sidebar ? sidebar->context_menu_controller() : nullptr;
++      if (!menu) {
++        break;
++      }
++      if (message == WM_NCRBUTTONUP) {
++        const gfx::Point screen_point(CR_GET_X_LPARAM(l_param),
++                                      CR_GET_Y_LPARAM(l_param));
++        menu->ShowContextMenuForView(
++            sidebar,
++            gfx::ToFlooredPoint(display::win::GetScreenWin()->ScreenToDIPPoint(
++                gfx::PointF(screen_point))),
++            ui::mojom::MenuSourceType::kMouse);
++      }
++      *result = 0;
++      return true;
++    }
+   }
+   return DesktopWindowTreeHostWin::PreHandleMSG(message, w_param, l_param,
+                                                 result);
 diff --git a/chrome/browser/ui/views/frame/themed_background.cc b/chrome/browser/ui/views/frame/themed_background.cc
 index 169aee34fb3855b3e85fc99725013a2259290e08..30b596029c33a2157416e45826988baea15861cc 100644
 --- a/chrome/browser/ui/views/frame/themed_background.cc

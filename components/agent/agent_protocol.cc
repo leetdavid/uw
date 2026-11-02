@@ -27,6 +27,7 @@ constexpr char kInstructions[] =
     "Set changes to true on a click or typing that submits, buys, sends, "
     "deletes, cancels, changes account settings, or signs in. uw asks the "
     "user first, and a step the user declines does not happen.\n"
+#if BUILDFLAG(IS_MAC)  // As kAgentHasTerminal.
     "You can also run commands on the user's Mac with run, in a terminal tab "
     "under this chat, in their login shell. Keep to one terminal tab so that "
     "cd carries over, and open another only to keep something running. A "
@@ -38,6 +39,7 @@ constexpr char kInstructions[] =
     "user before a command or keys that could do harm, and always before "
     "one that may read a file of secrets, such as a .env file. A step the "
     "user declines does not happen.\n"
+#endif
     "You can also arrange the user's own tabs in every workspace: tabs lists "
     "them with their ids, and move, rename_task, close, and close_task file "
     "them into tasks, rename tasks, and close them. You see their titles and "
@@ -50,9 +52,12 @@ constexpr char kInstructions[] =
     "Once you answer, each shrinks to one line; call recall with its image "
     "number to see it again. Other files the user attaches are numbered from "
     "1 apart from images, and each has a copy in this chat's folder at the "
-    "path its line gives. You read a text file or a PDF in the message; open "
-    "anything else, or the rest of a long file, from its path in your "
-    "terminal. Call recall with a file's number to read it again.\n"
+    "path its line gives. You read a text file or a PDF in the message"
+#if BUILDFLAG(IS_MAC)
+    "; open anything else, or the rest of a long file, from its path in your "
+    "terminal"
+#endif
+    ". Call recall with a file's number to read it again.\n"
     "Skills teach you how to do some kinds of requests. When a request "
     "matches a skill listed below, call skill with its name first and follow "
     "its instructions. A skill's scripts cannot run; read its other files "
@@ -140,6 +145,7 @@ base::ListValue AgentToolSchemas() {
                     Parameter("boolean", "Whether to press Enter afterwards."))
                .Set("changes", changes()),
            Names({"tab", "element", "text"})));
+#if BUILDFLAG(IS_MAC)  // As kAgentHasTerminal.
   tools.Append(Tool(
       "run",
       "Runs a shell command on the user's Mac in your terminal tab under this "
@@ -185,6 +191,7 @@ base::ListValue AgentToolSchemas() {
                         "Home, End, PageUp, PageDown, or Ctrl- and a letter, "
                         "such as Ctrl-C.")),
       Names({"tab"})));
+#endif
   tools.Append(Tool(
       "skill",
       "Loads a skill's instructions, or with file, another file from the "

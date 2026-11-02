@@ -14,6 +14,7 @@
 #include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -93,6 +94,14 @@ constexpr char kDraft[] =
 
 class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  PinsBrowserTest() {
+#if !BUILDFLAG(IS_MAC)
+    // Elsewhere browser tests draw nothing unless asked to, and the haze's
+    // colors are read from the window's pixels.
+    EnablePixelOutput();
+#endif
+  }
+
   // Opens `url` in a new tab of `window` and pins it.
   tabs::TabInterface* Pin(Browser* window, const GURL& url) {
     TabStripModel* tabs = window->tab_strip_model();

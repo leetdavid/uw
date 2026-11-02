@@ -2112,6 +2112,32 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AModePickedOnANewChatIsTheDefault) {
   EXPECT_EQ(Until(next, chip + " === 'Ask first'"), true);
 }
 
+// Pressing a row of the mode chip's menu leaves focus in the menu, so the menu
+// is still open when the click picks the row. The composer used to take focus
+// on any press, its menus' included, and closed the menu first.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, PressingAModeInTheMenuPicksIt) {
+  UseAgentModel();
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(content::EvalJs(chat, R"((async () => {
+    const until = (probe) => new Promise((resolve) => {
+      const check = () => probe() ? resolve(probe()) : setTimeout(check, 20);
+      check();
+    });
+    const chip = () => document.querySelector('[aria-label="Approval mode"]');
+    (await until(chip)).dispatchEvent(new PointerEvent('pointerdown',
+        {bubbles: true, button: 0, pointerType: 'mouse'}));
+    const row = await until(() => [...document.querySelectorAll(
+        '[role="menu"] [role^="menuitem"]')]
+        .find((each) => each.getAttribute('aria-label') === 'Full auto'));
+    const kept = row.dispatchEvent(new MouseEvent('mousedown',
+        {bubbles: true, cancelable: true, button: 0}));
+    row.click();
+    await until(() => chip().textContent === 'Full auto');
+    return kept;
+  })())"),
+            true);
+}
+
 // In Full auto the agent acts on a sensitive site without asking.
 IN_PROC_BROWSER_TEST_F(UwChatSensitiveSiteBrowserTest,
                        FullAutoActsOnASensitiveSiteWithoutAsking) {

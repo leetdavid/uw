@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { isMac } from "//resources/js/platform.js";
 import { ConnectDialog } from "./connect-dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -236,7 +237,10 @@ function ConnectorList({
       )}
       <p className="mt-3 max-w-[640px] text-[12px] text-muted-foreground">
         Connectors start with uw and serve every profile. Keys and sign-ins stay
-        in the macOS Keychain. Programs on this Mac start with your terminal's
+        {isMac
+          ? " in the macOS Keychain."
+          : " on this PC, encrypted for your Windows account."}{" "}
+        Programs on this Mac start with your terminal's
         environment, so they find what your terminal finds.
       </p>
       {environmentProblem && (
@@ -314,7 +318,8 @@ function ConnectorPage({ connector }: { connector: ConnectorInfo }) {
       {connector.secretNames.length > 0 && (
         <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
           <KeyRound aria-hidden className="size-3.5" />
-          In Keychain: <span className="font-mono text-[11.5px]">{connector.secretNames.join(", ")}</span>
+          {isMac ? "In Keychain" : "Saved"}:{" "}
+          <span className="font-mono text-[11.5px]">{connector.secretNames.join(", ")}</span>
         </p>
       )}
       <div className="mt-5 mb-1.5 flex h-[30px] items-center gap-2">
@@ -499,7 +504,9 @@ function AddConnectorDialog({
                       <>
                         <KeyRound aria-hidden className="size-3.5" />
                         <span className="font-mono">{connector.secretNames.join(", ")}</span>
-                        {connector.secretNames.length === 1 ? " goes" : " go"} to Keychain
+                        {isMac
+                          ? `${connector.secretNames.length === 1 ? " goes" : " go"} to Keychain`
+                          : `${connector.secretNames.length === 1 ? " is" : " are"} saved encrypted`}
                       </>
                     ) : connector.remote ? (
                       "Asks you to sign in if it needs to"

@@ -18,6 +18,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/platform_util_internal.h"
@@ -1138,6 +1139,13 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
   const std::string json =
       base::StrCat({R"({"mcpServers": {"fake": {"command": ")", FakeServer(),
                     R"(", "env": {"FAKE_KEY": "s3cret"}}}})"});
+  // The Mac keeps it in the Keychain, and Windows in a file encrypted for the
+  // Windows user.
+#if BUILDFLAG(IS_MAC)
+  constexpr char kKept[] = "FAKE_KEY goes to Keychain";
+#else
+  constexpr char kKept[] = "FAKE_KEY is saved encrypted";
+#endif
   EXPECT_THAT(
       Run(content::JsReplace(
               "(await until(() => document.getElementById('add-connector')))"
@@ -1160,7 +1168,7 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, AConnectorIsAddedByPaste) {
               "return said + ' | ' + row.textContent;",
               json))
           .ExtractString(),
-      ::testing::AllOf(::testing::HasSubstr("FAKE_KEY goes to Keychain"),
+      ::testing::AllOf(::testing::HasSubstr(kKept),
                        ::testing::HasSubstr("5 tools"),
                        ::testing::HasSubstr("Running")));
   SaveWindowScreenshot(browser(), "connectors");
