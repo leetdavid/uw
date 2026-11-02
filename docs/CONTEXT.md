@@ -374,6 +374,10 @@ A user-requested change to a website's appearance or behavior.
 A uw release anyone can download from GitHub or the website, marked as rough, with no support promise. Each has its own uw version, such as 0.1.0, and updates itself.
 _Avoid_: Test build, beta, nightly.
 
+**uw dev**:
+Any uw built on a developer's Mac rather than by the release command. It runs beside the installed preview as a separate app named "uw dev", with its own profile, saved keys, and macOS permissions.
+_Avoid_: uw Dev, dev version, local build, test build.
+
 **Problem report**:
 What uw sends, only with the user's consent, to help fix it: a native crash report, or a rage click, dead click, or JavaScript error on one of uw's own pages. Never anything from a website the user visits.
 _Avoid_: Telemetry, analytics, tracking.

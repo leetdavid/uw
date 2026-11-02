@@ -20,6 +20,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Try the current build](try-uw.md): manual tests for the built app and its current limits.
 - [Distribution plan](plans/distribution.md): previews on GitHub, Homebrew, signing, updates, problem reports, and the website.
 - [ADR 0019: Sparkle updates uw behind Chromium's relaunch button](adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md): why updates use Sparkle and not Chromium Updater.
+- [ADR 0028: local builds are uw dev](adr/0028-local-builds-are-uw-dev.md): why a local build has its own app ID, name, profile, keys, and command.
 - [Help plan](plans/help.md): how-to pages at `uwbrowser.com/help`, which uw's agent and outside agents search over MCP.
 - [ADR 0021: the agent reads Help from uwbrowser.com through a connector](adr/0021-the-agent-reads-help-from-uwbrowser-com-through-a-connector.md): why the agent reads the website's Help and not a copy in the app.
 - [ADR 0022: uw catches one Help address to open a chat](adr/0022-uw-catches-one-help-address-to-open-a-chat.md): why Ask in uw is an ordinary link uw catches, and why it never sends.
