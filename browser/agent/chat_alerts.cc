@@ -48,7 +48,7 @@ std::vector<ChatAlerts::Alert> Load(const base::FilePath& path) {
     if (id && chat && ChatFile::IsChatId(*chat) && what && text && time &&
         !alert->FindBool("waiting").value_or(false)) {
       alerts.push_back({*id, *chat, *what, *text, *time,
-                        alert->FindBool("seen").value_or(false)});
+                        alert->FindBool("read").value_or(false)});
     }
   }
   return alerts;
@@ -80,8 +80,8 @@ ChatAlerts::ChatAlerts(const base::FilePath& profile_path)
 
 ChatAlerts::~ChatAlerts() = default;
 
-size_t ChatAlerts::Unseen() const {
-  return static_cast<size_t>(std::ranges::count(alerts_, false, &Alert::seen));
+size_t ChatAlerts::Unread() const {
+  return static_cast<size_t>(std::ranges::count(alerts_, false, &Alert::read));
 }
 
 void ChatAlerts::Add(const std::string& chat_id,
@@ -94,28 +94,28 @@ void ChatAlerts::Add(const std::string& chat_id,
   Changed();
 }
 
-void ChatAlerts::SeeAll() {
-  if (Unseen() == 0) {
+void ChatAlerts::MarkAllRead() {
+  if (Unread() == 0) {
     return;
   }
   for (Alert& alert : alerts_) {
-    alert.seen = true;
+    alert.read = true;
   }
   Changed();
 }
 
-void ChatAlerts::SeeNewest(std::string_view chat_id) {
+void ChatAlerts::MarkNewestRead(std::string_view chat_id) {
   const auto newest = std::ranges::find(alerts_, chat_id, &Alert::chat_id);
-  if (newest != alerts_.end() && !newest->seen) {
-    newest->seen = true;
+  if (newest != alerts_.end() && !newest->read) {
+    newest->read = true;
     Changed();
   }
 }
 
-void ChatAlerts::See(std::string_view id) {
+void ChatAlerts::MarkRead(std::string_view id) {
   const auto alert = std::ranges::find(alerts_, id, &Alert::id);
-  if (alert != alerts_.end() && !alert->seen) {
-    alert->seen = true;
+  if (alert != alerts_.end() && !alert->read) {
+    alert->read = true;
     Changed();
   }
 }
@@ -170,7 +170,7 @@ void ChatAlerts::Changed() {
                                   .Set("what", alert.what)
                                   .Set("text", alert.text)
                                   .Set("time", base::TimeToValue(alert.time))
-                                  .Set("seen", alert.seen);
+                                  .Set("read", alert.read);
       if (alert.waiting) {
         saved.Set("waiting", true);
       }

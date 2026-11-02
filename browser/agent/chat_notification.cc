@@ -13,6 +13,7 @@
 #include "chrome/browser/notifications/notification_display_service.h"
 #include "chrome/browser/notifications/notification_display_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "components/tabs/public/tab_interface.h"
@@ -26,6 +27,7 @@
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 
 namespace uw {
 namespace {
@@ -126,17 +128,21 @@ void ChatNotificationHandler::OnClick(
   }
   const std::string chat_id(origin.path().substr(1));
   if (ChatAlerts* alerts = ChatAlerts::For(profile)) {
-    alerts->SeeNewest(chat_id);
+    alerts->MarkNewestRead(chat_id);
   }
   const std::vector<tabs::TabInterface*> showing =
       TabsShowingChat(profile, chat_id);
   if (!showing.empty()) {
     GoToTab(showing[0]);
   } else if (ChatFile::IsChatId(chat_id)) {
-    // No tab shows the chat, as after uw restarts, so it opens in one.
+    // No tab shows the chat, as after uw restarts, so it opens in one, at the
+    // top of the Scratchpad as a link from another app does.
     NavigateParams params(profile, ChatUrl(chat_id),
                           ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+    params.browser =
+        ProfileBrowserCollection::GetForProfile(profile)->FindTabbedBrowser();
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+    TabOrganizationController::LinksFromAnotherApp links_from_another_app;
     Navigate(&params);
     if (params.navigated_or_inserted_contents) {
       GoToTab(tabs::TabInterface::GetFromContents(

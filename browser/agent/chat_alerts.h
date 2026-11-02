@@ -31,7 +31,7 @@ class ChatAlerts : public base::SupportsUserData::Data {
     std::string what;
     std::string text;
     base::Time time;
-    bool seen = false;
+    bool read = false;
     // A step of the chat's run waits for the user's approval. The alert goes
     // once the step is answered or the run ends.
     bool waiting = false;
@@ -54,19 +54,20 @@ class ChatAlerts : public base::SupportsUserData::Data {
   bool loaded() const { return loaded_; }
   // Newest first.
   const std::vector<Alert>& alerts() const { return alerts_; }
-  // How many alerts the user has not seen.
-  size_t Unseen() const;
+  // How many alerts the user has not read.
+  size_t Unread() const;
 
   void Add(const std::string& chat_id,
            const std::string& what,
            const std::string& text,
            bool waiting);
-  // The Inbox opened, so every alert is seen.
-  void SeeAll();
-  // The notification of `chat_id` was clicked, so its newest alert is seen.
-  void SeeNewest(std::string_view chat_id);
-  // The alert `id` was opened or dismissed on the new tab page.
-  void See(std::string_view id);
+  // The user pressed Mark all read in the Inbox.
+  void MarkAllRead();
+  // The notification of `chat_id` was clicked, so its newest alert is read.
+  void MarkNewestRead(std::string_view chat_id);
+  // The alert `id` was opened in the Inbox, or opened or dismissed on the new
+  // tab page.
+  void MarkRead(std::string_view id);
   void Clear();
   void RemoveChat(std::string_view chat_id);
   // The step a run of `chat_id` waited on was answered, or the run ended.

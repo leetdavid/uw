@@ -86,8 +86,9 @@ class TabOrganizationController : public TabStripModelObserver,
   static void DidOpenTab(BrowserWindowInterface* window,
                          content::WebContents* page,
                          content::WebContents* source);
-  // While one lives, the tabs that open are links from another app. They open
-  // at the top of the Scratchpad in the order they come.
+  // While one lives, the tabs that open are links from another app, or what
+  // the Inbox or a notification opens. They open at the top of the Scratchpad
+  // in the order they come.
   class LinksFromAnotherApp {
    public:
     LinksFromAnotherApp();

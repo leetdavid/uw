@@ -1,9 +1,11 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
+#include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
@@ -11,9 +13,11 @@
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -32,6 +36,7 @@
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
@@ -125,7 +130,7 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
     watch.model = "test-agent";
     const std::string id = chats()->Watch(watch);
     EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
-    EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unseen() == 1; }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unread() == 1; }));
     return id;
   }
 
@@ -174,6 +179,31 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
     return false;
   }
 
+  TabOrganizationController* controller() {
+    return TabOrganizationController::From(browser());
+  }
+
+  // Puts the active tab in a task of its own, beside a tab in the Scratchpad,
+  // and returns the task.
+  std::optional<tab_groups::TabGroupId> MakeATask() {
+    chrome::AddTabAt(browser(), GURL("about:blank"), -1, false);
+    TabStripModel* tabs = browser()->tab_strip_model();
+    const std::optional<tab_groups::TabGroupId> task =
+        controller()->MoveToNewTask(
+            {controller()->IdFor(tabs->GetActiveTab()).value()}, u"Plan");
+    base::RunLoop().RunUntilIdle();
+    EXPECT_EQ(tabs->GetActiveTab()->GetGroup(), task);
+    return task;
+  }
+
+  // Whether the active tab sits at the top of the Scratchpad, right after the
+  // task `task`, the only one.
+  bool ActiveTabTopsTheScratchpad(std::optional<tab_groups::TabGroupId> task) {
+    TabStripModel* tabs = browser()->tab_strip_model();
+    return !tabs->GetActiveTab()->GetGroup() && tabs->active_index() > 0 &&
+           tabs->GetTabAtIndex(tabs->active_index() - 1)->GetGroup() == task;
+  }
+
   GURL ActiveUrl() {
     return browser()
         ->tab_strip_model()
@@ -187,18 +217,19 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
   std::string provider_;
 };
 
-IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnseenAlertsUntilOpened) {
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
   ASSERT_TRUE(button());
   EXPECT_EQ(button()->GetTooltipText(), u"Inbox");
   WatchTheDesk();
   EXPECT_TRUE(base::test::RunUntil(
-      [&] { return button()->GetTooltipText() == u"Inbox, 1 new"; }));
-  SaveWindowScreenshot(browser(), "inbox-button-unseen");
+      [&] { return button()->GetTooltipText() == u"Inbox, 1 unread"; }));
+  SaveWindowScreenshot(browser(), "inbox-button-unread");
 
+  // Opening the Inbox leaves the alert unread.
   content::WebContents* page = OpenTheInbox();
-  EXPECT_EQ(alerts()->Unseen(), 0u);
-  EXPECT_EQ(button()->GetTooltipText(), u"Inbox");
-  ASSERT_TRUE(Shows(page, "[data-alert]"));
+  ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
+  EXPECT_EQ(alerts()->Unread(), 1u);
+  EXPECT_EQ(button()->GetTooltipText(), u"Inbox, 1 unread");
   EXPECT_NE(Text(page, "[data-alert]").find("Change alert"), std::string::npos);
   EXPECT_NE(Text(page, "[data-alert]").find("The desk is $479"),
             std::string::npos);
@@ -207,29 +238,46 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnseenAlertsUntilOpened) {
   SaveWidgetScreenshot(
       views::Widget::GetWidgetForNativeView(page->GetNativeView()), "inbox");
 
-  // An alert that comes while the Inbox is open shows in it.
+  Click(page, "#inbox-mark-read");
+  EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unread() == 0; }));
+  EXPECT_EQ(button()->GetTooltipText(), u"Inbox");
+  ASSERT_TRUE(Shows(page, "[data-alert]:not([data-unread])"));
+  EXPECT_TRUE(content::EvalJs(
+                  page, "document.querySelector('#inbox-mark-read').disabled")
+                  .ExtractBool());
+
+  // An alert that comes while the Inbox is open shows in it, unread.
   alerts()->Add(alerts()->alerts().front().chat_id, "No change", "Still $479.",
                 /*waiting=*/false);
   EXPECT_TRUE(base::test::RunUntil([&] {
     return Text(page, "#inbox").find("Still $479.") != std::string::npos;
   }));
+  EXPECT_EQ(alerts()->Unread(), 1u);
+  ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AnAlertOpensItsPageOrItsChat) {
   const std::string id = WatchTheDesk();
+  const std::optional<tab_groups::TabGroupId> task = MakeATask();
+  ASSERT_TRUE(task);
 
-  // A watched page's alert opens the page.
+  // A watched page's alert opens the page at the top of the Scratchpad, and
+  // is read.
   content::WebContents* page = OpenTheInbox();
   ASSERT_TRUE(Shows(page, "[data-alert]"));
   Click(page, "[data-alert]");
   EXPECT_TRUE(base::test::RunUntil([&] { return !button()->IsShowing(); }));
   EXPECT_TRUE(base::test::RunUntil([&] { return ActiveUrl() == Desk(); }));
+  EXPECT_TRUE(ActiveTabTopsTheScratchpad(task));
+  EXPECT_EQ(alerts()->Unread(), 0u);
 
-  // Its Open chat chip opens the chat.
+  // Its Open chat chip opens the chat there too.
+  browser()->tab_strip_model()->ActivateTabAt(0);
   page = OpenTheInbox();
   ASSERT_TRUE(Shows(page, "[data-open-chat]"));
   Click(page, "[data-open-chat]");
   EXPECT_TRUE(base::test::RunUntil([&] { return ShowsChat(id); }));
+  EXPECT_TRUE(ActiveTabTopsTheScratchpad(task));
 
   // An alert waiting for approval opens the chat, where the step is answered.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));

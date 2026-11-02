@@ -44,7 +44,8 @@ class UwInboxHandler : public mojom::InboxHandler,
   // mojom::InboxHandler:
   void ShowUI() override;
   void OpenAlert(const std::string& id) override;
-  void OpenChat(const std::string& chat_id) override;
+  void OpenChat(const std::string& id) override;
+  void MarkAllRead() override;
   void ClearAll() override;
   void ShowScheduled() override;
   void Close() override;
@@ -62,6 +63,10 @@ class UwInboxHandler : public mojom::InboxHandler,
   Profile* profile() const;
   // The window the Inbox opened in, which a page or a chat opens in.
   BrowserWindowInterface* Window() const;
+  // Marks the alert `id` read and returns it, or null once it has gone.
+  const ChatAlerts::Alert* Read(const std::string& id);
+  // Shows the chat `chat_id` and closes the Inbox.
+  void ShowChat(const std::string& chat_id);
   // Remembers the icon of a watched page and sends the alerts.
   void OnLooked(const std::string& page,
                 const std::string& title,

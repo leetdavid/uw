@@ -62,6 +62,7 @@ function Alert({ alert }: { alert: InboxAlert }) {
       <button
         type="button"
         data-alert={alert.id}
+        data-unread={!alert.read || undefined}
         onClick={() => inboxHandler.openAlert(alert.id)}
         className="flex w-full flex-col gap-0.5 rounded-[9px] px-2.5 py-2 text-left outline-none hover:bg-accent focus-visible:bg-accent"
       >
@@ -80,11 +81,18 @@ function Alert({ alert }: { alert: InboxAlert }) {
           </b>
           <span
             className={cn(
-              "shrink-0 text-xs text-muted-foreground tabular-nums",
+              "flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums",
               opensPage && "group-hover:invisible group-focus-within:invisible",
             )}
           >
             {clockText(alert.time)}
+            {!alert.read && (
+              <span
+                role="img"
+                aria-label="Unread"
+                className="size-1.5 rounded-full bg-primary"
+              />
+            )}
           </span>
         </span>
         <span className="line-clamp-2 pl-[26px] text-[12.5px] text-muted-foreground">
@@ -103,7 +111,7 @@ function Alert({ alert }: { alert: InboxAlert }) {
         <button
           type="button"
           data-open-chat={alert.id}
-          onClick={() => inboxHandler.openChat(alert.chatId)}
+          onClick={() => inboxHandler.openChat(alert.id)}
           className="absolute top-[7px] right-2 flex h-[22px] items-center gap-1 rounded-md bg-background px-2 text-xs font-medium opacity-0 shadow-[0_1px_3px_rgba(30,27,46,.14)] outline-none group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3"
         >
           <MessageCircle aria-hidden />
@@ -153,6 +161,16 @@ function Inbox() {
     >
       <header className="flex items-center justify-between py-1.5 pr-1 pl-2.5">
         <h1 className="text-[15px] font-semibold">Inbox</h1>
+        <Button
+          id="inbox-mark-read"
+          variant="ghost"
+          size="compact"
+          className="ml-auto text-[12.5px]"
+          disabled={alerts.every((alert) => alert.read)}
+          onClick={() => inboxHandler.markAllRead()}
+        >
+          Mark all read
+        </Button>
         <Button
           id="inbox-clear"
           variant="ghost"

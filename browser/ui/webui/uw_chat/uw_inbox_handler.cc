@@ -16,12 +16,23 @@
 #include "content/public/browser/web_ui.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 
 namespace uw {
+namespace {
+
+// Opens `url` at the top of the Scratchpad, as a link from another app: what
+// the Inbox opens doesn't belong with the active tab.
+void OpenAtTopOfScratchpad(BrowserWindowInterface* window, const GURL& url) {
+  TabOrganizationController::LinksFromAnotherApp links_from_another_app;
+  chrome::AddTabAt(window, url, -1, true);
+}
+
+}  // namespace
 
 UwInboxHandler::UwInboxHandler(
     UwInboxUI* ui,
@@ -49,40 +60,36 @@ void UwInboxHandler::ShowUI() {
 }
 
 void UwInboxHandler::OpenAlert(const std::string& id) {
-  const ChatAlerts* alerts = alerts_.GetSource();
-  if (!alerts) {
-    return;
-  }
-  const auto alert = std::ranges::find(alerts->alerts(), id,
-                                       &ChatAlerts::Alert::id);
-  if (alert == alerts->alerts().end()) {
+  const ChatAlerts::Alert* alert = Read(id);
+  if (!alert) {
     return;
   }
   const ScheduledChat* chat = schedules_.GetSource()->Find(alert->chat_id);
   BrowserWindowInterface* window = Window();
   // An alert waiting for approval opens its chat, where the step is answered.
   if (alert->waiting || !chat || chat->page.empty() || !window) {
-    OpenChat(alert->chat_id);
+    ShowChat(alert->chat_id);
     return;
   }
   const GURL page(chat->page);
   if (tabs::TabInterface* tab = TabOfPage(profile(), page)) {
     GoToTab(tab);
   } else {
-    chrome::AddTabAt(window, page, -1, true);
+    OpenAtTopOfScratchpad(window, page);
   }
   Close();
 }
 
-void UwInboxHandler::OpenChat(const std::string& chat_id) {
-  const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile(), chat_id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-  } else if (BrowserWindowInterface* window = Window()) {
-    chrome::AddTabAt(window, ChatUrl(chat_id), -1, true);
+void UwInboxHandler::OpenChat(const std::string& id) {
+  if (const ChatAlerts::Alert* alert = Read(id)) {
+    ShowChat(alert->chat_id);
   }
-  Close();
+}
+
+void UwInboxHandler::MarkAllRead() {
+  if (ChatAlerts* alerts = alerts_.GetSource()) {
+    alerts->MarkAllRead();
+  }
 }
 
 void UwInboxHandler::ClearAll() {
@@ -122,6 +129,28 @@ Profile* UwInboxHandler::profile() const {
 
 BrowserWindowInterface* UwInboxHandler::Window() const {
   return webui::GetBrowserWindowInterface(ui_->web_ui()->GetWebContents());
+}
+
+const ChatAlerts::Alert* UwInboxHandler::Read(const std::string& id) {
+  ChatAlerts* alerts = alerts_.GetSource();
+  if (!alerts) {
+    return nullptr;
+  }
+  alerts->MarkRead(id);
+  const auto alert =
+      std::ranges::find(alerts->alerts(), id, &ChatAlerts::Alert::id);
+  return alert == alerts->alerts().end() ? nullptr : &*alert;
+}
+
+void UwInboxHandler::ShowChat(const std::string& chat_id) {
+  const std::vector<tabs::TabInterface*> showing =
+      TabsShowingChat(profile(), chat_id);
+  if (!showing.empty()) {
+    GoToTab(showing[0]);
+  } else if (BrowserWindowInterface* window = Window()) {
+    OpenAtTopOfScratchpad(window, ChatUrl(chat_id));
+  }
+  Close();
 }
 
 void UwInboxHandler::OnLooked(const std::string& page,
@@ -174,6 +203,7 @@ void UwInboxHandler::SendAlerts() {
     shown->text = alert.text;
     shown->time = alert.time.InMillisecondsFSinceUnixEpoch();
     shown->waiting = alert.waiting;
+    shown->read = alert.read;
     sent.push_back(std::move(shown));
   }
   BrowserWindowInterface* window = Window();

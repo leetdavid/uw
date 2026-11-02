@@ -183,7 +183,7 @@ class NewTabBrowserTest : public headless::HeadlessModeBrowserTest {
     watch.model = "test-agent";
     const std::string id = chats()->Watch(watch);
     EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
-    EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unseen() == 1; }));
+    EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unread() == 1; }));
     return id;
   }
 
@@ -356,7 +356,7 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, ARunShowsUnderFinishedAndComingUp) {
                       "$('[data-dismiss]').click();"
                       "return !!(await until(() =>"
                       "    !$('#newtab-finished')));"));
-  EXPECT_EQ(alerts()->Unseen(), 0u);
+  EXPECT_EQ(alerts()->Unread(), 0u);
   EXPECT_EQ(alerts()->alerts().size(), 1u);
 
   // A run that could not sign in waits for the user, and Open page opens the
@@ -377,7 +377,7 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, ARunShowsUnderFinishedAndComingUp) {
                            })));
   EXPECT_TRUE(base::test::RunUntil([&] { return ActiveUrl() == Desk(); }));
   EXPECT_EQ(browser()->tab_strip_model()->count(), tabs);
-  EXPECT_EQ(alerts()->Unseen(), 0u);
+  EXPECT_EQ(alerts()->Unread(), 0u);
 }
 
 IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, AChatsAnswerShowsUntilItIsSeen) {

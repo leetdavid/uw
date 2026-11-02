@@ -6,7 +6,6 @@
 #include <string>
 
 #include "base/functional/bind.h"
-#include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/profiles/profile.h"
@@ -17,9 +16,9 @@
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_wrapper.h"
 #include "chrome/grit/generated_resources.h"
+#include "third_party/skia/include/core/SkBlendMode.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
@@ -124,6 +123,10 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   const SkColor text = colors->GetColor(kColorTabForegroundInactiveFrameActive);
   const SkColor accent = colors->GetColor(kColorMenuCardAccent);
   const bool open = bubble_widget_.IsObserving();
+  // The fill and the icon go on a layer of their own, which the badge's ring
+  // cuts through, so the ring shows whatever is behind the button: the tint,
+  // or the glass.
+  canvas->SaveLayerAlpha(0xFF);
   cc::PaintFlags fill;
   fill.setAntiAlias(true);
   if (open || GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
@@ -141,14 +144,14 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
         open ? accent
              : SkColorSetA(text, active ? kIconAlpha : kInactiveIconAlpha));
   }
-  const size_t unseen = alerts_.GetSource()->Unseen();
-  if (unseen == 0) {
+  const size_t unread = alerts_.GetSource()->Unread();
+  if (unread == 0) {
+    canvas->Restore();
     return;
   }
-  // At the icon's top right, ringed in the tint: the frame's color, as much of
-  // it as covers the window's glass.
+  // At the icon's top right.
   const std::u16string count =
-      unseen > 99 ? u"99+" : base::NumberToString16(unseen);
+      unread > 99 ? u"99+" : base::NumberToString16(unread);
   const gfx::FontList font = gfx::FontList()
                                  .DeriveWithSizeDelta(
                                      kBadgeFontSize -
@@ -159,11 +162,11 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   const gfx::RectF badge(kSize - width, 0, width, kBadgeHeight);
   gfx::RectF ring = badge;
   ring.Outset(kBadgeRing);
-  fill.setColor(SkColorSetA(
-      colors->GetColor(active ? ui::kColorFrameActive
-                              : ui::kColorFrameInactive),
-      base::ClampRound<SkAlpha>(CoverOfWindow(window_) * 255)));
-  canvas->DrawRoundRect(ring, ring.height() / 2, fill);
+  cc::PaintFlags cut;
+  cut.setAntiAlias(true);
+  cut.setBlendMode(SkBlendMode::kClear);
+  canvas->DrawRoundRect(ring, ring.height() / 2, cut);
+  canvas->Restore();
   fill.setColor(accent);
   canvas->DrawRoundRect(badge, kBadgeHeight / 2.0f, fill);
   canvas->DrawStringRectWithFlags(
@@ -175,8 +178,7 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
 
 void InboxButton::AddedToWidget() {
   paint_as_active_ = GetWidget()->RegisterPaintAsActiveChangedCallback(
-      base::BindRepeating(&InboxButton::SchedulePaint,
-                          base::Unretained(this)));
+      base::BindRepeating(&InboxButton::SchedulePaint, base::Unretained(this)));
 }
 
 void InboxButton::RemovedFromWidget() {
@@ -227,14 +229,13 @@ void InboxButton::Show(bool by_page_corner) {
   ShowInThemeMode(widget, window_);
   // The page frosts itself while the window's glass is on.
   FrostPageBubble(widget, page());
-  alerts_.GetSource()->SeeAll();
   SchedulePaint();
 }
 
 void InboxButton::UpdateName() {
-  const size_t unseen = alerts_.GetSource()->Unseen();
+  const size_t unread = alerts_.GetSource()->Unread();
   const std::u16string name =
-      unseen ? l10n_util::GetPluralStringFUTF16(IDS_UW_INBOX_UNSEEN, unseen)
+      unread ? l10n_util::GetPluralStringFUTF16(IDS_UW_INBOX_UNSEEN, unread)
              : l10n_util::GetStringUTF16(IDS_UW_INBOX);
   SetTooltipText(name);
   GetViewAccessibility().SetName(name);

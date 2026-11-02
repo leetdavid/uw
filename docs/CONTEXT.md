@@ -266,6 +266,10 @@ _Avoid_: Notification, when meaning the kept copy.
 The list of alerts, opened from a button at the top of the sidebar.
 _Avoid_: Notification center, alerts panel.
 
+**Unread alert**:
+An alert the user has not opened or marked read. Opening the Inbox leaves its alerts unread.
+_Avoid_: Unseen alert, new alert.
+
 **Scheduled page**:
 The page that lists every scheduled chat, watched pages first, with when each last ran and runs next.
 _Avoid_: Scheduled filter, schedules list.

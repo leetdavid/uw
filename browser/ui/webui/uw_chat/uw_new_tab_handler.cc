@@ -383,7 +383,7 @@ void UwNewTabHandler::SendSections() {
   std::vector<mojom::NewTabRowPtr> finished;
   for (const ChatAlerts::Alert& alert : alerts->alerts()) {
     const ChatIndex::Entry* entry = entry_of(alert.chat_id);
-    if (alert.seen || alert.waiting || alert.what == "No change" || !entry) {
+    if (alert.read || alert.waiting || alert.what == "No change" || !entry) {
       continue;
     }
     mojom::NewTabRowPtr row = RowOf(*entry);
@@ -578,7 +578,7 @@ void UwNewTabHandler::Remove(const std::string& chat_id,
                              const std::string& alert_id) {
   if (!alert_id.empty()) {
     if (ChatAlerts* alerts = alerts_.GetSource()) {
-      alerts->See(alert_id);
+      alerts->MarkRead(alert_id);
     }
   } else if (ChatIndex* index = index_.GetSource()) {
     index->MarkRead(chat_id);

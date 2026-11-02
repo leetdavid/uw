@@ -28,9 +28,8 @@ namespace uw {
 DECLARE_ELEMENT_IDENTIFIER_VALUE(kInboxButtonElementId);
 
 // The Inbox button, at the right end of the line of window buttons at the top
-// of the sidebar. A badge counts the alerts the user has not seen, and a press
-// opens the Inbox under it and sees them all. See docs/product.md, "Scheduled
-// chats".
+// of the sidebar. A badge counts the alerts the user has not read, and a press
+// opens the Inbox under it. See docs/product.md, "Scheduled chats".
 class InboxButton : public views::Button,
                     public ChatAlerts::Observer,
                     public views::WidgetObserver {

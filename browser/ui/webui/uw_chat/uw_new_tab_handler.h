@@ -127,7 +127,7 @@ class UwNewTabHandler : public mojom::NewTabHandler,
                 const std::string& title,
                 const std::string& favicon);
   void OnRead(const std::string& chat_id, Ending ending);
-  // The row leaves Finished: its alert is seen, or its chat read.
+  // The row leaves Finished: its alert or its chat is read.
   void Remove(const std::string& chat_id, const std::string& alert_id);
   // Asks each terminal tab whether a program runs in it, while the page
   // shows. Shells tell no one when a command starts or ends.

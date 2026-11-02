@@ -303,9 +303,11 @@ Agreed on 2026-10-31: the chat page and the Scheduled page link to each other.
 
 Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
 
-- The Inbox button sits at the top of the sidebar in every normal window, the floating sidebar included, and never in private windows. It shows how many alerts are unseen. Opening the Inbox marks them all seen, and clicking an alert's notification marks that one seen.
-- An alert shows the page's icon, or a clock for a chat with no page, the chat's title, what the notification said, and the time.
+- The Inbox button sits at the top of the sidebar in every normal window, the floating sidebar included, and never in private windows. It shows how many alerts are [unread](CONTEXT.md#language).
+- An alert shows the page's icon, or a clock for a chat with no page, the chat's title, what the notification said, and the time. An unread alert has a dot after the time.
 - A click on a watched page's alert opens the page, or goes to its tab if one is open, with Open chat on hover. Any other alert opens its chat. "Waiting for your approval" always opens the chat. A click on the notification itself still opens the chat.
+- Agreed on 2026-11-02: an alert stays unread until the user opens it from the Inbox, from its notification, or from the new tab page. Mark all read, beside Clear all, marks every alert read. Before, opening the Inbox marked them all read.
+- Agreed on 2026-11-02: a page or chat opened from the Inbox or from a notification opens selected at the top of the Scratchpad, as a [link from another app](#automatic-tab-organization) does. Before, it opened beside the active tab, inside that tab's task.
 - Alerts stay until Clear all or until their chat is deleted. Stopping a watch or removing a schedule keeps them. An approval's alert goes once the step is answered or stopped.
 
 ### The uw command

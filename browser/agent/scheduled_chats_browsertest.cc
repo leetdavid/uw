@@ -31,6 +31,7 @@
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
 #include "components/prefs/pref_service.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -48,6 +49,7 @@
 #include "uw/browser/agent/chat_triggers.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/ai_providers/providers.h"
 
@@ -297,10 +299,9 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_EQ(alerts->alerts()[0].chat_id, kChat);
   EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
   EXPECT_THAT(alerts->alerts()[0].text, HasSubstr("Down to $479."));
-  EXPECT_EQ(alerts->Unseen(), 1u);
-  // Opening the Inbox sees them all.
-  alerts->SeeAll();
-  EXPECT_EQ(alerts->Unseen(), 0u);
+  EXPECT_EQ(alerts->Unread(), 1u);
+  alerts->MarkAllRead();
+  EXPECT_EQ(alerts->Unread(), 0u);
 
   // A muted chat sends no notification, so it keeps no alert.
   ScheduledChat muted = DeskWatch(provider);
@@ -351,7 +352,7 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
-                       ClickingANotificationSeesItsAlertAndClearEmptiesThem) {
+                       ClickingANotificationReadsItsAlertAndClearEmptiesThem) {
   SaveChat();
   model_.Script({ScriptedModel::Answer("I looked around.")});
   chats()->Save(kChat, DeskWatch(ProviderId()));
@@ -360,12 +361,12 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   ChatAlerts* alerts = ChatAlerts::For(profile());
   ASSERT_EQ(alerts->alerts().size(), 1u);
   EXPECT_EQ(alerts->alerts()[0].what, "Couldn't check");
-  EXPECT_EQ(alerts->Unseen(), 1u);
+  EXPECT_EQ(alerts->Unread(), 1u);
   ASSERT_EQ(Notifications().size(), 1u);
   notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT,
                                 Notifications()[0].id(), std::nullopt,
                                 std::nullopt);
-  EXPECT_EQ(alerts->Unseen(), 0u);
+  EXPECT_EQ(alerts->Unread(), 0u);
   EXPECT_EQ(alerts->alerts().size(), 1u);
 
   alerts->Clear();
@@ -444,6 +445,13 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   LinesAfterTheRun();
   ASSERT_TRUE(TabsShowingChat(profile(), kChat).empty());
   ASSERT_EQ(Notifications().size(), 1u);
+  // The active tab is in a task, which the chat stays out of.
+  TabOrganizationController* controller =
+      TabOrganizationController::From(browser());
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const std::optional<tab_groups::TabGroupId> task = controller->MoveToNewTask(
+      {controller->IdFor(tabs->GetActiveTab()).value()}, u"Plan");
+  ASSERT_TRUE(task);
 
   notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT,
                                 Notifications()[0].id(), std::nullopt,
@@ -452,7 +460,10 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   const std::vector<tabs::TabInterface*> showing =
       TabsShowingChat(profile(), kChat);
   ASSERT_EQ(showing.size(), 1u);
-  EXPECT_EQ(browser()->tab_strip_model()->GetActiveTab(), showing[0]);
+  EXPECT_EQ(tabs->GetActiveTab(), showing[0]);
+  // It opens at the top of the Scratchpad, as a link from another app does.
+  EXPECT_FALSE(showing[0]->GetGroup());
+  EXPECT_EQ(tabs->GetIndexOfTab(showing[0]), 1);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
@@ -474,7 +485,7 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, AlertsLastAcrossARestart) {
   ASSERT_TRUE(base::test::RunUntil([&] { return alerts->loaded(); }));
   ASSERT_EQ(alerts->alerts().size(), 1u);
   EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
-  EXPECT_EQ(alerts->Unseen(), 1u);
+  EXPECT_EQ(alerts->Unread(), 1u);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {

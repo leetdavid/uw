@@ -732,6 +732,7 @@ struct InboxAlert {
   double time;
   // A step of the chat's run waits for approval.
   bool waiting;
+  bool read;
 };
 
 // Links the Inbox's page to its handler.
@@ -745,11 +746,13 @@ interface InboxHandler {
   // The page has drawn and can be shown.
   ShowUI();
   // Goes to a tab of the alert's watched page, or opens the page; opens the
-  // chat for any other alert and for one that waits for approval. Then
-  // closes the Inbox.
+  // chat for any other alert and for one that waits for approval. Then marks
+  // the alert read and closes the Inbox.
   OpenAlert(string id);
-  // Shows the chat `chat_id` and closes the Inbox.
-  OpenChat(string chat_id);
+  // Shows the chat of the alert `id`, marks the alert read, and closes the
+  // Inbox.
+  OpenChat(string id);
+  MarkAllRead();
   ClearAll();
   // Opens uw://scheduled and closes the Inbox.
   ShowScheduled();

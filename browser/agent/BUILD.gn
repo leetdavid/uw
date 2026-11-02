@@ -240,12 +240,14 @@ source_set("chat_notification") {
     ":chats",
     "//base",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
     "//components/tabs:public",
     "//ui/base",
     "//ui/gfx",
     "//ui/message_center/public/cpp",
     "//url",
+    "//uw/browser/tab_organization",
   ]
 }
 

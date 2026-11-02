@@ -36,7 +36,7 @@ Drawn on 2026-10-29 for T263 in the frames "New tab page: a busy day (Fluid)" an
 
 - The sections sit under the box in two columns: Needs you, Finished, and Setup on the left, which want the user; Coming up, Running, and Tabs on the right, which go on by themselves.
 - Needs you lists steps oldest first, with Review, which opens the chat at its question, or Open page to sign in.
-- Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it takes it off this page; the Inbox keeps the alert. With the sidebar hidden, Inbox › opens the Inbox by the page's top-left corner, and the sidebar stays hidden.
+- Finished shows five at most, newest first, and leaves out runs that found no change. Opening a row or dismissing it marks its alert read and takes it off this page; the Inbox keeps the alert. With the sidebar hidden, Inbox › opens the Inbox by the page's top-left corner, and the sidebar stays hidden.
 - Coming up shows the next three runs. Paused chats are left out.
 - Running plays and pauses the mini player's media from the page. As built, a chat's row says "Working" without its current step, and a terminal's row names the program it runs, such as "Running sleep", since a shell does not say when a command started.
 - Tabs shows the organizer's moves and new tasks of the last hour, three at most, and a line saying whether automatic organization is on or paused, with Pause or Resume. With automatic organization off, the section is left out. Changed on 2026-10-30: only the newest row has Undo, while it is still what Undo would reverse, since uw's Undo takes back actions newest first. The user chose this over an Undo for each move.
