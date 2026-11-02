@@ -110,7 +110,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // Asked before `window` closes. With shared tabs, another window on its
   // workspace takes the window's live pages, and the window closes. The last
   // window on the workspace keeps the workspace's tabs instead: it hides, and
-  // its pages that are doing nothing unload. True when it stays.
+  // its pages that are doing nothing unload. Off the Mac, when no other window
+  // is on screen, uw quits instead, which closes the window. True when it
+  // stays.
   static bool KeepsWindow(BrowserWindowInterface* window);
   // True for a window that shares its tabs, so closing it closes none.
   static bool ClosesNoTabs(BrowserWindowInterface* window);

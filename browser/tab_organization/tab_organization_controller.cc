@@ -19,6 +19,7 @@
 #include "base/token.h"
 #include "base/uuid.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
@@ -50,6 +51,12 @@
 #include "uw/browser/terminal/busy_terminals.h"
 #include "uw/browser/terminal/close_guard.h"
 #include "uw/browser/workspaces/workspace_window.h"
+
+#if !BUILDFLAG(IS_MAC)
+#include "chrome/browser/lifetime/application_lifetime.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "components/keep_alive_registry/keep_alive_registry.h"
+#endif
 
 namespace uw {
 namespace {
@@ -85,6 +92,20 @@ bool InChatBranch(const TabOrganizationController& controller,
   }
   return false;
 }
+
+#if !BUILDFLAG(IS_MAC)
+// True when closing `window` would quit Chromium: no other window is on
+// screen, and only windows keep uw running.
+bool LastWindowOnScreen(BrowserWindowInterface* window) {
+  for (BrowserWindowInterface* other : GetAllBrowserWindowInterfaces()) {
+    if (other != window && !other->IsDeleteScheduled() &&
+        other->GetWindow()->IsVisible()) {
+      return false;
+    }
+  }
+  return KeepAliveRegistry::GetInstance()->IsKeepingAliveOnlyByBrowserOrigin();
+}
+#endif
 
 }  // namespace
 
@@ -547,6 +568,15 @@ bool TabOrganizationController::KeepsWindow(BrowserWindowInterface* window) {
       browser_shutdown::IsTryingToQuit()) {
     return false;
   }
+#if !BUILDFLAG(IS_MAC)
+  // Off the Mac a hidden window would leave uw running with nothing on
+  // screen, and Exit does not count as quitting, so uw quits instead.
+  if (LastWindowOnScreen(window)) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&chrome::AttemptExit));
+    return true;
+  }
+#endif
   self->CloseUnusedBlank(/*closing=*/true);
   if (self->shared_->windows().size() > 1) {
     self->shared_->HandOver(self);
