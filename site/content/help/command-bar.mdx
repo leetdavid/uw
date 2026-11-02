@@ -11,6 +11,27 @@ description: Open pages, switch tabs, ask uw, or run a shell command from one bo
 
 The rows are your open tabs, history, bookmarks, and a search for what you typed, labeled **Tab**, **History**, **Bookmark**, and **Search**. A **Tab** row switches to that tab. Any other row opens in a new tab, where <kbd>Cmd</kbd> <kbd>T</kbd>'s blank tab would have gone. Text with no row picked opens as an address, or as a search.
 
+<Figure caption="The command bar over the page. Each row says whether it's a tab, history, a bookmark, or a search.">
+  <Window bare height={330} cut>
+    <Page address="stayaway.com/alfama/flat-12" />
+    <Popup top={58} left={100} width={430}>
+      <Field icon="search" value="lisbon ho" />
+      <Row tile="Hotels in Baixa, Lisbon" title="Hotels in Baixa, Lisbon" detail="booking.com" selected>
+        <Muted>Tab</Muted>
+      </Row>
+      <Row icon="history" title="Lisbon hotels with a rooftop pool" detail="cntraveler.com">
+        <Muted>History</Muted>
+      </Row>
+      <Row icon="bookmark" title="Hostels in Lisbon" detail="hostelworld.com">
+        <Muted>Bookmark</Muted>
+      </Row>
+      <Row icon="search" title="lisbon ho">
+        <Muted>Search</Muted>
+      </Row>
+    </Popup>
+  </Window>
+</Figure>
+
 <kbd>Esc</kbd> closes the panel and opens nothing.
 
 <Callout>

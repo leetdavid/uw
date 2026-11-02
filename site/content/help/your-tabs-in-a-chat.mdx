@@ -39,4 +39,36 @@ A task the agent names keeps that name, with the lock, as if you typed it. Undo 
 
 Each step names the tabs, such as `Moved 2 tabs to a new task, Hotels`. Click a tab in a step to go to it, or a task to see it in the sidebar. The arrow at the end of a step shows the tabs it moved or closed.
 
+<Figure caption="Each step names the tabs it moved. In Auto, closing your tabs waits for you.">
+  <Window height={370} cut>
+    <Sidebar>
+      <Task name="Hotels" color="green" locked>
+        <TabRow>Hotels in Baixa</TabRow>
+        <TabRow>Stayaway, Alfama flat</TabRow>
+      </Task>
+      <Task name="Flights" color="blue">
+        <TabRow>SFO to LIS, TAP</TabRow>
+        <TabRow>SFO to LIS, United</TabRow>
+        <TabRow>Fare details</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow kind="chat" selected>Tidy my Lisbon tabs</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="uw://chat">
+      <Chat title="Tidy my Lisbon tabs" status="Waiting for you" waiting>
+        <Message>Put my hotel tabs in a task of their own, and close the flight tabs I don't need.</Message>
+        <Step icon="folder">Moved 2 tabs to a new task, Hotels</Step>
+        <Approval title="Close 5 tabs in Flights?">
+          <Buttons>
+            <Button primary icon="check">Approve</Button>
+            <Button>Not this one</Button>
+            <Button>Stop the chat</Button>
+          </Buttons>
+        </Approval>
+      </Chat>
+    </Page>
+  </Window>
+</Figure>
+
 A [scheduled chat](./scheduled-chats.mdx) can tidy your tabs too, such as every Friday. It never switches your window to a tab, and a close waits for you in Auto.

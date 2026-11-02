@@ -11,6 +11,20 @@ description: Add the uw command to your Mac, so you and your scripts can start c
 
 The row then says **Installed at** `/usr/local/bin/uw`, with **Uninstall**. **Uninstall** removes the command.
 
+<Figure caption="The uw command row at uw://settings/system, once it's installed.">
+  <Window bare height={210} cut>
+    <Page address="uw://settings/system">
+      <Stack>
+        <Section title="uw command">
+          <Row icon="terminal" title="Installed at /usr/local/bin/uw" detail="Run chats, add connectors, and change settings from a terminal">
+            <Button>Uninstall</Button>
+          </Row>
+        </Section>
+      </Stack>
+    </Page>
+  </Window>
+</Figure>
+
 Until you install it, uw doesn't listen for the command, and nothing else on this Mac can start chats through it. The command lives inside uw, so it updates when uw does.
 
 ## Try *it*

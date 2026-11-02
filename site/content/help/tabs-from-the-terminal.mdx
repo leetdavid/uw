@@ -11,6 +11,20 @@ uw tabs list
 
 The list shows your pinned tabs, then each task of the workspace you used last, then its Scratchpad. Each tab has an id, such as `3f9a1c07`, its site, and when you last looked at it. Tabs nested under another are indented.
 
+<Figure caption="uw tabs list: your pinned tabs, each task, then the Scratchpad. A nested tab is indented.">
+  <Terminal title="~">
+    <Cmd>uw tabs list</Cmd>
+    <Out tone="dim">{"Pinned"}</Out>
+    <Out>{"  9d03e1aa  Mail                    mail.google.com       2m ago"}</Out>
+    <Out tone="dim">{"Plan Lisbon trip"}</Out>
+    <Out>{"  3f9a1c07  SFO to LIS flights      google.com            5m ago"}</Out>
+    <Out>{"  7d1f2a90  Stayaway, Alfama flat   stayaway.com          1h ago"}</Out>
+    <Out>{"    c33e8b15  Flat 12, photos       stayaway.com          1h ago"}</Out>
+    <Out tone="dim">{"Scratchpad"}</Out>
+    <Out>{"  5b02e7c4  Hacker News             news.ycombinator.com  3h ago"}</Out>
+  </Terminal>
+</Figure>
+
 - `--query "words"` keeps the tabs whose title or address holds every word.
 - `--workspace Work` lists another workspace. The last line names the others.
 - `--json` prints each tab with its id, title, address, task, and parent.

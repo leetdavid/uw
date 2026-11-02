@@ -9,6 +9,27 @@ Choose **File → New Terminal**, or click **▾** at the foot of the sidebar an
 
 A tab opens with your login shell in your home folder. It's named after the shell's folder, or the title the shell sets.
 
+<Figure caption="A terminal tab, named after its folder, in a task like any other tab.">
+  <Window>
+    <Sidebar>
+      <Task name="Ship the shop site" color="orange">
+        <TabRow kind="terminal" selected>~/dev/shop-web</TabRow>
+        <TabRow>localhost:3000</TabRow>
+        <TabRow>Pull request #42</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="~/dev/shop-web" terminal>
+      <Cmd>pnpm dev</Cmd>
+      <Out tone="dim">{"  ▲ Next.js 16.4.3"}</Out>
+      <Out>{"  - Local:   http://localhost:3000"}</Out>
+      <Out tone="ok">{"  ✓ Ready in 1.2s"}</Out>
+    </Page>
+  </Window>
+</Figure>
+
 To run one command in a new terminal tab, type it in the [command bar](./command-bar.mdx) and press <kbd>Option</kbd> <kbd>Return</kbd>.
 
 ## Keys, paste, *and drop*

@@ -9,6 +9,34 @@ Choose **View → Theme…**, or right-click empty space in the sidebar and choo
 
 A panel opens beside the sidebar. The window changes as you pick, so you see each change right away.
 
+<Figure caption="The theme picker, beside the sidebar.">
+  <Window height={440}>
+    <Sidebar>
+      <Task name="Plan Lisbon trip" color="blue">
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+        <TabRow selected>Stayaway, Alfama flat</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="stayaway.com/alfama/flat-12" />
+    <Popup top={48} left={240} width={290}>
+      <Segmented options="Auto,Light,Dark" value="Light" />
+      <ColorField />
+      <Swatches />
+      <Slider label="Intensity" value={100} />
+      <Slider label="Grain" value={20} />
+      <Row title="Pages">
+        <Segmented options="Theme,Light,Dark" value="Theme" />
+      </Row>
+      <Row title="Theme colors in dark mode">
+        <Switch />
+      </Row>
+    </Popup>
+  </Window>
+</Figure>
+
 ## Pick *your colors*
 
 - Click a suggested theme.

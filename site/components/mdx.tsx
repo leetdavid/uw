@@ -1,36 +1,14 @@
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import type { MDXComponents } from "mdx/types";
-import {
-  Figure,
-  Menu,
-  MenuColors,
-  MenuItem,
-  MenuLine,
-  Page,
-  Scratchpad,
-  Sidebar,
-  TabRow,
-  Task,
-  Window,
-} from "./kit";
+import * as kit from "./kit";
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultMdxComponents,
     Tab,
     Tabs,
-    Figure,
-    Window,
-    Sidebar,
-    Task,
-    TabRow,
-    Scratchpad,
-    Page,
-    Menu,
-    MenuItem,
-    MenuColors,
-    MenuLine,
+    ...kit,
     ...components,
   } satisfies MDXComponents;
 }

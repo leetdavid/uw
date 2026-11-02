@@ -17,6 +17,33 @@ Any of these reverses the last move:
 - Click **Organize**, then **Undo Move**. It names the move it reverses, such as "SFO to LIS flights → Plan Lisbon trip". With nothing to undo, it's grayed and says "Nothing to undo".
 - Right-click a tab and choose **Undo Tab Organization**, or choose it from the **Tasks** menu.
 
+<Figure caption="Undo Move, in the Organize card, names the move it takes back.">
+  <Window>
+    <Sidebar foot>
+      <Task name="Plan Lisbon trip" color="blue">
+        <TabRow selected>SFO to LIS flights</TabRow>
+        <TabRow>Stayaway, Alfama flat</TabRow>
+      </Task>
+      <Task name="Fix the bike" color="green">
+        <TabRow>Cadence, bike shop</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow>Bite, Lisbon food guide</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="google.com/travel/flights" />
+    <Menu left={14} bottom={46}>
+      <MenuItem dim>Automatic organization is on</MenuItem>
+      <MenuLine />
+      <MenuItem icon="pause">Pause</MenuItem>
+      <MenuItem icon="undo" detail="SFO to LIS flights → Plan Lisbon trip">Undo Move</MenuItem>
+      <MenuItem icon="activity">Show Activity</MenuItem>
+      <MenuItem icon="settings">Settings…</MenuItem>
+    </Menu>
+  </Window>
+</Figure>
+
 ## What undo *covers*
 
 Undo reverses uw's moves and the moves you make with the branch commands, such as **Move to New Task**, **Move to Scratchpad**, **Nest Under Previous Tab**, and **Move Up One Level**. See [Tabs under tabs](./tabs-under-tabs.mdx).

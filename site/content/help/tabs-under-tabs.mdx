@@ -7,6 +7,20 @@ description: A link you open from a page lands just below it, one level in, so y
 
 <kbd>Cmd</kbd>-click a link, and the new tab opens directly below its page, indented one level. A page with tabs under it is a parent tab. Together they make a tab branch.
 
+<Figure caption="A tab branch: two pages opened from Hacker News sit under it, one level in.">
+  <Window>
+    <Sidebar>
+      <Task name="Read about local-first apps" color="purple">
+        <TabRow parent>Hacker News</TabRow>
+        <TabRow level={1} selected>Local-first software</TabRow>
+        <TabRow level={1}>Automerge docs</TabRow>
+        <TabRow>Ink and Switch essays</TabRow>
+      </Task>
+    </Sidebar>
+    <Page address="inkandswitch.com/local-first" />
+  </Window>
+</Figure>
+
 Close the parent with its close button, and the tabs under it stay open and move up a level. To close them too, right-click the parent and choose **Close Branch**, below **Close**. You can also Option-click its close button. Hold <kbd>Option</kbd> with the pointer on the close button, and the tabs that would close turn red first.
 
 To open a blank tab under a tab, right-click it and choose **New Child Tab**, below **New Tab Below**. The new tab is selected and sits first under that tab, above its other tabs. **New Tab Below** opens a tab at the same level, after the tab's branch.

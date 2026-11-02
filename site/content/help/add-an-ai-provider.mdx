@@ -15,6 +15,36 @@ Click a provider to see its address, key, format, and models, or to remove it. E
 
 ## Pick *your models*
 
+<Figure caption="uw://ai/providers: a model for each job, then your providers.">
+  <Window bare height={460} cut>
+    <Page address="uw://ai/providers">
+      <Stack>
+        <Title detail="Add each provider once. Every model in uw comes from one of them.">AI providers</Title>
+        <Section title="What uw uses models for">
+          <Row title="Makes quick choices" detail="Places tabs, and checks commands">
+            <Chip>jev-latest</Chip>
+          </Row>
+          <Row title="Names tasks" detail="A short name for each new task">
+            <Chip>claude-haiku-5-5</Chip>
+          </Row>
+          <Row title="Starts chats" detail="Each chat can switch">
+            <Chip>gpt-6.1-sol</Chip>
+            <Chip>medium</Chip>
+          </Row>
+        </Section>
+        <Section title="Providers" count={2}>
+          <Row tile="OpenAI" title="OpenAI" detail="api.openai.com/v1">
+            <Muted>43 models</Muted>
+          </Row>
+          <Row tile="Jev" title="Jev" detail="api.typesafe.ai/v1">
+            <Muted>2 models · 2 decision</Muted>
+          </Row>
+        </Section>
+      </Stack>
+    </Page>
+  </Window>
+</Figure>
+
 Under **What uw uses models for**, each row is named for its job:
 
 | Row | What its model does |

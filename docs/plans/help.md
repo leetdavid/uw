@@ -115,7 +115,7 @@ Where the build differs from the design:
 
 - The Open in menu is Fumadocs' own: GitHub, View as Markdown, ChatGPT, and Claude, plus Scira AI and Cursor.
 - Search is Fumadocs' dialog in Help's colors, without the key hints at its foot.
-- Figures, T302: `site/components/kit.tsx` and `kit.css` hold the UI kit, registered for MDX in `components/mdx.tsx`. `lib/figure-captions.ts` makes a page's Markdown copy and its search records show each `<Figure>` as `*Figure: <caption>*`. The `tasks` page has the first two figures. Nothing zooms, per [Figures](#figures).
+- Figures, T302 and T303: `site/components/kit.tsx` and `kit.css` hold the UI kit, every part registered for MDX in `components/mdx.tsx`. Besides the sidebar parts, the kit has floating cards (`Popup`, `Menu`), list rows, buttons, chips, switches, fields, the chat's parts, and a terminal, so a figure for a new page usually needs no new part. `lib/figure-captions.ts` makes a page's Markdown copy show each `<Figure>` as `*Figure: <caption>*`, and gives search one record, the caption, instead of the text inside the figure. 21 pages have figures, `tasks` and `scheduled-chats` two each. Nothing zooms, per [Figures](#figures).
 - No page needs the version pill yet, so it isn't built.
 - The agent tile on the Help home lists `llms.txt` and `llms-full.txt`; the MCP address joins it with T233. Ask uw joins the pages with T242.
 - "Was this helpful?" does not remember an answer after the page reloads.

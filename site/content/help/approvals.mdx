@@ -11,6 +11,33 @@ Before the agent changes something on a site, a card in the chat names the step,
 - **Not this one**, to skip it. Type in the field first to tell the agent what to do instead.
 - **Stop the chat**.
 
+<Figure caption="A step waits for your approval in the chat.">
+  <Window height={370} cut>
+    <Sidebar>
+      <Scratchpad>
+        <TabRow kind="chat" parent selected>Cancel unused subscriptions</TabRow>
+        <TabRow level={1}>Netflix: Membership</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="uw://chat">
+      <Chat title="Cancel unused subscriptions" status="Waiting for you" waiting>
+        <Step icon="tab">Opened Netflix: Account under this chat</Step>
+        <Step icon="file">Read your viewing activity: nothing since July 2</Step>
+        <Approval title='Click button "Cancel membership"?'>
+          <Muted>In Netflix: Membership. It changes your account on a site.</Muted>
+          <Field placeholder="Tell the agent what to do instead" />
+          <Buttons>
+            <Button primary icon="check">Approve</Button>
+            <Button>Not this one</Button>
+            <Button>Stop the chat</Button>
+          </Buttons>
+        </Approval>
+      </Chat>
+    </Page>
+  </Window>
+</Figure>
+
 While a step waits, pressing <kbd>Return</kbd> in the message box declines it, with your message as the note.
 
 By default, uw asks before a form's submit button, before pressing <kbd>Return</kbd> in a form's field, and before typing a password or payment details. The agent marks other changes itself. When Chromium's list marks a site as sensitive, the chat asks first, such as `Let the agent act on example.com?`. Reading, searching, and opening pages don't ask.

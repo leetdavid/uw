@@ -15,6 +15,24 @@ For each tab, uw sends your models its title, address, the tab it came from, you
 
 When the model is sure enough, uw moves the tab, with the tabs under it, and a message such as "Moved to Plan Lisbon trip" shows above **Organize** for a few seconds, with **Undo**. Nothing shows when the tab stays put.
 
+<Figure caption="uw moved a tab, and says so above Organize, with Undo. The lock marks a task name you typed, and the anchor a tab you keep where it is.">
+  <Window>
+    <Sidebar foot>
+      <Task name="Plan Lisbon trip" color="blue" locked>
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+        <TabRow>Stayaway, Alfama flat</TabRow>
+        <TabRow selected>Hotels in Baixa</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow kept>Bite, Lisbon food guide</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+      <Notice>Moved to Plan Lisbon trip</Notice>
+    </Sidebar>
+    <Page address="booking.com/hotels-in-baixa" />
+  </Window>
+</Figure>
+
 - A tab that fits one of your tasks moves into it.
 - A one-off page that doesn't fit its task, such as a sign-in page, moves to the Scratchpad.
 - A page that starts something of its own moves at once into a new task, "New task". Tabs under it go along, unless they still fit the old task.

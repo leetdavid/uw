@@ -15,6 +15,35 @@ A new chat suggests three requests. <kbd>Tab</kbd> takes the one in the field, a
 
 The chat's tab takes your first message as its title. The pages the agent opens appear as tabs under the chat's tab and load in the background, so your own tab stays selected. Each step shows as a short line, such as `Clicked button "Send" in tab 1`, and then the answer comes.
 
+<Figure caption="A chat at work. The pages the agent opens sit under the chat's tab.">
+  <Window height={400} cut>
+    <Sidebar>
+      <Task name="Plan Lisbon trip" color="blue">
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow kind="chat" parent selected>Book an Alfama tour</TabRow>
+        <TabRow level={1}>Alfama walking tour</TabRow>
+        <TabRow level={1}>Lisbon old town walk</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="uw://chat">
+      <Chat title="Book an Alfama tour" status="Working">
+        <Message>Find a walking tour of the Alfama on Saturday morning, under €40 each.</Message>
+        <Answer>I'll compare the tours on the two sites you used last week.</Answer>
+        <Step icon="history">Searched your history for Lisbon tours</Step>
+        <Step icon="tab">Opened 2 tabs under this chat</Step>
+        <Step icon="file">Read Alfama walking tour: 4.8 stars, €29 each</Step>
+        <Composer placeholder="Reply to the agent">
+          <Chip>claude-sonnet-5-5</Chip>
+          <Chip icon="shield">Auto</Chip>
+        </Composer>
+      </Chat>
+    </Page>
+  </Window>
+</Figure>
+
 uw never sorts a chat's tabs into tasks. Every tab opened from the chat, by the agent or by you, stays under it, and so does every tab opened from one of those. They go wherever you move the chat. Drag one out to let it go. When you close the chat, its tabs become ordinary tabs.
 
 The agent reads pages as text, and clicks and types only on https pages. It asks before it changes anything on a site. See [Approvals](./approvals.mdx).

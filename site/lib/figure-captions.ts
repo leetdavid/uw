@@ -16,6 +16,12 @@ export function remarkFigureCaptions() {
         )?.value;
         if (typeof caption === "string") {
           replaceSource(file, node, `*Figure: ${caption}*`);
+          node.data = {
+            ...node.data,
+            structuredData: {
+              contents: [{ heading: undefined, content: caption }],
+            },
+          };
         }
         return;
       }

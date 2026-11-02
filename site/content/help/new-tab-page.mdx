@@ -5,6 +5,37 @@ description: Search or ask from a blank tab, and see what uw is doing for you.
 
 A blank tab shows uw's new tab page: a box to search or ask. It opens from **New blank tab** in the [command bar](./command-bar.mdx), from <kbd>Cmd</kbd> <kbd>T</kbd> when the command bar is off, and from **New Child Tab**, **New Tab Below**, and a task's **New Tab**.
 
+<Figure caption="The new tab page: the box to search or ask, and what's going on under it.">
+  <Window bare height={400} cut>
+    <Page address="Search or type a URL">
+      <Stack>
+        <NewTabBox />
+        <Columns>
+          <Section title="Needs you" count={1}>
+            <Row tile="Order the standing desk" title="Order the standing desk" detail="Waits for your approval">
+              <Button>Review</Button>
+            </Row>
+          </Section>
+          <Section title="Coming up" count={2} link="Scheduled">
+            <Row tile="SFO to LIS, Dec 18" title="SFO to LIS, Dec 18" detail="Price drops · every 4 hours">
+              <Muted>12:00</Muted>
+            </Row>
+          </Section>
+        </Columns>
+        <Columns>
+          <Section title="Finished" count={2} link="Inbox">
+            <Row tile="Jarvis Bamboo desk" title="Jarvis Bamboo desk" detail="Change alert · $479, down $70" />
+            <Row icon="clock" title="Morning briefing" detail="Update · 2 meetings" />
+          </Section>
+          <Section title="Running" count={1}>
+            <Row icon="terminal" title="~/dev/site, pnpm build" detail="Running pnpm" />
+          </Section>
+        </Columns>
+      </Stack>
+    </Page>
+  </Window>
+</Figure>
+
 ## Search *or go to a page*
 
 1. Type a few letters of a page you visited or have open, or an address.

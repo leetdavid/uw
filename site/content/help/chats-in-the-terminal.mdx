@@ -7,6 +7,18 @@ description: Run uw's agent from a terminal, in a chat that fills the terminal o
 
 Run `uw chat`, type a request, and press <kbd>Return</kbd>. The steps tick off as the agent works, and the answer is drawn as Markdown.
 
+<Figure caption="uw chat in a terminal. The steps tick off, and an approval waits for a number.">
+  <Terminal title="uw chat">
+    <Out tone="accent">{"> Cancel the Audible plan I'm not using"}</Out>
+    <Out tone="ok">{"✓ Opened audible.com/account under this chat"}</Out>
+    <Out tone="ok">{"✓ Read your library: nothing played since May"}</Out>
+    <Out>{" "}</Out>
+    <Out tone="warn">{"Approve this change?"}</Out>
+    <Out>{'  Click button "Cancel membership" on audible.com'}</Out>
+    <Out>{"  1. Approve   2. Not this one   3. Stop the chat"}</Out>
+  </Terminal>
+</Figure>
+
 | Key | What it does |
 | --- | --- |
 | <kbd>Return</kbd> | Send a message. While the agent works, it steers the agent. |

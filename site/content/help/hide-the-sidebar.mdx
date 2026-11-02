@@ -12,6 +12,22 @@ description: Give the page the whole window. The sidebar waits at the left edge,
 
 Rest the pointer on the window's left edge. After a moment the sidebar slides in over the page as a card, with the window's buttons at its top left. The page doesn't move. Hold <kbd>Option</kbd> over the green button, and it shows a +: a click then zooms the window instead of making it full screen.
 
+<Figure caption="With the sidebar hidden, rest the pointer on the window's left edge, and the sidebar slides in over the page.">
+  <Window bare height={300}>
+    <Page address="stayaway.com/alfama/flat-12" />
+    <Sidebar floating>
+      <Task name="Plan Lisbon trip" color="blue">
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+        <TabRow selected>Stayaway, Alfama flat</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow>Bite, Lisbon food guide</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+  </Window>
+</Figure>
+
 Pick a tab and the card stays. Move the pointer onto the page, or press <kbd>Esc</kbd>, and it slides away.
 
 <Callout>

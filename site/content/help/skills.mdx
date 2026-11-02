@@ -7,6 +7,31 @@ description: Teach the agent how to do one kind of request your way. The agent p
 
 Open `uw://ai/skills`, or click **AI settings** at the foot of the chat list and choose **Skills**. The page lists every skill the agent can use, each with a switch. A skill that's off isn't used in any chat.
 
+<Figure caption="uw://ai/skills: every skill the agent can use, each with a switch.">
+  <Window bare height={360} cut>
+    <Page address="uw://ai/skills">
+      <Stack>
+        <Title detail="Instructions the agent reads when a request matches.">Skills</Title>
+        <Section title="Skills" count={3}>
+          <Row icon="name" title="handoff" detail="Write a short note on where this work stands">
+            <Chip>Only you</Chip>
+            <Switch on />
+          </Row>
+          <Row icon="name" title="book-activities" detail="Book tours and tickets on travel sites">
+            <Switch on />
+          </Row>
+          <Row icon="name" title="weekly-review" detail="Sum up the week's work">
+            <Switch />
+          </Row>
+        </Section>
+        <Buttons>
+          <Button icon="folder">Open skills folder</Button>
+        </Buttons>
+      </Stack>
+    </Page>
+  </Window>
+</Figure>
+
 Skills come from three places:
 
 - uw's skills folder, `~/Library/Application Support/uw/skills`. **Open skills folder** shows it in Finder.

@@ -49,6 +49,31 @@ uw mcp add --transport http files https://files.example.com/mcp \
 
 Each connector on `uw://ai/connectors` has a switch. Connectors start with uw and serve every profile.
 
+<Figure caption="uw://ai/connectors, with a switch for each connector.">
+  <Window bare height={360} cut>
+    <Page address="uw://ai/connectors">
+      <Stack>
+        <Title detail="Tools the agent can use, from services and programs on this Mac.">Connectors</Title>
+        <Section title="Connectors" count={3}>
+          <Row tile="Linear" title="Linear" detail="mcp.linear.app · 23 tools">
+            <Switch on />
+          </Row>
+          <Row tile="files" title="files" detail="npx @modelcontextprotocol/server-filesystem">
+            <Switch on />
+          </Row>
+          <Row tile="Notion" title="Notion" detail="mcp.notion.com">
+            <Accent tone="red">Can't sign in</Accent>
+            <Switch />
+          </Row>
+        </Section>
+        <Buttons>
+          <Button primary icon="plus">Add connector</Button>
+        </Buttons>
+      </Stack>
+    </Page>
+  </Window>
+</Figure>
+
 Click a connector to see its tools, each with its own switch. A tool that's off is never offered to the agent. **Reads only** marks a tool that only reads, and **Always allowed** one you've allowed in every chat.
 
 In a chat, **+ → Connectors** turns a connector off or on for that chat only. A new chat starts with every connector that's on.
