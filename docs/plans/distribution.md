@@ -58,7 +58,7 @@ Decided on 2026-10-27:
 
 ## Domain and bundle ID
 
-Agreed: the website is `uwbrowser.com`, registered through Vercel. The app's bundle ID changes from `org.uw.browser`, a domain uw does not own, to `com.uwbrowser.uw` before the first public preview. macOS keys permissions, preferences, and Sparkle's state on the bundle ID, so it must not change after people install uw.
+Agreed: the website is `uwbrowser.com`, registered through Vercel. The app's bundle ID changes from `org.uw.browser`, a domain uw does not own, to `com.uwbrowser.uw` before the first public preview. macOS keys permissions, preferences, and Sparkle's state on the bundle ID, so it must not change after people install uw. Every local build is uw dev, `com.uwbrowser.uw.dev`, so it never shares the installed uw's permissions ([ADR 0028](../adr/0028-local-builds-are-uw-dev.md)).
 
 ## Website
 

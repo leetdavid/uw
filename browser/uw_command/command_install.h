@@ -4,12 +4,17 @@
 #define UW_BROWSER_UW_COMMAND_COMMAND_INSTALL_H_
 
 #include "base/files/file_path.h"
+#include "uw/browser/branding/identity_buildflags.h"
 
 namespace uw {
 
-// Where "Install uw command" links the command. See
-// docs/plans/uw-command.md#reaching-uw.
+// Where "Install uw command" links the command. uw dev's is uw-dev, so it
+// leaves the installed uw's alone. See docs/plans/uw-command.md#reaching-uw.
+#if BUILDFLAG(UW_DEV)
+inline constexpr char kCommandLink[] = "/usr/local/bin/uw-dev";
+#else
 inline constexpr char kCommandLink[] = "/usr/local/bin/uw";
+#endif
 
 // Where the command is linked: kCommandLink, or the folder a test gave.
 base::FilePath CommandLink();

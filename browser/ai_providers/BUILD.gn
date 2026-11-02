@@ -34,6 +34,7 @@ source_set("ai_providers") {
   public_deps = [
     "//base",
     "//url",
+    "//uw/browser/branding:identity_buildflags",
     "//uw/components/ai_providers",
     "//uw/components/tab_organization",
   ]

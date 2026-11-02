@@ -9,6 +9,7 @@
 #include "base/auto_reset.h"
 #include "base/functional/bind.h"
 #include "base/no_destructor.h"
+#include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
@@ -17,6 +18,7 @@
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
+#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -54,6 +56,14 @@ ProviderSync::ProviderSync(PrefService* local_state,
   for (Profile* profile : profile_manager->GetLoadedProfiles()) {
     Join(profile);
   }
+#if BUILDFLAG(UW_DEV)
+  // macOS asks for each key it copies, so the copy waits off the UI thread,
+  // and quitting does not wait for it.
+  base::ThreadPool::PostTask(
+      FROM_HERE,
+      {base::MayBlock(), base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
+      base::BindOnce(&CopyModelKeysFromInstalledUw));
+#endif  // BUILDFLAG(UW_DEV)
 }
 
 ProviderSync::~ProviderSync() = default;

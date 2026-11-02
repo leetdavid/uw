@@ -174,6 +174,16 @@ test("the command finds its app from its own place in the bundle", () => {
   assert.equal(place({}, process.execPath).app, undefined);
 });
 
+test("uw dev's command talks to uw dev's profile and installs as uw-dev", () => {
+  const binary = join(dir, "uw.app", "Contents", "Helpers", "uw");
+  const dev = place({}, binary, true);
+  assert.match(dev.userData, /\/Library\/Application Support\/uw-dev$/);
+  assert.equal(dev.link, "/usr/local/bin/uw-dev");
+  const installed = place({}, binary, false);
+  assert.match(installed.userData, /\/Library\/Application Support\/uw$/);
+  assert.equal(installed.link, "/usr/local/bin/uw");
+});
+
 const LINEAR = {
   name: "linear", kind: "web", address: "https://mcp.linear.app/mcp", state: "needs-sign-in",
   error: "", tools: 0, secrets: [],

@@ -1,7 +1,42 @@
+diff --git a/build/util/branding.gni b/build/util/branding.gni
+index 1d4ffd68a75daf6d4d812e36b5aa6eee81f6064b..d3496d217aac7fb02324657479880c22cc3b838c 100644
+--- a/build/util/branding.gni
++++ b/build/util/branding.gni
+@@ -13,6 +13,7 @@
+ # build-time, for example, in the computation of output file names.
+ 
+ import("//build/config/chrome_build.gni")
++import("//uw/browser/branding/identity.gni")
+ 
+ _branding_dictionary_template =
+     "full_name = \"@PRODUCT_FULLNAME@\" " +
+@@ -40,6 +41,12 @@ chrome_product_installer_short_name = _result.installer_short_name
+ 
+ if (is_mac) {
+   chrome_mac_bundle_id = _result.bundle_id
++
++  # uw: every local build is uw dev, a separate app. See
++  # //uw/browser/branding/identity.gni.
++  if (uw_dev) {
++    chrome_mac_bundle_id += ".dev"
++  }
+   chrome_mac_creator_code = _result.creator_code
+   chrome_mac_team_id = _result.team_id
+ }
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+index c84f6d48986034c51b14cad7278025a9f4e57adb..68c3d83e553b053168dd5d3b9f56f53a2894d744 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
-@@ -573,6 +573,7 @@ if (is_win) {
+@@ -559,6 +559,8 @@ if (is_win) {
+       "CHROMIUM_BUNDLE_ID=$chrome_mac_bundle_id",
+       "CHROMIUM_SHORT_NAME=$chrome_product_short_name",
+       "CHROMIUM_CREATOR=$chrome_mac_creator_code",
++      "UW_APP_NAME=$uw_app_name",
++      "UW_PROFILE_FOLDER=$uw_profile_folder",
+     ]
+ 
+     sources = [
+@@ -573,6 +575,7 @@ if (is_win) {
        ":chrome_app_strings_bundle_data",
        ":chrome_resources",
        ":chrome_versioned_bundle_data",
@@ -9,7 +44,7 @@ diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
        "//base:compiler_specific",
        "//base/allocator:early_zone_registration_apple",
        "//build:branding_buildflags",
-@@ -682,12 +683,12 @@ if (is_win) {
+@@ -682,12 +685,12 @@ if (is_win) {
    }
  
    bundle_data("chrome_app_icon") {
@@ -24,15 +59,36 @@ diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
      outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
    }
  
+@@ -944,7 +947,7 @@ if (is_win) {
+   compile_plist("chrome_helper_app_alerts_plist_strings") {
+     format = "binary1"
+     plist_templates = [ "app/helper-alerts-InfoPlist.strings" ]
+-    substitutions = [ "CHROMIUM_FULL_NAME=$chrome_product_full_name" ]
++    substitutions = [ "CHROMIUM_FULL_NAME=$uw_app_name" ]
+     output_name = "$target_gen_dir/helper_alerts_infoplist_strings/base.lproj/InfoPlist.strings"
+   }
+   bundle_data("chrome_helper_app_alerts_resources") {
 diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
+index 6fada0a2b1a1f4b5675fc657a3a7b2337e43c4a1..6042fc8ef957cbe90d30f5fe69801a061a873dd0 100644
 --- a/chrome/app/app-Info.plist
 +++ b/chrome/app/app-Info.plist
-@@ -157,6 +157,8 @@
+@@ -5,7 +5,7 @@
+ 	<key>CFBundleDevelopmentRegion</key>
+ 	<string>en</string>
+ 	<key>CFBundleDisplayName</key>
+-	<string>${EXECUTABLE_NAME}</string>
++	<string>${UW_APP_NAME}</string>
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>
+@@ -156,7 +156,9 @@
+ 	<key>CFBundleInfoDictionaryVersion</key>
  	<string>6.0</string>
  	<key>CFBundleName</key>
- 	<string>${CHROMIUM_SHORT_NAME}</string>
+-	<string>${CHROMIUM_SHORT_NAME}</string>
++	<string>${UW_APP_NAME}</string>
 +	<key>CrProductDirName</key>
-+	<string>${CHROMIUM_SHORT_NAME}</string>
++	<string>${UW_PROFILE_FOLDER}</string>
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleSignature</key>

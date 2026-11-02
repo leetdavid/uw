@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 
+#include "uw/browser/branding/identity_buildflags.h"
+
 namespace uw {
 
 // Stores provider API keys in macOS Keychain under non-secret account ids.
@@ -27,6 +29,14 @@ class ApiKeyStore {
  private:
   const std::string service_name_;
 };
+
+#if BUILDFLAG(UW_DEV)
+// The first time uw dev starts with no keys of its own, it copies the
+// installed uw's model keys, and macOS asks for the login password once for
+// each. Connector sign-ins stay with the installed uw. A run with
+// --use-mock-keychain copies nothing. Blocks until the user answers.
+void CopyModelKeysFromInstalledUw();
+#endif  // BUILDFLAG(UW_DEV)
 
 }  // namespace uw
 

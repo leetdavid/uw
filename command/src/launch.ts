@@ -9,13 +9,16 @@ import { Channel } from "./channel.ts";
 import { CommandError, FAILED } from "./errors.ts";
 
 declare const UW_VERSION: string;
+declare const UW_DEV: boolean;
 
 /** The build sets UW_VERSION to uw's version. Run from source, the command skips the version check. */
 export const VERSION = typeof UW_VERSION === "string" ? UW_VERSION : "dev";
+/** A local build's command is uw dev's, uw-dev. See docs/adr/0028-local-builds-are-uw-dev.md. */
+const DEV = typeof UW_DEV === "boolean" && UW_DEV;
 export const SOCKET = "uw-command.sock";
-export const LINK = "/usr/local/bin/uw";
-export const NOT_INSTALLED =
-  "The uw command isn't installed. In uw, open Settings › System and click Install uw command.";
+export const NOT_INSTALLED = DEV
+  ? "The uw-dev command isn't installed. In uw dev, open Settings › System and click Install uw command."
+  : "The uw command isn't installed. In uw, open Settings › System and click Install uw command.";
 const START_WAIT_MS = 30_000;
 
 export interface Place {
@@ -27,14 +30,14 @@ export interface Place {
 }
 
 /** The binary sits at uw.app/Contents/Helpers/uw. UW_APP and UW_USER_DATA_DIR point a run from source elsewhere. */
-export function place(env: NodeJS.ProcessEnv = process.env, binary = process.execPath): Place {
+export function place(env: NodeJS.ProcessEnv = process.env, binary = process.execPath, dev = DEV): Place {
   const own = realpathSync(binary).split(`${sep}Contents${sep}Helpers${sep}`);
   const userData = env.UW_USER_DATA_DIR;
   return {
     app: env.UW_APP ?? (own.length === 2 && own[0]?.endsWith(".app") ? own[0] : undefined),
-    userData: userData ?? join(homedir(), "Library", "Application Support", "uw"),
+    userData: userData ?? join(homedir(), "Library", "Application Support", dev ? "uw-dev" : "uw"),
     defaultUserData: userData === undefined,
-    link: env.UW_COMMAND_LINK ?? LINK,
+    link: env.UW_COMMAND_LINK ?? (dev ? "/usr/local/bin/uw-dev" : "/usr/local/bin/uw"),
   };
 }
 

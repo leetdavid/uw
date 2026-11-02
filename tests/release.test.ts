@@ -83,7 +83,7 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
 
   assert.deepEqual(find("git checkout"), [["git", "checkout", "--detach", SHA]]);
   assert.deepEqual(find("node scripts/chromium.ts").map((command) => command.slice(2)), [
-    ["build", "--jobs", "8", "--symbols"], ["smoke"],
+    ["build", "--jobs", "8", "--symbols", "--release"], ["smoke"],
   ]);
   assert.deepEqual(find("node scripts/google-check.ts"), [["node", "scripts/google-check.ts"]]);
   assert.deepEqual(find("plutil").map((command) => command.slice(2, 5)), [
@@ -93,6 +93,8 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
     ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", "phc_test"],
     ["UWPostHogHost", "-string", POSTHOG_HOST],
   ]);
+  const forget = calls.find(({ command }) => command[0]?.endsWith("/lsregister"));
+  assert.deepEqual(forget?.command.slice(1), ["-u", join(worktree, ".chromium/src/out/uw/uw.app")]);
   const cli = join(worktree, ".chromium/releases/sentry-cli-3.8.2");
   const upload = calls.find(({ command }) => command[0] === cli);
   assert.ok(upload);

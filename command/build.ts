@@ -5,7 +5,8 @@
 // which only an ES module has, and a single executable starts a CommonJS
 // script, so the bundle is an asset that a small starter imports. GN runs it
 // with Chromium's node:
-//   build.ts --out <program> --version <uw's version> --depfile <file>
+//   build.ts --out <program> --version <uw's version> --depfile <file> [--dev]
+// --dev builds uw dev's command, uw-dev.
 import { execFileSync } from "node:child_process";
 import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -17,9 +18,11 @@ import { inject } from "postject";
 const SEA_FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { values } = parseArgs({ options: { out: { type: "string" }, version: { type: "string" }, depfile: { type: "string" } } });
+const { values } = parseArgs({
+  options: { out: { type: "string" }, version: { type: "string" }, depfile: { type: "string" }, dev: { type: "boolean" } },
+});
 if (!values.out || !values.version || !values.depfile) {
-  throw new Error("Usage: build.ts --out <program> --version <version> --depfile <file>");
+  throw new Error("Usage: build.ts --out <program> --version <version> --depfile <file> [--dev]");
 }
 const program = resolve(values.out);
 const work = `${program}.parts`;
@@ -35,7 +38,10 @@ const built = await esbuild.build({
   // A smaller bundle starts faster.
   minify: true,
   target: "node24",
-  define: { UW_VERSION: JSON.stringify(values.version), "process.env.NODE_ENV": JSON.stringify("production") },
+  define: {
+    UW_VERSION: JSON.stringify(values.version), UW_DEV: JSON.stringify(values.dev === true),
+    "process.env.NODE_ENV": JSON.stringify("production"),
+  },
   // Ink loads React devtools only when they are installed, for its own development.
   plugins: [{
     name: "no-devtools",

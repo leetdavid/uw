@@ -258,7 +258,7 @@ Expected result: the row says `Installed at /usr/local/bin/uw`, with `Uninstall`
 
 `claude mcp add uw -- uw mcp serve` gives Claude Code uw's page tools. Ask Claude Code to open and read a page: its tab opens out of sight, and none shows in your windows. Ask it to fill in and send a form: Claude Code shows uw's question, and the tab waits, unselected, at the end of your front window. Not this one, with a note, keeps the step from happening and tells the agent why. Add `--mode ask-first` to be asked before every click and typing. A client that can't ask, such as Claude's desktop app today, gets uw's notification with Approve and Not this one instead.
 
-A build started with `pnpm run launch` keeps its data in `uw-dev`, so point the command there: `UW_USER_DATA_DIR="$HOME/Library/Application Support/uw-dev" uw settings list`.
+A local build is uw dev. Install its command from uw dev's settings and run it as `uw-dev`, such as `uw-dev settings list`; `uw` stays the installed uw's.
 
 ## Not available yet
 

@@ -473,12 +473,14 @@ export class Chromium {
     this.runtime.log("Prepared uw customizations from chromium/patches/series");
   }
 
-  build(jobs: number, symbols = false): void {
+  build(jobs: number, symbols = false, release = false): void {
     this.requireHost();
     this.requireJobsForMemory(jobs);
     this.prepare();
     const gnArgs = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
-    const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols)].join("\n");
+    // Without it, the build is uw dev. See docs/adr/0028-local-builds-are-uw-dev.md.
+    const identity = release ? ["uw_release = true"] : [];
+    const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols), ...identity].join("\n");
     this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args}`, "--fail-on-unused-args"], this.layout.source);
     this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome"], this.layout.source);
     if (!existsSync(this.layout.binary)) throw new BuildError(`Build returned successfully but ${this.layout.binary} is missing`);
@@ -734,6 +736,7 @@ function help(command?: keyof typeof descriptions): string {
     (takesJobs(command) ? "  --jobs NUMBER        Parallel jobs; default: 2\n" : "") +
     (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
     (command === "build" ? "  --symbols            Keep symbols for crash reports, as releases do\n" : "") +
+    (command === "build" ? "  --release            Build the installed uw, not uw dev, as releases do\n" : "") +
     (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs uw's MANUAL_ tests\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
@@ -790,7 +793,7 @@ export function main(argv = process.argv.slice(2)): number {
         help: { type: "boolean", short: "h" }, "checkout-dir": { type: "string" },
         ...(takesJobs(name) ? { jobs: { type: "string" as const } } : {}),
         ...(takesTimeout(name) ? { timeout: { type: "string" as const } } : {}),
-        ...(name === "build" ? { symbols: { type: "boolean" as const } } : {}),
+        ...(name === "build" ? { symbols: { type: "boolean" as const }, release: { type: "boolean" as const } } : {}),
       },
     });
     if (positionals.length) throw new BuildError("Unexpected positional argument", 2);
@@ -803,7 +806,7 @@ export function main(argv = process.argv.slice(2)): number {
     if (name === "doctor") return chromium.doctor() ? 0 : 1;
     if (name === "sync") chromium.sync(jobs);
     if (name === "prepare") chromium.prepare();
-    if (name === "build") chromium.build(jobs, values.symbols === true);
+    if (name === "build") chromium.build(jobs, values.symbols === true, values.release === true);
     if (name === "smoke") chromium.smoke(timeout);
     if (name === "verify") chromium.verify(jobs, timeout);
     if (name === "window-tests") chromium.windowTests(passed);

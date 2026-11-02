@@ -2,6 +2,7 @@
 # See docs/plans/uw-command.md and docs/adr/0016.
 import("//chrome/version.gni")
 import("//third_party/node/node.gni")
+import("//uw/browser/branding/identity.gni")
 
 node("program") {
   script = "//third_party/node/node.py"
@@ -17,6 +18,9 @@ node("program") {
     "--depfile",
     rebase_path(depfile, root_build_dir),
   ]
+  if (uw_dev) {
+    args += [ "--dev" ]
+  }
 }
 
 bundle_data("bundle_data") {

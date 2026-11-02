@@ -26,6 +26,8 @@ const REPOSITORY = "https://github.com/leetdavid/uw";
 export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
 const BRANCH = "origin/main";
 const NETWORK_TIMEOUT = 300_000;
+const LSREGISTER =
+  "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
 
 export interface ReleaseOptions {
   version: string;
@@ -177,7 +179,7 @@ export class Release {
     if (this.capture(["git", "status", "--porcelain"], worktree)) throw new BuildError(`${worktree} has local changes`);
     this.step(["git", "checkout", "--detach", sha], worktree);
     this.step(["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"], worktree);
-    this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols"], worktree);
+    this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols", "--release"], worktree);
     this.step(["node", "scripts/chromium.ts", "smoke"], worktree);
     this.step(["node", "scripts/google-check.ts"], worktree);
     this.step([join(this.tools, "autoninja"), "-C", "out/uw", `-j${jobs}`, "chrome/installer/mac"], this.source);
@@ -193,6 +195,9 @@ export class Release {
     rmSync(directory, { recursive: true, force: true });
     mkdirSync(input, { recursive: true });
     this.step(["cp", "-cR", join(output, "uw.app"), join(output, "uw Packaging"), input], directory);
+    // The unsigned build has the installed uw's app ID. macOS could tie a
+    // permission to it or open links in it, so make macOS forget it.
+    this.step([LSREGISTER, "-u", join(output, "uw.app")], directory);
     const plist = join(app, "Contents/Info.plist");
     for (const [key, type, value] of [
       ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],

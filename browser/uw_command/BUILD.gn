@@ -27,7 +27,10 @@ source_set("uw_command") {
   } else {
     sources += [ "command_socket_stub.cc" ]
   }
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//uw/browser/branding:identity_buildflags",
+  ]
   deps = [
     "//base:i18n",
     "//chrome/browser:browser_process",

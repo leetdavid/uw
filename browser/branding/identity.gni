@@ -1,0 +1,18 @@
+# The installed uw or uw dev. See docs/adr/0028-local-builds-are-uw-dev.md.
+
+declare_args() {
+  # Builds the installed uw: com.uwbrowser.uw, the uw profile folder, the
+  # uw-ai keys, and the uw command. Only `pnpm run release` sets it.
+  uw_release = false
+}
+
+# macOS keys permissions and links on the app's ID, so only the Mac has uw dev.
+uw_dev = is_mac && !uw_release
+
+if (uw_dev) {
+  uw_app_name = "uw dev"
+  uw_profile_folder = "uw-dev"
+} else {
+  uw_app_name = "uw"
+  uw_profile_folder = "uw"
+}

@@ -416,6 +416,17 @@ test("build --symbols keeps the symbols a release sends to Sentry", (t) => {
   assert.throws(() => withSymbols("is_debug = false\n"), /symbol_level = 0/);
 });
 
+test("build --release builds the installed uw, and any other build is uw dev", (t) => {
+  const f = new Fixture(t);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.build(2);
+  f.browser.build(2, true, true);
+  const [dev, release] = f.calls.filter(({ command }) => basename(command[0]!) === "gn")
+    .map(({ command }) => command.find((arg) => arg.startsWith("--args="))!);
+  assert.doesNotMatch(dev!, /uw_release/);
+  assert.match(release!, /^uw_release = true$/m);
+});
+
 test("a Linux host cross-builds Windows uw with the packaged toolchain", (t) => {
   const toolchain = temporary(t);
   writeFileSync(join(toolchain, "abc123.zip"), "packaged toolchain fixture");

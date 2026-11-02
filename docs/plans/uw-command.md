@@ -33,7 +33,7 @@ In v2.2, `uw mcp serve` is the [tool server](#the-tool-server) for outside agent
 ### Reaching uw
 
 - Every command asks the running uw. When uw is not running, the command starts it with no window, as scheduled chats run, and uw keeps running afterwards.
-- uw listens only once the user installs the command. "Install `uw` command" in uw's settings links `/usr/local/bin/uw` to the program inside uw.app, behind macOS's admin prompt, and opens the channel. Uninstall removes the link and closes the channel. Only the user's own account can reach it.
+- uw listens only once the user installs the command. "Install `uw` command" in uw's settings links `/usr/local/bin/uw` to the program inside uw.app, behind macOS's admin prompt, and opens the channel. uw dev links `/usr/local/bin/uw-dev` instead, per [ADR 0028](../adr/0028-local-builds-are-uw-dev.md). Uninstall removes the link and closes the channel. Only the user's own account can reach it.
 - The link points into uw.app, so the command updates with uw. When the running uw is older than the command, such as after an update, the command says "Restart uw to finish its update."
 
 ### Workspaces
@@ -189,7 +189,7 @@ Proposed for the stages after T193. Product code follows [Architecture](../archi
 - `browser/uw_command/`: the channel, a Unix socket in the user data folder that only the user's account can open, served while the command is installed; install and uninstall; and a handler per command over `Connectors`, `ChatIndex`, the agent loop's approvals, and preferences.
 - `command/`: the TypeScript program, a pnpm workspace package using Ink, built into one binary with Node's single executable applications. Chromium's build runs its build script, as for the chat page, and puts the binary in uw.app.
 - uw starts with no window through Chromium's `--no-startup-window`.
-- `UW_USER_DATA_DIR` points the command at another user data folder, such as `uw-dev` during development.
+- `UW_USER_DATA_DIR` points the command at another user data folder. uw dev's command, `uw-dev`, uses `uw-dev` without it.
 
 ## Stages
 
