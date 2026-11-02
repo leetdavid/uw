@@ -42,6 +42,9 @@
 namespace uw {
 namespace {
 
+// Points a build at another list of releases, to test an update.
+constexpr char kFeedSwitch[] = "uw-update-feed";
+
 constexpr char kFeedAsset[] = "uw-windows-update.json";
 constexpr char kSignatureAsset[] = "uw-windows-update.json.sig";
 
@@ -362,7 +365,11 @@ std::optional<UpdateFeed> ReadUpdateFeed(std::string_view feed,
 
 void StartWindowsUpdater() {
   static base::NoDestructor<Updater> updater;
-  GURL releases(BUILDFLAG(UW_UPDATE_FEED_URL));
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
+  GURL releases(command_line.HasSwitch(kFeedSwitch)
+                    ? command_line.GetSwitchValueASCII(kFeedSwitch)
+                    : BUILDFLAG(UW_UPDATE_FEED_URL));
   if (releases.is_valid()) {
     updater->Start(releases);
   }
