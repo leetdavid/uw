@@ -55,7 +55,6 @@
 #if !BUILDFLAG(IS_MAC)
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
-#include "components/keep_alive_registry/keep_alive_registry.h"
 #endif
 
 namespace uw {
@@ -94,8 +93,7 @@ bool InChatBranch(const TabOrganizationController& controller,
 }
 
 #if !BUILDFLAG(IS_MAC)
-// True when closing `window` would quit Chromium: no other window is on
-// screen, and only windows keep uw running.
+// True when no window but `window` is on screen. A minimized window counts.
 bool LastWindowOnScreen(BrowserWindowInterface* window) {
   for (BrowserWindowInterface* other : GetAllBrowserWindowInterfaces()) {
     if (other != window && !other->IsDeleteScheduled() &&
@@ -103,7 +101,7 @@ bool LastWindowOnScreen(BrowserWindowInterface* window) {
       return false;
     }
   }
-  return KeepAliveRegistry::GetInstance()->IsKeepingAliveOnlyByBrowserOrigin();
+  return true;
 }
 #endif
 
