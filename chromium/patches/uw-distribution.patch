@@ -303,6 +303,27 @@ index 544c458..7c8a822 100644
    // Set the flag to restore state after the restart.
    pref_service->SetBoolean(prefs::kRestartLastSessionOnShutdown, true);
    if (ignore_unload_handlers) {
+diff --git a/chrome/browser/metrics/chrome_metrics_services_manager_client.cc b/chrome/browser/metrics/chrome_metrics_services_manager_client.cc
+--- a/chrome/browser/metrics/chrome_metrics_services_manager_client.cc
++++ b/chrome/browser/metrics/chrome_metrics_services_manager_client.cc
+@@ -375,6 +375,10 @@ bool ChromeMetricsServicesManagerClient::IsOffTheRecordSessionActive() {
+ void ChromeMetricsServicesManagerClient::UpdateRunningServices(
+     bool may_record,
+     bool may_upload) {
++  // uw: crash uploads follow the answer to "Help fix uw?", not Chromium's
++  // metrics consent, which is always off in uw. See
++  // uw/browser/problem_reports/problem_reports.h.
++#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   // First, set the registry value so that Crashpad will have the sampling state
+   // now and for subsequent runs. Note that Crashpad uses *both* the registry
+   // value and the value sent from SetUploadConsent below.
+@@ -392,5 +396,6 @@ void ChromeMetricsServicesManagerClient::UpdateRunningServices(
+   // SetUploadConsent() in components/crash/core/app/crashpad.cc for how this
+   // gets used.
+   SetUploadConsent_ExportThunk(may_record && may_upload);
++#endif
+ }
+ #endif  // BUILDFLAG(IS_WIN)
 diff --git a/chrome/browser/metrics/metrics_reporting_state.cc b/chrome/browser/metrics/metrics_reporting_state.cc
 index a69a9dba2b485976ff12aff032b77db221262bb0..9449110425c788f15f9189c9d5b2a8b455aa7ff9 100644
 --- a/chrome/browser/metrics/metrics_reporting_state.cc

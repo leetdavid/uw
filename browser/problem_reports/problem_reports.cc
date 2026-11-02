@@ -16,6 +16,7 @@
 #include "base/uuid.h"
 #include "base/values.h"
 #include "base/version_info/version_info.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/common/chrome_paths.h"
 #include "components/crash/core/app/crashpad.h"
@@ -26,6 +27,10 @@
 #include "third_party/re2/src/re2/re2.h"
 #include "url/gurl.h"
 #include "uw/browser/branding/release_version.h"
+
+#if BUILDFLAG(IS_WIN)
+#include "components/crash/core/app/crash_export_thunks.h"
+#endif
 
 namespace uw {
 namespace {
@@ -164,7 +169,12 @@ void ProblemReports::Answer(bool send) {
                        [](base::FilePath file, ProblemReportsAnswer answer,
                           bool uploads) {
                          WriteProblemReportsAnswer(file, answer);
+#if BUILDFLAG(IS_WIN)
+                         // Crashpad runs in chrome_elf.dll on Windows.
+                         SetUploadConsent_ExportThunk(uploads);
+#else
                          crash_reporter::SetUploadConsent(uploads);
+#endif
                        },
                        file_, answer, sending()));
   observers_.Notify();
