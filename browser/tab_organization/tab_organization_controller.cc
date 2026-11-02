@@ -12,6 +12,7 @@
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/no_destructor.h"
 #include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
@@ -20,6 +21,7 @@
 #include "base/uuid.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
@@ -52,9 +54,8 @@
 #include "uw/browser/terminal/close_guard.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
-#if !BUILDFLAG(IS_MAC)
-#include "chrome/browser/lifetime/application_lifetime.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#if BUILDFLAG(IS_WIN)
+#include "uw/browser/ui/tray/uw_tray.h"
 #endif
 
 namespace uw {
@@ -92,18 +93,15 @@ bool InChatBranch(const TabOrganizationController& controller,
   return false;
 }
 
-#if !BUILDFLAG(IS_MAC)
-// True when no window but `window` is on screen. A minimized window counts.
-bool LastWindowOnScreen(BrowserWindowInterface* window) {
-  for (BrowserWindowInterface* other : GetAllBrowserWindowInterfaces()) {
-    if (other != window && !other->IsDeleteScheduled() &&
-        other->GetWindow()->IsVisible()) {
-      return false;
-    }
-  }
-  return true;
+// True while every window closes so uw can quit, as Exit does. On Windows,
+// Exit does not set browser_shutdown's flag, and a kept window would stay.
+bool closing_all_browsers = false;
+
+void WatchClosingAllBrowsers() {
+  static base::NoDestructor<base::CallbackListSubscription> subscription(
+      chrome::AddClosingAllBrowsersCallback(base::BindRepeating(
+          [](bool closing) { closing_all_browsers = closing; })));
 }
-#endif
 
 }  // namespace
 
@@ -141,6 +139,10 @@ TabOrganizationController::TabOrganizationController(
       tabs_(window->GetTabStripModel()),
       shared_(base::MakeRefCounted<SharedTree>()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
+  WatchClosingAllBrowsers();
+#if BUILDFLAG(IS_WIN)
+  StartTray();
+#endif
   tabs_->AddObserver(this);
   Mirror({});
   active_ = IdFor(tabs_->GetActiveTab());
@@ -563,18 +565,9 @@ bool TabOrganizationController::KeepsWindow(BrowserWindowInterface* window) {
   TabOrganizationController* self = From(window);
   WorkspaceWindow* workspace = WorkspaceWindow::From(window);
   if (!self || !self->joined_ || !workspace ||
-      browser_shutdown::IsTryingToQuit()) {
+      browser_shutdown::IsTryingToQuit() || closing_all_browsers) {
     return false;
   }
-#if !BUILDFLAG(IS_MAC)
-  // Off the Mac a hidden window would leave uw running with nothing on
-  // screen, and Exit does not count as quitting, so uw quits instead.
-  if (LastWindowOnScreen(window)) {
-    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(&chrome::AttemptExit));
-    return true;
-  }
-#endif
   self->CloseUnusedBlank(/*closing=*/true);
   if (self->shared_->windows().size() > 1) {
     self->shared_->HandOver(self);

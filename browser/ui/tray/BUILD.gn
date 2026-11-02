@@ -1,0 +1,21 @@
+# uw's icon in Windows' notification area. uw keeps running with no window on
+# screen, as on the Mac, so the icon opens a window and quits uw. See
+# docs/plans/windows.md.
+source_set("tray") {
+  sources = [ "uw_tray.h" ]
+  if (is_win) {
+    sources += [ "uw_tray_win.cc" ]
+  }
+  deps = [
+    "//base",
+    "//chrome:strings",
+    "//chrome/browser:browser_process",
+    "//chrome/browser/lifetime",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/status_icons",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/win",
+    "//ui/base",
+    "//ui/gfx",
+  ]
+}

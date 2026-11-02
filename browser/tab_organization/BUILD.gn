@@ -51,6 +51,9 @@ source_set("tab_organization") {
     "//uw/browser/terminal:close_guard",
     "//uw/browser/workspaces",
   ]
+  if (is_win) {
+    deps += [ "//uw/browser/ui/tray" ]
+  }
 }
 
 # A page with another page's history and no renderer, as a pin's placeholder

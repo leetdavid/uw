@@ -63,7 +63,7 @@ index 7d8d4c39f798834fd6f7cfa1845f56515c2c338f..bf5637b3aaed5b1ad9fb8127fcd54441
  
  // Start a naming scheme to keep icons in order. A leading X is used to keep
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
-index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd1a01b58d 100644
+index a741f89bf54c65b3b188def7b03270015356debe..05ef9c9d4344867a12454a7abe450f7305186e8a 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
 @@ -294,15 +294,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
@@ -131,6 +131,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
            </message>
          </else>
        </if>
+@@ -515,7 +515,7 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+         </then>
+         <else>
+           <message name="IDS_ABOUT_VERSION_COMPANY_NAME" desc="Company name on the about pages">
+-            The Chromium Authors
++            uw
+           </message>
+           <message name="IDS_ABOUT_VERSION_COPYRIGHT" desc="Copyright information on the about pages">
+             Copyright <ph name="YEAR">{0,date,y}<ex>2016</ex></ph> The Chromium Authors. All rights reserved.
 @@ -552,22 +552,22 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
        </if>
        <if expr="is_win">
@@ -173,12 +182,12 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
          </message>
        </if>
        <!-- General app failure messages -->
-@@ -597,13 +597,13 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+@@ -597,37 +597,37 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
        <!-- Uninstall messages -->
        <if expr="is_win">
          <message name="IDS_UNINSTALL_CLOSE_APP" desc="Message to user when uninstall detects other app instance running">
 -          Please close all Chromium windows and try again.
-+          Please close all uw windows and try again.
++          uw is still running. Choose Exit from uw's icon in the notification area, then try again.
          </message>
          <message name="IDS_UNINSTALL_VERIFY" desc="Message to confirm user wants to uninstall">
 -          Are you sure you want to uninstall Chromium?
@@ -190,7 +199,13 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
          </message>
        </if>
        <!-- Default Browser messages -->
-@@ -615,19 +615,19 @@ New bookmarks can’t be saved in your account until you delete some. If you sig
+       <message name="IDS_FR_CUSTOMIZE_DEFAULT_BROWSER" desc="Default browser checkbox label">
+-        Make Chromium the default browser
++        Make uw the default browser
+       </message>
+       <message name="IDS_DEFAULT_BROWSER_CHANGED_MESSAGE" desc="Body of the notification shown when Chrome is no longer the default browser.">
+-        Chromium is no longer your default browser. Make Chromium the default browser?
++        uw is no longer your default browser. Make uw the default browser?
        </message>
        <if expr="is_win">
          <message name="IDS_DEFAULT_BROWSER_VISUAL_GUIDED_SETTER_PAGE_TITLE" desc="Title of the default browser visual guided setter page.">
@@ -344,6 +359,61 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
          </message>
        </if>
        <if expr="is_macosx">
+@@ -857,14 +857,14 @@ Chromium is unable to recover your settings.
+       </if>
+ 
+       <message name="IDS_DEFAULT_BROWSER_INFOBAR_TEXT" desc="Text to show in an infobar when Chromium is not the current default browser.">
+-        Chromium isn't your default browser
++        uw isn't your default browser
+       </message>
+       <message name="IDS_DEFAULT_BROWSER_PIN_INFOBAR_TEXT" desc="Text to show in an infobar when Chromium is not the current default browser and can be pinned to the taskbar.">
+-        Set Chromium as your default browser and pin it to your taskbar
++        Set uw as your default browser and pin it to your taskbar
+       </message>
+       <if expr="not is_android and not is_chromeos">
+         <message name="IDS_DEFAULT_BROWSER_MODAL_TITLE_WITH_SETTINGS_ILLUSTRATION" desc="Title of the default browser modal with settings illustration.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_MODAL_BODY_WITH_SETTINGS_ILLUSTRATION" desc="Body text of the default browser modal with settings illustration.">
+           Keep your passwords, bookmarks, and history perfectly synced across devices. Easily access the features you know and love by updating your default browser to Chromium.
+@@ -873,7 +873,7 @@ Chromium is unable to recover your settings.
+           Keep your passwords, bookmarks, and history perfectly synced across devices. Easily access the features you know and love by updating your default browser to Chromium. Chromium will be pinned to your taskbar for quick access.
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_MODAL_TITLE_WITHOUT_SETTINGS_ILLUSTRATION" desc="Title of the default browser modal without settings illustration.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_MODAL_BODY_WITHOUT_SETTINGS_ILLUSTRATION" desc="Body text of the default browser modal without settings illustration.">
+           Keep your passwords, bookmarks, and history perfectly synced across devices. Easily access the features you know and love by updating your default browser to Chromium.
+@@ -882,7 +882,7 @@ Chromium is unable to recover your settings.
+           Keep your passwords, bookmarks, and history perfectly synced across devices. Easily access the features you know and love by updating your default browser to Chromium. Chromium will be pinned to your taskbar for quick access.
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_BUBBLE_DIALOG_TITLE" desc="Title of the dialog prompting the user to set Chromium as the default browser.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_DEFAULT_BROWSER_BUBBLE_DIALOG_BODY" desc="Main explanatory text in the default browser dialog.">
+           Get easy access to the features you know, love, and trust by setting Chromium as your default browser.
+@@ -1123,15 +1123,15 @@ Chromium is unable to recover your settings.
+ 
+       <!-- Main Chrome menu -->
+       <message name="IDS_APPMENU_TOOLTIP" desc="The tooltip to show for the browser menu">
+-        Customize and control Chromium
++        Customize and control uw
+       </message>
+ 
+       <message name="IDS_APPMENU_TOOLTIP_UPDATE_AVAILABLE" desc="The tooltip to show for the browser menu when an update is available">
+-        Customize and control Chromium. Update is available.
++        Customize and control uw. Update is available.
+       </message>
+ 
+       <message name="IDS_APPMENU_TOOLTIP_ALERT" desc="The tooltip to show for the browser menu when a non-update alert is displayed">
+-        Customize and control Chromium. Something needs your attention - click for details.
++        Customize and control uw. Something needs your attention - click for details.
+       </message>
+ 
+       <message name="IDS_OPEN_IN_CHROME" desc="The text label of the Open in Chrome menu item for the Hosted App app menu">
 @@ -1147,7 +1147,7 @@ Chromium is unable to recover your settings.
            </then>
            <else>
@@ -368,6 +438,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
          </message>
        </if>
        <if expr="is_chromeos">
+@@ -1250,7 +1250,7 @@ Chromium is unable to recover your settings.
+         Continue where you left off: Chromium restored your tabs from your last session. You can turn this off in
+       </message>
+       <message name="IDS_SESSION_RESTORE_TURN_OFF_RESTORE_FROM_RESTART" desc="Message that appears in the session restore infobar when the user has restored their tabs multiple times.">
+-        Continue where you left off: Chromium restores your tabs every time you restart. To turn this off, go to
++        Continue where you left off: uw restores your tabs every time you restart. To turn this off, go to
+       </message>
+       <message name="IDS_SESSION_RESTORE_TURN_ON" desc="Message that appears in the session restore infobar to get the user to opt-in into session restore.">
+         Continue where you left off: Chromium can restore your tabs every time you restart. To turn this on, go to
 @@ -1343,7 +1343,7 @@ Chromium is unable to recover your settings.
          </then>
          <else>
@@ -386,6 +465,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
        </message>
        <if expr="not use_titlecase">
          <message name="IDS_PROFILE_MENU_SIGN_OUT_WHEN_SIGNIN_PENDING" desc="The text label of the Sign out of Chromium button in the Profile Menu when the user is in sign in pending state.">
+@@ -1684,7 +1684,7 @@ Chromium is unable to recover your settings.
+       <!-- Mac First-run dialog messages -->
+       <if expr="is_macosx">
+         <message name="IDS_FIRSTRUN_DLG_MAC_SET_DEFAULT_BROWSER_LABEL" desc="Label for checkbox that sets the default browser">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+       </if>
+ 
 @@ -1762,7 +1762,7 @@ Chromium is unable to recover your settings.
        <!-- Windows firewall rule strings. -->
        <if expr="is_win">
@@ -422,6 +510,31 @@ index a741f89bf54c65b3b188def7b03270015356debe..44b65d658a45a3d2b38babd54db2a4dd
          </message>
        </if>
        <!-- Relaunch notification bubble and dialog. -->
+@@ -2639,7 +2639,7 @@ Chromium is unable to recover your settings.
+ 
+         <!-- Default Browser Promo -->
+         <message name="IDS_FRE_DEFAULT_BROWSER_TITLE" desc="Title for the page that prompts user to set Chromium as their default browser in the first run experience.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+         <message name="IDS_FRE_DEFAULT_BROWSER_AND_PINNING_TITLE" desc="Title for the page that prompts user to set Chromium as their default browser and pin to taskbar in the first run experience.">
+           Use Chromium by default and get it pinned
+@@ -2654,13 +2654,13 @@ Chromium is unable to recover your settings.
+           Chromium logo inside a computer screen.
+         </message>
+         <message name="IDS_APP_MENU_TOOLTIP_DEFAULT_PROMPT" desc="The tooltip to show for the browser menu when the default browser prompt is displayed">
+-          Customize and control Chromium. Set Chromium as your default.
++          Customize and control uw. Set uw as your default.
+         </message>
+         <message name="IDS_APP_MENU_BUTTON_DEFAULT_PROMPT" desc="Text in the browser menu chip indicating that the user can change their default browser">
+           Set Chromium as your default
+         </message>
+         <message name="IDS_SET_BROWSER_AS_DEFAULT_MENU_ITEM" desc="Menu item that prompts user to set Chromium as their default browser.">
+-          Set Chromium as your default browser
++          Set uw as your default browser
+         </message>
+ 
+         <!-- Default Browser Promo Refresh -->
 @@ -2756,16 +2756,16 @@ Chromium is unable to recover your settings.
        <!--Launch On Startup-->
        <if expr="is_win">
@@ -697,6 +810,38 @@ index 920109c69cea5b2ae48a75ce07570ed72b55348b..4d1d1670ffafe2fbfd8108d8060c1f82
  #endif    // English (U.S.) resources
  /////////////////////////////////////////////////////////////////////////////
  
+diff --git a/chrome/installer/setup/uninstall.cc b/chrome/installer/setup/uninstall.cc
+index a9ed8fb8c014c658019d3fa9cb73e52a643d1343..8476c199c2da28ef3e5c77dc34f373831228e0b2 100644
+--- a/chrome/installer/setup/uninstall.cc
++++ b/chrome/installer/setup/uninstall.cc
+@@ -719,7 +719,8 @@ bool DeleteChromeRegistrationKeys(const InstallerState& installer_state,
+ 
+   std::wstring app_path_key(ShellUtil::kAppPathsRegistryKey);
+   app_path_key.push_back(base::FilePath::kSeparators[0]);
+-  app_path_key.append(installer::kChromeExe);
++  // uw: its App Paths entry is uw.exe; see GetChromeAppRegistrationEntries.
++  app_path_key.append(L"uw.exe");
+   DeleteRegistryKey(root, app_path_key, WorkItem::kWow64Default);
+ 
+   // Cleanup OpenWithList and OpenWithProgids:
+diff --git a/chrome/installer/util/shell_util.cc b/chrome/installer/util/shell_util.cc
+index fabd1fbc1e162d20081d896d26b339179f5e302c..b2d5a88f102a0ef152119f0fda1889977e1a6579 100644
+--- a/chrome/installer/util/shell_util.cc
++++ b/chrome/installer/util/shell_util.cc
+@@ -447,9 +447,10 @@ void GetChromeAppRegistrationEntries(
+     const base::FilePath& chrome_exe,
+     const std::wstring& suffix,
+     std::vector<std::unique_ptr<RegistryEntry>>* entries) {
+-  std::wstring app_path_key =
+-      base::StrCat({ShellUtil::kAppPathsRegistryKey, kFilePathSeparator,
+-                    chrome_exe.BaseName().value()});
++  // uw: listed as uw.exe, though the program is chrome.exe, so Run's
++  // "chrome" still finds an installed Google Chrome, and "uw" finds uw.
++  std::wstring app_path_key = base::StrCat(
++      {ShellUtil::kAppPathsRegistryKey, kFilePathSeparator, L"uw.exe"});
+   entries->push_back(
+       std::make_unique<RegistryEntry>(app_path_key, chrome_exe.value()));
+   entries->push_back(std::make_unique<RegistryEntry>(
 diff --git a/components/components_chromium_strings.grd b/components/components_chromium_strings.grd
 index 154a93064247c70fbcb1c3096005f58050aaf87c..7e85f3f86eea0c8b6e6d0351dc8c5da8afbfc961 100644
 --- a/components/components_chromium_strings.grd
