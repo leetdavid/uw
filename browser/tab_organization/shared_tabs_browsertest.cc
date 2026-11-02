@@ -28,11 +28,13 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
+#include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -72,9 +74,11 @@
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/run_window.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -255,6 +259,23 @@ std::string Layouts(const std::vector<Browser*>& windows) {
     }
   }
   return text;
+}
+
+// The items after New Task or New Window in the submenu that `command` opens
+// in `menu`, or none without that submenu.
+std::vector<std::u16string> ItemsOf(ui::SimpleMenuModel& menu, int command) {
+  std::vector<std::u16string> items;
+  const std::optional<size_t> row = menu.GetIndexOfCommandId(command);
+  if (!row) {
+    return items;
+  }
+  ui::MenuModel* submenu = menu.GetSubmenuModelAt(*row);
+  for (size_t i = 1; i < submenu->GetItemCount(); ++i) {
+    if (submenu->GetTypeAt(i) == ui::MenuModel::TYPE_COMMAND) {
+      items.push_back(submenu->GetLabelAt(i));
+    }
+  }
+  return items;
 }
 
 // A tab search page that only listens.
@@ -863,6 +884,90 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, TabListsShowEachPageOnce) {
   }
   EXPECT_EQ(searched[kMail], 1);
   EXPECT_EQ(searched[kIssues], 1);
+}
+
+// Move to Task lists each task once, however many windows show it, and the
+// tab moves within its own window.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, MoveToTaskListsEachTaskOnce) {
+  Browser* first = browser();
+  Open(first, kMail);
+  Open(first, kIssues);
+  Open(first, kIssue);
+  TabOrganizationController* organizer = ControllerOf(first);
+  ASSERT_TRUE(organizer->MoveToNewTask({*organizer->IdFor(TabAt(first, kMail))},
+                                       u"Trip"));
+  ASSERT_TRUE(organizer->MoveToNewTask(
+      {*organizer->IdFor(TabAt(first, kIssues))}, u"Bugs"));
+  Browser* second = CreateBrowser(first->GetProfile());
+  Browser* third = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return InStep(first, second) && InStep(first, third); }));
+
+  TabStripModel* tabs = second->tab_strip_model();
+  TabMenuModel menu(nullptr, second->GetFeatures().tab_menu_model_delegate(),
+                    tabs, tabs->GetIndexOfTab(TabAt(second, kIssue)));
+  EXPECT_THAT(ItemsOf(menu, TabStripModel::CommandAddToExistingGroup),
+              testing::UnorderedElementsAre(u"Trip", u"Bugs"));
+  TabMenuModel in_trip(
+      nullptr, third->GetFeatures().tab_menu_model_delegate(),
+      third->tab_strip_model(),
+      third->tab_strip_model()->GetIndexOfTab(TabAt(third, kMail)));
+  EXPECT_THAT(ItemsOf(in_trip, TabStripModel::CommandAddToExistingGroup),
+              testing::ElementsAre(u"Bugs"));
+
+  ui::MenuModel* tasks = menu.GetSubmenuModelAt(
+      *menu.GetIndexOfCommandId(TabStripModel::CommandAddToExistingGroup));
+  for (size_t i = 0; i < tasks->GetItemCount(); ++i) {
+    if (tasks->GetLabelAt(i) == u"Bugs") {
+      tasks->ActivatedAt(i);
+    }
+  }
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return InStep(first, second) && InStep(first, third) &&
+           TabAt(second, kIssue)->GetGroup() ==
+               TabAt(second, kIssues)->GetGroup();
+  }));
+  for (Browser* window : {first, second, third}) {
+    EXPECT_EQ(Count(window, kIssue), 1);
+  }
+}
+
+// Move Tab to Another Window lists only windows on screen, not a
+// workspace's hidden window or the run window.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       MoveToAnotherWindowListsOnlyShownWindows) {
+  Browser* first = browser();
+  tabs::TabInterface* mail = Open(first, kMail);
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal =
+      list.Add("Personal", std::string(list.UnusedIcon()),
+               first->GetProfile()->GetBaseName());
+  BrowserWindowInterface* partner = nullptr;
+  WorkspaceWindow::From(first)->WithPartner(
+      personal,
+      base::BindOnce([](BrowserWindowInterface** partner,
+                        BrowserWindowInterface* opened) { *partner = opened; },
+                     &partner));
+  ASSERT_TRUE(base::test::RunUntil([&] { return partner; }));
+  ASSERT_TRUE(WorkspaceWindow::IsHidden(partner));
+  ASSERT_TRUE(OpenRunTab(first->GetProfile()));
+
+  TabStripModel* tabs = first->tab_strip_model();
+  {
+    TabMenuModel menu(nullptr, first->GetFeatures().tab_menu_model_delegate(),
+                      tabs, tabs->GetIndexOfTab(mail));
+    EXPECT_FALSE(
+        menu.GetIndexOfCommandId(TabStripModel::CommandMoveToExistingWindow));
+    EXPECT_TRUE(
+        menu.GetIndexOfCommandId(TabStripModel::CommandMoveTabsToNewWindow));
+  }
+
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  TabMenuModel menu(nullptr, first->GetFeatures().tab_menu_model_delegate(),
+                    tabs, tabs->GetIndexOfTab(mail));
+  EXPECT_EQ(ItemsOf(menu, TabStripModel::CommandMoveToExistingWindow).size(),
+            1u);
 }
 
 // A task folded in one window folds in the other, where the selected tab

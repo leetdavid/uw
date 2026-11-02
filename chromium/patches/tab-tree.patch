@@ -1841,10 +1841,18 @@ index fd63fdec82640fdb42de8388dfd691900f706674..de6d2b8a3a374b430515b061dd7fe4fd
        [content_view addSubview:background_view_
                      positioned:NSWindowBelow
 diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
-index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..00d347983ef842fec5873c33b8e4123b0e8f4531 100644
+index 2e07ee15fe90a3c679d23664ebd02ba22c314f6a..761a7875b8ea86cef193148265d58dd0af3393d7 100644
 --- a/chrome/browser/ui/tabs/BUILD.gn
 +++ b/chrome/browser/ui/tabs/BUILD.gn
-@@ -320,6 +320,8 @@ if (!is_android) {
+@@ -272,6 +272,7 @@ if (!is_android) {
+       "//components/saved_tab_groups/public",
+       "//components/tab_groups",
+       "//components/tabs:impl",
++      "//uw/browser/tab_organization",
+     ]
+ 
+     if (is_chromeos) {
+@@ -320,6 +321,8 @@ if (!is_android) {
      ]
  
      deps = [
@@ -2606,3 +2614,42 @@ index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..298dda3bf2ba719e3a14fa1fd23b10e6
        } else if (auto start_it = start_view_layout_map_.find(child_view);
                   start_it != start_view_layout_map_.end()) {
          // Moved child.
+diff --git a/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc b/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
+index a6171fc347019e8650936b878e9d8827b05bbd0d..55aae3b364b2f9c7539d26360fa660205bc0924e 100644
+--- a/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
++++ b/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
+@@ -44,6 +44,7 @@
+ #include "ui/gfx/image/image_skia.h"
+ #include "ui/gfx/paint_vector_icon.h"
+ #include "ui/gfx/text_elider.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+ constexpr int kIconSize = 14;
+@@ -75,9 +76,13 @@ ExistingTabGroupSubMenuModel::ExistingTabGroupSubMenuModel(
+   }
+ 
+   // For each window, append the tab groups to the end of the menu items.
++  // uw: windows on one workspace show the same tasks, so each is listed once.
+   if (tab_menu_model_delegate_) {
+     for (BrowserWindowInterface* browser :
+-         tab_menu_model_delegate_->GetOtherBrowserWindows(/*is_app=*/false)) {
++         uw::TabOrganizationController::WindowsWithOtherTasks(
++             model->delegate()->GetBrowserWindowInterface(),
++             tab_menu_model_delegate_->GetOtherBrowserWindows(
++                 /*is_app=*/false))) {
+       if (browser->GetFeatures().tab_strip_model() == model) {
+         continue;
+       }
+@@ -186,7 +191,10 @@ bool ExistingTabGroupSubMenuModel::ShouldShowSubmenu(
+   // Look at tab groups in all other windows
+   if (tab_menu_model_delegate) {
+     for (BrowserWindowInterface* browser :
+-         tab_menu_model_delegate->GetOtherBrowserWindows(/*is_app=*/false)) {
++         uw::TabOrganizationController::WindowsWithOtherTasks(
++             model->delegate()->GetBrowserWindowInterface(),
++             tab_menu_model_delegate->GetOtherBrowserWindows(
++                 /*is_app=*/false))) {
+       TabGroupModel* browser_group_model =
+           browser->GetFeatures().tab_strip_model()->group_model();
+       if (!browser_group_model) {

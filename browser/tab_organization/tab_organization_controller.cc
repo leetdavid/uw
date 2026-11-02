@@ -1221,6 +1221,26 @@ bool TabOrganizationController::IsListedElsewhere(tabs::TabInterface* tab) {
          self->shared_->windows().front() != self;
 }
 
+// static
+std::vector<BrowserWindowInterface*>
+TabOrganizationController::WindowsWithOtherTasks(
+    BrowserWindowInterface* window,
+    const std::vector<BrowserWindowInterface*>& windows) {
+  const auto tree = [](BrowserWindowInterface* each) -> const SharedTree* {
+    const TabOrganizationController* self = From(each);
+    return self ? self->shared_.get() : nullptr;
+  };
+  std::set<const SharedTree*> listed = {tree(window)};
+  std::vector<BrowserWindowInterface*> others;
+  for (BrowserWindowInterface* each : windows) {
+    const SharedTree* shared = tree(each);
+    if (!shared || listed.insert(shared).second) {
+      others.push_back(each);
+    }
+  }
+  return others;
+}
+
 bool TabOrganizationController::CollapsesBranches(
     const std::vector<PageId>& ids) const {
   const std::vector<PageId> parents = Parents(ids);

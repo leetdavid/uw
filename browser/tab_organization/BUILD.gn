@@ -130,6 +130,7 @@ source_set("browser_tests") {
     "//ui/views:test_support",
     "//url",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/agent:run_window",
     "//uw/browser/ai_providers",
     "//uw/browser/ai_providers:test_support",
     "//uw/browser/terminal",

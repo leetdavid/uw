@@ -296,6 +296,12 @@ class TabOrganizationController : public TabStripModelObserver,
   // another tab already stands for its page: the page's live page in another
   // window, or, when no window holds it, the first window's copy.
   static bool IsListedElsewhere(tabs::TabInterface* tab);
+  // `windows` without each window that shows the tasks of `window` or of a
+  // window before it, as windows on one workspace do, so lists of tasks, such
+  // as Move to Task, show each task once.
+  static std::vector<BrowserWindowInterface*> WindowsWithOtherTasks(
+      BrowserWindowInterface* window,
+      const std::vector<BrowserWindowInterface*>& windows);
   // Moves the live page of the copy `tab` holds into it.
   void BringLivePage(tabs::TabInterface* tab);
   // The picture of the copy `tab` holds, as its page last left a window, for

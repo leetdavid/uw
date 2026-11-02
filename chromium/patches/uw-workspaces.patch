@@ -240,3 +240,44 @@ index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..63dc69aeb315b259e3b82feaaebc58e0
    }
  
    // Only manage the overflow button when there are at least some views
+diff --git a/chrome/browser/ui/browser_tab_menu_model_delegate.cc b/chrome/browser/ui/browser_tab_menu_model_delegate.cc
+index 365d04b927874d92019ccc47b8a9ca7944645411..5031d08144c75154cb1a42ef5503fdd73a93a351 100644
+--- a/chrome/browser/ui/browser_tab_menu_model_delegate.cc
++++ b/chrome/browser/ui/browser_tab_menu_model_delegate.cc
+@@ -10,6 +10,8 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
++#include "uw/browser/agent/run_window_mark.h"
++#include "uw/browser/workspaces/workspace_window.h"
+ 
+ namespace chrome {
+ 
+@@ -31,6 +33,12 @@ BrowserTabMenuModelDelegate::GetOtherBrowserWindows(bool is_app) {
+ 
+   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+       [&](BrowserWindowInterface* browser) {
++        // uw: a workspace's hidden window and the run window are never on
++        // screen, so no menu offers them.
++        if (uw::WorkspaceWindow::IsHidden(browser) ||
++            uw::IsRunWindow(browser)) {
++          return true;
++        }
+         // We can only move into a tabbed view of the same profile, and not the
+         // same window we're currently in.
+         if (browser->GetSessionID() != session_id_ &&
+diff --git a/chrome/browser/ui/tabs/tab_menu_model.cc b/chrome/browser/ui/tabs/tab_menu_model.cc
+index 85b8f3eb6302b20fdff79970c96f56e4b0c20364..a9a130e23d342f4d1cb59afab371415e613edbc7 100644
+--- a/chrome/browser/ui/tabs/tab_menu_model.cc
++++ b/chrome/browser/ui/tabs/tab_menu_model.cc
+@@ -380,7 +380,9 @@ void TabMenuModel::Build(int index) {
+     }
+   }
+ 
+-  if (ExistingWindowSubMenuModel::ShouldShowSubmenu(tab_strip_->profile())) {
++  // uw: windows never on screen do not count, as the submenu leaves them out.
++  if (!tab_menu_model_delegate_->GetOtherBrowserWindows(/*is_app=*/false)
++           .empty()) {
+     // Create submenu with existing windows
+     add_to_existing_window_submenu_ = ExistingWindowSubMenuModel::Create(
+         delegate(), tab_menu_model_delegate_, tab_strip_, index);
