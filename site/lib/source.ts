@@ -3,6 +3,7 @@ import { llms, loader } from "fumadocs-core/source";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { defineDocs } from "fumadocs-mdx/macro";
 import type { ReactNode } from "react";
+import { remarkFigureCaptions } from "./figure-captions";
 import { helpRoute } from "./shared";
 
 const help = defineDocs({
@@ -13,6 +14,7 @@ const help = defineDocs({
     mdxOptions: async (environment) => {
       const { applyMdxPreset } = await import("fumadocs-mdx/config");
       return applyMdxPreset({
+        remarkPlugins: [remarkFigureCaptions],
         rehypeCodeOptions: {
           themes: { light: "github-dark-default", dark: "github-dark-default" },
         },

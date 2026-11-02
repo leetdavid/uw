@@ -3,6 +3,25 @@ title: Tasks
 description: Keep the tabs of one piece of work together. Each task is a folder in the sidebar, and tabs outside every task sit in the Scratchpad.
 ---
 
+<Figure caption="Two tasks, each a folder of tabs, and the Scratchpad at the foot of the sidebar.">
+  <Window>
+    <Sidebar>
+      <Task name="Plan Lisbon trip" color="blue">
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+        <TabRow selected>Stayaway, Alfama flat</TabRow>
+      </Task>
+      <Task name="Fix the bike" color="green">
+        <TabRow>Cadence, bike shop</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow>Bite, Lisbon food guide</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="stayaway.com/alfama/flat-12" />
+  </Window>
+</Figure>
+
 ## Start *a task*
 
 1. Right-click a tab and choose **Move to New Task**. The tab, and the tabs it opened, move into a new task named "New task", after your other tasks.
@@ -31,6 +50,29 @@ Click **⋮** on the task's row, or right-click the row. The menu has:
 - **New Tab in Task** and **Move Task to New Window**.
 - **Move Tabs to Scratchpad**, which ends the task and keeps its tabs open.
 - **Close Task**, which closes the task and its tabs.
+
+<Figure caption="A task's menu, opened from ⋮ on its row.">
+  <Window height={380}>
+    <Sidebar>
+      <Task name="Plan Lisbon trip" color="blue" menu>
+        <TabRow>Flights from SFO to Lisbon</TabRow>
+        <TabRow selected>Stayaway, Alfama flat</TabRow>
+      </Task>
+    </Sidebar>
+    <Page address="stayaway.com/alfama/flat-12" />
+    <Menu top={84} left={14}>
+      <MenuItem icon="rename">Rename Task</MenuItem>
+      <MenuItem icon="name">Name Task</MenuItem>
+      <MenuColors current="blue" />
+      <MenuLine />
+      <MenuItem icon="new-tab">New Tab in Task</MenuItem>
+      <MenuItem icon="new-window">Move Task to New Window</MenuItem>
+      <MenuLine />
+      <MenuItem icon="scratchpad">Move Tabs to Scratchpad</MenuItem>
+      <MenuItem icon="close" keys="Ctrl+Cmd+W">Close Task</MenuItem>
+    </Menu>
+  </Window>
+</Figure>
 
 The arrow keys move between rows, <kbd>Return</kbd> runs one, and <kbd>Esc</kbd> closes the menu.
 

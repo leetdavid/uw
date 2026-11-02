@@ -115,7 +115,7 @@ Where the build differs from the design:
 
 - The Open in menu is Fumadocs' own: GitHub, View as Markdown, ChatGPT, and Claude, plus Scira AI and Cursor.
 - Search is Fumadocs' dialog in Help's colors, without the key hints at its foot.
-- No page has a figure yet, so nothing zooms. Fumadocs zooms images; a drawn figure would need its own zoom. See [Open questions](#open-questions).
+- Figures, T302: `site/components/kit.tsx` and `kit.css` hold the UI kit, registered for MDX in `components/mdx.tsx`. `lib/figure-captions.ts` makes a page's Markdown copy and its search records show each `<Figure>` as `*Figure: <caption>*`. The `tasks` page has the first two figures. Nothing zooms, per [Figures](#figures).
 - No page needs the version pill yet, so it isn't built.
 - The agent tile on the Help home lists `llms.txt` and `llms-full.txt`; the MCP address joins it with T233. Ask uw joins the pages with T242.
 - "Was this helpful?" does not remember an answer after the page reloads.
