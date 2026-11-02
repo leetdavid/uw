@@ -325,6 +325,14 @@ _Avoid_: Verified, official, featured.
 uw's how-to pages for the people who use it, published at uwbrowser.com/help. They describe only what is built. uw's agent reads them through the uw Help connector, which comes with uw and can be turned off but not removed.
 _Avoid_: Docs, documentation, user guide, manual, design docs.
 
+**Help figure**:
+A drawing of part of uw on a Help page, made from the UI kit, with a caption. It shows uw's layout and the labels the page talks about, not every detail.
+_Avoid_: Frame, screenshot, mockup.
+
+**UI kit**:
+The parts Help figures are drawn from: a simplified uw window, sidebar, page, pop-up cards, command bar, chat, and terminal, in Help's own font and colors.
+_Avoid_: Design system, component library.
+
 **Plugin**:
 A package a service publishes that adds its connector, its skills, or both to uw in one step.
 _Avoid_: App, extension, integration.

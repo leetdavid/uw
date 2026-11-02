@@ -48,7 +48,7 @@ The kanban is the [ticket board](docs/plans/roadmap.md#board) in the roadmap. Ke
 
 - Set a ticket to `in progress` when work starts, `in review` when the change is ready to verify, and `done` once it is verified.
 - Update the status in the same change as the work it describes.
-- A change that adds or changes something users see updates its [Help](docs/plans/help.md) page in `site/content/help/` in the same commit. A ticket is not `done` until it has.
+- A change that adds or changes something users see updates its [Help](docs/plans/help.md) page in `site/content/help/` in the same commit, and any [Help figure](docs/plans/help.md#figures) whose layout or labels it changes. A ticket is not `done` until it has.
 
 ## Commits
 

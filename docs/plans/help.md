@@ -20,11 +20,27 @@ On 2026-10-28 the user asked for published docs that uw's agent can look up, as 
 - English only. There is one version, for the latest release. Pages don't say which version a feature arrived in: older releases aren't supported for now. Changed on 2026-10-31 at the user's request: before, a page noted the version for a feature later than 0.1.0.
 - The first pages come from the "What works now" sections of [Try the current build](../try-uw.md), reworded for someone using a release instead of a dev build. Then `try-uw.md` is deleted: "Start uw" moves to the README's [Using your local build](../../README.md#using-your-local-build), and its links point to Help.
 - The pages look like the rest of the site.
-- From Fumadocs, a page has headings with links, code blocks with a title and a copy button, info and warning callouts, tables, tabs, steps, and figures that zoom when clicked. Search lists chosen pages before anything is typed. A narrow screen gets Fumadocs' top bar, a sidebar that slides out, and "On this page" as a dropdown.
+- From Fumadocs, a page has headings with links, code blocks with a title and a copy button, info and warning callouts, tables, tabs, and steps. Search lists chosen pages before anything is typed. A narrow screen gets Fumadocs' top bar, a sidebar that slides out, and "On this page" as a dropdown.
 - uw's own parts: key caps such as Cmd S, and the version pill.
 - Light or dark follows macOS. A switch in the sidebar picks light, dark, or the Mac's setting. The rest of uwbrowser.com stays light for now.
 - Beside "On this page": Copy as Markdown, a menu that opens the page in ChatGPT or Claude and links to its source on GitHub, and [Ask uw about this page](#ask-in-uw). There is no "Edit on GitHub", since the repo takes no pull requests.
 - Each page ends with "Was this helpful?": Yes or No, and an optional note. The answer, the note, and the page's address go to PostHog as one event. The box says that the note goes to uw's team.
+
+### Figures
+
+Agreed on 2026-11-02, at the user's request, after Factory's docs: Help pages show uw with [Help figures](../CONTEXT.md#language), drawn from a UI kit instead of screenshots.
+
+- The UI kit is an abstraction of uw, not a copy of its real UI. It keeps uw's layout and the labels and buttons a page talks about, in Help's own font and colors. Lists show a few rows, sites get letter tiles instead of favicons, and there is no glass or fine detail.
+- Its parts: the window with its traffic lights, the sidebar with tasks, tabs, the Scratchpad, and notices, the page card, pop-up cards such as the Inbox, menus, and the schedule card, the command bar, the chat page's parts, and a terminal window.
+- A figure is drawn at a size that reads well beside the text, cropped to what the page is about. It shows the window's edge where the window's top is in view. Nothing zooms.
+- A figure is light or dark as Help is.
+- Rows and buttons respond to the pointer as uw's do. A click does nothing.
+- Each figure has a short caption under it. A page's Markdown copy, which `llms.txt` and uw's agent read, shows the caption where the figure is.
+- Every page that shows uw gets figures: all but Install uw, Privacy, Report a problem, and Claude Code and other agents.
+- The home page keeps its own sidebar drawing, `site/app/sidebar.tsx`.
+- A change that alters a figure's layout or labels updates the figure in the same commit, per AGENTS.md.
+
+Implementability: the kit and the first figure are 7/10. Figures on every page are 5/10: about 21 pages to draw, and each needs care to stay current.
 
 ### The MCP route
 
@@ -122,6 +138,8 @@ Each stage is a ticket on the [board](roadmap.md#board).
 6. T235: Help → uw Help.
 7. T236: Help in `uw mcp serve`. Needs T197.
 8. T242: Ask in uw: uw catches `uwbrowser.com/ask`, the chat opens with the text in its composer, and the site's `/ask` page. Needs T232.
+9. T302: the UI kit and the Tasks page's figure, signed off by the user in light and dark.
+10. T303: figures on every other page that shows uw. Needs T302.
 
 ## Acceptance checks
 
@@ -139,6 +157,5 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Open questions
 
-- How figures are made. Proposed: draw them in MDX with the site's demo sidebar component, `site/app/sidebar.tsx`, as the T231 figure does, instead of screenshots of uw.
 - Whether a chat opened by Ask in uw says where its text came from. Proposed: a line above the composer, "A link typed this in. Read it, then press Send.", as "Help: Ask uw and search" shows.
 - Whether `try-uw.md` goes once Help is live, as agreed, or stays as the dev build's list of manual tests beside Help. Other sessions still add to it.
