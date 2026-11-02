@@ -78,6 +78,54 @@ index fd615c86084730bee69c4db74e4ea52c02397e72..c2746392b7617f9852e601d476ef5a24
  bool ChromeCrashReporterClient::ShouldMonitorCrashHandlerExpensively() {
    // This mechanism dedicates a process to be crashpad_handler's own
    // crashpad_handler. In Google Chrome, scale back on this in the more stable
+diff --git a/chrome/app/chrome_crash_reporter_client_win.cc b/chrome/app/chrome_crash_reporter_client_win.cc
+--- a/chrome/app/chrome_crash_reporter_client_win.cc
++++ b/chrome/app/chrome_crash_reporter_client_win.cc
+@@ -25,6 +25,8 @@
+ #include "chrome/install_static/user_data_dir.h"
+ #include "components/crash/core/app/crashpad.h"
+ #include "components/version_info/channel.h"
++#include "uw/browser/branding/release_buildflags.h"  // nogncheck
++#include "uw/browser/problem_reports/answer_file.h"  // nogncheck
+ 
+ ChromeCrashReporterClient::ChromeCrashReporterClient() = default;
+ 
+@@ -142,7 +144,20 @@ bool ChromeCrashReporterClient::IsRunningUnattended() {
+ }
+ 
+ bool ChromeCrashReporterClient::GetCollectStatsConsent() {
+-  return install_static::GetCollectStatsConsent();
++  // uw: a release asks "Help fix uw?" and sends crash reports after a Yes,
++  // which uw keeps in a file in the crash dumps folder.
++  std::wstring crash_dir;
++  if (GetUploadUrl().empty() || !GetCrashDumpLocation(&crash_dir)) {
++    return false;
++  }
++  std::optional<uw::ProblemReportsAnswer> answer =
++      uw::ReadProblemReportsAnswer(
++          uw::ProblemReportsAnswerFile(base::FilePath(crash_dir)));
++  return answer && answer->send;
++}
++
++std::string ChromeCrashReporterClient::GetUploadUrl() {
++  return BUILDFLAG(UW_CRASH_REPORT_URL);
+ }
+ 
+ bool ChromeCrashReporterClient::GetCollectStatsInSample() {
+diff --git a/chrome/app/chrome_crash_reporter_client_win.h b/chrome/app/chrome_crash_reporter_client_win.h
+--- a/chrome/app/chrome_crash_reporter_client_win.h
++++ b/chrome/app/chrome_crash_reporter_client_win.h
+@@ -39,6 +39,10 @@ class ChromeCrashReporterClient : public crash_reporter::CrashReporterClient {
+ 
+   bool GetCollectStatsConsent() override;
+ 
++  // uw: a release sends crash dumps to Sentry. See
++  // uw/browser/problem_reports/release_keys.h.
++  std::string GetUploadUrl() override;
++
+   bool GetCollectStatsInSample() override;
+ 
+   bool ReportingIsEnforcedByPolicy(bool* breakpad_enabled) override;
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
 index 1a7e62d3420e38d0659d526f3370be4120f642dd..cc6cd66c5a0a4b5f944da9df75698e45482ff73e 100644
 --- a/chrome/app/generated_resources.grd
@@ -193,6 +241,27 @@ index 4e62771..1d89df5 100644
    }
  }
  
+diff --git a/chrome/browser/chrome_browser_main_win.cc b/chrome/browser/chrome_browser_main_win.cc
+--- a/chrome/browser/chrome_browser_main_win.cc
++++ b/chrome/browser/chrome_browser_main_win.cc
+@@ -132,6 +132,7 @@
+ #include "ui/gfx/system_fonts_win.h"
+ #include "ui/gfx/win/crash_id_helper.h"
+ #include "ui/strings/grit/app_locale_settings.h"
++#include "uw/browser/update/windows_updater.h"
+ 
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ #include "chrome/browser/platform_experience/installer/installer_win.h"
+@@ -655,6 +656,9 @@ void ChromeBrowserMainPartsWin::PostProfileInit(Profile* profile,
+ void ChromeBrowserMainPartsWin::PostBrowserStart() {
+   ChromeBrowserMainParts::PostBrowserStart();
+ 
++  // uw: looks for updates once a day, as Sparkle does on the Mac.
++  uw::StartWindowsUpdater();
++
+   // Verify that the delay load helper hooks are in place. This cannot be tested
+   // from unit tests, so rely on this failing here.
+   DCHECK(__pfnDliFailureHook2);
 diff --git a/chrome/browser/lifetime/BUILD.gn b/chrome/browser/lifetime/BUILD.gn
 index 93f3a17..ef1c5bc 100644
 --- a/chrome/browser/lifetime/BUILD.gn
@@ -314,6 +383,32 @@ index f917e46..167d296 100644
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
    items.push_back(Item(IDS_FEEDBACK_MAC).command_id(IDC_FEEDBACK));
    bool is_profile_loaded =
+diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
+--- a/chrome/browser/ui/toolbar/app_menu_model.cc
++++ b/chrome/browser/ui/toolbar/app_menu_model.cc
+@@ -186,6 +186,7 @@
+ #include "base/win/shortcut.h"
+ #include "base/win/windows_version.h"
+ #include "content/public/browser/gpu_data_manager.h"
++#include "uw/browser/tab_organization/commands.h"  // nogncheck
+ #endif
+ 
+ using base::UserMetricsAction;
+@@ -2412,7 +2413,14 @@
+                                    features::IsRoundedIconsEnabled()
+                                        ? vector_icons::kInfoIcon
+                                        : vector_icons::kInfoRefreshOldIcon);
++#endif
+ #endif
++
++#if BUILDFLAG(IS_WIN)
++  // uw: Report an issue, which the Mac keeps in its Help menu. See
++  // uw/browser/branding/report_issue.h.
++  AddItemWithStringIdAndVectorIcon(this, uw::kReportIssue, IDS_FEEDBACK,
++                                   kFeedbackIcon);
+ #endif
+ 
+   AddItemWithStringIdAndVectorIcon(
 diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
 index cb47063dbbfcb743a3defe714673f41ce775bbd7..1fc5f9f42a1c7877fd3e4908b5f3eb3c19b06316 100644
 --- a/chrome/browser/ui/webui/settings/BUILD.gn
@@ -457,6 +552,20 @@ index 75e155bf95..0a506c267f 100644
    auto* const build_state = g_browser_process->GetBuildState();
    build_state->AddObserver(this);
    installed_version_poller_.emplace(build_state);
+diff --git a/chrome/chrome_elf/BUILD.gn b/chrome/chrome_elf/BUILD.gn
+--- a/chrome/chrome_elf/BUILD.gn
++++ b/chrome/chrome_elf/BUILD.gn
+@@ -108,6 +108,10 @@ static_library("crash") {
+     "//components/crash/core/app",
+     "//components/crash/core/common",  # crash_keys
+     "//components/version_info:channel",
++
++    # uw: a release's crash address and the answer to "Help fix uw?".
++    "//uw/browser/branding:release_buildflags",
++    "//uw/browser/problem_reports:consent",
+     "//sandbox/policy:win_hook_util",
+     "//third_party/crashpad/crashpad/client",  # DumpWithoutCrash
+   ]
 diff --git a/components/crash/core/app/crashpad_mac.mm b/components/crash/core/app/crashpad_mac.mm
 index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366ddedc9bcd33 100644
 --- a/components/crash/core/app/crashpad_mac.mm

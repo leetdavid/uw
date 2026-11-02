@@ -488,7 +488,11 @@ export class Chromium {
   }
 
   hostArgs(symbols: boolean): string[] {
-    if (this.runtime.platform !== "darwin") return ['target_os = "win"', 'target_cpu = "x64"'];
+    // Windows uw keeps Chromium's log, chrome_debug.log, which Report an Issue
+    // asks for. See docs/plans/windows.md.
+    if (this.runtime.platform !== "darwin") {
+      return ['target_os = "win"', 'target_cpu = "x64"', "chrome_enable_logging_by_default = true"];
+    }
     return [
       "use_system_xcode = true",
       ...(this.runtime.arch === "arm64" ? ["use_lld = false"] : []),

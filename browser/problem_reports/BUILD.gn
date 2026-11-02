@@ -14,13 +14,16 @@ source_set("consent") {
     "answer_file.h",
     "release_keys.h",
   ]
+  deps = [ "//base" ]
   if (is_mac) {
     sources += [ "release_keys_mac.mm" ]
     frameworks = [ "Foundation.framework" ]
+  } else if (is_win) {
+    sources += [ "release_keys_win.cc" ]
+    deps += [ "//uw/browser/branding:release_buildflags" ]
   } else {
     sources += [ "release_keys_stub.cc" ]
   }
-  deps = [ "//base" ]
 }
 
 source_set("problem_reports") {

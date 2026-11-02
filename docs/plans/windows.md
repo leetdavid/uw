@@ -24,7 +24,9 @@ Agreed on 2026-11-01. People download Windows uw from the website, and it update
 - Windows 11 only. The installer refuses Windows 10, and the website says so.
 - One release carries both platforms. `pnpm run release` on the Mac builds the Mac app, has the workstation build Windows, and puts `uw-windows-x64-setup.exe` beside the DMG on the same GitHub release, so the website's "latest" links find both.
 - Each Windows release has a higher four-part version than the last, as Chromium's installer requires: Chromium's version with its last number times 100 plus a count, so uw's releases on Chromium 153.0.8010.53 are 153.0.8010.5300, 5301, and so on. About shows uw's own version, as on the Mac. See [ADR 0027](../adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md).
-- Updates come from a small feed file on each release, signed on the Mac with the key that signs Sparkle's feed. The key never leaves the Mac. Proposed: the feed names the version, the installer's address and size, and its signature.
+- Updates come from a small feed file on each release, signed on the Mac with the key that signs Sparkle's feed. The key never leaves the Mac. Built on 2026-11-03: the release carries `uw-windows-update.json`, which names the version, the installer's file name, size, and SHA-256, and `uw-windows-update.json.sig`, Sparkle's `sign_update -p` signature of it. uw finds them through GitHub's list of releases. Test builds read the list with prereleases; regular releases will read only the latest release.
+- A Windows release carries its version, crash report address, PostHog key, and update address as GN arguments (`uw_release_version` and the rest in `browser/branding/BUILD.gn`), where a Mac release writes them into `Info.plist`. Development builds leave them empty, so they send nothing and look for no updates.
+- Windows uw keeps Chromium's log, `chrome_debug.log` in its `User Data` folder, with `chrome_enable_logging_by_default`. **Report an issue…** in the ⋮ menu opens a new GitHub issue that asks for it, and opens its folder.
 - The first Windows preview is not signed. Windows warns on its first run ("Windows protected your PC", then More info and Run anyway), and the website and Help say so. Windows 11's Smart App Control blocks it outright. Updates download in uw, so the warning does not come back. Signing is decided later.
 - The website's button matches the visitor's system: "Download for Windows" with "Windows 11, 64-bit" under it on Windows, the Mac button elsewhere, and a small link to the other. Drawn on the Doop canvas and signed off first.
 - winget from the first preview: `winget install uwbrowser.uw`. `pnpm run release` opens the pull request to Microsoft's `winget-pkgs` for each release. The manifest marks uw as updating itself, so `winget upgrade --all` leaves it alone.
@@ -46,4 +48,4 @@ Tests run in the Windows 11 VM on the workstation, as the Mac's real-window test
 
 ## Open questions
 
-- Whether a cross-built uw reports crashes. `win_cross.md` says no; the build files suggest yes.
+- Whether a cross-built uw reports crashes. `win_cross.md` says no; the build files suggest yes. The crash reporter reads uw's answer to "Help fix uw?" and Sentry's address since 2026-11-03; a real crash from a test build will tell.

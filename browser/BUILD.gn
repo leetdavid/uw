@@ -32,4 +32,7 @@ group("browser_tests") {
       "workspaces:browser_tests",
     ]
   }
+  if (is_win) {
+    deps += [ "update:windows_browser_tests" ]
+  }
 }

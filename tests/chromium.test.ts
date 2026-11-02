@@ -442,6 +442,7 @@ test("a Linux host cross-builds Windows uw with the packaged toolchain", (t) => 
   const args = gen.find((arg) => arg.startsWith("--args="))!;
   assert.match(args, /^target_os = "win"$/m);
   assert.match(args, /^target_cpu = "x64"$/m);
+  assert.match(args, /^chrome_enable_logging_by_default = true$/m);
   assert.match(args, /^symbol_level = 1$/m);
   assert.doesNotMatch(args, /use_system_xcode|use_lld|enable_dsyms/);
   assert.equal(basename(f.layout.binary), "chrome.exe");

@@ -9,21 +9,36 @@
 #include "base/strings/strcat.h"
 #include "base/system/sys_info.h"
 #include "base/version_info/version_info.h"
+#include "build/build_config.h"
 #include "url/gurl.h"
 #include "uw/browser/branding/release_version.h"
 
 namespace uw {
 
+namespace {
+
+#if BUILDFLAG(IS_WIN)
+constexpr char kSystem[] = ", Windows ";
+// Report an Issue opens the log's folder beside the new issue.
+constexpr char kLogHint[] =
+    "\n\nPlease attach chrome_debug.log from the folder uw opened.";
+#else
+constexpr char kSystem[] = ", macOS ";
+constexpr char kLogHint[] = "";
+#endif
+
+}  // namespace
+
 GURL NewIssueUrl() {
   std::optional<std::string> release = ReleaseVersion();
   std::string versions =
       base::StrCat({release ? "uw " + *release : "uw development build",
-                    ", Chromium ", version_info::GetVersionNumber(), ", macOS ",
+                    ", Chromium ", version_info::GetVersionNumber(), kSystem,
                     base::SysInfo::OperatingSystemVersion()});
-  return GURL(base::StrCat(
-      {"https://github.com/leetdavid/uw/issues/new?body=",
-       base::EscapeQueryParamValue(base::StrCat({"\n\n---\n", versions}),
-                                   /*use_plus=*/true)}));
+  return GURL(base::StrCat({"https://github.com/leetdavid/uw/issues/new?body=",
+                            base::EscapeQueryParamValue(
+                                base::StrCat({kLogHint, "\n\n---\n", versions}),
+                                /*use_plus=*/true)}));
 }
 
 }  // namespace uw

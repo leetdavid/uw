@@ -7,7 +7,7 @@ class GURL;
 
 namespace uw {
 
-// A new GitHub issue for uw, with the uw, Chromium, and macOS versions filled
+// A new GitHub issue for uw, with the uw, Chromium, and system versions filled
 // in.
 GURL NewIssueUrl();
 

@@ -7,20 +7,46 @@ buildflag_header("identity_buildflags") {
   flags = [ "UW_DEV=$uw_dev" ]
 }
 
+declare_args() {
+  # A Windows release's version, report addresses, and update feed, which a
+  # Mac release keeps in Info.plist instead. Development builds leave them
+  # empty, so they send nothing and look for no updates. See
+  # docs/plans/windows.md.
+  uw_release_version = ""
+  uw_crash_report_url = ""
+  uw_posthog_key = ""
+  uw_posthog_host = ""
+  uw_update_feed_url = ""
+}
+
+buildflag_header("release_buildflags") {
+  header = "release_buildflags.h"
+  flags = [
+    "UW_RELEASE_VERSION=\"$uw_release_version\"",
+    "UW_CRASH_REPORT_URL=\"$uw_crash_report_url\"",
+    "UW_POSTHOG_KEY=\"$uw_posthog_key\"",
+    "UW_POSTHOG_HOST=\"$uw_posthog_host\"",
+    "UW_UPDATE_FEED_URL=\"$uw_update_feed_url\"",
+  ]
+}
+
 # uw's own version in a release build. See docs/plans/distribution.md.
 
 source_set("release_version") {
   sources = [ "release_version.h" ]
-  if (is_mac) {
-    sources += [ "release_version_mac.mm" ]
-    frameworks = [ "Foundation.framework" ]
-  } else {
-    sources += [ "release_version_stub.cc" ]
-  }
   deps = [
     "//base",
     "//base/version_info",
   ]
+  if (is_mac) {
+    sources += [ "release_version_mac.mm" ]
+    frameworks = [ "Foundation.framework" ]
+  } else if (is_win) {
+    sources += [ "release_version_win.cc" ]
+    deps += [ ":release_buildflags" ]
+  } else {
+    sources += [ "release_version_stub.cc" ]
+  }
 }
 
 source_set("report_issue") {

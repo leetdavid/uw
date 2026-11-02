@@ -1,4 +1,5 @@
-# Sparkle updates behind Chromium's relaunch button. See ADR 0019.
+# Sparkle updates behind Chromium's relaunch button on the Mac, and uw's own
+# fetcher behind it on Windows. See ADR 0019 and ADR 0026.
 
 # Kept apart from Sparkle, so Chromium's updater stub can ask about a pending
 # update without pulling in browser code.
@@ -23,7 +24,36 @@ source_set("update") {
       "//chrome/browser/upgrade_detector",
     ]
     frameworks = [ "Foundation.framework" ]
+  } else if (is_win) {
+    sources = [
+      "windows_updater.cc",
+      "windows_updater.h",
+    ]
+    deps = [
+      "//base",
+      "//base/version_info",
+      "//chrome/browser:browser_process",
+      "//chrome/common:constants",
+      "//chrome/installer/util:with_no_strings",
+      "//crypto",
+      "//net",
+      "//services/network/public/cpp",
+      "//third_party/boringssl",
+      "//url",
+      "//uw/browser/branding:release_buildflags",
+    ]
   }
+}
+
+source_set("windows_browser_tests") {
+  testonly = true
+  sources = [ "windows_updater_browsertest.cc" ]
+  deps = [
+    ":update",
+    "//base",
+    "//testing/gtest",
+    "//third_party/boringssl",
+  ]
 }
 
 source_set("browser_tests") {

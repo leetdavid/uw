@@ -9,6 +9,7 @@
 
 #include "base/functional/callback_helpers.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
@@ -31,6 +32,12 @@
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
+
+#if BUILDFLAG(IS_WIN)
+#include "base/command_line.h"
+#include "chrome/browser/platform_util.h"
+#include "chrome/common/logging_chrome.h"
+#endif
 
 namespace uw {
 namespace {
@@ -206,6 +213,12 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kReportIssue:
       ShowSingletonTab(window, NewIssueUrl());
+#if BUILDFLAG(IS_WIN)
+      // Windows builds keep a log, which the issue asks for.
+      platform_util::ShowItemInFolder(
+          window->GetProfile(),
+          logging::GetLogFileName(*base::CommandLine::ForCurrentProcess()));
+#endif
       break;
     case kShowScheduled:
       ShowSingletonTab(window, GURL(kScheduledUrl));
