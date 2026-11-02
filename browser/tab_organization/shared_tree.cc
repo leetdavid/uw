@@ -348,11 +348,13 @@ void SharedTree::BringLivePage(TabOrganizationController* window,
     }
     return;
   }
-  // No window holds it, so the copy loads its history and becomes it.
-  content::WebContents* page = here->GetContents();
-  page->RemoveUserData(CopyMark::UserDataKey());
-  page->GetController().SetNeedsReload();
-  page->GetController().LoadIfNecessary();
+  // No window holds it, so a page with the copy's history loads in its place.
+  // Swapping it in tells the tab strip, which takes the hazed view down.
+  std::unique_ptr<content::WebContents> page =
+      CopyHistory(here->GetContents(), /*needs_reload=*/true);
+  content::WebContents* loading = page.get();
+  window->ReplacePage(here, std::move(page));
+  loading->GetController().LoadIfNecessary();
 }
 
 void SharedTree::ScheduleRefresh(const PageId& id) {

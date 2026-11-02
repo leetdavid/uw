@@ -469,6 +469,25 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ACopyFollowsItsLivePage) {
   }));
 }
 
+// A tab opened in one window shows its page's title in the other window's
+// row, though the copy there was made before the page had loaded.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ACopysRowShowsItsPagesTitle) {
+  Browser* first = browser();
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+
+  Open(first, kMail, /*select=*/true);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const tabs::TabInterface* copy = TabAt(second, kMail);
+    return copy && copy->GetContents()->GetTitle() == u"Mail";
+  }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const TabView* row =
+        views::AsViewClass<TabView>(RowOf(second, TabAt(second, kMail)));
+    return row && row->data().title == u"Mail";
+  }));
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ReloadInACopyRunsInTheLivePage) {
   Browser* first = browser();
   tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
@@ -565,6 +584,35 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
     return !TabOrganizationController::IsCopy(mail) &&
            mail->GetContents()->GetTitle() == u"Mail";
   }));
+}
+
+// A page no window holds, as one unloaded while the last window was kept,
+// loads where it is selected, and the hazed view over it goes.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       APageNoWindowHoldsLoadsWithoutTheHazedView) {
+  Profile* profile = browser()->GetProfile();
+  CreateIncognitoBrowser(profile);
+  Browser* first = browser();
+  Open(first, kMail);
+  first->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(first)->keeper(); }));
+  ASSERT_TRUE(TabOrganizationController::IsCopy(TabAt(first, kMail)));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !IsOpen(first) && TabAt(second, kMail); }));
+  // A tab opened here closes the window's unused blank tab now, so selecting
+  // Mail is the last change to the tab strip.
+  Open(second, kIssues, /*select=*/true);
+  tabs::TabInterface* mail = TabAt(second, kMail);
+  ASSERT_TRUE(TabOrganizationController::IsCopy(mail));
+
+  SelectByClick(second, mail);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(mail) &&
+           mail->GetContents()->GetTitle() == u"Mail";
+  }));
+  EXPECT_FALSE(InactivePinOverlay::From(second)->GetShownView());
 }
 
 // The last window keeps live the pages still at work, as Memory Saver would:
@@ -768,6 +816,40 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   SelectByClick(fresh, TabAt(fresh, kMail));
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return BlankTabs(first) == 0 && BlankTabs(fresh) == 0; }));
+}
+
+// Quitting closes the windows, so a new window's unused blank tab goes with
+// them and does not come back after a restart.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       PRE_AnUnusedBlankTabGoesWhenUwQuits) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  SessionStartupPref::SetStartupPref(
+      first->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(first, GURL(kMail)));
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::ExecuteCommand(first, IDC_NEW_WINDOW);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    Browser* fresh = NewWindow(known);
+    return fresh && TabAt(fresh, kMail) && BlankTabs(first) == 1 &&
+           InStep(first, fresh);
+  }));
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AnUnusedBlankTabGoesWhenUwQuits) {
+  Profile* profile = browser()->GetProfile();
+  std::vector<Browser*> windows;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    windows = ShownWindows(profile);
+    return windows.size() == 2u && TabAt(windows[0], kMail) &&
+           InStep(windows[0], windows[1]);
+  })) << Layouts(ShownWindows(profile));
+  for (Browser* window : windows) {
+    EXPECT_EQ(BlankTabs(window), 0) << Layouts(windows);
+  }
 }
 
 // A new window on a workspace with many tabs shows at once and fills in with

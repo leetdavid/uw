@@ -454,6 +454,7 @@ class TabOrganizationController : public TabStripModelObserver,
   // task's key in the tree. A group missing here is keyed by its own id.
   std::map<tab_groups::TabGroupId, std::string> keys_;
   base::CallbackListSubscription reveals_;
+  base::CallbackListSubscription closing_all_;
   base::RepeatingClosureList pictures_changed_;
   base::RepeatingClosureList command_bar_requests_;
   base::RepeatingClosureList drags_;

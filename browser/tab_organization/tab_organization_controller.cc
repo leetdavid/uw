@@ -40,6 +40,7 @@
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
+#include "content/public/browser/invalidate_type.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "ui/base/base_window.h"
@@ -140,6 +141,15 @@ TabOrganizationController::TabOrganizationController(
       shared_(base::MakeRefCounted<SharedTree>()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
   WatchClosingAllBrowsers();
+  // Quitting closes the window, so its unused blank tab goes too, while the
+  // session still takes the change.
+  closing_all_ = chrome::AddClosingAllBrowsersCallback(base::BindRepeating(
+      [](TabOrganizationController* self, bool closing) {
+        if (closing) {
+          self->CloseUnusedBlank(/*closing=*/true);
+        }
+      },
+      base::Unretained(this)));
 #if BUILDFLAG(IS_WIN)
   StartTray();
 #endif
@@ -363,6 +373,10 @@ std::unique_ptr<content::WebContents> TabOrganizationController::ReplacePage(
       tabs_->DiscardWebContents(tab->GetContents(), std::move(page));
   // The page has a session id of its own, under which the tab saves again.
   ScheduleOwnUpdate();
+  // The tab's row takes its title and icon from the page only as the page
+  // changes them, which a copy never does, so it is told now.
+  tab->GetContents()->NotifyNavigationStateChanged(
+      content::INVALIDATE_TYPE_TAB);
   return replaced;
 }
 
