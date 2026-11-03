@@ -1,6 +1,8 @@
 // Copyright 2026 The uw Authors
 // Use of this source code is governed by a BSD-style license.
 
+#import <AppKit/AppKit.h>
+
 #include <algorithm>
 #include <optional>
 #include <vector>
@@ -22,7 +24,11 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/events/base_event_utils.h"
+#include "ui/events/event.h"
+#include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
@@ -374,6 +380,37 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   PressAndNudge(parent_, 8, ui_controls::kCommand);
   EXPECT_EQ(parent_->GetGroup(), task_);
   EXPECT_EQ(tabs()->count(), 2);
+}
+
+// Any key ends a tab drag, Cmd included. Pressed before the pointer has moved
+// far enough to start the drag, it ends one that has no rows of its own yet,
+// and a pressed tab that joined a task meanwhile must not crash uw (Sentry
+// UW-3). The press goes straight to the row, so this runs headless.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       CmdBeforeADragStartsIsSafeAfterTheTabJoinedATask) {
+  chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+  other_ = tabs()->GetActiveTab();
+  Wait(base::Milliseconds(500));
+  views::View* row = RowOf(other_);
+  ASSERT_TRUE(row);
+  const gfx::Point at = row->GetLocalBounds().CenterPoint();
+  const gfx::Point on_screen = row->GetBoundsInScreen().CenterPoint();
+  row->OnMousePressed(ui::MouseEvent(
+      ui::EventType::kMousePressed, at, on_screen, ui::EventTimeForNow(),
+      ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON));
+
+  task_ = tabs()->AddToNewGroup({tabs()->GetIndexOfTab(other_)});
+  NSWindow* window =
+      browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  [NSApp sendEvent:cocoa_test_event_utils::SynthesizeKeyEvent(
+                       window, /*keyDown=*/true, ui::VKEY_COMMAND,
+                       NSEventModifierFlagCommand)];
+  row->OnMouseReleased(ui::MouseEvent(
+      ui::EventType::kMouseReleased, at, on_screen, ui::EventTimeForNow(),
+      ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON));
+  Wait(base::Milliseconds(300));
+  EXPECT_EQ(other_->GetGroup(), task_);
+  EXPECT_EQ(tabs()->GetActiveTab(), other_);
 }
 
 }  // namespace

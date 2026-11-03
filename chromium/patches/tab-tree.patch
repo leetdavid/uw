@@ -2561,7 +2561,7 @@ index b35f686251462c443d02dcd284f9b4fc46b610ad..f4e64cf0ee6b540950b665178e635a12
    raw_ptr<views::FlexLayout> flex_layout_ = nullptr;
  
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
-index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..20d03cdac04cc19a53e9e12d0bd0a34d7bbd5b8a 100644
+index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..c346e2d81b9b9f92fb4c2ee14bdcf6b3adaf9dff 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 @@ -84,6 +84,7 @@
@@ -2591,6 +2591,19 @@ index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..20d03cdac04cc19a53e9e12d0bd0a34d
    EndDragImpl(reason != EndDragReason::kComplete && source_context_
                    ? EndDragType::kCanceled
                    : EndDragType::kNormal);
+@@ -2987,6 +3000,12 @@ void TabDragController::NotifyEventIfTabAddedToGroup() {
+       continue;
+     }
+ 
++    // uw: a drag that has not started yet, as when a key ends it, or whose
++    // tabs are between windows, has no view of the tab to point the event at.
++    if (!tab_drag_datum.attached_view) {
++      continue;
++    }
++
+     if (source_context_->NotifyCustomEvent(kTabGroupedCustomEventId,
+                                            tab_drag_datum.attached_view)) {
+       break;
 diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
 index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..298dda3bf2ba719e3a14fa1fd23b10e624e8bf37 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
