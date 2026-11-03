@@ -153,7 +153,7 @@ Filing the Scratchpad's tabs into tasks all at once, when the user asks. Tabs th
 _Avoid_: Reorganize all tabs, organize all, sort.
 
 **Clear**:
-Closing the Scratchpad's tabs all at once, except kept tabs and busy terminals.
+Closing the Scratchpad's tabs all at once, except kept tabs, busy terminals, and working chats.
 _Avoid_: Archive, close all.
 
 **Organization action**:
@@ -285,6 +285,10 @@ _Avoid_: Agent tab.
 **Handed tab**:
 The web page the user hands a new chat's agent by starting the command bar's text with `@`. The agent reads and acts in it as in its own tabs, and it stays where it is.
 _Avoid_: Attached tab, mentioned tab, context tab.
+
+**Working chat**:
+A chat whose agent is between the user's message and its answer, including while a step waits for approval. An idle chat, one that has answered, is not working.
+_Avoid_: Busy chat, running chat, active chat.
 
 **Private chat**:
 A chat started from a private window. Nothing from it is kept after the private windows close.

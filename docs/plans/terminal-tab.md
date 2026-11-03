@@ -35,6 +35,7 @@ Agreed on 2026-10-31 as T36, to be built with the [close button on a task's row]
 - Unchanged: Clear leaves busy terminals open, and the agent's `close` and `close_task` tools and `uw tabs close` refuse them, per the [tab tools plan](tab-tools.md#agreed-scope).
 - While it asks about a task, the task's rows stay tinted as under the × of its row.
 - The design is the frames "Busy terminal warning: the dialog" and "Close task in one click: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-31 and signed off by the user the same day.
+- Agreed on 2026-11-03: working chats join the same dialog. See [Closing a working chat](agent-chats.md#closing-a-working-chat).
 
 How it is built:
 

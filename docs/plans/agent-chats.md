@@ -164,6 +164,28 @@ How the chat is built:
 
 Moved to the [new tab page plan](new-tab-page.md) on 2026-10-29, when the page grew from an Ask box into a page for all of uw's features.
 
+## Closing a working chat
+
+Agreed on 2026-11-03 as T317 (design) and T318 (build), after uw crashed when the user closed a task holding two of the agent's pages (T285). The design waits for the user's sign-off.
+
+Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). It reuses the [busy terminal warning](terminal-tab.md#busy-terminal-warning): its dialog, its four close hooks, and its strings, which are not in Chromium's resource files. The new parts are finding the chat behind each closing tab, the refusals in Clear and the tab tools, and Exit on Windows, the riskiest part at about 6/10.
+
+- A close that would close a [working chat](../CONTEXT.md#language)'s own tab asks first, in the busy terminal warning's dialog and on the same closes: the tab, Close Other Tabs, Close Tabs Below, Close Branch, Close Task, the window, and quitting. A close that ends both lists both, chats first. With [shared tabs](shared-tabs.md) on, closing a window closes no tabs and does not ask.
+- Each chat's row shows its title and "Working", or "Waits for approval". The sentence names what stops, such as "A chat in it is still working. Closing the task stops it."
+- These never ask: an idle chat; a close of only the agent's tabs or the [handed tab](../CONTEXT.md#language), after which the agent's next step there fails and it carries on; and chats out of sight, which are a scheduled chat's runs and `uw chat` chats.
+- The close button closes everything. Each chat stops and comes back as "Stopped before it finished" with Continue. Cancel closes nothing, and the task keeps all its tabs. A chat that answers while the dialog is open leaves it open, and the answer still applies. There is no "Don't ask again".
+- Clear leaves a working chat's tab open. The agent's `close` and `close_task` tools and `uw tabs close` refuse it with "Didn't close <title>: it's a working chat.", and `uw tabs list` marks it `working`.
+- On Windows, Exit in the notification area icon's menu asks too, as "Exit uw?".
+- Chromium's own "Leave site and end task?" is turned off. It asked on every page the agent had opened or been handed, whenever the chat's page was open, even after the chat had answered. Its Leave stopped the engine task the chat's agent uses, so every later page tool in that chat failed until the chat page reloaded. Its Cancel during a task's close took the task's other tabs out of the task. And its "task" meant the agent's work, not a uw [task](../CONTEXT.md#language).
+- The design is the frames "Working chat warning: the dialog" and "Working chat warning: every state" on the canvas page "Keyboard and mouse".
+
+How it will be built:
+
+- `CloseWarning` also asks, for each closing tab, whether it is a chat page whose agent is working or waits for approval (`UwChatHandler`), next to `FindBusyTerminals`. Clear and the tab tools ask the same.
+- The quit hook in `uw-busy-terminals.patch` moves out of `BrowserCloseManager`'s Mac-only block, so Exit on Windows reaches it. It is checked in the Windows VM.
+- `kGlicConfirmTabClose` goes off in `agent-chats.patch`. T285's section for `actor_task_unload_handler` goes too, since nothing can reach it, and `AgentToolsBrowserTest.ClosingATaskAsksOnEachPageTheAgentWorksIn` changes to check that closing the task asks once and does not crash.
+- The Help pages `tasks`, `chats`, and `terminal-tabs` say so, and the line T285 added to `tasks` goes.
+
 ## Context
 
 The model sees what the chat has gathered, and a `recall` tool brings back what has shrunk. Each request repeats the one before it and adds to its end, so a provider can serve most of it from its cache, at a small part of the price.
