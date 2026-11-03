@@ -819,6 +819,42 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
+                       PRE_APinNoWindowHoldsLoadsWhenSelected) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  Pin(browser(), GURL(kMail));
+  ASSERT_TRUE(content::NavigateToURL(
+      browser()->tab_strip_model()->GetWebContentsAt(1), GURL(kIssues)));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kMail)}));
+  MovePage(browser(), second);
+  browser()->tab_strip_model()->ActivateTabAt(1);
+  // The live page outlives the window only until uw quits.
+  CloseBrowserSynchronously(second);
+  base::RunLoop().RunUntilIdle();
+}
+
+// After a restart, a pin whose live page no window held loads when it is
+// selected, and the hazed view goes.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APinNoWindowHoldsLoadsWhenSelected) {
+  TabStripModel* tabs = browser()->tab_strip_model();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs->IndexOfFirstNonPinnedTab() == 1 &&
+           PinSync::IsPlaceholder(tabs->GetTabAtIndex(0));
+  }));
+  ASSERT_NE(tabs->active_index(), 0);
+
+  tabs->ActivateTabAt(0);
+
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return PinPageOf(browser())->GetLastCommittedURL() == GURL(kMail);
+  }));
+  EXPECT_FALSE(PinSync::IsPlaceholder(tabs->GetTabAtIndex(0)));
+  EXPECT_FALSE(InactivePinOverlay::From(browser())->GetShownView());
+  EXPECT_EQ(LiveCopies(), 1);
+}
+
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
                        PRE_IconsShowBeforeAHiddenWorkspaceLoads) {
   Profile* profile = browser()->GetProfile();
   SessionStartupPref::SetStartupPref(

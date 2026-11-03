@@ -142,13 +142,6 @@ std::unique_ptr<content::WebContents> MakePlaceholder(
   return placeholder;
 }
 
-// Makes a placeholder the live page, loading it from its history.
-void Wake(content::WebContents* page, std::string id) {
-  Mark(page, std::move(id));
-  page->GetController().SetNeedsReload();
-  page->GetController().LoadIfNecessary();
-}
-
 // Keeps a picture of `page` as it looks now, for the hazed view other windows
 // show once it leaves.
 void KeepPicture(content::WebContents* page, const std::string& id) {
@@ -595,12 +588,17 @@ bool PinSync::BringInto(int index) {
   }
   const std::string id = mark->id();
   std::unique_ptr<content::WebContents> page = TakeLivePage(id);
-  base::AutoReset<bool> applying(&applying_, true);
-  if (page) {
-    tabs_->DiscardWebContents(here, std::move(page));
-  } else {
-    Wake(here, id);
+  // No window holds it, so a page with the placeholder's history loads in its
+  // place. Swapping it in tells the tab strip, which takes the hazed view
+  // down.
+  if (!page) {
+    page = CopyHistory(here, /*needs_reload=*/true);
+    Mark(page.get(), id);
   }
+  content::WebContents* live = page.get();
+  base::AutoReset<bool> applying(&applying_, true);
+  tabs_->DiscardWebContents(here, std::move(page));
+  live->GetController().LoadIfNecessary();
   SaveSession();
   return true;
 }
