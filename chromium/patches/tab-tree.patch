@@ -963,7 +963,7 @@ index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..2543bacc96f51de5888dfc06c41253fe
        browser_view_->browser(), group_id,
        /*anchor_view=*/anchor_view, /*anchor_rect=*/std::nullopt,
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
-index 1107732839..f264a131d6 100644
+index 1107732839..e60c2c793c 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_strip_view.cc
 @@ -304,9 +304,15 @@ void TabStripView::OnTabChanged(const tabs::TabInterface* active_tab) {
@@ -983,6 +983,20 @@ index 1107732839..f264a131d6 100644
      TabCollectionNode* group_node = collection_node_->GetNodeForHandle(
          active_tab->GetBrowserWindowInterface()
              ->GetTabStripModel()
+@@ -535,6 +541,13 @@ void TabStripView::SetScrollViewProperties(views::ScrollView* scroll_view) {
+         views::ScrollView::ScrollBarMode::kDisabled);
+     scroll_view->SetOverflowGradientMask(
+         views::ScrollView::GradientDirection::kVertical);
++    // uw: the fade alone says more tabs are above or below, with no line.
++    for (const auto side : {views::OverflowIndicatorAlignment::kTop,
++                            views::OverflowIndicatorAlignment::kBottom}) {
++      scroll_view->SetCustomOverflowIndicator(
++          side, std::make_unique<views::View>(), /*thickness=*/0,
++          /*fills_opaquely=*/false);
++    }
+     scroll_view->SetVerticalScrollBar(
+         std::make_unique<VerticalTabStripScrollBar>(
+             collection_node_->GetController()->GetStateController()));
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view.h b/chrome/browser/ui/views/tabs/common/tab_strip_view.h
 index bca3e9acc5..76924802d0 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_view.h

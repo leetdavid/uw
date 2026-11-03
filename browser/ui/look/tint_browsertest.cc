@@ -12,6 +12,7 @@
 
 #include "base/environment.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/test/run_until.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -26,6 +27,7 @@
 #include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -41,9 +43,13 @@
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_provider_manager.h"
+#include "ui/compositor/layer.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/controls/scroll_view.h"
+#include "ui/views/controls/separator.h"
 #include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/skill_folders.h"
@@ -390,6 +396,29 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, SidebarTabsLetTheThemeShowThrough) {
     }
     SaveWindowScreenshot(browser(), dark ? "sidebar-dark" : "sidebar-light");
   }
+}
+
+// A tab list longer than the sidebar fades out at its edges, with no line
+// across them.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, ALongTabListFadesWithoutALine) {
+  for (int i = 0; i < 40; ++i) {
+    ASSERT_TRUE(
+        AddTabAtIndex(i + 1, GURL("about:blank"), ui::PAGE_TRANSITION_TYPED));
+  }
+  browser()->tab_strip_model()->ActivateTabAt(0);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  auto* list = views::AsViewClass<views::ScrollView>(
+      view->tab_strip_view()->GetTabStripView()->children().back());
+  ASSERT_TRUE(list);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    view->GetWidget()->LayoutRootViewIfNecessary();
+    return list->IsVerticalContentOverflowing() && list->layer() &&
+           list->layer()->HasGradientMask();
+  }));
+  EXPECT_TRUE(std::ranges::none_of(list->children(), [](views::View* child) {
+    return views::IsViewClass<views::Separator>(child);
+  }));
+  SaveWindowScreenshot(browser(), "sidebar-long-tab-list");
 }
 
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, AColorPickedElsewhereIsAOneColorTheme) {

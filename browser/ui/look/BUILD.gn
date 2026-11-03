@@ -67,6 +67,7 @@ source_set("browser_tests") {
     "//testing/gtest",
     "//ui/base/mojom",
     "//ui/color",
+    "//ui/compositor",
     "//ui/display",
     "//ui/gfx:color_utils",
     "//ui/gfx:gfx_switches",
