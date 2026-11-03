@@ -166,7 +166,7 @@ Moved to the [new tab page plan](new-tab-page.md) on 2026-10-29, when the page g
 
 ## Closing a working chat
 
-Agreed on 2026-11-03 as T317 (design) and T318 (build), after uw crashed when the user closed a task holding two of the agent's pages (T285). The design waits for the user's sign-off.
+Agreed on 2026-11-03 as T317 (design) and T318 (build), after uw crashed when the user closed a task holding two of the agent's pages (T285). The user signed off the design the same day ("lgtm").
 
 Implementability: **7/10** using the [roadmap convention](roadmap.md#implementability-estimates). It reuses the [busy terminal warning](terminal-tab.md#busy-terminal-warning): its dialog, its four close hooks, and its strings, which are not in Chromium's resource files. The new parts are finding the chat behind each closing tab, the refusals in Clear and the tab tools, and Exit on Windows, the riskiest part at about 6/10.
 
