@@ -309,6 +309,7 @@ Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in 
 - Agreed on 2026-11-02: an alert stays unread until the user opens it from the Inbox, from its notification, or from the new tab page. Mark all read, beside Clear all, marks every alert read. Before, opening the Inbox marked them all read.
 - Agreed on 2026-11-02: a page or chat opened from the Inbox or from a notification opens selected at the top of the Scratchpad, as a [link from another app](#automatic-tab-organization) does. Before, it opened beside the active tab, inside that tab's task.
 - Alerts stay until Clear all or until their chat is deleted. Stopping a watch or removing a schedule keeps them. An approval's alert goes once the step is answered or stopped.
+- Agreed on 2026-11-03: while open, the Inbox's pop-up and the watch card's pop-up fit their content whenever it changes, growing or shrinking, and slide to the new height. After Clear all, the Inbox shrinks to its "No alerts" card. The canvas guide `uw-scheduled-page-and-inbox` has the motion. Before, the pop-up kept the height it opened with.
 
 ### The uw command
 
