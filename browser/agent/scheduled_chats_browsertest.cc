@@ -16,6 +16,7 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
+#include "base/run_loop.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
@@ -35,10 +36,15 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/network_connection_change_simulator.h"
+#include "content/public/test/url_loader_interceptor.h"
+#include "net/base/net_errors.h"
+#include "net/base/network_change_notifier.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "services/network/public/cpp/url_loader_completion_status.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/base/base_window.h"
 #include "ui/message_center/public/cpp/notification.h"
@@ -90,6 +96,7 @@ class ScheduledChatsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   void TearDownOnMainThread() override {
+    offline_.reset();
     notifications_.reset();
     actor::ActorKeyedService::Get(profile())->ResetForTesting();
     HeadlessModeBrowserTest::TearDownOnMainThread();
@@ -160,8 +167,32 @@ class ScheduledChatsBrowserTest : public headless::HeadlessModeBrowserTest {
                                              .Set("number", 479))))));
   }
 
+  // Takes the Mac offline: Chromium reports no connection, and every model
+  // request fails without an answer.
+  void GoOffline() {
+    content::NetworkConnectionChangeSimulator().SetConnectionType(
+        net::NetworkChangeNotifier::CONNECTION_NONE);
+    offline_ = std::make_unique<content::URLLoaderInterceptor>(
+        base::BindRepeating(
+            [](content::URLLoaderInterceptor::RequestParams* params) {
+              if (!params->url_request.url.path().starts_with("/v1/")) {
+                return false;
+              }
+              params->client->OnComplete(network::URLLoaderCompletionStatus(
+                  net::ERR_INTERNET_DISCONNECTED));
+              return true;
+            }));
+  }
+
+  void ComeBackOnline() {
+    offline_.reset();
+    content::NetworkConnectionChangeSimulator().SetConnectionType(
+        net::NetworkChangeNotifier::CONNECTION_WIFI);
+  }
+
   ScopedMemoryKeychain keychain_;
   ScriptedModel model_{*embedded_test_server()};
+  std::unique_ptr<content::URLLoaderInterceptor> offline_;
   std::unique_ptr<NotificationDisplayServiceTester> notifications_;
 };
 
@@ -242,6 +273,72 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_EQ(*lines[0].GetDict().FindString("end"), "unreachable");
   EXPECT_EQ(lines[0].GetDict().FindBool("counted"), false);
   EXPECT_EQ(chats()->Find(kChat)->failures, 0);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ARunThatLostItsConnectionRunsAgainWhenItReturns) {
+  SaveChat();
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  GoOffline();
+
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_EQ(LinesAfterTheRun().size(), 1u);
+  ComeBackOnline();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return chats()->Find(kChat)->recent.size() == 1; }));
+  const base::ListValue lines = LinesAfterTheRun();
+
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[0].GetDict().FindString("end"), "unreachable");
+  EXPECT_THAT(*lines[0].GetDict().FindString("text"),
+              HasSubstr("ERR_INTERNET_DISCONNECTED"));
+  EXPECT_EQ(*lines[1].GetDict().FindString("end"), "reported");
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       AModelThatAnsweredWithAnErrorDoesNotWait) {
+  SaveChat();
+  model_.Script({ScriptedModel::Answer("unused")}, /*status=*/503);
+
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_EQ(LinesAfterTheRun().size(), 1u);
+  content::NetworkConnectionChangeSimulator().SetConnectionType(
+      net::NetworkChangeNotifier::CONNECTION_NONE);
+  ComeBackOnline();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(chats()->Running(kChat));
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunInBetweenEndsTheWait) {
+  SaveChat();
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  GoOffline();
+
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_EQ(LinesAfterTheRun().size(), 1u);
+  offline_.reset();
+  chats()->CheckNow(kChat);
+  ASSERT_EQ(LinesAfterTheRun().size(), 2u);
+  ComeBackOnline();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(chats()->Running(kChat));
+  EXPECT_EQ(LinesAfterTheRun().size(), 2u);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       APausedScheduleDoesNotWaitForTheConnection) {
+  SaveChat();
+  GoOffline();
+
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  ASSERT_EQ(LinesAfterTheRun().size(), 1u);
+  chats()->SetPaused(kChat, true);
+  ComeBackOnline();
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_FALSE(chats()->Running(kChat));
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,

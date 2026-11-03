@@ -41,6 +41,9 @@ class ChatRun {
     RunReport report;
     // What went wrong, for a run that did not report.
     std::string error;
+    // For kModelUnreachable: the model's request got no answer at all, as
+    // when the Mac is offline.
+    bool lost_connection = false;
     // Its steps, which fold under its line in the chat.
     std::vector<AgentLoop::Step> steps;
     // What its model requests used and cost.

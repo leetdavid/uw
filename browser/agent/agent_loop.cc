@@ -310,6 +310,9 @@ void AgentLoop::OnModel(RemoteModelClient::Outcome outcome) {
     }
     Step failed = Failed(std::move(text));
     failed.model_unreachable = true;
+    failed.lost_connection = outcome.http_status == 0 &&
+                             outcome.net_error != net::OK &&
+                             outcome.net_error != net::ERR_UNSAFE_REDIRECT;
     Finish(std::move(failed));
     return;
   }

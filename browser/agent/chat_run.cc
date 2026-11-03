@@ -21,6 +21,7 @@ AgentLoop::Step CopyOf(const AgentLoop::Step& step) {
   copy.result = step.result.Clone();
   copy.text = step.text;
   copy.model_unreachable = step.model_unreachable;
+  copy.lost_connection = step.lost_connection;
   return copy;
 }
 
@@ -102,6 +103,7 @@ void ChatRun::OnStep(const AgentLoop::Step& step) {
   } else if (step.model_unreachable) {
     outcome.kind = Outcome::Kind::kModelUnreachable;
     outcome.error = step.text;
+    outcome.lost_connection = step.lost_connection;
   } else {
     outcome.kind = Outcome::Kind::kFailed;
     outcome.error = step.kind == AgentLoop::Step::Kind::kFailed

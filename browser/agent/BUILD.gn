@@ -190,6 +190,7 @@ source_set("scheduled_chats") {
     "//base",
     "//mojo/public/cpp/bindings",
     "//services/device/public/mojom",
+    "//services/network/public/cpp",
     "//uw/components/agent",
     "//uw/components/ai_providers",
   ]

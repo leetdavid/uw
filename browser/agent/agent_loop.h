@@ -90,6 +90,8 @@ class AgentLoop {
     // A failure to reach the model: no model is set, or its request failed,
     // as when the provider is down, rejects the key, or the Mac is offline.
     bool model_unreachable = false;
+    // The model's request got no answer at all, as when the Mac is offline.
+    bool lost_connection = false;
   };
   using OnStep = base::RepeatingCallback<void(const Step&)>;
 

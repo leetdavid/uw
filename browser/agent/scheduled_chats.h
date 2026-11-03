@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,6 +21,7 @@
 #include "chrome/browser/profiles/profile_observer.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "services/device/public/mojom/time_zone_monitor.mojom.h"
+#include "services/network/public/cpp/network_connection_tracker.h"
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_run.h"
@@ -41,7 +43,9 @@ class ScheduledChats : public base::SupportsUserData::Data,
                        public ChatIndex::Observer,
                        public ProfileObserver,
                        public ChatTriggers::Delegate,
-                       public device::mojom::TimeZoneMonitorClient {
+                       public device::mojom::TimeZoneMonitorClient,
+                       public network::NetworkConnectionTracker::
+                           NetworkConnectionObserver {
  public:
   class Observer : public base::CheckedObserver {
    public:
@@ -147,6 +151,10 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // device::mojom::TimeZoneMonitorClient:
   void OnTimeZoneChange(const std::string& zone_id) override;
 
+  // network::NetworkConnectionTracker::NetworkConnectionObserver:
+  void OnConnectionChanged(
+      net::NetworkChangeNotifier::ConnectionType type) override;
+
   // ChatTriggers::Delegate:
   bool OnWake(const std::string& chat_id,
               const ChatTriggers::Trigger& trigger,
@@ -235,6 +243,9 @@ class ScheduledChats : public base::SupportsUserData::Data,
   std::map<std::string, ScheduledChat, std::less<>> chats_;
   std::map<std::string, Run, std::less<>> runs_;
   std::map<std::string, raw_ptr<Page>, std::less<>> pages_;
+  // Chats whose last run lost its connection, which run again once it
+  // returns.
+  std::set<std::string, std::less<>> lost_connection_;
   std::optional<ModelChoice> last_model_;
   ChatTriggers triggers_{this};
   ChatScheduler scheduler_;
@@ -244,6 +255,10 @@ class ScheduledChats : public base::SupportsUserData::Data,
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_observation_{
       this};
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
+  base::ScopedObservation<
+      network::NetworkConnectionTracker,
+      network::NetworkConnectionTracker::NetworkConnectionObserver>
+      connection_observation_{this};
   base::ObserverList<Observer> observers_;
   base::WeakPtrFactory<ScheduledChats> weak_factory_{this};
 };

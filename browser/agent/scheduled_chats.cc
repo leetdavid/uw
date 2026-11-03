@@ -18,6 +18,7 @@
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/device_service.h"
+#include "content/public/browser/network_service_instance.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
@@ -176,6 +177,7 @@ ScheduledChats::ScheduledChats(Profile* profile)
       scheduler_(
           base::BindRepeating(&ScheduledChats::OnDue, base::Unretained(this))) {
   profile_observation_.Observe(profile);
+  connection_observation_.Observe(content::GetNetworkConnectionTracker());
   if (ChatIndex* index = ChatIndex::For(profile)) {
     index_observation_.Observe(index);
   }
@@ -343,6 +345,7 @@ void ScheduledChats::Remove(const std::string& chat_id) {
   }
   scheduler_.Remove(chat_id);
   runs_.erase(chat_id);
+  lost_connection_.erase(chat_id);
   if (const ChatTriggers::Trigger* trigger = triggers_.Find(chat_id);
       trigger && trigger->lasting) {
     triggers_.End(chat_id);
@@ -358,6 +361,7 @@ void ScheduledChats::SetPaused(const std::string& chat_id, bool paused) {
     return;
   }
   chat->second.paused = paused;
+  lost_connection_.erase(chat_id);
   if (!paused) {
     chat->second.last = base::Time::Now();
     chat->second.failures = 0;
@@ -506,6 +510,16 @@ void ScheduledChats::OnProfileWillBeDestroyed(Profile* profile) {
   profile_observation_.Reset();
 }
 
+void ScheduledChats::OnConnectionChanged(
+    net::NetworkChangeNotifier::ConnectionType type) {
+  if (type == net::NetworkChangeNotifier::CONNECTION_NONE) {
+    return;
+  }
+  for (const std::string& chat_id : std::exchange(lost_connection_, {})) {
+    CheckNow(chat_id);
+  }
+}
+
 void ScheduledChats::OnTimeZoneChange(const std::string& zone_id) {
   scheduler_.TimeZoneChanged();
 }
@@ -620,6 +634,7 @@ void ScheduledChats::StartRun(const std::string& chat_id,
   if (ending_) {
     return;
   }
+  lost_connection_.erase(chat_id);
   const ScheduledChat& chat = chats_.at(chat_id);
   Run& run = runs_[chat_id] = Run();
   if (trigger) {
@@ -927,6 +942,10 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
   }
   if (effect.paused) {
     Arm(chat_id);
+  }
+  if (end == RunEnd::kModelUnreachable && outcome.lost_connection &&
+      !chat->second.paused) {
+    lost_connection_.insert(chat_id);
   }
   Persist();
   UpdateKeepAlive();
