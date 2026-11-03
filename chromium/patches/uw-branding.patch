@@ -119,7 +119,7 @@ index 7d8d4c39f798834fd6f7cfa1845f56515c2c338f..bf5637b3aaed5b1ad9fb8127fcd54441
  
  // Start a naming scheme to keep icons in order. A leading X is used to keep
 diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
-index a741f89bf54c65b3b188def7b03270015356debe..978c55a178a935b96e6d0866fdff0aa2754a95c9 100644
+index a741f89bf54c65b3b188def7b03270015356debe..ab8c34ba8652e59d1070806a756374453ce14ae2 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
 @@ -294,15 +294,15 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
@@ -451,6 +451,15 @@ index a741f89bf54c65b3b188def7b03270015356debe..978c55a178a935b96e6d0866fdff0aa2
          </message>
          <message name="IDS_DEFAULT_BROWSER_BUBBLE_DIALOG_BODY" desc="Main explanatory text in the default browser dialog.">
            Get easy access to the features you know, love, and trust by setting Chromium as your default browser.
+@@ -896,7 +896,7 @@ Chromium is unable to recover your settings.
+       </if>
+       <if expr="is_win or is_macosx">
+         <message name="IDS_PDF_INFOBAR_TEXT" desc="Text to show in an infobar when Chromium is not the default PDF viewer.">
+-          Set Chromium as your default PDF viewer
++          Set uw as your default PDF viewer
+         </message>
+       </if>
+       <if expr="enable_pdf">
 @@ -1123,15 +1123,15 @@ Chromium is unable to recover your settings.
  
        <!-- Main Chrome menu -->
