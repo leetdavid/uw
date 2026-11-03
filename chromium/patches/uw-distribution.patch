@@ -404,6 +404,41 @@ index f917e46..167d296 100644
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
    items.push_back(Item(IDS_FEEDBACK_MAC).command_id(IDC_FEEDBACK));
    bool is_profile_loaded =
+diff --git a/chrome/browser/ui/startup/startup_browser_creator.cc b/chrome/browser/ui/startup/startup_browser_creator.cc
+--- a/chrome/browser/ui/startup/startup_browser_creator.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator.cc
+@@ -131,6 +131,7 @@
+ #include "chrome/browser/ui/webui/settings/reset_settings_handler.h"
+ #include "chrome/browser/web_applications/web_app_provider.h"
+ #include "chrome/credential_provider/common/gcp_strings.h"
++#include "uw/browser/update/windows_updater.h"
+ #endif  // BUILDFLAG(IS_WIN)
+ 
+ #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+@@ -1504,6 +1505,23 @@ void StartupBrowserCreator::ProcessCommandLineAlreadyRunning(
+     return;
+   }
+ 
++#if BUILDFLAG(IS_WIN)
++  // uw: the installer's launch relaunches uw into the update it staged. See
++  // uw/browser/update/windows_updater.h.
++  if (uw::RelaunchIntoStagedUpdate(
++          command_line,
++          base::BindOnce(
++              [](const base::FilePath& cur_dir,
++                 const StartupProfilePathInfo& profile_path_info,
++                 const base::CommandLine& launch) {
++                ProcessCommandLineAlreadyRunning(launch, cur_dir,
++                                                 profile_path_info);
++              },
++              cur_dir, profile_path_info))) {
++    return;
++  }
++#endif
++
+   Profile* profile = nullptr;
+   if (profile_path_info.mode == StartupProfileMode::kBrowserWindow) {
+     ProfileManager* profile_manager = g_browser_process->profile_manager();
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
 +++ b/chrome/browser/ui/toolbar/app_menu_model.cc
@@ -587,6 +622,25 @@ diff --git a/chrome/chrome_elf/BUILD.gn b/chrome/chrome_elf/BUILD.gn
      "//sandbox/policy:win_hook_util",
      "//third_party/crashpad/crashpad/client",  # DumpWithoutCrash
    ]
+diff --git a/chrome/installer/setup/setup_main.cc b/chrome/installer/setup/setup_main.cc
+--- a/chrome/installer/setup/setup_main.cc
++++ b/chrome/installer/setup/setup_main.cc
+@@ -1428,6 +1428,15 @@ InstallStatus InstallProductsHelper(InstallationState& original_state,
+                  (install_status == IN_USE_UPDATED)) {
+         DCHECK_NE(chrome_exe.value(), std::wstring());
+         RemoveChromeLegacyRegistryKeys(chrome_exe);
++        // uw: an update someone runs by hand starts uw too, or reaches the uw
++        // that runs, so the installer never ends with nothing on screen. uw's
++        // own updater passes --do-not-launch-chrome.
++        bool do_not_launch_chrome = false;
++        prefs.GetBool(initial_preferences::kDoNotLaunchChrome,
++                      &do_not_launch_chrome);
++        if (!system_install && !do_not_launch_chrome) {
++          LaunchChromeBrowser(installer_state.target_path());
++        }
+       }
+     }
+   }
 diff --git a/components/crash/core/app/crashpad_mac.mm b/components/crash/core/app/crashpad_mac.mm
 index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366ddedc9bcd33 100644
 --- a/components/crash/core/app/crashpad_mac.mm

@@ -28,7 +28,10 @@
 #include "base/version_info/version_info.h"
 #include "build/buildflag.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/first_run/upgrade_util.h"
+#include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/common/chrome_switches.h"
 #include "chrome/installer/util/install_util.h"
 #include "crypto/hash.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
@@ -361,6 +364,31 @@ std::optional<UpdateFeed> ReadUpdateFeed(std::string_view feed,
     return std::nullopt;
   }
   return read;
+}
+
+bool RelaunchIntoStagedUpdate(
+    const base::CommandLine& command_line,
+    base::OnceCallback<void(const base::CommandLine&)> carry_on) {
+  if (!command_line.HasSwitch(switches::kFromInstaller)) {
+    return false;
+  }
+  base::CommandLine launch(command_line);
+  launch.RemoveSwitch(switches::kFromInstaller);
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce(&upgrade_util::IsUpdatePendingRestart),
+      base::BindOnce(
+          [](base::CommandLine launch,
+             base::OnceCallback<void(const base::CommandLine&)> carry_on,
+             bool staged) {
+            if (staged) {
+              chrome::AttemptRelaunch();
+            } else {
+              std::move(carry_on).Run(launch);
+            }
+          },
+          std::move(launch), std::move(carry_on)));
+  return true;
 }
 
 void StartWindowsUpdater() {

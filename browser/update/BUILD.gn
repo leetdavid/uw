@@ -33,6 +33,8 @@ source_set("update") {
       "//base",
       "//base/version_info",
       "//chrome/browser:browser_process",
+      "//chrome/browser/first_run",
+      "//chrome/browser/lifetime",
       "//chrome/common:constants",
       "//chrome/installer/util:with_no_strings",
       "//crypto",
