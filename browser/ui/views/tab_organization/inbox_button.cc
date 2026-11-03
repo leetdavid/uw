@@ -16,7 +16,8 @@
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_wrapper.h"
 #include "chrome/grit/generated_resources.h"
-#include "third_party/skia/include/core/SkBlendMode.h"
+#include "third_party/skia/include/core/SkClipOp.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_provider.h"
@@ -24,6 +25,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/text_utils.h"
@@ -123,32 +125,7 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   const SkColor text = colors->GetColor(kColorTabForegroundInactiveFrameActive);
   const SkColor accent = colors->GetColor(kColorMenuCardAccent);
   const bool open = bubble_widget_.IsObserving();
-  // The fill and the icon go on a layer of their own, which the badge's ring
-  // cuts through, so the ring shows whatever is behind the button: the tint,
-  // or the glass.
-  canvas->SaveLayerAlpha(0xFF);
-  cc::PaintFlags fill;
-  fill.setAntiAlias(true);
-  if (open || GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
-    fill.setColor(open ? SkColorSetA(accent, kOpenAlpha)
-                       : SkColorSetA(text, kHoverAlpha));
-    canvas->DrawRoundRect(GetLocalBounds(), kRadius, fill);
-  }
-  const bool active = GetWidget() && GetWidget()->ShouldPaintAsActive();
-  {
-    gfx::ScopedCanvas scoped(canvas);
-    canvas->Translate(gfx::Vector2d((kSize - kIconSize) / 2,
-                                    (kSize - kIconSize) / 2));
-    gfx::PaintVectorIcon(
-        canvas, kInboxIcon, kIconSize,
-        open ? accent
-             : SkColorSetA(text, active ? kIconAlpha : kInactiveIconAlpha));
-  }
   const size_t unread = alerts_.GetSource()->Unread();
-  if (unread == 0) {
-    canvas->Restore();
-    return;
-  }
   // At the icon's top right.
   const std::u16string count =
       unread > 99 ? u"99+" : base::NumberToString16(unread);
@@ -160,13 +137,36 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   const int width = std::max(
       kBadgeHeight, gfx::GetStringWidth(count, font) + kBadgeHeight / 2);
   const gfx::RectF badge(kSize - width, 0, width, kBadgeHeight);
-  gfx::RectF ring = badge;
-  ring.Outset(kBadgeRing);
-  cc::PaintFlags cut;
-  cut.setAntiAlias(true);
-  cut.setBlendMode(SkBlendMode::kClear);
-  canvas->DrawRoundRect(ring, ring.height() / 2, cut);
-  canvas->Restore();
+  cc::PaintFlags fill;
+  fill.setAntiAlias(true);
+  {
+    gfx::ScopedCanvas scoped(canvas);
+    if (unread) {
+      // The fill and the icon leave a ring around the badge unpainted, so the
+      // ring shows whatever is behind the button: the tint, or the glass.
+      gfx::RectF ring = badge;
+      ring.Outset(kBadgeRing);
+      canvas->sk_canvas()->clipRRect(
+          SkRRect::MakeRectXY(gfx::RectFToSkRect(ring), ring.height() / 2,
+                              ring.height() / 2),
+          SkClipOp::kDifference, /*do_anti_alias=*/true);
+    }
+    if (open || GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+      fill.setColor(open ? SkColorSetA(accent, kOpenAlpha)
+                         : SkColorSetA(text, kHoverAlpha));
+      canvas->DrawRoundRect(GetLocalBounds(), kRadius, fill);
+    }
+    const bool active = GetWidget() && GetWidget()->ShouldPaintAsActive();
+    canvas->Translate(gfx::Vector2d((kSize - kIconSize) / 2,
+                                    (kSize - kIconSize) / 2));
+    gfx::PaintVectorIcon(
+        canvas, kInboxIcon, kIconSize,
+        open ? accent
+             : SkColorSetA(text, active ? kIconAlpha : kInactiveIconAlpha));
+  }
+  if (unread == 0) {
+    return;
+  }
   fill.setColor(accent);
   canvas->DrawRoundRect(badge, kBadgeHeight / 2.0f, fill);
   canvas->DrawStringRectWithFlags(
