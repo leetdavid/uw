@@ -7,9 +7,11 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/task/sequenced_task_runner.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
@@ -264,6 +266,9 @@ InactivePinOverlay::InactivePinOverlay(BrowserView* browser_view)
     tab_pictures_ = tabs->ObservePictures(base::BindRepeating(
         &InactivePinOverlay::Update, base::Unretained(this)));
   }
+  activated_ =
+      browser_view_->browser()->RegisterDidBecomeActive(base::BindRepeating(
+          &InactivePinOverlay::OnBecameActive, base::Unretained(this)));
 }
 
 InactivePinOverlay::~InactivePinOverlay() {
@@ -338,6 +343,21 @@ void InactivePinOverlay::Update() {
           : TabOrganizationController::From(browser_view_->browser())
                 ->PictureOf(tab));
   view->SetVisible(true);
+}
+
+void InactivePinOverlay::OnBecameActive(BrowserWindowInterface* window) {
+  // Later, so a click that brought the window to the front picks its tab
+  // first.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&InactivePinOverlay::BringPageToFront,
+                                weak_factory_.GetWeakPtr()));
+}
+
+void InactivePinOverlay::BringPageToFront() {
+  if (GetShownView() && GetLastActiveBrowserWindowInterfaceWithAnyProfile() ==
+                            browser_view_->browser()) {
+    BringPage();
+  }
 }
 
 void InactivePinOverlay::BringPage() {

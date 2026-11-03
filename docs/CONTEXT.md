@@ -71,7 +71,7 @@ _Avoid_: Media controls, now playing, audio bar.
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
 **Inactive pinned view**:
-A hazed placeholder where a pinned page's live session is currently displayed in another window. Selecting it transfers the session back.
+A hazed placeholder where a pinned page's live session is currently displayed in another window. Clicking it, or bringing its window to the front, transfers the session back.
 
 **Regular tab**:
 A page tab or terminal tab in a workspace's tab tree.

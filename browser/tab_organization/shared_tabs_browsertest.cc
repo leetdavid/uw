@@ -26,6 +26,7 @@
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
@@ -143,6 +144,13 @@ void SelectByClick(Browser* window, tabs::TabInterface* tab) {
       window->tab_strip_model()->GetIndexOfTab(tab),
       TabStripUserGestureDetails(
           TabStripUserGestureDetails::GestureType::kMouse));
+}
+
+// Brings `window` to the front, as a click on it would. A headless window
+// stays active once shown, so it is made inactive first.
+void Focus(Browser* window) {
+  BrowserActiveStateManager::From(window)->DidBecomeInactive();
+  window->GetWindow()->Activate();
 }
 
 views::View* FindRow(views::View* view, const tabs::TabInterface* tab) {
@@ -455,6 +463,26 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, SelectingACopyBringsItsLivePage) {
       [&] { return !TabOrganizationController::IsCopy(notes); }));
   EXPECT_EQ("half-typed", content::EvalJs(notes->GetContents(), kNotesInput));
   EXPECT_FALSE(InactivePinOverlay::From(first)->GetShownView());
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       FocusingTheWindowBringsItsLivePage) {
+  Browser* first = browser();
+  tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(), kTypeIntoNotes));
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  SelectByClick(second, TabAt(second, kNotes));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return InactivePinOverlay::From(first)->GetShownView(); }));
+
+  Focus(first);
+
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !TabOrganizationController::IsCopy(notes); }));
+  EXPECT_EQ("half-typed", content::EvalJs(notes->GetContents(), kNotesInput));
+  EXPECT_FALSE(InactivePinOverlay::From(first)->GetShownView());
+  EXPECT_TRUE(InactivePinOverlay::From(second)->GetShownView());
 }
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ACopyFollowsItsLivePage) {

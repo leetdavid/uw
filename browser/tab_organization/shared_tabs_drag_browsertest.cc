@@ -214,9 +214,10 @@ IN_PROC_BROWSER_TEST_F(SharedTabsDragBrowserTest,
 }
 
 // The window a page left shows a picture of the page, hazed, with "Open
-// here", and a click on it brings the page back.
+// here". Bringing that window to the front brings the page back, and so does
+// a click on the hazed view.
 IN_PROC_BROWSER_TEST_F(SharedTabsDragBrowserTest,
-                       MANUAL_TheHazedViewShowsThePageAndAClickBringsItBack) {
+                       MANUAL_TheHazedViewShowsThePageAndFocusBringsItBack) {
   Browser* first = browser();
   Place(first, gfx::Rect(0, 40, 500, 600));
   tabs::TabInterface* mail = Open(kMail);
@@ -242,10 +243,20 @@ IN_PROC_BROWSER_TEST_F(SharedTabsDragBrowserTest,
   Wait(base::Milliseconds(500));
   SaveWindowScreenshot(first, "shared-tabs-hazed-view");
 
-  ui_controls::EnableUIControls();
   first->GetWindow()->Activate();
-  ASSERT_TRUE(
-      base::test::RunUntil([&] { return first->GetWindow()->IsActive(); }));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(mail) &&
+           !InactivePinOverlay::From(first)->GetShownView();
+  }));
+
+  // When the second window takes it back, the first one stays in front with
+  // the hazed view until it is clicked.
+  TabOrganizationController::From(second)->BringLivePage(TabAt(second, kMail));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return TabOrganizationController::IsCopy(mail) &&
+           InactivePinOverlay::From(first)->GetShownView();
+  }));
+  ui_controls::EnableUIControls();
   MoveMouse(InactivePinOverlay::From(first)
                 ->GetShownView()
                 ->GetBoundsInScreen()

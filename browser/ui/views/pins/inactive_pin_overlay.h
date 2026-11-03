@@ -5,6 +5,7 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
@@ -22,8 +23,9 @@ class HazeView;
 // Covers the page of a window whose selected pin, or selected shared tab, has
 // its live page in another window, per the design frame "Pins: the live page
 // in another window": a blurred, dimmed picture of the page as it left, with
-// "Open here" in the middle. A click anywhere on it brings the live page
-// here. Owned by EmbedderBrowserWindowFeatures.
+// "Open here" in the middle. A click anywhere on it, or the window coming to
+// the front, brings the live page here. Owned by
+// EmbedderBrowserWindowFeatures.
 class InactivePinOverlay : public TabStripModelObserver,
                            public views::ViewObserver {
  public:
@@ -52,6 +54,9 @@ class InactivePinOverlay : public TabStripModelObserver,
  private:
   void Update();
   void BringPage();
+  void OnBecameActive(BrowserWindowInterface* window);
+  // Brings the live page while the window is the one in front.
+  void BringPageToFront();
 
   HazeView* haze();
 
@@ -60,7 +65,9 @@ class InactivePinOverlay : public TabStripModelObserver,
   base::ScopedObservation<views::View, views::ViewObserver> contents_{this};
   base::CallbackListSubscription pictures_;
   base::CallbackListSubscription tab_pictures_;
+  base::CallbackListSubscription activated_;
   ui::ScopedUnownedUserData<InactivePinOverlay> user_data_;
+  base::WeakPtrFactory<InactivePinOverlay> weak_factory_{this};
 };
 
 }  // namespace uw

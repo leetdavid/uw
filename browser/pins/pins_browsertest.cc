@@ -28,6 +28,7 @@
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_tabrestore.h"
@@ -176,6 +177,13 @@ class PinsBrowserTest : public headless::HeadlessModeBrowserTest {
       return haze != nullptr;
     }));
     return haze;
+  }
+
+  // Brings `window` to the front, as a click on it would. A headless window
+  // stays active once shown, so it is made inactive first.
+  static void Focus(Browser* window) {
+    BrowserActiveStateManager::From(window)->DidBecomeInactive();
+    window->GetWindow()->Activate();
   }
 
   static void Click(views::View* view, const gfx::Point& at) {
@@ -777,6 +785,23 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TheWindowThePageLeftShowsItHazed) {
   EXPECT_EQ(StateOf(page), state);
 }
 
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, FocusingTheWindowBringsThePage) {
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  ASSERT_TRUE(content::ExecJs(page, kTypeIntoNotes));
+  const std::string state = StateOf(page);
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  MovePage(browser(), second);
+  ASSERT_TRUE(WaitForHaze(browser()));
+
+  Focus(browser());
+
+  ASSERT_TRUE(Holds(browser(), page));
+  EXPECT_FALSE(InactivePinOverlay::From(browser())->GetShownView());
+  EXPECT_TRUE(WaitForHaze(second));
+  EXPECT_EQ(StateOf(page), state);
+}
+
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
                        PRE_APlaceholderStaysUnloadedAfterARestart) {
   SessionStartupPref::SetStartupPref(
@@ -1072,11 +1097,12 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, MANUAL_TheHazedViewShowsInARealWindow) {
   Pin(browser(), GURL(kNotes));
   Browser* second = CreateBrowser(profile);
   ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  // macOS draws a window behind another only once it comes to the front. The
+  // page follows a window that comes to the front, so it moves after.
+  browser()->GetWindow()->Activate();
   MovePage(browser(), second);
   views::View* haze = WaitForHaze(browser());
   ASSERT_TRUE(haze);
-  // macOS draws a window behind another only once it comes to the front.
-  browser()->GetWindow()->Activate();
 
   views::View* pill = haze->children().back();
   SkColor in_pill = SK_ColorTRANSPARENT;
