@@ -66,6 +66,7 @@ constexpr size_t kMaxUndoActions = 100;
 
 TabOrganizationController::LinksFromAnotherApp* g_links_from_another_app =
     nullptr;
+bool g_dropping_links = false;
 
 bool Has(const std::vector<PageId>& ids, const PageId& id) {
   return std::ranges::find(ids, id) != ids.end();
@@ -643,7 +644,9 @@ void TabOrganizationController::DidOpenTab(BrowserWindowInterface* window,
     return;
   }
   self->shared_->opened().insert(*id);
-  if (source) {
+  if (g_dropping_links) {
+    // The tree took it in where it was dropped, which is where it stays.
+  } else if (source) {
     if (const std::optional<PageId> parent =
             self->IdFor(self->tabs_->GetTabForWebContents(source))) {
       self->shared_->tree().SetParent(*id, *parent);
@@ -676,6 +679,11 @@ TabOrganizationController::LinksFromAnotherApp::LinksFromAnotherApp()
 
 TabOrganizationController::LinksFromAnotherApp::~LinksFromAnotherApp() =
     default;
+
+TabOrganizationController::DroppedLinks::DroppedLinks()
+    : current_(&g_dropping_links, true) {}
+
+TabOrganizationController::DroppedLinks::~DroppedLinks() = default;
 
 content::WebContents* TabOrganizationController::RestoreTab(
     BrowserWindowInterface* window,

@@ -2666,3 +2666,24 @@ index a6171fc347019e8650936b878e9d8827b05bbd0d..55aae3b364b2f9c7539d26360fa66020
        TabGroupModel* browser_group_model =
            browser->GetFeatures().tab_strip_model()->group_model();
        if (!browser_group_model) {
+diff --git a/chrome/browser/ui/views/frame/browser_root_view.cc b/chrome/browser/ui/views/frame/browser_root_view.cc
+index e76865ea1ed81e709e382cba469a5bcd2ef3021f..4d6b3bf0fe37978e92752e640e6110af546b03f0 100644
+--- a/chrome/browser/ui/views/frame/browser_root_view.cc
++++ b/chrome/browser/ui/views/frame/browser_root_view.cc
+@@ -54,6 +54,7 @@
+ #include "ui/compositor/paint_recorder.h"
+ #include "ui/views/view.h"
+ #include "url/url_constants.h"
++#include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #if BUILDFLAG(ENABLE_PLUGINS)
+ #include "content/public/browser/plugin_service.h"
+@@ -644,6 +645,8 @@ void BrowserRootView::NavigateToDroppedUrls(
+     ++insertion_index;  // Additional URLs inserted to the right.
+   }
+ 
++  // uw: the tabs a drop opens stay where they were dropped.
++  uw::TabOrganizationController::DroppedLinks dropped_links;
+   for (const GURL& url : std::views::reverse(urls)) {
+     NavigateParams params(browser_view_->browser(), url,
+                           ui::PAGE_TRANSITION_LINK);

@@ -101,6 +101,18 @@ class TabOrganizationController : public TabStripModelObserver,
     base::AutoReset<LinksFromAnotherApp*> current_;
     std::optional<PageId> last_;
   };
+  // While one lives, the tabs that open are links or files dropped on the
+  // sidebar. They stay where they were dropped, as a dragged tab does.
+  class DroppedLinks {
+   public:
+    DroppedLinks();
+    DroppedLinks(const DroppedLinks&) = delete;
+    DroppedLinks& operator=(const DroppedLinks&) = delete;
+    ~DroppedLinks();
+
+   private:
+    base::AutoReset<bool> current_;
+  };
   // Takes back what the session saved for a restored tab. A tab that held a
   // copy comes back as one before it loads, and the page it returns stands in
   // for `page`.

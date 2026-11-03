@@ -33,12 +33,20 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gtest_mac.h"
+#include "ui/base/dragdrop/drag_drop_types.h"
+#include "ui/base/dragdrop/drop_target_event.h"
+#include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+#include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/hit_test.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_tree_owner.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #import "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
@@ -147,6 +155,39 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   int Depth(tabs::TabInterface* tab) { return controller()->DepthFor(tab); }
+
+  std::vector<tabs::TabInterface*> Order() {
+    std::vector<tabs::TabInterface*> order;
+    for (int i = 0; i < tabs()->count(); ++i) {
+      order.push_back(tabs()->GetTabAtIndex(i));
+    }
+    return order;
+  }
+
+  // Drops a link at the top or bottom edge of `tab`'s row, as a link or file
+  // dragged in from another app lands, and returns the tab it opens.
+  tabs::TabInterface* DropLinkAt(tabs::TabInterface* tab, bool below) {
+    TabView* row = TabRowOf(tab);
+    views::View* root = row->GetWidget()->GetRootView();
+    gfx::Point point(row->width() / 2, below ? row->height() - 2 : 2);
+    views::View::ConvertPointToTarget(row, root, &point);
+    ui::OSExchangeData data;
+    data.SetURL(GURL("about:blank"), std::u16string());
+    const ui::DropTargetEvent event(data, gfx::PointF(point),
+                                    gfx::PointF(point),
+                                    ui::DragDropTypes::DRAG_COPY);
+    root->OnDragEntered(event);
+    // The window checks the link off the main thread before it takes it.
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return root->OnDragUpdated(event) != ui::DragDropTypes::DRAG_NONE;
+    }));
+    const int count = tabs()->count();
+    ui::mojom::DragOperation operation = ui::mojom::DragOperation::kNone;
+    root->GetDropCallback(event).Run(event, operation, nullptr);
+    Settle();
+    EXPECT_EQ(tabs()->count(), count + 1);
+    return tabs()->GetActiveTab();
+  }
 
   // The views of class T on screen.
   template <typename T>
@@ -692,6 +733,28 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
   Settle();
   EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
   EXPECT_EQ(OpacitiesOn(tree.b), std::set<float>{1.0f});
+}
+
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       ALinkDroppedOnTheSidebarOpensWhereItWasDropped) {
+  // Rows that grow into place would move out from under the drop.
+  gfx::ScopedAnimationDurationScaleMode instant(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  const Tree tree = OpenTree();
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(tree.a));
+  Settle();
+
+  tabs::TabInterface* last = DropLinkAt(tree.d, /*below=*/true);
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{tree.a, tree.b, tree.c,
+                                                       tree.d, last}));
+  EXPECT_EQ(Depth(last), 0);
+
+  // Between a page and its child, it joins the child.
+  tabs::TabInterface* nested = DropLinkAt(tree.c, /*below=*/false);
+  EXPECT_EQ(Order(), (std::vector<tabs::TabInterface*>{tree.a, tree.b, nested,
+                                                       tree.c, tree.d, last}));
+  EXPECT_EQ(Depth(nested), 2);
+  EXPECT_EQ(Depth(tree.c), 2);
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
