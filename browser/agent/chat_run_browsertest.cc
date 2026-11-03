@@ -2,12 +2,14 @@
 
 #include "uw/browser/agent/chat_run.h"
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
@@ -17,10 +19,13 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/url_loader_interceptor.h"
+#include "net/base/net_errors.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "services/network/public/cpp/url_loader_completion_status.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/agent/scripted_model.h"
@@ -174,6 +179,32 @@ IN_PROC_BROWSER_TEST_F(ChatRunBrowserTest, AModelThatCannotBeReachedIsNoFault) {
 
   EXPECT_EQ(outcome.kind, Kind::kModelUnreachable);
   EXPECT_THAT(outcome.error, HasSubstr("HTTP 503"));
+}
+
+IN_PROC_BROWSER_TEST_F(ChatRunBrowserTest, ARunRidesOutANetworkChange) {
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("report", base::DictValue()
+                                             .Set("found", false)
+                                             .Set("message", "Nothing new.")))),
+       ScriptedModel::Answer("Reported.")});
+  std::atomic<int> changed = 0;
+  content::URLLoaderInterceptor interceptor(base::BindLambdaForTesting(
+      [&](content::URLLoaderInterceptor::RequestParams* params) {
+        if (!params->url_request.url.path().starts_with("/v1/") ||
+            changed.exchange(1) != 0) {
+          return false;
+        }
+        params->client->OnComplete(
+            network::URLLoaderCompletionStatus(net::ERR_NETWORK_CHANGED));
+        return true;
+      }));
+
+  const ChatRun::Outcome outcome = Run("The request: Any news about uw?");
+
+  EXPECT_EQ(changed, 1);
+  EXPECT_EQ(outcome.kind, Kind::kReported);
+  EXPECT_EQ(model_.Requests().size(), 2u);
 }
 
 }  // namespace

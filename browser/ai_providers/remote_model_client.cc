@@ -22,6 +22,9 @@ namespace uw {
 namespace {
 
 constexpr size_t kMaxResponseBytes = 64 * 1024;
+// Tries again at once when the network changes under a request or a name
+// lookup fails, as after joining Wi-Fi or a VPN.
+constexpr int kNetworkRetries = 3;
 // Vercel AI Gateway and OpenRouter list their models in over half a megabyte.
 constexpr size_t kMaxListBytes =
     network::SimpleURLLoader::kMaxBoundedStringDownloadSize;
@@ -141,6 +144,9 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
       network::SimpleURLLoader::Create(std::move(resource), kTrafficAnnotation);
   loader_->SetAllowHttpErrorResults(true);
   loader_->SetTimeoutDuration(timeout_);
+  loader_->SetRetryOptions(
+      kNetworkRetries, network::SimpleURLLoader::RETRY_ON_NETWORK_CHANGE |
+                           network::SimpleURLLoader::RETRY_ON_NAME_NOT_RESOLVED);
   // Reject redirects: following one could send the API key elsewhere.
   loader_->SetOnRedirectCallback(base::BindRepeating(
       [](base::WeakPtr<RemoteModelClient> self, const GURL&,
