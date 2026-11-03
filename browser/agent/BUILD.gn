@@ -63,6 +63,7 @@ source_set("user_tabs") {
     "//uw/components/agent",
   ]
   deps = [
+    ":chat_tab",
     ":run_window_mark",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
@@ -206,18 +207,20 @@ source_set("scheduled_chats") {
   ]
 }
 
-# What the browser's commands need to open a chat.
+# What the browser's commands need to open a chat, and what a close that
+# would stop a chat asks it.
 source_set("chat_tab") {
   sources = [
     "chat_tab.cc",
     "chat_tab.h",
   ]
   public_deps = [
+    "//base",
     "//components/tabs:public",
     "//url",
   ]
   deps = [
-    "//base",
+    ":run_window_mark",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/tab_list",
     "//chrome/browser/ui/browser_window",
@@ -255,10 +258,15 @@ source_set("chat_notification") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "fake_chat.cc",
+    "fake_chat.h",
     "scripted_model.cc",
     "scripted_model.h",
   ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    ":chat_tab",
+    "//base",
+  ]
   deps = [ "//net:test_support" ]
 }
 
@@ -316,12 +324,14 @@ source_set("browser_tests") {
     "//ui/base",
     "//ui/message_center/public/cpp",
     "//ui/gfx/geometry",
+    "//ui/views",
     "//url",
     "//uw/browser/ai_providers",
     "//uw/browser/ai_providers:test_support",
     "//uw/browser/pins",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",
+    "//uw/browser/ui/views/terminal",
     "//uw/browser/workspaces",
     "//uw/components/agent",
     "//uw/components/ai_providers",

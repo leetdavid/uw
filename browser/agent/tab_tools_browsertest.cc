@@ -32,6 +32,8 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/agent/agent_tools.h"
+#include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/fake_chat.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
@@ -354,6 +356,19 @@ IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest,
   EXPECT_EQ(*Call(kMoveTool, Tabs({pin}).Set("scratchpad", true))
                  .FindString("refused"),
             "it's a pinned tab");
+}
+
+// Another chat's tab stays while its agent works, as a busy terminal does.
+IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest, AWorkingChatIsNotClosed) {
+  tabs::TabInterface* other = Open("hotels");
+  FakeChat chat(other->GetContents(), ChatWork::kWorking);
+  EXPECT_THAT(*Call(kTabsTool, base::DictValue()).FindString("list"),
+              HasSubstr("hotels · 127.0.0.1 · working"));
+  const base::DictValue working = Call(kCloseTool, Tabs({IdOf(other)}));
+  EXPECT_EQ(*working.FindString("refused"), "it's a working chat");
+  EXPECT_EQ(*working.FindString("error"),
+            "Didn't close hotels: it's a working chat.");
+  EXPECT_TRUE(IsOpen(other));
 }
 
 IN_PROC_BROWSER_TEST_F(TabToolsBrowserTest,

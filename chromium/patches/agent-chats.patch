@@ -1,8 +1,19 @@
 diff --git a/chrome/common/chrome_features.cc b/chrome/common/chrome_features.cc
-index a67210a0392247edca3ab3f561275db8ea103c68..a85ed7550b1612c577fff80179ee9f65f0ac9abb 100644
+index a67210a0392247edca3ab3f561275db8ea103c68..4d486dd5d7b5f365f1ad6938e9cd931732dc344a 100644
 --- a/chrome/common/chrome_features.cc
 +++ b/chrome/common/chrome_features.cc
-@@ -389,17 +389,21 @@ const char kGlicActorUiBorderGlowName[] = "glic-actor-ui-border-glow";
+@@ -316,7 +316,9 @@ const base::FeatureParam<base::TimeDelta> kGlicActorClickDelay{
+ 
+ // Controls whether the Actor UI components are enabled.
+ BASE_FEATURE(kGlicActorUi, base::FEATURE_ENABLED_BY_DEFAULT);
+-BASE_FEATURE(kGlicConfirmTabClose, base::FEATURE_ENABLED_BY_DEFAULT);
++// uw: off. uw asks once before a close stops a working chat, where this asked
++// on each of the agent's pages. See docs/plans/agent-chats.md.
++BASE_FEATURE(kGlicConfirmTabClose, base::FEATURE_DISABLED_BY_DEFAULT);
+ // Controls whether we ignore users preference of reduced motion enabled and
+ // still show the tab indicator spinner. No-op if kGlicActorUiTabIndicator is
+ // disabled.
+@@ -389,17 +391,21 @@ const char kGlicActorUiBorderGlowName[] = "glic-actor-ui-border-glow";
  const char kGlicActorUiDebounceTimerName[] = "glic-actor-ui-debounce-timer";
  
  // Controls whether the task icon in the actor ui is enabled.
@@ -210,110 +221,3 @@ index 858751870a6ebfe439b47b3e80e66828d55aaa51..4b17e44059e639186d297b3e5fbe23b2
    <variant name="Web" summary="Web"/>
  </variants>
  
-diff --git a/chrome/browser/actor/ui/actor_task_unload_handler.cc b/chrome/browser/actor/ui/actor_task_unload_handler.cc
-index 160be49ea2a32de756be8ad4133da02777dbe926..417be14fc93677240e680cf9bfc55d31b0237cf1 100644
---- a/chrome/browser/actor/ui/actor_task_unload_handler.cc
-+++ b/chrome/browser/actor/ui/actor_task_unload_handler.cc
-@@ -278,8 +278,17 @@ bool ActorTaskUnloadHandler::ShouldShowCustomConfirmation(
- bool ActorTaskUnloadHandler::ShowCustomConfirmation(
-     content::WebContents* contents,
-     base::OnceCallback<void(bool)> on_closed) {
-+  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents);
-+  if (!tab) {
-+    return false;
-+  }
-+  // uw: a tab whose question is open waits for that answer.
-+  const tabs::TabHandle handle = tab->GetHandle();
-+  if (owned_widgets_.contains(handle)) {
-+    return true;
-+  }
-   auto stop_and_create_tag_callback = base::BindOnce(
--      [](base::WeakPtr<ActorTaskUnloadHandler> handler,
-+      [](base::WeakPtr<ActorTaskUnloadHandler> handler, tabs::TabHandle handle,
-          base::WeakPtr<content::WebContents> contents,
-          base::OnceCallback<void(bool)> on_closed, bool confirmed) {
-         if (confirmed && contents) {
-@@ -290,36 +299,39 @@ bool ActorTaskUnloadHandler::ShowCustomConfirmation(
-         }
-         base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-             FROM_HERE, base::BindOnce(
--                           [](base::WeakPtr<ActorTaskUnloadHandler> handler) {
-+                           [](base::WeakPtr<ActorTaskUnloadHandler> handler,
-+                              tabs::TabHandle handle) {
-                              if (handler) {
--                               handler->owned_widget_.reset();
-+                               handler->owned_widgets_.erase(handle);
-                              }
-                            },
--                           handler));
-+                           handler, handle));
-         std::move(on_closed).Run(confirmed);
-       },
--      weak_factory_.GetWeakPtr(), contents ? contents->GetWeakPtr() : nullptr,
--      std::move(on_closed));
--  owned_widget_ = ActorTaskTabCloseConfirmDialog::ShowModalIfActuating(
--      contents, std::move(stop_and_create_tag_callback));
--  if (owned_widget_) {
--    active_widget_ = owned_widget_->GetWeakPtr();
--    owned_widget_->MakeCloseSynchronous(base::BindOnce(
-+      weak_factory_.GetWeakPtr(), handle,
-+      contents ? contents->GetWeakPtr() : nullptr, std::move(on_closed));
-+  std::unique_ptr<views::Widget> widget =
-+      ActorTaskTabCloseConfirmDialog::ShowModalIfActuating(
-+          contents, std::move(stop_and_create_tag_callback));
-+  if (widget) {
-+    active_widget_ = widget->GetWeakPtr();
-+    widget->MakeCloseSynchronous(base::BindOnce(
-         [](base::WeakPtr<ActorTaskUnloadHandler> handler,
--           views::Widget::ClosedReason reason) {
-+           tabs::TabHandle handle, views::Widget::ClosedReason reason) {
-           if (handler) {
-             base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
--                FROM_HERE,
--                base::BindOnce(
--                    [](base::WeakPtr<ActorTaskUnloadHandler> handler) {
--                      if (handler) {
--                        handler->owned_widget_.reset();
--                      }
--                    },
--                    handler));
-+                FROM_HERE, base::BindOnce(
-+                               [](base::WeakPtr<ActorTaskUnloadHandler> handler,
-+                                  tabs::TabHandle handle) {
-+                                 if (handler) {
-+                                   handler->owned_widgets_.erase(handle);
-+                                 }
-+                               },
-+                               handler, handle));
-           }
-         },
--        weak_factory_.GetWeakPtr()));
-+        weak_factory_.GetWeakPtr(), handle));
-+    owned_widgets_[handle] = std::move(widget);
-     return true;
-   }
-   return false;
-diff --git a/chrome/browser/actor/ui/actor_task_unload_handler.h b/chrome/browser/actor/ui/actor_task_unload_handler.h
-index 4dae226f8d14101303c461a74b87bb16fc057122..9f74ac4ceda78c3cc875d593175982a2c840c479 100644
---- a/chrome/browser/actor/ui/actor_task_unload_handler.h
-+++ b/chrome/browser/actor/ui/actor_task_unload_handler.h
-@@ -5,6 +5,7 @@
- #ifndef CHROME_BROWSER_ACTOR_UI_ACTOR_TASK_UNLOAD_HANDLER_H_
- #define CHROME_BROWSER_ACTOR_UI_ACTOR_TASK_UNLOAD_HANDLER_H_
- 
-+#include <map>
- #include <memory>
- 
- #include "base/functional/callback.h"
-@@ -80,7 +81,10 @@ class ActorTaskUnloadHandler : public UnloadController::TabUnloadHandler {
-   views::Widget* GetActiveDialogWidgetForTesting() const;
- 
-  private:
--  std::unique_ptr<views::Widget> owned_widget_;
-+  // uw: one question per tab. With a single widget, a second tab's question
-+  // destroyed the first tab's open one, which answered it with "stay" while
-+  // the tab strip was still closing tabs.
-+  std::map<tabs::TabHandle, std::unique_ptr<views::Widget>> owned_widgets_;
-   base::WeakPtr<views::Widget> active_widget_;
-   base::WeakPtrFactory<ActorTaskUnloadHandler> weak_factory_{this};
- };

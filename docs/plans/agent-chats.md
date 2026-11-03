@@ -180,12 +180,13 @@ Implementability: **7/10** using the [roadmap convention](roadmap.md#implementab
 - Chromium's own "Leave site and end task?" is turned off. It asked on every page the agent had opened or been handed, whenever the chat's page was open, even after the chat had answered. Its Leave stopped the engine task the chat's agent uses, so every later page tool in that chat failed until the chat page reloaded. Its Cancel during a task's close took the task's other tabs out of the task. And its "task" meant the agent's work, not a uw [task](../CONTEXT.md#language).
 - The design is the frames "Working chat warning: the dialog" and "Working chat warning: every state" on the canvas page "Keyboard and mouse".
 
-How it will be built:
+How it is built, on 2026-11-03 as T318:
 
-- `CloseWarning` also asks, for each closing tab, whether it is a chat page whose agent is working or waits for approval (`UwChatHandler`), next to `FindBusyTerminals`. Clear and the tab tools ask the same.
-- The quit hook in `uw-busy-terminals.patch` moves out of `BrowserCloseManager`'s Mac-only block, so Exit on Windows reaches it. It is checked in the Windows VM.
-- `kGlicConfirmTabClose` goes off in `agent-chats.patch`. T285's section for `actor_task_unload_handler` goes too, since nothing can reach it, and `AgentToolsBrowserTest.ClosingATaskAsksOnEachPageTheAgentWorksIn` changes to check that closing the task asks once and does not crash.
-- The Help pages `tasks`, `chats`, and `terminal-tabs` say so, and the line T285 added to `tasks` goes.
+- A chat page tells what its agent does through `ChatWorkSource` (`browser/agent/chat_tab.h`), which `UwChatHandler` registers on its tab. `IsWorkingChat` reads it for `CloseWarning`, Clear, the tab tools, and `uw tabs`. A chat in the run window never counts.
+- `CloseWarning` asks when a close holds a busy terminal or a working chat, and lists the chats first. When its window is hidden, as the one uw keeps after the last window closes, the dialog shows on its own instead of over that window. That also fixes the busy terminal warning's quit with no window showing.
+- The quit hook in `uw-busy-terminals.patch` runs on every platform. After a yes it runs the check again past the question, so Windows still asks about downloads in progress.
+- `kGlicConfirmTabClose` is off in `agent-chats.patch`, and T285's section for `actor_task_unload_handler` is gone.
+- As built: a chat waiting for a password reads "Waits for your password". A window's rows put the task after the title on one line, as the busy terminal rows do, and the window's sentence says "in its terminal", as a task's does.
 
 ## Context
 

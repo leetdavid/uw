@@ -589,7 +589,7 @@ test("mcp serve leaves a step to uw's notification when the client can't ask", a
 
 const LISTED = (id: string, title: string, url: string, extra: object = {}) => ({
   id, title, url, place: "Personal › Scratchpad", workspace: "Personal", task: null, parent: null, depth: 0,
-  selected: false, kept: false, pinned: false, busy: false, seen: null, ...extra,
+  selected: false, kept: false, pinned: false, busy: false, working: false, seen: null, ...extra,
 });
 
 function tabsUw(): Promise<void> {
@@ -602,6 +602,7 @@ function tabsUw(): Promise<void> {
         LISTED("3f9a1c07", "TAP Air Portugal – Manage booking", "https://www.flytap.com/manage", { ...inFlights, selected: true }),
         LISTED("18a7e0b2", "SFO to LIS · KAYAK", "https://www.kayak.com/", { ...inFlights, depth: 1, parent: "3f9a1c07", seen: new Date(Date.now() - 6 * 86400000).toISOString() }),
         LISTED("e2b9f604", "~/dev/shop-web", "chrome://terminal/", { busy: true }),
+        LISTED("4d2a9e61", "Find a hotel in Alfama", "chrome://chat/4d2a9e61", { working: true }),
       ] } };
     }
     if (method === "tabs.move") {
@@ -625,7 +626,8 @@ test("uw tabs list draws the workspace's tree and names the others", async () =>
   assert.match(lines[3]!, /^ {2}3f9a1c07 {2}TAP Air Portugal – Manage booking +flytap\.com +selected$/);
   assert.match(lines[4]!, /^ {4}18a7e0b2 {2}SFO to LIS · KAYAK +kayak\.com +6 days ago$/);
   assert.match(lines[6]!, /^ {2}e2b9f604 {2}~\/dev\/shop-web +terminal +busy$/);
-  assert.equal(lines[7], "3 tabs in Personal. Work has 21: uw tabs list --workspace Work");
+  assert.match(lines[7]!, /^ {2}4d2a9e61 {2}Find a hotel in Alfama +uw:\/\/chat +working$/);
+  assert.equal(lines[8], "4 tabs in Personal. Work has 21: uw tabs list --workspace Work");
 });
 
 test("uw tabs move starts a task, and a refusal says why with its exit code", async () => {

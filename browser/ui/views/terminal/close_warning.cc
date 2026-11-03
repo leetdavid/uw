@@ -2,16 +2,19 @@
 
 #include "uw/browser/ui/views/terminal/close_warning.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/notreached.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "build/build_config.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -38,6 +41,7 @@
 #include "ui/views/style/typography.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -68,6 +72,24 @@ std::u16string Count(size_t count,
                     : base::StrCat({base::NumberToString16(count), many});
 }
 
+// Whether a close of `pages` may stop a busy terminal or a working chat.
+bool MayAsk(const std::vector<content::WebContents*>& pages) {
+  return HasTerminal(pages) || std::ranges::any_of(pages, &IsWorkingChat);
+}
+
+std::u16string WorkOf(content::WebContents* chat) {
+  switch (ChatWorkOf(chat)) {
+    case ChatWork::kWaitsForApproval:
+      return u"Waits for approval";
+    case ChatWork::kWaitsForPassword:
+      return u"Waits for your password";
+    case ChatWork::kIdle:
+    case ChatWork::kWorking:
+      return u"Working";
+  }
+  NOTREACHED();
+}
+
 }  // namespace
 
 CloseWarning::CloseWarning(BrowserWindowInterface* window)
@@ -93,7 +115,7 @@ views::Widget* CloseWarning::DialogForTesting(BrowserWindowInterface* window) {
 
 bool CloseWarning::HoldTabs(const std::vector<content::WebContents*>& pages,
                             TabsDone done) {
-  if (releasing_ || !CanAsk() || !HasTerminal(pages)) {
+  if (releasing_ || !CanAsk() || !MayAsk(pages)) {
     return false;
   }
   if (asking_) {
@@ -132,7 +154,7 @@ bool CloseWarning::HoldTask(const tab_groups::TabGroupId& task,
        tabs->group_model()->GetTabGroup(task)->ListTabs().ToIntVector()) {
     pages.push_back(tabs->GetWebContentsAt(index));
   }
-  if (!HasTerminal(pages)) {
+  if (!MayAsk(pages)) {
     return false;
   }
   if (asking_) {
@@ -163,7 +185,7 @@ bool CloseWarning::HoldWindow() {
       pages.insert(pages.end(), more.begin(), more.end());
     }
   }
-  if (!HasTerminal(pages)) {
+  if (!MayAsk(pages)) {
     return false;
   }
   if (asking_) {
@@ -194,7 +216,7 @@ bool CloseWarning::HoldQuit(base::OnceCallback<void(bool quit)> done) {
         }
         return true;
       });
-  if (!HasTerminal(pages)) {
+  if (!MayAsk(pages)) {
     return false;
   }
   // Quitting waits for an answer, so one asked during another question is a
@@ -222,13 +244,24 @@ void CloseWarning::Ask(Closing closing,
   closing_ = closing;
   count_ = count;
   task_ = task;
+  pages_.clear();
+  for (content::WebContents* page : pages) {
+    pages_.push_back(page->GetWeakPtr());
+  }
   done_ = std::move(done);
   FindBusyTerminals(
       pages, base::BindOnce(&CloseWarning::Show, weak_factory_.GetWeakPtr()));
 }
 
 void CloseWarning::Show(std::vector<BusyTerminal> busy) {
-  if (busy.empty()) {
+  std::vector<content::WebContents*> chats;
+  for (const base::WeakPtr<content::WebContents>& page : pages_) {
+    if (page && IsWorkingChat(page.get())) {
+      chats.push_back(page.get());
+    }
+  }
+  pages_.clear();
+  if (busy.empty() && chats.empty()) {
     Finish(true);
     return;
   }
@@ -238,49 +271,77 @@ void CloseWarning::Show(std::vector<BusyTerminal> busy) {
   }
 
   const bool one = busy.size() == 1;
-  const std::u16string running =
-      Count(busy.size(), u"A program is", u" programs are");
-  const std::u16string it = one ? u"it" : u"them";
   std::u16string title;
-  std::u16string text;
   std::u16string button;
+  std::u16string closing;
+  // Where the programs run, and where the chats are.
+  std::u16string where;
+  std::u16string among;
   switch (closing_) {
     case Closing::kTab:
       title = u"Close this tab?";
-      text =
-          u"A program is still running in this terminal. Closing the tab "
-          u"stops it.";
       button = u"Close Tab";
+      closing = u"Closing the tab";
+      where = u" in this terminal";
       break;
     case Closing::kTabs:
       title =
           base::StrCat({u"Close ", base::NumberToString16(count_), u" tabs?"});
-      text = base::StrCat({running, u" still running in ",
-                           one ? u"one of them" : u"them",
-                           u". Closing the tabs stops ", it, u"."});
       button = u"Close Tabs";
+      closing = u"Closing the tabs";
+      where = one ? u" in one of them" : u" in them";
+      among = u" in them";
       break;
     case Closing::kTask:
       title = u"Close this task?";
-      text = base::StrCat({running, u" still running in its ",
-                           one ? u"terminal" : u"terminals",
-                           u". Closing the task stops ", it, u"."});
       button = u"Close Task";
+      closing = u"Closing the task";
+      where = one ? u" in its terminal" : u" in its terminals";
+      among = u" in it";
       break;
     case Closing::kWindow:
       title = u"Close this window?";
-      text = base::StrCat({running, u" still running in its ",
-                           one ? u"terminal" : u"terminals",
-                           u". Closing the window stops ", it, u"."});
       button = u"Close Window";
+      closing = u"Closing the window";
+      where = one ? u" in its terminal" : u" in its terminals";
+      among = u" in it";
       break;
     case Closing::kQuit:
+#if BUILDFLAG(IS_WIN)
+      title = u"Exit uw?";
+      button = u"Exit uw";
+      closing = u"Exiting";
+#else
       title = u"Quit uw?";
-      text =
-          base::StrCat({running, u" still running. Quitting stops ", it, u"."});
       button = u"Quit uw";
+      closing = u"Quitting";
+#endif
+      if (!chats.empty()) {
+        where = one ? u" in a terminal" : u" in terminals";
+      }
       break;
   }
+  std::u16string text;
+  if (chats.empty()) {
+    text = base::StrCat({Count(busy.size(), u"A program is", u" programs are"),
+                         u" still running", where, u"."});
+  } else if (closing_ == Closing::kTab) {
+    text = u"This chat is still working.";
+  } else {
+    text =
+        base::StrCat({Count(chats.size(), u"A chat", u" chats"), among,
+                      chats.size() == 1 ? u" is" : u" are", u" still working"});
+    if (!busy.empty()) {
+      base::StrAppend(
+          &text,
+          {u", and ", Count(busy.size(), u"a program is", u" programs are"),
+           u" running", where});
+    }
+    base::StrAppend(&text, {u"."});
+  }
+  base::StrAppend(&text,
+                  {u" ", closing, u" stops ",
+                   chats.size() + busy.size() == 1 ? u"it" : u"them", u"."});
 
   std::unique_ptr<ui::DialogModel> model =
       ui::DialogModel::Builder()
@@ -288,7 +349,8 @@ void CloseWarning::Show(std::vector<BusyTerminal> busy) {
           .AddParagraph(ui::DialogModelLabel(text))
           .AddCustomField(
               std::make_unique<views::BubbleDialogModelHost::CustomView>(
-                  List(busy), views::BubbleDialogModelHost::FieldType::kText))
+                  List(chats, busy),
+                  views::BubbleDialogModelHost::FieldType::kText))
           .AddOkButton(base::BindOnce(&CloseWarning::Answered,
                                       weak_factory_.GetWeakPtr(), true),
                        ui::DialogModel::Button::Params().SetLabel(button))
@@ -300,8 +362,12 @@ void CloseWarning::Show(std::vector<BusyTerminal> busy) {
           .SetDialogDestroyingCallback(base::BindOnce(
               &CloseWarning::Answered, weak_factory_.GetWeakPtr(), false))
           .Build();
+  // Over a hidden window, such as the one uw keeps when its last window
+  // closes, the dialog shows on its own.
+  ui::BaseWindow* parent = window_->GetWindow();
   dialog_ = constrained_window::ShowBrowserModal(
-      std::move(model), window_->GetWindow()->GetNativeWindow());
+      std::move(model),
+      parent->IsVisible() ? parent->GetNativeWindow() : gfx::NativeWindow());
   views::MdTextButton* close =
       dialog_->widget_delegate()->AsDialogDelegate()->GetOkButton();
   close->SetBgColorIdOverride(ui::kColorSysError);
@@ -309,13 +375,17 @@ void CloseWarning::Show(std::vector<BusyTerminal> busy) {
 }
 
 std::unique_ptr<views::View> CloseWarning::List(
+    const std::vector<content::WebContents*>& chats,
     const std::vector<BusyTerminal>& busy) {
   auto list = std::make_unique<views::BoxLayoutView>();
   list->SetOrientation(views::BoxLayout::Orientation::kVertical);
   list->SetInsideBorderInsets(gfx::Insets(3));
   list->SetBackground(views::CreateRoundedRectBackground(
       ui::kColorSysNeutralContainer, kListRadius));
-  for (const BusyTerminal& terminal : busy) {
+  // One row: the page's icon, its title and where it is, and at the right
+  // what runs.
+  const auto add = [&](content::WebContents* page, const gfx::VectorIcon& icon,
+                       std::unique_ptr<views::Label> what) {
     auto* row = list->AddChildView(std::make_unique<views::BoxLayoutView>());
     row->SetCrossAxisAlignment(views::BoxLayout::CrossAxisAlignment::kCenter);
     row->SetMinimumCrossAxisSize(kRowHeight);
@@ -323,23 +393,36 @@ std::unique_ptr<views::View> CloseWarning::List(
     row->SetBetweenChildSpacing(10);
     row->AddChildView(
         std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
-            kTerminalIcon, ui::kColorSysOnSurfaceSubtle, kIconSize)));
+            icon, ui::kColorSysOnSurfaceSubtle, kIconSize)));
     auto* name = row->AddChildView(std::make_unique<views::Label>(
-        terminal.page->GetTitle(), views::style::CONTEXT_DIALOG_BODY_TEXT,
+        page->GetTitle(), views::style::CONTEXT_DIALOG_BODY_TEXT,
         views::style::STYLE_PRIMARY));
     name->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     name->SetElideBehavior(gfx::ELIDE_TAIL);
-    const std::u16string place = PlaceOf(terminal.page.get());
+    const std::u16string place = PlaceOf(page);
     if (!place.empty()) {
       row->AddChildView(std::make_unique<views::Label>(
           place, views::style::CONTEXT_DIALOG_BODY_TEXT,
           views::style::STYLE_SECONDARY));
     }
     row->SetFlexForView(row->AddChildView(std::make_unique<views::View>()), 1);
-    auto* program = row->AddChildView(std::make_unique<views::Label>(
+    row->AddChildView(std::move(what));
+  };
+  for (content::WebContents* chat : chats) {
+    auto work = std::make_unique<views::Label>(
+        WorkOf(chat), views::style::CONTEXT_DIALOG_BODY_TEXT,
+        views::style::STYLE_SECONDARY);
+    if (ChatWorkOf(chat) != ChatWork::kWorking) {
+      work->SetEnabledColor(ui::kColorAlertMediumSeverityText);
+    }
+    add(chat, kChatIcon, std::move(work));
+  }
+  for (const BusyTerminal& terminal : busy) {
+    auto program = std::make_unique<views::Label>(
         base::UTF8ToUTF16(terminal.program),
-        views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_SECONDARY));
+        views::style::CONTEXT_DIALOG_BODY_TEXT, views::style::STYLE_SECONDARY);
     program->SetFontList(gfx::FontList("Menlo, 12px"));
+    add(terminal.page.get(), kTerminalIcon, std::move(program));
   }
   return list;
 }

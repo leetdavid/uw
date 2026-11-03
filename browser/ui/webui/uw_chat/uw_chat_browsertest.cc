@@ -29,6 +29,8 @@
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/lifetime/application_lifetime_desktop.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/optimization_guide/browser_test_util.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
@@ -37,6 +39,7 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
@@ -57,6 +60,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/base/ui_base_switches.h"
@@ -66,6 +70,7 @@
 #include "ui/message_center/public/cpp/notification.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/window/dialog_delegate.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -83,7 +88,9 @@
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
+#include "uw/browser/ui/views/terminal/close_warning.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
+#include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/agent/schedule.h"
 #include "uw/components/ai_providers/providers.h"
 
@@ -2881,6 +2888,80 @@ IN_PROC_BROWSER_TEST_F(UwChatTerminalBrowserTest,
   SaveWindowScreenshot(browser(), "chat-row-unread");
   tabs()->ActivateTabAt(tabs()->GetIndexOfWebContents(chat));
   EXPECT_TRUE(base::test::RunUntil([&] { return !MarkedState(); }));
+}
+
+// A chat's page tells a close that would stop it whether its agent works,
+// so closing its tab asks first. See
+// docs/plans/agent-chats.md#closing-a-working-chat.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ClosingAChatWhileItWorksAsksFirst) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(ChatWorkOf(chat), ChatWork::kIdle);
+
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Find a tour")));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ChatWorkOf(chat) == ChatWork::kWorking; }));
+  CloseWarning::AskInTestsForTesting(true);
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfWebContents(chat),
+                             TabCloseTypes::CLOSE_USER_GESTURE);
+  views::Widget* dialog = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    dialog = CloseWarning::DialogForTesting(browser());
+    return dialog != nullptr;
+  }));
+  EXPECT_EQ(dialog->widget_delegate()->GetWindowTitle(), u"Close this tab?");
+  dialog->widget_delegate()->AsDialogDelegate()->CancelDialog();
+  CloseWarning::AskInTestsForTesting(false);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !CloseWarning::DialogForTesting(browser()); }));
+  EXPECT_NE(tabs()->GetIndexOfWebContents(chat), TabStripModel::kNoTab);
+
+  Reopen(chat);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ChatWorkOf(chat) == ChatWork::kIdle; }));
+
+  ScriptOrder("Ordered.");
+  ASSERT_TRUE(content::ExecJs(chat, SendScript("Place the order")));
+  Approval(chat);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ChatWorkOf(chat) == ChatWork::kWaitsForApproval; }));
+  EXPECT_EQ(UntilTheEnd(chat, ChooseScript("Approve")), "Ordered.");
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return ChatWorkOf(chat) == ChatWork::kIdle; }));
+}
+
+// Once the last window has closed, uw keeps it hidden and the chat works on.
+// Quitting, or Exit on Windows, then asks in a dialog of its own, since one
+// over the window would not show.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
+                       QuittingWithTheWindowHiddenAsksAboutAWorkingChat) {
+  UseAgentModel();
+  model_.Script({ScriptedModel::Hang()});
+  base::WeakPtr<content::WebContents> chat = OpenChat()->GetWeakPtr();
+  ASSERT_TRUE(content::ExecJs(chat.get(), SendScript("Find a tour")));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ChatWorkOf(chat.get()) == ChatWork::kWorking; }));
+  BrowserWindowInterface* window = browser();
+  window->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return WorkspaceWindow::From(window)->keeper(); }));
+  ASSERT_FALSE(window->GetWindow()->IsVisible());
+  ASSERT_TRUE(chat);
+  EXPECT_EQ(ChatWorkOf(chat.get()), ChatWork::kWorking);
+
+  CloseWarning::AskInTestsForTesting(true);
+  chrome::CloseAllBrowsersAndQuit();
+  views::Widget* dialog = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    dialog = CloseWarning::DialogForTesting(window);
+    return dialog != nullptr;
+  }));
+  EXPECT_TRUE(dialog->IsVisible());
+  dialog->widget_delegate()->AsDialogDelegate()->CancelDialog();
+  CloseWarning::AskInTestsForTesting(false);
+  EXPECT_TRUE(
+      base::test::RunUntil([] { return !browser_shutdown::IsTryingToQuit(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,

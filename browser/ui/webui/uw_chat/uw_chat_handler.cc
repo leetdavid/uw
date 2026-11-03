@@ -308,6 +308,7 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
     id_ = ChatFile::NewChatId();
   }
   OpenChats().emplace(id_, this);
+  SetChatWorkSource(contents_, weak_factory_.GetWeakPtr());
   start_ = TakeChatStart(contents_);
   from_terminal_ = start_ && start_->from_terminal;
   if (start_ && start_->text.empty()) {
@@ -1552,6 +1553,16 @@ const base::DictValue* UwChatHandler::LastLine() const {
 
 bool UwChatHandler::Working() const {
   return agent_ && agent_->working();
+}
+
+ChatWork UwChatHandler::GetChatWork() const {
+  if (approval_answer_) {
+    return ChatWork::kWaitsForApproval;
+  }
+  if (password_tab_) {
+    return ChatWork::kWaitsForPassword;
+  }
+  return Working() ? ChatWork::kWorking : ChatWork::kIdle;
 }
 
 mojom::StepPtr UwChatHandler::LineFor(const base::DictValue& entry) const {

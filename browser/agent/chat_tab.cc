@@ -17,14 +17,20 @@
 #include "ui/base/base_window.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
+#include "uw/browser/agent/run_window_mark.h"
 
 namespace uw {
 namespace {
 
 const void* const kStartKey = &kStartKey;
+const void* const kWorkKey = &kWorkKey;
 
 struct StartData : base::SupportsUserData::Data {
   ChatStart start;
+};
+
+struct WorkData : base::SupportsUserData::Data {
+  base::WeakPtr<ChatWorkSource> source;
 };
 
 }  // namespace
@@ -107,6 +113,30 @@ std::optional<ChatStart> TakeChatStart(content::WebContents* contents) {
   ChatStart start = std::move(data->start);
   contents->RemoveUserData(kStartKey);
   return start;
+}
+
+void SetChatWorkSource(content::WebContents* contents,
+                       base::WeakPtr<ChatWorkSource> source) {
+  auto data = std::make_unique<WorkData>();
+  data->source = std::move(source);
+  contents->SetUserData(kWorkKey, std::move(data));
+}
+
+ChatWork ChatWorkOf(content::WebContents* contents) {
+  const auto* data = static_cast<WorkData*>(contents->GetUserData(kWorkKey));
+  if (!data || !data->source) {
+    return ChatWork::kIdle;
+  }
+  const tabs::TabInterface* tab =
+      tabs::TabInterface::MaybeGetFromContents(contents);
+  if (tab && IsRunWindow(tab->GetBrowserWindowInterface())) {
+    return ChatWork::kIdle;
+  }
+  return data->source->GetChatWork();
+}
+
+bool IsWorkingChat(content::WebContents* contents) {
+  return ChatWorkOf(contents) != ChatWork::kIdle;
 }
 
 }  // namespace uw

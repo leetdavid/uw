@@ -59,6 +59,7 @@ class UwChatHandler : public mojom::ChatHandler,
                       public Connectors::Observer,
                       public ScheduledChats::Observer,
                       public ScheduledChats::Page,
+                      public ChatWorkSource,
                       public content::WebContentsObserver {
  public:
   // What the uw command sees of a chat it started or picked up again. While
@@ -199,6 +200,9 @@ class UwChatHandler : public mojom::ChatHandler,
 
   // ChatIndex::Observer:
   void OnChatsChanged() override;
+
+  // ChatWorkSource:
+  ChatWork GetChatWork() const override;
 
   // content::WebContentsObserver:
   void OnVisibilityChanged(content::Visibility visibility) override;

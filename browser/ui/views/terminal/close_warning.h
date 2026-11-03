@@ -24,8 +24,9 @@ class Widget;
 namespace uw {
 
 // A window's CloseGuard. Before a close the user asked for stops a program in
-// a terminal tab, one dialog over the window names the programs, with Cancel
-// and the close. A close with no busy terminal goes ahead without a question.
+// a terminal tab or a working chat, one dialog over the window names them,
+// with Cancel and the close. A close that stops neither goes ahead without a
+// question. See docs/plans/agent-chats.md#closing-a-working-chat.
 class CloseWarning : public CloseGuard {
  public:
   explicit CloseWarning(BrowserWindowInterface* window);
@@ -51,15 +52,18 @@ class CloseWarning : public CloseGuard {
   enum class Closing { kTab, kTabs, kTask, kWindow, kQuit };
 
   bool CanAsk() const;
-  // Asks the shells among `pages`, and the user if any is busy. `done` gets
-  // the answer: true without a question when none is.
+  // Asks the shells among `pages`, and the user if any is busy or any of
+  // `pages` is a working chat. `done` gets the answer: true without a
+  // question when none is.
   void Ask(Closing closing,
            size_t count,
            const std::vector<content::WebContents*>& pages,
            std::optional<tab_groups::TabGroupId> task,
            base::OnceCallback<void(bool)> done);
   void Show(std::vector<BusyTerminal> busy);
-  std::unique_ptr<views::View> List(const std::vector<BusyTerminal>& busy);
+  std::unique_ptr<views::View> List(
+      const std::vector<content::WebContents*>& chats,
+      const std::vector<BusyTerminal>& busy);
   // Where `page` is, for the dialog's list: its task in a window close, its
   // workspace when quitting.
   std::u16string PlaceOf(content::WebContents* page) const;
@@ -74,6 +78,8 @@ class CloseWarning : public CloseGuard {
   Closing closing_ = Closing::kTab;
   size_t count_ = 0;
   std::optional<tab_groups::TabGroupId> task_;
+  // The pages of the close, whose working chats the dialog names.
+  std::vector<base::WeakPtr<content::WebContents>> pages_;
   base::OnceCallback<void(bool)> done_;
   raw_ptr<views::Widget> dialog_ = nullptr;
   // While a close the user agreed to runs, its pages are not held again.

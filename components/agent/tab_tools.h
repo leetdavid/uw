@@ -50,6 +50,8 @@ struct ListedTab {
   bool kept = false;
   // A terminal running a command.
   bool busy = false;
+  // A chat whose agent is working.
+  bool working = false;
   // The agent's own tab by its number, or 0.
   int agent_tab = 0;
   // The chat's own tab.

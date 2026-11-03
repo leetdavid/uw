@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "base/memory/weak_ptr.h"
 #include "components/tabs/public/tab_interface.h"
 #include "url/gurl.h"
 
@@ -67,6 +68,31 @@ void AskInNewChat(BrowserWindowInterface* window,
 
 // What the chat in `contents` was opened with, taken once.
 std::optional<ChatStart> TakeChatStart(content::WebContents* contents);
+
+// What a chat's agent is doing, for a close that would stop it. A chat
+// works from the user's message until its answer, and while a step waits for
+// the user. See docs/plans/agent-chats.md#closing-a-working-chat.
+enum class ChatWork { kIdle, kWorking, kWaitsForApproval, kWaitsForPassword };
+
+// A chat page, as the closes that would stop it see it.
+class ChatWorkSource {
+ public:
+  virtual ChatWork GetChatWork() const = 0;
+
+ protected:
+  virtual ~ChatWorkSource() = default;
+};
+
+// The chat page in `contents` tells what its agent does through `source`.
+void SetChatWorkSource(content::WebContents* contents,
+                       base::WeakPtr<ChatWorkSource> source);
+
+// What the agent of the chat page in `contents` does. kIdle for any other
+// page, and for a chat out of sight in the run window.
+ChatWork ChatWorkOf(content::WebContents* contents);
+
+// Whether a close of `contents` would stop a working chat.
+bool IsWorkingChat(content::WebContents* contents);
 
 }  // namespace uw
 

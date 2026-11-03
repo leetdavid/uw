@@ -25,6 +25,7 @@
 #include "content/public/browser/web_contents.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "ui/base/base_window.h"
+#include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
@@ -106,6 +107,7 @@ void Describe(UserTab& tab, content::WebContents* contents) {
                         : contents->GetLastCommittedURL();
   tab.listed.url = url.spec();
   tab.listed.seen = contents->GetLastActiveTime();
+  tab.listed.working = IsWorkingChat(contents);
 }
 
 // The tree the tab of `tab` is in now, which may have gone since it was
@@ -455,6 +457,10 @@ base::expected<Plan, base::DictValue> PlanOf(std::string_view tool,
     }
     if (tabs[i].listed.chat) {
       return refuse(TabRefusal{"it's this chat's own tab", TitleOf(tabs[i]),
+                               ShortId(tabs[i].listed.id)});
+    }
+    if (tabs[i].listed.working) {
+      return refuse(TabRefusal{"it's a working chat", TitleOf(tabs[i]),
                                ShortId(tabs[i].listed.id)});
     }
   }

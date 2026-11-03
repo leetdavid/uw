@@ -62,6 +62,7 @@ base::DictValue Listed(const ListedTab& tab) {
   value.Set("kept", tab.kept);
   value.Set("pinned", tab.pinned);
   value.Set("busy", tab.busy);
+  value.Set("working", tab.working);
   value.Set("seen", tab.seen.is_null()
                         ? base::Value()
                         : base::Value(base::TimeFormatAsIso8601(tab.seen)));

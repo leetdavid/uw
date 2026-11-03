@@ -72,6 +72,9 @@ std::string LineOf(const ListedTab& tab, base::Time now) {
   if (tab.busy) {
     base::StrAppend(&line, {" · busy"});
   }
+  if (tab.working) {
+    base::StrAppend(&line, {" · working"});
+  }
   if (tab.kept) {
     base::StrAppend(&line, {" · kept"});
   }

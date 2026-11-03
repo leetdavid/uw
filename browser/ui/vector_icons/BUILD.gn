@@ -7,6 +7,7 @@ aggregate_vector_icons("uw_vector_icons") {
 
   sources = [
     "arrow_down.icon",
+    "chat.icon",
     "chevrons_up_down.icon",
     "eye_filled.icon",
     "inbox.icon",

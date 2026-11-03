@@ -49,6 +49,7 @@
 #include "ui/base/clipboard/file_info.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/clipboard/test/test_clipboard.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -60,6 +61,8 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/fake_chat.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -791,6 +794,36 @@ IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest, QuittingAsksFirst) {
   EXPECT_TRUE(
       base::test::RunUntil([] { return !browser_shutdown::IsTryingToQuit(); }));
   EXPECT_EQ(tabs()->count(), count);
+}
+
+// A close that stops a busy terminal and a working chat names both, the chat
+// first. See docs/plans/agent-chats.md#closing-a-working-chat.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       ATaskWithAWorkingChatAndABusyTerminalNamesBoth) {
+  content::WebContents* busy = OpenBusyTerminal();
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      browser(), GURL("data:text/html,<title>Find a hotel in Alfama</title>"),
+      WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  content::WebContents* chat = contents();
+  FakeChat working(chat, ChatWork::kWorking);
+  const std::optional<tab_groups::TabGroupId> task =
+      controller()->MoveToNewTask(
+          {*controller()->IdFor(tabs()->GetTabForWebContents(busy)),
+           *controller()->IdFor(tabs()->GetTabForWebContents(chat))},
+          u"Lisbon hotels");
+  ASSERT_TRUE(task);
+  controller()->CloseTask(*task);
+  views::Widget* dialog = Dialog();
+  EXPECT_TRUE(Shows(dialog,
+                    u"A chat in it is still working, and a program is "
+                    u"running in its terminal. Closing the task stops them."));
+  EXPECT_TRUE(Shows(dialog, u"Working"));
+  EXPECT_TRUE(Shows(dialog, u"sleep"));
+  SaveWidgetScreenshot(dialog, "working-chat-and-terminal");
+  Answer(dialog, false);
+  EXPECT_TRUE(IsOpen(chat));
+  EXPECT_TRUE(IsOpen(busy));
 }
 
 IN_PROC_BROWSER_TEST_F(UwTerminalBrowserTest, TheAddressCarriesNoCommand) {

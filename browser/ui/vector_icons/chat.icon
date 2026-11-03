@@ -1,0 +1,19 @@
+// Copyright 2026 The uw Authors. All rights reserved.
+
+// A chat: a speech bubble with a sparkle in it, as the chat page's favicon.
+CANVAS_DIMENSIONS, 24,
+STROKE, 1.75f,
+MOVE_TO, 7.9f, 20,
+ARC_TO, 9, 9, 0, 1, 0, 4, 16.1f,
+LINE_TO, 2, 22,
+CLOSE,
+NEW_PATH,
+MOVE_TO, 12, 8.2f,
+R_LINE_TO, 0.95f, 2.85f,
+R_LINE_TO, 2.85f, 0.95f,
+R_LINE_TO, -2.85f, 0.95f,
+LINE_TO, 12, 15.8f,
+R_LINE_TO, -0.95f, -2.85f,
+LINE_TO, 8.2f, 12,
+R_LINE_TO, 2.85f, -0.95f,
+CLOSE

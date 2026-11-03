@@ -8,11 +8,13 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/test/run_until.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
@@ -25,7 +27,12 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
+#include "ui/views/widget/widget.h"
+#include "ui/views/window/dialog_delegate.h"
+#include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/agent/fake_chat.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/terminal/close_warning.h"
 
 namespace uw {
 namespace {
@@ -180,31 +187,38 @@ IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysWhatWentWrong) {
             "There is no tool called fly.");
 }
 
-// Closing a task asks on each page the agent works in. The second page's
-// question used to replace the first one's, whose "stay" then reached the tab
-// strip in the middle of the close (crash at tab_strip_model.cc:144).
+// Closing a task with a working chat and the agent's pages in it asks once,
+// about the chat. Chromium's own question on each of the agent's pages is off:
+// a second one destroyed the first while it was open, and its answer crashed
+// uw in the middle of the close (tab_strip_model.cc:144, T285). See
+// docs/plans/agent-chats.md#closing-a-working-chat.
 IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest,
-                       ClosingATaskAsksOnEachPageTheAgentWorksIn) {
+                       ClosingATaskWithTheAgentsPagesAsksOnce) {
   Open("/article");
   Open("/form");
-  std::vector<tabs::TabHandle> pages;
   std::vector<int> all;
   for (int i = 0; i < tabs()->count(); ++i) {
-    if (tabs()->GetTabAtIndex(i) != chat_) {
-      pages.push_back(tabs()->GetTabAtIndex(i)->GetHandle());
-    }
     all.push_back(i);
   }
-  ASSERT_EQ(pages.size(), 2u);
+  ASSERT_EQ(all.size(), 3u);
   const tab_groups::TabGroupId task = tabs()->AddToNewGroup(all);
+  FakeChat chat(chat_->GetContents(), ChatWork::kWorking);
   chat_ = nullptr;
+  CloseWarning::AskInTestsForTesting(true);
 
   TabOrganizationController::From(browser())->CloseTask(task);
+  views::Widget* dialog = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    dialog = CloseWarning::DialogForTesting(browser());
+    return dialog != nullptr;
+  }));
+  dialog->widget_delegate()->AsDialogDelegate()->AcceptDialog();
+  CloseWarning::AskInTestsForTesting(false);
 
-  for (const tabs::TabHandle& page : pages) {
-    ASSERT_TRUE(page.Get());
-    EXPECT_FALSE(page.Get()->CanShowModalUI());
-  }
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !tabs()->group_model()->ContainsTabGroup(task); }));
+  EXPECT_EQ(tabs()->count(), 1);
+  EXPECT_FALSE(CloseWarning::DialogForTesting(browser()));
 }
 
 IN_PROC_BROWSER_TEST_F(AgentToolsBrowserTest, SaysSafeBrowsingMustBeOn) {

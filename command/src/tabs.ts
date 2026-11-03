@@ -47,6 +47,7 @@ interface Listed {
   kept: boolean;
   pinned: boolean;
   busy: boolean;
+  working: boolean;
   seen: string | null;
 }
 
@@ -189,7 +190,7 @@ function listText(list: List, query: string): string {
   const rows = list.tabs.map((tab) => {
     const title = tab.title || tab.url;
     const cut = title.length > MAX_TITLE ? `${title.slice(0, MAX_TITLE - 1)}…` : title;
-    const status = [tab.busy ? "busy" : "", tab.kept ? "kept" : "",
+    const status = [tab.busy ? "busy" : "", tab.working ? "working" : "", tab.kept ? "kept" : "",
       tab.selected ? "selected" : tab.seen ? seenAgo(tab.seen) : ""].filter(Boolean).join(" · ");
     return { tab, start: `${" ".repeat(2 + 2 * tab.depth)}${tab.id}  ${cut}`, site: site(tab.url), status };
   });

@@ -1072,8 +1072,9 @@ void TabOrganizationController::FindClearable(
   std::vector<std::pair<PageId, content::WebContents*>> pages;
   std::vector<content::WebContents*> contents;
   for (const Page& page : shared_->tree().pages()) {
-    if (page.task.empty() && !IsKept(page.id)) {
-      tabs::TabInterface* tab = TabFor(page.id);
+    tabs::TabInterface* tab = TabFor(page.id);
+    if (page.task.empty() && !IsKept(page.id) &&
+        !(tab && IsWorkingChat(tab->GetContents()))) {
       pages.emplace_back(page.id, tab ? tab->GetContents() : nullptr);
       if (tab) {
         contents.push_back(tab->GetContents());
