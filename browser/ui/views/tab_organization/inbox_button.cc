@@ -10,7 +10,6 @@
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_manager.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
@@ -37,8 +36,9 @@
 #include "url/gurl.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/menu_card.h"
-#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
+#include "uw/browser/ui/look/top_button.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 
@@ -48,19 +48,9 @@ DEFINE_ELEMENT_IDENTIFIER_VALUE(kInboxButtonElementId);
 
 namespace {
 
-constexpr int kSize = 28;
-constexpr int kRadius = 8;
-constexpr int kIconSize = 16;
-constexpr int kBadgeHeight = 15;
-constexpr int kBadgeRing = 2;
+constexpr int kBadgeHeight = 14;
+constexpr float kBadgeRing = 1.5f;
 constexpr int kBadgeFontSize = 10;
-// The icon is the tint's text color at 75%, and at 55% in a window that is not
-// in front.
-constexpr SkAlpha kIconAlpha = 0xBF;
-constexpr SkAlpha kInactiveIconAlpha = 0x8C;
-constexpr SkAlpha kHoverAlpha = 0x1A;
-// The primary color at 12% fills the button while the Inbox is open.
-constexpr SkAlpha kOpenAlpha = 0x1F;
 // How far in from the page's top-left corner the Inbox shows while the
 // sidebar is hidden.
 constexpr int kCornerGap = 10;
@@ -97,7 +87,8 @@ InboxButton::InboxButton(BrowserWindowInterface* window, ChatAlerts* alerts)
                                         base::Unretained(this))),
       window_(window) {
   SetProperty(views::kElementIdentifierKey, kInboxButtonElementId);
-  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), kRadius);
+  views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
+                                                kTopButtonRadius);
   alerts_.Observe(alerts);
   UpdateName();
 }
@@ -117,14 +108,13 @@ content::WebContents* InboxButton::page() const {
 
 gfx::Size InboxButton::CalculatePreferredSize(
     const views::SizeBounds& available_size) const {
-  return gfx::Size(kSize, kSize);
+  return gfx::Size(kTopButtonSize, kTopButtonSize);
 }
 
 void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   const ui::ColorProvider* colors = GetColorProvider();
-  const SkColor text = colors->GetColor(kColorTabForegroundInactiveFrameActive);
   const SkColor accent = colors->GetColor(kColorMenuCardAccent);
-  const bool open = bubble_widget_.IsObserving();
+  const bool lit = bubble_widget_.IsObserving() || IsTopButtonLit(GetState());
   const size_t unread = alerts_.GetSource()->Unread();
   // At the icon's top right.
   const std::u16string count =
@@ -136,7 +126,7 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
                                  .DeriveWithWeight(gfx::Font::Weight::SEMIBOLD);
   const int width = std::max(
       kBadgeHeight, gfx::GetStringWidth(count, font) + kBadgeHeight / 2);
-  const gfx::RectF badge(kSize - width, 0, width, kBadgeHeight);
+  const gfx::RectF badge(kTopButtonSize - width, 0, width, kBadgeHeight);
   cc::PaintFlags fill;
   fill.setAntiAlias(true);
   {
@@ -151,18 +141,14 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
                               ring.height() / 2),
           SkClipOp::kDifference, /*do_anti_alias=*/true);
     }
-    if (open || GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
-      fill.setColor(open ? SkColorSetA(accent, kOpenAlpha)
-                         : SkColorSetA(text, kHoverAlpha));
-      canvas->DrawRoundRect(GetLocalBounds(), kRadius, fill);
+    if (lit) {
+      PaintTopButtonFill(canvas, *this);
     }
     const bool active = GetWidget() && GetWidget()->ShouldPaintAsActive();
-    canvas->Translate(gfx::Vector2d((kSize - kIconSize) / 2,
-                                    (kSize - kIconSize) / 2));
-    gfx::PaintVectorIcon(
-        canvas, kInboxIcon, kIconSize,
-        open ? accent
-             : SkColorSetA(text, active ? kIconAlpha : kInactiveIconAlpha));
+    constexpr int kInset = (kTopButtonSize - kTopButtonIconSize) / 2;
+    canvas->Translate(gfx::Vector2d(kInset, kInset));
+    gfx::PaintVectorIcon(canvas, kInboxIcon, kTopButtonIconSize,
+                         colors->GetColor(TopButtonIconColor(lit, active)));
   }
   if (unread == 0) {
     return;

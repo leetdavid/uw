@@ -14,6 +14,8 @@ source_set("look") {
     "tint_color_mixer.h",
     "tint_painter.cc",
     "tint_painter.h",
+    "top_button.cc",
+    "top_button.h",
     "window_buttons.h",
   ]
   if (is_mac) {
@@ -25,6 +27,7 @@ source_set("look") {
   deps = [
     "//base",
     "//cc/paint",
+    "//chrome/app/vector_icons",
     "//chrome/browser/ui/color:color_headers",
     "//components/prefs",
     "//skia",
@@ -32,6 +35,7 @@ source_set("look") {
     "//ui/gfx",
     "//ui/gfx:color_utils",
     "//ui/views",
+    "//uw/browser/ui/vector_icons",
     "//uw/components/look:prefs",
   ]
   if (is_mac) {

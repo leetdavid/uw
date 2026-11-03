@@ -10,6 +10,8 @@ aggregate_vector_icons("uw_vector_icons") {
     "chat.icon",
     "chevrons_up_down.icon",
     "eye_filled.icon",
+    "folder_plus.icon",
+    "folders.icon",
     "inbox.icon",
     "life_buoy.icon",
     "list_tree.icon",
@@ -26,9 +28,12 @@ aggregate_vector_icons("uw_vector_icons") {
     "mini_player_replay.icon",
     "mini_player_volume.icon",
     "palette.icon",
+    "panel_left_close.icon",
+    "panel_left_open.icon",
     "smile.icon",
     "sparkles.icon",
     "terminal.icon",
+    "text_search.icon",
     "user.icon",
   ]
 }

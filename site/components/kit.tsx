@@ -13,13 +13,15 @@ import {
   Eye,
   FileText,
   Folder,
+  Folders,
   History,
   Inbox,
   ListTree,
   Lock,
   Maximize2,
   MessageCircle,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelTop,
   Pause,
   Pencil,
@@ -38,6 +40,7 @@ import {
   Star,
   Tag,
   Terminal as TerminalIcon,
+  TextSearch,
   Undo2,
   Volume2,
   X,
@@ -169,7 +172,13 @@ export function Sidebar({
           <i />
         </span>
         <span className="kit-button">
-          <PanelLeft />
+          {floating ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </span>
+        <span className="kit-button kit-push">
+          <Folders />
+        </span>
+        <span className="kit-button">
+          <TextSearch />
         </span>
         <span className="kit-button">
           <Inbox />

@@ -43,6 +43,8 @@ source_set("tab_organization") {
     "task_card.h",
     "task_name_field.cc",
     "task_name_field.h",
+    "tasks_card.cc",
+    "tasks_card.h",
     "tint_style.cc",
     "tint_style.h",
     "window_commands.cc",

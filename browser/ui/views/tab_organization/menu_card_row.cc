@@ -104,6 +104,11 @@ void MenuCardRow::SetDetail(std::unique_ptr<views::View> detail) {
       views::BoxLayout::CrossAxisAlignment::kStart);
 }
 
+void MenuCardRow::SetIconColor(ui::ColorId color) {
+  icon_color_ = color;
+  Update();
+}
+
 void MenuCardRow::StateChanged(ButtonState old_state) {
   Button::StateChanged(old_state);
   Update();
@@ -127,7 +132,9 @@ views::Button::KeyClickAction MenuCardRow::GetKeyClickActionForEvent(
 void MenuCardRow::Update() {
   const bool enabled = GetEnabled();
   image_->SetImage(ui::ImageModel::FromVectorIcon(
-      *icon_, enabled ? kColorMenuCardIcon : kColorMenuCardDisabled,
+      *icon_,
+      enabled ? icon_color_.value_or(kColorMenuCardIcon)
+              : kColorMenuCardDisabled,
       kIconSize));
   label_->SetEnabledColor(enabled ? kColorMenuCardText
                                   : kColorMenuCardDisabled);

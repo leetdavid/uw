@@ -22,6 +22,7 @@
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/ui/look/top_button.h"
 
 namespace uw {
 namespace {
@@ -44,10 +45,14 @@ constexpr std::string_view kThemeColorFamilies[] = {
 
 // uw's own: the edge around the page card and uw's cards.
 constexpr ui::ColorId kUwThemeColors[] = {
-    kColorPageCardEdge,     kColorMenuCardBackground, kColorMenuCardHover,
-    kColorMenuCardText,     kColorMenuCardIcon,       kColorMenuCardMuted,
-    kColorMenuCardDisabled, kColorMenuCardLine,       kColorMenuCardChipHover,
-    kColorMenuCardAccent,   kColorMenuCardGlass};
+    kColorPageCardEdge,          kColorMenuCardBackground,
+    kColorMenuCardHover,         kColorMenuCardText,
+    kColorMenuCardIcon,          kColorMenuCardMuted,
+    kColorMenuCardDisabled,      kColorMenuCardLine,
+    kColorMenuCardChipHover,     kColorMenuCardAccent,
+    kColorMenuCardGlass,         kColorTopButtonIcon,
+    kColorTopButtonIconInactive, kColorTopButtonIconLit,
+    kColorTopButtonFill};
 
 // Past this many sets of mixers, Chromium's store of colors is cleared and the
 // unused sets go, as for page colors.

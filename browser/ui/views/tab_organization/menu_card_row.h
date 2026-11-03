@@ -4,10 +4,12 @@
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_MENU_CARD_ROW_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "base/memory/raw_ptr.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/color/color_id.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/label_button.h"
 
@@ -47,6 +49,9 @@ class MenuCardRow : public views::Button {
   void SetEnd(std::unique_ptr<views::View> view);
   // A second line under the label, in the muted color.
   void SetDetail(std::unique_ptr<views::View> detail);
+  // Draws the icon in `color` instead of the card's icon color, as a task's
+  // folder is drawn in the task's color.
+  void SetIconColor(ui::ColorId color);
 
   // views::Button:
   void StateChanged(ButtonState old_state) override;
@@ -58,6 +63,7 @@ class MenuCardRow : public views::Button {
   void Update();
 
   const raw_ref<const gfx::VectorIcon> icon_;
+  std::optional<ui::ColorId> icon_color_;
   raw_ptr<views::ImageView> image_ = nullptr;
   raw_ptr<views::View> line_ = nullptr;
   raw_ptr<views::View> column_ = nullptr;

@@ -2532,13 +2532,14 @@ index e8ec955ea42e6a7f5124579007b7ce23228bd310..f61460e21cd7e24c873724af5eda489f
  
    // views::ContextMenuController:
 diff --git a/chrome/browser/ui/views/tabs/vertical/BUILD.gn b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
-index 6ff7745f13856bf4e385ea70852312435158d766..8dac07da131b145a057d17a5b08db0ec2f0ef7dc 100644
+index 6ff7745f13856bf4e385ea70852312435158d766..aa88cc5202817710e234f9a8ab564a8b8f1ffbee 100644
 --- a/chrome/browser/ui/views/tabs/vertical/BUILD.gn
 +++ b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
-@@ -45,6 +45,7 @@ source_set("impl") {
+@@ -45,6 +45,8 @@ source_set("impl") {
    ]
  
    deps = [
++    "//uw/browser/ui/look",
 +    "//uw/browser/ui/views/tab_organization",
      "//chrome/browser:primitives",
      "//chrome/browser/glic",
@@ -2701,3 +2702,21 @@ index e76865ea1ed81e709e382cba469a5bcd2ef3021f..4d6b3bf0fe37978e92752e640e6110af
    for (const GURL& url : std::views::reverse(urls)) {
      NavigateParams params(browser_view_->browser(), url,
                            ui::PAGE_TRANSITION_LINK);
+diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
+index a899f322a795f1da39c4676c59c2bc237610f9b9..6a8a26022fe05f86066ac72e84ff010e4ab69ea8 100644
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -1221,10 +1221,11 @@ void BrowserActions::InitializeChromeMenuActions() {
+               },
+               bwi))
+           .SetActionId(kActionTabGroupsMenu)
++          // uw: the button is Tasks, and lists the open tasks.
+           .SetText(BrowserActions::GetCleanTitleAndTooltipText(
+-              l10n_util::GetStringUTF16(IDS_SAVED_TAB_GROUPS_MENU)))
++              l10n_util::GetStringUTF16(IDS_UW_TASKS_MENU_MAC)))
+           .SetTooltipText(BrowserActions::GetCleanTitleAndTooltipText(
+-              l10n_util::GetStringUTF16(IDS_SAVED_TAB_GROUPS_MENU)))
++              l10n_util::GetStringUTF16(IDS_UW_TASKS_MENU_MAC)))
+           .SetImage(ui::ImageModel::FromVectorIcon(
+               features::IsRoundedIconsEnabled()
+                   ? kGridViewIcon

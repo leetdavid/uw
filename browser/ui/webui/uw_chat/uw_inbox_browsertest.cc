@@ -480,7 +480,7 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, MANUAL_TheBadgesRingShowsTheSidebar) {
     const SkBitmap window = CaptureNativeWindow(browser());
     SaveBitmap(window, open ? "inbox-ring-open" : "inbox-ring");
     // Left of the one-figure badge, halfway across its ring.
-    const SkColor ring = ButtonColorAt(window, gfx::PointF(12, 7.5));
+    const SkColor ring = ButtonColorAt(window, gfx::PointF(13.25, 7));
     const SkColor corner = ButtonColorAt(window, gfx::PointF(1, 1));
     for (const int shift : {16, 8, 0}) {
       EXPECT_NEAR((ring >> shift) & 0xFF, (corner >> shift) & 0xFF, 8)

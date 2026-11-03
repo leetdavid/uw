@@ -14,6 +14,7 @@
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/ui/look/top_button.h"
 #include "uw/components/look/theme.h"
 #include "uw/components/look/tint.h"
 
@@ -27,6 +28,11 @@ constexpr SkAlpha kFillOnLightAlpha = 0x75;
 constexpr SkAlpha kFillOnDarkAlpha = 0x14;
 // The active tab on black: white at 12%.
 constexpr float kActiveTabOnBlack = 0.12f;
+
+// The icons of the buttons at the top of the sidebar: the text color at 75%,
+// and at 55% in a window that is not in front.
+constexpr SkAlpha kTopButtonIconAlpha = 0xBF;
+constexpr SkAlpha kTopButtonIconInactiveAlpha = 0x8C;
 
 // A menu card over frosted glass keeps 85% of its color.
 constexpr SkAlpha kMenuCardOverGlass = 0xD9;
@@ -131,6 +137,12 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
   mixer[kColorPageCardEdge] = {SK_ColorTRANSPARENT};
   AddPageFieldDefaults(mixer);
   AddMenuCardColors(mixer, IsDarkMode(key));
+  mixer[kColorTopButtonIcon] =
+      ui::SetAlpha(kColorTabForegroundInactiveFrameActive, kTopButtonIconAlpha);
+  mixer[kColorTopButtonIconInactive] = ui::SetAlpha(
+      kColorTabForegroundInactiveFrameActive, kTopButtonIconInactiveAlpha);
+  mixer[kColorTopButtonIconLit] = {kColorTabForegroundInactiveFrameActive};
+  mixer[kColorTopButtonFill] = {kColorNewTabButtonCRBackgroundFrameActive};
   if (!UsesTint(key)) {
     return;
   }
