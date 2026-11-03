@@ -134,6 +134,12 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
                                                   .Set("unit", "USD")
                                                   .Set("number", 479)))))),
          ScriptedModel::Answer("Reported.")});
+    return WatchTheDeskAsScripted();
+  }
+
+  // Watches the desk, with a first run as the model is scripted, and waits
+  // for that run's alert.
+  std::string WatchTheDeskAsScripted() {
     ScheduledChat watch;
     watch.request = "Tell me when the price of the desk drops below $500.";
     watch.page = Desk().spec();
@@ -316,6 +322,55 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
   }));
   EXPECT_EQ(alerts()->Unread(), 1u);
   ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
+}
+
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
+  model_.Script({ScriptedModel::Answer("I looked around.")});
+  const std::string id = WatchTheDeskAsScripted();
+  content::WebContents* page = OpenTheInbox();
+  ASSERT_TRUE(Shows(page, "[data-retry]"));
+  EXPECT_NE(Text(page, "[data-alert]").find("Couldn't check"),
+            std::string::npos);
+  SaveWidgetScreenshot(
+      views::Widget::GetWidgetForNativeView(page->GetNativeView()),
+      "inbox-retry");
+
+  // Retry runs the chat out of sight and marks the alert read; the Inbox
+  // stays open and shows the run going.
+  model_.Script({ScriptedModel::Hang()});
+  const size_t asked = model_.Requests().size();
+  Click(page, "[data-retry]");
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return model_.Requests().size() == asked + 1; }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Text(page, "[data-alert]").find("Running now") != std::string::npos;
+  }));
+  EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('[data-retry]')")
+                   .ExtractBool());
+  EXPECT_TRUE(alerts()->alerts()[0].read);
+  EXPECT_TRUE(button()->IsShowing());
+  SaveWidgetScreenshot(
+      views::Widget::GetWidgetForNativeView(page->GetNativeView()),
+      "inbox-retry-running");
+
+  // A stopped run leaves the chat failing, so Retry comes back. A run that
+  // finds nothing new still sends its alert, and Retry goes.
+  chats()->Stop(id);
+  ASSERT_TRUE(Shows(page, "[data-retry]"));
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("report", base::DictValue()
+                                             .Set("found", false)
+                                             .Set("message", "Still $549.")))),
+       ScriptedModel::Answer("Reported.")});
+  Click(page, "[data-retry]");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Text(page, "#inbox").find("Still $549.") != std::string::npos;
+  }));
+  ASSERT_EQ(alerts()->alerts().size(), 2u);
+  EXPECT_EQ(alerts()->alerts()[0].what, "No change");
+  EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('[data-retry]')")
+                   .ExtractBool());
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AnAlertOpensItsPageOrItsChat) {

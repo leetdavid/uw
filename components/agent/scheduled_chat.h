@@ -97,16 +97,24 @@ struct RunEffect {
   bool counted = false;
   // Whether this run paused the schedule.
   bool paused = false;
+  // Whether this run, a Retry, resumed a schedule that failures paused.
+  bool resumed = false;
 };
 
 // Records in `chat` a run that ended at `when` as `end`, with `report` when it
 // reported and `error` when it did not, and says what the user hears. A report
-// that names a site wanting a sign-in is a counted failure.
+// that names a site wanting a sign-in is a counted failure. A `retry` always
+// tells how it went, and one that works resumes a schedule failures paused.
 RunEffect AfterRun(ScheduledChat& chat,
                    RunEnd end,
                    const RunReport& report,
                    std::string_view error,
-                   base::Time when);
+                   base::Time when,
+                   bool retry = false);
+
+// Whether an alert that says `what`, such as "Couldn't check", tells of a
+// failed run, so it offers Retry.
+bool OffersRetry(std::string_view what);
 
 }  // namespace uw
 

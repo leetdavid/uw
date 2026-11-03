@@ -294,9 +294,10 @@ Agreed on 2026-11-03: [Retry](CONTEXT.md#language) is Check now on a failed sche
 
 - The Inbox shows it on "Couldn't check", "Sign in required", and "Paused" alerts, only on the chat's newest such alert, and only while the chat's last run failed. It hides while a run is under way or waits for approval; "Running now" shows instead.
 - A click marks the alert read, and the Inbox stays open. Retry's run always sends an alert saying how it went, such as "No change · $129" or "Couldn't check · fully.com didn't load", unless the chat is muted. A run that fails again thus brings a new alert with Retry.
-- On a schedule that 3 failed runs paused, a Retry that succeeds resumes it, and its alert says so. One that fails leaves it paused.
-- The notification's Retry does the same when the chat's last run failed and no run is under way, without bringing a window forward. Otherwise it opens the chat. A click launches uw if it has quit.
-- The canvas page with the Inbox frames has its states.
+- On a schedule that 3 failed runs paused, a Retry that succeeds resumes it, and its alert reads "Resumed". One that fails leaves it paused.
+- The notification's Retry does the same when the chat's last run failed and no run is under way, without bringing a window forward. Otherwise it opens the chat, as it does right after uw relaunches, before its schedules have loaded. A click launches uw if it has quit.
+- The new tab page's rows have no Retry.
+- The frames "Retry: the Inbox (Fluid)" and "Retry: every state (Fluid)" have its states. The user signed them off on 2026-11-03.
 
 Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
 

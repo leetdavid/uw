@@ -733,6 +733,10 @@ struct InboxAlert {
   // A step of the chat's run waits for approval.
   bool waiting;
   bool read;
+  // The chat's newest alert of a failed run, while its last run failed: it
+  // offers Retry, or shows that a run of the chat is under way.
+  bool retry;
+  bool running;
 };
 
 // Links the Inbox's page to its handler.
@@ -752,6 +756,9 @@ interface InboxHandler {
   // Shows the chat of the alert `id`, marks the alert read, and closes the
   // Inbox.
   OpenChat(string id);
+  // Runs the chat of the alert `id` again at once, out of sight, and marks
+  // the alert read. The Inbox stays open.
+  Retry(string id);
   MarkAllRead();
   ClearAll();
   // Opens uw://scheduled and closes the Inbox.

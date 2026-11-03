@@ -12,7 +12,9 @@ import {
   ArrowRight,
   Clock,
   Inbox as InboxIcon,
+  Loader2,
   MessageCircle,
+  RefreshCw,
   Terminal as TerminalIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -107,6 +109,14 @@ function Alert({ alert }: { alert: InboxAlert }) {
           </span>
           {alert.text && ` · ${alert.text}`}
         </span>
+        {alert.running && (
+          <span className="mt-1 flex h-6 items-center gap-1.5 pl-[26px] text-xs font-medium text-muted-foreground">
+            <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
+            Running now
+          </span>
+        )}
+        {/* Room for Retry, which can't sit inside this button. */}
+        {alert.retry && <span aria-hidden className="mt-1 block h-6" />}
       </button>
       {opensPage && (
         <button
@@ -118,6 +128,18 @@ function Alert({ alert }: { alert: InboxAlert }) {
           <MessageCircle aria-hidden />
           Open chat
         </button>
+      )}
+      {alert.retry && (
+        <Button
+          variant="ghost"
+          size="compact"
+          leadingIcon={RefreshCw}
+          data-retry={alert.id}
+          className="absolute bottom-2 left-7 h-6 text-primary hover:bg-primary/[0.08] hover:text-primary"
+          onClick={() => inboxHandler.retry(alert.id)}
+        >
+          Retry
+        </Button>
       )}
     </div>
   );

@@ -178,6 +178,10 @@ ScheduledChats::ScheduledChats(Profile* profile)
           base::BindRepeating(&ScheduledChats::OnDue, base::Unretained(this))) {
   profile_observation_.Observe(profile);
   connection_observation_.Observe(content::GetNetworkConnectionTracker());
+  SetRetryChat(base::BindRepeating([](Profile* profile, const std::string& id) {
+    ScheduledChats* chats = For(profile);
+    return chats && chats->Retry(id);
+  }));
   if (ChatIndex* index = ChatIndex::For(profile)) {
     index_observation_.Observe(index);
   }
@@ -431,6 +435,24 @@ void ScheduledChats::Stop(const std::string& chat_id) {
 }
 
 void ScheduledChats::CheckNow(const std::string& chat_id) {
+  RunNow(chat_id, /*retry=*/false);
+}
+
+bool ScheduledChats::CanRetry(std::string_view chat_id) const {
+  const ScheduledChat* chat = Find(chat_id);
+  return loaded_ && !ending_ && chat && chat->failing &&
+         !runs_.contains(chat_id);
+}
+
+bool ScheduledChats::Retry(const std::string& chat_id) {
+  if (!CanRetry(chat_id)) {
+    return false;
+  }
+  RunNow(chat_id, /*retry=*/true);
+  return true;
+}
+
+void ScheduledChats::RunNow(const std::string& chat_id, bool retry) {
   const auto chat = chats_.find(chat_id);
   if (ending_ || chat == chats_.end() || runs_.contains(chat_id)) {
     return;
@@ -439,7 +461,7 @@ void ScheduledChats::CheckNow(const std::string& chat_id) {
   chat->second.last = now;
   Arm(chat_id);
   Persist();
-  StartRun(chat_id, now);
+  StartRun(chat_id, now, /*trigger=*/nullptr, std::string(), retry);
 }
 
 void ScheduledChats::BringWaitingTab(const std::string& chat_id,
@@ -630,13 +652,15 @@ void ScheduledChats::OnDue(const std::string& chat_id, base::Time when) {
 void ScheduledChats::StartRun(const std::string& chat_id,
                               base::Time when,
                               const ChatTriggers::Trigger* trigger,
-                              std::string wake) {
+                              std::string wake,
+                              bool retry) {
   if (ending_) {
     return;
   }
   lost_connection_.erase(chat_id);
   const ScheduledChat& chat = chats_.at(chat_id);
   Run& run = runs_[chat_id] = Run();
+  run.retry = retry;
   if (trigger) {
     run.trigger = trigger->command;
     run.wake = std::move(wake);
@@ -883,9 +907,11 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
                                ChatRun::Outcome outcome) {
   int skipped = 0;
   std::string trigger;
+  bool retry = false;
   if (const auto run = runs_.find(chat_id); run != runs_.end()) {
     skipped = run->second.skipped;
     trigger = std::move(run->second.trigger);
+    retry = run->second.retry;
     runs_.erase(run);
   }
   if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
@@ -909,7 +935,7 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
     NameValues(chat->second, outcome.report);
   }
   const RunEffect effect =
-      AfterRun(chat->second, end, outcome.report, outcome.error, when);
+      AfterRun(chat->second, end, outcome.report, outcome.error, when, retry);
   base::ListValue lines;
   if (skipped > 0) {
     lines.Append(
@@ -940,8 +966,11 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
     Remove(chat_id);
     return;
   }
-  if (effect.paused) {
+  if (effect.paused || effect.resumed) {
     Arm(chat_id);
+  }
+  if (effect.resumed) {
+    StartLastingTrigger(chat_id);
   }
   if (end == RunEnd::kModelUnreachable && outcome.lost_connection &&
       !chat->second.paused) {
@@ -969,7 +998,7 @@ void ScheduledChats::Notify(const std::string& chat_id,
       }
     }
   }
-  NotifyAboutChat(profile_, chat_id, title, what, text);
+  NotifyAboutChat(profile_, chat_id, title, what, text, OffersRetry(what));
   if (ChatAlerts* alerts = ChatAlerts::For(profile_)) {
     alerts->Add(chat_id, what, text, waiting);
   }

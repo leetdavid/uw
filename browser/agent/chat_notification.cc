@@ -35,14 +35,43 @@ namespace {
 // Enough for the lines macOS shows; it cuts the rest itself.
 constexpr size_t kMaxTextLength = 200;
 
+constexpr char kChatNotificationPrefix[] = "uw-chat-";
+
 // Who hears the answer to each step's notification, by its id.
 std::map<std::string, StepAnswered>& StepsAsked() {
   static base::NoDestructor<std::map<std::string, StepAnswered>> asked;
   return *asked;
 }
 
+RetryChat& RetryHook() {
+  static base::NoDestructor<RetryChat> retry;
+  return *retry;
+}
+
 std::string ChatNotificationId(std::string_view chat_id) {
-  return base::StrCat({"uw-chat-", chat_id});
+  return base::StrCat({kChatNotificationPrefix, chat_id});
+}
+
+void ShowChat(Profile* profile, const std::string& chat_id) {
+  const std::vector<tabs::TabInterface*> showing =
+      TabsShowingChat(profile, chat_id);
+  if (!showing.empty()) {
+    GoToTab(showing[0]);
+  } else if (ChatFile::IsChatId(chat_id)) {
+    // No tab shows the chat, as after uw restarts, so it opens in one, at the
+    // top of the Scratchpad as a link from another app does.
+    NavigateParams params(profile, ChatUrl(chat_id),
+                          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+    params.browser =
+        ProfileBrowserCollection::GetForProfile(profile)->FindTabbedBrowser();
+    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+    TabOrganizationController::LinksFromAnotherApp links_from_another_app;
+    Navigate(&params);
+    if (params.navigated_or_inserted_contents) {
+      GoToTab(tabs::TabInterface::GetFromContents(
+          params.navigated_or_inserted_contents));
+    }
+  }
 }
 
 }  // namespace
@@ -51,10 +80,14 @@ void NotifyAboutChat(Profile* profile,
                      std::string_view id,
                      const std::string& title,
                      const std::string& what,
-                     const std::string& text) {
+                     const std::string& text,
+                     bool retry) {
   message_center::RichNotificationData data;
   // Each answer is news, even when it replaces the last one.
   data.renotify = true;
+  if (retry) {
+    data.buttons.emplace_back(u"Retry");
+  }
   message_center::Notification notification(
       message_center::NOTIFICATION_TYPE_SIMPLE, ChatNotificationId(id),
       base::UTF8ToUTF16(title.empty() ? "Chat" : title),
@@ -76,10 +109,15 @@ void CloseChatNotification(Profile* profile, std::string_view id) {
       NotificationHandler::Type::UW_CHAT, ChatNotificationId(id));
 }
 
+void SetRetryChat(RetryChat retry) {
+  RetryHook() = std::move(retry);
+}
+
 bool StaysAfterQuit(NotificationHandler::Type type,
                     const message_center::Notification& notification) {
   return type == NotificationHandler::Type::UW_CHAT &&
-         notification.buttons().empty();
+         (notification.buttons().empty() ||
+          notification.id().starts_with(kChatNotificationPrefix));
 }
 
 void AskAboutStep(Profile* profile,
@@ -130,24 +168,10 @@ void ChatNotificationHandler::OnClick(
   if (ChatAlerts* alerts = ChatAlerts::For(profile)) {
     alerts->MarkNewestRead(chat_id);
   }
-  const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile, chat_id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-  } else if (ChatFile::IsChatId(chat_id)) {
-    // No tab shows the chat, as after uw restarts, so it opens in one, at the
-    // top of the Scratchpad as a link from another app does.
-    NavigateParams params(profile, ChatUrl(chat_id),
-                          ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
-    params.browser =
-        ProfileBrowserCollection::GetForProfile(profile)->FindTabbedBrowser();
-    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-    TabOrganizationController::LinksFromAnotherApp links_from_another_app;
-    Navigate(&params);
-    if (params.navigated_or_inserted_contents) {
-      GoToTab(tabs::TabInterface::GetFromContents(
-          params.navigated_or_inserted_contents));
-    }
+  // Retry runs the chat out of sight; one that can't, as while a run goes,
+  // opens the chat instead.
+  if (!action_index || !RetryHook() || !RetryHook().Run(profile, chat_id)) {
+    ShowChat(profile, chat_id);
   }
   NotificationDisplayServiceFactory::GetForProfile(profile)->Close(
       NotificationHandler::Type::UW_CHAT, notification_id);

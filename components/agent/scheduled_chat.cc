@@ -256,13 +256,18 @@ RunEffect AfterRun(ScheduledChat& chat,
                    RunEnd end,
                    const RunReport& report,
                    std::string_view error,
-                   base::Time when) {
+                   base::Time when,
+                   bool retry) {
   RunEffect effect;
   std::string failure;
   if (end == RunEnd::kStopped) {
     return effect;
   }
   if (end == RunEnd::kReported && report.sign_in.empty()) {
+    effect.resumed = retry && chat.paused && !chat.pause_reason.empty();
+    if (effect.resumed) {
+      chat.paused = false;
+    }
     chat.recent.push_back({when, report});
     if (chat.recent.size() > kPastRuns) {
       chat.recent.erase(chat.recent.begin());
@@ -272,11 +277,13 @@ RunEffect AfterRun(ScheduledChat& chat,
     chat.last_failure.clear();
     chat.pause_reason.clear();
     effect.text = report.message;
-    if (chat.regular_updates) {
+    if (effect.resumed) {
+      effect.what = "Resumed";
+    } else if (chat.regular_updates) {
       effect.what = "Update";
     } else if (report.found) {
       effect.what = "Change alert";
-    } else if (chat.even_when_nothing_changes) {
+    } else if (chat.even_when_nothing_changes || retry) {
       effect.what = "No change";
     }
   } else {
@@ -293,7 +300,7 @@ RunEffect AfterRun(ScheduledChat& chat,
     }
     chat.last_failure = failure;
     effect.text = failure;
-    if (first) {
+    if (first || retry) {
       effect.what =
           end == RunEnd::kReported ? "Sign in required" : "Couldn't check";
     }
@@ -313,6 +320,11 @@ RunEffect AfterRun(ScheduledChat& chat,
     effect.what.clear();
   }
   return effect;
+}
+
+bool OffersRetry(std::string_view what) {
+  return what == "Couldn't check" || what == "Sign in required" ||
+         what == "Paused";
 }
 
 }  // namespace uw

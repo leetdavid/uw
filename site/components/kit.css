@@ -716,6 +716,22 @@
   font-size: 12px;
 }
 
+.kit-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--kit-accent);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.kit-retry svg {
+  width: 12px;
+  height: 12px;
+}
+
 .kit-trail {
   display: flex;
   flex: none;

@@ -25,6 +25,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   RotateCcw,
   RotateCw,
   Search,
@@ -76,6 +77,7 @@ const ICONS = {
   "new-window": SquareArrowOutUpRight,
   pause: Pause,
   plus: Plus,
+  refresh: RefreshCw,
   rename: Pencil,
   scratchpad: Inbox,
   search: Search,
@@ -487,6 +489,7 @@ export function Row({
   tile,
   title,
   detail,
+  retry,
   selected,
   children,
 }: {
@@ -494,6 +497,8 @@ export function Row({
   tile?: string;
   title: ReactNode;
   detail?: ReactNode;
+  // An Inbox alert's Retry, under its text.
+  retry?: boolean;
   selected?: boolean;
   children?: ReactNode;
 }) {
@@ -504,6 +509,12 @@ export function Row({
       <span className="kit-text">
         <b>{title}</b>
         {detail && <span>{detail}</span>}
+        {retry && (
+          <em className="kit-retry">
+            <Glyph icon="refresh" />
+            Retry
+          </em>
+        )}
       </span>
       {children && <span className="kit-trail">{children}</span>}
     </div>

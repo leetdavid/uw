@@ -39,13 +39,13 @@ namespace uw {
 // schedules, kept in uw_chats/schedules.json, and their runs, which happen
 // out of sight while uw is open, with or without a window. Each run adds a
 // line to its chat and tells the user what the chat's settings say to.
-class ScheduledChats : public base::SupportsUserData::Data,
-                       public ChatIndex::Observer,
-                       public ProfileObserver,
-                       public ChatTriggers::Delegate,
-                       public device::mojom::TimeZoneMonitorClient,
-                       public network::NetworkConnectionTracker::
-                           NetworkConnectionObserver {
+class ScheduledChats
+    : public base::SupportsUserData::Data,
+      public ChatIndex::Observer,
+      public ProfileObserver,
+      public ChatTriggers::Delegate,
+      public device::mojom::TimeZoneMonitorClient,
+      public network::NetworkConnectionTracker::NetworkConnectionObserver {
  public:
   class Observer : public base::CheckedObserver {
    public:
@@ -134,6 +134,13 @@ class ScheduledChats : public base::SupportsUserData::Data,
   // paused. Its schedule keeps its times. Nothing starts while a run of it is
   // under way.
   void CheckNow(const std::string& chat_id);
+  // Whether Retry can run `chat_id` again: its last run failed, and no run of
+  // it goes.
+  bool CanRetry(std::string_view chat_id) const;
+  // Runs `chat_id` again at once, as Check now does, when CanRetry() says it
+  // can, and says whether it did. The run always tells how it went, and one
+  // that works resumes a schedule that failures paused.
+  bool Retry(const std::string& chat_id);
   // Brings the tab a waiting run of `chat_id` waits in next to `chat_tab`,
   // in the user's window.
   void BringWaitingTab(const std::string& chat_id,
@@ -182,6 +189,8 @@ class ScheduledChats : public base::SupportsUserData::Data,
     // it.
     std::string trigger;
     std::string wake;
+    // A Retry, which always tells how it went.
+    bool retry = false;
   };
 
   void OnLoaded(std::optional<base::DictValue> saved);
@@ -192,12 +201,15 @@ class ScheduledChats : public base::SupportsUserData::Data,
   void Changed(const std::string& chat_id);
 
   void OnDue(const std::string& chat_id, base::Time when);
+  // Runs `chat_id` at once, outside its schedule, which keeps its times.
+  void RunNow(const std::string& chat_id, bool retry);
   // Starts a run of the schedule. On a wake of its lasting trigger, `wake`
   // tells what woke it.
   void StartRun(const std::string& chat_id,
                 base::Time when,
                 const ChatTriggers::Trigger* trigger = nullptr,
-                std::string wake = std::string());
+                std::string wake = std::string(),
+                bool retry = false);
   // The model `choice` names in `format`, with its key, or nothing when it is
   // not set up.
   std::optional<AgentModel> ModelFor(const ModelChoice& choice);

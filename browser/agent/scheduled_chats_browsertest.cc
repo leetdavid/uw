@@ -51,6 +51,7 @@
 #include "uw/browser/agent/chat_alerts.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
+#include "uw/browser/agent/chat_notification.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/chat_triggers.h"
 #include "uw/browser/agent/scripted_model.h"
@@ -172,8 +173,8 @@ class ScheduledChatsBrowserTest : public headless::HeadlessModeBrowserTest {
   void GoOffline() {
     content::NetworkConnectionChangeSimulator().SetConnectionType(
         net::NetworkChangeNotifier::CONNECTION_NONE);
-    offline_ = std::make_unique<content::URLLoaderInterceptor>(
-        base::BindRepeating(
+    offline_ =
+        std::make_unique<content::URLLoaderInterceptor>(base::BindRepeating(
             [](content::URLLoaderInterceptor::RequestParams* params) {
               if (!params->url_request.url.path().starts_with("/v1/")) {
                 return false;
@@ -468,6 +469,64 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
 
   alerts->Clear();
   EXPECT_TRUE(alerts->alerts().empty());
+}
+
+// A failure's notification has Retry, which runs the chat again out of
+// sight and always tells how it went.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ANotificationsRetryRunsTheChatAgainAndTellsHowItWent) {
+  SaveChat();
+  model_.Script({ScriptedModel::Answer("I looked around.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  ASSERT_EQ(Notifications().size(), 1u);
+  const message_center::Notification failed = Notifications()[0];
+  EXPECT_EQ(failed.context_message(), u"Couldn't check");
+  ASSERT_EQ(failed.buttons().size(), 1u);
+  EXPECT_EQ(failed.buttons()[0].title, u"Retry");
+  EXPECT_TRUE(StaysAfterQuit(NotificationHandler::Type::UW_CHAT, failed));
+  EXPECT_TRUE(chats()->CanRetry(kChat));
+  const int tabs = browser()->tab_strip_model()->count();
+
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  notifications_->SimulateClick(NotificationHandler::Type::UW_CHAT, failed.id(),
+                                0, std::nullopt);
+  EXPECT_TRUE(chats()->Running(kChat));
+  const base::ListValue lines = LinesAfterTheRun();
+
+  ASSERT_EQ(lines.size(), 2u);
+  EXPECT_EQ(*lines[1].GetDict().FindString("what"), "No change");
+  ASSERT_EQ(Notifications().size(), 1u);
+  EXPECT_EQ(Notifications()[0].context_message(), u"No change");
+  EXPECT_EQ(Notifications()[0].message(), u"Still $549.");
+  EXPECT_TRUE(Notifications()[0].buttons().empty());
+  EXPECT_EQ(ChatAlerts::For(profile())->Unread(), 1u);
+  EXPECT_FALSE(chats()->CanRetry(kChat));
+  EXPECT_EQ(browser()->tab_strip_model()->count(), tabs);
+}
+
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       ARetryThatWorksResumesAScheduleFailuresPaused) {
+  SaveChat();
+  model_.Script({ScriptedModel::Answer("I looked around.")});
+  chats()->Save(kChat, DeskWatch(ProviderId()));
+  LinesAfterTheRun();
+  for (int check = 0; check < 2; ++check) {
+    chats()->CheckNow(kChat);
+    LinesAfterTheRun();
+  }
+  ASSERT_TRUE(chats()->Find(kChat)->paused);
+  ASSERT_FALSE(chats()->NextRunOf(kChat));
+
+  model_.Script({Report(false, "Still $549."), ScriptedModel::Answer("Done.")});
+  ASSERT_TRUE(chats()->Retry(kChat));
+  LinesAfterTheRun();
+
+  EXPECT_FALSE(chats()->Find(kChat)->paused);
+  EXPECT_TRUE(chats()->NextRunOf(kChat));
+  ASSERT_EQ(Notifications().size(), 1u);
+  EXPECT_EQ(Notifications()[0].context_message(), u"Resumed");
+  EXPECT_EQ(Notifications()[0].message(), u"Still $549.");
 }
 
 // Check now runs a schedule at once, as an extra run: its next time stays,

@@ -20,17 +20,27 @@ namespace uw {
 
 // Sends the chat `id`'s macOS notification: the chat's `title`, then `what`
 // happened, such as "Answered", then the start of `text`. The next one for
-// the same chat replaces it. See the agent chats plan.
+// the same chat replaces it. One about a failed run has `retry`, a Retry
+// button. See the agent chats plan.
 void NotifyAboutChat(Profile* profile,
                      std::string_view id,
                      const std::string& title,
                      const std::string& what,
-                     const std::string& text);
+                     const std::string& text,
+                     bool retry = false);
 // Takes back the chat `id`'s notification, if it still shows.
 void CloseChatNotification(Profile* profile, std::string_view id);
 
+// Runs the scheduled chat `id` again from its notification's Retry, and says
+// whether it did. ScheduledChats sets it, since this target can't depend on
+// it.
+using RetryChat =
+    base::RepeatingCallback<bool(Profile* profile, const std::string& id)>;
+void SetRetryChat(RetryChat retry);
+
 // Whether `notification` stays in Notification Center after uw quits, as a
-// chat's does. A step's, with its buttons, can't be answered then.
+// chat's does, Retry included. A step's, with its buttons, can't be answered
+// then.
 bool StaysAfterQuit(NotificationHandler::Type type,
                     const message_center::Notification& notification);
 

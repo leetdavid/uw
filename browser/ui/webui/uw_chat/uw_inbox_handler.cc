@@ -3,6 +3,7 @@
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_handler.h"
 
 #include <algorithm>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -83,6 +84,17 @@ void UwInboxHandler::OpenAlert(const std::string& id) {
 void UwInboxHandler::OpenChat(const std::string& id) {
   if (const ChatAlerts::Alert* alert = Read(id)) {
     ShowChat(alert->chat_id);
+  }
+}
+
+void UwInboxHandler::Retry(const std::string& id) {
+  const ChatAlerts::Alert* alert = Read(id);
+  if (!alert) {
+    return;
+  }
+  const std::string chat_id = alert->chat_id;
+  if (ScheduledChats* chats = schedules_.GetSource()) {
+    chats->Retry(chat_id);
   }
 }
 
@@ -177,6 +189,8 @@ void UwInboxHandler::SendAlerts() {
       ++scheduled;
     }
   }
+  // Chats whose newest alert of a failed run has been sent.
+  std::set<std::string> told_of_failure;
   for (const ChatAlerts::Alert& alert : alerts->alerts()) {
     auto shown = mojom::InboxAlert::New();
     shown->id = alert.id;
@@ -204,6 +218,11 @@ void UwInboxHandler::SendAlerts() {
     shown->time = alert.time.InMillisecondsFSinceUnixEpoch();
     shown->waiting = alert.waiting;
     shown->read = alert.read;
+    if (OffersRetry(alert.what) &&
+        told_of_failure.insert(alert.chat_id).second && chat && chat->failing) {
+      shown->running = chats->Running(alert.chat_id);
+      shown->retry = !shown->running;
+    }
     sent.push_back(std::move(shown));
   }
   BrowserWindowInterface* window = Window();

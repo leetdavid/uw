@@ -225,6 +225,77 @@ TEST(ScheduledChatTest, ASiteThatWantsASignInIsACountedFailure) {
   EXPECT_TRUE(chat.recent.empty());
 }
 
+// A Retry always tells how it went: a quiet success, and a failure after
+// the first.
+TEST(ScheduledChatTest, ARetryAlwaysTellsHowItWent) {
+  ScheduledChat chat = DeskWatch();
+  AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(20));
+
+  const RunEffect again = AfterRun(chat, RunEnd::kFailed, {},
+                                   "fully.com didn't load", Utc(21), true);
+  EXPECT_EQ(again.what, "Couldn't check");
+  EXPECT_EQ(again.text, "fully.com didn't load");
+  const RunEffect worked = AfterRun(
+      chat, RunEnd::kReported, Report(false, "Still $549."), "", Utc(22), true);
+  EXPECT_EQ(worked.what, "No change");
+  EXPECT_EQ(worked.text, "Still $549.");
+  EXPECT_FALSE(chat.failing);
+}
+
+TEST(ScheduledChatTest, ARetryThatWorksResumesAScheduleFailuresPaused) {
+  ScheduledChat chat = DeskWatch();
+  for (int day = 20; day <= 22; ++day) {
+    AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(day));
+  }
+  ASSERT_TRUE(chat.paused);
+
+  const RunEffect failed = AfterRun(chat, RunEnd::kFailed, {},
+                                    "fully.com didn't load", Utc(23), true);
+  EXPECT_EQ(failed.what, "Couldn't check");
+  EXPECT_FALSE(failed.resumed);
+  EXPECT_TRUE(chat.paused);
+  const RunEffect worked =
+      AfterRun(chat, RunEnd::kReported, Report(true, "Down to $479."), "",
+               Utc(24), true);
+  EXPECT_TRUE(worked.resumed);
+  EXPECT_EQ(worked.what, "Resumed");
+  EXPECT_EQ(worked.text, "Down to $479.");
+  EXPECT_FALSE(chat.paused);
+  EXPECT_TRUE(chat.pause_reason.empty());
+}
+
+// Check now on a schedule paused by failures leaves it paused.
+TEST(ScheduledChatTest, ACheckThatWorksLeavesAScheduleFailuresPaused) {
+  ScheduledChat chat = DeskWatch();
+  for (int day = 20; day <= 22; ++day) {
+    AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(day));
+  }
+
+  const RunEffect check = AfterRun(chat, RunEnd::kReported,
+                                   Report(false, "Still $549."), "", Utc(23));
+  EXPECT_FALSE(check.resumed);
+  EXPECT_TRUE(chat.paused);
+}
+
+TEST(ScheduledChatTest, MuteSilencesARetry) {
+  ScheduledChat chat = DeskWatch();
+  chat.muted = true;
+  AfterRun(chat, RunEnd::kFailed, {}, "fully.com didn't load", Utc(20));
+  EXPECT_EQ(AfterRun(chat, RunEnd::kReported, Report(false, "Still $549."), "",
+                     Utc(21), true)
+                .what,
+            "");
+}
+
+TEST(ScheduledChatTest, OnlyAFailedRunsAlertOffersRetry) {
+  EXPECT_TRUE(OffersRetry("Couldn't check"));
+  EXPECT_TRUE(OffersRetry("Sign in required"));
+  EXPECT_TRUE(OffersRetry("Paused"));
+  EXPECT_FALSE(OffersRetry("Change alert"));
+  EXPECT_FALSE(OffersRetry("No change"));
+  EXPECT_FALSE(OffersRetry("Waits for your approval"));
+}
+
 TEST(ScheduledChatTest, MuteSilencesButKeepsCounting) {
   ScheduledChat chat = DeskWatch();
   chat.muted = true;
