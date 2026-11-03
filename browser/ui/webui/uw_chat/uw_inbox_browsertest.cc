@@ -1,5 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
+#include <cmath>
+#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <string>
@@ -7,13 +9,16 @@
 
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_run_loop_timeout.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -26,9 +31,13 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
+#include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/vector2d.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_alerts.h"
@@ -38,9 +47,12 @@
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -211,6 +223,56 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
         ->GetLastCommittedURL();
   }
 
+  // How tall the Inbox's content is, and how tall the pop-up shows its page.
+  std::string Heights(content::WebContents* page) {
+    return base::StrCat(
+        {"content ",
+         base::NumberToString(
+             content::EvalJs(page,
+                             "Math.ceil(document.querySelector('#inbox')"
+                             ".getBoundingClientRect().height)")
+                 .ExtractInt()),
+         ", page viewport ",
+         base::NumberToString(
+             content::EvalJs(page, "innerHeight").ExtractInt()),
+         ", pop-up ",
+         base::NumberToString(page->GetContainerBounds().height())});
+  }
+
+  // Whether the pop-up shows `page` at its content's height.
+  bool FitsItsContent(content::WebContents* page) {
+    const int content =
+        content::EvalJs(page,
+                        "Math.ceil(document.querySelector('#inbox')"
+                        ".getBoundingClientRect().height)")
+            .ExtractInt();
+    return std::abs(page->GetContainerBounds().height() - content) <= 1;
+  }
+
+  // The color of `window` at `point` in the Inbox button, averaged over the
+  // pixels around it, so the tint's grain evens out.
+  SkColor ButtonColorAt(const SkBitmap& window, gfx::PointF point) {
+    views::Widget* widget =
+        BrowserView::GetBrowserViewForBrowser(browser())->GetWidget();
+    const float scale = static_cast<float>(window.width()) /
+                        widget->GetWindowBoundsInScreen().width();
+    const gfx::Vector2d offset =
+        button()->GetBoundsInScreen().origin() -
+        widget->GetWindowBoundsInScreen().origin();
+    const int x = std::lround((point.x() + offset.x()) * scale);
+    const int y = std::lround((point.y() + offset.y()) * scale);
+    int r = 0, g = 0, b = 0;
+    for (int dx = -1; dx <= 1; ++dx) {
+      for (int dy = -1; dy <= 1; ++dy) {
+        const SkColor pixel = window.getColor(x + dx, y + dy);
+        r += SkColorGetR(pixel);
+        g += SkColorGetG(pixel);
+        b += SkColorGetB(pixel);
+      }
+    }
+    return SkColorSetRGB(r / 9, g / 9, b / 9);
+  }
+
   ScopedMemoryKeychain keychain_;
   ScriptedModel model_{*embedded_test_server()};
   std::unique_ptr<NotificationDisplayServiceTester> notifications_;
@@ -314,6 +376,63 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, ClearAllEmptiesTheInbox) {
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return ActiveUrl() == GURL(kScheduledUrl); }));
   EXPECT_TRUE(base::test::RunUntil([&] { return !button()->IsShowing(); }));
+}
+
+// Real windows only: a headless pop-up never takes its page's size.
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest, MANUAL_ClearAllShrinksThePopUp) {
+  const std::string id = WatchTheDesk();
+  for (int i = 0; i < 5; ++i) {
+    alerts()->Add(id, "No change", "Still $479.", /*waiting=*/false);
+  }
+  content::WebContents* page = OpenTheInbox();
+  ASSERT_TRUE(Shows(page, "[data-alert]"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return FitsItsContent(page); }))
+      << Heights(page);
+  const int full = page->GetContainerBounds().height();
+  views::Widget* popup =
+      views::Widget::GetWidgetForNativeView(page->GetNativeView());
+  SaveWidgetScreenshot(popup, "inbox-full");
+
+  Click(page, "#inbox-clear");
+  ASSERT_TRUE(Shows(page, "#inbox-empty"));
+  {
+    base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
+    EXPECT_TRUE(base::test::RunUntil([&] { return FitsItsContent(page); }))
+        << Heights(page);
+  }
+  EXPECT_LT(page->GetContainerBounds().height(), full);
+  SaveWidgetScreenshot(popup, "inbox-shrunk");
+}
+
+// Real windows only: headless windows draw no glass. Over glass, the ring
+// around the badge shows what is behind the button, the same as the button's
+// corner, which neither the fill nor the icon reaches.
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest, MANUAL_TheBadgesRingShowsTheSidebar) {
+  if (!CanShowGlass() || ReducesTransparency()) {
+    GTEST_SKIP() << "This Mac draws no glass.";
+  }
+  browser()->GetWindow()->Activate();
+  Theme theme = ThemeOfWindow(browser());
+  theme.transparency = kFullTransparency / 2;
+  SetThemeOfWindow(browser(), theme);
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsGlass(browser()); }));
+  WatchTheDesk();
+  for (const bool open : {false, true}) {
+    if (open) {
+      OpenTheInbox();
+    }
+    CaptureWindow(browser());
+    const SkBitmap window = CaptureNativeWindow(browser());
+    SaveBitmap(window, open ? "inbox-ring-open" : "inbox-ring");
+    // Left of the one-figure badge, halfway across its ring.
+    const SkColor ring = ButtonColorAt(window, gfx::PointF(12, 7.5));
+    const SkColor corner = ButtonColorAt(window, gfx::PointF(1, 1));
+    for (const int shift : {16, 8, 0}) {
+      EXPECT_NEAR((ring >> shift) & 0xFF, (corner >> shift) & 0xFF, 8)
+          << (open ? "open: " : "closed: ") << std::hex << ring << " vs "
+          << corner;
+    }
+  }
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, NoButtonInAPrivateWindow) {

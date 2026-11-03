@@ -15,6 +15,7 @@ import {
   watchCardPage,
   type WatchCardState,
 } from "./watch-card-api";
+import { FadeOver, FitToContent } from "../fit-to-content";
 import { WatchForm, WatchList, Watched, viewOf } from "./watch-parts";
 
 // What the card shows: the page's watches, one watch, a watch being changed,
@@ -56,8 +57,11 @@ function WatchCard() {
     watches.find((watch) => watch.chatId === chatId);
   const toWatches = () => setShowing({ kind: "watches" });
   const another = () => setShowing({ kind: "new" });
+  // Names what shows, so another card fades in over it.
+  let view;
   let body;
   if (watches.length === 0) {
+    view = "fresh";
     body = (
       <WatchForm
         card={fresh}
@@ -69,6 +73,7 @@ function WatchCard() {
       />
     );
   } else if (showing.kind === "new") {
+    view = "new";
     body = (
       <WatchForm
         key="new"
@@ -91,6 +96,7 @@ function WatchCard() {
     // With several watches, a watch's card goes back to their list.
     const back = watches.length > 1 ? toWatches : undefined;
     if (!selected) {
+      view = "watches";
       body = (
         <WatchList
           page={card}
@@ -100,6 +106,7 @@ function WatchCard() {
         />
       );
     } else if (showing.kind === "edit") {
+      view = `edit ${selected.chatId}`;
       body = (
         <WatchForm
           key={selected.chatId}
@@ -113,6 +120,7 @@ function WatchCard() {
         />
       );
     } else {
+      view = `watch ${selected.chatId}`;
       body = (
         <Watched
           card={viewOf(card, selected)}
@@ -134,14 +142,18 @@ function WatchCard() {
     }
   }
   return (
-    <div
-      id="watch-card"
-      role="dialog"
-      aria-label="Watch this page"
-      className="flex w-96 flex-col gap-2.5 bg-background p-4"
-    >
-      {body}
-    </div>
+    <FitToContent>
+      <div
+        id="watch-card"
+        role="dialog"
+        aria-label="Watch this page"
+        className="flex w-96 flex-col bg-background p-4"
+      >
+        <FadeOver view={view} className="gap-2.5">
+          {body}
+        </FadeOver>
+      </div>
+    </FitToContent>
   );
 }
 

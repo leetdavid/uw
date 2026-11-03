@@ -634,6 +634,14 @@
     }
 }
 
+/* The watch card and the Inbox size their pop-up to their content, so their
+   page must not fill the pop-up, or the pop-up could never shrink. */
+html.pop-up,
+html.pop-up body,
+html.pop-up #root {
+  height: auto;
+}
+
 /* The watch card and the Inbox over frosted glass, while their window's glass
    is on. */
 html.frosted {

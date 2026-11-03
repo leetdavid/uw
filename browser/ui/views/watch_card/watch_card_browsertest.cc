@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -13,6 +14,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_run_loop_timeout.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -41,6 +43,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/actions/actions.h"
+#include "ui/views/widget/widget.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_index.h"
 #include "uw/browser/agent/chat_tab.h"
@@ -474,6 +477,43 @@ IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, APageCanHaveSeveralWatches) {
   EXPECT_TRUE(chats()->Find(stock));
   ASSERT_TRUE(Shows(page, "#watch-list"));
   EXPECT_TRUE(EyeSays(u"Watching this page for 2 things"));
+}
+
+// Real windows only: a headless pop-up never takes its page's size. The card
+// fits each view it switches to.
+IN_PROC_BROWSER_TEST_F(WatchCardBrowserTest, MANUAL_TheCardFitsEachView) {
+  WatchTheDesk();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Url("/desk")));
+  ASSERT_TRUE(EyeSays(kWatching));
+  ASSERT_TRUE(WatchCard::Open(browser()));
+  content::WebContents* page = card()->page();
+  ASSERT_TRUE(page);
+  const auto fits = [&] {
+    base::test::ScopedRunLoopTimeout timeout(FROM_HERE, base::Seconds(10));
+    return base::test::RunUntil([&] {
+      const int content =
+          content::EvalJs(page,
+                          "Math.ceil(document.querySelector('#watch-card')"
+                          ".getBoundingClientRect().height)")
+              .ExtractInt();
+      return std::abs(page->GetContainerBounds().height() - content) <= 1;
+    });
+  };
+
+  ASSERT_TRUE(Shows(page, "#watch-another"));
+  ASSERT_TRUE(fits());
+  const int watch = page->GetContainerBounds().height();
+  Click(page, "#watch-another");
+  ASSERT_TRUE(Shows(page, "#watch-back"));
+  EXPECT_TRUE(fits());
+  EXPECT_NE(page->GetContainerBounds().height(), watch);
+  SaveWidgetScreenshot(
+      views::Widget::GetWidgetForNativeView(page->GetNativeView()),
+      "watch-card-another");
+
+  Click(page, "#watch-back");
+  EXPECT_TRUE(fits());
+  EXPECT_EQ(page->GetContainerBounds().height(), watch);
 }
 
 // A headless bubble never draws its page, so the card is shown in a tab to

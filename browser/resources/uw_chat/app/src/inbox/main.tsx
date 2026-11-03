@@ -7,7 +7,7 @@ import "@/trusted-types";
 import "@/theme-colors";
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
+import { MotionConfig, motion } from "motion/react";
 import {
   ArrowRight,
   Clock,
@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { KIND_COLORS } from "../alert-kinds";
+import { FadeOver, FitToContent, SLIDE } from "../fit-to-content";
 import { connect, inboxHandler, inboxPage, type InboxAlert } from "./inbox-api";
 
 function clockText(ms: number): string {
@@ -153,77 +154,86 @@ function Inbox() {
     return null;
   }
   return (
-    <div
-      id="inbox"
-      role="dialog"
-      aria-label="Inbox"
-      className="flex max-h-[520px] w-[372px] flex-col p-1.5"
-    >
-      <header className="flex items-center justify-between py-1.5 pr-1 pl-2.5">
-        <h1 className="text-[15px] font-semibold">Inbox</h1>
-        <Button
-          id="inbox-mark-read"
-          variant="ghost"
-          size="compact"
-          className="ml-auto text-[12.5px]"
-          disabled={alerts.every((alert) => alert.read)}
-          onClick={() => inboxHandler.markAllRead()}
-        >
-          Mark all read
-        </Button>
-        <Button
-          id="inbox-clear"
-          variant="ghost"
-          size="compact"
-          className="text-[12.5px]"
-          disabled={alerts.length === 0}
-          onClick={() => inboxHandler.clearAll()}
-        >
-          Clear all
-        </Button>
-      </header>
-      {alerts.length === 0 ? (
-        <div
-          id="inbox-empty"
-          className="flex flex-col items-center px-6 pt-5 pb-6 text-center"
-        >
-          <span className="mb-2.5 grid size-10 place-items-center rounded-xl bg-accent text-muted-foreground">
-            <InboxIcon aria-hidden className="size-[18px]" />
-          </span>
-          <b className="text-[13.5px] font-semibold">No alerts</b>
-          <p className="mt-1 max-w-64 text-[12.5px] text-muted-foreground">
-            What your watched pages and scheduled chats tell you shows here.
-          </p>
-        </div>
-      ) : (
-        <div className="-mx-1.5 min-h-0 overflow-y-auto px-1.5">
-          {groupsOf(alerts).map((group) => (
-            <section key={group.day} className="flex flex-col">
-              <h2 className="px-2.5 pt-2 pb-1 text-[11.5px] font-semibold text-muted-foreground">
-                {group.day}
-              </h2>
-              {group.alerts.map((alert) => (
-                <Alert key={alert.id} alert={alert} />
+    <FitToContent>
+      <div
+        id="inbox"
+        role="dialog"
+        aria-label="Inbox"
+        className="flex max-h-[520px] w-[372px] flex-col p-1.5"
+      >
+        <header className="flex items-center justify-between py-1.5 pr-1 pl-2.5">
+          <h1 className="text-[15px] font-semibold">Inbox</h1>
+          <Button
+            id="inbox-mark-read"
+            variant="ghost"
+            size="compact"
+            className="ml-auto text-[12.5px]"
+            disabled={alerts.every((alert) => alert.read)}
+            onClick={() => inboxHandler.markAllRead()}
+          >
+            Mark all read
+          </Button>
+          <Button
+            id="inbox-clear"
+            variant="ghost"
+            size="compact"
+            className="text-[12.5px]"
+            disabled={alerts.length === 0}
+            onClick={() => inboxHandler.clearAll()}
+          >
+            Clear all
+          </Button>
+        </header>
+        <FadeOver view={alerts.length === 0 ? "empty" : "alerts"}>
+          {alerts.length === 0 ? (
+            <div
+              id="inbox-empty"
+              className="flex flex-col items-center px-6 pt-5 pb-6 text-center"
+            >
+              <span className="mb-2.5 grid size-10 place-items-center rounded-xl bg-accent text-muted-foreground">
+                <InboxIcon aria-hidden className="size-[18px]" />
+              </span>
+              <b className="text-[13.5px] font-semibold">No alerts</b>
+              <p className="mt-1 max-w-64 text-[12.5px] text-muted-foreground">
+                What your watched pages and scheduled chats tell you shows here.
+              </p>
+            </div>
+          ) : (
+            <div className="-mx-1.5 min-h-0 overflow-y-auto px-1.5">
+              {groupsOf(alerts).map((group) => (
+                <section key={group.day} className="flex flex-col">
+                  <h2 className="px-2.5 pt-2 pb-1 text-[11.5px] font-semibold text-muted-foreground">
+                    {group.day}
+                  </h2>
+                  {group.alerts.map((alert) => (
+                    <Alert key={alert.id} alert={alert} />
+                  ))}
+                </section>
               ))}
-            </section>
-          ))}
-        </div>
-      )}
-      <footer className="mt-1 flex items-center justify-between border-t border-border px-2.5 pt-2.5 pb-1.5">
-        <button
-          type="button"
-          id="inbox-see-all"
-          onClick={() => inboxHandler.showScheduled()}
-          className="flex items-center gap-1.5 rounded-md text-[12.5px] font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            </div>
+          )}
+        </FadeOver>
+        {/* It moves with the pop-up's bottom edge as the list changes. */}
+        <motion.footer
+          layout="position"
+          transition={SLIDE}
+          className="mt-1 flex items-center justify-between border-t border-border px-2.5 pt-2.5 pb-1.5"
         >
-          <ArrowRight aria-hidden className="size-3.5" />
-          See all scheduled
-        </button>
-        <span className="text-xs text-muted-foreground">
-          {scheduled === 1 ? "1 scheduled chat" : `${scheduled} scheduled chats`}
-        </span>
-      </footer>
-    </div>
+          <button
+            type="button"
+            id="inbox-see-all"
+            onClick={() => inboxHandler.showScheduled()}
+            className="flex items-center gap-1.5 rounded-md text-[12.5px] font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ArrowRight aria-hidden className="size-3.5" />
+            See all scheduled
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {scheduled === 1 ? "1 scheduled chat" : `${scheduled} scheduled chats`}
+          </span>
+        </motion.footer>
+      </div>
+    </FitToContent>
   );
 }
 
