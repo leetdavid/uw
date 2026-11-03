@@ -240,6 +240,13 @@ Agreed failures, on 2026-10-22: a failed run is one line in the chat, such as `9
 
 Revised on 2026-10-22: three failed runs in a row pause the schedule, with a notification and the reason on the strip beside Resume. Every failure counts, such as a site that does not load or answer, "Sign in required", or a run that ends without a report, except two: a failure to reach the model, such as the provider being down or rejecting the key, and a lost connection, such as the Mac being offline. Those do not count and do not end a streak.
 
+Agreed on 2026-11-03, after a watch failed with "The model request failed: ERR_NETWORK_CHANGED":
+
+- Every request to a model, in chats, runs, and the organizer alike, tries again up to 3 times at once when the network changes under it or a name lookup fails.
+- A run whose model request still gets no answer at all, such as when the Mac is offline, notifies as any failure does, then waits for the Mac's connection to return and makes one [catch-up run](CONTEXT.md#language). A model's error answer, such as a rejected key, does not wait, since a new connection won't fix it.
+- If the next scheduled time comes first, that run goes and the wait ends. A catch-up run that fails the same way waits again. A paused schedule does not wait, and quitting uw ends the wait. The chat shows the catch-up run as an ordinary run.
+- A page that fails to load in a run's tab is left to the agent, which can load it again.
+
 Agreed reporting, revised on 2026-10-22: each scheduled chat notifies in one of two ways.
 
 | Mode | Behavior |
@@ -280,6 +287,14 @@ Agreed on 2026-10-29: [Check now](CONTEXT.md#language) starts a run of a schedul
 - It hides while a run is under way or waits for approval; "Running now" shows instead.
 - It is an extra run: the schedule's next time stays. Otherwise it is like any run: it notifies per the chat's settings, counts toward the failure pause, and shows in the chat with no mark.
 - On a paused schedule it runs once, and the schedule stays paused.
+
+Agreed on 2026-11-03: [Retry](CONTEXT.md#language) is Check now on a failed scheduled chat, offered from the Inbox and from the notification.
+
+- The Inbox shows it on "Couldn't check", "Sign in required", and "Paused" alerts, only on the chat's newest such alert, and only while the chat's last run failed. It hides while a run is under way or waits for approval; "Running now" shows instead.
+- A click marks the alert read, and the Inbox stays open. Retry's run always sends an alert saying how it went, such as "No change · $129" or "Couldn't check · fully.com didn't load", unless the chat is muted. A run that fails again thus brings a new alert with Retry.
+- On a schedule that 3 failed runs paused, a Retry that succeeds resumes it, and its alert says so. One that fails leaves it paused.
+- The notification's Retry does the same when the chat's last run failed and no run is under way, without bringing a window forward. Otherwise it opens the chat. A click launches uw if it has quit.
+- The canvas page with the Inbox frames has its states.
 
 Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
 

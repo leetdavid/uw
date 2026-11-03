@@ -234,6 +234,10 @@ _Avoid_: Check, job, execution.
 The button that starts a run of a scheduled chat at once, outside its schedule. Its label is the one place "check" stands for a run.
 _Avoid_: Run now, refresh.
 
+**Retry**:
+Check now, offered on the Inbox's newest error alert of a scheduled chat whose last run failed. Its run always sends an alert saying how it went.
+_Avoid_: Try again, rerun.
+
 **Trigger**:
 A command left running out of sight that wakes its chat once when it ends, or once for each line it prints. In a scheduled chat each wake starts a run.
 _Avoid_: Monitor, watcher, hook.
@@ -247,7 +251,7 @@ A page that a scheduled chat checks. The page shows that it is watched. The user
 _Avoid_: Page watch, tracked page.
 
 **Catch-up run**:
-A single run of a scheduled chat after uw becomes available following missed scheduled runs.
+A single run of a scheduled chat after uw becomes available following missed scheduled runs, or after the Mac's connection returns following a run that couldn't reach the model.
 _Avoid_: Catch-up check.
 
 **Change alert**:
