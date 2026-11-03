@@ -8,8 +8,10 @@
 #include "base/functional/callback.h"
 #include "base/task/bind_post_task.h"
 #include "base/time/time.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/favicon_status.h"
+#include "content/public/browser/invalidate_type.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -33,6 +35,17 @@ std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
       content::WebContents::Create(params);
   copy->GetController().CopyStateFrom(&page->GetController(), needs_reload);
   return copy;
+}
+
+std::unique_ptr<content::WebContents> SwapPage(
+    TabStripModel* tabs,
+    content::WebContents* old,
+    std::unique_ptr<content::WebContents> page) {
+  content::WebContents* shown = page.get();
+  std::unique_ptr<content::WebContents> replaced =
+      tabs->DiscardWebContents(old, std::move(page));
+  shown->NotifyNavigationStateChanged(content::INVALIDATE_TYPE_TAB);
+  return replaced;
 }
 
 bool SameHistory(content::WebContents* a, content::WebContents* b) {

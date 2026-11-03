@@ -36,6 +36,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+#include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -1003,6 +1004,29 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, PlaceholdersFollowThePagesHistory) {
       [&] { return PinPageOf(second)->GetTitle() == u"More notes"; }));
   EXPECT_EQ(PinPageOf(second)->GetController().GetEntryCount(), 2);
   EXPECT_FALSE(HasRenderer(PinPageOf(second)));
+}
+
+// A placeholder never loads, so its tile learns the page's new title and icon
+// only when uw swaps in the newer placeholder.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APlaceholdersTileFollowsItsPage) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  content::WebContents* page = Pin(browser(), GURL(kNotes))->GetContents();
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));
+  tabs::TabInterface* placeholder = second->tab_strip_model()->GetTabAtIndex(0);
+
+  ASSERT_TRUE(content::NavigateToURL(
+      page, embedded_test_server()->GetURL("/favicon/page_with_favicon.html")));
+
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ShowsIcon(placeholder->GetContents()); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const TabView* tile = views::AsViewClass<TabView>(FindTabView(
+        BrowserView::GetBrowserViewForBrowser(second), placeholder));
+    TabUIHelper* shown = TabUIHelper::From(placeholder);
+    return tile && tile->data().title == shown->GetTitle() &&
+           tile->data().favicon == shown->GetFavicon();
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest,

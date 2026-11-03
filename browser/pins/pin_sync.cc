@@ -245,7 +245,7 @@ content::WebContents* PinSync::RestoreTab(
   Mark(made.get(), id, /*restored=*/true, /*placeholder=*/true);
   content::WebContents* stand_in = made.get();
   base::AutoReset<bool> applying(&sync->applying_, true);
-  sync->tabs_->DiscardWebContents(page, std::move(made));
+  SwapPage(sync->tabs_, page, std::move(made));
   return stand_in;
 }
 
@@ -540,9 +540,9 @@ void PinSync::Apply() {
     }
     const std::string id = mark->id();
     if (std::unique_ptr<content::WebContents> kept = pages->Take(id)) {
-      tabs_->DiscardWebContents(page, std::move(kept));
+      SwapPage(tabs_, page, std::move(kept));
     } else if (LivePageIsElsewhere(id)) {
-      tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
+      SwapPage(tabs_, page, MakePlaceholder(page, id));
     }
   }
   // A window that Cmd+Shift+T brings back takes the page it gave up.
@@ -552,7 +552,7 @@ void PinSync::Apply() {
     if (mark && mark->placeholder() && mark->restored()) {
       if (std::unique_ptr<content::WebContents> kept =
               pages->Take(mark->id())) {
-        tabs_->DiscardWebContents(page, std::move(kept));
+        SwapPage(tabs_, page, std::move(kept));
       }
     }
   }
@@ -597,7 +597,7 @@ bool PinSync::BringInto(int index) {
   }
   content::WebContents* live = page.get();
   base::AutoReset<bool> applying(&applying_, true);
-  tabs_->DiscardWebContents(here, std::move(page));
+  SwapPage(tabs_, here, std::move(page));
   live->GetController().LoadIfNecessary();
   SaveSession();
   return true;
@@ -650,7 +650,7 @@ void PinSync::RefreshPlaceholders(const std::string& id) {
         continue;
       }
       base::AutoReset<bool> applying(&sync->applying_, true);
-      sync->tabs_->DiscardWebContents(page, MakePlaceholder(live, id));
+      SwapPage(sync->tabs_, page, MakePlaceholder(live, id));
       sync->SaveSession();
     }
   }
@@ -673,7 +673,7 @@ void PinSync::UnpinPlaceholder(base::WeakPtr<tabs::TabInterface> tab,
   if (std::unique_ptr<content::WebContents> page =
           PinPages::For(window_->GetProfile())->Take(id)) {
     Unmark(page.get());
-    tabs_->DiscardWebContents(here, std::move(page));
+    SwapPage(tabs_, here, std::move(page));
   } else {
     Unmark(here);
     here->GetController().SetNeedsReload();
@@ -697,7 +697,7 @@ std::unique_ptr<content::WebContents> PinSync::TakeLivePage(
     KeepPicture(page, id);
     base::AutoReset<bool> applying(&sync->applying_, true);
     std::unique_ptr<content::WebContents> taken =
-        sync->tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
+        SwapPage(sync->tabs_, page, MakePlaceholder(page, id));
     sync->SaveSession();
     return taken;
   }
@@ -756,7 +756,7 @@ void PinSync::HoldLivePages() {
     const std::string id = mark->id();
     KeepPicture(page, id);
     std::unique_ptr<content::WebContents> live =
-        tabs_->DiscardWebContents(page, MakePlaceholder(page, id));
+        SwapPage(tabs_, page, MakePlaceholder(page, id));
     // A page that has not loaded since the restart still waits in Chromium's
     // queue of restored tabs to load, which expects each one in a tab. A copy
     // of its history that was never a tab outlives the window instead.

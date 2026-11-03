@@ -65,6 +65,7 @@ source_set("page_copy") {
   ]
   public_deps = [ "//base" ]
   deps = [
+    "//chrome/browser/ui/tabs:tab_strip",
     "//components/viz/common",
     "//content/public/browser",
     "//skia",

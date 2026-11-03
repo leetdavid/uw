@@ -40,7 +40,6 @@
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_group.h"
-#include "content/public/browser/invalidate_type.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "ui/base/base_window.h"
@@ -50,6 +49,7 @@
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/page_copy.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/terminal/busy_terminals.h"
 #include "uw/browser/terminal/close_guard.h"
@@ -370,13 +370,9 @@ std::unique_ptr<content::WebContents> TabOrganizationController::ReplacePage(
     std::unique_ptr<content::WebContents> page) {
   base::AutoReset<bool> guard(&applying_, true);
   std::unique_ptr<content::WebContents> replaced =
-      tabs_->DiscardWebContents(tab->GetContents(), std::move(page));
+      SwapPage(tabs_, tab->GetContents(), std::move(page));
   // The page has a session id of its own, under which the tab saves again.
   ScheduleOwnUpdate();
-  // The tab's row takes its title and icon from the page only as the page
-  // changes them, which a copy never does, so it is told now.
-  tab->GetContents()->NotifyNavigationStateChanged(
-      content::INVALIDATE_TYPE_TAB);
   return replaced;
 }
 

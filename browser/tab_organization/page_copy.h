@@ -7,6 +7,8 @@
 
 #include "base/functional/callback_forward.h"
 
+class TabStripModel;
+
 namespace content {
 class WebContents;
 }
@@ -22,6 +24,14 @@ namespace uw {
 // another window are both one.
 std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
                                                   bool needs_reload);
+
+// Puts `page` in the tab of `old` and returns `old`. The tab's row shows
+// `page`'s title and icon at once: Chromium reads them only as a page changes
+// them, which a copy never does.
+std::unique_ptr<content::WebContents> SwapPage(
+    TabStripModel* tabs,
+    content::WebContents* old,
+    std::unique_ptr<content::WebContents> page);
 
 // Whether `a` and `b` show the same history, title, and icon.
 bool SameHistory(content::WebContents* a, content::WebContents* b);
