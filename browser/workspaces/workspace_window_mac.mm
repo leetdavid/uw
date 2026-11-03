@@ -21,6 +21,10 @@ void WorkspaceWindow::SetContentsHidden(bool hidden) {
   NSWindowOf(window_).contentView.hidden = hidden;
 }
 
+void WorkspaceWindow::SetSeen(bool seen) {
+  NSWindowOf(window_).alphaValue = seen ? 1 : 0;
+}
+
 void WorkspaceWindow::OrderBelow(WorkspaceWindow* above) {
   [NSWindowOf(window_) orderWindow:NSWindowBelow
                         relativeTo:NSWindowOf(above->window_).windowNumber];

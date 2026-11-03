@@ -12,6 +12,7 @@
 #include "base/scoped_multi_source_observation.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/event_handler.h"
@@ -46,12 +47,14 @@ class WorkspaceWindow;
 // the sidebar slides back. Ctrl+1 to 9, Cmd+Option+arrows, and a click on a
 // workspace play the same slide on their own.
 //
-// The other workspace's sidebar is a picture of its window from when it last
-// slid away. A window that has not slid away since launch has no picture, so
-// only its workspace's name slides in, and its tabs show as it lands.
+// The other workspace's sidebar is a picture of its window, which goes in
+// under this one as the slide heads to it, so it draws unseen. Until that
+// picture is in, the one from when the window last slid away stands in, or
+// only the other workspace's tint.
 class WorkspaceSwipe : public ui::EventHandler,
                        public gfx::AnimationDelegate,
-                       public views::ViewObserver {
+                       public views::ViewObserver,
+                       public content::WebContentsObserver {
  public:
   DECLARE_USER_DATA(WorkspaceSwipe);
 
@@ -69,14 +72,18 @@ class WorkspaceSwipe : public ui::EventHandler,
   // or while the sidebar is hidden, only the page fades.
   void SlideTo(const std::string& id);
 
-  // The tab strip as it was when this window last slid away. Null until then.
+  // The tab strip as it was when this window last started to slide, or last
+  // drew under the window that shows. Null until then.
   const gfx::ImageSkia& picture() const { return picture_; }
+  // Takes a new picture of the tab strip and runs `taken` once it is in. The
+  // window must be on screen, as under the window that shows.
+  void RetakePicture(base::OnceClosure taken);
 
   // Shows `page`, the page of the window this one takes over from, over this
-  // window's page, which waits 12px toward `direction`.
-  void CoverPage(const gfx::ImageSkia& page, int direction);
-  // Fades the cover out as it drifts 12px with the slide, while this window's
-  // page settles in.
+  // window's page.
+  void CoverPage(const gfx::ImageSkia& page);
+  // Fades the cover out once this window's page has drawn. A page still
+  // loading gets up to a second.
   void UncoverPage();
 
   bool sliding() const { return phase_ != Phase::kNone; }
@@ -97,6 +104,10 @@ class WorkspaceSwipe : public ui::EventHandler,
 
   // views::ViewObserver:
   void OnViewHierarchyWillBeDeleted(views::View* view) override;
+
+  // content::WebContentsObserver:
+  void DidFirstVisuallyNonEmptyPaint() override;
+  void DidStopLoading() override;
 
  private:
   enum class Gesture {
@@ -144,6 +155,7 @@ class WorkspaceSwipe : public ui::EventHandler,
   void Begin(bool with_picture);
   void OnLeavingPicture(int slide, gfx::ImageSkia picture);
   void ShowSlide();
+  void OnComingPicture(int slide, const std::string& target);
   // Points the slide at `target`, `direction` from here.
   void Aim(const std::string& target, int direction);
   void Track(float fingers, base::TimeTicks time);
@@ -157,10 +169,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   void Land(base::TimeDelta duration);
   void OnPagePicture(int slide, gfx::ImageSkia page);
   void ArriveIfReady();
-  void SwitchTo(gfx::ImageSkia page,
-                int direction,
-                BrowserWindowInterface* partner);
+  void SwitchTo(gfx::ImageSkia page, BrowserWindowInterface* partner);
   void PlaceCover();
+  void FadeCover();
   // Takes cover number `cover` away once its fade ends, unless another took
   // its place.
   void PostUncovered(int cover);
@@ -218,10 +229,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   base::OneShotTimer give_up_;
 
   raw_ptr<PageCover> cover_ = nullptr;
-  int cover_direction_ = 0;
   int covers_ = 0;
-  // Set when the fade gave the page a layer it did not have.
-  bool page_layer_made_ = false;
+  // Gives up waiting for the page under the cover to draw.
+  base::OneShotTimer cover_wait_;
 
   base::ScopedMultiSourceObservation<views::View, views::ViewObserver>
       observations_{this};

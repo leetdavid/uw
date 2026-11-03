@@ -45,6 +45,7 @@ source_set("workspaces") {
     "//components/tabs:public",
     "//components/vector_icons",
     "//components/viz/common",
+    "//content/public/browser",
     "//skia",
     "//third_party/icu",
     "//ui/base",

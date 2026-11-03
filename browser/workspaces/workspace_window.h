@@ -11,6 +11,7 @@
 #include "base/callback_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -108,9 +109,15 @@ class WorkspaceWindow : public views::WidgetObserver,
   // Gives `found` this group's window for workspace `id`, opened hidden if
   // there is none yet.
   void WithPartner(std::string_view id, WindowCallback found);
-  // Starts loading the page this group shows for workspace `id`, opening its
-  // window hidden if there is none yet.
+  // Puts this group's window for workspace `id` just under this one, where
+  // it draws unseen and its page loads, and returns it. Neither window plays
+  // macOS's animation while both are on screen. Null when it is not open yet.
+  WorkspaceWindow* Prepare(std::string_view id);
+  // As Prepare, opening the window first if there is none yet.
   void Preload(std::string_view id);
+  // Sends the windows Prepare put under this one behind again, unless one is
+  // on its way to the front.
+  void Unprepare();
 
   // Adds a workspace on `profile`, or on a new profile named `new_profile`
   // when `profile` is empty, and switches `window` to it.
@@ -166,6 +173,11 @@ class WorkspaceWindow : public views::WidgetObserver,
   // Brings this window to the front and hides `shown`.
   void Present(base::WeakPtr<WorkspaceWindow> shown);
   void LoadActiveTab();
+  // Orders this hidden window in just under `shown`, at its place and size,
+  // with its page drawing and loading.
+  void GoUnder(WorkspaceWindow* shown);
+  // Undoes GoUnder.
+  void GoBehind();
   views::Widget* GetWidget();
   // Whether macOS animates the window as it is ordered in or out.
   void SetAnimates(bool animates);
@@ -174,6 +186,9 @@ class WorkspaceWindow : public views::WidgetObserver,
   // ordered out as visible.
   void SetHidden(bool hidden);
   void SetContentsHidden(bool hidden);
+  // Whether the screen shows the window. Unseen, it still draws, as under its
+  // partner, where a see-through theme would otherwise let it show.
+  void SetSeen(bool seen);
   // Orders the window in just under `above`, where it draws unseen.
   void OrderBelow(WorkspaceWindow* above);
   // Asked once something past BrowserView, such as macOS's Window menu,
@@ -198,6 +213,11 @@ class WorkspaceWindow : public views::WidgetObserver,
   bool keeper_ = false;
   // Set while the window waits under its partner to draw.
   bool revealing_ = false;
+  // Set while the window is under its partner, hidden or on its way up.
+  bool under_ = false;
+  // Keeps the selected page drawing while the window is under its partner,
+  // which macOS counts as covering it.
+  base::ScopedClosureRunner page_drawing_;
   // Counts reveals, so a late frame of an older one is left.
   int reveals_ = 0;
   base::OneShotTimer reveal_timer_;

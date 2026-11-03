@@ -25,6 +25,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
+#include "content/public/browser/web_contents.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -37,7 +38,7 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/point.h"
-#include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/controls/scroll_view.h"
@@ -46,6 +47,7 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/tint_painter.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -71,7 +73,8 @@ constexpr base::TimeDelta kLand = base::Milliseconds(150);
 constexpr base::TimeDelta kShortestLand = base::Milliseconds(60);
 constexpr base::TimeDelta kKeySlide = base::Milliseconds(175);
 constexpr base::TimeDelta kFade = base::Milliseconds(150);
-constexpr int kNudge = 12;
+// How long the page of the window left stays over a page still loading.
+constexpr base::TimeDelta kCoverWait = base::Seconds(1);
 // The other workspace's window opens once its profile loads.
 constexpr base::TimeDelta kGiveUp = base::Seconds(5);
 
@@ -195,6 +198,9 @@ class PageCover : public views::View {
  public:
   explicit PageCover(const gfx::ImageSkia& page) : page_(page) {
     MakeOverlay(this);
+    layer()->SetRoundedCornerRadius(
+        gfx::RoundedCornersF(0, 0, kPageCardRadius, kPageCardRadius));
+    layer()->SetIsFastRoundedCorner(true);
   }
 
   // views::View:
@@ -275,20 +281,13 @@ void WorkspaceSwipe::SlideTo(const std::string& id) {
                                 base::Unretained(this)));
 }
 
-void WorkspaceSwipe::CoverPage(const gfx::ImageSkia& page, int direction) {
+void WorkspaceSwipe::CoverPage(const gfx::ImageSkia& page) {
   if (page.isNull() || !browser_view_) {
     return;
   }
   OnUncovered();
-  views::View* contents = browser_view_->multi_contents_view();
   cover_ = browser_view_->AddChildView(std::make_unique<PageCover>(page));
-  cover_direction_ = direction;
   ++covers_;
-  if (!contents->layer()) {
-    contents->SetPaintToLayer();
-    contents->layer()->SetFillsBoundsOpaquely(false);
-    page_layer_made_ = true;
-  }
   PlaceCover();
 }
 
@@ -296,14 +295,30 @@ void WorkspaceSwipe::UncoverPage() {
   if (!cover_ || !browser_view_) {
     return;
   }
+  // A page that is still loading would show blank, so the cover stays over
+  // it until it draws.
+  content::WebContents* page = browser_view_->GetActiveWebContents();
+  if (page && page->IsLoading() &&
+      !page->CompletedFirstVisuallyNonEmptyPaint()) {
+    Observe(page);
+    cover_wait_.Start(
+        FROM_HERE, kCoverWait,
+        base::BindOnce(&WorkspaceSwipe::FadeCover, base::Unretained(this)));
+    return;
+  }
+  FadeCover();
+}
+
+void WorkspaceSwipe::FadeCover() {
+  Observe(nullptr);
+  cover_wait_.Stop();
+  if (!cover_ || !browser_view_) {
+    return;
+  }
   if (views::Widget* widget = browser_view_->GetWidget()) {
     widget->LayoutRootViewIfNecessary();
   }
   PlaceCover();
-  views::View* contents = browser_view_->multi_contents_view();
-  const int nudge = cover_direction_ * kNudge;
-  // Each layer's clip moves against its drift, so neither spills past the
-  // page's edges.
   views::AnimationBuilder()
       .OnEnded(base::BindOnce(&WorkspaceSwipe::PostUncovered,
                               weak_factory_.GetWeakPtr(), covers_))
@@ -311,15 +326,29 @@ void WorkspaceSwipe::UncoverPage() {
                                 weak_factory_.GetWeakPtr(), covers_))
       .Once()
       .SetDuration(kFade)
-      .SetOpacity(cover_.get(), 0.0f, gfx::Tween::EASE_OUT)
-      .SetTransform(cover_.get(), gfx::Transform::MakeTranslation(-nudge, 0),
-                    gfx::Tween::EASE_OUT)
-      .SetClipRect(cover_.get(),
-                   gfx::Rect(nudge, 0, cover_->width(), cover_->height()),
-                   gfx::Tween::EASE_OUT)
-      .SetTransform(contents, gfx::Transform(), gfx::Tween::EASE_OUT)
-      .SetClipRect(contents, gfx::Rect(contents->size()),
-                   gfx::Tween::EASE_OUT);
+      .SetOpacity(cover_.get(), 0.0f, gfx::Tween::EASE_OUT);
+}
+
+void WorkspaceSwipe::RetakePicture(base::OnceClosure taken) {
+  views::View* strip = TabStrip();
+  if (!strip || !strip->layer()) {
+    return;
+  }
+  // A window that has not shown since launch is laid out only now.
+  if (views::Widget* widget = strip->GetWidget()) {
+    widget->LayoutRootViewIfNecessary();
+  }
+  Copy(strip->layer(), strip->GetLocalBounds(),
+       base::BindOnce(
+           [](base::WeakPtr<WorkspaceSwipe> self, base::OnceClosure taken,
+              gfx::ImageSkia picture) {
+             if (!self || picture.isNull()) {
+               return;
+             }
+             self->picture_ = std::move(picture);
+             std::move(taken).Run();
+           },
+           weak_factory_.GetWeakPtr(), std::move(taken)));
 }
 
 bool WorkspaceSwipe::shows_slide() const {
@@ -417,11 +446,21 @@ void WorkspaceSwipe::AnimationEnded(const gfx::Animation* animation) {
   }
 }
 
+void WorkspaceSwipe::DidFirstVisuallyNonEmptyPaint() {
+  FadeCover();
+}
+
+void WorkspaceSwipe::DidStopLoading() {
+  FadeCover();
+}
+
 void WorkspaceSwipe::OnViewHierarchyWillBeDeleted(views::View* view) {
   // The window's views are going, BrowserView's children before BrowserView
   // itself, so nothing here may touch any of them after.
   animation_.Stop();
   give_up_.Stop();
+  cover_wait_.Stop();
+  Observe(nullptr);
   if (region_) {
     region_->RemovePreTargetHandler(this);
   }
@@ -432,7 +471,6 @@ void WorkspaceSwipe::OnViewHierarchyWillBeDeleted(views::View* view) {
   hidden_.clear();
   layered_.clear();
   cover_ = nullptr;
-  page_layer_made_ = false;
   region_ = nullptr;
   browser_view_ = nullptr;
   observations_.RemoveAllObservations();
@@ -543,6 +581,7 @@ void WorkspaceSwipe::OnLeavingPicture(int slide, gfx::ImageSkia picture) {
   leaving_ = std::move(picture);
   // Without a picture the real sidebar stays, and only the page fades.
   if (!leaving_.isNull()) {
+    picture_ = leaving_;
     if (!slide_view_) {
       slide_view_ =
           region_->AddChildView(std::make_unique<SlideView>(browser_view_));
@@ -620,6 +659,22 @@ void WorkspaceSwipe::Aim(const std::string& target, int direction) {
   area_ = SlidingArea(target);
   ShowSlide();
   SetOffset(offset_);
+  // The other workspace's window goes in under this one, so its sidebar slides
+  // in as it is now and its page is drawn by the time it lands.
+  WorkspaceWindow* partner =
+      target.empty() ? nullptr
+                     : WorkspaceWindow::From(window_)->Prepare(target);
+  if (WorkspaceSwipe* other = partner ? From(partner->window()) : nullptr) {
+    other->RetakePicture(base::BindOnce(&WorkspaceSwipe::OnComingPicture,
+                                        weak_factory_.GetWeakPtr(), slide_,
+                                        target));
+  }
+}
+
+void WorkspaceSwipe::OnComingPicture(int slide, const std::string& target) {
+  if (slide == slide_ && target == target_) {
+    ShowSlide();
+  }
 }
 
 void WorkspaceSwipe::Track(float fingers, base::TimeTicks time) {
@@ -628,6 +683,10 @@ void WorkspaceSwipe::Track(float fingers, base::TimeTicks time) {
   if (direction != direction_) {
     Aim(NeighborToward(direction), direction);
   }
+  // The other workspace's sidebar stops where it lands, however far the
+  // fingers go on.
+  const float width = area_.width();
+  fingers_ = std::clamp(fingers_, -width, width);
   // Past either end the sidebar only stretches a little.
   const float offset =
       target_.empty() ? kStretch * fingers_ / (std::abs(fingers_) + kStretch)
@@ -749,23 +808,19 @@ void WorkspaceSwipe::ArriveIfReady() {
     return;
   }
   landed_ = false;
-  if (!leaving_.isNull()) {
-    picture_ = leaving_;
-  }
   give_up_.Start(FROM_HERE, kGiveUp,
                  base::BindOnce(&WorkspaceSwipe::Reset,
                                 base::Unretained(this)));
   WorkspaceWindow::From(window_)->WithPartner(
       target_, base::BindOnce(&WorkspaceSwipe::SwitchTo,
-                              weak_factory_.GetWeakPtr(), page_, direction_));
+                              weak_factory_.GetWeakPtr(), page_));
 }
 
 void WorkspaceSwipe::SwitchTo(gfx::ImageSkia page,
-                              int direction,
                               BrowserWindowInterface* partner) {
   base::WeakPtr<WorkspaceSwipe> other;
   if (WorkspaceSwipe* swipe = From(partner); swipe && swipe != this) {
-    swipe->CoverPage(page, direction);
+    swipe->CoverPage(page);
     other = swipe->weak_factory_.GetWeakPtr();
   }
   // The other window draws under this one, with the cover, before it comes
@@ -796,12 +851,6 @@ void WorkspaceSwipe::PlaceCover() {
   gfx::Point origin;
   views::View::ConvertPointToTarget(contents, browser_view_, &origin);
   cover_->SetBoundsRect(gfx::Rect(origin, contents->size()));
-  cover_->layer()->SetClipRect(gfx::Rect(cover_->size()));
-  // The page starts 12px over, clipped to where it settles.
-  const int nudge = cover_direction_ * kNudge;
-  contents->layer()->SetTransform(gfx::Transform::MakeTranslation(nudge, 0));
-  contents->layer()->SetClipRect(
-      gfx::Rect(-nudge, 0, contents->width(), contents->height()));
 }
 
 void WorkspaceSwipe::PostUncovered(int cover) {
@@ -817,16 +866,10 @@ void WorkspaceSwipe::PostUncovered(int cover) {
 }
 
 void WorkspaceSwipe::OnUncovered() {
+  Observe(nullptr);
+  cover_wait_.Stop();
   if (!browser_view_) {
     return;
-  }
-  views::View* contents = browser_view_->multi_contents_view();
-  if (page_layer_made_) {
-    contents->DestroyLayer();
-    page_layer_made_ = false;
-  } else if (cover_ && contents->layer()) {
-    contents->layer()->SetTransform(gfx::Transform());
-    contents->layer()->SetClipRect(gfx::Rect());
   }
   if (PageCover* cover = cover_) {
     cover_ = nullptr;
@@ -862,6 +905,9 @@ void WorkspaceSwipe::Reset() {
     switcher->SetSlide(std::string(), 0);
   }
   RepaintTint();
+  if (WorkspaceWindow* shown = WorkspaceWindow::From(window_)) {
+    shown->Unprepare();
+  }
 }
 
 void WorkspaceSwipe::RepaintTint() {

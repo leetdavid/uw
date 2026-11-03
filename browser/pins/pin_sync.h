@@ -130,6 +130,9 @@ class PinSync : public TabStripModelObserver {
   PinSync* WindowWithLivePage(std::string_view id) const;
   // Pin `id`'s live page in another window of this profile, or null.
   content::WebContents* FindLivePage(std::string_view id) const;
+  // Pin `id`'s page in another window of this profile: its live page, or else
+  // a placeholder. Null when no other window shows the pin.
+  content::WebContents* FindPage(std::string_view id) const;
   // Whether another window or PinPages holds pin `id`'s live page.
   bool LivePageIsElsewhere(std::string_view id) const;
   void HoldLivePages();

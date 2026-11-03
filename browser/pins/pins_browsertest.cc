@@ -880,6 +880,46 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APinNoWindowHoldsLoadsWhenSelected) {
   EXPECT_EQ(LiveCopies(), 1);
 }
 
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, PRE_ANewWindowLoadsNoPinAfterARestart) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL url =
+      embedded_test_server()->GetURL("/favicon/page_with_favicon.html");
+  content::WebContents* page = Pin(browser(), url)->GetContents();
+  ASSERT_TRUE(base::test::RunUntil([&] { return ShowsIcon(page); }));
+  ASSERT_TRUE(content::NavigateToURL(
+      browser()->tab_strip_model()->GetWebContentsAt(1), GURL(kIssues)));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(ShowsPins(second, {url}));
+  MovePage(browser(), second);
+  browser()->tab_strip_model()->ActivateTabAt(1);
+  // The live page outlives the window only until uw quits.
+  CloseBrowserSynchronously(second);
+  base::RunLoop().RunUntilIdle();
+}
+
+// After a restart in which no window held a pin's live page, a new window
+// gets a placeholder with the saved icon, not a page loading its home URL.
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowLoadsNoPinAfterARestart) {
+  TabStripModel* tabs = browser()->tab_strip_model();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return tabs->IndexOfFirstNonPinnedTab() == 1 &&
+           PinSync::IsPlaceholder(tabs->GetTabAtIndex(0));
+  }));
+  const GURL url = tabs->GetWebContentsAt(0)->GetVisibleURL();
+
+  Browser* next = CreateBrowser(browser()->GetProfile());
+
+  ASSERT_TRUE(ShowsPins(next, {url}));
+  tabs::TabInterface* pin = next->tab_strip_model()->GetTabAtIndex(0);
+  EXPECT_TRUE(PinSync::IsPlaceholder(pin));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return ShowsIcon(pin->GetContents()); }));
+  EXPECT_FALSE(Started(pin->GetContents()));
+  EXPECT_EQ(LiveCopies(), 0);
+}
+
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
                        PRE_IconsShowBeforeAHiddenWorkspaceLoads) {
   Profile* profile = browser()->GetProfile();

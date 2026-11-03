@@ -9,6 +9,8 @@ namespace uw {
 
 void WorkspaceWindow::SetContentsHidden(bool hidden) {}
 
+void WorkspaceWindow::SetSeen(bool seen) {}
+
 void WorkspaceWindow::OrderBelow(WorkspaceWindow* above) {}
 
 }  // namespace uw

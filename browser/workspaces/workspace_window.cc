@@ -47,6 +47,7 @@
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/compositor/compositor.h"
+#include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -248,10 +249,38 @@ void WorkspaceWindow::WithPartner(std::string_view id, WindowCallback found) {
                      workspace->id, std::move(found)));
 }
 
+WorkspaceWindow* WorkspaceWindow::Prepare(std::string_view id) {
+  if (hidden_) {
+    return nullptr;
+  }
+  for (WorkspaceWindow* partner : Partners()) {
+    if (partner->workspace_ == id) {
+      partner->GoUnder(this);
+      SetAnimates(false);
+      return partner;
+    }
+  }
+  return nullptr;
+}
+
 void WorkspaceWindow::Preload(std::string_view id) {
-  WithPartner(id, base::BindOnce([](BrowserWindowInterface* window) {
-                From(window)->LoadActiveTab();
-              }));
+  WithPartner(id, base::BindOnce(
+                      [](base::WeakPtr<WorkspaceWindow> self,
+                         BrowserWindowInterface* window) {
+                        if (self && window != self->window_) {
+                          self->Prepare(From(window)->workspace_);
+                        }
+                      },
+                      weak_factory_.GetWeakPtr()));
+}
+
+void WorkspaceWindow::Unprepare() {
+  for (WorkspaceWindow* partner : Partners()) {
+    partner->GoBehind();
+  }
+  if (!hidden_ && !switching()) {
+    SetAnimates(true);
+  }
 }
 
 // static
@@ -344,8 +373,8 @@ bool WorkspaceWindow::WillShow(BrowserWindowInterface* window) {
 
 void WorkspaceWindow::OnWidgetVisibilityChanged(views::Widget* widget,
                                                 bool visible) {
-  // A reveal orders the window in under its partner itself.
-  if (visible && hidden_ && !revealing_) {
+  // A reveal or a slide orders the window in under its partner itself.
+  if (visible && hidden_ && !revealing_ && !under_) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&WorkspaceWindow::OnShownElsewhere,
                                   weak_factory_.GetWeakPtr()));
@@ -357,7 +386,7 @@ void WorkspaceWindow::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void WorkspaceWindow::OnShownElsewhere() {
-  if (!hidden_ || revealing_ || !window_->GetWindow()->IsVisible()) {
+  if (!hidden_ || revealing_ || under_ || !window_->GetWindow()->IsVisible()) {
     return;
   }
   WillShow(window_);
@@ -388,7 +417,7 @@ void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
   }
   // With nothing to swap with, or once something else has put the window on
   // screen, it comes to the front at once.
-  if (!shown || window_->GetWindow()->IsVisible()) {
+  if (!shown || (window_->GetWindow()->IsVisible() && !under_)) {
     Present(shown ? shown->weak_factory_.GetWeakPtr() : nullptr);
     return;
   }
@@ -397,12 +426,8 @@ void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
   // or close animation.
   revealing_ = true;
   ++reveals_;
-  SetAnimates(false);
   shown->SetAnimates(false);
-  window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
-  SetContentsHidden(false);
-  OrderBelow(shown);
-  LoadActiveTab();
+  GoUnder(shown);
   const auto present = base::BindRepeating(
       [](base::WeakPtr<WorkspaceWindow> self,
          base::WeakPtr<WorkspaceWindow> shown, int reveal) {
@@ -446,6 +471,7 @@ void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
 
 void WorkspaceWindow::Present(base::WeakPtr<WorkspaceWindow> shown) {
   revealing_ = false;
+  under_ = false;
   reveal_timer_.Stop();
   keeper_ = false;
   SetHidden(false);
@@ -453,8 +479,10 @@ void WorkspaceWindow::Present(base::WeakPtr<WorkspaceWindow> shown) {
   if (shown && shown.get() != this) {
     window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
   }
+  SetSeen(true);
   window_->GetWindow()->Show();
   LoadActiveTab();
+  page_drawing_.RunAndReset();
   if (shown && shown.get() != this && !shown->hidden_) {
     shown->SetAnimates(false);
     shown->SetHidden(true);
@@ -476,6 +504,38 @@ void WorkspaceWindow::LoadActiveTab() {
           window_->GetTabStripModel()->GetActiveWebContents()) {
     active->GetController().LoadIfNecessary();
   }
+}
+
+void WorkspaceWindow::GoUnder(WorkspaceWindow* shown) {
+  if (!hidden_) {
+    return;
+  }
+  under_ = true;
+  SetAnimates(false);
+  SetSeen(false);
+  window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
+  SetContentsHidden(false);
+  OrderBelow(shown);
+  content::WebContents* page =
+      window_->GetTabStripModel()->GetActiveWebContents();
+  if (page && !page_drawing_) {
+    page_drawing_ = page->IncrementCapturerCount(
+        gfx::Size(), /*stay_hidden=*/true, /*stay_awake=*/false,
+        /*is_activity=*/false);
+  }
+  LoadActiveTab();
+}
+
+void WorkspaceWindow::GoBehind() {
+  if (!under_ || revealing_ || !hidden_) {
+    return;
+  }
+  under_ = false;
+  page_drawing_.RunAndReset();
+  window_->GetWindow()->Hide();
+  SetSeen(true);
+  SetContentsHidden(true);
+  SetAnimates(true);
 }
 
 views::Widget* WorkspaceWindow::GetWidget() {

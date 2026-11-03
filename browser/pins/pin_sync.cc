@@ -23,7 +23,9 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_controller.h"
+#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/reload_type.h"
 #include "content/public/browser/web_contents.h"
@@ -507,15 +509,26 @@ void PinSync::Apply() {
       continue;
     }
     // A live page no window holds comes here as it was. While another window
-    // holds it, this window gets a placeholder.
+    // holds it, this window gets a placeholder, and so it does while the
+    // other windows have only placeholders, as after a restart: the page
+    // loads once a window selects it.
     if (std::unique_ptr<content::WebContents> page = pages->Take(id)) {
       tabs_->InsertWebContentsAt(index, std::move(page),
                                  AddTabTypes::ADD_PINNED);
       continue;
     }
-    if (content::WebContents* live = FindLivePage(id)) {
-      tabs_->InsertWebContentsAt(index, MakePlaceholder(live, id),
+    if (content::WebContents* shown = FindPage(id)) {
+      std::unique_ptr<content::WebContents> placeholder =
+          MakePlaceholder(shown, id);
+      content::WebContents* added = placeholder.get();
+      tabs_->InsertWebContentsAt(index, std::move(placeholder),
                                  AddTabTypes::ADD_PINNED);
+      // A page that has not loaded since the restart has no icon of its own.
+      content::NavigationEntry* entry =
+          added->GetController().GetLastCommittedEntry();
+      if (!entry || !entry->GetFavicon().valid) {
+        WorkspaceWindow::ShowSavedIcon(added);
+      }
       continue;
     }
     NavigateParams params(window_, pins[index].home,
@@ -738,6 +751,21 @@ content::WebContents* PinSync::FindLivePage(std::string_view id) const {
   const PinSync* sync = WindowWithLivePage(id);
   return sync ? sync->tabs_->GetWebContentsAt(sync->IndexOfLivePage(id))
               : nullptr;
+}
+
+content::WebContents* PinSync::FindPage(std::string_view id) const {
+  if (content::WebContents* live = FindLivePage(id)) {
+    return live;
+  }
+  for (PinSync* sync : Others()) {
+    for (int i = 0; i < sync->tabs_->IndexOfFirstNonPinnedTab(); ++i) {
+      content::WebContents* page = sync->tabs_->GetWebContentsAt(i);
+      if (const PinMark* mark = MarkOf(page); mark && mark->id() == id) {
+        return page;
+      }
+    }
+  }
+  return nullptr;
 }
 
 bool PinSync::LivePageIsElsewhere(std::string_view id) const {

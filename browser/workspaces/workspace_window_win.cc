@@ -12,6 +12,9 @@ namespace uw {
 // Windows hides a window's pages with the window.
 void WorkspaceWindow::SetContentsHidden(bool hidden) {}
 
+// No see-through theme on Windows shows the window under another.
+void WorkspaceWindow::SetSeen(bool seen) {}
+
 void WorkspaceWindow::OrderBelow(WorkspaceWindow* above) {
   views::Widget* widget = GetWidget();
   views::Widget* above_widget = above->GetWidget();

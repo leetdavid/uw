@@ -17,6 +17,7 @@
 #include "base/time/time.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
@@ -25,6 +26,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -37,10 +39,14 @@
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/referrer.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "net/http/http_status_code.h"
+#include "net/test/embedded_test_server/controllable_http_response.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/base_window.h"
+#include "ui/base/page_transition_types.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/compositor/layer.h"
@@ -361,6 +367,22 @@ class WorkspaceSwipeBrowserTest : public headless::HeadlessModeBrowserTest {
         window->GetTabStripModel()->active_index(), true);
   }
 
+  // Whether macOS animates `window` as it is ordered in or out.
+  static bool Animates(BrowserWindowInterface* window) {
+    return window->GetWindow()
+               ->GetNativeWindow()
+               .GetNativeNSWindow()
+               .animationBehavior != NSWindowAnimationBehaviorNone;
+  }
+
+  // Whether the screen shows `window` where it is, under another or not.
+  static bool Seen(BrowserWindowInterface* window) {
+    return window->GetWindow()
+               ->GetNativeWindow()
+               .GetNativeNSWindow()
+               .alphaValue == 1;
+  }
+
   // Where the part of `window`'s sidebar that slides is, in its sidebar.
   static gfx::Rect SlideArea(BrowserWindowInterface* window) {
     TabStripRegionView* region =
@@ -521,8 +543,11 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   EXPECT_TRUE(!page || page->transform().IsIdentity());
 }
 
+// As the swipe heads to it, the other workspace's window goes in under this
+// one, where its page loads and draws and its sidebar is pictured as it is.
+// A swipe that slides back sends it behind again.
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
-                       PastHalfwayTheOtherPageLoadsBeforeTheFingersLift) {
+                       TheOtherWindowDrawsUnderThisOneAsTheSwipeStarts) {
   ASSERT_TRUE(embedded_test_server()->Start());
   const GURL article = embedded_test_server()->GetURL("/title1.html");
   const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
@@ -533,23 +558,144 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   WorkspaceWindow::From(partner)->Switch(work_);
   WaitForShown(partner, work_);
   content::WebContents* page = Unload(partner);
+  ASSERT_TRUE(SwipeOf(partner)->picture().isNull());
 
-  const float half = SidebarWidth(browser()) / 2;
-  MoveFingers(browser(), -(half - 10));
-  base::RunLoop().RunUntilIdle();
-  EXPECT_TRUE(page->GetController().NeedsReload());
-  for (int i = 0; i < 4; ++i) {
-    Scroll(browser(), Sidebar(browser()), -kSlowStepWidth, 0,
-           ui::EventMomentumPhase::NONE);
-  }
-  EXPECT_FALSE(page->GetController().NeedsReload());
+  MoveFingers(browser(), -kShortSwipe);
+
+  // A see-through theme never shows it, and neither window animates.
+  EXPECT_TRUE(partner->GetWindow()->IsVisible());
+  EXPECT_FALSE(Seen(partner));
+  EXPECT_FALSE(Animates(partner));
+  EXPECT_FALSE(Animates(browser()));
+  EXPECT_TRUE(WorkspaceWindow::IsHidden(partner));
+  EXPECT_TRUE(page->IsBeingCaptured());
   EXPECT_TRUE(base::test::RunUntil([&] {
     return page->GetPrimaryMainFrame()->GetLastCommittedURL() == article;
   }));
-  EXPECT_TRUE(SwipeOf(browser())->sliding());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !SwipeOf(partner)->picture().isNull(); }));
   EXPECT_EQ(ShownOf(browser()), browser());
+
   Lift(browser());
-  EXPECT_EQ(WaitForShown(browser(), reading), partner);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return !SwipeOf(browser())->sliding(); }));
+  EXPECT_FALSE(partner->GetWindow()->IsVisible());
+  EXPECT_TRUE(Seen(partner));
+  EXPECT_TRUE(Animates(partner));
+  EXPECT_TRUE(Animates(browser()));
+  EXPECT_FALSE(page->IsBeingCaptured());
+  EXPECT_EQ(ShownOf(browser()), browser());
+
+  // A full swipe brings it up, seen.
+  EXPECT_EQ(SwipeToNext(browser(), reading), partner);
+  EXPECT_TRUE(Seen(partner));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       PRE_AWorkspaceNotShownSinceLaunchSlidesInWithItsTabs) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  WorkspaceWindow::From(partner)->Switch(work_);
+  WaitForShown(partner, work_);
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       AWorkspaceNotShownSinceLaunchSlidesInWithItsTabs) {
+  BrowserWindowInterface* shown = nullptr;
+  BrowserWindowInterface* behind = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    shown = behind = nullptr;
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      (WorkspaceWindow::IsHidden(window) ? behind : shown) = window;
+    }
+    return shown && behind && shown->GetWindow()->IsVisible() &&
+           !behind->GetWindow()->IsVisible();
+  }));
+  ASSERT_TRUE(SwipeOf(behind)->picture().isNull());
+
+  MoveFingers(shown, -kShortSwipe);
+
+  WorkspaceSwipe* swipe = SwipeOf(shown);
+  EXPECT_EQ(swipe->target(), WorkspaceWindow::From(behind)->workspace());
+  EXPECT_TRUE(behind->GetWindow()->IsVisible());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !SwipeOf(behind)->picture().isNull(); }));
+  SaveWindowScreenshot(shown->GetBrowserForMigrationOnly(),
+                       "swipe-not-shown-since-launch");
+  Lift(shown);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+  EXPECT_FALSE(behind->GetWindow()->IsVisible());
+}
+
+// However far the fingers go, the other workspace's sidebar stops where it
+// lands, so it never springs back.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       AFarSwipeStopsAtTheNextWorkspace) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  const float width = SidebarWidth(browser());
+  MoveFingers(browser(), -width * 1.5f);
+  WorkspaceSwipe* swipe = SwipeOf(browser());
+  EXPECT_EQ(swipe->target(), reading);
+  EXPECT_NEAR(swipe->offset(), -width, 0.5f);
+  // Back the other way, it follows the fingers at once.
+  Scroll(browser(), Sidebar(browser()), 2 * kSlowStepWidth, 0,
+         ui::EventMomentumPhase::NONE);
+  EXPECT_NEAR(swipe->offset(), -width + 2 * kSlowStepWidth, 0.5f);
+  Lift(browser());
+  WaitForShown(browser(), reading);
+}
+
+// The page of the window left stays over a page that has not drawn yet, as a
+// tab restored and not loaded since, so the switch never shows a blank page.
+// It fades once the page draws.
+IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
+                       ThePageLeftStaysUntilTheNewPageDraws) {
+  net::test_server::ControllableHttpResponse first(embedded_test_server(),
+                                                   "/slow");
+  net::test_server::ControllableHttpResponse again(embedded_test_server(),
+                                                   "/slow");
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  RunWindowCommand(browser(), kNextWorkspace);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  content::WebContents* shown =
+      partner->GetTabStripModel()->GetActiveWebContents();
+  shown->GetController().LoadURL(embedded_test_server()->GetURL("/slow"),
+                                 content::Referrer(), ui::PAGE_TRANSITION_TYPED,
+                                 std::string());
+  first.WaitForRequest();
+  // Not kept, so the page asks again when it loads next.
+  const std::string no_store[] = {"Cache-Control: no-store"};
+  first.Send(net::HTTP_OK, "text/html", "<body>The answer</body>", {},
+             no_store);
+  first.Done();
+  ASSERT_TRUE(content::WaitForLoadStop(shown));
+  RunWindowCommand(partner, kPreviousWorkspace);
+  WaitForShown(browser(), work_);
+  content::WebContents* page = Unload(partner);
+
+  RunWindowCommand(browser(), kNextWorkspace);
+  again.WaitForRequest();
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return ShownOf(browser()) == partner && SwipeOf(partner)->has_cover();
+  }));
+  base::RunLoop wait;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, wait.QuitClosure(), base::Milliseconds(300));
+  wait.Run();
+  EXPECT_FALSE(page->CompletedFirstVisuallyNonEmptyPaint());
+  EXPECT_TRUE(SwipeOf(partner)->has_cover());
+
+  again.Send(net::HTTP_OK, "text/html",
+             "<body style='background:green'>The answer</body>");
+  again.Done();
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !SwipeOf(partner)->has_cover(); }));
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, AFlickLands) {
@@ -806,8 +952,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, MANUAL_ASwipeInARealWindow) {
   SaveNativeWindowScreenshot(shown->GetBrowserForMigrationOnly(),
                              "swipe-real-landed");
 
-  // Back the other way, whose page comes in from the left: nothing of the
-  // card's edge stays over the sidebar.
+  // Back the other way: nothing of the card's edge stays over the sidebar.
   // The card has an edge in dark mode.
   ThemeServiceFactory::GetForProfile(browser()->GetProfile())
       ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
@@ -822,8 +967,8 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, MANUAL_ASwipeInARealWindow) {
 }
 
 
-// Whatever draws the card's edge while the page is still nudged draws it where
-// the card is laid out, so no outline stays over the sidebar after the fade.
+// Whatever draws the card's edge while the page fades in draws it where the
+// card is laid out, so no outline stays over the sidebar after the fade.
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
                        NoEdgeIsLeftOverTheSidebarAfterThePageFades) {
   // The card has an edge in dark mode.
@@ -833,7 +978,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
   RunWindowCommand(browser(), kNextWorkspace);
   BrowserWindowInterface* shown = WaitForShown(browser(), reading);
-  // Back to the workspace before, whose page comes in from 12px to the left.
+  // Back to the workspace before.
   RunWindowCommand(shown, kPreviousWorkspace);
   ASSERT_TRUE(base::test::RunUntil([&] {
     return ShownOf(browser()) == browser() && SwipeOf(browser())->has_cover();
