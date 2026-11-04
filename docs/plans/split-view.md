@@ -1,6 +1,6 @@
 # Split views
 
-Status: scope agreed on 2026-11-04 in a grilling session, after the user asked for "more than just 2-tab splitting ... as many as the user wants like a terminal window splitting", with drag and drop to rearrange the panes, Cmd+D to split left and right, and Cmd+Shift+D to split top and bottom. The design, T331, comes first. Nothing is built.
+Status: scope agreed on 2026-11-04 in a grilling session, after the user asked for "more than just 2-tab splitting ... as many as the user wants like a terminal window splitting", with drag and drop to rearrange the panes, Cmd+D to split left and right, and Cmd+Shift+D to split top and bottom. The design, T331, was drawn the same day and waits for the user's sign-off. Nothing is built.
 
 Implementability: **3/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's split view has the drop zones, mini toolbars, restore, and sidebar handling, but holds exactly two tabs, and about 80 of its files read splits. uw patches it to hold any number ([ADR 0029](../adr/0029-split-views-extend-chromiums-split.md)), and each Chromium update can conflict. Pinned split views are the hardest part: a live pin moves one page between windows today, and this moves several pages and their layout.
 
@@ -85,12 +85,18 @@ Today a [split view](../CONTEXT.md#language) is Chromium's: two tabs, side by si
 
 ## Design
 
-Drawn before any build, as T331, on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), on a new page "Split view":
+Drawn on 2026-11-04 as T331, on the "Keyboard and mouse" page of the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), with the rules in the "Split views" section of the canvas guide `uw-sideways-drag`. Not signed off yet.
 
-- "Split view: three panes": a nested layout with its mini toolbars and its sidebar box in reading order.
-- "Split view: dragging": a pane's drop zones, a pane on its way, a sidebar tab dropped on an edge, and a row dragged out of the box.
-- "Split view: pinned": the pin icon of a split, and its hazed layout in another window.
-- "Split view: every state": the menus with their keys, a drop zone that stays dark at the 200px limit, focus, and light and dark themes.
+- "Split view: three panes": a page, a terminal, and a page in a nested layout, the mini toolbars, and the sidebar box in reading order.
+- "Split view: dragging a pane": a terminal's mini toolbar on its way to the bottom half of another pane.
+- "Split view: pinned": the pinned split's tile, its menu, and its hazed layout in another window.
+- "Split view: every state": splitting, the order, the 200px limit, closing and ending, the drop zones, drags from and to the sidebar, the divider, the menus and keys, dark, and Edit Homes.
+
+The frames propose, for sign-off:
+
+- Panes inside the page card under one toolbar, as Chromium draws them, with the focused pane's outline in the primary color.
+- The drop zone: the half of the pane by the nearest edge, within a quarter of the pane, or the whole pane nearer its middle.
+- A pinned split's tile two pins wide, drawing the layout with a favicon per pane. Its menu: Reset to Home, Replace Homes with Current, Edit Homes…, Split Right, Split Down, and Unpin Split View. Edit Homes… lists each pane's home; saving loads each changed address in its pane, and a terminal's new folder applies at its next reset.
 
 ## How it is built
 
@@ -132,5 +138,3 @@ Each stage is a ticket on the [board](roadmap.md#board). Each one that changes w
 ## Open questions
 
 - Whether a split's rows show nesting. Today the box draws none, and a tab in a split is not shown under its parent until the split ends.
-- How Chromium's horizontal tab strip shows a split of more than two tabs.
-- The look of a pinned split's icon, settled in the design.
