@@ -126,7 +126,15 @@ A regular tab with child tabs beneath it in the tab tree.
 A regular tab nested directly under a parent tab, in its parent's tab branch and task. A child the user nested by hand, or one opened from a chat or from a tab under one, stays with its parent; a child opened from any other link can leave for another task.
 
 **Selected tab**:
-The tab whose page is currently displayed in a browser window.
+The tab whose page is currently displayed in a browser window. In a split view, it is the tab in the pane with focus.
+
+**Split view**:
+Tabs shown together in one window's page area, each in its own pane, made by splitting a pane right or down as in a terminal. Its tabs are in one task, or all in the Scratchpad, and share one box in the sidebar.
+_Avoid_: Side by side, split screen, tiling.
+
+**Pane**:
+One tab's area in a split view. Any kind of tab can fill one: a web page, a terminal, a chat, or a uw page.
+_Avoid_: View, split, half.
 
 **Ungrouped tab**:
 A tab currently outside every task, so in the Scratchpad. Its relationship to a browsing task may still be unclear.
