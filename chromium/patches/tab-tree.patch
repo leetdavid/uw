@@ -2424,10 +2424,16 @@ index 5329d73ade213228cfd01bb8be971b252d458f6b..6ca0194fda55ceb39ed6cc02a3cf48af
      }
      if (original && browser->GetProfile()->GetOriginalProfile() != original) {
 diff --git a/chrome/browser/ui/ui_features.cc b/chrome/browser/ui/ui_features.cc
-index 6b2e98a16cc019bf36ab7e8a70e17b176968284b..4f791ce21a32cfc86b4ff9ca90b13370984be741 100644
+index 6b2e98a16cc019bf36ab7e8a70e17b176968284b..16ecbe7af9aeea7085c3cdb68aeea9fbac498fce 100644
 --- a/chrome/browser/ui/ui_features.cc
 +++ b/chrome/browser/ui/ui_features.cc
-@@ -338,13 +338,15 @@ BASE_FEATURE(kNonMilestoneUpdateToast, base::FEATURE_ENABLED_BY_DEFAULT);
+@@ -334,17 +334,20 @@ BASE_FEATURE(kTabsFromOtherDevicesSidePanel, base::FEATURE_DISABLED_BY_DEFAULT);
+ BASE_FEATURE(kTabsFromOtherDevicesSidePanelPinnedByDefault,
+              base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+-BASE_FEATURE(kNonMilestoneUpdateToast, base::FEATURE_ENABLED_BY_DEFAULT);
++// uw: no "Chrome was updated" toast after an update, as on the Mac.
++BASE_FEATURE(kNonMilestoneUpdateToast, base::FEATURE_DISABLED_BY_DEFAULT);
  
  
  #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
