@@ -96,7 +96,7 @@ The frames propose, for sign-off:
 
 - Panes inside the page card under one toolbar, as Chromium draws them, with the focused pane's outline in the primary color.
 - The drop zone: the half of the pane by the nearest edge, within a quarter of the pane, or the whole pane nearer its middle.
-- A pinned split's tile two pins wide, drawing the layout with a favicon per pane. Its menu: Reset to Home, Replace Homes with Current, Edit Homes…, Split Right, Split Down, and Unpin Split View. Edit Homes… lists each pane's home; saving loads each changed address in its pane, and a terminal's new folder applies at its next reset.
+- A pinned split's tile is the same size as every pin, the user's call on 2026-11-04 after the first draw made it two pins wide. The frame "Split view: the pinned tile at pin size, worst cases" compares three ways to fill it; uw recommends up to four favicons in a shape set by the pane count, with the last cell counting the rest. Its menu: Reset to Home, Replace Homes with Current, Edit Homes…, Split Right, Split Down, and Unpin Split View. Edit Homes… lists each pane's home; saving loads each changed address in its pane, and a terminal's new folder applies at its next reset.
 
 ## How it is built
 
