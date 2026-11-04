@@ -77,7 +77,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Shared tabs plan](plans/shared-tabs.md): a workspace's tabs in every window on it, one live page per tab, and windows that close no tabs.
 - [Shared tabs spike](research/shared-tabs-spike.md): what copying a workspace's tabs into every window costs, and what the rest of Chromium sees.
 - [ADR 0024: a workspace's tabs show in every window](adr/0024-a-workspaces-tabs-show-in-every-window.md): why tabs belong to the workspace and not the window, and why each has one live page.
-- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, black dark mode, a page mode apart from the window's, a toolbar in each page's color, and proposed glass.
+- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, website mode for how websites look, Brightness down to black, a toolbar in each page's color, and glass.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Split view plan](plans/split-view.md): any number of panes split right or down as in a terminal, rearranged by dragging, and whole splits pinned as one.
 - [ADR 0029: split views extend Chromium's split](adr/0029-split-views-extend-chromiums-split.md): why any number of panes is a patch to Chromium's two-tab split and not a pane layout of uw's own.
@@ -90,7 +90,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [New tab page plan](plans/new-tab-page.md): uw's page in a blank tab, with a box to search or ask and the state of uw's features, replacing Chromium's.
 - [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
 - [ADR 0011: uw keeps its own key list](adr/0011-uw-keeps-its-own-key-list.md): why keys are changed in uw's settings and not through macOS App Shortcuts.
-- [ADR 0017: the theme's light or dark rides in Chromium's color key](adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md): why page mode drives all of Chromium's colors and the sidebar keeps its own.
+- [ADR 0017: the theme's light or dark rides in Chromium's color key](adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md): why page mode drives all of Chromium's colors and the sidebar keeps its own. Replaced by ADR 0030.
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Logo](logo.md): the mark, its colors and files, and what is still undecided.
 
@@ -107,4 +107,5 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Windows plan](plans/windows.md): Windows uw, cross-built on Linux and installed with Chromium's own installer, and what the first preview leaves out.
 - [ADR 0026: Windows uw updates with a fetcher of its own behind Chromium's relaunch button](adr/0026-windows-uw-updates-with-a-fetcher-of-its-own-behind-chromiums-relaunch-button.md): why not WinSparkle, Velopack, or Chromium Updater.
 - [ADR 0027: Windows uw numbers its releases from Chromium's version](adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md): why Windows releases are 153.0.8010.5301 and not 0.1.1.
+- [ADR 0030: the theme's light or dark comes from its colors](adr/0030-the-themes-light-or-dark-comes-from-its-colors.md): why Chromium's menus and pages follow the theme and website mode reaches only websites.
 - [Windows port audit](research/windows-port-audit.md): what is Mac-only in uw's tooling, code, and patches, and the Windows options for building, signing, installing, and updating.

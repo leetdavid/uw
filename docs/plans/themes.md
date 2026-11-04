@@ -1,6 +1,6 @@
 # Themes
 
-Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T94 to T97, the saved theme, black dark mode, the picker, and grain, were built that day. All four were checked in a real window and done on 2026-10-22.
+Status: scope agreed on 2026-10-16, and the designs, T93, signed off the same day. T94 to T97, the saved theme, black dark mode, the picker, and grain, were built that day. All four were checked in a real window and done on 2026-10-22. Changed on 2026-11-04: the theme loses its light and dark modes and website mode takes the place of page mode, per [One look](#one-look).
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). Gradients, black dark mode, and the saved theme reuse the tint code that exists. The picker is the risk: a color field with dots to drag is a custom control.
 
@@ -11,23 +11,23 @@ The look of the window is in the [Arc-style look plan](arc-style-look.md). This 
 - A profile has one theme, shared by all its windows. Each profile can look different. Changed on 2026-10-21: each [workspace](workspaces.md) has its own theme, T131.
 - The picker opens over the window, beside the sidebar, from "Theme…" in the menu of empty sidebar space and from View → Theme… in the menu bar. The window changes as the user picks. The "Window tint" section of uw's settings page becomes one row that opens the picker.
 - The picker has, from the top:
-  - Light, Dark, and Auto. Auto follows macOS. Since T201 this sets the theme alone, and [page mode](#page-mode) sets everything else.
+  - Light, Dark, and Auto. Auto follows macOS. Since T201 this sets the theme alone, and [page mode](#page-mode) sets everything else. Replaced on 2026-11-04 by the Websites row, per [One look](#one-look).
   - Suggested themes.
   - A color field with up to three dots to drag. One dot gives today's gradient, from that color to its neighbor on the color wheel. Two or three dots give a gradient through those colors.
   - An intensity slider, for saturation.
   - A grain slider.
 - Text on the theme stays readable, per the [readable tints](arc-style-look.md#scope) rule, at every color the gradient passes through.
-- Dark mode is black by default, after Vercel's neutral blacks: a black window, a near-black page card and toolbar with a thin gray edge, and white text. uw's own pages, such as the chat page, the providers page, and the command bar, use the same blacks. Chromium's own pages keep its dark gray.
+- Dark mode is black by default, after Vercel's neutral blacks: a black window, a near-black page card and toolbar with a thin gray edge, and white text. uw's own pages, such as the chat page, the providers page, and the command bar, use the same blacks. Chromium's own pages keep its dark gray. Replaced on 2026-11-04: there is no dark mode, and Black is a suggested theme, per [One look](#one-look).
 - Chromium's lines, such as the line above "Manage Extensions" in the extensions menu, are neutral gray in light mode, as uw's own lines are, and not a light tone of the theme's color. Since T202, after the user saw a cyan line there on 2026-10-25.
-- A switch in the picker, "Theme colors in dark mode", shows the theme darkened in dark mode instead of black, as Arc does.
-- Suggested themes: lilac, sky, mint, butter, peach, wine, and forest as one-color themes, and three two-color gradients, such as lilac to sky, peach to butter, and mint to sky. Lilac is the default. Indigo, the old dark default, is gone.
-- The "Customize Chromium" panel stays. A color picked there becomes a one-color theme, and its mode is the picker's mode. Chromium's full browser themes still replace uw's look.
+- A switch in the picker, "Theme colors in dark mode", shows the theme darkened in dark mode instead of black, as Arc does. Removed on 2026-11-04.
+- Suggested themes: lilac, sky, mint, butter, peach, wine, and forest as one-color themes, and three two-color gradients, such as lilac to sky, peach to butter, and mint to sky. Lilac is the default. Indigo, the old dark default, is gone. Changed on 2026-11-04: lilac to sky is the default and comes first, and Black is added, per [One look](#one-look).
+- The "Customize Chromium" panel stays. A color picked there becomes a one-color theme, and its mode is the picker's mode. Changed on 2026-11-04: its mode is website mode. Chromium's full browser themes still replace uw's look.
 - Agreed on 2026-10-24: the chat app's primary color, on the chat page, the AI page, and the watch card, is the theme's color. It is Chromium's primary color, which the theme's first color sets, read from `chrome://theme/colors.css`, and it changes at once with the theme. It covers primary buttons and the scheduled chats' accents, which the frames draw in the primary color. Blue stays for links and notices elsewhere.
 
 Defaults, proposed by uw and accepted on 2026-10-16:
 
 - Grain starts at none and intensity at full.
-- "Theme colors in dark mode" starts off.
+- "Theme colors in dark mode" starts off. Removed on 2026-11-04 with the switch.
 - A tint the user picked before themes becomes a one-color theme.
 - A two- or three-color gradient runs at 160 degrees, through the dots in the order they were added.
 
@@ -76,7 +76,7 @@ Each stage is a ticket on the [board](roadmap.md#board).
 
 ## Page mode
 
-Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24, and T102 built it the same day. The user approved the build that day and tried it in uw: "it looks good".
+Status: scope agreed with the user on 2026-10-16. The design, T101, was signed off on 2026-10-24, and T102 built it the same day. The user approved the build that day and tried it in uw: "it looks good". Replaced on 2026-11-04 by website mode, per [One look](#one-look).
 
 Implementability: **7/10**. Chromium decides in one place whether a page is told light or dark, `GetPreferredColorScheme` in `chrome/browser/chrome_content_browser_client.cc`, and today it reads the [window mode](../CONTEXT.md#language). uw's pages already follow what they are told. The new parts are a part of the theme, a picker row, and a patch that reads the [page mode](../CONTEXT.md#language) there and for the card's empty color.
 
@@ -117,7 +117,7 @@ How it is built, for T102:
 
 ### The theme apart from Chromium
 
-Status: agreed with the user on 2026-10-25 in a grilling session. The designs, T200, were pre-approved: "the designs are pre-approved, just start the implementation right after". T201 built it the same day. Nobody has used it in a real window yet.
+Status: agreed with the user on 2026-10-25 in a grilling session. The designs, T200, were pre-approved: "the designs are pre-approved, just start the implementation right after". T201 built it the same day. Nobody has used it in a real window yet. Replaced on 2026-11-04 by [One look](#one-look) and [ADR 0030](../adr/0030-the-themes-light-or-dark-comes-from-its-colors.md): Chromium's menus, dialogs, and pages follow the theme again.
 
 Implementability: **5/10**. Chromium works out every color of a window from one color key, which held the theme's light or dark. Page mode becomes the key's light or dark, and the theme's key rides along in it for the sidebar's colors, per [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Every Chromium surface then follows page mode by itself. The risks are general Chromium colors that a view in the sidebar uses, uw's sidebar menus and cards, which must ask for the theme's mode, and macOS's own menus, which take the window's look.
 
@@ -246,6 +246,48 @@ Acceptance checks:
 8. Two workspaces keep their own Transparency and Glass.
 9. With Glass off its left end, a task's menu, the new button's menu, the profile list, the ⋮ menu and its submenus, the address bar's suggestion list, the command bar, the picker, and the "Watch this page" card show what is behind them frosted, and their text keeps 4.5:1. The switcher's current workspace, Tidy and Clear under the pointer, and the activity card are lit glass.
 10. `pnpm run check` and the focused suites pass. Browser tests stay headless.
+
+## One look
+
+Status: agreed with the user on 2026-11-04 in a grilling session, after "I want one theme toggle (auto, light, dark), and this ONLY controls the page's content's theme", "the color picker and thing will faithfully change uw's theme (mainly the sidebar), without a "dark" mode. you should be able to just pick black too", "Theme colors in dark mode doesn't seem to do anything, so let's remove that", and "uw's own interfaces should use the uw theme". The design, T337, was signed off the same day: "this looks good". T338 and T339 wait for the user's go-ahead.
+
+Implementability: **6/10**. Most of the work removes code: the theme's mode, the switch, black dark mode, the Pages row, and the sidebar mixers of [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Chromium has the OKLCH math, in `ui/gfx/color_conversions.h`, and OKLCH gradients, in `SkGradient::Interpolation`. The risks are Chromium's colors made from a dark theme color that is not black, telling uw's and Chromium's pages in tabs the theme's light or dark while websites get website mode, and extensions' popups finding their window.
+
+Agreed:
+
+- The theme has no light or dark of its own. A theme whose text is white is dark, by the [readable tints](arc-style-look.md#scope) rule that already picks the text. With two or three colors, one text color covers the whole gradient, so the theme has one answer.
+- The theme's light or dark covers the sidebar, the edge around the page card, the sidebar's menus and cards, the picker, uw's pages such as the chat, providers, scheduled, and settings pages and the terminal, the command bar, the "Watch this page" card, and Chromium's menus, bubbles, dialogs, and pages such as Settings, History, and the new tab page.
+- [Website mode](../CONTEXT.md#language) is Auto, Light, or Dark, and covers websites, extensions' pages and popups, and the card before a page paints: `#0A0A0A` or white. Auto, the default, follows macOS; its tooltip and VoiceOver label say "Same as macOS". Pages are only told the mode, so a site with no dark look of its own stays light.
+- Website mode is one per profile, kept in Chromium's own light or dark setting, `browser_color_scheme`. Private windows follow it. In Settings → Appearance, "Mode" reads "Websites", and VoiceOver reads the "Customize Chromium" panel's mode buttons as "Websites". Open pages change at once.
+- The picker, from the top: the Websites row, the color field, the suggested themes, Intensity, Brightness, Grain, Transparency, and Glass. The picker takes the theme's light or dark, and changes as a drag crosses from one to the other.
+- Brightness, from 0 to 100, is one slider for the whole theme, so a gradient cannot run from white to black and leave no readable text. 100, the default, is the colors as picked, and 0 is black. It scales each color's OKLCH lightness. Its track runs from black to the theme's first color. The field stays at full brightness, and the dots show each color as drawn.
+- OKLCH for the field, Brightness, Intensity, which scales each color's OKLCH chroma, and the gradient between dots. The gradient turns through the hues between two dots, so sky to butter passes through green. Colors are still saved as sRGB.
+- Suggested themes, in order: lilac to sky, lilac, sky, mint, butter, peach, wine, forest, black, peach to butter, and mint to sky, as 20px circles. Wine is a rose at Brightness 43, forest a pale green at 37, and black any color at 0. Lilac to sky is the default for everyone, whatever macOS says.
+- A new workspace takes the next unused suggested theme at the Brightness of the workspace it was made from.
+- Text stays near-black or white at 4.5:1. A mid-tone where neither reads is still made a little lighter or darker.
+- The toolbar keeps the [page color](#page-colors). Proposed by uw: before a page reports one, it is white or `#0A0A0A` as website mode says, like the card behind it.
+- On upgrade, each workspace keeps its colors at full Brightness. Website mode starts from Chromium's setting, or from `uw.theme.page_mode` where the Pages row said Light or Dark. The theme's mode, page mode, and "Theme colors in dark mode" leave the saved themes, the profile prefs, and the `uw` command's `theme.mode`, `theme.page-mode`, and `theme.colors-in-dark-mode`.
+
+How it is to be built is in [ADR 0030](../adr/0030-the-themes-light-or-dark-comes-from-its-colors.md): Chromium's color key takes the theme's light or dark, and website mode reaches only the pages it covers, through `GetPreferredColorScheme` and the card's empty color.
+
+Design: the frames "One look: lilac to sky, dark websites", "One look: black theme, light websites", and "One look: every state" on the canvas's "Themes" page.
+
+Stages:
+
+1. T337: the design, signed off on 2026-11-04.
+2. T338: the theme: light or dark from its colors, Brightness, the new suggestions, OKLCH, the removals, and the upgrade, per ADR 0030.
+3. T339: website mode: Chromium's setting, the Websites row, `GetPreferredColorScheme` and the card's empty color, the strings in Settings and the panel, the `uw` command, and the Help page.
+
+Acceptance checks:
+
+1. With lilac to sky and Websites on Dark, a website, an extension's popup, and the card before a page paints are dark. The sidebar, its menus, the picker, the chat page, Settings, the ⋮ menu, and the command bar are light.
+2. With black and Websites on Light, the reverse, with a `#000000` sidebar.
+3. Mint at Brightness 80 takes near-black text and light menus; at 60 and below, white text and dark menus. The picker changes during the drag.
+4. At Brightness 0 any colors give a black sidebar, and at 100 the colors as picked. Text keeps 4.5:1 at every color of a two- or three-color gradient, which blends in OKLCH.
+5. The picker's row, Chromium's Settings, and the "Customize Chromium" panel set one website mode per profile and always agree. Auto follows macOS. Private windows follow it.
+6. After the upgrade, each workspace keeps its colors, and a profile whose Pages row said Dark keeps dark websites.
+7. A new profile starts on lilac to sky with Websites on Auto. A new workspace keeps the Brightness of the one it was made from.
+8. `pnpm run check` and the focused suites pass. Browser tests stay headless.
 
 ## Open questions
 

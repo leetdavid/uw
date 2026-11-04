@@ -20,15 +20,15 @@ The logins, cookies, history, and extensions that one or more workspaces share, 
 _Avoid_: Account, user.
 
 **Theme**:
-The colors uw draws its sidebar and the edge around the page card in, and whether they are light or dark. Each workspace has its own theme, so two workspaces on one profile can look different.
+The colors of uw's own look: the sidebar, the edge around the page card, and the menus, cards, dialogs, and pages that uw and Chromium draw. A theme whose text is white is dark, and all of these are dark with it. Each workspace has its own theme, so two workspaces on one profile can look different.
 _Avoid_: Skin, space color, window mode.
 
-**Page mode**:
-Whether everything outside the sidebar is light or dark: websites, Chromium's and uw's pages, and Chromium's menus, bubbles, and dialogs. A site with no dark look of its own stays light.
-_Avoid_: Page theme, website theme, content theme, browser mode, web dark mode.
+**Website mode**:
+Whether websites and extensions' pages are told to be light or dark. A site with no dark look of its own stays light. uw's and Chromium's own pages take the theme instead. Each profile has one website mode, shared by all its workspaces.
+_Avoid_: Page mode, page theme, website theme, content theme, browser mode, web dark mode.
 
 **Page color**:
-The color a page paints behind its content. The toolbar above the page and the bookmarks bar take it, whatever the theme and page mode, and fade when it changes.
+The color a page paints behind its content. The toolbar above the page and the bookmarks bar take it, whatever the theme and website mode, and fade when it changes.
 _Avoid_: Theme color, site color, tint.
 
 **Page card**:
