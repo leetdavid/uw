@@ -55,3 +55,26 @@ if (is_mac) {
     ]
   }
 }
+
+if (is_win) {
+  source_set("windows_browser_tests") {
+    testonly = true
+    defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+    sources = [ "windows_keys_browsertest.cc" ]
+    deps = [
+      "//base/test:test_support",
+      "//chrome/app:command_ids",
+      "//chrome/browser",
+      "//chrome/browser/headless:browser_tests",
+      "//chrome/browser/ui",
+      "//chrome/common",
+      "//chrome/test:test_support",
+      "//content/public/browser",
+      "//content/test:test_support",
+      "//testing/gtest",
+      "//ui/base",
+      "//ui/events",
+      "//ui/views",
+    ]
+  }
+}

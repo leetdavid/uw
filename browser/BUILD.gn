@@ -34,6 +34,9 @@ group("browser_tests") {
     ]
   }
   if (is_win) {
-    deps += [ "update:windows_browser_tests" ]
+    deps += [
+      "shortcuts:windows_browser_tests",
+      "update:windows_browser_tests",
+    ]
   }
 }
