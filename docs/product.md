@@ -143,7 +143,7 @@ Preserve loaded pages, the selected tab, and the moved branches' internal hierar
 
 ### Task names
 
-Agreed: once a task is known, give its group a short, action-oriented name describing the immediate activity, such as "Benchmark GLiNER2.5". Revise an automatically generated name only when the task clearly changes. Users can edit names; a user-edited name takes priority over automatic renaming.
+Agreed: once a task is known, give its group a name of two or three words for what it is about, with no verb, such as "uw repository" or "midterm elections". Capitalize only proper names, as in running text. Changed on 2026-11-04. Before, the name was an action-oriented phrase of up to five words, such as "View uw GitHub repository". Revise an automatically generated name only when the task clearly changes. Users can edit names; a user-edited name takes priority over automatic renaming.
 
 Agreed on 2026-10-12: the model that decides placement also decides when a task needs a name or a new one. The language model writes the name and is asked only then. See the [name check](plans/automatic-organization.md#name-check).
 

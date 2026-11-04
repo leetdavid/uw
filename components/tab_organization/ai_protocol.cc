@@ -39,8 +39,10 @@ constexpr char kSystemPrompt[] =
     "research of its own that the user is likely to continue in more tabs. A "
     "one-off scores low: a quick lookup, a sign-in or verification page, a "
     "home page, a feed, or a dashboard.\n"
-    "- \"name\": a short action-oriented phrase of at most five words that "
-    "names that piece of work.";
+    "- \"name\": two or three words for what that piece of work is about, "
+    "such as \"uw repository\" or \"midterm elections\". Name the subject, "
+    "not what the user does with it, so use no verb. Capitalize only names, "
+    "as in running text.";
 
 // Some chat models think before they answer, and the provider counts that
 // thinking against the limit. A small limit leaves them no room to answer.
@@ -92,26 +94,33 @@ constexpr char kSubjectDescription[] =
     "The tab is about one subject: an article, a search for something, a "
     "document, a product, a video, or a discussion.";
 constexpr char kNamingPrompt[] =
-    "Name the browsing task that this tab starts. Reply with only the name: a "
-    "short, action-oriented phrase of at most five words, with no quotes.";
+    "Name the browsing task that this tab starts. Reply with only the name: "
+    "two or three words for what the task is about, such as \"uw "
+    "repository\" or \"midterm elections\". Name the subject, not what the "
+    "user does with it, so use no verb. Capitalize only names, as in running "
+    "text. Use no quotes.";
 constexpr char kTaskNamingPrompt[] =
     "Name the browsing task that these tabs belong to. Reply with only the "
-    "name: a short, action-oriented phrase of at most five words, with no "
-    "quotes.";
+    "name: two or three words for what the task is about, such as \"uw "
+    "repository\" or \"midterm elections\". Name the subject, not what the "
+    "user does with it, so use no verb. Capitalize only names, as in running "
+    "text. Use no quotes.";
 constexpr char kTidyPrompt[] =
     "File the user's loose browser tabs into their browsing tasks. A browsing "
-    "task is the immediate activity the user pursues with a set of tabs, such "
-    "as \"Plan Lisbon trip\". For each loose tab, give the number of the task "
-    "it belongs to, or the name of a new task it starts together with other "
-    "loose tabs, or neither for a one-off page. A new task needs at least two "
-    "tabs, and all of them carry exactly the same name: a short, "
-    "action-oriented phrase of at most five words. Mark a hub with "
-    "\"hub\": true: a page the user comes back to for many things, such as a "
-    "home page, a feed, an inbox, or a dashboard. A hub joins no task. Reply "
-    "with only JSON, one entry per loose tab, like "
-    "{\"tabs\":[{\"tab\":1,\"task\":2},{\"tab\":2,\"new_task\":\"Choose a "
-    "coffee grinder\"},{\"tab\":3,\"new_task\":\"Choose a coffee "
-    "grinder\"},{\"tab\":4},{\"tab\":5,\"hub\":true}]}.";
+    "task is the immediate activity the user pursues with a set of tabs. For "
+    "each loose tab, give the number of the task it belongs to, or the name "
+    "of a new task it starts together with other loose tabs, or neither for a "
+    "one-off page. A new task needs at least two tabs, and all of them carry "
+    "exactly the same name: two or three words for what the task is about, "
+    "such as \"uw repository\" or \"midterm elections\". Name the subject, "
+    "not what the user does with it, so use no verb. Capitalize only names, "
+    "as in running text. Mark a hub with \"hub\": true: a page the user comes "
+    "back to for many things, such as a home page, a feed, an inbox, or a "
+    "dashboard. A hub joins no task. Reply with only JSON, one entry per "
+    "loose tab, like "
+    "{\"tabs\":[{\"tab\":1,\"task\":2},{\"tab\":2,\"new_task\":\"coffee "
+    "grinders\"},{\"tab\":3,\"new_task\":\"coffee grinders\"},{\"tab\":4},"
+    "{\"tab\":5,\"hub\":true}]}.";
 
 bool ValidConfidence(double value) {
   return value >= 0.0 && value <= 1.0;
