@@ -29,7 +29,7 @@ Today a [split view](../CONTEXT.md#language) is Chromium's: two tabs, side by si
 - Bookmark This Tab and Bookmark All Tabs lose Cmd+D and Cmd+Shift+D. They keep their menu entries with no key, and the user can give them one in [Keyboard shortcuts](keyboard-and-mouse.md#keyboard-shortcuts).
 - Cmd+Option+N, today's New Split View, goes.
 - A page that handles Cmd+D itself keeps it, as with every uw key.
-- Ctrl+Tab and Cmd+Option+← and → step through the panes in reading order, then on to the next tab. No key moves focus by direction.
+- Ctrl+Tab and Ctrl+Shift+Tab step through the panes in reading order, then on to the next tab, since each pane is a tab. No key moves focus by direction. Cmd+Option+← and → keep switching workspace; the grilling named them by mistake on 2026-11-04.
 - Windows uses Ctrl+D and Ctrl+Shift+D.
 
 ### Closing and ending
