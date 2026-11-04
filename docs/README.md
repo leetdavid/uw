@@ -72,7 +72,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 
 ### Look and controls
 
-- [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card, tab rows, favorites tiles, task folder rows, and the screenshot review.
+- [Arc-style look plan](plans/arc-style-look.md): the tint and its text color rule, page card and the switch that turns off its margin, tab rows, favorites tiles, task folder rows, and the screenshot review.
 - [Workspaces plan](plans/workspaces.md): Arc-style workspaces you swipe between, several to a profile, and pinned tabs shared by every window of a profile.
 - [Shared tabs plan](plans/shared-tabs.md): a workspace's tabs in every window on it, one live page per tab, and windows that close no tabs.
 - [Shared tabs spike](research/shared-tabs-spike.md): what copying a workspace's tabs into every window costs, and what the rest of Chromium sees.

@@ -1,6 +1,6 @@
 # Arc-style look
 
-Status: approved on 2026-10-11 with the decisions below. Stages 1 to 4 and 6 are built, except the card's shadow. Stage 5 is built except the toolbar height.
+Status: approved on 2026-10-11 with the decisions below. Stages 1 to 4 and 6 are built, except the card's shadow. Stage 5 is built except the toolbar height. The [margin](#margin) switch was agreed on 2026-11-04 and is not built.
 
 Implementability: **4/10** using the [roadmap convention](roadmap.md#implementability-estimates). Sizes and colors are small changes because Chromium already has settings for them. The tint gradient, the user's own tint, and the task folder row need custom drawing in several views. Chromium's vertical tab strip is new and changes with every release, and the result can only be judged by eye.
 
@@ -21,13 +21,17 @@ Agreed on 2026-10-12:
 - The user picks the tint with a control on uw's settings page.
 - A picked color that would leave text hard to read is made readable.
 
+Agreed on 2026-11-04:
+
+- A switch for all of uw turns off the margin around the page card. See [Margin](#margin).
+
 ## Scope
 
 - **Window tint.** The frame, the sidebar, and the area around the page share one gradient. It runs from the picked color to the same color with its hue turned by 40 degrees.
 - **Text on the tint.** Text and icons are near-black or white, whichever has more contrast with the tint. Fills and the active tab change strength the same way. Fills are see-through white, 46% on a light tint and 8% on a dark one, so the gradient shows through tiles, pills, and hovered rows.
 - **Readable tints.** Text keeps at least a 4.5:1 contrast ratio everywhere on the tint. A mid-tone color cannot do that, so uw makes it lighter or darker, whichever takes the smaller change, and keeps its hue.
 - **Default tints.** Lilac to sky until the user picks a color. Changed on 2026-10-16: dark mode is black whatever color is picked, and the [themes plan](themes.md) makes the tint a theme of up to three colors.
-- **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint.
+- **Page card.** The page and its toolbar sit in a card with an 8px inset, a 12px radius, and a soft shadow. The card follows light or dark mode, not the tint. The user can turn its [margin](#margin) off.
 - **Tab rows.** 34px tall with a 10px radius. The active tab is a card. Other tabs have no background until hovered.
 - **Favorites.** Pinned tabs are tiles, four per row, 44px tall with a 12px radius.
 - **Tasks.** A tab group header is a folder row: a folder icon in the group's color and the name in semibold. While the pointer is on the row, a chevron takes the folder icon's place, as on a [parent tab](keyboard-and-mouse.md#branches-with-the-mouse). It keeps Chromium's collapse, rename, color, and drag. Changed on 2026-10-16: the chevron used to sit at the end of the row.
@@ -54,6 +58,20 @@ Agreed on 2026-10-12:
 - **Task rows.** `TabGroupHeaderView` is patched for the vertical strip: no fill, text in the tint's text color, and a folder icon where it shows the shared-group icon. Chromium's collapse chevron sits beside the folder icon and replaces it under the pointer. Its click, drag, and editor code are untouched.
 - **Screenshots.** `SaveWindowScreenshot` saves the composited window as a PNG from a headless test. See [the README](../../README.md#tooling-checks).
 
+## Margin
+
+Agreed on 2026-11-04 in a grilling session, after the owner asked for "an app-wide setting to change the layout a bit": no [margin](../CONTEXT.md#language) around the page, and on Windows, Windows' own window buttons back. The frames "No margin: the Mac", "No margin: Windows", "No margin: every state", and "Hidden sidebar, no margin: four ways (C chosen)" are on the canvas's "Keyboard and mouse" page, signed off the same day.
+
+Implementability: **5/10**. Dropping the inset is a few lines. The window layout, the Windows frame, the hidden sidebar, grain, and Transparency each have to handle both looks, on both platforms.
+
+- **The switch.** "Space around the page", with "On for all of uw. Off, the page runs to the window's edges." under it, on uw's settings page under the Theme row, beside the Transparency switch. On by default. It belongs to all of uw, not to a workspace's theme. Every open window changes at once, without a restart. `uw settings` sets it as `look.page-space`.
+- **The card.** With the switch off, the card meets the window's top, right, and bottom edges, and the window's own corners round its right side. It keeps its 12px corners and its edge where it meets the sidebar. The toolbar keeps its height and padding and runs to the window's edge.
+- **What showed in the margin.** Grain covers only the sidebar. Transparency lets the desktop through only the sidebar and the toolbar. In black dark mode the card's gray edge shows only beside the sidebar.
+- **Hidden sidebar.** The page fills the window. Resting the pointer on the window's left 8px, over the page, brings the floating sidebar in, as in full screen today. The floating sidebar keeps its own 8px inset, its corners, and its shadow. The owner chose this over a sidebar flush with the window's edges: "having a margin is fine, i meant the content window shouldn't have margins."
+- **Windows.** With the switch off, minimize, maximize, and close are Windows' own buttons at the window's top right, as Chromium draws them: 46px wide, as tall as the toolbar, gray under the pointer, Windows' red under close, and snap layouts on maximize. The toolbar ends where they start. With it on, they stay uw's toolbar buttons inside the card, per the [Windows plan](windows.md#agreed). A maximized window has no corners, and the card keeps its round corners by the sidebar.
+- **Unchanged.** Full screen has no card either way. Pop-ups keep Chromium's layout.
+- **Help.** [Themes](../../site/content/help/themes.mdx) says where the switch is and what it does. Help figures keep the margin, the default.
+
 ## Stages
 
 1. **Screenshot helper.** Built. It saves the sidebar with a task in light and dark mode, an automatic move, and the settings page.
@@ -62,6 +80,7 @@ Agreed on 2026-10-12:
 4. **Task rows.** Built. The header shows a folder icon in the group's color and the name in semibold. Under the pointer, the chevron takes the folder icon's place. Chromium's colored line beside a task's tabs stays, although the design has none.
 5. **Sidebar foot and toolbar.** The Organize and Undo buttons are pills. The automatic-move message is the [activity card](automatic-organization.md#agreed-scope), built on 2026-10-12. The toolbar keeps Chromium's height of about 46px.
 6. **User tint.** Built. A color picked on uw's settings page drives the gradient and the text color, and a mid-tone pick is made readable.
+7. **Margin.** T329 for the switch and the Mac, then T330 for Windows' buttons, per [Margin](#margin). Not built.
 
 ## Acceptance checks
 
@@ -71,4 +90,5 @@ Agreed on 2026-10-12:
 4. With either default tint, text on the tint and on the card has at least a 4.5:1 contrast ratio.
 5. With any picked tint, text on it has at least a 4.5:1 contrast ratio. `TintTest.*` covers light, dark, and mid-tone colors. `TintBrowserTest.*` covers a picked color in a window. `ThemePickerBrowserTest.*` picks a suggested theme, moves and adds dots, and sets intensity, grain, and the mode from the picker.
 6. Windows without a sidebar, such as pop-ups, keep Chromium's layout. Their frame takes the tint as a plain color, like any Chromium theme color.
-7. `pnpm run check` and `pnpm run verify` pass.
+7. With the margin off, headless screenshots match the frames "No margin: the Mac" and "No margin: every state" in light and dark mode, and the switch changes every open window without a restart. On Windows, the VM shows the frame "No margin: Windows", and minimize, maximize, restore, close, and snap layouts work.
+8. `pnpm run check` and `pnpm run verify` pass.
