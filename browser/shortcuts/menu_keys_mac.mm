@@ -54,6 +54,10 @@ constexpr struct {
     {Controller::kMoveDown, "move_branch_down"},
     {Controller::kToggleBranch, "collapse_branch"},
     {Controller::kCloseBranch, "close_branch"},
+    {kSplitRight, "split_right"},
+    {kSplitDown, "split_down"},
+    {kMoveOutOfSplit, "move_out_of_split_view"},
+    {kSeparatePanes, "separate_panes"},
     {IDC_CREATE_NEW_TAB_GROUP, "new_task"},
     {Controller::kNewTask, "move_to_new_task"},
     {Controller::kScratchpad, "move_to_scratchpad"},
@@ -73,6 +77,10 @@ constexpr struct {
     {kResumeOrganization, "resume_organization"},
     {kShowOrganizationSettings, "organization_settings"},
     {kShowShortcutSettings, "keyboard_shortcuts"},
+    // These lost their keys to Split Right and Split Down, so the user can
+    // give them new ones.
+    {IDC_BOOKMARK_THIS_TAB, "bookmark_this_tab"},
+    {IDC_BOOKMARK_ALL_TABS, "bookmark_all_tabs"},
 };
 
 // The name of one of uw's commands, or an empty one for Chromium's.

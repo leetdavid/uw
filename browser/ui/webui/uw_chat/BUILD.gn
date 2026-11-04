@@ -152,6 +152,7 @@ source_set("browser_tests") {
     "//uw/browser/terminal",
     "//uw/browser/ui/glass",
     "//uw/browser/ui/views/command_bar",
+    "//uw/browser/ui/views/split_view",
     "//uw/browser/ui/views/tab_organization",
     "//uw/browser/ui/views/terminal",
     "//uw/browser/update:pending_update",

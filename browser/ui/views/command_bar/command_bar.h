@@ -13,6 +13,7 @@
 #include "base/scoped_observation.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/tab_groups/tab_group_id.h"
+#include "components/tabs/public/tab_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/views/widget/widget_observer.h"
 
@@ -23,10 +24,6 @@ namespace content {
 struct OpenURLParams;
 class WebContents;
 }  // namespace content
-
-namespace tabs {
-class TabInterface;
-}
 
 namespace uw {
 
@@ -56,6 +53,11 @@ class CommandBar : public views::WidgetObserver {
   // terminal it opens goes at the end of the task.
   static bool OpenForTask(BrowserWindowInterface* window,
                           const tab_groups::TabGroupId& task);
+  // Shows it over `pane`, the new tab of a split view, as Split Right does.
+  // A page, chat, or terminal it opens, or an open tab picked in it, takes
+  // the place of `pane`.
+  static bool OpenForPane(BrowserWindowInterface* window,
+                          tabs::TabInterface* pane);
 
   bool IsShowing() const;
   // Null while the setting is off.
@@ -83,6 +85,9 @@ class CommandBar : public views::WidgetObserver {
   // Moves the tab just opened to the end of the task the command bar was
   // opened for, if any.
   void PlaceInTask();
+  // Puts `tab`, just opened or picked, in the place of the pane the command
+  // bar was opened for, if any.
+  void PlaceInPane(tabs::TabInterface* tab);
 
   const raw_ptr<BrowserWindowInterface> window_;
   PrefChangeRegistrar setting_;
@@ -91,6 +96,7 @@ class CommandBar : public views::WidgetObserver {
   base::WeakPtr<WebUIBubbleDialogView> bubble_;
   base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};
   std::optional<tab_groups::TabGroupId> task_;
+  tabs::TabHandle pane_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;
 };
 

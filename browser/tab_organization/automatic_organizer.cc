@@ -291,7 +291,7 @@ void AutomaticOrganizer::Tidy() {
   std::map<PageId, size_t> numbers;
   for (const Page& page : tree.pages()) {
     const auto activity = pages_.find(page.id);
-    if (!page.task.empty() || controller_->IsKept(page.id) ||
+    if (!page.task.empty() || controller_->IsLeftAlone(page.id) ||
         activity == pages_.end() || activity->second.title.empty()) {
       continue;
     }
@@ -383,7 +383,7 @@ void AutomaticOrganizer::OnTidy(RemoteModelClient::Outcome outcome) {
     const Page* page = before.Find(id);
     const auto activity = pages_.find(id);
     if (!page || !page->task.empty() || page->parent != request->parents[i] ||
-        controller_->IsKept(id) || activity == pages_.end() ||
+        controller_->IsLeftAlone(id) || activity == pages_.end() ||
         activity->second.revision != request->revisions[i]) {
       continue;
     }
@@ -606,9 +606,9 @@ void AutomaticOrganizer::Scan() {
     activity.url = url;
     activity.folder = folder;
     activity.title = title;
-    if (controller_->IsKept(page.id) || controller_->IsHeld(page.id)) {
-      // A kept or held tab is never asked about. A request already out for it
-      // is dropped, and its branch need not wait for it.
+    if (controller_->IsLeftAlone(page.id) || controller_->IsHeld(page.id)) {
+      // A kept, split, or held tab is never asked about. A request already out
+      // for it is dropped, and its branch need not wait for it.
       if (first_sight || activity.asking ||
           activity.requested < activity.revision) {
         CancelRequestsFor(page.id);
@@ -1062,7 +1062,7 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
   std::map<PageId, TabAnswer> tabs;
   for (const PageId& id : tree.BranchOf(top)) {
     const auto activity = pages_.find(id);
-    const bool kept_tab = controller_->IsKept(id);
+    const bool kept_tab = controller_->IsLeftAlone(id);
     if (activity == pages_.end() && !kept_tab) {
       continue;
     }

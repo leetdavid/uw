@@ -1,0 +1,3133 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index e155778e0039b89457d58bfd34d69aed810a37dd..fd546a509812033e3e1dfc6cd465c18821f938b2 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -344,6 +344,12 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_EXPAND_BRANCH_MAC" desc="In Title Case: Shows the tabs nested under the selected tab again in the tab sidebar.">Expand Branch</message>
+       <message name="IDS_UW_HIDDEN_TABS" desc="Tooltip of the number at the end of a tab in the tab sidebar whose nested tabs are hidden.">{COUNT, plural, =1 {1 hidden tab} other {# hidden tabs}}</message>
+       <message name="IDS_UW_NEW_CHILD_TAB_MAC" desc="In Title Case: Opens a blank tab nested directly under the selected tab.">New Child Tab</message>
++      <message name="IDS_UW_SPLIT_RIGHT_MAC" desc="In Title Case: Cuts the selected tab's part of the page area in two, side by side, and opens a new tab in the right half.">Split Right</message>
++      <message name="IDS_UW_SPLIT_DOWN_MAC" desc="In Title Case: Cuts the selected tab's part of the page area in two, one above the other, and opens a new tab in the bottom half.">Split Down</message>
++      <message name="IDS_UW_MOVE_OUT_OF_SPLIT_MAC" desc="In Title Case: Takes the tab out of the split view it shares the page area with, and keeps it open.">Move Out of Split View</message>
++      <message name="IDS_UW_SEPARATE_PANES_MAC" desc="In Title Case: Ends the split view the tab is in. Each of its tabs stays open on its own.">Separate Panes</message>
++      <message name="IDS_UW_TAB_AX_LABEL_SPLIT_PANE_FORMAT" desc="Accessibility label text for a tab in a split view of more than two tabs. The number counts the split's panes from the top left, left to right, then top to bottom. Example: 'Google Search - Pane 3 of split view'"><ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pane <ph name="NUMBER">$2<ex>3</ex></ph> of split view</message>
++      <message name="IDS_UW_SPLIT_VIEW" desc="Tooltip of the icon on the first row of a split view in the tab sidebar. A split view shows several tabs together in the page area.">Split view</message>
+       <message name="IDS_UW_COMMAND_BAR" desc="Name of uw's command bar in the task manager. The command bar is a panel for opening pages and running commands from the keyboard.">Command bar</message>
+       <message name="IDS_UW_ACTIVITY_COULD_NOT_NAME" desc="Headline of the sidebar card after the language model gave no name for a task the user asked to name.">Couldn't name <ph name="TASK">$1<ex>Plan Lisbon trip</ex></ph></message>
+       <message name="IDS_UW_TRY_AGAIN" desc="In Title Case: Button on the sidebar card that asks the language model again for a task's name after it gave none.">Try Again</message>
+diff --git a/chrome/browser/actor/ui/actor_ui_window_controller.cc b/chrome/browser/actor/ui/actor_ui_window_controller.cc
+index 2d086ebb1ea3787b25d18d0577dbf204216be3c5..9bc4ad31da27b5bed14cd27981eff227c5978b46 100644
+--- a/chrome/browser/actor/ui/actor_ui_window_controller.cc
++++ b/chrome/browser/actor/ui/actor_ui_window_controller.cc
+@@ -274,6 +274,14 @@ ActorUiWindowController::ActorUiWindowController(
+ 
+ ActorUiWindowController::~ActorUiWindowController() = default;
+ 
++void ActorUiWindowController::AddContentsContainer(
++    views::WebView* contents_view,
++    ActorOverlayWebView* actor_overlay_web_view) {
++  contents_container_controllers_.push_back(
++      std::make_unique<actor::ui::ActorUiContentsContainerController>(
++          contents_view, actor_overlay_web_view, this));
++}
++
+ // static
+ ActorUiWindowController* ActorUiWindowController::From(
+     BrowserWindowInterface* browser_window_interface) {
+diff --git a/chrome/browser/actor/ui/actor_ui_window_controller.h b/chrome/browser/actor/ui/actor_ui_window_controller.h
+index 3e4ccc511d02246b8cb80de6eb646d9ab9193df7..38da5a1c03ed210c7238e9ffc184da400d1bd7f2 100644
+--- a/chrome/browser/actor/ui/actor_ui_window_controller.h
++++ b/chrome/browser/actor/ui/actor_ui_window_controller.h
+@@ -138,6 +138,10 @@ class ActorUiWindowController : public ImmersiveModeController::Observer {
+ 
+   void TearDown();
+ 
++  // uw: a pane added after the window opened.
++  void AddContentsContainer(views::WebView* contents_view,
++                            ActorOverlayWebView* actor_overlay_web_view);
++
+   actor::ui::ActorUiContentsContainerController* GetControllerForWebContents(
+       content::WebContents* web_contents);
+ 
+diff --git a/chrome/browser/devtools/devtools_ui_controller.cc b/chrome/browser/devtools/devtools_ui_controller.cc
+index f2a3fe25fe45f4f356b15f5e7ad0ce2f704d255c..8f2353e52d3b080b9d0e56510fc231b77566a472 100644
+--- a/chrome/browser/devtools/devtools_ui_controller.cc
++++ b/chrome/browser/devtools/devtools_ui_controller.cc
+@@ -31,6 +31,12 @@ DevtoolsUIController::DevtoolsUIController(
+ 
+ DevtoolsUIController::~DevtoolsUIController() = default;
+ 
++void DevtoolsUIController::AddContentsContainerView(
++    ContentsContainerView* contents_container_view) {
++  devtools_web_view_controllers_[contents_container_view] =
++      std::make_unique<DevtoolsWebViewController>(contents_container_view);
++}
++
+ DevtoolsUIController* DevtoolsUIController::From(
+     BrowserWindowInterface* browser) {
+   return Get(browser->GetUnownedUserDataHost());
+diff --git a/chrome/browser/devtools/devtools_ui_controller.h b/chrome/browser/devtools/devtools_ui_controller.h
+index aecb3609bfa9a1137f5dd96320e0c4049082e3f0..1cae01e8ca8bd53917b39978dd57337e7208d2f7 100644
+--- a/chrome/browser/devtools/devtools_ui_controller.h
++++ b/chrome/browser/devtools/devtools_ui_controller.h
+@@ -41,6 +41,9 @@ class DevtoolsUIController {
+ 
+   void TearDown();
+ 
++  // uw: a pane added after the window opened.
++  void AddContentsContainerView(ContentsContainerView* contents_container_view);
++
+   bool UpdateDevtools(content::WebContents* web_contents,
+                       bool update_devtools_web_contents = true);
+ 
+diff --git a/chrome/browser/enterprise/data_protection/data_protection_ui_controller.cc b/chrome/browser/enterprise/data_protection/data_protection_ui_controller.cc
+index e76b91d6f18c830a7bcc041572a18964aff69984..e74d76c9e09e77de70f7989c5bc3fcabcb6a6fe4 100644
+--- a/chrome/browser/enterprise/data_protection/data_protection_ui_controller.cc
++++ b/chrome/browser/enterprise/data_protection/data_protection_ui_controller.cc
+@@ -144,6 +144,14 @@ DataProtectionUIController::DataProtectionUIController(
+   }
+ }
+ 
++void DataProtectionUIController::AddContentsContainerView(
++    ContentsContainerView* contents_container_view) {
++  contents_view_data_protection_controllers_.push_back(
++      std::make_unique<ContentsViewDataProtectionController>(
++          this, contents_container_view,
++          browser_view_->GetProfile()->GetPrefs()));
++}
++
+ // static
+ DataProtectionUIController* DataProtectionUIController::From(
+     BrowserWindowInterface* browser_window_interface) {
+diff --git a/chrome/browser/enterprise/data_protection/data_protection_ui_controller.h b/chrome/browser/enterprise/data_protection/data_protection_ui_controller.h
+index 658f1de0fb6795ffcfaa369cf934cc712c2ca2ae..0c324466c225c29ab53bf2804b2f8b29461058fd 100644
+--- a/chrome/browser/enterprise/data_protection/data_protection_ui_controller.h
++++ b/chrome/browser/enterprise/data_protection/data_protection_ui_controller.h
+@@ -36,6 +36,9 @@ class DataProtectionUIController {
+   static DataProtectionUIController* From(
+       BrowserWindowInterface* browser_window_interface);
+ 
++  // uw: a pane added after the window opened.
++  void AddContentsContainerView(ContentsContainerView* contents_container_view);
++
+   // controller tied to a `contents_container_view` that is responsible for
+   // setting and clearing watermark on the view. It is also responsible for
+   // notifying DataProtectionUIController to update screenshot policy.
+diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
+index 71e3a025159ae19050b358db9cb1c69438880056..be48ba2896ac7077bfaaff319a0284891bb90240 100644
+--- a/chrome/browser/sessions/session_restore.cc
++++ b/chrome/browser/sessions/session_restore.cc
+@@ -1062,11 +1062,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+             browser->GetTabStripModel()->GetIndexOfTab(tab));
+       }
+ 
+-      // The number of supported split tabs is 2. Do not attempt to restore
+-      // more than this to future proof it.
+-      if (tab_contents_list.size() == 2) {
+-        browser->GetTabStripModel()->RestoreSplit(
+-            split_id, tab_index_list, split_tabs::SplitTabVisualData());
++      // uw: a split has a pane for each of its tabs. One whose saved panes
++      // do not match its tabs comes back as a pair, or not at all.
++      split_tabs::SplitTabVisualData visual_data;
++      for (const auto& saved : window.split_tabs) {
++        if (saved->id_ == split_id &&
++            saved->split_visual_data_.panes().pane_count() ==
++                tab_contents_list.size()) {
++          visual_data = saved->split_visual_data_;
++        }
++      }
++      std::ranges::sort(tab_index_list);
++      if (visual_data.panes().pane_count() == tab_contents_list.size()) {
++        browser->GetTabStripModel()->RestoreSplit(split_id, tab_index_list,
++                                                  visual_data);
+       }
+     }
+   }
+@@ -1172,6 +1181,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+       }
+ 
+       CHECK(browser->GetTabStripModel()->GetSplitData(session_split_tab->id_));
++      // uw: a larger split came back with all of its panes.
++      if (session_split_tab->split_visual_data_.panes().pane_count() != 2) {
++        continue;
++      }
+       browser->GetTabStripModel()->UpdateSplitLayout(
+           session_split_tab->id_,
+           session_split_tab->split_visual_data_.split_layout());
+diff --git a/chrome/browser/ui/accelerator_table.cc b/chrome/browser/ui/accelerator_table.cc
+index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf563e99249 100644
+--- a/chrome/browser/ui/accelerator_table.cc
++++ b/chrome/browser/ui/accelerator_table.cc
+@@ -60,10 +60,17 @@ const AcceleratorMapping kAcceleratorMap[] = {
+ #endif
+     {ui::VKEY_ESCAPE, ui::EF_NONE, IDC_CLOSE_FIND_OR_STOP},
+ 
+-#if !BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_WIN)
++    // uw: Ctrl+D and Ctrl+Shift+D split the page, and Bookmark This Tab and
++    // Bookmark All Tabs have no key.
++    {ui::VKEY_D, ui::EF_CONTROL_DOWN, uw::kSplitRight},
++    {ui::VKEY_D, ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN, uw::kSplitDown},
++#elif !BUILDFLAG(IS_MAC)
+     {ui::VKEY_D, ui::EF_PLATFORM_ACCELERATOR, IDC_BOOKMARK_THIS_TAB},
+     {ui::VKEY_D, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR,
+      IDC_BOOKMARK_ALL_TABS},
++#endif
++#if !BUILDFLAG(IS_MAC)
+     {ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR, IDC_CLOSE_TAB},
+     {ui::VKEY_W, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR,
+      IDC_CLOSE_WINDOW},
+@@ -91,8 +98,7 @@ const AcceleratorMapping kAcceleratorMap[] = {
+      uw::TabOrganizationController::kCloseBranch},
+     {ui::VKEY_Z, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
+      uw::TabOrganizationController::kUndo},
+-    {ui::VKEY_RIGHT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
+-     uw::kNextWorkspace},
++    {ui::VKEY_RIGHT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN, uw::kNextWorkspace},
+     {ui::VKEY_LEFT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
+      uw::kPreviousWorkspace},
+     {ui::VKEY_1, ui::EF_ALT_DOWN, uw::kGoToWorkspace1},
+@@ -353,7 +359,7 @@ std::vector<AcceleratorMapping> GetAcceleratorList() {
+                          std::begin(kDevToolsAcceleratorMap),
+                          std::end(kDevToolsAcceleratorMap));
+ 
+-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
++#if BUILDFLAG(IS_LINUX)
+     accelerators->emplace_back(AcceleratorMapping(
+         {ui::VKEY_N, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, IDC_NEW_SPLIT_TAB}));
+ #elif BUILDFLAG(IS_CHROMEOS)
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+index ec6ecb7da85d13df72713ff4446c412383c62ab6..eef52a0f9a51debba453ce74e6ddbc50ffe4ac57 100644
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -695,9 +695,15 @@ void ReloadInternal(BrowserWindowInterface* browser,
+   // tab strip. To detect whether the user has selected multiple UI tabs,
+   // compare the number of model selected tabs wither either 2 or 1 depending on
+   // whether the active tab is split.
++  // uw: a split may have more than two tabs.
+   bool multiple_ui_tabs_selected =
+-      active_tab && tab_strip_model->selection_model().size() >
+-                        (active_tab->IsSplit() ? 2 : 1);
++      active_tab &&
++      tab_strip_model->selection_model().size() >
++          (active_tab->IsSplit()
++               ? tab_strip_model->GetSplitData(*active_tab->GetSplit())
++                     ->ListTabs()
++                     .size()
++               : 1);
+ 
+   if (multiple_ui_tabs_selected) {
+     // Reloading a tab may change the selection (see crbug.com/339061099), so
+@@ -1424,9 +1430,14 @@ void CloseTab(BrowserWindowInterface* browser) {
+   // If the selection model consists of only the indices of a single split tab,
+   // decide if just the active tab in the split is closed instead of all tabs in
+   // the split.
++  // uw: a split may have more than two tabs.
+   const bool only_active_split_tab_selected =
+       active_tab->IsSplit() &&
+-      browser->GetTabStripModel()->selection_model().size() == 2;
++      browser->GetTabStripModel()->selection_model().size() ==
++          browser->GetTabStripModel()
++              ->GetSplitData(*active_tab->GetSplit())
++              ->ListTabs()
++              .size();
+ 
+   if (only_active_split_tab_selected) {
+     RecordTabCloseCount(1);
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index 29db497993227311233af1caa1e346cb49e1c0c8..fcb43cae0d9c521bafd8e1b2668433f5bd25ee58 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -465,6 +465,40 @@ void BrowserLiveTabContext::ReconstructSplit(
+   }
+ }
+ 
++void BrowserLiveTabContext::ReconstructSplitOfTabs(
++    const std::vector<sessions::LiveTab*>& tabs,
++    split_tabs::SplitTabId split_id,
++    const split_tabs::SplitTabVisualData& visual_data,
++    size_t focused_pane) {
++  std::vector<int> indices;
++  for (sessions::LiveTab* tab : tabs) {
++    const int index = tab_strip_model_->GetIndexOfWebContents(
++        &static_cast<sessions::ContentLiveTab*>(tab)->GetWebContents());
++    if (index == TabStripModel::kNoTab) {
++      return;
++    }
++    indices.push_back(index);
++  }
++  // The tabs were restored next to each other in pane order.
++  if (!std::ranges::is_sorted(indices) ||
++      visual_data.panes().pane_count() != indices.size()) {
++    return;
++  }
++  // The split brings its tabs together, so the pane to focus is found by its
++  // page afterwards.
++  const bool selected = tab_strip_model_->active_index() == indices[0];
++  content::WebContents* focused =
++      focused_pane < tabs.size()
++          ? &static_cast<sessions::ContentLiveTab*>(tabs[focused_pane])
++                 ->GetWebContents()
++          : nullptr;
++  tab_strip_model_->RestoreSplit(split_id, indices, visual_data);
++  if (selected && focused) {
++    tab_strip_model_->ActivateTabAt(
++        tab_strip_model_->GetIndexOfWebContents(focused));
++  }
++}
++
+ void BrowserLiveTabContext::CloseTab() {
+   chrome::CloseTab(&*browser_);
+ }
+diff --git a/chrome/browser/ui/browser_live_tab_context.h b/chrome/browser/ui/browser_live_tab_context.h
+index 6b5e2433d337f4db99fa0c8cff55bb28c5d8cf03..b4832119886e89ae3df6610676e61f549a46789d 100644
+--- a/chrome/browser/ui/browser_live_tab_context.h
++++ b/chrome/browser/ui/browser_live_tab_context.h
+@@ -106,6 +106,10 @@ class BrowserLiveTabContext : public sessions::LiveTabContext {
+       sessions::LiveTab* trailing_tab,
+       split_tabs::SplitTabId split_id,
+       const split_tabs::SplitTabVisualData& visual_data) override;
++  void ReconstructSplitOfTabs(const std::vector<sessions::LiveTab*>& tabs,
++                              split_tabs::SplitTabId split_id,
++                              const split_tabs::SplitTabVisualData& visual_data,
++                              size_t focused_pane) override;
+   void CloseTab() override;
+ 
+   // see Browser::Create
+diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..4a43bb8bfcf31076a4bbd3d06849e1de7f669c6d 100644
+--- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
++++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+@@ -102,7 +102,10 @@ const struct AcceleratorMapping {
+      ui::VKEY_B},
+     {IDC_SHOW_BOOKMARK_MANAGER, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN,
+      ui::VKEY_B},
+-    {IDC_BOOKMARK_THIS_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_D},
++    // uw: Cmd+D and Cmd+Shift+D split the page, and Bookmark This Tab and
++    // Bookmark All Tabs have no key.
++    {uw::kSplitRight, ui::EF_COMMAND_DOWN, ui::VKEY_D},
++    {uw::kSplitDown, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_D},
+     {IDC_SHOW_DOWNLOADS, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_J},
+     {IDC_SHOW_HISTORY, ui::EF_COMMAND_DOWN, ui::VKEY_Y},
+     {IDC_VIEW_SOURCE, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN, ui::VKEY_U},
+@@ -150,8 +153,6 @@ const struct AcceleratorMapping {
+     {IDC_HOME, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_H},
+     {IDC_BACK, ui::EF_COMMAND_DOWN, ui::VKEY_OEM_4},
+     {IDC_FORWARD, ui::EF_COMMAND_DOWN, ui::VKEY_OEM_6},
+-    {IDC_BOOKMARK_ALL_TABS, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
+-     ui::VKEY_D},
+     {IDC_MINIMIZE_WINDOW, ui::EF_COMMAND_DOWN, ui::VKEY_M},
+     {IDC_CYCLE_TO_NEXT_TAB, ui::EF_CONTROL_DOWN, ui::VKEY_TAB},
+     {IDC_CYCLE_TO_PREV_TAB, ui::EF_CONTROL_DOWN | ui::EF_SHIFT_DOWN,
+@@ -168,7 +169,6 @@ const struct AcceleratorMapping {
+     // uw: Cmd+S hides and shows the sidebar, as in Arc, and Save Page As has
+     // no key.
+     {IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, ui::EF_COMMAND_DOWN, ui::VKEY_S},
+-    {IDC_NEW_SPLIT_TAB, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN, ui::VKEY_N},
+ };
+ 
+ ui::Accelerator AcceleratorForCloseWindow() {
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index 167d296626e3846e61346bfb57e37e1f5f191caa..37d26a240e37d89e21f9fcda6f04ccbf43325e1e 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -587,8 +587,11 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+                   .set_hidden(true),
+               Item(IDS_MOVE_TAB_TO_NEW_WINDOW)
+                   .command_id(IDC_MOVE_TAB_TO_NEW_WINDOW),
+-              Item(IDS_TAB_CXMENU_ADD_TAB_TO_NEW_SPLIT)
+-                  .command_id(IDC_NEW_SPLIT_TAB),
++              Item(IDS_UW_SPLIT_RIGHT_MAC).command_id(uw::kSplitRight),
++              Item(IDS_UW_SPLIT_DOWN_MAC).command_id(uw::kSplitDown),
++              Item(IDS_UW_MOVE_OUT_OF_SPLIT_MAC)
++                  .command_id(uw::kMoveOutOfSplit),
++              Item(IDS_UW_SEPARATE_PANES_MAC).command_id(uw::kSeparatePanes),
+               Item(IDS_SEARCH_TABS)
+                   .command_id(IDC_TAB_SEARCH),
+               Item().is_separator(),
+diff --git a/chrome/browser/ui/tabs/split_tab_menu_model.cc b/chrome/browser/ui/tabs/split_tab_menu_model.cc
+index d09ed0f7c8abbcd1437deb56fc5ee2f13a276e1e..476ab821378b7e8e8081700274094d372142db0a 100644
+--- a/chrome/browser/ui/tabs/split_tab_menu_model.cc
++++ b/chrome/browser/ui/tabs/split_tab_menu_model.cc
+@@ -257,8 +257,10 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
+   const split_tabs::SplitTabId split_id = GetSplitTabId();
+   split_tabs::SplitTabData* const split_tab_data =
+       tab_strip_model_->GetSplitData(split_id);
++  // uw: a split may have more than two tabs; start and end are its first
++  // and last.
+   std::vector<tabs::TabInterface*> tabs_in_split = split_tab_data->ListTabs();
+-  CHECK_EQ(tabs_in_split.size(), 2U);
++  CHECK_GE(tabs_in_split.size(), 2U);
+   CommandId split_command_id = GetCommandIdEnum(command_id);
+   switch (split_command_id) {
+     case CommandId::kReversePosition:
+@@ -269,13 +271,15 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
+           tab_strip_model_->GetWebContentsAt(split_tab_index_.value()));
+       break;
+     case CommandId::kCloseStartTab: {
+-      int startIndex = base::i18n::IsRTL() ? 1 : 0;
+-      CloseWebContents(tabs_in_split[startIndex]->GetContents());
++      CloseWebContents(
++          (base::i18n::IsRTL() ? tabs_in_split.back() : tabs_in_split.front())
++              ->GetContents());
+       break;
+     }
+     case CommandId::kCloseEndTab: {
+-      int endIndex = base::i18n::IsRTL() ? 0 : 1;
+-      CloseWebContents(tabs_in_split[endIndex]->GetContents());
++      CloseWebContents(
++          (base::i18n::IsRTL() ? tabs_in_split.front() : tabs_in_split.back())
++              ->GetContents());
+       break;
+     }
+     case CommandId::kExitSplit:
+diff --git a/chrome/browser/ui/tabs/split_tab_metrics.cc b/chrome/browser/ui/tabs/split_tab_metrics.cc
+index d2d3a1db11a77e8ce2f071e6681b86cc25f4f698..6ac672ec2989df077e43e5fd3bab05859183cda7 100644
+--- a/chrome/browser/ui/tabs/split_tab_metrics.cc
++++ b/chrome/browser/ui/tabs/split_tab_metrics.cc
+@@ -94,7 +94,10 @@ void LogSplitViewCreatedUKM(const TabStripModel* tab_strip_model,
+                             const SplitTabId split_id) {
+   SplitTabData* split_data = tab_strip_model->GetSplitData(split_id);
+   std::vector<tabs::TabInterface*> split_tabs = split_data->ListTabs();
+-  CHECK(split_tabs.size() == 2);
++  // uw: the events describe pairs only.
++  if (split_tabs.size() != 2) {
++    return;
++  }
+ 
+   int64_t split_event_id = base::RandUint64();
+ 
+@@ -112,7 +115,10 @@ void LogSplitViewUpdatedUKM(const TabStripModel* tab_strip_model,
+                             const SplitTabId split_id) {
+   SplitTabData* split_data = tab_strip_model->GetSplitData(split_id);
+   std::vector<tabs::TabInterface*> split_tabs = split_data->ListTabs();
+-  CHECK(split_tabs.size() == 2);
++  // uw: the events describe pairs only.
++  if (split_tabs.size() != 2) {
++    return;
++  }
+ 
+   int64_t split_event_id = base::RandUint64();
+ 
+diff --git a/chrome/browser/ui/tabs/split_tab_swap_menu_model.cc b/chrome/browser/ui/tabs/split_tab_swap_menu_model.cc
+index 7b3307b7856fdc4e2b8c42cd541225fda943c519..c39096a26c09362945ba760a23d1499e7fbdbc34 100644
+--- a/chrome/browser/ui/tabs/split_tab_swap_menu_model.cc
++++ b/chrome/browser/ui/tabs/split_tab_swap_menu_model.cc
+@@ -102,7 +102,10 @@ void SplitTabSwapMenuModel::ExecuteCommand(int command_id, int event_flags) {
+   split_tabs::SplitTabData* const split_tab_data =
+       tab_strip_model_->GetSplitData(*split_id);
+   std::vector<tabs::TabInterface*> tabs_in_split = split_tab_data->ListTabs();
+-  CHECK_EQ(tabs_in_split.size(), 2U);
++  // uw: only a pair has a start and an end to swap with.
++  if (tabs_in_split.size() != 2) {
++    return;
++  }
+ 
+   if (id == CommandId::kSwapStartTab) {
+     tab_strip_model_->UpdateTabInSplit(tabs_in_split[0], tab_index_,
+diff --git a/chrome/browser/ui/tabs/split_tab_util.cc b/chrome/browser/ui/tabs/split_tab_util.cc
+index 6382385b3f5f85ddcf3d12d9dd56cd5429486faa..658b057dfc5dca07c56a5808102bf8fdc998c04e 100644
+--- a/chrome/browser/ui/tabs/split_tab_util.cc
++++ b/chrome/browser/ui/tabs/split_tab_util.cc
+@@ -50,8 +50,8 @@ SplitTabActiveLocation GetLastActiveTabLocation(
+     split_tabs::SplitTabId split_id) {
+   split_tabs::SplitTabData* const split_tab_data =
+       tab_strip_model->GetSplitData(split_id);
++  // uw: a split may have more than two tabs; any but the first is the end.
+   std::vector<tabs::TabInterface*> tabs_in_split = split_tab_data->ListTabs();
+-  CHECK_EQ(tabs_in_split.size(), 2U);
+ 
+   const int last_active_index =
+       GetIndexOfLastActiveTab(tab_strip_model, split_id);
+diff --git a/chrome/browser/ui/tabs/tab_menu_model.cc b/chrome/browser/ui/tabs/tab_menu_model.cc
+index a9a130e23d342f4d1cb59afab371415e613edbc7..8baf6b1266245d612bbead279430348872b0e1f8 100644
+--- a/chrome/browser/ui/tabs/tab_menu_model.cc
++++ b/chrome/browser/ui/tabs/tab_menu_model.cc
+@@ -52,6 +52,7 @@
+ #include "components/feed/feed_feature_list.h"
+ #include "components/send_tab_to_self/features.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
++#include "components/tabs/public/split_tab_data.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/context_menu_params.h"
+@@ -270,7 +271,11 @@ void TabMenuModel::Build(int index) {
+   SetElementIdentifierAt(GetItemCount() - 1, kAddNewTabAdjacentMenuItem);
+ 
+   if (!tab_strip_->GetSplitForTab(index).has_value()) {
+-    if (tab_strip_->GetActiveTab()->IsSplit()) {
++    // uw: only a pair has a start and an end to swap with.
++    if (tab_strip_->GetActiveTab()->IsSplit() &&
++        tab_strip_->GetSplitData(*tab_strip_->GetActiveTab()->GetSplit())
++                ->ListTabs()
++                .size() == 2) {
+       swap_with_split_submenu_ =
+           std::make_unique<SplitTabSwapMenuModel>(tab_strip_, index);
+       AddSubMenuWithStringIdAndIcon(
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
+index 29eecec28c90f6c4477a18eacd27e5b5830ba260..2a6fed1b23d07c9db61ca94b32f2bd6165260f61 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.cc
++++ b/chrome/browser/ui/tabs/tab_strip_model.cc
+@@ -17,6 +17,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "base/auto_reset.h"
+ #include "base/check.h"
+ #include "base/check_op.h"
+ #include "base/containers/flat_map.h"
+@@ -595,6 +596,7 @@ std::unique_ptr<DetachedTab> TabStripModel::DetachTabWithReasonAt(
+                           web_contents_remove_reason, tab_detach_reason);
+   notifications.detached_tab.push_back(std::move(dt));
+   SendDetachWebContentsNotifications(&notifications);
++  RemakePendingSplits();
+   return std::move(notifications.detached_tab[0]);
+ }
+ 
+@@ -1664,7 +1666,9 @@ void TabStripModel::DeselectTabAt(int index) {
+     // If the tab is already deselected, no need to do anything.
+     return;
+   } else if (selection_model_.size() == 1 ||
+-             (selection_model_.size() == 2 && tab->GetSplit().has_value())) {
++             (tab->GetSplit().has_value() &&
++              selection_model_.size() ==
++                  GetSplitData(tab->GetSplit().value())->ListTabs().size())) {
+     // One tab must be selected and this tab is currently selected so we can't
+     // unselect it.
+     return;
+@@ -1971,6 +1975,11 @@ void TabStripModel::UpdateSplitLayout(
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+ 
+   split_tabs::SplitTabData* split_data = GetSplitData(split_id);
++  // uw: turning only the outermost cut of a larger split would reorder its
++  // panes; uw offers no command for it.
++  if (split_data->visual_data()->panes().pane_count() != 2) {
++    return;
++  }
+ 
+   if (split_data->visual_data()->split_layout() == tab_layout) {
+     return;
+@@ -2002,20 +2011,120 @@ void TabStripModel::UpdateSplitLayout(
+ void TabStripModel::UpdateSplitRatio(split_tabs::SplitTabId split_id,
+                                      double split_ratio,
+                                      bool is_intermediate) {
++  UpdateSplitCutRatio(split_id, 0, split_ratio, is_intermediate);
++}
++
++void TabStripModel::UpdateSplitCutRatio(split_tabs::SplitTabId split_id,
++                                        size_t cut,
++                                        double ratio,
++                                        bool is_intermediate) {
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+   split_tabs::SplitTabData* split_data = GetSplitData(split_id);
+-  if (split_data->visual_data()->split_ratio() == split_ratio) {
++  uw::SplitLayout& panes = split_data->visual_data()->panes();
++  if (cut >= panes.cut_count()) {
++    return;
++  }
++  ratio = std::clamp(ratio, 0.01, 0.99);
++  if (panes.ratio_of(cut) == ratio && is_intermediate) {
+     return;
+   }
+ 
+   split_tabs::SplitTabVisualData old_visual_data = *split_data->visual_data();
+-  split_data->visual_data()->set_split_ratio(split_ratio);
++  panes.SetRatio(cut, ratio);
++
++  // Panes keep their places while a divider is dragged, and take their
++  // reading order when it is let go.
++  if (!is_intermediate) {
++    std::vector<tabs::TabInterface*> tabs = split_data->ListTabs();
++    const uw::SplitLayout::Renumbering renumbering = panes.Renumber();
++    std::vector<tabs::TabInterface*> ordered(tabs.size());
++    bool reordered = false;
++    for (size_t i = 0; i < tabs.size(); ++i) {
++      ordered[*renumbering.to[i]] = tabs[i];
++      reordered |= *renumbering.to[i] != i;
++    }
++    if (reordered) {
++      RemakeSplit(split_id, std::move(ordered), *split_data->visual_data(),
++                  SplitTabChange::SplitTabAddReason::kSplitTabUpdated);
++      return;
++    }
++  }
+ 
++  if (old_visual_data == *split_data->visual_data()) {
++    return;
++  }
+   NotifySplitTabVisualsChanged(
+       split_id, old_visual_data, *split_data->visual_data(),
+       SplitTabChange::SplitVisualChangeReason::kRatioUpdated, is_intermediate);
+ }
+ 
++void TabStripModel::SplitPane(int index,
++                              int new_index,
++                              split_tabs::SplitTabLayout direction) {
++  ReentrancyCheck reentrancy_check(&reentrancy_guard_);
++  tabs::TabInterface* tab = GetTabAtIndex(index);
++  tabs::TabInterface* new_tab = GetTabAtIndex(new_index);
++  CHECK_NE(tab, new_tab);
++  CHECK(!new_tab->IsSplit());
++  const uw::SplitDirection way =
++      direction == split_tabs::SplitTabLayout::kStacked
++          ? uw::SplitDirection::kStacked
++          : uw::SplitDirection::kSideBySide;
++
++  if (!tab->IsSplit()) {
++    RemakeSplit(split_tabs::SplitTabId::GenerateNew(), {tab, new_tab},
++                split_tabs::SplitTabVisualData(uw::SplitLayout(way)),
++                SplitTabChange::SplitTabAddReason::kNewSplitTabAdded);
++    return;
++  }
++
++  const split_tabs::SplitTabId split_id = tab->GetSplit().value();
++  std::vector<tabs::TabInterface*> tabs = GetSplitData(split_id)->ListTabs();
++  split_tabs::SplitTabVisualData visual_data =
++      *GetSplitData(split_id)->visual_data();
++  const size_t pane = std::ranges::find(tabs, tab) - tabs.begin();
++  const size_t added = visual_data.panes().Split(pane, way);
++  tabs.insert(tabs.begin() + added, new_tab);
++  RemakeSplit(split_id, std::move(tabs), std::move(visual_data),
++              SplitTabChange::SplitTabAddReason::kSplitTabUpdated);
++}
++
++void TabStripModel::MoveTabOutOfSplit(int index) {
++  ReentrancyCheck reentrancy_check(&reentrancy_guard_);
++  tabs::TabInterface* tab = GetTabAtIndex(index);
++  if (!tab->IsSplit()) {
++    return;
++  }
++  const split_tabs::SplitTabId split_id = tab->GetSplit().value();
++  std::vector<tabs::TabInterface*> split_tabs =
++      GetSplitData(split_id)->ListTabs();
++
++  if (std::optional<PendingSplit> rest = SplitWithout(split_id, {tab})) {
++    std::vector<tabs::TabInterface*> rest_tabs;
++    for (const tabs::TabHandle& handle : rest->tabs) {
++      rest_tabs.push_back(handle.Get());
++    }
++    RemakeSplit(split_id, rest_tabs, std::move(rest->visual_data),
++                SplitTabChange::SplitTabAddReason::kSplitTabUpdated);
++    split_tabs = std::move(rest_tabs);
++  } else {
++    RemoveSplitImpl(split_id,
++                    SplitTabChange::SplitTabRemoveReason::kSplitTabRemoved);
++    std::erase(split_tabs, tab);
++  }
++
++  // Just after the split, wherever the tab was in it.
++  int last = 0;
++  for (tabs::TabInterface* split_tab : split_tabs) {
++    last = std::max(last, GetIndexOfTab(split_tab));
++  }
++  const int from = GetIndexOfTab(tab);
++  if (from < last) {
++    MoveTabToIndexImpl(from, last, tab->GetGroup(), tab->IsPinned(),
++                       /*select_after_move=*/false);
++  }
++}
++
+ void TabStripModel::UpdateTabInSplit(tabs::TabInterface* split_tab,
+                                      int update_index,
+                                      SplitUpdateType update_type) {
+@@ -2047,6 +2156,10 @@ void TabStripModel::UpdateTabInSplit(tabs::TabInterface* split_tab,
+ 
+ void TabStripModel::ReverseTabsInSplit(split_tabs::SplitTabId split_id) {
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
++  // uw: only a pair has a reverse.
++  if (GetSplitData(split_id)->ListTabs().size() != 2) {
++    return;
++  }
+ 
+   tabs::TabInterface* first_tab = GetSplitData(split_id)->ListTabs()[0];
+   const int index_of_first_tab_in_split = GetIndexOfTab(first_tab);
+@@ -2061,14 +2174,15 @@ split_tabs::SplitTabId TabStripModel::AddToNewSplit(
+     split_tabs::SplitTabCreatedSource source) {
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+ 
+-  CHECK(indices.size() == 1u || indices.size() == 2u)
+-      << "Invalid index count: " << indices.size();
++  CHECK(!indices.empty());
+ 
+   // If there is only one entry in `indices`, use the active index as the pivot
+   // index. Otherwise, use the first index.
+   if (indices.size() == 1u) {
+     indices.insert(indices.begin(), active_index());
+   }
++  // uw: a split has a pane for each tab.
++  CHECK_EQ(visual_data.panes().pane_count(), indices.size());
+   int pivot_index = indices[0];
+   CHECK(pivot_index != kNoTab);
+   // Check that the indices are unique.
+@@ -2104,7 +2218,8 @@ void TabStripModel::RestoreSplit(split_tabs::SplitTabId split_id,
+                                  split_tabs::SplitTabVisualData visual_data) {
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+   CHECK(std::ranges::is_sorted(indices));
+-  CHECK_EQ(indices.size(), 2u);
++  CHECK_GE(indices.size(), 2u);
++  CHECK_EQ(indices.size(), visual_data.panes().pane_count());
+ 
+   // Ideally these are consecutive indices from the restore flow and the pivot
+   // index does not matter. However, given there are numerous steps in restore
+@@ -2143,6 +2258,7 @@ tab_groups::TabGroupId TabStripModel::AddToNewGroup(
+     observer.OnTabGroupAdded(new_group);
+   }
+ 
++  RemakePendingSplits();
+   return new_group;
+ }
+ 
+@@ -2164,6 +2280,7 @@ void TabStripModel::AddToExistingGroup(const std::vector<int> indices,
+   MaybeRemoveSplitsForUpdate(indices);
+ 
+   AddToExistingGroupImpl(indices, group, add_to_end);
++  RemakePendingSplits();
+ }
+ 
+ void TabStripModel::AddToGroupForRestore(const std::vector<int>& indices,
+@@ -2242,6 +2359,7 @@ void TabStripModel::RemoveFromGroup(const std::vector<int>& indices) {
+     MoveTabsAndSetPropertiesImpl(right_of_group, last_tab_index + 1,
+                                  std::nullopt, false);
+   }
++  RemakePendingSplits();
+ }
+ 
+ void TabStripModel::RemoveSplit(split_tabs::SplitTabId split_id) {
+@@ -3880,6 +3998,8 @@ void TabStripModel::CloseTabs(base::span<content::WebContents* const> items,
+     return;
+   }
+ 
++  RemakePendingSplits();
++
+   if (closing_all) {
+     // CloseAllTabsStopped is sent with reason kCloseAllCompleted if
+     // closed_all; otherwise kCloseAllCanceled is sent.
+@@ -4474,6 +4594,134 @@ void TabStripModel::RemoveSplitImpl(
+   NotifySplitTabRemoved(split_id, tabs_with_indices, reason);
+ }
+ 
++TabStripModel::PendingSplit::PendingSplit(
++    split_tabs::SplitTabId id,
++    split_tabs::SplitTabVisualData visual_data)
++    : id(id), visual_data(std::move(visual_data)) {}
++TabStripModel::PendingSplit::PendingSplit(const PendingSplit&) = default;
++TabStripModel::PendingSplit& TabStripModel::PendingSplit::operator=(
++    const PendingSplit&) = default;
++TabStripModel::PendingSplit::~PendingSplit() = default;
++
++std::optional<TabStripModel::PendingSplit> TabStripModel::SplitWithout(
++    split_tabs::SplitTabId split_id,
++    const std::vector<tabs::TabInterface*>& leaving) {
++  split_tabs::SplitTabData* split_data = GetSplitData(split_id);
++  std::vector<tabs::TabInterface*> tabs = split_data->ListTabs();
++  PendingSplit pending(split_id, *split_data->visual_data());
++  uw::SplitLayout& panes = pending.visual_data.panes();
++  if (panes.pane_count() != tabs.size()) {
++    return std::nullopt;
++  }
++  for (tabs::TabInterface* tab : leaving) {
++    auto it = std::ranges::find(tabs, tab);
++    if (it == tabs.end()) {
++      continue;
++    }
++    if (tabs.size() <= 2) {
++      return std::nullopt;
++    }
++    const uw::SplitLayout::Renumbering renumbering =
++        panes.Remove(it - tabs.begin());
++    std::vector<tabs::TabInterface*> renumbered(tabs.size() - 1);
++    for (size_t i = 0; i < tabs.size(); ++i) {
++      if (renumbering.to[i]) {
++        renumbered[*renumbering.to[i]] = tabs[i];
++      }
++    }
++    tabs = std::move(renumbered);
++  }
++  for (tabs::TabInterface* tab : tabs) {
++    pending.tabs.push_back(tab->GetHandle());
++  }
++  return pending;
++}
++
++void TabStripModel::RemakeSplit(split_tabs::SplitTabId split_id,
++                                std::vector<tabs::TabInterface*> tabs,
++                                split_tabs::SplitTabVisualData visual_data,
++                                SplitTabChange::SplitTabAddReason reason) {
++  CHECK_GE(tabs.size(), 2u);
++  CHECK_EQ(visual_data.panes().pane_count(), tabs.size());
++  if (contents_data_->GetSplitTabCollection(split_id)) {
++    RemoveSplitImpl(split_id,
++                    SplitTabChange::SplitTabRemoveReason::kSplitTabUpdated);
++  }
++
++  // Line the tabs up in pane order from where the first of them is.
++  const std::optional<tab_groups::TabGroupId> group = tabs[0]->GetGroup();
++  const bool pinned = tabs[0]->IsPinned();
++  int start = GetIndexOfTab(tabs[0]);
++  for (tabs::TabInterface* tab : tabs) {
++    start = std::min(start, GetIndexOfTab(tab));
++  }
++  std::vector<int> indices;
++  for (size_t i = 0; i < tabs.size(); ++i) {
++    const int to = start + static_cast<int>(i);
++    const int from = GetIndexOfTab(tabs[i]);
++    if (from != to || tabs[i]->GetGroup() != group ||
++        tabs[i]->IsPinned() != pinned) {
++      MoveTabToIndexImpl(from, to, group, pinned, /*select_after_move=*/false);
++    }
++    indices.push_back(to);
++  }
++
++  const int pivot =
++      std::ranges::contains(indices, active_index()) ? active_index() : start;
++  AddToSplitImpl(split_id, indices, pivot, std::move(visual_data), reason);
++}
++
++void TabStripModel::RemakePendingSplits() {
++  if (remaking_splits_ || pending_splits_.empty()) {
++    return;
++  }
++  if (closing_all_) {
++    pending_splits_.clear();
++    return;
++  }
++  base::AutoReset<bool> remaking(&remaking_splits_, true);
++  std::vector<PendingSplit> pending = std::move(pending_splits_);
++  pending_splits_.clear();
++
++  for (PendingSplit& split : pending) {
++    if (contents_data_->GetSplitTabCollection(split.id)) {
++      continue;
++    }
++    std::vector<tabs::TabInterface*> tabs;
++    for (const tabs::TabHandle& handle : split.tabs) {
++      tabs.push_back(handle.Get());
++    }
++    // Drop the tabs that closed, left this window, or joined another split
++    // meanwhile; their neighbors take their space.
++    uw::SplitLayout& panes = split.visual_data.panes();
++    for (size_t i = 0; i < tabs.size() && tabs.size() >= 2;) {
++      tabs::TabInterface* tab = tabs[i];
++      if (tab && GetIndexOfTab(tab) != kNoTab && !tab->IsSplit()) {
++        ++i;
++        continue;
++      }
++      if (tabs.size() == 2) {
++        tabs.clear();
++        break;
++      }
++      const uw::SplitLayout::Renumbering renumbering = panes.Remove(i);
++      std::vector<tabs::TabInterface*> renumbered(tabs.size() - 1);
++      for (size_t j = 0; j < tabs.size(); ++j) {
++        if (renumbering.to[j]) {
++          renumbered[*renumbering.to[j]] = tabs[j];
++        }
++      }
++      tabs = std::move(renumbered);
++      i = 0;
++    }
++    if (tabs.size() < 2) {
++      continue;
++    }
++    RemakeSplit(split.id, std::move(tabs), std::move(split.visual_data),
++                SplitTabChange::SplitTabAddReason::kSplitTabUpdated);
++  }
++}
++
+ void TabStripModel::UpdateTabInSplitImpl(tabs::TabInterface* split_tab,
+                                          int update_index,
+                                          SplitUpdateType update_type) {
+@@ -4485,6 +4733,9 @@ void TabStripModel::UpdateTabInSplitImpl(tabs::TabInterface* split_tab,
+   split_tabs::SplitTabVisualData split_visual_data =
+       *GetSplitData(split_id)->visual_data();
+   const bool initial_split_active = split_tab->IsActivated();
++  // uw: the split's tabs afterwards, in pane order.
++  std::vector<tabs::TabInterface*> new_split_tabs = tabs_to_split;
++  std::ranges::replace(new_split_tabs, split_tab, GetTabAtIndex(update_index));
+ 
+   // Require that one of the tabs in the split must be active.
+   CHECK(std::any_of(tabs_to_split.begin(), tabs_to_split.end(),
+@@ -4557,16 +4808,15 @@ void TabStripModel::UpdateTabInSplitImpl(tabs::TabInterface* split_tab,
+   }
+ 
+   std::vector<int> split_indices;
+-  for (tabs::TabInterface* tab : tabs_to_split) {
++  for (tabs::TabInterface* tab : new_split_tabs) {
+     split_indices.emplace_back(GetIndexOfTab(tab));
+   }
++  std::ranges::sort(split_indices);
++  const int pivot = std::ranges::contains(split_indices, active_index())
++                        ? active_index()
++                        : split_indices[0];
+ 
+-  // Insert the active index into the sorted `indices`.
+-  auto position =
+-      lower_bound(split_indices.begin(), split_indices.end(), active_index());
+-  split_indices.insert(position, active_index());
+-
+-  AddToSplitImpl(split_id, split_indices, active_index(), split_visual_data,
++  AddToSplitImpl(split_id, split_indices, pivot, split_visual_data,
+                  SplitTabChange::SplitTabAddReason::kSplitTabUpdated);
+ 
+   split_tabs::LogSplitViewUpdatedUKM(this, split_id);
+@@ -4800,9 +5050,23 @@ std::unique_ptr<tabs::TabModel> TabStripModel::RemoveTabFromIndexImpl(
+       DetermineNewSelectedIndex(tab_to_remove);
+   const bool removed_tab_is_split = tab_to_remove->IsSplit();
+   if (removed_tab_is_split) {
+-    next_selected_index = GetIndexOfTab(
+-        GetSplitData(tab_to_remove->GetSplit().value())->ListTabs()[0]);
+-    RemoveSplitImpl(tab_to_remove->GetSplit().value(),
++    const split_tabs::SplitTabId split_id = tab_to_remove->GetSplit().value();
++    const std::vector<tabs::TabInterface*> split_tabs =
++        GetSplitData(split_id)->ListTabs();
++    next_selected_index = GetIndexOfTab(split_tabs[0]);
++    // uw: a split of more than two tabs keeps the others, and the pane that
++    // takes the closed one's space is selected next.
++    if (std::optional<PendingSplit> rest =
++            SplitWithout(split_id, {tab_to_remove})) {
++      const size_t pane =
++          std::ranges::find(split_tabs, tab_to_remove) - split_tabs.begin();
++      const int heir_index = GetIndexOfTab(
++          split_tabs[GetSplitData(split_id)->visual_data()->panes().Heir(
++              pane)]);
++      next_selected_index = heir_index > index ? heir_index - 1 : heir_index;
++      pending_splits_.push_back(std::move(*rest));
++    }
++    RemoveSplitImpl(split_id,
+                     SplitTabChange::SplitTabRemoveReason::kSplitTabRemoved);
+   }
+ 
+@@ -4899,6 +5163,13 @@ void TabStripModel::MoveTabToIndexImpl(
+     initial_split_tabs = GetTabsAndIndicesInSplit(tab->GetSplit().value());
+   }
+ 
++  // uw: a larger split's tabs keep their places in it; they follow its
++  // panes.
++  if (move_within_split &&
++      GetSplitData(tab->GetSplit().value())->ListTabs().size() > 2) {
++    return;
++  }
++
+   if (initial_index != final_index) {
+     FixOpeners(initial_index);
+   }
+@@ -4957,6 +5228,8 @@ void TabStripModel::MoveTabToIndexImpl(
+       SetFocusedGroup(std::nullopt);
+     }
+   }
++
++  RemakePendingSplits();
+ }
+ 
+ void TabStripModel::MoveTabsToIndexImpl(
+@@ -5881,6 +6154,11 @@ void TabStripModel::MaybeRemoveSplitsForMove(
+   // Remove the split of the origin tab if it is not moving within the
+   // split collection.
+   if (tab->IsSplit()) {
++    // uw: a split of more than two tabs keeps the others.
++    if (std::optional<PendingSplit> rest =
++            SplitWithout(tab->GetSplit().value(), {tab})) {
++      pending_splits_.push_back(std::move(*rest));
++    }
+     RemoveSplitImpl(tab->GetSplit().value(),
+                     SplitTabChange::SplitTabRemoveReason::kSplitTabRemoved);
+   }
+@@ -5911,6 +6189,16 @@ void TabStripModel::MaybeRemoveSplitsForUpdate(
+   for (const auto& [split, count] : num_tabs_per_split) {
+     if (count <
+         contents_data_->GetSplitTabCollection(split)->TabCountRecursive()) {
++      // uw: a split of more than two tabs keeps the ones that stay.
++      std::vector<tabs::TabInterface*> leaving;
++      for (int index : indices) {
++        if (GetSplitForTab(index) == split) {
++          leaving.push_back(GetTabAtIndex(index));
++        }
++      }
++      if (std::optional<PendingSplit> rest = SplitWithout(split, leaving)) {
++        pending_splits_.push_back(std::move(*rest));
++      }
+       NotifyInactiveSplitTabWillBecomeHidden(split);
+       RemoveSplitImpl(split,
+                       SplitTabChange::SplitTabRemoveReason::kSplitTabRemoved);
+@@ -5931,7 +6219,8 @@ void TabStripModel::CreateHistoricalSplitIfClosing(
+       }
+     }
+     for (const auto& [split_id, count] : split_closing_counts) {
+-      if (count == 2) {
++      if (count ==
++          static_cast<int>(GetSplitData(split_id)->ListTabs().size())) {
+         delegate_->CreateHistoricalSplit(split_id);
+       }
+     }
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.h b/chrome/browser/ui/tabs/tab_strip_model.h
+index eb02a95efe49df7b96d89eb395ed518293ce6bbc..7f3051f2691f94ec61cfafcd932e27ba658b217c 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.h
++++ b/chrome/browser/ui/tabs/tab_strip_model.h
+@@ -640,6 +640,24 @@ class TabStripModel {
+                         double start_content_ratio,
+                         bool is_intermediate = false);
+ 
++  // uw: sets how much of its space the first part of `cut` takes, in a split
++  // of any number of tabs. Cut 0 is the outermost, as in uw::SplitLayout.
++  void UpdateSplitCutRatio(split_tabs::SplitTabId split_id,
++                           size_t cut,
++                           double ratio,
++                           bool is_intermediate = false);
++
++  // uw: cuts the pane of the tab at `index` in two the given way and puts the
++  // tab at `new_index` in the new half, on the right or below. Starts a split
++  // when the tab at `index` is in none.
++  void SplitPane(int index,
++                 int new_index,
++                 split_tabs::SplitTabLayout direction);
++
++  // uw: takes the tab at `index` out of its split and puts it just after the
++  // split. A split left with one tab ends.
++  void MoveTabOutOfSplit(int index);
++
+   // Updates the split tab at index `split_index` with the tab at
+   // `update_index`. The split that includes `split_index` must include the
+   // active tab in the tab strip.
+@@ -1234,6 +1252,37 @@ class TabStripModel {
+                             int update_index,
+                             SplitUpdateType update_type);
+ 
++  // uw: a split to make again once the current change is done, after some of
++  // its tabs left it.
++  struct PendingSplit {
++    PendingSplit(split_tabs::SplitTabId id,
++                 split_tabs::SplitTabVisualData visual_data);
++    PendingSplit(const PendingSplit&);
++    PendingSplit& operator=(const PendingSplit&);
++    ~PendingSplit();
++
++    split_tabs::SplitTabId id;
++    split_tabs::SplitTabVisualData visual_data;
++    // In pane order.
++    std::vector<tabs::TabHandle> tabs;
++  };
++
++  // uw: `split_id` without the tabs in `leaving`, or nothing when fewer than
++  // two of its tabs stay.
++  std::optional<PendingSplit> SplitWithout(
++      split_tabs::SplitTabId split_id,
++      const std::vector<tabs::TabInterface*>& leaving);
++
++  // uw: ends `split_id` if it exists, and makes it again of `tabs` in that
++  // order, next to each other from where the first of them is in the strip.
++  void RemakeSplit(split_tabs::SplitTabId split_id,
++                   std::vector<tabs::TabInterface*> tabs,
++                   split_tabs::SplitTabVisualData visual_data,
++                   SplitTabChange::SplitTabAddReason reason);
++
++  // uw: makes `pending_splits_` again, dropping tabs that closed meanwhile.
++  void RemakePendingSplits();
++
+   // Adds tabs to newly-allocated group id `new_group`. This group must be new
+   // and have no tabs in it.
+   void AddToNewGroupImpl(
+@@ -1485,6 +1534,10 @@ class TabStripModel {
+   // True if all tabs are currently being closed via CloseAllTabs.
+   bool closing_all_ = false;
+ 
++  // uw: splits that lost tabs during the current change. See PendingSplit.
++  std::vector<PendingSplit> pending_splits_;
++  bool remaking_splits_ = false;
++
+   // This must be kept in sync with `contents_data_`.
+   tabs::TabStripModelSelectionState selection_model_;
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 8469ec0cd989d42a027a84c7be0eacfb6fd1bdbe..44db02068879fccb495b6ca4179593629fd648e2 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -2015,7 +2015,7 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+       GetWidget()->GetFocusManager()->ClearFocus();
+     }
+ 
+-    multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
++    multi_contents_view_->ClearInactiveContentsViews();
+     active_contents_view->SetWebContents(nullptr);
+   }
+ 
+@@ -2179,18 +2179,11 @@ void BrowserView::SetContentsSize(const gfx::Size& size) {
+ 
+   // If in split view, the size diff needs to be scaled by the split ratio to
+   // account for the combined width of both contents views.
++  // uw: in a split of any size, by the active pane's share each way.
+   if (multi_contents_view_->IsInSplitView()) {
+-    const double split_ratio = multi_contents_view_->GetSplitRatio();
+-    CHECK(split_ratio > 0.0 && split_ratio < 1.0);
+-    const double divider = multi_contents_view_->GetActiveIndex() == 0
+-                               ? split_ratio
+-                               : (1.0 - split_ratio);
+-    if (multi_contents_view_->GetSplitLayout() ==
+-        split_tabs::SplitTabLayout::kSideBySide) {
+-      width_diff = std::round(width_diff / divider);
+-    } else {
+-      height_diff = std::round(height_diff / divider);
+-    }
++    const gfx::Vector2dF share = multi_contents_view_->GetActiveContentsShare();
++    width_diff = std::round(width_diff / share.x());
++    height_diff = std::round(height_diff / share.y());
+   }
+ 
+   gfx::Rect bounds = GetBounds();
+@@ -4294,6 +4287,8 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
+ 
+   std::vector<tabs::TabInterface*> split_tabs = split_data->ListTabs();
+ 
++  // uw: a pane for each tab, made before the pages go in.
++  multi_contents_view_->ShowSplitView(*split_data->visual_data());
+   for (size_t i = 0; tabs::TabInterface* tab : split_tabs) {
+     multi_contents_view_->SetWebContentsAtIndex(tab->GetContents(), i++);
+   }
+@@ -4343,7 +4338,7 @@ void BrowserView::UpdateActiveTabInSplitView() {
+   // However, there are cases where inactive tab can be activated without a
+   // focus change e.g. using tab shortcuts and in these cases update focus.
+   if (GetWidget()->IsActive() &&
+-      multi_contents_view_->GetInactiveContentsView()->HasFocus()) {
++      multi_contents_view_->InactiveContentsViewHasFocus()) {
+     multi_contents_view_->GetActiveContentsView()->RequestFocus();
+   }
+ }
+@@ -4353,8 +4348,7 @@ bool BrowserView::IsTabChangeInSplitView(content::WebContents* old_contents,
+   return multi_contents_view_->IsInSplitView() &&
+          multi_contents_view_->GetActiveContentsView()->web_contents() ==
+              old_contents &&
+-         multi_contents_view_->GetInactiveContentsView()->web_contents() ==
+-             new_contents;
++         multi_contents_view_->IsInactiveContentsView(new_contents);
+ }
+ 
+ void BrowserView::UpdateTabModalDialogHost() {
+@@ -4404,14 +4398,7 @@ void BrowserView::MaybeUpdateStoredFocusForWebContents(
+ }
+ 
+ std::vector<ContentsWebView*> BrowserView::GetAllVisibleContentsWebViews() {
+-  std::vector<ContentsWebView*> contents_views;
+-  contents_views.push_back(multi_contents_view_->GetActiveContentsView());
+-  ContentsWebView* inactive_contents_view =
+-      multi_contents_view_->GetInactiveContentsView();
+-  if (multi_contents_view_->IsInSplitView()) {
+-    contents_views.push_back(inactive_contents_view);
+-  }
+-  return contents_views;
++  return multi_contents_view_->GetVisibleContentsViews();
+ }
+ 
+ void BrowserView::RevealTopContainerIfNeeded() {
+diff --git a/chrome/browser/ui/views/frame/contents_border_controller.cc b/chrome/browser/ui/views/frame/contents_border_controller.cc
+index aede147f28b832bb790264a1fc85c31fa7be807c..2aa7847661c3e6f51c1d754d733e445ee7847509 100644
+--- a/chrome/browser/ui/views/frame/contents_border_controller.cc
++++ b/chrome/browser/ui/views/frame/contents_border_controller.cc
+@@ -32,6 +32,14 @@ ContentsBorderController::ContentsBorderController(BrowserView* browser_view) {
+ 
+ ContentsBorderController::~ContentsBorderController() = default;
+ 
++void ContentsBorderController::AddContentsContainerView(
++    ContentsContainerView* contents_container_view,
++    BrowserView* browser_view) {
++  border_controllers_.push_back(
++      std::make_unique<ContentsContainerViewBorderController>(
++          contents_container_view, browser_view));
++}
++
+ ContentsBorderController::ContentsContainerViewBorderController::
+     ContentsContainerViewBorderController(
+         ContentsContainerView* contents_container_view,
+diff --git a/chrome/browser/ui/views/frame/contents_border_controller.h b/chrome/browser/ui/views/frame/contents_border_controller.h
+index 4966e74c146d79977701d40f676f634f72d4d58a..3f29b77674457d1d0f6d21cf6e39acecbe358369 100644
+--- a/chrome/browser/ui/views/frame/contents_border_controller.h
++++ b/chrome/browser/ui/views/frame/contents_border_controller.h
+@@ -32,6 +32,10 @@ class ContentsBorderController {
+   explicit ContentsBorderController(BrowserView* browser_view);
+   ~ContentsBorderController();
+ 
++  // uw: a pane added after the window opened.
++  void AddContentsContainerView(ContentsContainerView* contents_container_view,
++                                BrowserView* browser_view);
++
+   // Manages the border for a single contents container view
+   class ContentsContainerViewBorderController {
+    public:
+diff --git a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc b/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
+index 37a68df743470656997d8fc707ffa5b9055e2a1d..71703d6986d94388e690d90684f19ed2d80422b7 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
+@@ -76,8 +76,7 @@ END_METADATA
+ 
+ MultiContentsResizeArea::MultiContentsResizeArea(
+     MultiContentsView* multi_contents_view)
+-    : ResizeArea(multi_contents_view),
+-      multi_contents_view_(multi_contents_view) {
++    : ResizeArea(this), multi_contents_view_(multi_contents_view) {
+   flex_layout_manager_ =
+       SetLayoutManager(std::make_unique<views::FlexLayout>());
+   flex_layout_manager_->SetMainAxisAlignment(views::LayoutAlignment::kCenter)
+@@ -98,6 +97,10 @@ void MultiContentsResizeArea::SetLayout(split_tabs::SplitTabLayout layout) {
+   }
+ }
+ 
++void MultiContentsResizeArea::OnResize(int resize_amount, bool done_resizing) {
++  multi_contents_view_->OnCutResize(cut_, resize_amount, done_resizing);
++}
++
+ void MultiContentsResizeArea::OnGestureEvent(ui::GestureEvent* event) {
+   // If the gesture event was a double tap and was not part of a resizing event,
+   // swap the contents views.
+@@ -130,12 +133,12 @@ bool MultiContentsResizeArea::OnKeyPressed(const ui::KeyEvent& event) {
+     return false;
+   }
+ 
+-  multi_contents_view_->OnResize(resize_amount, true);
++  multi_contents_view_->OnCutResize(cut_, resize_amount, true);
+ 
+   if ((axis() == Axis::kHorizontal ? multi_contents_view_->width()
+                                    : multi_contents_view_->height()) > 0) {
+     const int start_percent =
+-        base::ClampRound(multi_contents_view_->GetSplitRatio() * 100);
++        base::ClampRound(multi_contents_view_->GetCutRatio(cut_) * 100);
+     const int end_percent = 100 - start_percent;
+ 
+     auto [start_label_id, end_label_id] = GetAccessibleAlertStringIds();
+diff --git a/chrome/browser/ui/views/frame/multi_contents_resize_area.h b/chrome/browser/ui/views/frame/multi_contents_resize_area.h
+index 460c40a7c5033c97ace6c442d347d7ebab13a82f..9a03a9d4cd1d1eef8ec4a872ba2e91e73a166ea1 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_resize_area.h
++++ b/chrome/browser/ui/views/frame/multi_contents_resize_area.h
+@@ -10,6 +10,7 @@
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/events/keycodes/keyboard_codes.h"
+ #include "ui/views/controls/resize_area.h"
++#include "ui/views/controls/resize_area_delegate.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/view.h"
+ 
+@@ -46,7 +47,8 @@ class MultiContentsResizeHandle : public views::View,
+ 
+ // ResizeArea meant to draw in between WebContents within a MultiContentsView,
+ // and responsiveness to key events via a focusable MultiContentsResizeHandle.
+-class MultiContentsResizeArea : public views::ResizeArea {
++class MultiContentsResizeArea : public views::ResizeArea,
++                                public views::ResizeAreaDelegate {
+   METADATA_HEADER(MultiContentsResizeArea, ResizeArea)
+ 
+  public:
+@@ -59,6 +61,12 @@ class MultiContentsResizeArea : public views::ResizeArea {
+ 
+   void SetLayout(split_tabs::SplitTabLayout layout);
+ 
++  // uw: the cut this area divides, as in uw::SplitLayout.
++  void set_cut(size_t cut) { cut_ = cut; }
++
++  // views::ResizeAreaDelegate:
++  void OnResize(int resize_amount, bool done_resizing) override;
++
+   // views::ResizeArea:
+   void OnGestureEvent(ui::GestureEvent* event) override;
+   void OnMouseReleased(const ui::MouseEvent& event) override;
+@@ -78,6 +86,7 @@ class MultiContentsResizeArea : public views::ResizeArea {
+   std::pair<int, int> GetAccessibleAlertStringIds();
+ 
+   raw_ptr<MultiContentsView> multi_contents_view_;
++  size_t cut_ = 0;
+   raw_ptr<MultiContentsResizeHandle> resize_handle_;
+ 
+   raw_ptr<views::FlexLayout> flex_layout_manager_;
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
+index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171eb5278ff2 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
+@@ -10,14 +10,19 @@
+ #include "base/check_deref.h"
+ #include "base/notreached.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
++#include "chrome/browser/actor/ui/actor_ui_window_controller.h"
+ #include "chrome/browser/browser_process.h"
++#include "chrome/browser/devtools/devtools_ui_controller.h"
++#include "chrome/browser/enterprise/data_protection/data_protection_ui_controller.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/read_anything/read_anything_immersive_overlay_view.h"
+ #include "chrome/browser/ui/sad_tab_helper.h"
+ #include "chrome/browser/ui/view_ids.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/contents_border_controller.h"
+ #include "chrome/browser/ui/views/frame/contents_container_view.h"
+ #include "chrome/browser/ui/views/frame/contents_separator.h"
+ #include "chrome/browser/ui/views/frame/contents_web_view.h"
+@@ -30,6 +35,7 @@
+ #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
+ #include "chrome/browser/ui/views/frame/scrim_view.h"
+ #include "chrome/browser/ui/views/frame/themed_background.h"
++#include "chrome/browser/ui/views/new_tab_footer/footer_controller.h"
+ #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/common/pref_names.h"
+@@ -83,6 +89,7 @@ MultiContentsView::MultiContentsView(
+ 
+   resize_area_ = AddChildView(std::make_unique<MultiContentsResizeArea>(this));
+   resize_area_->SetVisible(false);
++  resize_areas_.push_back(resize_area_.get());
+ 
+   contents_container_views_.push_back(
+       AddChildView(std::make_unique<ContentsContainerView>(browser_view_)));
+@@ -133,39 +140,7 @@ MultiContentsView::MultiContentsView(
+   lens_overlay_view_ = AddChildView(std::move(lens_overlay_view));
+ 
+   for (auto& contents_container_view : contents_container_views_) {
+-    auto& view_map = container_focusable_map_[contents_container_view];
+-
+-    auto* contents_view = contents_container_view->contents_view();
+-    view_map[contents_view->GetClassName()] = contents_view;
+-
+-    contents_focused_subscriptions_.push_back(
+-        contents_view->AddWebContentsFocusedCallback(base::BindRepeating(
+-            &MultiContentsView::OnWebContentsFocused, base::Unretained(this))));
+-
+-    if (auto* footer = contents_container_view->new_tab_footer_view()) {
+-      view_map[footer->GetClassName()] = footer;
+-      contents_focused_subscriptions_.push_back(
+-          footer->AddWebContentsFocusedCallback(base::BindRepeating(
+-              &MultiContentsView::OnNtpFooterFocused, base::Unretained(this))));
+-    }
+-
+-    if (auto* actor_overlay =
+-            contents_container_view->actor_overlay_web_view()) {
+-      view_map[actor_overlay->GetClassName()] = actor_overlay;
+-      contents_focused_subscriptions_.push_back(
+-          actor_overlay->AddWebContentsFocusedCallback(
+-              base::BindRepeating(&MultiContentsView::OnActorOverlayFocused,
+-                                  base::Unretained(this))));
+-    }
+-
+-    if (auto* read_anything_overlay =
+-            contents_container_view->read_anything_immersive_overlay_view()) {
+-      view_map[read_anything_overlay->GetClassName()] = read_anything_overlay;
+-      contents_focused_subscriptions_.push_back(
+-          read_anything_overlay->AddWebViewFocusedCallback(base::BindRepeating(
+-              &MultiContentsView::OnReadAnythingOverlayFocused,
+-              base::Unretained(this), contents_container_view)));
+-    }
++    ObserveContentsContainerView(contents_container_view);
+   }
+ 
+   is_drag_drop_pref_enabled_ =
+@@ -179,11 +154,193 @@ MultiContentsView::MultiContentsView(
+                           base::Unretained(this)));
+ }
+ 
++void MultiContentsView::ObserveContentsContainerView(
++    ContentsContainerView* contents_container_view) {
++  auto& view_map = container_focusable_map_[contents_container_view];
++
++  auto* contents_view = contents_container_view->contents_view();
++  view_map[contents_view->GetClassName()] = contents_view;
++
++  contents_focused_subscriptions_.push_back(
++      contents_view->AddWebContentsFocusedCallback(base::BindRepeating(
++          &MultiContentsView::OnWebContentsFocused, base::Unretained(this))));
++
++  if (auto* footer = contents_container_view->new_tab_footer_view()) {
++    view_map[footer->GetClassName()] = footer;
++    contents_focused_subscriptions_.push_back(
++        footer->AddWebContentsFocusedCallback(base::BindRepeating(
++            &MultiContentsView::OnNtpFooterFocused, base::Unretained(this))));
++  }
++
++  if (auto* actor_overlay = contents_container_view->actor_overlay_web_view()) {
++    view_map[actor_overlay->GetClassName()] = actor_overlay;
++    contents_focused_subscriptions_.push_back(
++        actor_overlay->AddWebContentsFocusedCallback(
++            base::BindRepeating(&MultiContentsView::OnActorOverlayFocused,
++                                base::Unretained(this))));
++  }
++
++  if (auto* read_anything_overlay =
++          contents_container_view->read_anything_immersive_overlay_view()) {
++    view_map[read_anything_overlay->GetClassName()] = read_anything_overlay;
++    contents_focused_subscriptions_.push_back(
++        read_anything_overlay->AddWebViewFocusedCallback(base::BindRepeating(
++            &MultiContentsView::OnReadAnythingOverlayFocused,
++            base::Unretained(this), contents_container_view)));
++  }
++}
++
++void MultiContentsView::AddContentsContainerView() {
++  ContentsContainerView* view = AddChildViewAt(
++      std::make_unique<ContentsContainerView>(browser_view_),
++      GetIndexOf(contents_container_views_.back().get()).value() + 1);
++  view->SetVisible(false);
++  contents_container_views_.push_back(view);
++  ObserveContentsContainerView(view);
++
++  // The features that attach to every pane when the window opens attach to
++  // this one too.
++  BrowserWindowInterface* browser = browser_view_->browser();
++  if (auto* devtools = DevtoolsUIController::From(browser)) {
++    devtools->AddContentsContainerView(view);
++  }
++  BrowserWindowFeatures& features = browser->GetFeatures();
++  if (auto* footer = features.new_tab_footer_controller()) {
++    footer->AddContentsContainerView(view);
++  }
++  if (auto* border = features.contents_border_controller()) {
++    border->AddContentsContainerView(view, browser_view_);
++  }
++  if (auto* actor = ActorUiWindowController::From(browser);
++      actor && view->actor_overlay_web_view()) {
++    actor->AddContentsContainer(view->contents_view(),
++                                view->actor_overlay_web_view());
++  }
++  if (auto* data_protection =
++          enterprise_data_protection::DataProtectionUIController::From(
++              browser)) {
++    data_protection->AddContentsContainerView(view);
++  }
++}
++
++void MultiContentsView::UpdateResizeAreas() {
++  const size_t cuts = IsInSplitView() ? visual_data_.panes().cut_count() : 0;
++  while (resize_areas_.size() < cuts) {
++    resize_areas_.push_back(
++        AddChildViewAt(std::make_unique<MultiContentsResizeArea>(this),
++                       GetIndexOf(resize_areas_.back().get()).value() + 1));
++  }
++  for (size_t cut = 0; cut < resize_areas_.size(); ++cut) {
++    MultiContentsResizeArea* area = resize_areas_[cut];
++    area->set_cut(cut);
++    if (cut < cuts) {
++      area->SetLayout(visual_data_.panes().direction_of(cut) ==
++                              uw::SplitDirection::kStacked
++                          ? split_tabs::SplitTabLayout::kStacked
++                          : split_tabs::SplitTabLayout::kSideBySide);
++    }
++    area->SetVisible(cut < cuts);
++  }
++}
++
++void MultiContentsView::SwapContentsContainerViews(size_t a, size_t b) {
++  if (a == b) {
++    return;
++  }
++  // Reorder the child views so that focus order will be consistent with
++  // contents_container_views_.
++  ContentsContainerView* view_a = contents_container_views_[a];
++  ContentsContainerView* view_b = contents_container_views_[b];
++  const size_t child_a = GetIndexOf(view_a).value();
++  const size_t child_b = GetIndexOf(view_b).value();
++  ReorderChildView(view_a, child_b);
++  ReorderChildView(view_b, child_a);
++  std::swap(contents_container_views_[a], contents_container_views_[b]);
++  if (active_index_ == static_cast<int>(a)) {
++    active_index_ = b;
++  } else if (active_index_ == static_cast<int>(b)) {
++    active_index_ = a;
++  }
++}
++
++bool MultiContentsView::IsInactiveContentsView(
++    const content::WebContents* web_contents) const {
++  for (size_t i = 0; i < pane_count_; ++i) {
++    if (static_cast<int>(i) != active_index_ &&
++        contents_container_views_[i]->contents_view()->web_contents() ==
++            web_contents) {
++      return true;
++    }
++  }
++  return false;
++}
++
++bool MultiContentsView::InactiveContentsViewHasFocus() const {
++  for (size_t i = 0; i < pane_count_; ++i) {
++    if (static_cast<int>(i) != active_index_ &&
++        contents_container_views_[i]->contents_view()->HasFocus()) {
++      return true;
++    }
++  }
++  return false;
++}
++
++std::vector<ContentsWebView*> MultiContentsView::GetVisibleContentsViews()
++    const {
++  std::vector<ContentsWebView*> views = {GetActiveContentsView()};
++  for (size_t i = 0; i < pane_count_; ++i) {
++    if (static_cast<int>(i) != active_index_) {
++      views.push_back(contents_container_views_[i]->contents_view());
++    }
++  }
++  return views;
++}
++
++void MultiContentsView::ClearInactiveContentsViews() {
++  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++    if (static_cast<int>(i) != active_index_) {
++      contents_container_views_[i]->contents_view()->SetWebContents(nullptr);
++    }
++  }
++}
++
++bool MultiContentsView::IsBelowAnotherPane(
++    const ContentsContainerView* container) const {
++  if (!IsInSplitView()) {
++    return false;
++  }
++  int top = container->y();
++  for (size_t i = 0; i < pane_count_; ++i) {
++    top = std::min(top, contents_container_views_[i]->y());
++  }
++  return container->y() > top;
++}
++
++gfx::Vector2dF MultiContentsView::GetActiveContentsShare() const {
++  if (!IsInSplitView() || split_area_.IsEmpty()) {
++    return gfx::Vector2dF(1, 1);
++  }
++  const gfx::Rect pane = GetActiveContentsContainerView()->bounds();
++  return gfx::Vector2dF(
++      std::clamp(static_cast<float>(pane.width()) / split_area_.width(), 0.05f,
++                 1.0f),
++      std::clamp(static_cast<float>(pane.height()) / split_area_.height(),
++                 0.05f, 1.0f));
++}
++
++std::vector<gfx::Rect> MultiContentsView::GetPaneBounds(
++    const uw::SplitLayout& panes) const {
++  gfx::Rect area = GetLocalBounds();
++  area.Inset(split_view_insets_);
++  return panes.PaneBounds(area, GetSplitGap());
++}
++
+ MultiContentsView::~MultiContentsView() {
+   // Clear the map and vectors before `RemoveAllChildViews()` to avoid having
+   // dangling pointers.
+   container_focusable_map_.clear();
+   contents_container_views_.clear();
++  resize_areas_.clear();
+   if (drop_target_controller_) {
+     drop_target_controller_.reset();
+   }
+@@ -253,21 +410,29 @@ MultiContentsView::GetFocusableViewsMapFor(
+ }
+ 
+ bool MultiContentsView::IsInSplitView() const {
+-  return resize_area_->GetVisible();
++  return pane_count_ > 1;
+ }
+ 
+ void MultiContentsView::SetWebContentsAtIndex(
+     content::WebContents* web_contents,
+     int index) {
+-  CHECK(index >= 0 && index < 2);
++  CHECK(index >= 0 &&
++        index < static_cast<int>(contents_container_views_.size()));
+   contents_container_views_[index]->contents_view()->SetWebContents(
+       web_contents);
+ 
+-  if (index == 1 && !contents_container_views_[1]->GetVisible()) {
++  // Setting the second pane of a single page makes a pair.
++  if (index == 1 && !IsInSplitView()) {
++    if (visual_data_.panes().pane_count() != 2) {
++      visual_data_ = split_tabs::SplitTabVisualData(visual_data_.split_layout(),
++                                                    visual_data_.split_ratio());
++    }
++    pane_count_ = 2;
+     contents_container_views_[1]->SetVisible(true);
+-    resize_area_->SetVisible(true);
++    UpdateResizeAreas();
+     UpdateContentsBorderAndOverlay();
+   }
++  CHECK_LT(index, static_cast<int>(pane_count_));
+ 
+   if (web_contents) {
+     if (auto* sad_tab_helper = SadTabHelper::FromWebContents(web_contents)) {
+@@ -278,18 +443,26 @@ void MultiContentsView::SetWebContentsAtIndex(
+ 
+ void MultiContentsView::ShowSplitView(
+     split_tabs::SplitTabVisualData visual_data) {
+-  if (!contents_container_views_[1]->GetVisible()) {
+-    // If split view is not visible, set the `visual_data_` and update the view
+-    // visibility.
+-    visual_data_ = visual_data;
+-    contents_container_views_[1]->SetVisible(true);
+-    resize_area_->SetVisible(true);
+-    resize_area_->SetLayout(visual_data.split_layout());
+-    UpdateContentsBorderAndOverlay();
+-  } else {
+-    // If the split view is visible, update the split visual data.
+-    UpdateSplitVisualData(visual_data);
++  const size_t panes = visual_data.panes().pane_count();
++  while (contents_container_views_.size() < panes) {
++    AddContentsContainerView();
++  }
++  // The active page stays shown while panes come and go.
++  if (active_index_ >= static_cast<int>(panes)) {
++    SwapContentsContainerViews(0, active_index_);
++  }
++  visual_data_ = std::move(visual_data);
++  pane_count_ = panes;
++  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++    ContentsContainerView* view = contents_container_views_[i];
++    if (i >= panes && view->GetVisible()) {
++      view->contents_view()->SetWebContents(nullptr);
++    }
++    view->SetVisible(i < panes);
+   }
++  UpdateResizeAreas();
++  UpdateContentsBorderAndOverlay();
++  InvalidateLayout();
+ }
+ 
+ void MultiContentsView::CloseSplitView() {
+@@ -298,11 +471,14 @@ void MultiContentsView::CloseSplitView() {
+   }
+ 
+   if (active_index_ != 0) {
+-    SwapContentsInSplitView();
++    SwapContentsContainerViews(0, active_index_);
+   }
+-  contents_container_views_[1]->contents_view()->SetWebContents(nullptr);
+-  contents_container_views_[1]->SetVisible(false);
+-  resize_area_->SetVisible(false);
++  for (size_t i = 1; i < contents_container_views_.size(); ++i) {
++    contents_container_views_[i]->contents_view()->SetWebContents(nullptr);
++    contents_container_views_[i]->SetVisible(false);
++  }
++  pane_count_ = 1;
++  UpdateResizeAreas();
+   UpdateContentsBorderAndOverlay();
+ 
+   if (auto* active_contents = GetActiveContentsView()->web_contents()) {
+@@ -313,29 +489,22 @@ void MultiContentsView::CloseSplitView() {
+ }
+ 
+ void MultiContentsView::SwapContentsInSplitView() {
+-  // Reorder the child views so that focus order will be consistent with
+-  // contents_container_views_.
+-  ContentsContainerView* start_view = contents_container_views_[0];
+-  ContentsContainerView* end_view = contents_container_views_[1];
+-  size_t start_view_child_index = GetIndexOf(start_view).value();
+-  size_t end_view_child_index = GetIndexOf(end_view).value();
+-  ReorderChildView(start_view, end_view_child_index);
+-  ReorderChildView(end_view, start_view_child_index);
+-
+-  std::swap(contents_container_views_[0], contents_container_views_[1]);
+-
+-  active_index_ = active_index_ == 0 ? 1 : 0;
++  SwapContentsContainerViews(0, 1);
+ }
+ 
+ void MultiContentsView::SetActiveIndex(int index) {
+-  // Index should never be less than 0 or equal to or greater than the total
+-  // number of contents views.
+-  CHECK(index >= 0 && index < 2);
++  // Index should never be less than 0 or equal to or greater than the number
++  // of panes in use.
++  CHECK(index >= 0 && index < static_cast<int>(pane_count_));
+   // We will only activate a visible contents view.
+   CHECK(contents_container_views_[index]->GetVisible());
+   active_index_ = index;
+-  GetActiveContentsView()->set_is_primary_web_contents_for_window(true);
+-  GetInactiveContentsView()->set_is_primary_web_contents_for_window(false);
++  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++    contents_container_views_[i]
++        ->contents_view()
++        ->set_is_primary_web_contents_for_window(static_cast<int>(i) ==
++                                                 active_index_);
++  }
+   UpdateContentsBorderAndOverlay();
+ }
+ 
+@@ -344,9 +513,14 @@ void MultiContentsView::UpdateSplitVisualData(
+   if (visual_data_ == visual_data) {
+     return;
+   }
++  if (IsInSplitView() &&
++      visual_data.panes().pane_count() != visual_data_.panes().pane_count()) {
++    ShowSplitView(visual_data);
++    return;
++  }
+ 
+   visual_data_ = visual_data;
+-  resize_area_->SetLayout(visual_data.split_layout());
++  UpdateResizeAreas();
+   InvalidateLayout();
+ }
+ 
+@@ -401,25 +575,52 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
+ }
+ 
+ void MultiContentsView::OnResize(int resize_amount, bool done_resizing) {
++  OnCutResize(0, resize_amount, done_resizing);
++}
++
++void MultiContentsView::OnCutResize(size_t cut,
++                                    int resize_amount,
++                                    bool done_resizing) {
++  const int gap = GetSplitGap();
++  const std::vector<uw::SplitLayout::Divider> dividers =
++      visual_data_.panes().Dividers(split_area_, gap,
++                                    GetMinPaneSize(split_area_));
++  if (cut >= dividers.size()) {
++    return;
++  }
++  const uw::SplitLayout::Divider& divider = dividers[cut];
++  const bool side_by_side =
++      divider.direction == uw::SplitDirection::kSideBySide;
+   if (!initial_start_size_on_resize_.has_value()) {
+-    initial_start_size_on_resize_ = std::make_optional(
+-        GetResizeAxisComponent(contents_container_views_[0]->size()));
++    initial_start_size_on_resize_ = side_by_side
++                                        ? divider.bounds.x() - divider.span.x()
++                                        : divider.bounds.y() - divider.span.y();
++  }
++  const double total_size =
++      (side_by_side ? divider.span.width() : divider.span.height()) - gap;
++  if (total_size <= 0) {
++    return;
+   }
+-  double total_size =
+-      GetResizeAxisComponent(contents_container_views_[0]->size()) +
+-      GetResizeAxisComponent(contents_container_views_[1]->size());
+-  double new_start_size = initial_start_size_on_resize_.value() + resize_amount;
++  const double new_start_size = std::clamp<double>(
++      initial_start_size_on_resize_.value() + resize_amount, 1, total_size - 1);
+ 
+   // If new_start_size is within the snap point sizes, update to the snap
+   // point.
+-  delegate_->ResizeWebContents(
+-      CalculateRatioWithSnapPoints(new_start_size, total_size), done_resizing);
++  delegate_->ResizeCut(cut,
++                       CalculateRatioWithSnapPoints(new_start_size, total_size),
++                       done_resizing);
+ 
+   if (done_resizing) {
+     initial_start_size_on_resize_ = std::nullopt;
+   }
+ }
+ 
++double MultiContentsView::GetCutRatio(size_t cut) const {
++  return cut < visual_data_.panes().cut_count()
++             ? visual_data_.panes().ratio_of(cut)
++             : 0.5;
++}
++
+ double MultiContentsView::CalculateRatioWithSnapPoints(
+     double start_size,
+     double total_size) const {
+@@ -445,7 +646,7 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
+   if (IsInSplitView()) {
+     // Check whether the widget is visible as otherwise during browser hide,
+     // inactive web contents gets focus. See crbug.com/419335827
+-    if (GetInactiveContentsView()->web_contents() == web_view->web_contents() &&
++    if (IsInactiveContentsView(web_view->web_contents()) &&
+         GetWidget()->IsVisible()) {
+       delegate_->WebContentsFocused(web_view->web_contents());
+     }
+@@ -455,12 +656,12 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
+ void MultiContentsView::OnActorOverlayFocused(views::WebView* web_view) {
+   if (IsInSplitView() && GetWidget()->IsVisible()) {
+     for (auto& contents_container_view : contents_container_views_) {
++      content::WebContents* contents =
++          contents_container_view->contents_view()->web_contents();
+       if (contents_container_view->actor_overlay_web_view() &&
+           contents_container_view->actor_overlay_web_view() == web_view &&
+-          GetInactiveContentsView() ==
+-              contents_container_view->contents_view()) {
+-        return delegate_->WebContentsFocused(
+-            GetInactiveContentsView()->web_contents());
++          IsInactiveContentsView(contents)) {
++        return delegate_->WebContentsFocused(contents);
+       }
+     }
+   }
+@@ -469,12 +670,12 @@ void MultiContentsView::OnActorOverlayFocused(views::WebView* web_view) {
+ void MultiContentsView::OnNtpFooterFocused(views::WebView* web_view) {
+   if (IsInSplitView() && GetWidget()->IsVisible()) {
+     for (auto& contents_container_view : contents_container_views_) {
++      content::WebContents* contents =
++          contents_container_view->contents_view()->web_contents();
+       if (contents_container_view->new_tab_footer_view() &&
+           contents_container_view->new_tab_footer_view() == web_view &&
+-          GetInactiveContentsView() ==
+-              contents_container_view->contents_view()) {
+-        return delegate_->WebContentsFocused(
+-            GetInactiveContentsView()->web_contents());
++          IsInactiveContentsView(contents)) {
++        return delegate_->WebContentsFocused(contents);
+       }
+     }
+   }
+@@ -484,8 +685,9 @@ void MultiContentsView::OnReadAnythingOverlayFocused(
+     ContentsContainerView* container,
+     views::WebView* web_view) {
+   if (IsInSplitView() && GetWidget()->IsVisible()) {
+-    if (GetInactiveContentsContainerView() == container) {
+-      delegate_->WebContentsFocused(container->contents_view()->web_contents());
++    content::WebContents* contents = container->contents_view()->web_contents();
++    if (IsInactiveContentsView(contents)) {
++      delegate_->WebContentsFocused(contents);
+     }
+   }
+ }
+@@ -516,36 +718,33 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+   available_space =
+       CalculateSeparatorLayouts(available_space, layouts.child_layouts);
+ 
++  // uw: a pane for each tab of the split and a divider for each cut, as the
++  // split's panes place them.
++  std::vector<gfx::Rect> pane_bounds = {available_space};
++  std::vector<uw::SplitLayout::Divider> dividers;
+   if (IsInSplitView()) {
+     available_space.Inset(split_view_insets_);
++    const gfx::Size min_size = GetMinPaneSize(available_space);
++    pane_bounds = visual_data_.panes().PaneBounds(available_space,
++                                                  GetSplitGap(), min_size);
++    dividers =
++        visual_data_.panes().Dividers(available_space, GetSplitGap(), min_size);
++    split_area_ = available_space;
++  }
++
++  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++    const bool in_use = i < pane_count_ && i < pane_bounds.size();
++    layouts.child_layouts.emplace_back(
++        contents_container_views_[i].get(),
++        in_use && contents_container_views_[i]->GetVisible(),
++        in_use ? pane_bounds[i] : gfx::Rect());
++  }
++  for (size_t cut = 0; cut < resize_areas_.size(); ++cut) {
++    const bool in_use = cut < dividers.size();
++    layouts.child_layouts.emplace_back(
++        resize_areas_[cut].get(), in_use && resize_areas_[cut]->GetVisible(),
++        in_use ? dividers[cut].bounds : gfx::Rect());
+   }
+-  ViewSizes sizes = GetViewSizes(available_space);
+-
+-  gfx::Rect start_rect, resize_rect, end_rect;
+-  if (GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide) {
+-    start_rect = gfx::Rect(available_space.origin(),
+-                           gfx::Size(sizes.start, available_space.height()));
+-    resize_rect = gfx::Rect(start_rect.top_right(),
+-                            gfx::Size(sizes.resize, available_space.height()));
+-    end_rect = gfx::Rect(resize_rect.top_right(),
+-                         gfx::Size(sizes.end, available_space.height()));
+-  } else {
+-    start_rect = gfx::Rect(available_space.origin(),
+-                           gfx::Size(available_space.width(), sizes.start));
+-    resize_rect = gfx::Rect(start_rect.bottom_left(),
+-                            gfx::Size(available_space.width(), sizes.resize));
+-    end_rect = gfx::Rect(resize_rect.bottom_left(),
+-                         gfx::Size(available_space.width(), sizes.end));
+-  }
+-
+-  layouts.child_layouts.emplace_back(contents_container_views_[0].get(),
+-                                     contents_container_views_[0]->GetVisible(),
+-                                     start_rect);
+-  layouts.child_layouts.emplace_back(resize_area_.get(),
+-                                     resize_area_->GetVisible(), resize_rect);
+-  layouts.child_layouts.emplace_back(contents_container_views_[1].get(),
+-                                     contents_container_views_[1]->GetVisible(),
+-                                     end_rect);
+   layouts.child_layouts.emplace_back(lens_overlay_view_.get(),
+                                      lens_overlay_view_->GetVisible(),
+                                      gfx::Rect(width, height));
+@@ -586,33 +785,27 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+ 
+   const auto& default_clip = target_content_bounds_->clipped_area;
+ 
+-  // Due to the way web contents resize, and the fact that both split views will
+-  // grow or shrink as the animation progresses, always clip from the trailing
+-  // edge for both split webviews. This reduces jumping/popping for very slow
+-  // websites.
+-
+-  gfx::Outsets first_outsets = gfx::Outsets::TLBR(
+-      default_clip.top(), 0, default_clip.bottom(), default_clip.left());
+-  auto* const first = contents_container_views_[0].get();
+-  auto* const first_current = layout.GetLayoutFor(first);
+-  auto* const first_target = target_layout.GetLayoutFor(first);
+-  if (first_current && first_target) {
+-    first_outsets.set_right(std::max(
+-        0, first_target->bounds.width() - first_current->bounds.width()));
+-  }
+-
+-  gfx::Outsets second_outsets = gfx::Outsets::TLBR(
+-      default_clip.top(), 0, default_clip.bottom(), default_clip.right());
+-  auto* const second = contents_container_views_[1].get();
+-  auto* const second_current = layout.GetLayoutFor(second);
+-  auto* const second_target = target_layout.GetLayoutFor(second);
+-  if (second_current && second_target) {
+-    second_outsets.set_right(std::max(
+-        0, second_target->bounds.width() - second_current->bounds.width()));
++  // Due to the way web contents resize, and the fact that every split view
++  // will grow or shrink as the animation progresses, always clip from the
++  // trailing edge for every split webview. This reduces jumping/popping for
++  // very slow websites.
++  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
++    auto* const pane = contents_container_views_[i].get();
++    if (i >= pane_count_) {
++      pane->SetTargetContentBounds(std::nullopt);
++      continue;
++    }
++    gfx::Outsets outsets =
++        gfx::Outsets::TLBR(default_clip.top(), 0, default_clip.bottom(),
++                           i == 0 ? default_clip.left() : default_clip.right());
++    auto* const current = layout.GetLayoutFor(pane);
++    auto* const target = target_layout.GetLayoutFor(pane);
++    if (current && target) {
++      outsets.set_right(
++          std::max(0, target->bounds.width() - current->bounds.width()));
++    }
++    pane->SetTargetContentBounds(outsets);
+   }
+-
+-  first->SetTargetContentBounds(first_outsets);
+-  second->SetTargetContentBounds(second_outsets);
+ }
+ 
+ gfx::Rect MultiContentsView::CalculateDropTargetLayout(
+@@ -727,67 +920,23 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
+                    height - separator_height);
+ }
+ 
+-MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+-    gfx::Rect available_space) const {
+-  const int available_size =
+-      GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide
+-          ? available_space.width()
+-          : available_space.height();
+-  ViewSizes sizes;
+-  if (IsInSplitView()) {
+-    CHECK(contents_container_views_[0]->GetVisible() &&
+-          contents_container_views_[1]->GetVisible());
+-    sizes.resize = GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide
+-                       ? resize_area_->GetPreferredSize().width()
+-                       : resize_area_->GetPreferredSize().height();
+-    sizes.start = std::round(visual_data_.split_ratio() *
+-                             (available_size - sizes.resize));
+-    sizes.end = available_size - sizes.start - sizes.resize;
+-  } else {
+-    CHECK(!contents_container_views_[1]->GetVisible());
+-    sizes.start = available_size;
+-  }
+-  return ClampToMinSize(available_space, sizes);
+-}
+-
+-MultiContentsView::ViewSizes MultiContentsView::ClampToMinSize(
+-    gfx::Rect available_space,
+-    ViewSizes sizes) const {
+-  if (!IsInSplitView()) {
+-    // Don't clamp if in a single-view state, where other views should be 0
+-    // width.
+-    return sizes;
+-  }
+-
+-  const int min_size = GetMinViewSize(available_space);
+-  if (sizes.start < min_size) {
+-    const int diff = min_size - sizes.start;
+-    sizes.start += diff;
+-    sizes.end -= diff;
+-  } else if (sizes.end < min_size) {
+-    const int diff = min_size - sizes.end;
+-    sizes.end += diff;
+-    sizes.start -= diff;
+-  }
+-  return sizes;
+-}
+-
+-int MultiContentsView::GetMinViewSize(gfx::Rect available_space) const {
+-  CHECK(IsInSplitView());
+-
+-  // The minimum size (in the resize axis) for a content view in a split should
+-  // be the lesser of kMinWebContentsSize, and kMinWebContentsSizePercentage as
+-  // a percentage of the MultiContentsView's available size with a lower bound
+-  // of kConstrainedMinWebContentsSize.
+-  const int min_percentage =
+-      kMinWebContentsSizePercentage *
+-      (visual_data_.split_layout() == split_tabs::SplitTabLayout::kSideBySide
+-           ? available_space.width()
+-           : available_space.height());
++gfx::Size MultiContentsView::GetMinPaneSize(
++    const gfx::Rect& available_space) const {
+   const int min_fixed_value =
+       min_contents_size_for_testing_.value_or(kMinWebContentsSize);
+-  return std::min(min_fixed_value,
+-                  std::max(kConstrainedMinWebContentsSize, min_percentage));
++  auto least = [min_fixed_value](int extent) {
++    return std::min(
++        min_fixed_value,
++        std::max(kConstrainedMinWebContentsSize,
++                 static_cast<int>(kMinWebContentsSizePercentage * extent)));
++  };
++  return gfx::Size(least(available_space.width()),
++                   least(available_space.height()));
++}
++
++int MultiContentsView::GetSplitGap() const {
++  return MultiContentsResizeArea::kHandleResizeAxisSize +
++         MultiContentsResizeArea::kHandleResizeAxisPadding;
+ }
+ 
+ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+@@ -858,12 +1007,5 @@ void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
+   InvalidateLayout(/*avoid_propagate_during_layout=*/true);
+ }
+ 
+-int MultiContentsView::GetResizeAxisComponent(const gfx::Size& size) const {
+-  return (visual_data_.split_layout() ==
+-          split_tabs::SplitTabLayout::kSideBySide)
+-             ? size.width()
+-             : size.height();
+-}
+-
+ BEGIN_METADATA(MultiContentsView)
+ END_METADATA
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
+index 6ecb49a239f704f61442eee7d14a0454553aea4f..f2dc08146f437fb58ee79171d916588bd45153f7 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view.h
+@@ -19,7 +19,9 @@
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/gfx/geometry/rect.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/gfx/geometry/vector2d_f.h"
+ #include "ui/views/controls/resize_area_delegate.h"
+ #include "ui/views/layout/proposed_layout.h"
+ #include "ui/views/view.h"
+@@ -47,7 +49,9 @@ class WebView;
+ }  // namespace views
+ 
+ // MultiContentsView shows up to two contents web views side by side, and
+-// manages their layout relative to each other.
++// manages their layout relative to each other. uw: it shows a pane for each
++// tab of a split of any size, laid out by the split's uw::SplitLayout, and
++// adds panes as a split needs them.
+ class MultiContentsView
+     : public views::View,
+       public views::ResizeAreaDelegate,
+@@ -58,12 +62,6 @@ class MultiContentsView
+  public:
+   using FocusableViewMap = base::flat_map<std::string, views::View*>;
+ 
+-  struct ViewSizes {
+-    int start = 0;
+-    int resize = 0;
+-    int end = 0;
+-  };
+-
+   static constexpr int kSplitViewContentInset = 8;
+   static constexpr float kSplitViewContentCornerRadius = 6;
+   static constexpr gfx::RoundedCornersF kSplitViewContentRoundedCorners{
+@@ -96,6 +94,26 @@ class MultiContentsView
+   // Returns true if more than one WebContents is displayed.
+   bool IsInSplitView() const;
+ 
++  // uw: whether `web_contents` shows in a pane other than the active one.
++  bool IsInactiveContentsView(const content::WebContents* web_contents) const;
++  // uw: whether a pane other than the active one has focus.
++  bool InactiveContentsViewHasFocus() const;
++  // uw: every pane's contents view in use, the active one first.
++  std::vector<ContentsWebView*> GetVisibleContentsViews() const;
++  // uw: shows no page in any pane but the active one.
++  void ClearInactiveContentsViews();
++  // uw: whether another pane sits above `container`.
++  bool IsBelowAnotherPane(const ContentsContainerView* container) const;
++  // uw: how much of the page area's width and height the active pane takes.
++  gfx::Vector2dF GetActiveContentsShare() const;
++  // uw: where `panes` would put each pane in this view at its size now.
++  std::vector<gfx::Rect> GetPaneBounds(const uw::SplitLayout& panes) const;
++
++  // uw: a divider was dragged by `resize_amount`. `cut` is as in
++  // uw::SplitLayout.
++  void OnCutResize(size_t cut, int resize_amount, bool done_resizing);
++  double GetCutRatio(size_t cut) const;
++
+   // Show the split view without set any WebContents and update the size and
+   // layout of contents views based on `visual_data`, this is used to prepare
+   // the layout and prevent a re-layout of WebContents.
+@@ -262,30 +280,32 @@ class MultiContentsView
+ 
+   int GetInactiveIndex() const;
+ 
++  // uw: adds a hidden pane after the last one, and has the features that
++  // attach to every pane attach to it.
++  void AddContentsContainerView();
++  void ObserveContentsContainerView(ContentsContainerView* view);
++  // uw: shows a divider for each cut of the split, along its cut.
++  void UpdateResizeAreas();
++  // uw: swaps two panes' places, so focus order follows them.
++  void SwapContentsContainerViews(size_t a, size_t b);
++  // uw: the least size a pane can be in `available_space`: the lesser of
++  // kMinWebContentsSize and kMinWebContentsSizePercentage of the space each
++  // way, which leaves particularly narrow windows some room.
++  gfx::Size GetMinPaneSize(const gfx::Rect& available_space) const;
++  int GetSplitGap() const;
++
+   void OnWebContentsFocused(views::WebView*);
+   void OnNtpFooterFocused(views::WebView*);
+   void OnActorOverlayFocused(views::WebView*);
+   void OnReadAnythingOverlayFocused(ContentsContainerView* container,
+                                     views::WebView* web_view);
+ 
+-  ViewSizes GetViewSizes(gfx::Rect available_space) const;
+-
+-  // Clamps to the minimum of kMinWebContentsSize or
+-  // kMinWebContentsSizePercentage multiplied by the available width. This
+-  // allows for some flexibility when it comes to particularly narrow windows.
+-  ViewSizes ClampToMinSize(gfx::Rect available_space, ViewSizes sizes) const;
+-
+-  // Returns the minimum size along the resize axis for a single view within the
+-  // `MultiContentsView`. Returns 0 if not in a split view.
+-  int GetMinViewSize(gfx::Rect available_space) const;
+ 
+   void UpdateContentsBorderAndOverlay();
+ 
+   double CalculateRatioWithSnapPoints(double start_size,
+                                       double total_size) const;
+ 
+-  // Helper function that gets the component of |size| along the resize axis.
+-  int GetResizeAxisComponent(const gfx::Size& size) const;
+ 
+   raw_ptr<BrowserView> browser_view_;
+   std::unique_ptr<MultiContentsViewDelegate> delegate_;
+@@ -309,6 +329,17 @@ class MultiContentsView
+   // each other.
+   raw_ptr<MultiContentsResizeArea> resize_area_ = nullptr;
+ 
++  // uw: a resize area for each cut of a split, `resize_area_` first.
++  std::vector<raw_ptr<MultiContentsResizeArea, DanglingUntriaged>>
++      resize_areas_;
++
++  // uw: how many of `contents_container_views_` the split uses.
++  size_t pane_count_ = 1;
++
++  // uw: where the last layout put the panes, which a divider drag measures
++  // against.
++  mutable gfx::Rect split_area_;
++
+   // The views that are shown for entering split view. E.g., this is shown when
+   // the user drags a link to the edge of the contents view.
+   raw_ptr<MultiContentsDropTargetView> drop_target_view_ = nullptr;
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
+index b1024f94e9934909db7e44972b6482085b490cd9..962a36c59bb218d9169bbcd3635f2eb4ffe8db16 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
+@@ -22,6 +22,14 @@
+ #include "ui/base/dragdrop/os_exchange_data.h"
+ #include "url/url_constants.h"
+ 
++void MultiContentsViewDelegate::ResizeCut(size_t cut,
++                                          double ratio,
++                                          bool done_resizing) {
++  if (cut == 0) {
++    ResizeWebContents(ratio, done_resizing);
++  }
++}
++
+ MultiContentsViewDelegateImpl::MultiContentsViewDelegateImpl(
+     BrowserWindowInterface& browser)
+     : browser_(browser), tab_strip_model_(*browser.GetTabStripModel()) {}
+@@ -60,12 +68,18 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
+ 
+ void MultiContentsViewDelegateImpl::ResizeWebContents(double start_ratio,
+                                                       bool done_resizing) {
++  ResizeCut(0, start_ratio, done_resizing);
++}
++
++void MultiContentsViewDelegateImpl::ResizeCut(size_t cut,
++                                              double start_ratio,
++                                              bool done_resizing) {
+   const std::optional<split_tabs::SplitTabId> split_tab_id =
+       tab_strip_model_->GetActiveTab()->GetSplit();
+ 
+   CHECK(split_tab_id.has_value());
+-  tab_strip_model_->UpdateSplitRatio(split_tab_id.value(), start_ratio,
+-                                     !done_resizing);
++  tab_strip_model_->UpdateSplitCutRatio(split_tab_id.value(), cut, start_ratio,
++                                        !done_resizing);
+ 
+   if (done_resizing) {
+     const split_tabs::SplitTabId split_id =
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.h b/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
+index e182430481fed7ac4c17b0fd11b57c3d511a80b9..595ee1ad5b090beb6220ab950edc0e9fea0f00ca 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.h
+@@ -21,6 +21,9 @@ class MultiContentsViewDelegate
+ 
+   virtual void WebContentsFocused(content::WebContents* contents) = 0;
+   virtual void ResizeWebContents(double ratio, bool done_resizing) = 0;
++  // uw: resizes one cut of a split of any size, as in uw::SplitLayout. The
++  // outermost cut is `ResizeWebContents`.
++  virtual void ResizeCut(size_t cut, double ratio, bool done_resizing);
+   virtual void ReverseWebContents() = 0;
+ };
+ 
+@@ -41,6 +44,7 @@ class MultiContentsViewDelegateImpl : public MultiContentsViewDelegate {
+   // Updates the split sizing ratio.
+   // Must already be in a split.
+   void ResizeWebContents(double ratio, bool done_resizing) override;
++  void ResizeCut(size_t cut, double ratio, bool done_resizing) override;
+ 
+   // Reverses the order of split tabs.
+   // Must already be in a split.
+diff --git a/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc b/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc
+index 7ad0e2b5aa68192110b721666509c2bc97d285da..a1f5eceb84b191cc584749aaf19e41ed435117da 100644
+--- a/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc
++++ b/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc
+@@ -161,10 +161,7 @@ void TabModalDialogHost::NotifyPositionRequiresUpdate() {
+ }
+ 
+ bool TabModalDialogHost::IsBottomTabInSplit() {
+-  auto* multi_contents_view = browser_view_->multi_contents_view();
+-  return multi_contents_view->IsInSplitView() &&
+-         multi_contents_view->GetSplitLayout() ==
+-             split_tabs::SplitTabLayout::kStacked &&
+-         contents_container_view_ ==
+-             multi_contents_view->contents_container_views().back();
++  // uw: any pane with another above it, in a split of any size.
++  return browser_view_->multi_contents_view()->IsBelowAnotherPane(
++      contents_container_view_);
+ }
+diff --git a/chrome/browser/ui/views/new_tab_footer/footer_controller.cc b/chrome/browser/ui/views/new_tab_footer/footer_controller.cc
+index d75e15297e6f7b8b2a41b3860c089f8f10cf5570..4c38350691bb5b3bd71bb22eae53cc75ce2d33a6 100644
+--- a/chrome/browser/ui/views/new_tab_footer/footer_controller.cc
++++ b/chrome/browser/ui/views/new_tab_footer/footer_controller.cc
+@@ -68,6 +68,12 @@ NewTabFooterController::NewTabFooterController(
+ 
+ NewTabFooterController::~NewTabFooterController() = default;
+ 
++void NewTabFooterController::AddContentsContainerView(
++    ContentsContainerView* contents_container_view) {
++  footer_controllers_.push_back(std::make_unique<ContentsViewFooterCotroller>(
++      this, contents_container_view));
++}
++
+ void NewTabFooterController::TearDown() {
+   pref_change_registrar_.Reset();
+   local_state_pref_change_registrar_.Reset();
+diff --git a/chrome/browser/ui/views/new_tab_footer/footer_controller.h b/chrome/browser/ui/views/new_tab_footer/footer_controller.h
+index 64959c2fe809d03149b49d15e87a7507da7f4635..3fcedd2b5ea1f96cabdda03d12305bb4840f096d 100644
+--- a/chrome/browser/ui/views/new_tab_footer/footer_controller.h
++++ b/chrome/browser/ui/views/new_tab_footer/footer_controller.h
+@@ -44,6 +44,9 @@ class NewTabFooterController {
+ 
+   void TearDown();
+ 
++  // uw: a pane added after the window opened.
++  void AddContentsContainerView(ContentsContainerView* contents_container_view);
++
+   bool GetFooterVisible(content::WebContents* contents) const;
+ 
+   void AddObserver(NewTabFooterControllerObserver* observer);
+diff --git a/chrome/browser/ui/views/tabs/common/BUILD.gn b/chrome/browser/ui/views/tabs/common/BUILD.gn
+index f3b526cc11c8dd433fc17a65c59f0ef65fd120dd..c78d90519c33a56d838c7b622824febd720ef668 100644
+--- a/chrome/browser/ui/views/tabs/common/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/common/BUILD.gn
+@@ -80,6 +80,7 @@ source_set("impl") {
+     "//uw/browser/tab_organization",
+     "//uw/browser/pins",
+     "//uw/browser/ui/views/pins",
++    "//uw/browser/ui/views/split_view",
+     "//uw/browser/ui/views/tab_organization",
+     "//uw/browser/ui/views/workspaces",
+     "//chrome/browser:primitives",
+diff --git a/chrome/browser/ui/views/tabs/common/split_tab_view.cc b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+index 4b3a2f667cfc6c6e763e05ce43dcaba5c871cbb5..fd1f3cf408cf40eaf5b5c03d5fccffe30057beb3 100644
+--- a/chrome/browser/ui/views/tabs/common/split_tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/split_tab_view.cc
+@@ -174,27 +174,25 @@ std::optional<BrowserRootView::DropIndex> SplitTabView::GetLinkDropIndex(
+     return std::nullopt;
+   }
+ 
+-  CHECK_EQ(collection_node_->children().size(), 2ul);
++  CHECK_GE(collection_node_->children().size(), 2ul);
+ 
+-  const auto& start_node = collection_node_->children()[0];
+-  gfx::Point start_loc = views::View::ConvertPointToTarget(
+-      start_node->view(), this,
+-      start_node->view()->GetLocalBounds().CenterPoint());
+-  const auto& end_node = collection_node_->children()[1];
+-  gfx::Point end_loc = views::View::ConvertPointToTarget(
+-      end_node->view(), this, end_node->view()->GetLocalBounds().CenterPoint());
++  // Links can't be dropped between tabs in a split view so just determine the
++  // closest tab to the drop point. uw: of a split of any size.
++  const TabCollectionNode* closest = nullptr;
++  int64_t closest_distance = 0;
++  for (const auto& node : collection_node_->children()) {
++    const gfx::Point center = views::View::ConvertPointToTarget(
++        node->view(), this, node->view()->GetLocalBounds().CenterPoint());
++    const int64_t distance = (center - loc_in_view).LengthSquared();
++    if (!closest || distance < closest_distance) {
++      closest = &*node;
++      closest_distance = distance;
++    }
++  }
+ 
+   TabDragHandler& drag_handler =
+       collection_node_->GetController()->GetDragHandler();
+-
+-  // Links can't be dropped between tabs in a split view so just determine the
+-  // closest tab to the drop point.
+-  if ((start_loc - loc_in_view).LengthSquared() <
+-      (end_loc - loc_in_view).LengthSquared()) {
+-    return drag_handler.GetLinkDropIndexForNode(*start_node, std::nullopt);
+-  } else {
+-    return drag_handler.GetLinkDropIndexForNode(*end_node, std::nullopt);
+-  }
++  return drag_handler.GetLinkDropIndexForNode(*closest, std::nullopt);
+ }
+ 
+ double SplitTabView::GetHoverAnimationValue() const {
+@@ -321,7 +319,8 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+   const std::vector<views::View*> children =
+       collection_node_ ? collection_node_->GetDirectChildren()
+                        : std::vector<views::View*>();
+-  if (children.size() != 2) {
++  // uw: a split of any size stacks.
++  if (children.size() < 2) {
+     layouts.host_size = gfx::Size(0, 0);
+     return layouts;
+   }
+@@ -343,23 +342,25 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+                 GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) *
+                 children.size())))) {
+     int x = 0;
++    // uw: a split of any size shares the row evenly.
++    const int count = static_cast<int>(children.size());
+     for (auto* child : children) {
+-      bool is_first_child = x == 0;
++      const bool is_last_child = child == children.back();
+       gfx::Rect bounds = gfx::Rect(child->GetPreferredSize());
+       bounds.set_x(x);
+       // Fill available width if bounded.
+       if (size_bounds.width().is_bounded()) {
+-        // Split available space between the two children. Once this calculation
+-        // is done for the first child, the second fills the remaining space.
+-        bounds.set_width(
+-            is_first_child ? (std::floor(size_bounds.width().value() +
+-                                         2 * border_thickness - kSplitViewGap) /
+-                              2)
+-                           : size_bounds.width().value() - x);
++        // Split available space between the children. Each takes an even
++        // share, and the last fills the remaining space.
++        bounds.set_width(is_last_child ? size_bounds.width().value() - x
++                                       : (size_bounds.width().value() +
++                                          (count - 1) * (2 * border_thickness -
++                                                         kSplitViewGap)) /
++                                             count);
+       }
+       // Advance x position by child width, accounting for any border and gap.
+       x += bounds.width() - 2 * border_thickness +
+-           (is_first_child ? kSplitViewGap : 0);
++           (is_last_child ? 0 : kSplitViewGap);
+       height = std::max(height, bounds.height());
+       layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
+     }
+@@ -377,14 +378,16 @@ views::ProposedLayout SplitTabView::CalculateVerticalLayout(
+     }
+     int y = inset;
+     for (auto* child : children) {
+-      const bool is_first_child = y == inset;
++      // uw: the same gap between every two rows of a split of any size.
++      if (child != children.front()) {
++        y += kSplitViewGap;
++      }
+       gfx::Rect bounds = gfx::Rect(child->GetPreferredSize());
+       bounds.set_origin({inset, y});
+       bounds.set_width(width - 2 * inset);
+       bounds.set_height(bounds.height() - trim);
+       // Advance y position by child height, accounting for any border and gap.
+-      y += bounds.height() - 2 * border_thickness +
+-           (is_first_child ? kSplitViewGap : 0);
++      y += bounds.height() - 2 * border_thickness;
+       layouts.child_layouts.emplace_back(child, child->GetVisible(), bounds);
+     }
+     height = y + 2 * border_thickness + inset;
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
+index 2543bacc96f51de5888dfc06c41253fed4696d5a..44d235e98a516b4c41350ad1eac27665c093709f 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
+@@ -47,6 +47,7 @@
+ #include "ui/views/view_utils.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/ui/views/pins/pin_menu.h"
++#include "uw/browser/ui/views/split_view/split_commands.h"
+ #include "uw/browser/ui/views/tab_organization/task_card.h"
+ #include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
+ 
+@@ -461,6 +462,7 @@ void TabStripCollectionController::ShowTabContextMenu(
+           uw::TabOrganizationController::From(browser_view_->browser());
+       organizer && organizer->IdFor(tab)) {
+     organizer->AddCommands(model.get(), organizer->SelectionFor(tab));
++    uw::AddSplitCommands(model.get(), tab);
+   } else if (tab->IsPinned()) {
+     uw::AddPinCommands(model.get(), collection_node->view());
+   }
+diff --git a/chrome/browser/ui/views/tabs/tab/BUILD.gn b/chrome/browser/ui/views/tabs/tab/BUILD.gn
+index 098be0d20e8dbc329f76d82664e3b21ae23e1bc0..50cbd9bb08625a34db73116a86eec43dfb6cdf83 100644
+--- a/chrome/browser/ui/views/tabs/tab/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/tab/BUILD.gn
+@@ -51,6 +51,7 @@ source_set("impl") {
+   deps = [
+     "//uw/browser/tab_organization",
+     "//uw/browser/ui/views/pins",
++    "//uw/browser/ui/views/split_view",
+     "//uw/browser/ui/views/tab_organization",
+     "//uw/browser/ui/views/workspaces",
+     ":tab",
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_accessibility.cc b/chrome/browser/ui/views/tabs/tab/tab_accessibility.cc
+index 6ddbb101fd97d3adedd419fba43288e90b88827a..21009dff5a4b81403e11c765a96d95bc11ab515a 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_accessibility.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_accessibility.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/tab/tab_accessibility.h"
+ 
++#include "base/strings/string_number_conversions.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/location_bar/location_bar.h"
+ #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
+@@ -113,10 +114,18 @@ std::u16string GetAccessibleTabLabel(const TabInterface* tab, bool is_for_tab) {
+     int tab_index_in_split = std::distance(
+         tabs_in_split.begin(),
+         std::find(tabs_in_split.begin(), tabs_in_split.end(), tab));
+-    title = l10n_util::GetStringFUTF16(
+-        GetAccessibleTabLabelFormatStringForSplit(
+-            split_data->visual_data()->split_layout(), tab_index_in_split),
+-        title);
++    // uw: in a split of more than two, a tab's pane goes by its number in
++    // reading order.
++    if (tabs_in_split.size() > 2) {
++      title = l10n_util::GetStringFUTF16(
++          IDS_UW_TAB_AX_LABEL_SPLIT_PANE_FORMAT, title,
++          base::NumberToString16(tab_index_in_split + 1));
++    } else {
++      title = l10n_util::GetStringFUTF16(
++          GetAccessibleTabLabelFormatStringForSplit(
++              split_data->visual_data()->split_layout(), tab_index_in_split),
++          title);
++    }
+   }
+ 
+   if (const std::optional<tab_groups::TabGroupId> group = tab->GetGroup()) {
+diff --git a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+index b3dd6cbace3fc32158bd968b7e3094c485e8c7e4..509a221a3c71aebc3c90a64990cc7f3ad7e1c50d 100644
+--- a/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
++++ b/chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.cc
+@@ -10,6 +10,7 @@
+ #include "ui/views/controls/menu/menu_runner.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/ui/views/pins/pin_menu.h"
++#include "uw/browser/ui/views/split_view/split_commands.h"
+ #include "uw/browser/ui/views/tab_organization/window_commands.h"
+ #include "uw/browser/ui/views/workspaces/move_to_workspace_menu.h"
+ 
+@@ -57,9 +58,10 @@ void TabContextMenuController::CloseMenu() {
+ 
+ bool TabContextMenuController::IsCommandIdChecked(int command_id) const {
+   if (uw::TabOrganizationController::IsCommand(command_id) ||
+-      uw::IsPinCommand(command_id) ||
+-      uw::IsMoveToWorkspaceCommand(command_id))
++      uw::IsSplitCommand(command_id) || uw::IsPinCommand(command_id) ||
++      uw::IsMoveToWorkspaceCommand(command_id)) {
+     return false;
++  }
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+   if (extensions::ContextMenuMatcher::IsExtensionsCustomCommandId(command_id)) {
+     if (tab_menu_model_ && tab_menu_model_->extension_items()) {
+@@ -79,6 +81,9 @@ bool TabContextMenuController::IsCommandIdEnabled(int command_id) const {
+   if (uw::IsPinCommand(command_id)) {
+     return uw::CanExecutePinCommand(tab_handle_.Get());
+   }
++  if (uw::IsSplitCommand(command_id)) {
++    return uw::CanRunSplitCommand(tab_handle_.Get(), command_id);
++  }
+   if (uw::TabOrganizationController::IsCommand(command_id)) {
+     auto* tab = tab_handle_.Get();
+     auto* organizer = tab ? uw::TabOrganizationController::From(
+@@ -116,9 +121,10 @@ bool TabContextMenuController::IsCommandIdVisible(int command_id) const {
+ 
+ bool TabContextMenuController::IsCommandIdAlerted(int command_id) const {
+   if (uw::TabOrganizationController::IsCommand(command_id) ||
+-      uw::IsPinCommand(command_id) ||
+-      uw::IsMoveToWorkspaceCommand(command_id))
++      uw::IsSplitCommand(command_id) || uw::IsPinCommand(command_id) ||
++      uw::IsMoveToWorkspaceCommand(command_id)) {
+     return false;
++  }
+   return delegate_->IsContextMenuCommandAlerted(
+       static_cast<TabStripModel::ContextMenuCommand>(command_id));
+ }
+@@ -128,6 +134,10 @@ void TabContextMenuController::ExecuteCommand(int command_id, int event_flags) {
+     uw::ExecutePinCommand(tab_handle_.Get(), command_id);
+     return;
+   }
++  if (uw::IsSplitCommand(command_id)) {
++    uw::RunSplitCommand(tab_handle_.Get(), command_id);
++    return;
++  }
+   if (uw::TabOrganizationController::IsCommand(command_id)) {
+     if (auto* tab = tab_handle_.Get()) {
+       if (auto* organizer = uw::TabOrganizationController::From(
+@@ -173,7 +183,8 @@ bool TabContextMenuController::GetAcceleratorForCommandId(
+       uw::IsMoveToWorkspaceCommand(command_id)) {
+     return false;
+   }
+-  if (uw::TabOrganizationController::IsCommand(command_id)) {
++  if (uw::TabOrganizationController::IsCommand(command_id) ||
++      uw::IsSplitCommand(command_id)) {
+     auto* tab = tab_handle_.Get();
+     return tab && uw::GetCommandAccelerator(tab->GetBrowserWindowInterface(),
+                                             command_id, accelerator);
+diff --git a/components/sessions/core/live_tab.cc b/components/sessions/core/live_tab.cc
+index 4ebce2ee38bd9677d8704a46cdc7b48350765201..a2bed25aefdbc240d334ae1631e641cbd08cbf44 100644
+--- a/components/sessions/core/live_tab.cc
++++ b/components/sessions/core/live_tab.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "components/sessions/core/live_tab.h"
+ 
++#include "components/sessions/core/live_tab_context.h"
++
+ namespace sessions {
+ 
+ LiveTab::~LiveTab() = default;
+@@ -13,4 +15,15 @@ LiveTab::GetPlatformSpecificTabData() {
+   return nullptr;
+ }
+ 
++// uw: LiveTabContext has no file of its own.
++void LiveTabContext::ReconstructSplitOfTabs(
++    const std::vector<LiveTab*>& tabs,
++    split_tabs::SplitTabId split_id,
++    const split_tabs::SplitTabVisualData& visual_data,
++    size_t focused_pane) {
++  if (tabs.size() == 2) {
++    ReconstructSplit(tabs[0], tabs[1], split_id, visual_data);
++  }
++}
++
+ }  // namespace sessions
+diff --git a/components/sessions/core/live_tab_context.h b/components/sessions/core/live_tab_context.h
+index 99c5a9b2d96815a5d94d2d23fe05a6df4f8500c7..9ce790ac78a1f3bd98409b0887db37480e1372c6 100644
+--- a/components/sessions/core/live_tab_context.h
++++ b/components/sessions/core/live_tab_context.h
+@@ -108,6 +108,15 @@ class SESSIONS_EXPORT LiveTabContext {
+       split_tabs::SplitTabId split_id,
+       const split_tabs::SplitTabVisualData& visual_data) = 0;
+ 
++  // uw: a split of any number of tabs, in pane order, with focus on
++  // `tabs[focused_pane]` when the split is selected. Contexts that only know
++  // pairs make one of two tabs and leave larger splits apart.
++  virtual void ReconstructSplitOfTabs(
++      const std::vector<LiveTab*>& tabs,
++      split_tabs::SplitTabId split_id,
++      const split_tabs::SplitTabVisualData& visual_data,
++      size_t focused_pane);
++
+   virtual void CloseTab() = 0;
+ 
+  protected:
+diff --git a/components/sessions/core/session_service_commands.cc b/components/sessions/core/session_service_commands.cc
+index c7c19d9eef5edb3d05470dcecbe219e69a02f695..7ac69ed201dce5e2109c70011a2e010a0753aef8 100644
+--- a/components/sessions/core/session_service_commands.cc
++++ b/components/sessions/core/session_service_commands.cc
+@@ -845,6 +845,17 @@ void CreateTabsAndWindows(
+ 
+         split->split_visual_data_ = split_tabs::SplitTabVisualData(
+             SplitTabLayoutFromString(split_layout_str), split_ratio);
++
++        // uw: every pane's place, written after the outermost cut so that
++        // builds without it still read a pair.
++        std::string panes;
++        if (iter.ReadString(&panes)) {
++          if (std::optional<uw::SplitLayout> layout =
++                  uw::SplitLayout::FromString(panes)) {
++            split->split_visual_data_ =
++                split_tabs::SplitTabVisualData(std::move(*layout));
++          }
++        }
+         break;
+       }
+ 
+@@ -1211,6 +1222,7 @@ std::unique_ptr<SessionCommand> CreateSplitTabDataUpdateCommand(
+   pickle.WriteDouble(split_tab_visual_data->split_ratio());
+   pickle.WriteString(
+       SplitTabLayoutToString(split_tab_visual_data->split_layout()));
++  pickle.WriteString(split_tab_visual_data->panes().ToString());
+ 
+   return std::make_unique<SessionCommand>(kCommandSetSplitTabData, pickle);
+ }
+diff --git a/components/sessions/core/tab_restore_service_helper.cc b/components/sessions/core/tab_restore_service_helper.cc
+index f2913423e5d1f8bd08987517d3774bf01f9dea8e..f1b8cc63647aaef6f00b774451fd58a8a1c7bc79 100644
+--- a/components/sessions/core/tab_restore_service_helper.cc
++++ b/components/sessions/core/tab_restore_service_helper.cc
+@@ -59,6 +59,31 @@ void MaybeAddSplitToGroup(tab_restore::Group& group,
+   }
+ }
+ 
++// uw: takes the `drop` tabs out of a split's `tabs` and their panes out of
++// `panes`, keeping the rest in pane order. Two or more must stay.
++void DropPanes(std::vector<std::unique_ptr<tab_restore::Tab>>& tabs,
++               uw::SplitLayout& panes,
++               std::vector<bool> drop) {
++  for (size_t i = 0; i < tabs.size();) {
++    if (!drop[i]) {
++      ++i;
++      continue;
++    }
++    const uw::SplitLayout::Renumbering renumbering = panes.Remove(i);
++    std::vector<std::unique_ptr<tab_restore::Tab>> renumbered(tabs.size() - 1);
++    std::vector<bool> still_drop(tabs.size() - 1);
++    for (size_t j = 0; j < tabs.size(); ++j) {
++      if (renumbering.to[j]) {
++        renumbered[*renumbering.to[j]] = std::move(tabs[j]);
++        still_drop[*renumbering.to[j]] = drop[j];
++      }
++    }
++    tabs = std::move(renumbered);
++    drop = std::move(still_drop);
++    i = 0;
++  }
++}
++
+ void MaybeAddSplitToWindow(tab_restore::Window& window,
+                            const tab_restore::Tab& tab) {
+   if (tab.split_id.has_value() &&
+@@ -186,17 +211,30 @@ void ReconstructSplits(
+                    std::vector<raw_ptr<tab_restore::Tab>>>& split_tabs_map,
+     const std::map<SessionID, LiveTab*>& restored_tab_map) {
+   for (const auto& [split_id, tabs] : split_tabs_map) {
+-    CHECK(tabs.size() == 2);
+-    auto leading_it = restored_tab_map.find(tabs[0]->id);
+-    auto trailing_it = restored_tab_map.find(tabs[1]->id);
+-    if (leading_it != restored_tab_map.end() &&
+-        trailing_it != restored_tab_map.end()) {
+-      const split_tabs::SplitTabVisualData visual_data =
+-          tabs[0]->split_visual_data.value_or(split_tabs::SplitTabVisualData());
+-
+-      context->ReconstructSplit(leading_it->second, trailing_it->second,
+-                                split_id, visual_data);
++    // uw: a split of any number of tabs comes back whole when all of its
++    // tabs do.
++    std::vector<LiveTab*> live_tabs;
++    for (const auto& tab : tabs) {
++      auto it = restored_tab_map.find(tab->id);
++      if (it == restored_tab_map.end()) {
++        live_tabs.clear();
++        break;
++      }
++      live_tabs.push_back(it->second);
+     }
++    if (live_tabs.size() < 2) {
++      continue;
++    }
++    split_tabs::SplitTabVisualData visual_data =
++        tabs[0]->split_visual_data.value_or(split_tabs::SplitTabVisualData());
++    if (visual_data.panes().pane_count() != live_tabs.size()) {
++      if (live_tabs.size() != 2) {
++        continue;
++      }
++      visual_data = split_tabs::SplitTabVisualData();
++    }
++    context->ReconstructSplitOfTabs(live_tabs, split_id, visual_data,
++                                    /*focused_pane=*/0);
+   }
+ }
+ 
+@@ -419,19 +457,27 @@ void TabRestoreServiceHelper::CreateHistoricalSplit(
+   }
+ 
+   auto split = CreateHistoricalSplitImpl(context, id, split_tabs);
++  for (size_t pane = 0; split && pane < split_tabs.size(); ++pane) {
++    if (split_tabs[pane].first == context->GetSelectedIndex()) {
++      split->focused_pane = pane;
++    }
++  }
+ 
+-  if (split && split->tabs.size() == 2) {
+-    bool tab0_valid = ValidateTab(*split->tabs[0]);
+-    bool tab1_valid = ValidateTab(*split->tabs[1]);
+-
+-    if (tab0_valid && tab1_valid) {
++  if (split && split->tabs.size() >= 2) {
++    // uw: a split of any number of tabs is kept whole when all of its tabs
++    // are worth keeping, and as single tabs otherwise.
++    const size_t valid = std::ranges::count_if(
++        split->tabs, [](const auto& tab) { return ValidateTab(*tab); });
++    if (valid == split->tabs.size()) {
+       AddEntry(std::move(split), true, true);
+-    } else if (tab0_valid) {
+-      AddEntry(std::move(split->tabs[0]), true, true);
+-    } else if (tab1_valid) {
+-      AddEntry(std::move(split->tabs[1]), true, true);
+-    } else {
++    } else if (valid == 0) {
+       closing_split_tabs_.erase(id);
++    } else {
++      for (auto& tab : split->tabs) {
++        if (ValidateTab(*tab)) {
++          AddEntry(std::move(tab), true, true);
++        }
++      }
+     }
+   } else {
+     // In the case of an error, clear the cache so that the history can proceed
+@@ -466,7 +512,7 @@ TabRestoreServiceHelper::CreateHistoricalSplitImpl(
+     LiveTabContext* context,
+     const split_tabs::SplitTabId& id,
+     const std::vector<std::pair<int, LiveTab*>>& split_tabs) {
+-  if (split_tabs.size() != 2) {
++  if (split_tabs.size() < 2) {
+     return nullptr;
+   }
+ 
+@@ -584,17 +630,22 @@ bool TabRestoreServiceHelper::DeleteFromSplit(
+     Split* split,
+     std::unique_ptr<Tab>& remaining_tab) {
+   CHECK(ValidateSplit(*split));
+-  DCHECK_EQ(split->tabs.size(), 2u);
+-  bool leading_deleted = DeleteFromTab(predicate, split->tabs[0].get());
+-  bool trailing_deleted = DeleteFromTab(predicate, split->tabs[1].get());
+-
+-  if (leading_deleted && trailing_deleted) {
++  // uw: a split may have more than two tabs.
++  std::vector<bool> deleted;
++  for (auto& tab : split->tabs) {
++    deleted.push_back(DeleteFromTab(predicate, tab.get()));
++  }
++  const size_t kept = std::ranges::count(deleted, false);
++  if (kept == 0) {
+     return true;
+   }
+-  if (leading_deleted) {
+-    remaining_tab = std::move(split->tabs[1]);
+-  } else if (trailing_deleted) {
+-    remaining_tab = std::move(split->tabs[0]);
++  if (kept == 1) {
++    remaining_tab = std::move(
++        split->tabs[std::ranges::find(deleted, false) - deleted.begin()]);
++    return false;
++  }
++  if (kept < split->tabs.size()) {
++    DropPanes(split->tabs, split->visual_data.panes(), deleted);
+   }
+   return false;
+ }
+@@ -731,14 +782,16 @@ LiveTabContext* TabRestoreServiceHelper::RestoreTabOrGroupFromWindow(
+     }
+ 
+     if (split_id.has_value()) {
+-      auto other_tabs_in_split = std::find_if(
+-          window.tabs.begin(), window.tabs.end(), [&split_id](const auto& t) {
+-            return t->split_id.has_value() && t->split_id.value() == split_id;
+-          });
+-
+-      if (other_tabs_in_split != window.tabs.end()) {
+-        (*other_tabs_in_split)->split_id = std::nullopt;
+-        (*other_tabs_in_split)->split_visual_data = std::nullopt;
++      // uw: the other tabs of a larger split leave it too.
++      bool others = false;
++      for (auto& other : window.tabs) {
++        if (other->split_id == split_id) {
++          other->split_id = std::nullopt;
++          other->split_visual_data = std::nullopt;
++          others = true;
++        }
++      }
++      if (others) {
+         window.split_tabs.erase(split_id.value());
+       }
+     }
+@@ -1167,7 +1220,6 @@ std::optional<std::vector<LiveTab*>> TabRestoreServiceHelper::RestoreEntryById(
+     case tab_restore::Type::SPLIT: {
+       auto& split = static_cast<tab_restore::Split&>(entry);
+       CHECK(ValidateSplit(split));
+-      CHECK_EQ(split.tabs.size(), 2u);
+ 
+       if (entry_id_matches_restore_id) {
+         if (split.timestamp != base::Time() &&
+@@ -1184,24 +1236,30 @@ std::optional<std::vector<LiveTab*>> TabRestoreServiceHelper::RestoreEntryById(
+           live_tabs.push_back(restored_leading_tab->GetWeakPtr());
+         }
+ 
+-        // Directly restore the trailing tab into the same context as the
++        // Directly restore the other tabs into the same context as the
+         // leading tab to ensure that they remain unified in a single browser
+-        // window.
+-        LiveTab* restored_trailing_tab = context->AddRestoredTab(
+-            *split.tabs[1], context->GetTabCount(), false, false, entry.type);
+-        if (restored_trailing_tab && !split.tabs[1]->navigations.empty()) {
+-          int nav_index = std::clamp(
+-              split.tabs[1]->current_navigation_index, 0,
+-              static_cast<int>(split.tabs[1]->navigations.size() - 1));
+-          client_->OnTabRestored(
+-              split.tabs[1]->navigations.at(nav_index).virtual_url());
+-          live_tabs.push_back(restored_trailing_tab->GetWeakPtr());
++        // window. uw: a split may have more than two tabs.
++        std::vector<LiveTab*> restored_split = {restored_leading_tab};
++        for (size_t i = 1; i < split.tabs.size(); ++i) {
++          LiveTab* restored_tab = context->AddRestoredTab(
++              *split.tabs[i], context->GetTabCount(), false, false, entry.type);
++          if (restored_tab && !split.tabs[i]->navigations.empty()) {
++            int nav_index = std::clamp(
++                split.tabs[i]->current_navigation_index, 0,
++                static_cast<int>(split.tabs[i]->navigations.size() - 1));
++            client_->OnTabRestored(
++                split.tabs[i]->navigations.at(nav_index).virtual_url());
++            live_tabs.push_back(restored_tab->GetWeakPtr());
++          }
++          restored_split.push_back(restored_tab);
+         }
+ 
+-        if (restored_leading_tab && restored_trailing_tab &&
++        if (std::ranges::none_of(restored_split,
++                                 [](LiveTab* tab) { return !tab; }) &&
+             split.split_id.has_value()) {
+-          context->ReconstructSplit(restored_leading_tab, restored_trailing_tab,
+-                                    split.split_id.value(), split.visual_data);
++          context->ReconstructSplitOfTabs(
++              restored_split, split.split_id.value(), split.visual_data,
++              split.focused_pane);
+         }
+ 
+       } else {
+@@ -1600,6 +1658,14 @@ TabRestoreServiceHelper::RestoreOneTabFromSplit(
+         live_tabs.push_back(restored_tab->GetWeakPtr());
+       }
+ 
++      // uw: the others of a larger split stay one, without this tab.
++      if (split.tabs.size() > 2) {
++        std::vector<bool> drop(split.tabs.size());
++        drop[i] = true;
++        DropPanes(split.tabs, split.visual_data.panes(), drop);
++        return nullptr;
++      }
++
+       // Extract the remaining tab, remove split association, and return it.
+       std::unique_ptr<Tab> remaining_tab = std::move(split.tabs[1 - i]);
+       remaining_tab->split_id = std::nullopt;
+@@ -1690,11 +1756,13 @@ bool TabRestoreServiceHelper::ValidateGroup(const Group& group) {
+ }
+ 
+ bool TabRestoreServiceHelper::ValidateSplit(const Split& split) {
+-  if (split.tabs.size() != 2) {
++  // uw: a split may have more than two tabs, and has a pane for each.
++  if (split.tabs.size() < 2 ||
++      split.visual_data.panes().pane_count() != split.tabs.size()) {
+     return false;
+   }
+-  return split.tabs[0] && split.tabs[1] && ValidateTab(*split.tabs[0]) &&
+-         ValidateTab(*split.tabs[1]);
++  return std::ranges::all_of(
++      split.tabs, [](const auto& tab) { return tab && ValidateTab(*tab); });
+ }
+ 
+ bool TabRestoreServiceHelper::IsTabInteresting(const Tab& tab) {
+@@ -1727,11 +1795,13 @@ bool TabRestoreServiceHelper::IsGroupInteresting(const Group& group) {
+ }
+ 
+ bool TabRestoreServiceHelper::IsSplitInteresting(const Split& split) {
+-  if (split.tabs.size() != 2) {
++  // uw: a split may have more than two tabs.
++  if (split.tabs.size() < 2) {
+     return false;
+   }
+-  return (split.tabs[0] && IsTabInteresting(*split.tabs[0])) ||
+-         (split.tabs[1] && IsTabInteresting(*split.tabs[1]));
++  return std::ranges::any_of(split.tabs, [this](const auto& tab) {
++    return tab && IsTabInteresting(*tab);
++  });
+ }
+ 
+ bool TabRestoreServiceHelper::FilterEntry(const Entry& entry) {
+diff --git a/components/sessions/core/tab_restore_service_impl.cc b/components/sessions/core/tab_restore_service_impl.cc
+index 28174f9137db041562b18257c7f8d0adce80b34c..103b8868dfdeef36666e94e1cd9bb8bdb186245e 100644
+--- a/components/sessions/core/tab_restore_service_impl.cc
++++ b/components/sessions/core/tab_restore_service_impl.cc
+@@ -305,6 +305,15 @@ bool ReadSplitTabVisualData(base::PickleIterator* iter,
+   if (split_ratio >= 0.0 && split_ratio <= 1.0 &&
+       DeserializeSplitTabLayout(split_layout_type, &layout)) {
+     *visual_data = split_tabs::SplitTabVisualData(layout, split_ratio);
++    // uw: every pane's place, after the outermost cut so that builds without
++    // it still read a pair.
++    std::string panes;
++    if (iter->ReadString(&panes)) {
++      if (std::optional<uw::SplitLayout> tree =
++              uw::SplitLayout::FromString(panes)) {
++        *visual_data = split_tabs::SplitTabVisualData(std::move(*tree));
++      }
++    }
+     return true;
+   }
+   return false;
+@@ -529,7 +538,8 @@ std::unique_ptr<sessions::tab_restore::Group> CreateGroupEntryFromCommand(
+ 
+ std::unique_ptr<sessions::tab_restore::Split> CreateSplitEntryFromCommand(
+     const SessionCommand* command,
+-    SessionID* session_id) {
++    SessionID* session_id,
++    int* tab_count) {
+   base::PickleIterator it = command->ContentsAsPickle();
+   std::optional<base::Token> split_token = ReadTokenFromPickle(&it);
+   if (!split_token.has_value()) {
+@@ -549,6 +559,17 @@ std::unique_ptr<sessions::tab_restore::Split> CreateSplitEntryFromCommand(
+ 
+   ReadSplitTabVisualData(&it, &split->visual_data);
+ 
++  // uw: a split may have more than two tabs; older entries are pairs.
++  *tab_count = 2;
++  int count = 0;
++  if (it.ReadInt(&count) && count >= 2) {
++    *tab_count = count;
++  }
++  int focused = 0;
++  if (it.ReadInt(&focused) && focused >= 0 && focused < *tab_count) {
++    split->focused_pane = focused;
++  }
++
+   return split;
+ }
+ 
+@@ -661,7 +682,8 @@ class TabRestoreServiceImpl::PersistenceDelegate
+       SessionID session_id,
+       split_tabs::SplitTabId split_id,
+       const split_tabs::SplitTabVisualData& visual_data,
+-      base::Time timestamp);
++      base::Time timestamp,
++      size_t focused_pane);
+ 
+   // Creates a tab close command.
+   static std::unique_ptr<SessionCommand> CreateSelectedNavigationInTabCommand(
+@@ -963,7 +985,6 @@ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForGroup(
+ 
+ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForSplit(
+     const tab_restore::Split& split) {
+-  DCHECK_EQ(split.tabs.size(), 2u);
+ 
+   // Count how many tabs in the split are valid to persist.
+   std::vector<std::pair<const tab_restore::Tab*, int>> valid_tabs;
+@@ -974,18 +995,20 @@ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForSplit(
+     }
+   }
+ 
+-  if (valid_tabs.size() == 2) {
++  // uw: a split may have more than two tabs.
++  if (valid_tabs.size() >= 2 && valid_tabs.size() == split.tabs.size()) {
+     command_storage_manager_->ScheduleCommand(CreateSplitCommand(
+         split.id,
+         split.split_id.value_or(split_tabs::SplitTabId::CreateEmpty()),
+-        split.visual_data, split.timestamp));
++        split.visual_data, split.timestamp, split.focused_pane));
++    for (const auto& [tab, index] : valid_tabs) {
++      ScheduleCommandsForTab(*tab, index);
++    }
++  } else {
++    // Valid tabs of a split that cannot be kept whole are regular tabs.
+     for (const auto& [tab, index] : valid_tabs) {
+       ScheduleCommandsForTab(*tab, index);
+     }
+-  } else if (valid_tabs.size() == 1) {
+-    // If there's only one valid tab, schedule it as a regular tab.
+-    const auto& [tab, index] = valid_tabs[0];
+-    ScheduleCommandsForTab(*tab, index);
+   }
+ }
+ 
+@@ -1058,6 +1081,7 @@ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForTab(
+         tab.split_visual_data.value_or(split_tabs::SplitTabVisualData());
+     pickle.WriteDouble(visual_data.split_ratio());
+     pickle.WriteInt(static_cast<int>(visual_data.split_layout()));
++    pickle.WriteString(visual_data.panes().ToString());
+     command_storage_manager_->ScheduleCommand(
+         std::make_unique<SessionCommand>(kCommandSetTabSplitData, pickle));
+   }
+@@ -1168,13 +1192,17 @@ TabRestoreServiceImpl::PersistenceDelegate::CreateSplitCommand(
+     SessionID session_id,
+     split_tabs::SplitTabId split_id,
+     const split_tabs::SplitTabVisualData& visual_data,
+-    base::Time timestamp) {
++    base::Time timestamp,
++    size_t focused_pane) {
+   base::Pickle pickle;
+   WriteTokenToPickle(&pickle, split_id.token());
+   pickle.WriteInt(static_cast<int>(session_id.id()));
+   pickle.WriteInt64(timestamp.ToDeltaSinceWindowsEpoch().InMicroseconds());
+   pickle.WriteDouble(visual_data.split_ratio());
+   pickle.WriteInt(static_cast<int>(visual_data.split_layout()));
++  pickle.WriteString(visual_data.panes().ToString());
++  pickle.WriteInt(static_cast<int>(visual_data.panes().pane_count()));
++  pickle.WriteInt(static_cast<int>(focused_pane));
+ 
+   std::unique_ptr<SessionCommand> command =
+       std::make_unique<SessionCommand>(kCommandCreateSplit, pickle);
+@@ -1354,15 +1382,17 @@ void TabRestoreServiceImpl::PersistenceDelegate::CreateEntriesFromCommands(
+         }
+ 
+         SessionID split_id = SessionID::InvalidValue();
++        int tab_count = 2;
+         std::unique_ptr<tab_restore::Split> split =
+-            CreateSplitEntryFromCommand(&command, &split_id);
++            CreateSplitEntryFromCommand(&command, &split_id, &tab_count);
+         if (!split) {
+           return;
+         }
+ 
+         RemoveEntryByID(split_id, &entries);
+         split->original_id = split_id;
+-        current_split = std::make_optional(std::make_pair(split.get(), 2));
++        current_split =
++            std::make_optional(std::make_pair(split.get(), tab_count));
+         entries.push_back(std::move(split));
+         break;
+       }
+diff --git a/components/sessions/core/tab_restore_types.h b/components/sessions/core/tab_restore_types.h
+index acbd0bbeafc2ce18bf870aaecbef4fa7ba25c2d3..1e9f5d810a68ab369197b08d1dc4232e38ec9bd2 100644
+--- a/components/sessions/core/tab_restore_types.h
++++ b/components/sessions/core/tab_restore_types.h
+@@ -165,6 +165,9 @@ struct SESSIONS_EXPORT Split : public Entry {
+ 
+   // The tabs that comprised the split view, in order.
+   std::vector<std::unique_ptr<Tab>> tabs;
++
++  // uw: which of `tabs` had focus.
++  size_t focused_pane = 0;
+ };
+ 
+ // Represents a previously open group.
+diff --git a/components/split_tabs/BUILD.gn b/components/split_tabs/BUILD.gn
+index 2f4577522f35a6a4e9326e5b1e40fe1126c45798..0de5c9255591da334742d00e8ef1ace0810f8e00 100644
+--- a/components/split_tabs/BUILD.gn
++++ b/components/split_tabs/BUILD.gn
+@@ -12,5 +12,6 @@ source_set("split_tabs") {
+   public_deps = [
+     "//base",
+     "//components/tab_groups",
++    "//uw/components/split_view",
+   ]
+ }
+diff --git a/components/split_tabs/split_tab_visual_data.cc b/components/split_tabs/split_tab_visual_data.cc
+index f10ddcf5a839e4e9366c1d71b6a23a4e034d2411..169e4276d10b068a415560c9b295e064e697246c 100644
+--- a/components/split_tabs/split_tab_visual_data.cc
++++ b/components/split_tabs/split_tab_visual_data.cc
+@@ -4,18 +4,57 @@
+ 
+ #include "components/split_tabs/split_tab_visual_data.h"
+ 
++#include <algorithm>
++
+ namespace split_tabs {
+ 
++namespace {
++
++uw::SplitDirection DirectionOf(SplitTabLayout layout) {
++  return layout == SplitTabLayout::kStacked ? uw::SplitDirection::kStacked
++                                            : uw::SplitDirection::kSideBySide;
++}
++
++// A ratio read from an old or broken session file can be 0 or 1, which would
++// hide a pane.
++double UsableRatio(double ratio) {
++  return std::clamp(ratio, 0.05, 0.95);
++}
++
++}  // namespace
++
+ SplitTabVisualData::SplitTabVisualData()
+-    : split_layout_(SplitTabLayout::kSideBySide) {}
++    : panes_(uw::SplitDirection::kSideBySide) {}
+ 
+ SplitTabVisualData::SplitTabVisualData(SplitTabLayout split_layout)
+-    : split_layout_(split_layout) {}
++    : panes_(DirectionOf(split_layout)) {}
+ 
+ SplitTabVisualData::SplitTabVisualData(SplitTabLayout split_layout,
+                                        double split_ratio)
+-    : split_layout_(split_layout), split_ratio_(split_ratio) {}
++    : panes_(DirectionOf(split_layout), UsableRatio(split_ratio)) {}
++
++SplitTabVisualData::SplitTabVisualData(uw::SplitLayout panes)
++    : panes_(std::move(panes)) {}
+ 
+ SplitTabVisualData::~SplitTabVisualData() = default;
+ 
++void SplitTabVisualData::set_split_layout(SplitTabLayout split_layout) {
++  panes_.SetDirection(0, DirectionOf(split_layout));
++  panes_.Renumber();
++}
++
++void SplitTabVisualData::set_split_ratio(double split_ratio) {
++  panes_.SetRatio(0, UsableRatio(split_ratio));
++}
++
++SplitTabLayout SplitTabVisualData::split_layout() const {
++  return panes_.direction() == uw::SplitDirection::kStacked
++             ? SplitTabLayout::kStacked
++             : SplitTabLayout::kSideBySide;
++}
++
++double SplitTabVisualData::split_ratio() const {
++  return panes_.ratio();
++}
++
+ }  // namespace split_tabs
+diff --git a/components/split_tabs/split_tab_visual_data.h b/components/split_tabs/split_tab_visual_data.h
+index 5d14b4e38373ead928a469e954d60c10678ea472..d60c7ce0796fc67ca46c09959e1664158f9bcf24 100644
+--- a/components/split_tabs/split_tab_visual_data.h
++++ b/components/split_tabs/split_tab_visual_data.h
+@@ -5,6 +5,8 @@
+ #ifndef COMPONENTS_SPLIT_TABS_SPLIT_TAB_VISUAL_DATA_H_
+ #define COMPONENTS_SPLIT_TABS_SPLIT_TAB_VISUAL_DATA_H_
+ 
++#include "uw/components/split_view/split_layout.h"
++
+ namespace split_tabs {
+ 
+ // Orientation of a split view. Needs to be kept in sync with
+@@ -27,6 +29,8 @@ class SplitTabVisualData {
+   SplitTabVisualData();
+   explicit SplitTabVisualData(SplitTabLayout split_layout);
+   SplitTabVisualData(SplitTabLayout split_layout, double split_ratio);
++  // uw: a split of any number of tabs.
++  explicit SplitTabVisualData(uw::SplitLayout panes);
+   ~SplitTabVisualData();
+ 
+   SplitTabVisualData(const SplitTabVisualData& other) = default;
+@@ -35,24 +39,23 @@ class SplitTabVisualData {
+   SplitTabVisualData& operator=(const SplitTabVisualData& other) = default;
+   SplitTabVisualData& operator=(SplitTabVisualData&& other) = default;
+ 
+-  void set_split_layout(SplitTabLayout split_layout) {
+-    split_layout_ = split_layout;
+-  }
+-
+-  void set_split_ratio(double split_ratio) { split_ratio_ = split_ratio; }
+-
+-  SplitTabLayout split_layout() const { return split_layout_; }
++  // uw: these four are the outermost cut, which is all a two-tab split has.
++  void set_split_layout(SplitTabLayout split_layout);
++  void set_split_ratio(double split_ratio);
++  SplitTabLayout split_layout() const;
++  double split_ratio() const;
+ 
+-  double split_ratio() const { return split_ratio_; }
++  // uw: how every tab of the split is placed. Its panes are the split's tabs
++  // in tab strip order.
++  const uw::SplitLayout& panes() const { return panes_; }
++  uw::SplitLayout& panes() { return panes_; }
+ 
+   // Checks whether two instances are visually equivalent.
+   friend bool operator==(const SplitTabVisualData&,
+                          const SplitTabVisualData&) = default;
+ 
+  private:
+-  SplitTabLayout split_layout_;
+-  // ratio of the first split tab's width to the available width.
+-  double split_ratio_ = 0.5;
++  uw::SplitLayout panes_;
+ };
+ 
+ }  // namespace split_tabs

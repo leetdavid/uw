@@ -1,6 +1,6 @@
 # Split views
 
-Status: scope agreed on 2026-11-04 in a grilling session, after the user asked for "more than just 2-tab splitting ... as many as the user wants like a terminal window splitting", with drag and drop to rearrange the panes, Cmd+D to split left and right, and Cmd+Shift+D to split top and bottom. The design, T331, was drawn the same day and waits for the user's sign-off. Nothing is built.
+Status: scope agreed on 2026-11-04 in a grilling session, after the user asked for "more than just 2-tab splitting ... as many as the user wants like a terminal window splitting", with drag and drop to rearrange the panes, Cmd+D to split left and right, and Cmd+Shift+D to split top and bottom. The design, T331, was drawn and signed off the same day. T332, any number of panes, is built and in review. Dragging, pinned split views, and shared tabs are not built.
 
 Implementability: **3/10** using the [roadmap convention](roadmap.md#implementability-estimates). Chromium's split view has the drop zones, mini toolbars, restore, and sidebar handling, but holds exactly two tabs, and about 80 of its files read splits. uw patches it to hold any number ([ADR 0029](../adr/0029-split-views-extend-chromiums-split.md)), and each Chromium update can conflict. Pinned split views are the hardest part: a live pin moves one page between windows today, and this moves several pages and their layout.
 
@@ -85,14 +85,14 @@ Today a [split view](../CONTEXT.md#language) is Chromium's: two tabs, side by si
 
 ## Design
 
-Drawn on 2026-11-04 as T331, on the "Keyboard and mouse" page of the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), with the rules in the "Split views" section of the canvas guide `uw-sideways-drag`. Not signed off yet.
+Drawn on 2026-11-04 as T331, on the "Keyboard and mouse" page of the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), with the rules in the "Split views" section of the canvas guide `uw-sideways-drag`. The user signed it off the same day.
 
 - "Split view: three panes": a page, a terminal, and a page in a nested layout, the mini toolbars, and the sidebar box in reading order.
 - "Split view: dragging a pane": a terminal's mini toolbar on its way to the bottom half of another pane.
 - "Split view: pinned": the pinned split's tile, its menu, and its hazed layout in another window.
 - "Split view: every state": splitting, the order, the 200px limit, closing and ending, the drop zones, drags from and to the sidebar, the divider, the menus and keys, dark, and Edit Homes.
 
-The frames propose, for sign-off:
+The frames settle:
 
 - Panes inside the page card under one toolbar, as Chromium draws them, with the focused pane's outline in the primary color.
 - The drop zone: the half of the pane by the nearest edge, within a quarter of the pane, or the whole pane nearer its middle.
@@ -105,9 +105,17 @@ Per [ADR 0029](../adr/0029-split-views-extend-chromiums-split.md), in a new `uw-
 - A Chromium split holds any number of tabs. `SplitTabVisualData` carries a layout tree in place of one direction and one ratio: each branch has a direction and its children's sizes, and each leaf is a tab. `TabStripModel`'s split calls, `split_tab_util`, the split menus, and the metrics lose their two-tab checks. The tabs' order in the tab strip is reading order, so Ctrl+Tab and the sidebar follow it.
 - `MultiContentsView` lays out a pane per tab and a divider per branch. Its drop target controller gives each pane four edges and a center, and the mini toolbar becomes a drag source.
 - Chromium builds the page area's panes when a window opens, and devtools, the new-tab footer, the agent overlay, the screen-capture border, and enterprise data protection each attach to every pane then. `MultiContentsView` adds panes as a split needs them and keeps them for the window's life, and those five attach to a pane when it is added. On 2026-11-04 the user chose this over a fixed 16 panes made up front, which would have left the five unchanged.
-- The session file saves the tree with the split, beside Chromium's direction and ratio.
-- `SplitTabView` (`uw-look.patch`) stacks a row per pane.
+- The session file saves the tree with the split, beside Chromium's direction and ratio. A closed split's entry keeps which pane had focus, so Reopen Closed Split View brings it back.
+- `SplitTabView`, whose box is in `uw-look.patch`, stacks a row per pane.
+- The split commands are window commands, in `browser/ui/views/split_view/`.
 - Pinned split views build on uw's live pins (`uw-live-pins.patch`), which move one page between windows today, to move a split's pages and layout together.
+
+### Built differently
+
+Built in T332 on 2026-11-05:
+
+- A tab's menu has Split Right, Split Down, and, on a tab in a split, Move Out of Split View and Separate Panes, in place of Chromium's split items. A pinned tab keeps Chromium's items and has neither split command until [pinned split views](#pinned-split-views) are built.
+- An open tab picked in the command bar over a new pane moves into it only from the same window. One in another window is switched to, as before, and the new pane keeps its new tab page.
 
 ## Stages
 

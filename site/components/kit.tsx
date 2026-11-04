@@ -277,6 +277,11 @@ export function TabRow({
   );
 }
 
+// A split view in the sidebar: one box, a row per pane.
+export function Split({ children }: { children: ReactNode }) {
+  return <div className="kit-split">{children}</div>;
+}
+
 export function Scratchpad({ children }: { children: ReactNode }) {
   return (
     <>
@@ -365,6 +370,55 @@ export function Page({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// A split view's panes in a page card, side by side or, with `down`, one
+// above another. Panes nest.
+export function Panes({
+  down,
+  children,
+}: {
+  down?: boolean;
+  children: ReactNode;
+}) {
+  return <div className={classes("kit-panes", down && "down")}>{children}</div>;
+}
+
+// A pane in a split view. Panes other than the selected one show their tag.
+export function Pane({
+  site,
+  selected,
+  terminal,
+  children,
+}: {
+  site: string;
+  selected?: boolean;
+  terminal?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={classes("kit-pane", selected && "on")}>
+      {terminal ? (
+        <div className="kit-shell">{children}</div>
+      ) : (
+        (children ?? (
+          <div className="kit-lines">
+            <i />
+            <i />
+            <i />
+            <i />
+          </div>
+        ))
+      )}
+      {!selected && (
+        <span className="kit-pane-tag">
+          {terminal ? <Glyph icon="terminal" /> : <Tile title={site} />}
+          {site}
+          <X />
+        </span>
+      )}
     </div>
   );
 }

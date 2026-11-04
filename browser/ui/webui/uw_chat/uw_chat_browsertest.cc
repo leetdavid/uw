@@ -48,6 +48,7 @@
 #include "components/optimization_guide/core/filters/optimization_hints_component_update_listener.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
@@ -82,11 +83,13 @@
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
+#include "uw/browser/ui/views/split_view/split_commands.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/views/terminal/close_warning.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
@@ -1251,6 +1254,50 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, SideBySidePutsTheChatBesideItsTab) {
       chat, "document.querySelector('[data-side-by-side]').click();"));
   EXPECT_TRUE(
       base::test::RunUntil([&] { return !chat_tab->GetSplit().has_value(); }));
+}
+
+// The user can add panes to the chat's split. As the agent moves on to
+// another tab, only the agent's pane changes, and the tab it showed stays
+// open.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, SideBySideKeepsThePanesTheUserAdds) {
+  browser()->GetProfile()->GetPrefs()->SetBoolean(kCommandBarEnabledPref,
+                                                  false);
+  UseAgentModel();
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(
+           ScriptedModel::Call("open", base::DictValue().Set("url", Form())))),
+       ScriptedModel::Answer("Opened the form.")});
+  content::WebContents* chat = OpenChat();
+  ASSERT_EQ(Ask(chat, "Open the form"), "Opened the form.");
+  tabs::TabInterface* chat_tab = tabs::TabInterface::GetFromContents(chat);
+  ASSERT_TRUE(content::ExecJs(
+      chat, "document.querySelector('[data-side-by-side]').click();"));
+  ASSERT_TRUE(base::test::RunUntil([&] { return chat_tab->IsSplit(); }));
+  const auto split = [&] {
+    return tabs()->GetSplitData(*chat_tab->GetSplit())->ListTabs();
+  };
+  ASSERT_EQ(split().size(), 2u);
+  tabs::TabInterface* form = split()[0] == chat_tab ? split()[1] : split()[0];
+
+  RunSplitCommand(chat_tab, kSplitDown);
+  tabs::TabInterface* mine = tabs()->GetActiveTab();
+  ASSERT_EQ(split().size(), 3u);
+
+  model_.Script(
+      {ScriptedModel::Calls(base::ListValue().Append(ScriptedModel::Call(
+           "open", base::DictValue().Set("url", Checkout())))),
+       ScriptedModel::Answer("Opened the checkout.")});
+  ASSERT_EQ(Ask(chat, "Open the checkout"), "Opened the checkout.");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const std::vector<tabs::TabInterface*> tabs_in_split = split();
+    return tabs_in_split.size() == 3u &&
+           std::ranges::contains(tabs_in_split, mine) &&
+           !std::ranges::contains(tabs_in_split, form) &&
+           std::ranges::any_of(tabs_in_split, [&](tabs::TabInterface* tab) {
+             return tab->GetContents()->GetVisibleURL().spec() == Checkout();
+           });
+  }));
+  EXPECT_NE(tabs()->GetIndexOfTab(form), TabStripModel::kNoTab);
 }
 
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentListsSkillsAndLoadsOne) {

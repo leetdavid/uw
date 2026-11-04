@@ -19,6 +19,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "components/split_tabs/split_tab_id.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -287,6 +288,8 @@ class UwChatHandler : public mojom::ChatHandler,
 
   // The agent's open tab `number`, or null.
   tabs::TabInterface* AgentTab(int number);
+  // The agent's open tab in `split`, or null.
+  tabs::TabInterface* AgentPane(split_tabs::SplitTabId split);
   // Brings the card of the tab a tool step acted in up to date, and takes a
   // new picture of that tab.
   void OnToolStep(const AgentLoop::Step& step);

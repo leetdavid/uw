@@ -8,6 +8,7 @@ source_set("command_bar") {
     "//base",
     "//components/prefs",
     "//components/tab_groups",
+    "//components/tabs:public",
     "//ui/base/unowned_user_data",
     "//ui/views",
   ]
@@ -20,6 +21,7 @@ source_set("command_bar") {
     "//chrome/browser/ui/views/bubble",
     "//chrome/browser/ui/webui/top_chrome",
     "//components/input",
+    "//components/split_tabs",
     "//content/public/browser",
     "//ui/gfx",
     "//url",

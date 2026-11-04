@@ -4,6 +4,7 @@
 
 #import <AppKit/AppKit.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -105,6 +106,31 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, CmdSHidesTheSidebar) {
             CommandFor(ui::VKEY_L, kCmd | NSEventModifierFlagShift));
   ui::Accelerator key;
   EXPECT_FALSE(GetDefaultMacAcceleratorForCommandId(IDC_SAVE_PAGE, &key));
+}
+
+// Split Right and Split Down took Cmd+D and Cmd+Shift+D. Bookmark This Tab
+// and Bookmark All Tabs keep their rows with no key, and can be given one.
+IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, CmdDSplitsThePage) {
+  EXPECT_EQ(kSplitRight, CommandFor(ui::VKEY_D, kCmd));
+  EXPECT_EQ(kSplitDown,
+            CommandFor(ui::VKEY_D, kCmd | NSEventModifierFlagShift));
+  const MenuKey right = Row("Split Right");
+  EXPECT_EQ("Tab", right.menu);
+  EXPECT_EQ("split_right", right.name);
+  EXPECT_EQ("Command+D", right.key);
+  EXPECT_EQ("Command+Shift+D", Row("Split Down").key);
+  EXPECT_EQ("move_out_of_split_view", Row("Move Out of Split View").name);
+  EXPECT_EQ("separate_panes", Row("Separate Panes").name);
+  const std::vector<MenuKey> keys = MenuKeys();
+  for (const char* name : {"bookmark_this_tab", "bookmark_all_tabs"}) {
+    const auto bookmark = std::ranges::find(keys, name, &MenuKey::name);
+    ASSERT_NE(bookmark, keys.end()) << name;
+    EXPECT_EQ("", bookmark->key) << name;
+  }
+  ui::Accelerator key;
+  EXPECT_FALSE(GetDefaultMacAcceleratorForCommandId(IDC_NEW_SPLIT_TAB, &key));
+  EXPECT_FALSE(
+      GetDefaultMacAcceleratorForCommandId(IDC_BOOKMARK_THIS_TAB, &key));
 }
 
 IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, ANewKeyRunsItsCommandInTheWindow) {

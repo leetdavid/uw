@@ -614,7 +614,7 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   ASSERT_EQ(menu.GetItemCount(), 7u);
   EXPECT_EQ(menu.GetCommandIdAt(0), IDC_NEW_TAB);
   EXPECT_EQ(menu.GetCommandIdAt(1), IDC_CREATE_NEW_TAB_GROUP);
-  EXPECT_EQ(menu.GetCommandIdAt(5), IDC_NEW_SPLIT_TAB);
+  EXPECT_EQ(menu.GetCommandIdAt(5), kSplitRight);
   EXPECT_EQ(menu.GetCommandIdAt(6), kNewWorkspaceCommand);
   ui::Accelerator key;
   ASSERT_TRUE(menu.GetAcceleratorForCommandId(IDC_CREATE_NEW_TAB_GROUP, &key));

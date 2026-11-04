@@ -1,0 +1,74 @@
+---
+title: Split view
+description: Show tabs next to each other in panes, as many as you like, split left and right or top and bottom as in a terminal.
+---
+
+## Split *the page*
+
+1. Press <kbd>Cmd</kbd> <kbd>D</kbd>. The pane you're in splits left and right, and the new pane on the right opens the [command bar](./command-bar.mdx). Pick a page, or pick an open tab to move it into the pane. With the command bar off, the new pane shows a new tab.
+2. Press <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>D</kbd> to split the pane you're in top and bottom. The new pane goes below.
+
+Any pane splits again either way, and only that pane gets smaller. In a [terminal tab](./terminal-tabs.mdx), the new pane is a new terminal in the same folder.
+
+<Figure caption="A page beside two panes: Cmd D split the page, then Shift Cmd D split the right pane. The sidebar shows the split as one box with a row per pane.">
+  <Window height={330}>
+    <Sidebar>
+      <Task name="Ship the pricing page" color="blue">
+        <TabRow>Linear</TabRow>
+        <Split>
+          <TabRow selected>Pricing · Acme</TabRow>
+          <TabRow kind="terminal">~/dev/site</TabRow>
+          <TabRow>acme-site · Deployments</TabRow>
+        </Split>
+      </Task>
+    </Sidebar>
+    <Page address="localhost:3000/pricing">
+      <Panes>
+        <Pane site="localhost" selected />
+        <Panes down>
+          <Pane site="~/dev/site" terminal>
+            <Cmd>pnpm dev</Cmd>
+            <Out tone="ok">✓ Ready in 812ms</Out>
+          </Pane>
+          <Pane site="vercel.com" />
+        </Panes>
+      </Panes>
+    </Page>
+  </Window>
+</Figure>
+
+**Split Right** and **Split Down** are also in the **Tab** menu and in a tab's right-click menu. **Split Right** is in the menu of the **▾** at the bottom of the sidebar.
+
+A pane is never narrower or shorter than 200 pixels. When the pane you're in is too small to split, nothing happens.
+
+## Move *between panes*
+
+Click a pane to use it. The pane you're in is outlined, and the other panes show a tag with their site in a corner.
+
+Each pane is a tab. <kbd>Ctrl</kbd> <kbd>Tab</kbd> goes through the panes from the top left, left to right and then top to bottom, and then on to the next tab. In the sidebar the split's rows are in the same order.
+
+Drag the gap between two panes to resize them.
+
+## Close a pane or *end the split*
+
+- <kbd>Cmd</kbd> <kbd>W</kbd>, or the **×** on a pane's tag, closes that pane's tab. The panes beside it take its space. With one pane left, the split ends.
+- **Move Out of Split View**, in a tab's right-click menu or the **Tab** menu, takes the tab out of the split. It stays open, just below the split in the sidebar.
+- **Separate Panes** ends the split. Its tabs stay open, in the order of their panes.
+
+Right-click a tab in the split and choose **Close** to close the whole split. <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>T</kbd> brings it back as it was: its panes, their sizes, and the pane you were in. Quitting and opening uw again keeps it too.
+
+## Split views and *your tasks*
+
+A split's tabs are all in one [task](./tasks.mdx), or all in the Scratchpad. [Automatic organization](./automatic-organization.mdx) leaves them alone, as it does a kept tab: it doesn't ask about them or move them, and **Tidy** and **Clear** skip them. Once the split ends, uw organizes its tabs again.
+
+## Keys
+
+| Keys | What they do |
+| --- | --- |
+| <kbd>Cmd</kbd> <kbd>D</kbd> | Split Right |
+| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>D</kbd> | Split Down |
+| <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Next pane, then the next tab |
+| <kbd>Shift</kbd> <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Previous pane |
+| <kbd>Cmd</kbd> <kbd>W</kbd> | Close the pane |
+
+**Bookmark This Tab** and **Bookmark All Tabs** have no keys in uw. Give them one at `uw://settings/shortcuts`.

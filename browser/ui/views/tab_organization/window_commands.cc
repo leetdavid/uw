@@ -27,6 +27,7 @@
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/split_view/split_commands.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/watch_card/watch_card.h"
@@ -85,6 +86,9 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
   if (TabOrganizationController::IsCommand(command)) {
     return controller->CanExecute(command, controller->TargetsFor(command));
   }
+  if (IsSplitCommand(command)) {
+    return CanRunSplitCommand(window->GetActiveTabInterface(), command);
+  }
   if (command >= kGoToTask1 && command <= kGoToTask9) {
     return static_cast<size_t>(command - kGoToTask1) <
            controller->tree().Tasks().size();
@@ -105,16 +109,17 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
     case kClearScratchpad:
       return std::ranges::any_of(
           controller->tree().pages(), [controller](const Page& page) {
-            return page.task.empty() && !controller->IsKept(page.id);
+            return page.task.empty() && !controller->IsLeftAlone(page.id);
           });
     // Without a language model, Tidy opens AI providers to pick one.
     case kTidyScratchpad:
       return organizer && !window->GetProfile()->IsOffTheRecord() &&
              !organizer->IsTidying() &&
-             std::ranges::any_of(
-                 controller->tree().pages(), [controller](const Page& page) {
-                   return page.task.empty() && !controller->IsKept(page.id);
-                 });
+             std::ranges::any_of(controller->tree().pages(),
+                                 [controller](const Page& page) {
+                                   return page.task.empty() &&
+                                          !controller->IsLeftAlone(page.id);
+                                 });
     case kRenameTask:
       return SelectedTask(window).has_value();
     case kNameTask:
@@ -146,6 +151,10 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       TabOrganizationController::From(window);
   if (TabOrganizationController::IsCommand(command)) {
     controller->Execute(command, controller->TargetsFor(command));
+    return;
+  }
+  if (IsSplitCommand(command)) {
+    RunSplitCommand(window->GetActiveTabInterface(), command);
     return;
   }
   if (command >= kGoToTask1 && command <= kGoToTask9) {

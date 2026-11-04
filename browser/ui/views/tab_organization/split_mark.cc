@@ -39,8 +39,7 @@ constexpr gfx::VectorIcon kSplitIcon(kSplitReps,
 }  // namespace
 
 SplitMark::SplitMark(tabs::TabHandle tab) : tab_(tab) {
-  const std::u16string hint =
-      l10n_util::GetStringUTF16(IDS_SPLIT_TAB_NEW_VERTICAL);
+  const std::u16string hint = l10n_util::GetStringUTF16(IDS_UW_SPLIT_VIEW);
   SetTooltipText(hint);
   GetViewAccessibility().SetName(hint);
   SetBorder(views::CreateEmptyBorder(gfx::Insets(kPadding)));
@@ -60,8 +59,8 @@ bool SplitMark::ShownOnRow(bool hovered) const {
   if (!split) {
     return false;
   }
-  const std::vector<tabs::TabInterface*> pair = split->ListTabs();
-  return !pair.empty() && pair.front() == tab;
+  const std::vector<tabs::TabInterface*> tabs = split->ListTabs();
+  return !tabs.empty() && tabs.front() == tab;
 }
 
 void SplitMark::OnThemeChanged() {

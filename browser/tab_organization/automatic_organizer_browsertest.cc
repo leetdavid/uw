@@ -1965,6 +1965,35 @@ IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
   EXPECT_FALSE(controller()->IsKept(Id(kept)));
 }
 
+// A tab in a split view stays where it is, as a kept tab does: uw does not
+// ask about it or move it. Once the split ends, it is an ordinary tab again.
+IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
+                       ATabInASplitStaysWhereItIs) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
+  tabs::TabInterface* beside = OpenLinkFrom(page, "assistant");
+  ASSERT_EQ(beside->GetGroup(), task);
+  tabs()->SplitPane(tabs()->GetIndexOfTab(page), tabs()->GetIndexOfTab(beside),
+                    split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(beside->IsSplit());
+  EXPECT_TRUE(controller()->IsLeftAlone(Id(beside)));
+  EXPECT_FALSE(controller()->IsKept(Id(beside)));
+
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99));
+  Browse(beside, "weather");
+  Browse(ungrouped, "radar");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(beside->GetGroup(), task);
+  EXPECT_TRUE(RequestAbout("weather").empty());
+
+  tabs()->RemoveSplit(*beside->GetSplit());
+  EXPECT_FALSE(controller()->IsLeftAlone(Id(beside)));
+  Browse(beside, "forecast");
+  ASSERT_TRUE(SettleAfter(2));
+  EXPECT_FALSE(beside->GetGroup());
+}
+
 IN_PROC_BROWSER_TEST_F(AutomaticOrganizerBrowserTest,
                        PRE_AKeptTabIsKeptAfterARestart) {
   SessionStartupPref::SetStartupPref(

@@ -2,7 +2,9 @@
 
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 
+#include <algorithm>
 #include <utility>
+#include <vector>
 
 #include "base/auto_reset.h"
 #include "base/containers/circular_deque.h"
@@ -17,11 +19,14 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_dialog_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_wrapper.h"
 #include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/input/native_web_keyboard_event.h"
 #include "components/prefs/pref_service.h"
+#include "components/split_tabs/split_tab_visual_data.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "content/public/browser/focused_node_details.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/page_navigator.h"
@@ -225,6 +230,7 @@ bool CommandBar::Open(BrowserWindowInterface* window) {
     return false;
   }
   bar->task_.reset();
+  bar->pane_ = tabs::TabHandle();
   bar->Show();
   return true;
 }
@@ -235,6 +241,7 @@ bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
     return false;
   }
   bar->task_.reset();
+  bar->pane_ = tabs::TabHandle();
   ResetCommandBar(bar->page(), /*shell=*/true);
   bar->Show();
   return true;
@@ -247,6 +254,19 @@ bool CommandBar::OpenForTask(BrowserWindowInterface* window,
     return false;
   }
   bar->task_ = task;
+  bar->pane_ = tabs::TabHandle();
+  bar->Show();
+  return true;
+}
+
+bool CommandBar::OpenForPane(BrowserWindowInterface* window,
+                             tabs::TabInterface* pane) {
+  CommandBar* bar = From(window);
+  if (!bar || !bar->contents_) {
+    return false;
+  }
+  bar->task_.reset();
+  bar->pane_ = pane->GetHandle();
   bar->Show();
   return true;
 }
@@ -277,9 +297,23 @@ void CommandBar::Show() {
   if (IsShowing()) {
     return;
   }
-  views::View* card =
-      BrowserView::GetBrowserViewForBrowser(window_)->contents_container();
-  const gfx::Rect area = card->GetBoundsInScreen();
+  BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(window_);
+  views::View* card = browser_view->contents_container();
+  gfx::Rect area = card->GetBoundsInScreen();
+  // Opened for a new pane, it shows over that pane, where the split puts it
+  // even before the page area is laid out again.
+  if (tabs::TabInterface* pane = pane_.Get(); pane && pane->GetSplit()) {
+    const split_tabs::SplitTabData* split =
+        window_->GetTabStripModel()->GetSplitData(*pane->GetSplit());
+    const std::vector<tabs::TabInterface*> tabs = split->ListTabs();
+    MultiContentsView* page_area = browser_view->multi_contents_view();
+    const std::vector<gfx::Rect> panes =
+        page_area->GetPaneBounds(split->visual_data()->panes());
+    const size_t index = std::ranges::find(tabs, pane) - tabs.begin();
+    if (index < panes.size()) {
+      area = panes[index] + page_area->GetBoundsInScreen().OffsetFromOrigin();
+    }
+  }
   const gfx::Rect anchor(area.CenterPoint().x(), area.y() + kTopInset, 0, 0);
   // The page's last size is in pixels at the scale it was laid out at.
   content::RenderWidgetHostView* page_view = page()->GetRenderWidgetHostView();
@@ -339,10 +373,24 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
         std::make_unique<NewTabGroupingUserData>(active ? active->GetGroup()
                                                         : std::nullopt));
   }
+  // Over a new pane, an open tab of this window moves into the pane. Navigate
+  // would switch to it, and close the pane's blank tab on the way.
+  if (params.disposition == WindowOpenDisposition::SWITCH_TO_TAB &&
+      pane_.Get()) {
+    TabStripModel* model = window_->GetTabStripModel();
+    for (int i = 0; i < model->count(); ++i) {
+      tabs::TabInterface* tab = model->GetTabAtIndex(i);
+      if (tab->GetContents()->GetLastCommittedURL() == params.url) {
+        PlaceInPane(tab);
+        return;
+      }
+    }
+  }
   Navigate(&navigate);
   if (navigate.disposition != WindowOpenDisposition::SWITCH_TO_TAB) {
     PlaceInTask();
   }
+  PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
 }
 
 tabs::TabInterface* CommandBar::SelectedPage() {
@@ -358,6 +406,7 @@ void CommandBar::Ask(const std::string& text, tabs::TabInterface* page) {
   }
   AskInNewChat(window_, page, text);
   PlaceInTask();
+  PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
 }
 
 void CommandBar::RunInTerminal(const std::string& text) {
@@ -366,6 +415,7 @@ void CommandBar::RunInTerminal(const std::string& text) {
   }
   OpenTerminalTabRunning(window_, text);
   PlaceInTask();
+  PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
 }
 
 void CommandBar::PlaceInTask() {
@@ -375,6 +425,23 @@ void CommandBar::PlaceInTask() {
   if (task && controller) {
     controller->PlaceInTask(window_->GetTabStripModel()->GetActiveTab(), *task);
   }
+}
+
+void CommandBar::PlaceInPane(tabs::TabInterface* tab) {
+  tabs::TabInterface* pane = std::exchange(pane_, tabs::TabHandle()).Get();
+  TabStripModel* model = window_->GetTabStripModel();
+  // A tab picked in another window, or already in this split, stays put.
+  if (!pane || !pane->IsSplit() || !tab || tab == pane || tab->IsPinned() ||
+      tab->GetSplit() == pane->GetSplit()) {
+    return;
+  }
+  if (tab->IsSplit()) {
+    model->MoveTabOutOfSplit(model->GetIndexOfTab(tab));
+  }
+  // The split takes another tab only while one of its own is selected.
+  model->ActivateTabAt(model->GetIndexOfTab(pane));
+  model->UpdateTabInSplit(pane, model->GetIndexOfTab(tab),
+                          TabStripModel::SplitUpdateType::kReplace);
 }
 
 }  // namespace uw

@@ -1,0 +1,20 @@
+# How a split view's panes are arranged. No browser dependencies, so it is
+# tested without a window.
+source_set("split_view") {
+  sources = [
+    "split_layout.cc",
+    "split_layout.h",
+  ]
+  public_deps = [ "//ui/gfx/geometry" ]
+  deps = [ "//base" ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [ "split_layout_unittest.cc" ]
+  deps = [
+    ":split_view",
+    "//base",
+    "//testing/gtest",
+  ]
+}

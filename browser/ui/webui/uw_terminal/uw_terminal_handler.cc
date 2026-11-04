@@ -36,10 +36,14 @@ int Clamp(int32_t cells) {
 
 ShellHost::Options UserShell(int columns,
                              int rows,
-                             base::EnvironmentMap environment) {
+                             base::EnvironmentMap environment,
+                             const base::FilePath& folder) {
   ShellHost::Options options = ShellHost::ForUser();
   options.columns = columns;
   options.rows = rows;
+  if (!folder.empty()) {
+    options.folder = folder;
+  }
   for (auto& [key, value] : environment) {
     options.environment[key] = std::move(value);
   }
@@ -121,7 +125,7 @@ void UwTerminalHandler::Start(int32_t columns, int32_t rows) {
   StartCommand start = TakeStartCommand(contents_);
   session_ = std::make_unique<ShellSession>(
       base::BindOnce(&UserShell, Clamp(columns), Clamp(rows),
-                     std::move(start.environment)),
+                     std::move(start.environment), start.folder),
       this);
   // A command from the command bar or the connectors page, run as if typed
   // and entered.

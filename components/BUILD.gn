@@ -5,6 +5,7 @@ group("unit_tests") {
     "ai_providers:unit_tests",
     "connectors:unit_tests",
     "look:unit_tests",
+    "split_view:unit_tests",
     "tab_organization:unit_tests",
     "terminal:unit_tests",
     "uw_command:unit_tests",

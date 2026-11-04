@@ -6,13 +6,10 @@
 #include <string>
 
 #include "base/environment.h"
+#include "base/files/file_path.h"
 
 class BrowserWindowInterface;
 class GURL;
-
-namespace base {
-class FilePath;
-}
 
 namespace content {
 struct DropData;
@@ -38,8 +35,13 @@ void OpenTerminalTabRunning(BrowserWindowInterface* window,
                             const std::string& command,
                             base::EnvironmentMap environment = {});
 
-// What a terminal tab opened by OpenTerminalTabRunning starts with, taken
-// once. Empty for any other tab.
+// Opens a terminal tab the same way, with its shell in `folder`, or in the
+// home folder when `folder` is empty.
+void OpenTerminalTabIn(BrowserWindowInterface* window,
+                       const base::FilePath& folder);
+
+// What a terminal tab opened by OpenTerminalTabRunning or OpenTerminalTabIn
+// starts with, taken once. Empty for any other tab.
 struct StartCommand {
   StartCommand();
   StartCommand(StartCommand&&);
@@ -48,6 +50,7 @@ struct StartCommand {
 
   std::string command;
   base::EnvironmentMap environment;
+  base::FilePath folder;
 };
 StartCommand TakeStartCommand(content::WebContents* contents);
 

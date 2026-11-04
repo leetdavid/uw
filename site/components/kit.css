@@ -1207,3 +1207,76 @@
   gap: 14px;
   padding: 20px 24px;
 }
+
+.kit-split {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 12px;
+  background: var(--kit-hover);
+}
+
+.kit-panes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+}
+
+.kit-panes .kit-panes {
+  position: static;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+.kit-panes.down {
+  flex-direction: column;
+}
+
+.kit-pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--kit-page);
+  box-shadow: 0 0 0 1px var(--kit-line);
+}
+
+.kit-pane.on {
+  box-shadow: 0 0 0 2px var(--kit-accent);
+}
+
+.kit-pane .kit-lines {
+  padding: 18px 20px;
+}
+
+.kit-pane > .kit-shell {
+  height: 100%;
+}
+
+.kit-pane-tag {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 8px;
+  border-radius: 8px;
+  background: var(--kit-raised);
+  box-shadow:
+    0 0 0 1px var(--kit-line),
+    0 2px 6px var(--kit-shadow);
+  color: var(--kit-ink2);
+  font: 11.5px / 1 var(--font-sans);
+}
+
+.kit .kit-pane-tag svg {
+  width: 12px;
+  height: 12px;
+}

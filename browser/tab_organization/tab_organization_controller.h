@@ -227,6 +227,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // to the Scratchpad. Keeping a tab is not an organization action, so undo
   // leaves it alone.
   bool IsKept(const PageId& id) const;
+  // A kept tab, or a tab in a split view, which the organizer treats as kept
+  // until the split ends. Tidy and Clear leave it alone too.
+  bool IsLeftAlone(const PageId& id) const;
   // True when ToggleKept would keep the tabs of `ids`, false when it would
   // let them go.
   bool KeepsTabs(const std::vector<PageId>& ids) const;

@@ -35,6 +35,18 @@ struct StartCommandData : base::SupportsUserData::Data {
   StartCommand start;
 };
 
+void OpenTerminalTabStarting(BrowserWindowInterface* window,
+                             StartCommand start) {
+  content::WebContents* contents =
+      chrome::AddAndReturnTabAt(window, TerminalUrl(), -1, true);
+  if (!contents) {
+    return;
+  }
+  auto data = std::make_unique<StartCommandData>();
+  data->start = std::move(start);
+  contents->SetUserData(kStartCommandKey, std::move(data));
+}
+
 }  // namespace
 
 GURL TerminalUrl() {
@@ -54,15 +66,17 @@ StartCommand::~StartCommand() = default;
 void OpenTerminalTabRunning(BrowserWindowInterface* window,
                             const std::string& command,
                             base::EnvironmentMap environment) {
-  content::WebContents* contents =
-      chrome::AddAndReturnTabAt(window, TerminalUrl(), -1, true);
-  if (!contents) {
-    return;
-  }
-  auto data = std::make_unique<StartCommandData>();
-  data->start.command = command;
-  data->start.environment = std::move(environment);
-  contents->SetUserData(kStartCommandKey, std::move(data));
+  StartCommand start;
+  start.command = command;
+  start.environment = std::move(environment);
+  OpenTerminalTabStarting(window, std::move(start));
+}
+
+void OpenTerminalTabIn(BrowserWindowInterface* window,
+                       const base::FilePath& folder) {
+  StartCommand start;
+  start.folder = folder;
+  OpenTerminalTabStarting(window, std::move(start));
 }
 
 StartCommand TakeStartCommand(content::WebContents* contents) {

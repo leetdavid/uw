@@ -57,6 +57,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -194,6 +195,31 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
                            "(c => c.hidden ? '' : c.textContent)("
                            "document.querySelector('#chip'))")
         .ExtractString();
+  }
+
+  // Finds the open tab whose title is "Title Of Awesomeness" once its visit is
+  // indexed, and picks its row.
+  void PickTheTabRow() {
+    ASSERT_TRUE(Eventually(
+        [&] {
+          Type("awesomeness");
+          Wait(base::Milliseconds(100));
+          return Kinds().find("Tab") != std::string::npos;
+        },
+        base::Seconds(5)))
+        << "The rows are: " << Kinds();
+    const int row =
+        content::EvalJs(bar()->page(),
+                        "[...document.querySelectorAll('#results .kind')]"
+                        ".findIndex(kind => kind.textContent === 'Tab')")
+            .ExtractInt();
+    for (int i = 0; i < row; ++i) {
+      PressInField("ArrowDown");
+    }
+    EXPECT_EQ("Switch to tab",
+              content::EvalJs(bar()->page(),
+                              "document.querySelector('#action').textContent"));
+    PressInField("Enter");
   }
 
   // Lets uw finish placing tabs after a change to the tab strip.
@@ -543,31 +569,67 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnOpenTabRowSwitchesToIt) {
   const int count = tabs->count();
 
   Press(ui::VKEY_T, NSEventModifierFlagCommand);
-  // The page's title, "Title Of Awesomeness", finds it once its visit is
-  // indexed.
-  ASSERT_TRUE(Eventually(
-      [&] {
-        Type("awesomeness");
-        Wait(base::Milliseconds(100));
-        return Kinds().find("Tab") != std::string::npos;
-      },
-      base::Seconds(5)))
-      << "The rows are: " << Kinds();
-  const int row =
-      content::EvalJs(bar()->page(),
-                      "[...document.querySelectorAll('#results .kind')]"
-                      ".findIndex(kind => kind.textContent === 'Tab')")
-          .ExtractInt();
-  for (int i = 0; i < row; ++i) {
-    PressInField("ArrowDown");
-  }
-  EXPECT_EQ("Switch to tab",
-            content::EvalJs(bar()->page(),
-                            "document.querySelector('#action').textContent"));
-  PressInField("Enter");
+  PickTheTabRow();
 
   EXPECT_TRUE(Eventually([&] { return tabs->GetActiveWebContents() == open; }));
   EXPECT_EQ(count, tabs->count());
+}
+
+// Split Right opens the command bar over the new pane. A page picked there
+// takes the pane, which closes.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, APickedPageFillsTheNewPane) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  browser()->GetWindow()->SetBounds(gfx::Rect(0, 0, 1400, 900));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL("/title1.html")));
+  tabs::TabInterface* left = tabs->GetActiveTab();
+  chrome::ExecuteCommand(browser(), kSplitRight);
+  ASSERT_TRUE(bar()->IsShowing());
+  ASSERT_EQ(tabs->count(), 2);
+
+  const GURL page = embedded_test_server()->GetURL("/title2.html");
+  Type(page.spec());
+  ASSERT_TRUE(Eventually([&] { return Rows() > 0; }));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    tabs::TabInterface* pane = tabs->GetActiveTab();
+    return tabs->count() == 2 && pane != left && pane->IsSplit() &&
+           pane->GetSplit() == left->GetSplit() &&
+           pane->GetContents()->GetVisibleURL() == page;
+  }));
+}
+
+// An open tab picked over the new pane moves into the split in its place.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, APickedTabMovesIntoTheNewPane) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  browser()->GetWindow()->SetBounds(gfx::Rect(0, 0, 1400, 900));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), embedded_test_server()->GetURL("/title1.html")));
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      browser(), embedded_test_server()->GetURL("/title2.html"),
+      WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  content::WebContents* open = tabs->GetActiveWebContents();
+  tabs->ActivateTabAt(0);
+  Settle();
+  tabs::TabInterface* left = tabs->GetActiveTab();
+
+  chrome::ExecuteCommand(browser(), kSplitRight);
+  ASSERT_TRUE(bar()->IsShowing());
+  ASSERT_EQ(tabs->count(), 3);
+  PickTheTabRow();
+
+  EXPECT_TRUE(Eventually([&] {
+    tabs::TabInterface* picked = tabs::TabInterface::GetFromContents(open);
+    return tabs->count() == 2 && picked->IsSplit() &&
+           picked->GetSplit() == left->GetSplit() &&
+           tabs->GetActiveWebContents() == open;
+  }));
 }
 
 // Only results ready at once are asked for, so the search engine hears of

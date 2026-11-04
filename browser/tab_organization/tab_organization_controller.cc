@@ -1073,7 +1073,7 @@ void TabOrganizationController::FindClearable(
   std::vector<content::WebContents*> contents;
   for (const Page& page : shared_->tree().pages()) {
     tabs::TabInterface* tab = TabFor(page.id);
-    if (page.task.empty() && !IsKept(page.id) &&
+    if (page.task.empty() && !IsLeftAlone(page.id) &&
         !(tab && IsWorkingChat(tab->GetContents()))) {
       pages.emplace_back(page.id, tab ? tab->GetContents() : nullptr);
       if (tab) {
@@ -1110,7 +1110,7 @@ void TabOrganizationController::ClearScratchpad() {
         // A tab may have moved or been kept while the shells answered.
         std::erase_if(ids, [&self](const PageId& id) {
           const Page* page = self->shared_->tree().Find(id);
-          return !page || !page->task.empty() || self->IsKept(id);
+          return !page || !page->task.empty() || self->IsLeftAlone(id);
         });
         if (ids.empty()) {
           return;
@@ -1273,6 +1273,11 @@ bool TabOrganizationController::IsKept(const PageId& id) const {
   const auto kept = shared_->kept().find(id);
   const Page* page = shared_->tree().Find(id);
   return kept != shared_->kept().end() && page && page->task == kept->second;
+}
+
+bool TabOrganizationController::IsLeftAlone(const PageId& id) const {
+  const tabs::TabInterface* tab = TabFor(id);
+  return IsKept(id) || (tab && tab->IsSplit());
 }
 
 bool TabOrganizationController::KeepsTabs(

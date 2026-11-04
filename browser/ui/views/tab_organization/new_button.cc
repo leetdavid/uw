@@ -24,6 +24,7 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_background.h"
@@ -64,7 +65,7 @@ NewItemsMenu::NewItemsMenu(BrowserWindowInterface* window)
   AddItemWithStringId(kNewChatCommand, IDS_UW_NEW_CHAT);
   AddItemWithStringId(kNewTerminalCommand, IDS_UW_NEW_TERMINAL);
   AddSeparator(ui::NORMAL_SEPARATOR);
-  AddItemWithStringId(IDC_NEW_SPLIT_TAB, IDS_TAB_CXMENU_NEW_SPLIT_WITH_CURRENT);
+  AddItemWithStringId(kSplitRight, IDS_UW_SPLIT_RIGHT_MAC);
   if (WorkspaceWindow::From(window)) {
     AddItemWithStringId(kNewWorkspaceCommand, IDS_UW_NEW_WORKSPACE);
   }

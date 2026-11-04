@@ -40,6 +40,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
@@ -73,6 +74,7 @@
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
@@ -659,6 +661,50 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   tabs()->ActivateTabAt(tabs()->GetIndexOfTab(page));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return !PartOf(rows[0], "SplitMark")->GetVisible(); }));
+}
+
+// A split of any size is one box in the sidebar, with a row per pane in
+// reading order: by each pane's top-left corner, left to right, then top to
+// bottom. The rows re-sort when a divider moves a pane past another.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ASplitHasARowPerPaneInReadingOrder) {
+  const auto instant = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
+  tabs::TabInterface* a = InitialTab();
+  tabs::TabInterface* b = NewTab();
+  tabs::TabInterface* c = NewTab();
+  tabs::TabInterface* d = NewTab();
+  const auto index = [&](tabs::TabInterface* tab) {
+    return tabs()->GetIndexOfTab(tab);
+  };
+  // Two columns of two: a over b on the left, c over d on the right.
+  tabs()->SplitPane(index(a), index(c),
+                    split_tabs::SplitTabLayout::kSideBySide);
+  tabs()->SplitPane(index(a), index(b), split_tabs::SplitTabLayout::kStacked);
+  tabs()->SplitPane(index(c), index(d), split_tabs::SplitTabLayout::kStacked);
+  base::RunLoop().RunUntilIdle();
+  const auto rows = [&] {
+    std::vector<views::View*> found = VisibleRows();
+    std::ranges::sort(found, {}, [](views::View* row) {
+      return row->GetBoundsInScreen().y();
+    });
+    std::vector<const tabs::TabInterface*> order;
+    for (views::View* row : found) {
+      order.push_back(views::AsViewClass<TabView>(row)->GetTabInterface());
+    }
+    return order;
+  };
+  // Each change to the split makes its box again, and the old ones go.
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return ViewsOfClass("SplitTabView").size() == 1u;
+  })) << ViewsOfClass("SplitTabView").size()
+      << " split boxes";
+  EXPECT_EQ(rows(), (std::vector<const tabs::TabInterface*>{a, c, b, d}));
+
+  // The left column's divider drops below the right one's.
+  tabs()->UpdateSplitCutRatio(*a->GetSplit(), 1, 0.7);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(rows(), (std::vector<const tabs::TabInterface*>{a, c, d, b}));
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

@@ -37,7 +37,12 @@ enum WindowCommand {
   kShowScheduled,
   // Opens the Inbox, as its button in the sidebar does.
   kShowInbox,
-  kLastWindowCommand = kShowInbox,
+  // Split views, on the selected tab. See split_commands.h.
+  kSplitRight,
+  kSplitDown,
+  kMoveOutOfSplit,
+  kSeparatePanes,
+  kLastWindowCommand = kSeparatePanes,
 };
 
 bool IsWindowCommand(int command);

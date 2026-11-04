@@ -700,7 +700,7 @@ const TEST_SUITES = {
     "ConnectorConfigTest.*", "McpTest.*", "ConnectorToolsTest.*", "OAuthTest.*", "ShellEnvironmentTest.*", "ConnectorCatalogTest.*", "UsageTest.*", "ChatUsageTest.*",
     "ScheduleTest.*", "ChatSchedulerTest.*", "RunReportTest.*", "ScheduledChatTest.*",
     "CommandCheckTest.*", "ProviderAddressTest.*", "ShellHostPromptTest.*", "ThemeTest.*", "ThemePrefsTest.*",
-    "CommandSettingsTest.*", "CommandMessagesTest.*",
+    "CommandSettingsTest.*", "CommandMessagesTest.*", "SplitLayoutTest.*",
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
@@ -717,7 +717,7 @@ const TEST_SUITES = {
     "SharedTabsBrowserTest.*", "SharedTabsFirstLaunchBrowserTest.*", "SharedTabsOffBrowserTest.*", "SharedTabsOrganizerBrowserTest.*", "TopButtonsBrowserTest.*",
     "WorkspacesOffBrowserTest.*", "BusyTerminalWarningOffBrowserTest.*", "WorkingChatWarningOffBrowserTest.*",
     "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*", "UwCommandSectionBrowserTest.*",
-    "UwCommandConnectorsBrowserTest.*", "UwCommandChatBrowserTest.*",
+    "UwCommandConnectorsBrowserTest.*", "UwCommandChatBrowserTest.*", "SplitViewBrowserTest.*",
   ],
 } as const;
 

@@ -1,0 +1,64 @@
+# Split views' commands: Split Right, Split Down, Move Out of Split View, and
+# Separate Panes.
+source_set("split_view") {
+  sources = [
+    "split_commands.cc",
+    "split_commands.h",
+  ]
+  public_deps = [ "//ui/menus" ]
+  deps = [
+    "//base",
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ui/browser_window",
+    "//components/split_tabs",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/gfx/geometry",
+    "//uw/browser/tab_organization",
+    "//uw/browser/terminal",
+    "//uw/browser/ui/views/command_bar",
+    "//uw/components/split_view",
+  ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "split_view_browsertest.cc" ]
+  deps = [
+    ":split_view",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/app:command_ids",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/sessions:test_support",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/common",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//components/sessions",
+    "//components/split_tabs",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/events",
+    "//ui/gfx/geometry",
+    "//ui/views",
+    "//url",
+    "//uw/browser/agent:chat_tab",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/terminal",
+    "//uw/browser/ui/views/command_bar",
+    "//uw/components/split_view",
+  ]
+}

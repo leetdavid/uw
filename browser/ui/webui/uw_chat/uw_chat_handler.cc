@@ -36,6 +36,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
 #include "components/prefs/pref_service.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
@@ -1079,12 +1080,27 @@ void UwChatHandler::SetSideBySide(bool on, int32_t number) {
   }
   TabStripModel* model = chat->GetBrowserWindowInterface()->GetTabStripModel();
   const std::optional<split_tabs::SplitTabId> split = chat->GetSplit();
+  tabs::TabInterface* agent = AgentTab(number ? number : current_tab_);
+  const bool beside =
+      on && agent &&
+      agent->GetBrowserWindowInterface() == chat->GetBrowserWindowInterface();
+  // In a split the user added panes to, only the agent's pane changes.
+  if (split && model->GetSplitData(*split)->ListTabs().size() > 2) {
+    tabs::TabInterface* pane = AgentPane(*split);
+    if (beside && pane && !agent->IsSplit()) {
+      model->ActivateTabAt(model->GetIndexOfTab(chat));
+      model->UpdateTabInSplit(pane, model->GetIndexOfTab(agent),
+                              TabStripModel::SplitUpdateType::kSwap);
+    } else if (!on && pane) {
+      model->MoveTabOutOfSplit(model->GetIndexOfTab(pane));
+    }
+    SendTabs();
+    return;
+  }
   if (split) {
     model->RemoveSplit(*split);
   }
-  tabs::TabInterface* agent = AgentTab(number ? number : current_tab_);
-  if (on && agent &&
-      agent->GetBrowserWindowInterface() == chat->GetBrowserWindowInterface()) {
+  if (beside) {
     // The split takes the active tab, which is the chat while its page is
     // being used.
     model->ActivateTabAt(model->GetIndexOfTab(chat));
@@ -1826,6 +1842,18 @@ tabs::TabInterface* UwChatHandler::AgentTab(int number) {
   const std::map<int, tabs::TabInterface*> open = agent_->tools().OpenTabs();
   const auto tab = open.find(number);
   return tab == open.end() ? nullptr : tab->second;
+}
+
+tabs::TabInterface* UwChatHandler::AgentPane(split_tabs::SplitTabId split) {
+  if (!agent_) {
+    return nullptr;
+  }
+  for (const auto& [number, tab] : agent_->tools().OpenTabs()) {
+    if (tab->GetSplit() == split) {
+      return tab;
+    }
+  }
+  return nullptr;
 }
 
 void UwChatHandler::OnToolStep(const AgentLoop::Step& step) {
