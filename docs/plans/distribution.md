@@ -14,6 +14,21 @@ Agreed: every preview is signed with a Developer ID and notarized by Apple, so i
 
 Agreed: Sparkle 2 checks for, downloads, and verifies updates in the background. When one is ready, Chromium's own "Relaunch to update" chip and menu item appear, and relaunching installs it with the user's tabs restored. Sparkle's own windows never show. The feed, `appcast.xml`, is an asset of each GitHub release. Only releases carry Sparkle: `pnpm run release` adds the framework and the feed's address, so daily builds never check for updates. See [ADR 0019](../adr/0019-sparkle-updates-behind-chromiums-relaunch-button.md).
 
+Agreed on 2026-11-04 (T336): uw checks every 5 hours, as Chrome does, and at launch when the last check is older than that. Before, it checked once a day.
+
+Agreed on 2026-11-04 (T336): opening About uw checks at once, through uw's own updater. Before, the page asked Chromium's Google updater, which uw does not ship, and every Mac release showed "An error occurred while checking for updates: 0 (error code 0)".
+
+| State | About uw shows |
+| --- | --- |
+| Checking | "Checking for updates" |
+| A newer version is downloading | "Updating uw" |
+| A newer version is ready | "Nearly up to date! Relaunch uw to finish updating." and a Relaunch button |
+| No newer version | "uw is up to date" |
+| The check failed | "uw couldn't check for updates. Check your connection, then open this page again." and Learn more, which opens the Updates section of the [Install uw](../../site/content/help/install-uw.mdx) Help page |
+| A daily build, which has no updater | No update line, only the version |
+
+A check or download already under way, from the page or the schedule, shows its state; the page does not start another. Windows behaves the same with its own updater; see [Windows](windows.md).
+
 ## Release pipeline
 
 Agreed: previews are built on the owner's Mac in the `~/dev/uw-release` worktree, not in CI. Free GitHub runners stop a job after 6 hours, which is too short for a Chromium build. One command, `pnpm run release <sha>`, runs every step: check out, build, smoke test, sign and notarize with Chromium's `sign_chrome.py`, make the DMG, sign the Sparkle feed entry, and publish the GitHub release. `sign_chrome.py` is upstream Python, like the rest of Chromium's build tools.
