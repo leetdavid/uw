@@ -704,7 +704,7 @@ const TEST_SUITES = {
   ],
   browser_tests: [
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
-    "UwOrganizationPageBrowserTest.*", "MenuKeysBrowserTest.*", "ReleaseVersionBrowserTest.*", "UpdateBrowserTest.*", "ProblemReportsBrowserTest.*", "GoogleRequestsBrowserTest.*", "CodecsBrowserTest.*", "UwShortcutsPageBrowserTest.*",
+    "UwOrganizationPageBrowserTest.*", "MenuKeysBrowserTest.*", "ReleaseVersionBrowserTest.*", "UpdateBrowserTest.*", "AboutUpdatesBrowserTest.*", "ProblemReportsBrowserTest.*", "GoogleRequestsBrowserTest.*", "CodecsBrowserTest.*", "UwShortcutsPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "PageClipboardBrowserTest.*", "UwTerminalBrowserTest.*",
     "UwTerminalMenuBrowserTest.*", "BusyTerminalWarningBrowserTest.*", "WorkingChatWarningBrowserTest.*",
     "AgentEngineBrowserTest.*", "AgentToolsBrowserTest.*", "RunWindowBrowserTest.*", "ChatRunBrowserTest.*", "ScheduledChatsBrowserTest.*", "ScheduledPageBrowserTest.*", "InboxBrowserTest.*", "WatchCardBrowserTest.*", "AgentLoopBrowserTest.*",
