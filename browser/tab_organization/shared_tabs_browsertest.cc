@@ -32,6 +32,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
@@ -49,6 +50,8 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/actor/core/task_source_info.h"
 #include "components/actor/public/mojom/actor_types.mojom.h"
+#include "components/favicon/content/content_favicon_driver.h"
+#include "components/favicon/core/favicon_driver.h"
 #include "components/performance_manager/performance_manager_tab_helper.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
@@ -226,6 +229,35 @@ int LivePages(const std::vector<Browser*>& windows, const char* url) {
   return live;
 }
 
+// Whether `page`'s row shows the page's own icon, not the default one.
+bool ShowsIcon(content::WebContents* page) {
+  favicon::FaviconDriver* icons =
+      favicon::ContentFaviconDriver::FromWebContents(page);
+  return icons && icons->FaviconIsValid() && !icons->GetFavicon().IsEmpty();
+}
+
+// `window`'s tab for the page with an icon, whatever port it was served on.
+tabs::TabInterface* IconPageIn(BrowserWindowInterface* window) {
+  TabStripModel* tabs = window->GetTabStripModel();
+  for (int i = 0; i < tabs->count(); ++i) {
+    if (tabs->GetWebContentsAt(i)->GetLastCommittedURL().path() ==
+        "/favicon/page_with_favicon.html") {
+      return tabs->GetTabAtIndex(i);
+    }
+  }
+  return nullptr;
+}
+
+// Whether `window`'s row for `tab` shows the title and icon of `tab`'s page,
+// and the icon is the page's own.
+bool RowShowsItsPage(Browser* window, tabs::TabInterface* tab) {
+  const TabView* row = views::AsViewClass<TabView>(RowOf(window, tab));
+  TabUIHelper* shown = TabUIHelper::From(tab);
+  return row && ShowsIcon(tab->GetContents()) &&
+         row->data().title == shown->GetTitle() &&
+         row->data().favicon == shown->GetFavicon();
+}
+
 // `profile`'s windows that show.
 std::vector<Browser*> ShownWindows(Profile* profile) {
   std::vector<Browser*> shown;
@@ -312,14 +344,15 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
     embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
         [](const net::test_server::HttpRequest& request)
             -> std::unique_ptr<net::test_server::HttpResponse> {
+          if (request.relative_url != "/timer") {
+            return nullptr;
+          }
           auto response =
               std::make_unique<net::test_server::BasicHttpResponse>();
           response->set_content_type("text/html");
           response->set_content(
-              request.relative_url == "/timer"
-                  ? "<title>0</title><script>let n = 0;"
-                    "setInterval(() => document.title = ++n, 1000)</script>"
-                  : "<title>Plain</title>");
+              "<title>0</title><script>let n = 0;"
+              "setInterval(() => document.title = ++n, 1000)</script>");
           return response;
         }));
     ASSERT_TRUE(embedded_test_server()->Start());
@@ -513,6 +546,23 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ACopysRowShowsItsPagesTitle) {
     const TabView* row =
         views::AsViewClass<TabView>(RowOf(second, TabAt(second, kMail)));
     return row && row->data().title == u"Mail";
+  }));
+}
+
+// A copy's row shows its page's icon too, once the page has one.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ACopysRowShowsItsPagesIcon) {
+  Browser* first = browser();
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+
+  tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
+  ASSERT_TRUE(content::NavigateToURL(
+      notes->GetContents(),
+      embedded_test_server()->GetURL("/favicon/page_with_favicon.html")));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    tabs::TabInterface* copy = IconPageIn(second);
+    return copy && TabOrganizationController::IsCopy(copy) &&
+           RowShowsItsPage(second, copy);
   }));
 }
 
@@ -1315,6 +1365,83 @@ std::vector<std::string> LayoutAfterLaunch(Browser* window) {
     return row.starts_with("about:blank ");
   });
   return rows;
+}
+
+// After a restart, a copy shows its page's icon before anything loads it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       PRE_ACopyShowsItsPagesIconAfterARestart) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  const GURL url =
+      embedded_test_server()->GetURL("/favicon/page_with_favicon.html");
+  Open(first, url.spec().c_str());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ShowsIcon(IconPageIn(first)->GetContents()); }));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return IconPageIn(second) && ShowsIcon(IconPageIn(second)->GetContents());
+  }));
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ACopyShowsItsPagesIconAfterARestart) {
+  Profile* profile = browser()->GetProfile();
+  std::vector<Browser*> windows;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    windows = ShownWindows(profile);
+    return windows.size() == 2u && IconPageIn(windows[0]) &&
+           IconPageIn(windows[1]);
+  }));
+  for (Browser* window : windows) {
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      return RowShowsItsPage(window, IconPageIn(window));
+    })) << (TabOrganizationController::IsCopy(IconPageIn(window)) ? "copy"
+                                                                  : "live");
+  }
+}
+
+// A page that every window holds as a copy, as once the last window closed,
+// shows its icon after a restart, and so does a new window's copy of it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       PRE_APageNoWindowHoldsShowsItsIconAfterARestart) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  SessionStartupPref::SetStartupPref(
+      profile, SessionStartupPref(SessionStartupPref::LAST));
+  CreateIncognitoBrowser(profile);
+  const GURL url =
+      embedded_test_server()->GetURL("/favicon/page_with_favicon.html");
+  Open(first, url.spec().c_str());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return ShowsIcon(IconPageIn(first)->GetContents()); }));
+  first->GetWindow()->Close();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabOrganizationController::IsCopy(IconPageIn(first)); }));
+  base::RunLoop().RunUntilIdle();
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       APageNoWindowHoldsShowsItsIconAfterARestart) {
+  Profile* profile = browser()->GetProfile();
+  Browser* window = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::vector<Browser*> windows = ShownWindows(profile);
+    window = windows.size() == 1u ? windows[0] : nullptr;
+    return window && IconPageIn(window);
+  }));
+  ASSERT_TRUE(TabOrganizationController::IsCopy(IconPageIn(window)));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return RowShowsItsPage(window, IconPageIn(window)); }));
+
+  Browser* second = CreateBrowser(profile);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return IconPageIn(second) && RowShowsItsPage(second, IconPageIn(second));
+  }));
 }
 
 // The first launch with shared tabs, after a session saved without them.
