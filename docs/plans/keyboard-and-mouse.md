@@ -38,6 +38,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
 | New terminal | Ctrl+Shift+\` | new |
 | Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
+| Split right, split down | Cmd+D, Cmd+Shift+D | planned, per the [split view plan](split-view.md#keys). Chromium's Bookmark This Tab and Bookmark All Tabs lose them, and Cmd+Option+N, today's New Split View, goes. |
 | Move to task, pause, organizer activity, Name Task, [Tidy and Clear Scratchpad](scratchpad-buttons.md) | menu, and the command bar later | no key |
 
 ### Terminal key
@@ -95,7 +96,7 @@ Agreed on 2026-10-15.
 
 - A split button, "+" and "▾", sits at the right end of the sidebar's foot, with the Organize button at the left. The "+" under the tab list goes away.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
-- A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and New split view.
+- A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and New split view. Planned: New split view becomes Split Right, per the [split view plan](split-view.md#splitting).
 - The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user signed off the same day once the button moved from beside Organize to the right end.
 
 ### Branches with the mouse
@@ -138,6 +139,7 @@ Agreed on 2026-10-24 from the frames "Side by side: the sidebar" and "Side by si
 - Only the page in front is drawn selected, with its close button.
 - While the top row is not in front, it ends in a 13px split icon at 55%, with the tooltip "Side by side". Under the pointer the close button takes its place.
 - A pinned pair keeps Chromium's look.
+- Planned in the [split view plan](split-view.md#the-sidebar): a row per pane in reading order, the tooltip "Split view", and pinned split views in place of the pinned pair.
 - Built differently from the design: the pointer lights both rows of a pair, as Chromium's split does, and both show their close buttons.
 
 ### Mouse actions
