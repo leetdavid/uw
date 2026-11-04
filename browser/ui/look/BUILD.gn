@@ -92,6 +92,7 @@ source_set("browser_tests") {
     "//ui/gfx:color_utils",
     "//ui/gfx:gfx_switches",
     "//ui/views",
+    "//ui/views:test_support",
     "//url",
     "//uw/browser/agent:skill_folders",
     "//uw/browser/ai_providers",

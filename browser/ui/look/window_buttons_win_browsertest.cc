@@ -1,29 +1,48 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 #include "base/test/run_until.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/frame/window_frame_util.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/hit_test.h"
+#include "ui/events/event.h"
+#include "ui/events/event_utils.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/views/controls/button/button.h"
+#include "ui/views/test/button_test_api.h"
 #include "ui/views/view.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 
 namespace uw {
 namespace {
+
+// Windows' own buttons are 45px wide and 1px apart, as Chromium draws them.
+constexpr int kOwnButtonWidth =
+    WindowFrameUtil::kWindowsCaptionButtonWidth +
+    WindowFrameUtil::kWindowsCaptionButtonVisualSpacing;
 
 // On Windows, minimize, maximize, and close are toolbar buttons at the
 // toolbar's end. See page_card.h.
 class WindowButtonsWinBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  // Browser tests on Windows draw nothing unless asked to, and one saves a
+  // screenshot.
+  WindowButtonsWinBrowserTest() { EnablePixelOutput(); }
+
   void SetUpOnMainThread() override {
     HeadlessModeBrowserTest::SetUpOnMainThread();
     widget()->SetBounds(gfx::Rect(0, 0, 1280, 900));
@@ -46,6 +65,21 @@ class WindowButtonsWinBrowserTest : public headless::HeadlessModeBrowserTest {
 
   int HitTest(const gfx::Point& point) {
     return widget()->non_client_view()->frame_view()->NonClientHitTest(point);
+  }
+
+  void Press(int id) {
+    views::test::ButtonTestApi(views::AsViewClass<views::Button>(Button(id)))
+        .NotifyClick(ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(),
+                                    gfx::Point(), ui::EventTimeForNow(),
+                                    ui::EF_LEFT_MOUSE_BUTTON, 0));
+  }
+
+  // Turns the page card's margin off and waits for Windows' own buttons.
+  void TurnOffPageSpace() {
+    g_browser_process->local_state()->SetBoolean(kPageSpacePref, false);
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      return InWidget(Button(VIEW_ID_CLOSE_BUTTON)).width() == kOwnButtonWidth;
+    }));
   }
 };
 
@@ -81,6 +115,60 @@ IN_PROC_BROWSER_TEST_F(WindowButtonsWinBrowserTest,
   const gfx::Rect sidebar =
       InWidget(view()->vertical_tab_strip_region_view_for_testing());
   EXPECT_EQ(HitTest(sidebar.CenterPoint()), HTCAPTION);
+}
+
+// Without the page card's margin, Windows' own buttons sit at the window's
+// top right, over the toolbar's end and as tall as the toolbar, and the
+// toolbar's buttons end where they start. Turning the margin back on brings
+// uw's buttons back. See docs/plans/arc-style-look.md#margin.
+IN_PROC_BROWSER_TEST_F(WindowButtonsWinBrowserTest,
+                       WithoutSpaceWindowsOwnButtonsSitAtTheTopRight) {
+  TurnOffPageSpace();
+  views::View* const close = Button(VIEW_ID_CLOSE_BUTTON);
+
+  const gfx::Rect toolbar = InWidget(view()->toolbar());
+  EXPECT_EQ(toolbar.right(), InWidget(view()).right());
+  EXPECT_EQ(InWidget(close).right(), toolbar.right());
+  for (int id : {VIEW_ID_MINIMIZE_BUTTON, VIEW_ID_MAXIMIZE_BUTTON,
+                 VIEW_ID_CLOSE_BUTTON}) {
+    const gfx::Rect button = InWidget(Button(id));
+    EXPECT_EQ(button.y(), toolbar.y()) << id;
+    EXPECT_EQ(button.height(), toolbar.height()) << id;
+  }
+  EXPECT_LE(InWidget(Button(VIEW_ID_APP_MENU)).right(),
+            InWidget(Button(VIEW_ID_MINIMIZE_BUTTON)).x());
+  EXPECT_FALSE(close->parent()->children().front()->GetVisible());
+  EXPECT_EQ(HitTest(InWidget(Button(VIEW_ID_MAXIMIZE_BUTTON)).CenterPoint()),
+            HTMAXBUTTON);
+  EXPECT_EQ(HitTest(InWidget(close).CenterPoint()), HTCLOSE);
+  SaveWindowScreenshot(browser(), "windows-no-margin");
+
+  g_browser_process->local_state()->SetBoolean(kPageSpacePref, true);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return InWidget(close).width() == kWindowButtonWidth + kWindowButtonGap;
+  }));
+  EXPECT_EQ(InWidget(view()->toolbar()).right() - InWidget(close).right(),
+            kWindowButtonsEnd);
+  EXPECT_TRUE(close->parent()->children().front()->GetVisible());
+}
+
+// Run in the Windows VM with --run-manual --headful-mode. In a real window,
+// maximize, restore, and minimize work from Windows' own buttons with the
+// margin off.
+IN_PROC_BROWSER_TEST_F(WindowButtonsWinBrowserTest,
+                       MANUAL_WithoutSpaceTheButtonsWorkInARealWindow) {
+  TurnOffPageSpace();
+  SaveWindowScreenshot(browser(), "windows-no-margin-real");
+  Press(VIEW_ID_MAXIMIZE_BUTTON);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return widget()->IsMaximized() &&
+           Button(VIEW_ID_RESTORE_BUTTON)->GetVisible();
+  }));
+  SaveWindowScreenshot(browser(), "windows-no-margin-maximized");
+  Press(VIEW_ID_RESTORE_BUTTON);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !widget()->IsMaximized(); }));
+  Press(VIEW_ID_MINIMIZE_BUTTON);
+  ASSERT_TRUE(base::test::RunUntil([&] { return widget()->IsMinimized(); }));
 }
 
 }  // namespace

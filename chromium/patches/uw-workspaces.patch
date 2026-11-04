@@ -224,18 +224,30 @@ index f9b1d3de0545b1426169859660f555f825e02468..8469ec0cd989d42a027a84c7be0eacfb
      if (manager->RequestDeferShow(base::BindOnce(
              &BrowserView::Activate, weak_ptr_factory_.GetWeakPtr()))) {
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..65fd674bd7c48bf49bb403f30eb524d222c75aba 100644
+index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..1ff640be9bc7c48d06d53cd82fc9022981e86dfc 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-@@ -166,6 +166,7 @@
+@@ -25,6 +25,7 @@
+ #include "chrome/browser/actor/ui/actor_ui_metrics.h"
+ #include "chrome/browser/actor/ui/task_list_bubble/actor_task_list_bubble.h"
+ #include "chrome/browser/actor/ui/task_list_bubble/actor_task_list_bubble_controller.h"
++#include "chrome/browser/browser_process.h"
+ #include "chrome/browser/command_updater.h"
+ #include "chrome/browser/glic/browser_ui/glic_actor_nudge_controller.h"
+ #include "chrome/browser/glic/browser_ui/glic_actor_task_icon_manager_factory.h"
+@@ -166,6 +167,11 @@
  #include "ui/views/view_utils.h"
  #include "ui/views/widget/tooltip_manager.h"
  #include "ui/views/widget/widget.h"
 +#include "uw/browser/ui/look/page_card.h"
++
++#if BUILDFLAG(IS_WIN)
++#include "chrome/browser/ui/frame/window_frame_util.h"
++#endif
  
  #if defined(USE_AURA)
  #include <array>
-@@ -577,9 +578,9 @@ void ToolbarView::Init() {
+@@ -577,9 +583,9 @@ void ToolbarView::Init() {
  
    if (!features::IsWebUIAvatarButtonEnabled()) {
      avatar_ = AddChildView(std::make_unique<AvatarToolbarButton>(browser_));
@@ -248,17 +260,23 @@ index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..65fd674bd7c48bf49bb403f30eb524d2
    }
  
    // Only manage the overflow button when there are at least some views
-@@ -1703,6 +1704,15 @@ void ToolbarView::LayoutCommon() {
+@@ -1703,6 +1709,21 @@ void ToolbarView::LayoutCommon() {
        interior_margin.set_right(0);
      }
    }
 +#if BUILDFLAG(IS_WIN)
-+  // uw: Windows' minimize, maximize, and close sit at the toolbar's end. See
++  // uw: Windows' minimize, maximize, and close sit at the toolbar's end:
++  // uw's own inside the page card, or Windows' own, 45px each and 1px apart,
++  // while the card has no margin. See
 +  // BrowserFrameViewWin::LayoutCaptionButtons().
 +  if (browser_view_ && browser_view_->GetSupportsTabStrip() &&
 +      !browser_view_->IsFullscreen()) {
-+    interior_margin.set_right(uw::kWindowButtonsEnd + uw::kWindowButtonsWidth +
-+                              uw::kWindowButtonsDividerGap);
++    interior_margin.set_right(
++        !uw::PageCardMargins(g_browser_process->local_state()).IsEmpty()
++            ? uw::kWindowButtonsEnd + uw::kWindowButtonsWidth +
++                  uw::kWindowButtonsDividerGap
++            : 3 * WindowFrameUtil::kWindowsCaptionButtonWidth +
++                  2 * WindowFrameUtil::kWindowsCaptionButtonVisualSpacing);
 +  }
 +#endif
    layout_manager_->SetInteriorMargin(interior_margin);
