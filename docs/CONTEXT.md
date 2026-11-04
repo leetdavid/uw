@@ -31,8 +31,16 @@ _Avoid_: Page theme, website theme, content theme, browser mode, web dark mode.
 The color a page paints behind its content. The toolbar above the page and the bookmarks bar take it, whatever the theme and page mode, and fade when it changes.
 _Avoid_: Theme color, site color, tint.
 
+**Page card**:
+The rounded card beside the sidebar that holds the toolbar and the page.
+_Avoid_: Content area, main area, page frame.
+
+**Margin**:
+The strip of theme around the page card, above it, right of it, and below it. With the margin off, for all of uw, the card meets the window's edges.
+_Avoid_: Outline, edge, inset, border.
+
 **Transparency**:
-A theme setting, from solid to clear, that lets the desktop behind uw's window show through, blurred: through the sidebar and the edges around the page under the theme, and through the toolbar under the page color. The page stays solid; it does not scroll under the toolbar.
+A theme setting, from solid to clear, that lets the desktop behind uw's window show through, blurred: through the sidebar and the margin under the theme, and through the toolbar under the page color. The page stays solid; it does not scroll under the toolbar.
 _Avoid_: Glass, translucency, opacity, vibrancy.
 
 **Glass**:
