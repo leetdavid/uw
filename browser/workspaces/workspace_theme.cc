@@ -24,7 +24,6 @@
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/color/color_provider_key.h"
-#include "ui/native_theme/native_theme.h"
 #include "ui/views/controls/menu/menu_controller.h"
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/submenu_view.h"
@@ -49,34 +48,10 @@ std::map<base::FilePath, Theme>& SeenThemes() {
   return *seen;
 }
 
-ThemeMode ModeOf(ThemeService::BrowserColorScheme scheme) {
-  switch (scheme) {
-    case ThemeService::BrowserColorScheme::kSystem:
-      return ThemeMode::kAuto;
-    case ThemeService::BrowserColorScheme::kLight:
-      return ThemeMode::kLight;
-    case ThemeService::BrowserColorScheme::kDark:
-      return ThemeMode::kDark;
-  }
-}
-
-ThemeService::BrowserColorScheme SchemeOf(ThemeMode mode) {
-  switch (mode) {
-    case ThemeMode::kAuto:
-      return ThemeService::BrowserColorScheme::kSystem;
-    case ThemeMode::kLight:
-      return ThemeService::BrowserColorScheme::kLight;
-    case ThemeMode::kDark:
-      return ThemeService::BrowserColorScheme::kDark;
-  }
-}
-
 // The theme Chromium's settings for `profile` hold, with uw's own parts.
 Theme ProfileTheme(Profile* profile) {
-  const ThemeService* themes = ThemeServiceFactory::GetForProfile(profile);
-  Theme theme = ReadTheme(*profile->GetPrefs(), themes->GetUserColor());
-  theme.mode = ModeOf(themes->GetBrowserColorScheme());
-  return theme;
+  return ReadTheme(*profile->GetPrefs(),
+                   ThemeServiceFactory::GetForProfile(profile)->GetUserColor());
 }
 
 // The front window that shows workspace `id`, or null.
@@ -100,40 +75,29 @@ const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   return shown ? WorkspaceList::Get().Find(shown->workspace()) : nullptr;
 }
 
-// Sets the colors of `theme` in `key`, whose mode is already set.
+// Sets the colors of `theme` in `key`.
 void SetThemeColors(const Theme& theme, ui::ColorProviderKey& key) {
   using Source = ui::ColorProviderKey::UserColorSource;
-  // Dark mode is black unless "Theme colors in dark mode" is on.
-  const bool black = key.color_mode == ui::ColorProviderKey::ColorMode::kDark &&
-                     !theme.colors_in_dark_mode;
   // Until a color is picked, Chromium keeps its own colors, as it does for a
   // profile with none.
-  if (theme.colors == Theme().colors && theme.intensity == kFullIntensity) {
+  if (theme.colors == Theme().colors && theme.intensity == kFullIntensity &&
+      theme.brightness == kFullBrightness) {
     key.user_color = std::nullopt;
     key.scheme_variant = std::nullopt;
-    key.user_color_source = black ? Source::kGrayscale : Source::kBaseline;
+    key.user_color_source = Source::kBaseline;
     return;
   }
-  key.user_color = WithIntensity(theme.colors[0], theme.intensity);
+  const SkColor first = ColorAsShown(theme, theme.colors[0]);
+  key.user_color = first;
   key.scheme_variant = ui::ColorProviderKey::SchemeVariant::kTonalSpot;
-  key.user_color_source = black ? Source::kGrayscale : Source::kAccent;
+  // A color with no hue of its own, such as black, gives Chromium's neutral
+  // colors.
+  key.user_color_source = IsNeutral(first) ? Source::kGrayscale : Source::kAccent;
 }
 
-// The light or dark of `theme`, Auto as macOS has it.
 ui::ColorProviderKey::ColorMode ModeOfTheme(const Theme& theme) {
-  using ColorMode = ui::ColorProviderKey::ColorMode;
-  switch (theme.mode) {
-    case ThemeMode::kAuto:
-      return ui::NativeTheme::GetInstanceForNativeUi()
-                         ->preferred_color_scheme() ==
-                     ui::NativeTheme::PreferredColorScheme::kDark
-                 ? ColorMode::kDark
-                 : ColorMode::kLight;
-    case ThemeMode::kLight:
-      return ColorMode::kLight;
-    case ThemeMode::kDark:
-      return ColorMode::kDark;
-  }
+  return IsDarkTheme(theme) ? ui::ColorProviderKey::ColorMode::kDark
+                            : ui::ColorProviderKey::ColorMode::kLight;
 }
 
 // Menus and cards of the sidebar, shown in their window's theme mode, which
@@ -241,9 +205,11 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
     WriteTheme(*profile->GetPrefs(), theme);
     ThemeService* themes = ThemeServiceFactory::GetForProfile(profile);
     themes->SetUserColorAndBrowserColorVariant(
-        WithIntensity(theme.colors[0], theme.intensity),
+        ColorAsShown(theme, theme.colors[0]),
         ui::mojom::BrowserColorVariant::kTonalSpot);
-    themes->SetBrowserColorScheme(SchemeOf(theme.mode));
+    themes->SetBrowserColorScheme(IsDarkTheme(theme)
+                                      ? ThemeService::BrowserColorScheme::kDark
+                                      : ThemeService::BrowserColorScheme::kLight);
   }
   SeenThemes()[profile->GetPath()] = ProfileTheme(profile);
   if (!workspace.empty()) {
@@ -253,18 +219,19 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
 
 Theme NewWorkspaceTheme(const Theme& like) {
   Theme theme;
-  theme.mode = like.mode;
+  theme.brightness = like.brightness;
   theme.page_mode = like.page_mode;
-  const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
-  theme.colors = suggested.front();
-  for (const std::vector<SkColor>& colors : suggested) {
+  const std::vector<SuggestedTheme> suggested = SuggestedThemes();
+  theme.colors = suggested.front().colors;
+  for (const SuggestedTheme& suggestion : suggested) {
     const bool used = std::ranges::any_of(
         WorkspaceList::Get().workspaces(),
         [&](const WorkspaceList::Workspace& workspace) {
-          return workspace.theme && workspace.theme->colors == colors;
+          return workspace.theme &&
+                 workspace.theme->colors == suggestion.colors;
         });
     if (!used) {
-      theme.colors = colors;
+      theme.colors = suggestion.colors;
       break;
     }
   }
@@ -285,14 +252,14 @@ void ApplyThemeOfWindow(BrowserWindowInterface* window,
     return;
   }
   // Page mode drives Chromium's colors, and the sidebar keeps the theme's.
-  // Dark pages are black whatever the theme does in dark mode.
+  // Dark pages take Chromium's neutral colors and uw's blacks.
   const ui::ColorProviderKey theme_key = key;
-  Theme pages = theme;
-  pages.colors_in_dark_mode = false;
   key.color_mode = theme.page_mode == PageMode::kDark
                        ? ui::ColorProviderKey::ColorMode::kDark
                        : ui::ColorProviderKey::ColorMode::kLight;
-  SetThemeColors(pages, key);
+  if (theme.page_mode == PageMode::kDark) {
+    key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
+  }
   if (key == theme_key) {
     return;
   }
@@ -361,18 +328,14 @@ void FollowChromiumTheme(BrowserWindowInterface* window) {
     return;
   }
   Theme theme = *workspace->theme;
-  if (now.colors != before.colors || now.intensity != before.intensity) {
+  if (now.colors != before.colors || now.intensity != before.intensity ||
+      now.brightness != before.brightness) {
     theme.colors = now.colors;
     theme.intensity = now.intensity;
+    theme.brightness = now.brightness;
   }
   if (now.grain != before.grain) {
     theme.grain = now.grain;
-  }
-  if (now.colors_in_dark_mode != before.colors_in_dark_mode) {
-    theme.colors_in_dark_mode = now.colors_in_dark_mode;
-  }
-  if (now.mode != before.mode) {
-    theme.mode = now.mode;
   }
   if (theme == *workspace->theme) {
     return;

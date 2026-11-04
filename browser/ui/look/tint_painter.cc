@@ -18,6 +18,7 @@
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkMatrix.h"
 #include "third_party/skia/include/core/SkRRect.h"
+#include "third_party/skia/include/effects/SkGradient.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/point.h"
@@ -169,9 +170,13 @@ void PaintSheet(gfx::Canvas* canvas,
                         static_cast<SkScalar>(colors.size() - 1));
   }
   cc::PaintFlags flags;
+  // The theme blends in OKLCH, turning through the hues between its colors.
   flags.setShader(cc::PaintShader::MakeLinearGradient(
       ends, stops.data(), positions.data(), static_cast<int>(stops.size()),
-      SkTileMode::kClamp));
+      SkTileMode::kClamp,
+      {SkGradient::Interpolation::InPremul::kNo,
+       SkGradient::Interpolation::ColorSpace::kOKLCHGamutMap,
+       SkGradient::Interpolation::HueMethod::kShorter}));
   if (cover < 1.0f) {
     canvas->SaveLayerAlpha(AlphaOf(cover));
   }

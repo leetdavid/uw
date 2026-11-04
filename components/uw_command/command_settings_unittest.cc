@@ -83,14 +83,11 @@ TEST(CommandSettingsTest, AWorkspaceSettingReadsAndChangesItsTheme) {
   Theme theme;
   SetThemeSetting(theme, Setting("theme.grain"), base::Value(40));
   SetThemeSetting(theme, Setting("theme.page-mode"), base::Value("dark"));
-  SetThemeSetting(theme, Setting("theme.colors-in-dark-mode"),
-                  base::Value(true));
+  SetThemeSetting(theme, Setting("theme.brightness"), base::Value(0));
   EXPECT_EQ(theme.grain, 40);
   EXPECT_EQ(theme.page_mode, PageMode::kDark);
-  EXPECT_TRUE(theme.colors_in_dark_mode);
+  EXPECT_EQ(theme.brightness, 0);
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.grain")), base::Value(40));
-  EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.mode")),
-            base::Value("auto"));
   SetThemeSetting(theme, Setting("theme.page-mode"), base::Value("theme"));
   EXPECT_EQ(theme.page_mode, PageMode::kTheme);
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.page-mode")),

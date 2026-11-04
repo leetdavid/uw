@@ -32,17 +32,18 @@ Theme ThemeOfWindow(BrowserWindowInterface* window);
 
 // Gives the workspace that `window` shows `theme`, or its profile when it has
 // no workspace, and redraws the windows that show it. Chromium's own color
-// and mode settings for the profile follow, so its color panel and the
-// profile's private windows show the latest pick.
+// and light or dark settings for the profile follow, so its color panel and
+// the profile's private windows show the latest pick.
 void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme);
 
 // The theme a new workspace starts on: the first suggested theme no
-// workspace uses, in the mode and page mode of `like`.
+// workspace uses, at the brightness and in the page mode of `like`.
 Theme NewWorkspaceTheme(const Theme& like);
 
-// Sets the color and the mode in the color key of `window` from the theme its
-// workspace has: the page mode's, with mixers that keep the theme's colors in
-// the sidebar, per docs/plans/themes.md#the-theme-apart-from-chromium.
+// Sets the color and the light or dark in the color key of `window` from the
+// theme its workspace has: the theme's own, or the page mode's with mixers
+// that keep the theme's colors in the sidebar, per
+// docs/plans/themes.md#the-theme-apart-from-chromium.
 // Chromium's BrowserWidget calls it. A theme from Chromium's theme store still
 // replaces uw's look.
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
@@ -61,9 +62,8 @@ void ShowOpenMenuInThemeMode(BrowserWindowInterface* window);
 std::optional<SkColor> EmptyPageColor(content::WebContents* page);
 
 // The profile's theme changed. What changed somewhere other than uw's picker,
-// such as a color picked in the Customize Chromium panel or the mode in
-// Chromium's settings, becomes part of the theme of the workspace that
-// `window`, the profile's front window, shows.
+// such as a color picked in the Customize Chromium panel, becomes part of the
+// theme of the workspace that `window`, the profile's front window, shows.
 void FollowChromiumTheme(BrowserWindowInterface* window);
 
 // Called once a workspace window starts. A workspace without a theme of its

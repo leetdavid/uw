@@ -11,8 +11,6 @@
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -37,6 +35,8 @@
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/workspaces/workspace_theme.h"
+#include "uw/components/look/theme.h"
 #include "uw/components/look/tint.h"
 
 namespace uw {
@@ -62,9 +62,11 @@ class PageColorsBrowserTest : public headless::HeadlessModeBrowserTest {
     return view()->GetColorProvider()->GetColor(id);
   }
 
-  void SetMode(ThemeService::BrowserColorScheme mode) {
-    ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-        ->SetBrowserColorScheme(mode);
+  // A dark window is one whose theme is black.
+  void SetDark(bool dark) {
+    Theme theme;
+    theme.brightness = dark ? 0 : kFullBrightness;
+    SetThemeOfWindow(browser(), theme);
   }
 
   // Waits until the toolbar is `color`.
@@ -73,12 +75,11 @@ class PageColorsBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 };
 
-// A red page gives a red toolbar and bookmarks bar, with white text, in both
-// modes. The theme around the card does not change.
+// A red page gives a red toolbar and bookmarks bar, with white text, on a
+// light and a dark theme. The theme around the card does not change.
 IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, ARedPageGivesARedToolbar) {
-  for (auto mode : {ThemeService::BrowserColorScheme::kLight,
-                    ThemeService::BrowserColorScheme::kDark}) {
-    SetMode(mode);
+  for (bool dark : {false, true}) {
+    SetDark(dark);
     const SkColor frame = Color(ui::kColorFrameActive);
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kRed)));
     ASSERT_TRUE(ToolbarBecomes(kRed));
@@ -92,9 +93,7 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, ARedPageGivesARedToolbar) {
               kReadableContrast);
     EXPECT_EQ(Color(ui::kColorFrameActive), frame);
     SaveWindowScreenshot(browser(),
-                         mode == ThemeService::BrowserColorScheme::kLight
-                             ? "page-color-red-light"
-                             : "page-color-red-dark");
+                         dark ? "page-color-red-dark" : "page-color-red-light");
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));
   }
 }
@@ -103,7 +102,7 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, ARedPageGivesARedToolbar) {
 // toolbar exactly.
 IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest,
                        TheTerminalsBlackKeepsTheToolbar) {
-  SetMode(ThemeService::BrowserColorScheme::kDark);
+  SetDark(true);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kRed)));
   ASSERT_TRUE(ToolbarBecomes(kRed));
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kBlackCard)));
@@ -114,7 +113,7 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest,
 // A white page in a dark window gives a white toolbar with near-black text,
 // while the window stays black.
 IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, AWhitePageInADarkWindow) {
-  SetMode(ThemeService::BrowserColorScheme::kDark);
+  SetDark(true);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(SK_ColorWHITE)));
   ASSERT_TRUE(ToolbarBecomes(SK_ColorWHITE));
   EXPECT_EQ(Color(kColorPageFieldText), kDarkTextOnTint);
@@ -129,7 +128,7 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, AWhitePageInADarkWindow) {
 IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, SwitchingTabsCrossfades) {
   gfx::ScopedAnimationDurationScaleMode normal_speed(
       gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
-  SetMode(ThemeService::BrowserColorScheme::kLight);
+  SetDark(false);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kRed)));
   ASSERT_TRUE(ToolbarBecomes(kRed));
   ASSERT_TRUE(AddTabAtIndex(1, PageIn(kBlue), ui::PAGE_TRANSITION_TYPED));
@@ -151,7 +150,7 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, SwitchingTabsCrossfades) {
 
 // A page that changes its background changes the toolbar without a reload.
 IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, APageThatChangesItsColor) {
-  SetMode(ThemeService::BrowserColorScheme::kLight);
+  SetDark(false);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kRed)));
   ASSERT_TRUE(ToolbarBecomes(kRed));
   ASSERT_TRUE(

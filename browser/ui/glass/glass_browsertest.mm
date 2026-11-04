@@ -270,7 +270,6 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
 IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesThePageMode) {
   using ColorMode = ui::ColorProviderKey::ColorMode;
   Theme theme = ThemeOfWindow(browser());
-  theme.mode = ThemeMode::kLight;
   theme.page_mode = PageMode::kDark;
   SetThemeOfWindow(browser(), theme);
   OmniboxPopupPresenterBase* suggestions = Suggestions();
@@ -318,7 +317,7 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_GlassAsMacOSShowsIt) {
   Theme dark = ThemeOfWindow(browser());
   dark.transparency = kFullTransparency / 2;
   dark.glass = kFullGlass / 2;
-  dark.mode = ThemeMode::kDark;
+  dark.brightness = 0;
   SetThemeOfWindow(browser(), dark);
   CaptureWindow(browser());
   SaveNativeWindowScreenshot(browser(), "glass-native-dark");

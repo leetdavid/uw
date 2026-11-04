@@ -14,8 +14,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
@@ -65,7 +63,9 @@
 #include "uw/browser/ui/views/workspaces/workspace_text.h"
 #include "uw/browser/workspaces/workspace_commands.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -215,8 +215,9 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest, TheFootInDarkMode) {
-  ThemeServiceFactory::GetForProfile(profile())->SetBrowserColorScheme(
-      ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   AddWorkspace("Reading", profile());
   AddWorkspace("Side project", profile());
   Settle();
@@ -341,8 +342,9 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest, TheRenameCardInDarkMode) {
-  ThemeServiceFactory::GetForProfile(profile())->SetBrowserColorScheme(
-      ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   Settle();
   const std::string id = WorkspaceWindow::From(browser())->workspace();
   SwitcherOf(browser())->ShowRenameCard(id);

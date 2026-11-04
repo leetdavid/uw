@@ -2,13 +2,6 @@
 
 module uw.mojom;
 
-// Chromium's color mode: Auto follows macOS.
-enum ColorMode {
-  kAuto,
-  kLight,
-  kDark,
-};
-
 // The light or dark of everything outside the sidebar: the theme's own, Light,
 // or Dark.
 enum PageMode {
@@ -21,15 +14,29 @@ enum PageMode {
 struct Theme {
   // One to three colors as 0xAARRGGBB, in the order they were added.
   array<uint32> colors;
-  // How much of each color's saturation shows, from 0 to 100.
+  // How much of each color's chroma shows, from 0 to 100.
   int32 intensity;
+  // How much of each color's lightness shows, from 0, black, to 100.
+  int32 brightness;
   // How strong the grain over the theme is, from 0 to 100.
   int32 grain;
   // How much of the desktop shows through the window, from 0, solid, to 100.
   int32 transparency;
   // How glassy the window's tiles and buttons are, from 0, flat, to 100.
   int32 glass;
-  bool colors_in_dark_mode;
+};
+
+// One of the suggested themes, with its colors as the window would show them.
+struct SuggestedTheme {
+  array<uint32> colors;
+  int32 brightness;
+  array<uint32> shown;
+};
+
+// A point of the color field, each axis from 0 to 1.
+struct FieldPoint {
+  float x;
+  float y;
 };
 
 // Why the window is solid and its tiles flat while the sliders ask for glass.
@@ -57,18 +64,22 @@ interface ThemePickerHandlerFactory {
 
 // Browser side. Only the theme picker page can reach it.
 interface ThemePickerHandler {
-  // The theme, the color mode, the page mode, the suggested themes, each one
-  // to three colors, and the glass sliders.
-  GetState() => (Theme theme, ColorMode mode, PageMode page_mode,
-                 array<array<uint32>> suggested, GlassSliders glass);
+  // The theme, each of its colors as the window shows it and where it sits on
+  // the color field, the page mode, the suggested themes, and the glass
+  // sliders.
+  GetState() => (Theme theme, array<uint32> shown, array<FieldPoint> points,
+                 PageMode page_mode, array<SuggestedTheme> suggested,
+                 GlassSliders glass);
 
-  // The glass sliders for `theme` in `mode`, whose colors move the tick.
-  GetGlassSliders(Theme theme, ColorMode mode) => (GlassSliders glass);
+  // The color under `point` of the color field.
+  ColorAt(FieldPoint point) => (uint32 color);
 
-  // Saves the theme. The window changes at once.
-  SetTheme(Theme theme);
+  // Where on the color field each of `colors` sits.
+  PointsOf(array<uint32> colors) => (array<FieldPoint> points);
 
-  SetMode(ColorMode mode);
+  // Saves the theme. The window changes at once. Answers with each color as
+  // the window shows it and the glass sliders, whose tick moves with them.
+  SetTheme(Theme theme) => (array<uint32> shown, GlassSliders glass);
 
   // Open pages change at once.
   SetPageMode(PageMode mode);

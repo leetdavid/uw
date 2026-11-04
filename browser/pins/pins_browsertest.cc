@@ -25,8 +25,6 @@
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -70,7 +68,9 @@
 #include "uw/browser/ui/views/pins/inactive_pin_overlay.h"
 #include "uw/browser/ui/views/pins/pin_menu.h"
 #include "uw/browser/workspaces/workspace_list.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -759,8 +759,7 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TheWindowThePageLeftShowsItHazed) {
   ASSERT_TRUE(haze);
   EXPECT_FALSE(InactivePinOverlay::From(second)->GetShownView());
   // The pill is the card's white, and the haze over the picture is not.
-  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
-      ThemeService::BrowserColorScheme::kLight);
+  SetThemeOfWindow(browser(), Theme());
   base::RunLoop().RunUntilIdle();
   HazeColors light = ColorsOf(browser(), haze);
   EXPECT_EQ(light.pill, SK_ColorWHITE);
@@ -768,8 +767,9 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TheWindowThePageLeftShowsItHazed) {
   EXPECT_FALSE(color_utils::IsDark(light.haze));
   SaveWindowScreenshot(browser(), "pin-haze-light");
 
-  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
-      ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   base::RunLoop().RunUntilIdle();
   HazeColors dark = ColorsOf(browser(), haze);
   // The pill takes the dark card's color, and the haze darkens the picture.
@@ -1156,8 +1156,6 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest,
 // Needs a real window: run it with `pnpm run window-tests`.
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, MANUAL_TheHazedViewShowsInARealWindow) {
   Profile* profile = browser()->GetProfile();
-  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
-      ThemeService::BrowserColorScheme::kLight);
   Pin(browser(), GURL(kNotes));
   Browser* second = CreateBrowser(profile);
   ASSERT_TRUE(ShowsPins(second, {GURL(kNotes)}));

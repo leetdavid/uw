@@ -1,6 +1,6 @@
 ---
 title: Themes
-description: Pick the colors of uw's window, and choose whether uw and the pages you visit are light or dark.
+description: Pick the colors of uw's window, from pale to black, and choose whether the pages you visit are light or dark.
 ---
 
 ## Open *the theme picker*
@@ -22,17 +22,14 @@ A panel opens beside the sidebar. The window changes as you pick, so you see eac
     </Sidebar>
     <Page address="stayaway.com/alfama/flat-12" />
     <Popup top={48} left={240} width={290}>
-      <Segmented options="Auto,Light,Dark" value="Light" />
-      <ColorField />
-      <Swatches />
-      <Slider label="Intensity" value={100} />
-      <Slider label="Grain" value={20} />
       <Row title="Pages">
         <Segmented options="Theme,Light,Dark" value="Theme" />
       </Row>
-      <Row title="Theme colors in dark mode">
-        <Switch />
-      </Row>
+      <ColorField />
+      <Swatches />
+      <Slider label="Intensity" value={100} />
+      <Slider label="Brightness" value={100} />
+      <Slider label="Grain" value={20} />
     </Popup>
   </Window>
 </Figure>
@@ -41,7 +38,8 @@ A panel opens beside the sidebar. The window changes as you pick, so you see eac
 
 - Click a suggested theme.
 - Or drag a dot in the color field. **+** adds a dot, up to three, for a gradient. Drag a dot out of the field to remove it.
-- **Intensity** grays the colors. **Grain** adds a fine texture around the page.
+- **Intensity** grays the colors. **Brightness** darkens them all evenly, down to black. **Grain** adds a fine texture around the page.
+- For a black window, pick **Black** among the suggestions.
 
 Text on the window stays readable: white on a dark color, near-black on a light one.
 
@@ -57,13 +55,11 @@ The switch is for all of uw, not for one theme, and every open window follows at
 
 ## Light, dark, *and pages*
 
-**Light**, **Dark**, and **Auto** set the theme's mode. **Auto** follows macOS.
-
-In dark mode the window is black. Turn on **Theme colors in dark mode** to see your theme's colors, darkened, instead.
+uw has no separate dark mode: your colors decide. A theme whose text is white is dark, and the sidebar's menus and cards and the picker turn dark with it. Pick **Black**, or lower **Brightness**, for a dark uw.
 
 **Pages** sets everything outside the sidebar: websites, extensions, uw's and Chromium's own pages such as Settings, and Chromium's menus and bubbles. Leave it on **Theme** to match the theme, or pick **Light** or **Dark**.
 
-For example, with **Light** above and **Pages** on **Dark**, the sidebar, its menus, and the picker stay light, while Settings, menus, and websites that have a dark look of their own turn dark.
+For example, with a light theme and **Pages** on **Dark**, the sidebar, its menus, and the picker stay light, while Settings, menus, and websites that have a dark look of their own turn dark.
 
 <Callout>
   uw tells websites which mode you want. A site with no dark look of its own stays light.

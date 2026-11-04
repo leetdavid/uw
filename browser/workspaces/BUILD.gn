@@ -30,7 +30,6 @@ source_set("workspaces") {
     "//chrome/browser/themes",
     "//ui/base/mojom",
     "//ui/color",
-    "//ui/native_theme",
     "//uw/browser/ui/look",
     "//uw/components/look:prefs",
     "//chrome/browser/lifetime",

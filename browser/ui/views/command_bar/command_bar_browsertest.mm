@@ -250,7 +250,6 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdTOpensItWithoutATab) {
 // It opens over the page, so it takes the page mode, per T198.
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesThePageMode) {
   Theme theme;
-  theme.mode = ThemeMode::kLight;
   theme.page_mode = PageMode::kDark;
   SetThemeOfWindow(browser(), theme);
 

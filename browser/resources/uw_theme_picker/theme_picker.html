@@ -11,10 +11,8 @@
         --text2: #4a4760;
         --well: #f2f1f8;
         --chosen: #fff;
-        --line: rgb(30 27 46 / 9%);
         --track: rgb(30 27 46 / 12%);
         --track-faint: rgb(30 27 46 / 4%);
-        --switch-off: rgb(30 27 46 / 18%);
         --primary: #3b5bdb;
         --muted: #77748c;
         --glass-solid: rgb(30 27 46 / 30%);
@@ -29,10 +27,8 @@
           --text2: #a1a1a1;
           --well: #0a0a0a;
           --chosen: #262626;
-          --line: #262626;
           --track: rgb(255 255 255 / 14%);
           --track-faint: rgb(255 255 255 / 5%);
-          --switch-off: rgb(255 255 255 / 18%);
           --primary: #9db0ff;
           --muted: #737373;
           --glass-solid: rgb(255 255 255 / 30%);
@@ -95,38 +91,10 @@
         width: 14px;
       }
 
-      #modes {
-        background: var(--well);
-        border-radius: 10px;
-        display: grid;
-        gap: 4px;
-        grid-template-columns: repeat(3, 1fr);
-        padding: 3px;
-      }
-
-      #modes button {
-        align-items: center;
-        border-radius: 8px;
-        color: var(--text2);
-        display: flex;
-        font-size: 12px;
-        font-weight: 500;
-        gap: 6px;
-        height: 28px;
-        justify-content: center;
-      }
-
-      #modes button[aria-pressed='true'],
       #pages button[aria-pressed='true'] {
         background: var(--chosen);
         box-shadow: 0 1px 2px rgb(30 27 46 / 14%);
         color: var(--text);
-      }
-
-      #mode-group {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
       }
 
       #pages {
@@ -160,10 +128,10 @@
         background:
             linear-gradient(to bottom, rgb(255 255 255 / 92%),
                             rgb(255 255 255 / 0%) 52%),
-            linear-gradient(to right, hsl(0 70% 72%), hsl(40 75% 70%),
-                            hsl(80 60% 68%), hsl(140 50% 66%),
-                            hsl(200 65% 70%), hsl(250 60% 74%),
-                            hsl(300 55% 72%), hsl(360 70% 72%));
+            linear-gradient(to right in oklch, oklch(0.78 0.11 0),
+                            oklch(0.78 0.11 60), oklch(0.78 0.11 120),
+                            oklch(0.78 0.11 180), oklch(0.78 0.11 240),
+                            oklch(0.78 0.11 300), oklch(0.78 0.11 360));
         border-radius: 12px;
         box-shadow: inset 0 0 0 1px rgb(30 27 46 / 6%);
         height: 176px;
@@ -240,6 +208,10 @@
                                     var(--track) var(--value));
       }
 
+      #brightness {
+        background: linear-gradient(to right in oklch, #000, var(--first));
+      }
+
       #grain {
         background: repeating-linear-gradient(90deg, var(--track) 0 2px,
                                               var(--track-faint) 2px 4px);
@@ -290,79 +262,24 @@
         height: 14px;
         width: 14px;
       }
-
-      #switch-row {
-        align-items: center;
-        border-top: 1px solid var(--line);
-        display: flex;
-        font-size: 12.5px;
-        justify-content: space-between;
-        padding-top: 12px;
-      }
-
-      #colors-in-dark-mode {
-        appearance: none;
-        background: var(--switch-off);
-        border-radius: 9px;
-        height: 18px;
-        margin: 0;
-        position: relative;
-        width: 30px;
-      }
-
-      #colors-in-dark-mode::after {
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 1px 2px rgb(30 27 46 / 30%);
-        content: '';
-        height: 14px;
-        left: 2px;
-        position: absolute;
-        top: 2px;
-        width: 14px;
-      }
-
-      #colors-in-dark-mode:checked {
-        background: var(--primary);
-      }
-
-      #colors-in-dark-mode:checked::after {
-        left: 14px;
-      }
     </style>
   </head>
   <body>
-    <div id="mode-group">
-      <div id="modes" role="group">
-        <button id="auto" aria-pressed="false">
-          <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
+    <div class="row">
+      <span id="pages-label"></span>
+      <div id="pages" role="group" aria-labelledby="pages-label">
+        <button id="pages-theme" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
           <span></span>
         </button>
-        <button id="light" aria-pressed="false">
+        <button id="pages-light" aria-pressed="false">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <span></span>
         </button>
-        <button id="dark" aria-pressed="false">
+        <button id="pages-dark" aria-pressed="false">
           <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
           <span></span>
         </button>
-      </div>
-      <div class="row">
-        <span id="pages-label"></span>
-        <div id="pages" role="group" aria-labelledby="pages-label">
-          <button id="pages-theme" aria-pressed="false">
-            <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-            <span></span>
-          </button>
-          <button id="pages-light" aria-pressed="false">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-            <span></span>
-          </button>
-          <button id="pages-dark" aria-pressed="false">
-            <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            <span></span>
-          </button>
-        </div>
       </div>
     </div>
     <div id="field" role="group">
@@ -374,6 +291,10 @@
     <div class="row">
       <label for="intensity"></label>
       <input id="intensity" type="range" min="0" max="100">
+    </div>
+    <div class="row">
+      <label for="brightness"></label>
+      <input id="brightness" type="range" min="0" max="100">
     </div>
     <div class="row">
       <label for="grain"></label>
@@ -391,10 +312,6 @@
       <input id="glass" type="range" min="0" max="100">
     </div>
     <p id="glass-why" hidden></p>
-    <div id="switch-row">
-      <label for="colors-in-dark-mode"></label>
-      <input id="colors-in-dark-mode" type="checkbox" role="switch">
-    </div>
     <script type="module" src="/problems.js"></script>
     <script type="module" src="theme_picker.js"></script>
   </body>

@@ -3321,7 +3321,6 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ThePrimaryColorFollowsTheTheme) {
   ThemeService* themes =
       ThemeServiceFactory::GetForProfile(browser()->GetProfile());
-  themes->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   themes->SetUserColorAndBrowserColorVariant(
       SkColorSetRGB(0x2e, 0x7d, 0x32),
       ui::mojom::BrowserColorVariant::kTonalSpot);

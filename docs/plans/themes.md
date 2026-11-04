@@ -35,10 +35,10 @@ Defaults, proposed by uw and accepted on 2026-10-16:
 
 Chosen by uw for T94 on 2026-10-16.
 
-- The theme's first color, at its intensity, is Chromium's own user color. Chromium's color picker, the "Customize Chromium" panel, and Chromium's sync see it, and Chromium's colors follow it.
-- The colors, intensity, grain, and "Theme colors in dark mode" are four profile prefs, `uw.theme.*` in `components/look/theme_prefs.h`. They do not sync.
+- The theme's first color, at its intensity and, since T338, its brightness, is Chromium's own user color. Chromium's color picker, the "Customize Chromium" panel, and Chromium's sync see it, and Chromium's colors follow it.
+- The colors, intensity, grain, and "Theme colors in dark mode" are four profile prefs, `uw.theme.*` in `components/look/theme_prefs.h`. They do not sync. Since T338 the switch is gone, `uw.theme.brightness` is added, and the pref the switch left behind is no longer read.
 - When Chromium's user color is not the saved first color at the saved intensity, the color was picked somewhere else, and the theme is that one color. This covers the "Customize Chromium" panel and tints picked before themes, with no migration step.
-- The window draws the more colors only when its frame color is the one the saved theme makes. Black dark mode and Chromium's own themes stay one color.
+- The window draws the more colors only when its frame color is the one the saved theme makes. Chromium's own themes stay one color.
 - Since T131, on 2026-10-24, each workspace keeps its own theme; see [How workspace windows work](workspaces.md#how-workspace-windows-work). The profile's settings above hold the latest pick in any of its workspaces, which the "Customize Chromium" panel and the profile's private windows show.
 
 ## Design
@@ -277,6 +277,15 @@ Stages:
 1. T337: the design, signed off on 2026-11-04.
 2. T338: the theme: light or dark from its colors, Brightness, the new suggestions, OKLCH, the removals, and the upgrade, per ADR 0030.
 3. T339: website mode: Chromium's setting, the Websites row, `GetPreferredColorScheme` and the card's empty color, the strings in Settings and the panel, the `uw` command, and the Help page.
+
+How T338 is built:
+
+- `components/look/tint` turns colors to and from OKLCH with Chromium's `ui/gfx/color_conversions.h`. A color too colorful for sRGB keeps its lightness and hue and loses chroma until it fits. The tint's second color, the readable nudge, Intensity, and Brightness all work in OKLCH there and in `components/look/theme`.
+- `IsDarkTheme` is the theme's light or dark: its text is white. `ApplyThemeOfWindow` puts it in the window's color key, so Chromium's own colors, uw's pages, and the sidebar's menus and cards follow it. Chromium's own setting for the profile gets it too, for windows without a workspace and the "Customize Chromium" panel.
+- A first color with almost no chroma, such as black, gives Chromium's neutral colors (`IsNeutral`). The same rule in `ThemeService::GetColorProviderKey`, in `uw-look`, replaces black dark mode.
+- The window's gradient blends in OKLCH (`SkGradient::Interpolation::ColorSpace::kOKLCHGamutMap`).
+- The picker's page asks the browser for the color under a point of the field and where a color sits on it, so the field's math lives only in `components/look/theme`. The page draws the field with CSS `oklch()` at the same lightness and chroma.
+- Until T339, the Pages row keeps working through ADR 0017's mixers, and dark pages keep Chromium's neutral colors.
 
 Acceptance checks:
 

@@ -7,11 +7,11 @@
 
 namespace uw {
 
-// The tint used in light mode until the user picks a color.
+// Lilac, the first color of the default theme, lilac to sky.
 inline constexpr SkColor kDefaultLightTint = SkColorSetRGB(0xE7, 0xE1, 0xF6);
 
-// Dark mode is black, after Vercel's neutral blacks: the window is black and
-// the page card and its toolbar near-black, with a gray edge.
+// A dark theme's page card and toolbar, after Vercel's neutral blacks:
+// near-black, with a gray edge.
 inline constexpr SkColor kBlackCard = SkColorSetRGB(0x0A, 0x0A, 0x0A);
 inline constexpr SkColor kBlackCardEdge = SkColorSetRGB(0x26, 0x26, 0x26);
 inline constexpr SkColor kBlackCardLine = SkColorSetRGB(0x1F, 0x1F, 0x1F);
@@ -20,6 +20,18 @@ inline constexpr SkColor kBlackCardField = SkColorSetRGB(0x17, 0x17, 0x17);
 // Text on a tint is one of these two.
 inline constexpr SkColor kDarkTextOnTint = SkColorSetRGB(0x1E, 0x1B, 0x2E);
 inline constexpr SkColor kLightTextOnTint = SK_ColorWHITE;
+
+// A color in OKLCH: lightness from 0 to 1, chroma, and hue in degrees.
+struct Oklch {
+  float l;
+  float c;
+  float h;
+};
+
+Oklch OklchOf(SkColor color);
+
+// The sRGB color of `oklch`, its chroma lowered until it fits.
+SkColor ColorOf(const Oklch& oklch);
 
 // The window tint is a gradient from one color to its neighbor on the color
 // wheel.
@@ -32,7 +44,7 @@ struct Tint {
 inline constexpr float kReadableContrast = 4.5f;
 
 // The tint for one picked color: the color itself, then the same color with
-// its hue turned by 40 degrees at the same saturation and lightness. A color
+// its OKLCH hue turned by 40 degrees at the same chroma and lightness. A color
 // too close to mid-tone for readable text is first made lighter or darker,
 // whichever takes the smaller change.
 Tint TintFrom(SkColor picked);

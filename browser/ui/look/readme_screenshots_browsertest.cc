@@ -315,11 +315,6 @@ class ReadmeScreenshotsBrowserTest : public headless::HeadlessModeBrowserTest {
     return TabOrganizationController::From(browser());
   }
 
-  void SetScheme(ThemeService::BrowserColorScheme scheme) {
-    ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-        ->SetBrowserColorScheme(scheme);
-  }
-
   // Saves `colors` as the profile's theme, as the picker does.
   void SetTheme(std::vector<SkColor> colors) {
     Theme theme;
@@ -431,7 +426,6 @@ class ReadmeScreenshotsBrowserTest : public headless::HeadlessModeBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, JevFilesATab) {
   prefs().SetBoolean(kOrganizationEnabledPref, false);
-  SetScheme(ThemeService::BrowserColorScheme::kLight);
   SetTheme({SkColorSetRGB(0xE4, 0xDC, 0xF7), SkColorSetRGB(0xFB, 0xE3, 0xD3)});
   NameWorkspace("Personal", "🏡");
 
@@ -472,7 +466,6 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, JevFilesATab) {
 }
 
 IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, BringYourOwnKey) {
-  SetScheme(ThemeService::BrowserColorScheme::kLight);
   SetTheme({SkColorSetRGB(0xE4, 0xDC, 0xF7), SkColorSetRGB(0xFB, 0xE3, 0xD3)});
   NameWorkspace("Personal", "🏡");
   models_["api.openai.com"] =
@@ -505,7 +498,9 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, BringYourOwnKey) {
 }
 
 IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, WorkspacesAndPins) {
-  SetScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   ShowWorkspacesAndPins();
   SaveWindowScreenshot(browser(), "workspaces");
 }
@@ -517,7 +512,6 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest,
   if (!CanShowGlass() || ReducesTransparency()) {
     GTEST_SKIP() << "This Mac draws no glass.";
   }
-  SetScheme(ThemeService::BrowserColorScheme::kLight);
   ShowWorkspacesAndPins();
   gfx::Rect bounds = display::Screen::Get()->GetPrimaryDisplay().work_area();
   bounds.ClampToCenteredSize(gfx::Size(1180, 740));

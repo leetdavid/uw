@@ -1,5 +1,5 @@
-# The theme picker's page: the mode, a color field of up to three dots, the
-# suggested themes, intensity, grain, and theme colors in dark mode.
+# The theme picker's page: the Pages row, a color field of up to three dots,
+# the suggested themes, and the sliders.
 import("//ui/webui/resources/tools/build_webui.gni")
 
 assert(!is_android)

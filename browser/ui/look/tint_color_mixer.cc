@@ -10,7 +10,6 @@
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_recipe.h"
 #include "ui/color/color_transform.h"
-#include "ui/gfx/color_utils.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/page_color.h"
@@ -26,8 +25,6 @@ constexpr SkAlpha kDividerAlpha = 0x1A;
 // one, see-through so the theme shows through them.
 constexpr SkAlpha kFillOnLightAlpha = 0x75;
 constexpr SkAlpha kFillOnDarkAlpha = 0x14;
-// The active tab on black: white at 12%.
-constexpr float kActiveTabOnBlack = 0.12f;
 
 // The icons of the buttons at the top of the sidebar: the text color at 75%,
 // and at 55% in a window that is not in front.
@@ -37,8 +34,8 @@ constexpr SkAlpha kTopButtonIconInactiveAlpha = 0x8C;
 // A menu card over frosted glass keeps 85% of its color.
 constexpr SkAlpha kMenuCardOverGlass = 0xD9;
 
-// uw's menu cards, in light mode and on black. They follow the mode, not the
-// theme.
+// uw's menu cards, light or on uw's blacks, as the window's light or dark
+// says.
 void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {
   mixer[kColorMenuCardBackground] = {dark ? kBlackCardField : SK_ColorWHITE};
   mixer[kColorMenuCardHover] = {dark ? kBlackCardEdge
@@ -74,31 +71,22 @@ bool IsDarkMode(const ui::ColorProviderKey& key) {
   return key.color_mode == ui::ColorProviderKey::ColorMode::kDark;
 }
 
-// Dark mode is black unless "Theme colors in dark mode" is on, which Chromium's
-// key shows by not asking for its neutral colors.
-bool IsBlack(const ui::ColorProviderKey& key) {
-  return IsDarkMode(key) &&
-         key.user_color_source ==
-             ui::ColorProviderKey::UserColorSource::kGrayscale;
-}
-
 // The theme's first color, which lives in Chromium's user color, or the
 // default.
 SkColor FirstThemeColor(const ui::ColorProviderKey& key) {
-  if (key.user_color &&
-      key.user_color_source == ui::ColorProviderKey::UserColorSource::kAccent) {
+  using Source = ui::ColorProviderKey::UserColorSource;
+  // Chromium's neutral colors for a color with a hue, as in a private window.
+  if (key.user_color_source == Source::kGrayscale &&
+      !(key.user_color && IsNeutral(*key.user_color))) {
+    return IsDarkMode(key) ? SK_ColorBLACK : SK_ColorWHITE;
+  }
+  if (key.user_color && key.user_color_source != Source::kBaseline) {
     return *key.user_color;
   }
   return kDefaultLightTint;
 }
 
 Tint TintFor(const ui::ColorProviderKey& key) {
-  if (IsBlack(key)) {
-    return TintFrom(SK_ColorBLACK);
-  }
-  if (IsDarkMode(key)) {
-    return TintFrom(DarkModeColorOf(FirstThemeColor(key)));
-  }
   return TintFrom(FirstThemeColor(key));
 }
 
@@ -166,10 +154,7 @@ void AddTintTabColorMixer(ui::ColorProvider* provider,
   mixer[kColorPipWindowForegroundInactive] = {SkColorSetA(text, 0x8C)};
   mixer[kColorVerticalTabPinnedOutline] = {SK_ColorTRANSPARENT};
   mixer[kColorVerticalTabStripShadow] = {SK_ColorTRANSPARENT};
-  const SkColor active_tab =
-      IsBlack(key) ? color_utils::AlphaBlend(SK_ColorWHITE, SK_ColorBLACK,
-                                             kActiveTabOnBlack)
-                   : ActiveTabOn(tint);
+  const SkColor active_tab = ActiveTabOn(tint);
   mixer[kColorTabBackgroundActiveFrameActive] = {active_tab};
   mixer[kColorTabBackgroundActiveFrameInactive] = {active_tab};
   if (!IsDarkMode(key)) {

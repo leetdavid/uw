@@ -23,7 +23,6 @@
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/webui/web_ui_util.h"
-#include "ui/native_theme/native_theme.h"
 #include "ui/webui/webui_util.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/workspaces/workspace_theme.h"
@@ -35,7 +34,6 @@ namespace uw {
 namespace {
 
 constexpr webui::LocalizedString kStrings[] = {
-    {"modeAuto", IDS_UW_THEME_MODE_AUTO},
     {"modeLight", IDS_UW_THEME_MODE_LIGHT},
     {"modeDark", IDS_UW_THEME_MODE_DARK},
     {"pages", IDS_UW_THEME_PAGES},
@@ -45,38 +43,28 @@ constexpr webui::LocalizedString kStrings[] = {
     {"addColor", IDS_UW_THEME_ADD_COLOR},
     {"suggested", IDS_UW_THEME_SUGGESTED},
     {"intensity", IDS_UW_THEME_INTENSITY},
+    {"brightness", IDS_UW_THEME_BRIGHTNESS},
     {"grain", IDS_UW_THEME_GRAIN},
     {"transparency", IDS_UW_THEME_TRANSPARENCY},
     {"glass", IDS_UW_THEME_GLASS},
     {"glassTick", IDS_UW_THEME_GLASS_TICK},
     {"glassEnergySaver", IDS_UW_THEME_GLASS_ENERGY_SAVER},
     {"glassReduceTransparency", IDS_UW_THEME_GLASS_REDUCE_TRANSPARENCY},
-    {"colorsInDarkMode", IDS_UW_THEME_COLORS_IN_DARK_MODE},
-    {"suggestion0", IDS_UW_THEME_LILAC},
-    {"suggestion1", IDS_UW_THEME_SKY},
-    {"suggestion2", IDS_UW_THEME_MINT},
-    {"suggestion3", IDS_UW_THEME_BUTTER},
-    {"suggestion4", IDS_UW_THEME_PEACH},
-    {"suggestion5", IDS_UW_THEME_WINE},
-    {"suggestion6", IDS_UW_THEME_FOREST},
-    {"suggestion7", IDS_UW_THEME_LILAC_TO_SKY},
-    {"suggestion8", IDS_UW_THEME_PEACH_TO_BUTTER},
-    {"suggestion9", IDS_UW_THEME_MINT_TO_SKY},
+    {"suggestion0", IDS_UW_THEME_LILAC_TO_SKY},
+    {"suggestion1", IDS_UW_THEME_LILAC},
+    {"suggestion2", IDS_UW_THEME_SKY},
+    {"suggestion3", IDS_UW_THEME_MINT},
+    {"suggestion4", IDS_UW_THEME_BUTTER},
+    {"suggestion5", IDS_UW_THEME_PEACH},
+    {"suggestion6", IDS_UW_THEME_WINE},
+    {"suggestion7", IDS_UW_THEME_FOREST},
+    {"suggestion8", IDS_UW_THEME_BLACK},
+    {"suggestion9", IDS_UW_THEME_PEACH_TO_BUTTER},
+    {"suggestion10", IDS_UW_THEME_MINT_TO_SKY},
 };
 
 std::vector<uint32_t> ToMojo(const std::vector<SkColor>& colors) {
   return std::vector<uint32_t>(colors.begin(), colors.end());
-}
-
-ThemeMode ThemeModeOf(mojom::ColorMode mode) {
-  switch (mode) {
-    case mojom::ColorMode::kAuto:
-      return ThemeMode::kAuto;
-    case mojom::ColorMode::kLight:
-      return ThemeMode::kLight;
-    case mojom::ColorMode::kDark:
-      return ThemeMode::kDark;
-  }
 }
 
 PageMode PageModeOf(mojom::PageMode mode) {
@@ -101,15 +89,33 @@ mojom::PageMode ToMojo(PageMode mode) {
   }
 }
 
-// The glass sliders for a theme whose first color, at its intensity, is
-// `first`, in `mode`. The tick sits where the theme's text stops reading.
-mojom::GlassSlidersPtr GlassSlidersFor(SkColor first, ThemeMode mode) {
-  const bool dark =
-      mode == ThemeMode::kDark ||
-      (mode == ThemeMode::kAuto &&
-       ui::NativeTheme::GetInstanceForNativeUi()->preferred_color_scheme() ==
-           ui::NativeTheme::PreferredColorScheme::kDark);
-  const SkColor text = dark ? kLightTextOnTint : TextColorOn(TintFrom(first));
+std::vector<SkColor> ColorsOf(const std::vector<uint32_t>& colors) {
+  return std::vector<SkColor>(
+      colors.begin(), colors.begin() + std::min(colors.size(), kMaxThemeColors));
+}
+
+std::vector<uint32_t> ShownColorsOf(const Theme& theme) {
+  std::vector<uint32_t> shown;
+  for (SkColor color : theme.colors) {
+    shown.push_back(ColorAsShown(theme, color));
+  }
+  return shown;
+}
+
+std::vector<mojom::FieldPointPtr> FieldPointsOf(
+    const std::vector<SkColor>& colors) {
+  std::vector<mojom::FieldPointPtr> points;
+  for (SkColor color : colors) {
+    const FieldPoint point = FieldPointOf(color);
+    points.push_back(mojom::FieldPoint::New(point.x, point.y));
+  }
+  return points;
+}
+
+// The glass sliders for `theme`. The tick sits where its text stops reading.
+mojom::GlassSlidersPtr GlassSlidersFor(const Theme& theme) {
+  const SkColor text =
+      TextColorOn(TintFrom(ColorAsShown(theme, theme.colors[0])));
   using performance_manager::user_tuning::BatterySaverModeManager;
   mojom::GlassPause pause = mojom::GlassPause::kNone;
   if (ReducesTransparency()) {
@@ -140,56 +146,47 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
     BrowserWindowInterface* window = Window();
     const Theme theme = window ? ThemeOfWindow(window) : Theme();
     auto state = mojom::Theme::New(ToMojo(theme.colors), theme.intensity,
-                                   theme.grain, theme.transparency, theme.glass,
-                                   theme.colors_in_dark_mode);
-    std::vector<std::vector<uint32_t>> suggested;
-    for (const std::vector<SkColor>& colors : SuggestedThemes()) {
-      suggested.push_back(ToMojo(colors));
+                                   theme.brightness, theme.grain,
+                                   theme.transparency, theme.glass);
+    std::vector<mojom::SuggestedThemePtr> suggested;
+    for (const SuggestedTheme& suggestion : SuggestedThemes()) {
+      Theme suggested_theme;
+      suggested_theme.colors = suggestion.colors;
+      suggested_theme.brightness = suggestion.brightness;
+      suggested.push_back(mojom::SuggestedTheme::New(
+          ToMojo(suggestion.colors), suggestion.brightness,
+          ShownColorsOf(suggested_theme)));
     }
-    std::move(callback).Run(
-        std::move(state), ModeOf(theme.mode), ToMojo(theme.page_mode),
-        std::move(suggested),
-        GlassSlidersFor(WithIntensity(theme.colors[0], theme.intensity),
-                        theme.mode));
+    std::move(callback).Run(std::move(state), ShownColorsOf(theme),
+                            FieldPointsOf(theme.colors),
+                            ToMojo(theme.page_mode), std::move(suggested),
+                            GlassSlidersFor(theme));
   }
 
-  void GetGlassSliders(mojom::ThemePtr theme,
-                       mojom::ColorMode mode,
-                       GetGlassSlidersCallback callback) override {
-    const SkColor first =
-        theme->colors.empty() ? Theme().colors[0] : theme->colors[0];
-    std::move(callback).Run(GlassSlidersFor(
-        WithIntensity(first, std::clamp(theme->intensity, 0, kFullIntensity)),
-        ThemeModeOf(mode)));
+  void ColorAt(mojom::FieldPointPtr point, ColorAtCallback callback) override {
+    std::move(callback).Run(FieldColorAt({point->x, point->y}));
   }
 
-  void SetTheme(mojom::ThemePtr picked) override {
+  void PointsOf(const std::vector<uint32_t>& colors,
+                PointsOfCallback callback) override {
+    std::move(callback).Run(FieldPointsOf(ColorsOf(colors)));
+  }
+
+  void SetTheme(mojom::ThemePtr picked, SetThemeCallback callback) override {
     BrowserWindowInterface* window = Window();
-    if (!window) {
-      return;
-    }
-    Theme theme = ThemeOfWindow(window);
+    Theme theme = window ? ThemeOfWindow(window) : Theme();
     if (!picked->colors.empty()) {
-      theme.colors.assign(picked->colors.begin(),
-                          picked->colors.begin() +
-                              std::min(picked->colors.size(), kMaxThemeColors));
+      theme.colors = ColorsOf(picked->colors);
     }
     theme.intensity = std::clamp(picked->intensity, 0, kFullIntensity);
+    theme.brightness = std::clamp(picked->brightness, 0, kFullBrightness);
     theme.grain = std::clamp(picked->grain, 0, kFullGrain);
     theme.transparency = std::clamp(picked->transparency, 0, kFullTransparency);
     theme.glass = std::clamp(picked->glass, 0, kFullGlass);
-    theme.colors_in_dark_mode = picked->colors_in_dark_mode;
-    SetThemeOfWindow(window, theme);
-  }
-
-  void SetMode(mojom::ColorMode mode) override {
-    BrowserWindowInterface* window = Window();
-    if (!window) {
-      return;
+    if (window) {
+      SetThemeOfWindow(window, theme);
     }
-    Theme theme = ThemeOfWindow(window);
-    theme.mode = ThemeModeOf(mode);
-    SetThemeOfWindow(window, theme);
+    std::move(callback).Run(ShownColorsOf(theme), GlassSlidersFor(theme));
   }
 
   void SetPageMode(mojom::PageMode mode) override {
@@ -221,17 +218,6 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
           return true;
         });
     return found;
-  }
-
-  static mojom::ColorMode ModeOf(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode::kAuto:
-        return mojom::ColorMode::kAuto;
-      case ThemeMode::kLight:
-        return mojom::ColorMode::kLight;
-      case ThemeMode::kDark:
-        return mojom::ColorMode::kDark;
-    }
   }
 
   const raw_ptr<UwThemePickerUI> ui_;

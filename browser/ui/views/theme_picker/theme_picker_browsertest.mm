@@ -165,7 +165,6 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
 // A headless bubble never draws its page, so the page is shown in a tab to
 // check it against the design.
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
-  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(kThemePickerUrl)));
   content::WebContents* page =
       browser()->tab_strip_model()->GetActiveWebContents();
@@ -173,17 +172,21 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
     return content::EvalJs(page,
                            "document.querySelectorAll('#suggested button')"
                            ".length")
-               .ExtractInt() == 10;
+               .ExtractInt() == 11;
   }));
-  EXPECT_EQ(1,
+  EXPECT_EQ(2,
             content::EvalJs(page, "document.querySelectorAll('.dot').length"));
   EXPECT_EQ(
       "true",
       content::EvalJs(page, "document.querySelectorAll('#suggested button')[0]"
                             ".getAttribute('aria-pressed')"));
+  EXPECT_EQ(0, content::EvalJs(page, "document.querySelectorAll("
+                                     "'#modes, #colors-in-dark-mode').length"));
   SaveWindowScreenshot(browser(), "theme-picker");
 
-  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  // Black is a dark theme, so the page turns dark with it.
+  ASSERT_TRUE(content::ExecJs(
+      page, "document.querySelectorAll('#suggested button')[8].click();"));
   EXPECT_TRUE(base::test::RunUntil([&] {
     return content::EvalJs(page, "matchMedia('(prefers-color-scheme: dark)')"
                                  ".matches")
@@ -193,31 +196,55 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
 }
 
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ASuggestedThemeBecomesTheTheme) {
-  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   content::WebContents* page = Open();
   ASSERT_TRUE(content::ExecJs(
-      page, "document.querySelectorAll('#suggested button')[8].click();"));
+      page, "document.querySelectorAll('#suggested button')[9].click();"));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return Saved().colors == std::vector<SkColor>{kPeach, kButter}; }));
   EXPECT_EQ(FrameColor(), TintFrom(kPeach).start);
   EXPECT_EQ("true",
             content::EvalJs(page, "document.querySelectorAll('#suggested "
-                                  "button')[8].getAttribute('aria-pressed')"));
+                                  "button')[9].getAttribute('aria-pressed')"));
+
+  // Black is the default colors at no brightness.
+  ASSERT_TRUE(content::ExecJs(
+      page, "document.querySelectorAll('#suggested button')[8].click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return Saved().brightness == 0; }));
+  EXPECT_EQ(Saved().colors, std::vector<SkColor>{kDefaultLightTint});
+  EXPECT_EQ(FrameColor(), SK_ColorBLACK);
+}
+
+// The picker opens from the sidebar, so it is light or dark as the theme is.
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePickerIsDarkOnADarkTheme) {
+  content::WebContents* page = Open();
+  const auto mode = [&] {
+    return picker()
+        ->GetWidgetForTesting()
+        ->GetColorProviderKeyForTesting()
+        .color_mode;
+  };
+  EXPECT_EQ(mode(), ui::ColorProviderKey::ColorMode::kLight);
+  ASSERT_TRUE(content::ExecJs(page, R"(
+    const brightness = document.getElementById('brightness');
+    brightness.value = 20;
+    brightness.dispatchEvent(new Event('input'));
+  )"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return mode() == ui::ColorProviderKey::ColorMode::kDark; }));
 }
 
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheFieldAddsUpToThreeDots) {
   content::WebContents* page = Open();
-  ASSERT_TRUE(content::ExecJs(page, "document.querySelector('#add').click();"));
-  EXPECT_TRUE(
-      base::test::RunUntil([&] { return Saved().colors.size() == 2u; }));
-
-  const SkColor before = Saved().colors[1];
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return content::EvalJs(page, "document.querySelectorAll('.dot').length")
+               .ExtractInt() == 2;
+  }));
   ASSERT_TRUE(content::ExecJs(
       page, "document.querySelectorAll('.dot')[1].dispatchEvent("
             "    new KeyboardEvent('keydown', {key: 'ArrowRight'}));"));
   EXPECT_TRUE(base::test::RunUntil([&] {
     const Theme saved = Saved();
-    return saved.colors.size() == 2u && saved.colors[1] != before;
+    return saved.colors.size() == 2u && saved.colors[1] != kSky;
   }));
 
   ASSERT_TRUE(content::ExecJs(page, "document.querySelector('#add').click();"));
@@ -227,7 +254,7 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheFieldAddsUpToThreeDots) {
             content::EvalJs(page, "document.querySelector('#add').hidden"));
 }
 
-IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, SlidersAndTheSwitchSaveAtOnce) {
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, SlidersSaveAtOnce) {
   content::WebContents* page = Open();
   ASSERT_TRUE(content::ExecJs(page, R"(
     const set = (id, value) => {
@@ -236,13 +263,13 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, SlidersAndTheSwitchSaveAtOnce) {
       slider.dispatchEvent(new Event('input'));
     };
     set('intensity', 40);
+    set('brightness', 70);
     set('grain', 60);
-    document.getElementById('colors-in-dark-mode').click();
   )"));
   EXPECT_TRUE(base::test::RunUntil([&] {
     const Theme saved = Saved();
-    return saved.intensity == 40 && saved.grain == 60 &&
-           saved.colors_in_dark_mode;
+    return saved.intensity == 40 && saved.brightness == 70 &&
+           saved.grain == 60;
   }));
 }
 
@@ -261,26 +288,7 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
             content::EvalJs(page, "document.getElementById('grain').value"));
 }
 
-IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheModeButtonsSetTheMode) {
-  content::WebContents* page = Open();
-  ASSERT_TRUE(
-      content::ExecJs(page, "document.getElementById('dark').click();"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return themes()->GetBrowserColorScheme() ==
-           ThemeService::BrowserColorScheme::kDark;
-  }));
-  EXPECT_EQ(FrameColor(), SK_ColorBLACK);
-
-  ASSERT_TRUE(
-      content::ExecJs(page, "document.getElementById('auto').click();"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return themes()->GetBrowserColorScheme() ==
-           ThemeService::BrowserColorScheme::kSystem;
-  }));
-}
-
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
-  themes()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   content::WebContents* page = Open();
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
                                           "'pages-theme').getAttribute("
@@ -394,8 +402,7 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
                        MANUAL_ADotFollowsTheMouseAndLeavesWhenDraggedOut) {
   content::WebContents* page = Open();
   ASSERT_TRUE(content::WaitForLoadStop(page));
-  ASSERT_TRUE(content::ExecJs(page, "document.querySelector('#add').click();"));
-  ASSERT_TRUE(Eventually([&] { return Saved().colors.size() == 2u; }));
+  ASSERT_EQ(Saved().colors.size(), 2u);
   ASSERT_TRUE(Eventually([&] {
     return content::EvalJs(page, "document.querySelectorAll('.dot').length")
                .ExtractInt() == 2;

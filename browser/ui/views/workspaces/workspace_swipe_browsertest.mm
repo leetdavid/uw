@@ -21,8 +21,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -810,9 +808,10 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
-                       TheSlideInDarkModeAndTowardAnotherProfile) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+                       TheSlideFromBlackTowardAnotherProfile) {
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   Profile& personal = MakeProfile();
   const std::string home = AddWorkspace("Home", &personal);
   // Home's window opens, then slides away, so the next slide has its picture
@@ -836,17 +835,15 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
                        HeldPartwayTheTintAroundTheCardIsOneBlend) {
   const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
-  const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
+  const std::vector<SuggestedTheme> suggested = SuggestedThemes();
   Theme butter;
-  butter.colors = suggested[3];
-  butter.mode = ThemeMode::kLight;
+  butter.colors = suggested[4].colors;
   SetThemeOfWindow(browser(), butter);
   RunWindowCommand(browser(), kNextWorkspace);
   BrowserWindowInterface* partner = WaitForShown(browser(), reading);
   Theme wine;
-  wine.colors = suggested[5];
-  wine.mode = ThemeMode::kDark;
-  wine.colors_in_dark_mode = true;
+  wine.colors = suggested[6].colors;
+  wine.brightness = suggested[6].brightness;
   SetThemeOfWindow(partner, wine);
   RunWindowCommand(partner, kPreviousWorkspace);
   WaitForShown(browser(), work_);
@@ -877,8 +874,7 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
   }
   const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
   Theme look;
-  look.colors = SuggestedThemes()[3];
-  look.mode = ThemeMode::kLight;
+  look.colors = SuggestedThemes()[4].colors;
   look.transparency = 2;
   SetThemeOfWindow(browser(), look);
   RunWindowCommand(browser(), kNextWorkspace);
@@ -953,9 +949,11 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, MANUAL_ASwipeInARealWindow) {
                              "swipe-real-landed");
 
   // Back the other way: nothing of the card's edge stays over the sidebar.
-  // The card has an edge in dark mode.
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  // The card has an edge on black.
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(shown, black);
+  SetThemeOfWindow(browser(), black);
   RunWindowCommand(shown, kPreviousWorkspace);
   WaitForShown(browser(), work_);
   base::RunLoop settle;
@@ -971,9 +969,10 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest, MANUAL_ASwipeInARealWindow) {
 // card is laid out, so no outline stays over the sidebar after the fade.
 IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
                        NoEdgeIsLeftOverTheSidebarAfterThePageFades) {
-  // The card has an edge in dark mode.
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  // The card has an edge on black, and the new workspace starts on black too.
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   gfx::ScopedAnimationDurationScaleMode slow(10);
   const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
   RunWindowCommand(browser(), kNextWorkspace);

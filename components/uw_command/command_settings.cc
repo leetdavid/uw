@@ -26,8 +26,6 @@ constexpr double kStepsPerUnit = 20;
 
 constexpr Choice kApprovalModes[] = {
     {"ask-first", "ask_first"}, {"auto", "auto"}, {"full-auto", "full_auto"}};
-constexpr Choice kThemeModes[] = {
-    {"auto", "auto"}, {"light", "light"}, {"dark", "dark"}};
 constexpr Choice kPageModes[] = {
     {"theme", "theme"}, {"light", "light"}, {"dark", "dark"}};
 
@@ -93,13 +91,12 @@ constexpr auto kSettings = std::to_array<CommandSetting>({
     Switch("glass.windows-behind", Scope::kEverywhere,
            "uw.glass.windows_behind"),
     Switch("look.page-space", Scope::kEverywhere, "uw.look.page_space"),
-    Choices("theme.mode", Scope::kWorkspace, kThemeModes),
     Choices("theme.page-mode", Scope::kWorkspace, kPageModes),
     Percent("theme.intensity"),
+    Percent("theme.brightness"),
     Percent("theme.grain"),
     Percent("theme.transparency"),
     Percent("theme.glass"),
-    Switch("theme.colors-in-dark-mode", Scope::kWorkspace),
 });
 
 std::string ChoiceNames(base::span<const Choice> choices) {
@@ -113,17 +110,6 @@ std::string ChoiceNames(base::span<const Choice> choices) {
 base::unexpected<std::string> Refuse(const CommandSetting& setting) {
   return base::unexpected(
       base::StrCat({setting.name, " takes ", Takes(setting), "."}));
-}
-
-std::string_view ModeName(ThemeMode mode) {
-  switch (mode) {
-    case ThemeMode::kAuto:
-      return "auto";
-    case ThemeMode::kLight:
-      return "light";
-    case ThemeMode::kDark:
-      return "dark";
-  }
 }
 
 std::string_view PageModeName(PageMode mode) {
@@ -140,6 +126,9 @@ std::string_view PageModeName(PageMode mode) {
 int* PercentOf(Theme& theme, std::string_view name) {
   if (name == "theme.intensity") {
     return &theme.intensity;
+  }
+  if (name == "theme.brightness") {
+    return &theme.brightness;
   }
   if (name == "theme.grain") {
     return &theme.grain;
@@ -246,14 +235,8 @@ base::Value ShownSettingValue(const CommandSetting& setting,
 
 base::Value ThemeSettingValue(const Theme& theme,
                               const CommandSetting& setting) {
-  if (setting.name == "theme.mode") {
-    return base::Value(ModeName(theme.mode));
-  }
   if (setting.name == "theme.page-mode") {
     return base::Value(PageModeName(theme.page_mode));
-  }
-  if (setting.name == "theme.colors-in-dark-mode") {
-    return base::Value(theme.colors_in_dark_mode);
   }
   Theme copy = theme;
   int* percent = PercentOf(copy, setting.name);
@@ -263,18 +246,11 @@ base::Value ThemeSettingValue(const Theme& theme,
 void SetThemeSetting(Theme& theme,
                      const CommandSetting& setting,
                      const base::Value& stored) {
-  if (setting.name == "theme.mode" && stored.is_string()) {
-    const std::string& mode = stored.GetString();
-    theme.mode = mode == "light"  ? ThemeMode::kLight
-                 : mode == "dark" ? ThemeMode::kDark
-                                  : ThemeMode::kAuto;
-  } else if (setting.name == "theme.page-mode" && stored.is_string()) {
+  if (setting.name == "theme.page-mode" && stored.is_string()) {
     const std::string& mode = stored.GetString();
     theme.page_mode = mode == "light"  ? PageMode::kLight
                       : mode == "dark" ? PageMode::kDark
                                        : PageMode::kTheme;
-  } else if (setting.name == "theme.colors-in-dark-mode" && stored.is_bool()) {
-    theme.colors_in_dark_mode = stored.GetBool();
   } else if (int* percent = PercentOf(theme, setting.name);
              percent && stored.is_int()) {
     *percent = stored.GetInt();

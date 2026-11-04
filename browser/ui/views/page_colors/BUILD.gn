@@ -46,5 +46,6 @@ source_set("browser_tests") {
     "//url",
     "//uw/browser/tab_organization:test_support",
     "//uw/browser/ui/look",
+    "//uw/browser/workspaces",
   ]
 }

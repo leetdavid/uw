@@ -13,8 +13,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
@@ -72,7 +70,9 @@
 #include "uw/browser/ui/views/tab_organization/task_name_field.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_commands.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/ai_providers/providers.h"
+#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -338,8 +338,9 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, Sidebar) {
 }
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, SidebarInDarkMode) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   StageSidebar();
   SaveWindowScreenshot(browser(), "sidebar-dark");
 }
@@ -415,8 +416,9 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
                        TheFloatingSidebarInDarkMode) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   StageSidebar();
   CheckTheFloatingSidebar("sidebar-floating-dark");
 }
@@ -453,8 +455,9 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, WithoutSpaceInDarkMode) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   StageSidebar();
   SetPageSpace(false);
   SaveWindowScreenshot(browser(), "sidebar-no-margin-dark");
@@ -694,8 +697,9 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, TheOrganizeCardInDarkMode) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   StageSidebar();
   SetUpAModel();
   PrefService* prefs = browser()->GetProfile()->GetPrefs();
@@ -894,8 +898,9 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, TheTaskCardInDarkMode) {
-  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
-      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  Theme black;
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
   StageSidebar();
   SetUpAModel();
   views::Widget* card = RightClick(RowOf(Task()));

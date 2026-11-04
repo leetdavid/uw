@@ -4,15 +4,13 @@ import '/strings.m.js';
 
 import {loadTimeData} from '//resources/js/load_time_data.js';
 
-import type {GlassSliders, Theme} from './uw_theme_picker.mojom-webui.js';
-import {ColorMode, GlassPause, PageMode, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
+import type {FieldPoint, GlassSliders, SuggestedTheme, Theme} from './uw_theme_picker.mojom-webui.js';
+import {GlassPause, PageMode, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
 
 const MAX_COLORS = 3;
-// The field is pale at the top and full from 52% of its height down.
+// The field is pale at the top and full from 52% of its height down, as the
+// browser's color field has it.
 const PALE_UNTIL = 0.52;
-const PALEST = 0.92;
-const FULL_SATURATION = 0.62;
-const FULL_LIGHTNESS = 0.7;
 // A dot let go this far outside the field is removed.
 const REMOVE_DISTANCE = 24;
 const KEY_STEP = 0.02;
@@ -28,6 +26,7 @@ const field = document.querySelector<HTMLElement>('#field')!;
 const add = document.querySelector<HTMLButtonElement>('#add')!;
 const suggestedRow = document.querySelector<HTMLElement>('#suggested')!;
 const intensity = document.querySelector<HTMLInputElement>('#intensity')!;
+const brightness = document.querySelector<HTMLInputElement>('#brightness')!;
 const grain = document.querySelector<HTMLInputElement>('#grain')!;
 const transparencyRow =
     document.querySelector<HTMLElement>('#transparency-row')!;
@@ -38,13 +37,6 @@ const transparencyTick =
 const glassRow = document.querySelector<HTMLElement>('#glass-row')!;
 const glass = document.querySelector<HTMLInputElement>('#glass')!;
 const glassWhy = document.querySelector<HTMLElement>('#glass-why')!;
-const colorsInDarkMode =
-    document.querySelector<HTMLInputElement>('#colors-in-dark-mode')!;
-const modes = new Map<ColorMode, HTMLButtonElement>([
-  [ColorMode.kAuto, document.querySelector<HTMLButtonElement>('#auto')!],
-  [ColorMode.kLight, document.querySelector<HTMLButtonElement>('#light')!],
-  [ColorMode.kDark, document.querySelector<HTMLButtonElement>('#dark')!],
-]);
 const pagesTheme =
     document.querySelector<HTMLButtonElement>('#pages-theme')!;
 const pageModes = new Map<PageMode, HTMLButtonElement>([
@@ -57,56 +49,15 @@ const pageModes = new Map<PageMode, HTMLButtonElement>([
 ]);
 
 let theme: Theme;
-let currentMode: ColorMode;
+// Each color as the window shows it, and where it sits on the field.
+let shown: number[] = [];
+let points: FieldPoint[] = [];
 let glassSliders: GlassSliders;
-let suggestions: number[][] = [];
+let suggestions: SuggestedTheme[] = [];
 let savePending = false;
 
 function css(color: number): string {
   return `#${(color & 0xffffff).toString(16).padStart(6, '0')}`;
-}
-
-function hslToColor(h: number, s: number, l: number): number {
-  const k = (n: number) => (n + h * 12) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const channel = (n: number) => Math.round(
-      255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
-  return (0xff000000 | (channel(0) << 16) | (channel(8) << 8) | channel(4)) >>>
-      0;
-}
-
-function colorToHsl(color: number): [number, number, number] {
-  const r = ((color >> 16) & 0xff) / 255;
-  const g = ((color >> 8) & 0xff) / 255;
-  const b = (color & 0xff) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) {
-    return [0, 0, l];
-  }
-  const d = max - min;
-  const s = d / (1 - Math.abs(2 * l - 1));
-  const h = max === r ? ((g - b) / d + 6) % 6 :
-      max === g       ? (b - r) / d + 2 :
-                        (r - g) / d + 4;
-  return [h / 6, s, l];
-}
-
-// The color under a point of the field, each axis from 0 to 1: the hue runs
-// left to right, pale at the top to full at the middle.
-function colorAt(x: number, y: number): number {
-  const paleness = Math.max(0, 1 - y / PALE_UNTIL) * PALEST;
-  return hslToColor(
-      x, FULL_SATURATION * (1 - paleness),
-      FULL_LIGHTNESS + (1 - FULL_LIGHTNESS) * paleness);
-}
-
-function placeOf(color: number): [number, number] {
-  const [h, , l] = colorToHsl(color);
-  const paleness = Math.min(
-      PALEST, Math.max(0, (l - FULL_LIGHTNESS) / (1 - FULL_LIGHTNESS)));
-  return [h, (1 - paleness / PALEST) * PALE_UNTIL];
 }
 
 // Saves at most once a frame while a dot is dragged or a slider moves.
@@ -115,10 +66,12 @@ function save() {
     return;
   }
   savePending = true;
-  setTimeout(() => {
+  setTimeout(async () => {
     savePending = false;
-    handler.setTheme(theme);
-    refreshGlass();
+    const {shown: colors, glass: sliders} = await handler.setTheme(theme);
+    shown = colors;
+    paintDots();
+    showGlass(sliders);
   }, SAVE_DELAY_MS);
 }
 
@@ -149,26 +102,30 @@ function showGlass(sliders: GlassSliders) {
       'glass-off', sliders.pause === GlassPause.kReduceTransparency);
 }
 
-// The tick moves with the theme's colors and mode.
-async function refreshGlass() {
-  const {glass: sliders} =
-      await handler.getGlassSliders(theme, currentMode);
-  showGlass(sliders);
-}
-
 function sameColors(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((color, i) => color === b[i]);
 }
 
+// The dots show each color as the window does, the theme's brightness
+// included, and the Brightness track runs from black to the first color.
+function paintDots() {
+  field.querySelectorAll<HTMLElement>('.dot').forEach((dot, i) => {
+    dot.style.background = css(shown[i] ?? theme.colors[i]!);
+  });
+  brightness.style.setProperty('--first', css(theme.colors[0]!));
+}
+
+function placeDot(dot: HTMLElement, point: FieldPoint) {
+  dot.style.left = `${point.x * 100}%`;
+  dot.style.top = `${point.y * 100}%`;
+}
+
 function drawDots() {
   field.querySelectorAll('.dot').forEach(dot => dot.remove());
-  theme.colors.forEach((color, index) => {
-    const [x, y] = placeOf(color);
+  theme.colors.forEach((_, index) => {
     const dot = document.createElement('button');
     dot.className = 'dot';
-    dot.style.background = css(color);
-    dot.style.left = `${x * 100}%`;
-    dot.style.top = `${y * 100}%`;
+    placeDot(dot, points[index]!);
     dot.setAttribute('aria-label', `${loadTimeData.getString('colorField')} ${
         index + 1}`);
     dot.addEventListener('pointerdown', e => drag(e, dot, index));
@@ -176,12 +133,17 @@ function drawDots() {
     field.insertBefore(dot, add);
   });
   add.hidden = theme.colors.length >= MAX_COLORS;
+  paintDots();
 }
 
 function drawSuggestions() {
   suggestedRow.querySelectorAll('button').forEach((button, i) => {
+    const suggestion = suggestions[i]!;
     button.setAttribute(
-        'aria-pressed', String(sameColors(suggestions[i]!, theme.colors)));
+        'aria-pressed',
+        String(
+            sameColors(suggestion.colors, theme.colors) &&
+            suggestion.brightness === theme.brightness));
   });
 }
 
@@ -190,19 +152,18 @@ function draw() {
   drawSuggestions();
   intensity.value = String(theme.intensity);
   intensity.style.setProperty('--value', `${theme.intensity}%`);
+  brightness.value = String(theme.brightness);
   grain.value = String(theme.grain);
   transparency.value = String(theme.transparency);
   glass.value = String(theme.glass);
   glass.style.setProperty('--value', `${theme.glass}%`);
-  colorsInDarkMode.checked = theme.colorsInDarkMode;
 }
 
-function moveDot(dot: HTMLElement, index: number, x: number, y: number) {
-  const color = colorAt(x, y);
+async function moveDot(dot: HTMLElement, index: number, point: FieldPoint) {
+  points[index] = point;
+  placeDot(dot, point);
+  const {color} = await handler.colorAt(point);
   theme.colors[index] = color;
-  dot.style.background = css(color);
-  dot.style.left = `${x * 100}%`;
-  dot.style.top = `${y * 100}%`;
   drawSuggestions();
   save();
 }
@@ -216,15 +177,18 @@ function drag(start: PointerEvent, dot: HTMLElement, index: number) {
       e.clientY < box.top - REMOVE_DISTANCE ||
       e.clientY > box.bottom + REMOVE_DISTANCE;
   const move = (e: PointerEvent) => {
-    moveDot(
-        dot, index, clamp((e.clientX - box.left) / box.width),
-        clamp((e.clientY - box.top) / box.height));
+    moveDot(dot, index, {
+      x: clamp((e.clientX - box.left) / box.width),
+      y: clamp((e.clientY - box.top) / box.height),
+    });
   };
   const end = (e: PointerEvent) => {
     dot.removeEventListener('pointermove', move);
     dot.removeEventListener('pointerup', end);
     if (outside(e) && theme.colors.length > 1) {
       theme.colors.splice(index, 1);
+      points.splice(index, 1);
+      shown.splice(index, 1);
       draw();
       save();
     }
@@ -245,15 +209,22 @@ function nudge(e: KeyboardEvent, dot: HTMLElement, index: number) {
     return;
   }
   e.preventDefault();
-  const [x, y] = placeOf(theme.colors[index]!);
-  moveDot(
-      dot, index, Math.min(1, Math.max(0, x + step[0])),
-      Math.min(PALE_UNTIL, Math.max(0, y + step[1])));
+  const {x, y} = points[index]!;
+  moveDot(dot, index, {
+    x: Math.min(1, Math.max(0, x + step[0])),
+    y: Math.min(PALE_UNTIL, Math.max(0, y + step[1])),
+  });
 }
 
-add.addEventListener('click', () => {
-  const [x] = placeOf(theme.colors[theme.colors.length - 1]!);
-  theme.colors.push(colorAt((x + 1 / 6) % 1, PALE_UNTIL / 2));
+add.addEventListener('click', async () => {
+  const point = {
+    x: (points[points.length - 1]!.x + 1 / 6) % 1,
+    y: PALE_UNTIL / 2,
+  };
+  const {color} = await handler.colorAt(point);
+  theme.colors.push(color);
+  points.push(point);
+  shown.push(color);
   draw();
   save();
 });
@@ -261,6 +232,12 @@ add.addEventListener('click', () => {
 intensity.addEventListener('input', () => {
   theme.intensity = Number(intensity.value);
   intensity.style.setProperty('--value', `${theme.intensity}%`);
+  save();
+});
+
+brightness.addEventListener('input', () => {
+  theme.brightness = Number(brightness.value);
+  drawSuggestions();
   save();
 });
 
@@ -280,33 +257,6 @@ glass.addEventListener('input', () => {
   frost();
   save();
 });
-
-colorsInDarkMode.addEventListener('change', () => {
-  theme.colorsInDarkMode = colorsInDarkMode.checked;
-  save();
-});
-
-function showMode(mode: ColorMode) {
-  for (const [value, button] of modes) {
-    button.setAttribute('aria-pressed', String(value === mode));
-  }
-}
-
-const modeNames = new Map<ColorMode, string>([
-  [ColorMode.kAuto, 'modeAuto'],
-  [ColorMode.kLight, 'modeLight'],
-  [ColorMode.kDark, 'modeDark'],
-]);
-for (const [mode, button] of modes) {
-  button.querySelector('span')!.textContent =
-      loadTimeData.getString(modeNames.get(mode)!);
-  button.addEventListener('click', () => {
-    currentMode = mode;
-    showMode(mode);
-    handler.setMode(mode);
-    refreshGlass();
-  });
-}
 
 function showPageMode(mode: PageMode) {
   for (const [value, button] of pageModes) {
@@ -339,6 +289,8 @@ add.setAttribute('aria-label', loadTimeData.getString('addColor'));
 suggestedRow.setAttribute('aria-label', loadTimeData.getString('suggested'));
 document.querySelector('label[for=intensity]')!.textContent =
     loadTimeData.getString('intensity');
+document.querySelector('label[for=brightness]')!.textContent =
+    loadTimeData.getString('brightness');
 document.querySelector('label[for=grain]')!.textContent =
     loadTimeData.getString('grain');
 document.querySelector('label[for=transparency]')!.textContent =
@@ -348,31 +300,38 @@ document.querySelector('label[for=glass]')!.textContent =
 transparencyTick.title = loadTimeData.getString('glassTick');
 transparencyTick.setAttribute(
     'aria-label', loadTimeData.getString('glassTick'));
-document.querySelector('label[for=colors-in-dark-mode]')!.textContent =
-    loadTimeData.getString('colorsInDarkMode');
-
-const {theme: saved, mode, pageMode, suggested, glass: sliders} =
-    await handler.getState();
+const {
+  theme: saved,
+  shown: savedShown,
+  points: savedPoints,
+  pageMode,
+  suggested,
+  glass: sliders,
+} = await handler.getState();
 theme = saved;
-currentMode = mode;
+shown = savedShown;
+points = savedPoints;
 showGlass(sliders);
 suggestions = suggested;
-suggestedRow.replaceChildren(...suggestions.map((colors, i) => {
+suggestedRow.replaceChildren(...suggestions.map((suggestion, i) => {
   const button = document.createElement('button');
-  button.style.background = colors.length === 1 ?
-      css(colors[0]!) :
-      `linear-gradient(135deg, ${colors.map(css).join(', ')})`;
+  button.style.background = suggestion.shown.length === 1 ?
+      css(suggestion.shown[0]!) :
+      `linear-gradient(135deg in oklch, ${
+          suggestion.shown.map(css).join(', ')})`;
   const name = loadTimeData.getString(`suggestion${i}`);
   button.title = name;
   button.setAttribute('aria-label', name);
-  button.addEventListener('click', () => {
-    theme.colors = [...colors];
+  button.addEventListener('click', async () => {
+    theme.colors = [...suggestion.colors];
+    theme.brightness = suggestion.brightness;
+    shown = [...suggestion.shown];
+    ({points} = await handler.pointsOf(theme.colors));
     draw();
     save();
   });
   return button;
 }));
-showMode(mode);
 showPageMode(pageMode);
 draw();
 handler.showUI();

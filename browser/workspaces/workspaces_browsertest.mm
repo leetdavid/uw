@@ -324,14 +324,13 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, EachProfileStartsAsAWorkspace) {
   EXPECT_FALSE(window->hidden());
 }
 
-// Each workspace keeps its own theme, its mode included, and the pages in its
-// windows see that mode.
+// Each workspace keeps its own theme, and the pages in its windows see that
+// theme's light or dark.
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   const std::string reading = AddWorkspace("Reading", profile());
-  const std::vector<std::vector<SkColor>> suggested = SuggestedThemes();
+  const std::vector<SuggestedTheme> suggested = SuggestedThemes();
   Theme butter;
-  butter.colors = suggested[3];
-  butter.mode = ThemeMode::kLight;
+  butter.colors = suggested[4].colors;
   SetThemeOfWindow(browser(), butter);
   Load(browser(), GURL(kForm));
 
@@ -339,9 +338,8 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   BrowserWindowInterface* partner = WaitForShown(browser(), reading);
   ASSERT_TRUE(partner);
   Theme wine;
-  wine.colors = suggested[5];
-  wine.mode = ThemeMode::kDark;
-  wine.colors_in_dark_mode = true;
+  wine.colors = suggested[6].colors;
+  wine.brightness = suggested[6].brightness;
   SetThemeOfWindow(partner, wine);
   Load(partner, GURL(kForm));
 
@@ -359,16 +357,18 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   };
   EXPECT_EQ(ThemeOfWindow(browser()), butter);
   EXPECT_EQ(ThemeOfWindow(partner), wine);
-  EXPECT_EQ(frame(browser()), TintFrom(suggested[3][0]).start);
-  EXPECT_EQ(frame(partner), TintFrom(DarkModeColorOf(suggested[5][0])).start);
+  EXPECT_EQ(frame(browser()), TintFrom(butter.colors[0]).start);
+  EXPECT_EQ(frame(partner),
+            TintFrom(ColorAsShown(wine, wine.colors[0])).start);
   EXPECT_FALSE(dark(browser()));
   EXPECT_TRUE(dark(partner));
   SaveWindowScreenshot(partner->GetBrowserForMigrationOnly(),
                        "workspace-dark-wine");
 
-  // A new workspace starts on a suggested theme no workspace uses.
-  EXPECT_EQ(NewWorkspaceTheme(wine).colors, suggested[0]);
-  EXPECT_EQ(NewWorkspaceTheme(wine).mode, ThemeMode::kDark);
+  // A new workspace starts on a suggested theme no workspace uses, at the
+  // brightness of the one it came from.
+  EXPECT_EQ(NewWorkspaceTheme(wine).colors, suggested[0].colors);
+  EXPECT_EQ(NewWorkspaceTheme(wine).brightness, wine.brightness);
 }
 
 // Per docs/plans/themes.md#the-theme-apart-from-chromium.
@@ -378,7 +378,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
     return BrowserView::GetBrowserViewForBrowser(browser())->GetColorProvider();
   };
   Theme theme;
-  theme.mode = ThemeMode::kLight;
   SetThemeOfWindow(browser(), theme);
   const SkColor light_frame = colors()->GetColor(ui::kColorFrameActive);
   theme.page_mode = PageMode::kDark;
@@ -398,7 +397,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   SaveWindowScreenshot(browser()->GetBrowserForMigrationOnly(),
                        "page-mode-dark-chromium-page");
 
-  theme.mode = ThemeMode::kDark;
+  theme.brightness = 0;
   theme.page_mode = PageMode::kLight;
   SetThemeOfWindow(browser(), theme);
   EXPECT_EQ(colors()->GetColor(ui::kColorFrameActive), SK_ColorBLACK);
@@ -452,22 +451,22 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
     }
     return count;
   };
-  for (const ThemeMode mode : {ThemeMode::kLight, ThemeMode::kDark}) {
+  for (const int brightness : {kFullBrightness, 0}) {
     Theme theme;
-    theme.mode = mode;
+    theme.brightness = brightness;
     SetThemeOfWindow(browser(), theme);
     const SkBitmap same = sidebar();
-    theme.page_mode =
-        mode == ThemeMode::kLight ? PageMode::kDark : PageMode::kLight;
+    const bool dark = IsDarkTheme(theme);
+    theme.page_mode = dark ? PageMode::kLight : PageMode::kDark;
     SetThemeOfWindow(browser(), theme);
     const SkBitmap apart = sidebar();
     const int count = differing(same, apart);
     if (count) {
-      const std::string name = mode == ThemeMode::kLight ? "light" : "dark";
+      const std::string name = dark ? "dark" : "light";
       SaveBitmap(same, "sidebar-" + name + "-same");
       SaveBitmap(apart, "sidebar-" + name + "-apart");
     }
-    EXPECT_EQ(count, 0) << "theme " << static_cast<int>(mode);
+    EXPECT_EQ(count, 0) << "brightness " << brightness;
     EXPECT_EQ(same.width(), apart.width());
   }
 }
@@ -475,7 +474,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesKeepTwoPageModes) {
   const std::string reading = AddWorkspace("Reading", profile());
   Theme dark_pages;
-  dark_pages.mode = ThemeMode::kLight;
   dark_pages.page_mode = PageMode::kDark;
   SetThemeOfWindow(browser(), dark_pages);
   Load(browser(), GURL(kForm));
@@ -497,7 +495,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesKeepTwoPageModes) {
 
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, OpenPagesTakeANewPageModeAtOnce) {
   Theme theme;
-  theme.mode = ThemeMode::kLight;
   SetThemeOfWindow(browser(), theme);
   Load(browser(), GURL(kForm));
   AddTab(browser(), GURL(kGreen));
@@ -530,7 +527,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   ASSERT_TRUE(extension);
 
   Theme theme;
-  theme.mode = ThemeMode::kLight;
   theme.page_mode = PageMode::kDark;
   SetThemeOfWindow(browser(), theme);
   std::unique_ptr<ExtensionActionTestHelper> actions =
@@ -559,8 +555,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, ChromiumsLinesAreNeutral) {
   ASSERT_TRUE(extensions::ChromeTestExtensionLoader(profile()).LoadExtension(
       dir.UnpackedPath()));
   Theme theme;
-  theme.mode = ThemeMode::kLight;
-  theme.colors = SuggestedThemes()[1];
+  theme.colors = SuggestedThemes()[2].colors;
   SetThemeOfWindow(browser(), theme);
 
   BrowserView::GetBrowserViewForBrowser(browser())
@@ -590,7 +585,6 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
         .toSkColor();
   };
   Theme theme;
-  theme.mode = ThemeMode::kLight;
   theme.page_mode = PageMode::kDark;
   SetThemeOfWindow(browser(), theme);
   Load(browser(), GURL(kForm));
@@ -598,7 +592,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   Load(browser(), GURL(kNotes));
   EXPECT_EQ(card(), kBlackCard);
 
-  theme.mode = ThemeMode::kDark;
+  theme.brightness = 0;
   theme.page_mode = PageMode::kLight;
   SetThemeOfWindow(browser(), theme);
   Load(browser(), GURL(kForm));

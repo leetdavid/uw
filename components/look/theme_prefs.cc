@@ -15,10 +15,10 @@ namespace uw {
 void RegisterThemeProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kThemeColorsPref);
   registry->RegisterIntegerPref(kThemeIntensityPref, kFullIntensity);
+  registry->RegisterIntegerPref(kThemeBrightnessPref, kFullBrightness);
   registry->RegisterIntegerPref(kThemeGrainPref, 0);
   registry->RegisterIntegerPref(kThemeTransparencyPref, 0);
   registry->RegisterIntegerPref(kThemeGlassPref, 0);
-  registry->RegisterBooleanPref(kThemeColorsInDarkModePref, false);
   registry->RegisterStringPref(kThemePageModePref, "window");
 }
 
@@ -52,10 +52,10 @@ Theme SavedTheme(const PrefService& prefs) {
     }
   }
   theme.intensity = prefs.GetInteger(kThemeIntensityPref);
+  theme.brightness = prefs.GetInteger(kThemeBrightnessPref);
   theme.grain = prefs.GetInteger(kThemeGrainPref);
   theme.transparency = prefs.GetInteger(kThemeTransparencyPref);
   theme.glass = prefs.GetInteger(kThemeGlassPref);
-  theme.colors_in_dark_mode = prefs.GetBoolean(kThemeColorsInDarkModePref);
   theme.page_mode = PageModeNamed(prefs.GetString(kThemePageModePref));
   return theme;
 }
@@ -67,10 +67,12 @@ Theme ReadTheme(const PrefService& prefs, std::optional<SkColor> user_color) {
   if (!user_color) {
     theme.colors = Theme().colors;
     theme.intensity = kFullIntensity;
+    theme.brightness = kFullBrightness;
   } else if (theme.colors.empty() ||
-             WithIntensity(theme.colors[0], theme.intensity) != *user_color) {
+             ColorAsShown(theme, theme.colors[0]) != *user_color) {
     theme.colors = {*user_color};
     theme.intensity = kFullIntensity;
+    theme.brightness = kFullBrightness;
   }
   return theme;
 }
@@ -80,17 +82,13 @@ base::DictValue ThemeToValue(const Theme& theme) {
   for (SkColor color : theme.colors) {
     colors.Append(static_cast<int>(color));
   }
-  const std::string_view mode = theme.mode == ThemeMode::kLight  ? "light"
-                                : theme.mode == ThemeMode::kDark ? "dark"
-                                                                 : "auto";
   return base::DictValue()
       .Set("colors", std::move(colors))
       .Set("intensity", theme.intensity)
+      .Set("brightness", theme.brightness)
       .Set("grain", theme.grain)
       .Set("transparency", theme.transparency)
       .Set("glass", theme.glass)
-      .Set("colors_in_dark_mode", theme.colors_in_dark_mode)
-      .Set("mode", mode)
       .Set("page_mode", PageModeName(theme.page_mode));
 }
 
@@ -108,16 +106,10 @@ std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
     return std::nullopt;
   }
   theme.intensity = value.FindInt("intensity").value_or(kFullIntensity);
+  theme.brightness = value.FindInt("brightness").value_or(kFullBrightness);
   theme.grain = value.FindInt("grain").value_or(0);
   theme.transparency = value.FindInt("transparency").value_or(0);
   theme.glass = value.FindInt("glass").value_or(0);
-  theme.colors_in_dark_mode =
-      value.FindBool("colors_in_dark_mode").value_or(false);
-  const std::string* mode = value.FindString("mode");
-  theme.mode = !mode              ? ThemeMode::kAuto
-               : *mode == "light" ? ThemeMode::kLight
-               : *mode == "dark"  ? ThemeMode::kDark
-                                  : ThemeMode::kAuto;
   if (const std::string* page_mode = value.FindString("page_mode")) {
     theme.page_mode = PageModeNamed(*page_mode);
   }
@@ -131,10 +123,10 @@ void WriteTheme(PrefService& prefs, const Theme& theme) {
   }
   prefs.SetList(kThemeColorsPref, std::move(colors));
   prefs.SetInteger(kThemeIntensityPref, theme.intensity);
+  prefs.SetInteger(kThemeBrightnessPref, theme.brightness);
   prefs.SetInteger(kThemeGrainPref, theme.grain);
   prefs.SetInteger(kThemeTransparencyPref, theme.transparency);
   prefs.SetInteger(kThemeGlassPref, theme.glass);
-  prefs.SetBoolean(kThemeColorsInDarkModePref, theme.colors_in_dark_mode);
   prefs.SetString(kThemePageModePref, PageModeName(theme.page_mode));
 }
 

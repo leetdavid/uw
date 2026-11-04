@@ -1212,9 +1212,9 @@ index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..3199f87ac4b3e5dfff13c83954c7aab4
        prefs::kUserColor, base::BindRepeating(&ThemeService::NotifyThemeChanged,
                                               base::Unretained(this)));
 +  for (const char* pref :
-+       {uw::kThemeColorsPref, uw::kThemeIntensityPref, uw::kThemeGrainPref,
-+        uw::kThemeTransparencyPref, uw::kThemeGlassPref,
-+        uw::kThemeColorsInDarkModePref}) {
++       {uw::kThemeColorsPref, uw::kThemeIntensityPref,
++        uw::kThemeBrightnessPref, uw::kThemeGrainPref,
++        uw::kThemeTransparencyPref, uw::kThemeGlassPref}) {
 +    pref_change_registrar_.Add(
 +        pref, base::BindRepeating(&ThemeService::NotifyThemeChanged,
 +                                  base::Unretained(this)));
@@ -1222,16 +1222,14 @@ index 7451b98b9c3f598f5fe8f9bbbc2e505b938c2fce..3199f87ac4b3e5dfff13c83954c7aab4
  }
  
  void ThemeService::Shutdown() {
-@@ -765,6 +775,15 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
+@@ -765,6 +775,13 @@ ui::ColorProviderKey ThemeService::GetColorProviderKey(
      key.custom_theme = GetThemeSupplier();
    }
  
-+  // uw: dark mode is black whatever color is picked, unless "Theme colors in
-+  // dark mode" is on, so Chromium draws its own parts in the neutral colors it
-+  // uses for incognito.
-+  if (key.color_mode == ui::ColorProviderKey::ColorMode::kDark &&
-+      !key.custom_theme && !UsingDeviceTheme() &&
-+      !profile_->GetPrefs()->GetBoolean(uw::kThemeColorsInDarkModePref)) {
++  // uw: a theme color with no hue of its own, such as black, gives Chromium's
++  // neutral colors, which it also uses for incognito.
++  if (!key.custom_theme && !UsingDeviceTheme() && key.user_color &&
++      uw::IsNeutral(*key.user_color)) {
 +    key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
 +  }
 +
