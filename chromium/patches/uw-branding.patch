@@ -692,6 +692,7 @@ index a741f89bf54c65b3b188def7b03270015356debe..ab8c34ba8652e59d1070806a75637445
        </if>
  
 diff --git a/chrome/app/settings_chromium_strings.grdp b/chrome/app/settings_chromium_strings.grdp
+index 237b2a8517c3c1e20595dacbb543a33d758b6c01..49134384d8a0d55c8126605191422452099a7961 100644
 --- a/chrome/app/settings_chromium_strings.grdp
 +++ b/chrome/app/settings_chromium_strings.grdp
 @@ -19,7 +19,7 @@
@@ -703,6 +704,30 @@ diff --git a/chrome/app/settings_chromium_strings.grdp b/chrome/app/settings_chr
        </message>
        <message name="IDS_SETTINGS_GET_HELP_USING_CHROME" desc="Text of the button which takes the user to the Chrome help page.">
          Get help with Chromium
+@@ -28,16 +28,19 @@
+   </if>
+   <if expr="not is_chromeos">
+     <message name="IDS_SETTINGS_UPGRADE_UPDATING" desc="Status label: Updating Chromium">
+-      Updating Chromium
++      Updating uw
+     </message>
+     <message name="IDS_SETTINGS_UPGRADE_UPDATING_PERCENT" desc="Status label: Updating Chromium (90%)">
+-      Updating Chromium (<ph name="PROGRESS_PERCENT">$1<ex>90%</ex></ph>)
++      Updating uw (<ph name="PROGRESS_PERCENT">$1<ex>90%</ex></ph>)
+     </message>
+     <message name="IDS_SETTINGS_UPGRADE_SUCCESSFUL_RELAUNCH" desc="Status label: Successfully updated Chromium">
+-      Nearly up to date! Relaunch Chromium to finish updating.
++      Nearly up to date! Relaunch uw to finish updating.
+     </message>
+     <message name="IDS_SETTINGS_UPGRADE_UP_TO_DATE" desc="Status label: Already up to date (Chromium)">
+-      Chromium is up to date
++      uw is up to date
++    </message>
++    <message name="IDS_UW_UPDATE_FAILED" desc="Status label on About uw when uw's updater could not check for updates or download one.">
++      uw couldn't check for updates. Check your connection, then open this page again.
+     </message>
+   </if>
+   <if expr="is_chromeos">
 diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
 --- a/chrome/app/theme/chromium/BRANDING
 +++ b/chrome/app/theme/chromium/BRANDING

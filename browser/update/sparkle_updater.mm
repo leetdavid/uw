@@ -13,6 +13,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/upgrade_detector/build_state.h"
 #include "uw/browser/update/pending_update.h"
+#include "uw/browser/update/update_check.h"
 
 // The parts of Sparkle's SPUUpdater and SPUStandardUserDriver uw calls. uw
 // loads Sparkle.framework at runtime, so it does not link its headers.
@@ -22,6 +23,8 @@
                         userDriver:(id)userDriver
                           delegate:(id)delegate;
 - (BOOL)startUpdater:(NSError* __autoreleasing*)error;
+- (void)checkForUpdatesInBackground;
+@property(nonatomic, readonly) BOOL sessionInProgress;
 @end
 
 @protocol UwSparkleUserDriver <NSObject>
@@ -34,6 +37,17 @@
 @implementation UwSparkleDelegate
 
 - (BOOL)updater:(id)updater
+    mayPerformUpdateCheck:(NSInteger)updateCheck
+                    error:(NSError* __autoreleasing*)error {
+  uw::ReportUpdateState(uw::UpdateState::kChecking);
+  return YES;
+}
+
+- (void)updater:(id)updater didFindValidUpdate:(id)item {
+  uw::ReportUpdateState(uw::UpdateState::kDownloading);
+}
+
+- (BOOL)updater:(id)updater
        willInstallUpdateOnQuit:(id)item
     immediateInstallationBlock:(void (^)(void))immediateInstallHandler {
   uw::OnUpdateDownloaded(base::BindRepeating(^{
@@ -42,13 +56,31 @@
   return YES;
 }
 
+// Sparkle ends every check here. Finding no newer version ends it with
+// SUNoUpdateError, 1001 in Sparkle's error domain.
+- (void)updater:(id)updater
+    didFinishUpdateCycleForUpdateCheck:(NSInteger)updateCheck
+                                 error:(NSError*)error {
+  uw::OnSparkleCheckFinished(
+      error && !([error.domain isEqualToString:@"SUSparkleErrorDomain"] &&
+                 error.code == 1001));
+}
+
 @end
 
 namespace uw {
 namespace {
 
 UwSparkleDelegate* g_delegate;
-id g_updater;
+id<UwSparkleUpdater> g_updater;
+
+void CheckNow() {
+  if (g_updater.sessionInProgress) {
+    return;
+  }
+  ReportUpdateState(UpdateState::kChecking);
+  [g_updater checkForUpdatesInBackground];
+}
 
 }  // namespace
 
@@ -79,6 +111,7 @@ void StartSparkleUpdater() {
                 delegate:g_delegate];
   if ([updater startUpdater:nil]) {
     g_updater = updater;
+    SetUpdateChecker(base::BindRepeating(&CheckNow));
   }
 }
 
@@ -86,6 +119,15 @@ void OnUpdateDownloaded(base::RepeatingClosure install) {
   SetPendingUpdate(std::move(install));
   g_browser_process->GetBuildState()->SetUpdate(
       BuildState::UpdateType::kNormalUpdate, base::Version(), std::nullopt);
+  ReportUpdateState(UpdateState::kReady);
+}
+
+void OnSparkleCheckFinished(bool failed) {
+  if (HasPendingUpdate()) {
+    ReportUpdateState(UpdateState::kReady);
+  } else {
+    ReportUpdateState(failed ? UpdateState::kFailed : UpdateState::kUpToDate);
+  }
 }
 
 }  // namespace uw

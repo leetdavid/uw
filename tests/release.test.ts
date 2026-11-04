@@ -90,6 +90,7 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
     ["CFBundleShortVersionString", "-string", "0.1.0"], ["CFBundleVersion", "-string", "0.1.0"],
     ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
     ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
+    ["SUScheduledCheckInterval", "-integer", "18000"],
     ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", "phc_test"],
     ["UWPostHogHost", "-string", POSTHOG_HOST],
   ]);

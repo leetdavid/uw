@@ -242,6 +242,7 @@ index 4e62771..1d89df5 100644
  }
  
 diff --git a/chrome/browser/chrome_browser_main_win.cc b/chrome/browser/chrome_browser_main_win.cc
+index 967ccba64ae8943acf40557f0bb75687c6efcd4a..a8c34e8a12f3c630cfeedea296d8ebfa1aba088b 100644
 --- a/chrome/browser/chrome_browser_main_win.cc
 +++ b/chrome/browser/chrome_browser_main_win.cc
 @@ -132,6 +132,7 @@
@@ -256,7 +257,7 @@ diff --git a/chrome/browser/chrome_browser_main_win.cc b/chrome/browser/chrome_b
  void ChromeBrowserMainPartsWin::PostBrowserStart() {
    ChromeBrowserMainParts::PostBrowserStart();
  
-+  // uw: looks for updates once a day, as Sparkle does on the Mac.
++  // uw: looks for updates every 5 hours, as Sparkle does on the Mac.
 +  uw::StartWindowsUpdater();
 +
    // Verify that the delay load helper hooks are in place. This cannot be tested
@@ -345,6 +346,19 @@ index a69a9dba2b485976ff12aff032b77db221262bb0..9449110425c788f15f9189c9d5b2a8b4
  }
  
  bool IsMetricsReportingPolicyManaged() {
+diff --git a/chrome/browser/resources/settings/about_page/about_page.html.ts b/chrome/browser/resources/settings/about_page/about_page.html.ts
+index b9ac4e634feddf9e14a6da7c36fcb49fa143c032..b4fe0c7ff7ec852cc3c5110d6799e3a6eac24ecd 100644
+--- a/chrome/browser/resources/settings/about_page/about_page.html.ts
++++ b/chrome/browser/resources/settings/about_page/about_page.html.ts
+@@ -41,7 +41,7 @@ export function getHtml(this: SettingsAboutPageElement) {
+             .innerHTML="${this.getUpdateStatusMessage_()}">
+         </div>
+         <a ?hidden="${!this.shouldShowLearnMoreLink_()}" target="_blank"
+-            href="https://support.google.com/chrome?p=update_error"
++            href="https://uwbrowser.com/help/install-uw#updates-come-by-themselves"
+             aria-label="$i18nPolymer{aboutLearnMoreUpdatingErrors}">
+           $i18n{learnMore}
+         </a>
 diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page.html b/chrome/browser/resources/settings/privacy_page/privacy_page.html
 index e7b77860d821689053997e054b74cedeb1f80369..1afccd8f8fe6408fa07cdfb6c68292cf24423a73 100644
 --- a/chrome/browser/resources/settings/privacy_page/privacy_page.html
@@ -465,6 +479,46 @@ diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/too
  #endif
  
    AddItemWithStringIdAndVectorIcon(
+diff --git a/chrome/browser/ui/webui/help/BUILD.gn b/chrome/browser/ui/webui/help/BUILD.gn
+index 17d8d3e2832c4d572054a7c866690703e9fe87a2..c8df42d6f76c0ae29ebeac32f1ceb9e832c5a312 100644
+--- a/chrome/browser/ui/webui/help/BUILD.gn
++++ b/chrome/browser/ui/webui/help/BUILD.gn
+@@ -35,17 +35,15 @@ source_set("help") {
+     ]
+   }
+ 
++  # uw: About uw asks uw's own updater, Sparkle on the Mac and uw's fetcher on
++  # Windows, instead of Chromium's Google one.
+   if (is_mac) {
+-    sources = [ "version_updater_mac.mm" ]
++    sources = [ "//uw/browser/update/version_updater.cc" ]
+     deps += [
+-      "//base:i18n",
+       "//chrome/app:branded_strings",
+-      "//chrome/app:generated_resources_grit",
+-      "//chrome/browser/updater",
+-      "//chrome/updater:browser_sources",
+       "//ui/base",
++      "//uw/browser/update:update_check",
+     ]
+-    frameworks = [ "Foundation.framework" ]
+   }
+ 
+   if (is_win) {
+@@ -62,7 +60,12 @@ source_set("help") {
+         "//ui/gfx",
+       ]
+     } else {
+-      sources = [ "version_updater_basic.cc" ]
++      sources = [ "//uw/browser/update/version_updater.cc" ]
++      deps += [
++        "//chrome/app:branded_strings",
++        "//ui/base",
++        "//uw/browser/update:update_check",
++      ]
+     }
+   }
+ 
 diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
 index cb47063dbbfcb743a3defe714673f41ce775bbd7..1fc5f9f42a1c7877fd3e4908b5f3eb3c19b06316 100644
 --- a/chrome/browser/ui/webui/settings/BUILD.gn

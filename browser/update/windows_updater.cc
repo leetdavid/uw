@@ -41,6 +41,7 @@
 #include "third_party/boringssl/src/include/openssl/curve25519.h"
 #include "url/gurl.h"
 #include "uw/browser/branding/release_buildflags.h"
+#include "uw/browser/update/update_check.h"
 
 namespace uw {
 namespace {
@@ -52,7 +53,7 @@ constexpr char kFeedAsset[] = "uw-windows-update.json";
 constexpr char kSignatureAsset[] = "uw-windows-update.json.sig";
 
 constexpr base::TimeDelta kFirstCheck = base::Minutes(3);
-constexpr base::TimeDelta kCheckEvery = base::Days(1);
+constexpr base::TimeDelta kCheckEvery = base::Hours(5);
 constexpr size_t kMaxReleases = 4 * 1024 * 1024;
 constexpr size_t kMaxFeed = 16 * 1024;
 constexpr int64_t kMaxInstaller = 1024 * 1024 * 1024;
@@ -62,9 +63,10 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
       semantics {
         sender: "uw updates"
         description:
-          "uw for Windows looks for a newer release on GitHub once a day and "
-          "downloads its installer."
-        trigger: "A few minutes after launch, then once a day."
+          "uw for Windows looks for a newer release on GitHub every 5 hours "
+          "and downloads its installer."
+        trigger: "A few minutes after launch, then every 5 hours, and when "
+                 "the user opens About uw."
         data: "None. The requests carry no user data."
         destination: OTHER
         destination_other: "GitHub's releases for uw."
@@ -212,7 +214,6 @@ class Updater {
                  base::BindOnce(&Updater::Check, base::Unretained(this)));
   }
 
- private:
   void Check() {
     timer_.Start(FROM_HERE, kCheckEvery,
                  base::BindOnce(&Updater::Check, base::Unretained(this)));
@@ -220,6 +221,7 @@ class Updater {
       return;
     }
     busy_ = true;
+    ReportUpdateState(UpdateState::kChecking);
     loader_ = Request(releases_, /*api=*/true);
     loader_->DownloadToString(
         g_browser_process->shared_url_loader_factory().get(),
@@ -227,11 +229,14 @@ class Updater {
         kMaxReleases);
   }
 
+ private:
   void OnReleases(std::optional<std::string> answer) {
-    std::optional<ReleaseAssets> assets =
-        answer ? NewestRelease(*answer) : std::nullopt;
+    if (!answer) {
+      return Done(UpdateState::kFailed);
+    }
+    std::optional<ReleaseAssets> assets = NewestRelease(*answer);
     if (!assets) {
-      return Done();
+      return Done(UpdateState::kUpToDate);
     }
     assets_ = std::move(*assets);
     loader_ = Request(assets_.signature);
@@ -243,7 +248,7 @@ class Updater {
 
   void OnSignature(std::optional<std::string> signature) {
     if (!signature) {
-      return Done();
+      return Done(UpdateState::kFailed);
     }
     signature_ = std::move(*signature);
     loader_ = Request(assets_.feed);
@@ -255,12 +260,15 @@ class Updater {
   void OnFeed(std::optional<std::string> text) {
     std::optional<UpdateFeed> feed =
         text ? ReadUpdateFeed(*text, signature_) : std::nullopt;
-    if (!feed || feed->version <= version_info::GetVersion()) {
-      return Done();
+    if (!feed) {
+      return Done(UpdateState::kFailed);
+    }
+    if (feed->version <= version_info::GetVersion()) {
+      return Done(UpdateState::kUpToDate);
     }
     feed_ = std::move(*feed);
     if (!base::PathService::Get(chrome::DIR_USER_DATA, &downloads_)) {
-      return Done();
+      return Done(UpdateState::kFailed);
     }
     downloads_ = downloads_.AppendASCII("uw-update");
     base::ThreadPool::PostTaskAndReplyWithResult(
@@ -272,7 +280,7 @@ class Updater {
   void OnInstalledVersion(base::Version installed) {
     // An update already waits for the relaunch.
     if (installed.IsValid() && installed >= feed_.version) {
-      return Done();
+      return Done(UpdateState::kReady);
     }
     GURL installer;
     for (const auto& [name, url] : assets_.files) {
@@ -282,8 +290,9 @@ class Updater {
     }
     if (!installer.is_valid() || feed_.size <= 0 ||
         feed_.size > kMaxInstaller) {
-      return Done();
+      return Done(UpdateState::kFailed);
     }
+    ReportUpdateState(UpdateState::kDownloading);
     loader_ = Request(installer);
     loader_->DownloadToFile(
         g_browser_process->shared_url_loader_factory().get(),
@@ -293,7 +302,7 @@ class Updater {
 
   void OnDownloaded(base::FilePath installer) {
     if (installer.empty()) {
-      return Done();
+      return Done(UpdateState::kFailed);
     }
     base::ThreadPool::PostTaskAndReplyWithResult(
         FROM_HERE,
@@ -308,12 +317,13 @@ class Updater {
       LOG(WARNING) << "uw update: " << feed_.version.GetString()
                    << " waits for a relaunch";
     }
-    Done();
+    Done(installed ? UpdateState::kReady : UpdateState::kFailed);
   }
 
-  void Done() {
+  void Done(UpdateState state) {
     loader_.reset();
     busy_ = false;
+    ReportUpdateState(state);
   }
 
   GURL releases_;
@@ -400,6 +410,8 @@ void StartWindowsUpdater() {
                     : BUILDFLAG(UW_UPDATE_FEED_URL));
   if (releases.is_valid()) {
     updater->Start(releases);
+    SetUpdateChecker(
+        base::BindRepeating(&Updater::Check, base::Unretained(updater.get())));
   }
 }
 

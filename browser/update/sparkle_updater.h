@@ -15,6 +15,10 @@ void StartSparkleUpdater();
 // Chromium show its "Relaunch to update" prompt.
 void OnUpdateDownloaded(base::RepeatingClosure install);
 
+// Sparkle ended a check, with an error other than finding no newer version
+// when `failed`.
+void OnSparkleCheckFinished(bool failed);
+
 }  // namespace uw
 
 #endif  // UW_BROWSER_UPDATE_SPARKLE_UPDATER_H_

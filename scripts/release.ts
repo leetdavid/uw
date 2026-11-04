@@ -12,6 +12,8 @@ export const DMG = "uw-macos-arm64.dmg";
 export const SPARKLE_VERSION = "2.10.1";
 export const SPARKLE_SHA256 = "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27";
 export const SPARKLE_PUBLIC_KEY = "tUSDZsx93uVKuL7o7d/RMObl4n5XFcTn/G5SHNENRZk=";
+// Seconds between Sparkle's checks: 5 hours, as Chrome does. See docs/plans/distribution.md.
+export const UPDATE_CHECK_EVERY = 5 * 60 * 60;
 export const SENTRY_CLI_VERSION = "3.8.2";
 export const SENTRY_CLI_SHA256 = "c80d92b6d34eb64fe7402f56cc7968fbb15aab1c763254ad428b55cc98ec7dcf";
 // Crash reports go to the Sentry project eslee/uw, and uw's pages report problems
@@ -203,6 +205,7 @@ export class Release {
       ["CFBundleShortVersionString", "-string", version], ["CFBundleVersion", "-string", version],
       ["SUFeedURL", "-string", FEED_URL], ["SUPublicEDKey", "-string", SPARKLE_PUBLIC_KEY],
       ["SUEnableAutomaticChecks", "-bool", "YES"], ["SUAutomaticallyUpdate", "-bool", "YES"],
+      ["SUScheduledCheckInterval", "-integer", String(UPDATE_CHECK_EVERY)],
       ["UWCrashReportURL", "-string", CRASH_REPORT_URL], ["UWPostHogKey", "-string", posthogToken],
       ["UWPostHogHost", "-string", POSTHOG_HOST],
     ] as const) {

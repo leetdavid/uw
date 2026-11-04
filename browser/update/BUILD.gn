@@ -11,6 +11,16 @@ source_set("pending_update") {
   deps = [ "//base" ]
 }
 
+# What uw's updater is doing, for About uw. Chromium's About page code
+# compiles version_updater.cc and asks this.
+source_set("update_check") {
+  sources = [
+    "update_check.cc",
+    "update_check.h",
+  ]
+  deps = [ "//base" ]
+}
+
 source_set("update") {
   public_deps = [ ":pending_update" ]
   if (is_mac) {
@@ -19,6 +29,7 @@ source_set("update") {
       "sparkle_updater.mm",
     ]
     deps = [
+      ":update_check",
       "//base",
       "//chrome/browser:browser_process",
       "//chrome/browser/upgrade_detector",
@@ -30,6 +41,7 @@ source_set("update") {
       "windows_updater.h",
     ]
     deps = [
+      ":update_check",
       "//base",
       "//base/version_info",
       "//chrome/browser:browser_process",
@@ -58,12 +70,30 @@ source_set("windows_browser_tests") {
   ]
 }
 
+source_set("about_browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "about_updates_browsertest.cc" ]
+  deps = [
+    ":update_check",
+    "//base",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/ui",
+    "//chrome/test:test_support",
+    "//content/test:test_support",
+    "//testing/gtest",
+    "//url",
+  ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [ "update_browsertest.cc" ]
   deps = [
     ":update",
+    ":update_check",
     "//base",
     "//base/version_info",
     "//chrome/browser",

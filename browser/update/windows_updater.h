@@ -16,10 +16,11 @@ class CommandLine;
 
 namespace uw {
 
-// Looks for a newer uw a few minutes after launch and then once a day, as
-// Sparkle does on the Mac. It downloads the installer, checks it against the
-// signed feed, and runs it, which stages the new uw for Chromium's "Relaunch
-// to update". A build without a feed address does nothing. See
+// Looks for a newer uw a few minutes after launch, then every 5 hours, as
+// Sparkle does on the Mac, and when About uw asks. It downloads the installer,
+// checks it against the signed feed, and runs it, which stages the new uw for
+// Chromium's "Relaunch to update". A build without a feed address does nothing.
+// See
 // docs/adr/0026-windows-uw-updates-with-a-fetcher-of-its-own-behind-chromiums-relaunch-button.md.
 void StartWindowsUpdater();
 

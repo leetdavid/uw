@@ -20,6 +20,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "uw/browser/update/pending_update.h"
 #include "uw/browser/update/sparkle_updater.h"
+#include "uw/browser/update/update_check.h"
 
 namespace uw {
 namespace {
@@ -28,6 +29,7 @@ class UpdateBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   void TearDownOnMainThread() override {
     ClearPendingUpdateForTesting();
+    ResetUpdateCheckForTesting();
     g_browser_process->GetBuildState()->SetUpdate(
         BuildState::UpdateType::kNone, base::Version(), std::nullopt);
     headless::HeadlessModeBrowserTest::TearDownOnMainThread();
@@ -77,6 +79,26 @@ IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, RelaunchHandsTheInstallToSparkle) {
   EXPECT_EQ(installs_, 1);
   EXPECT_TRUE(local_state().GetBoolean(prefs::kWasRestarted));
   EXPECT_FALSE(local_state().GetBoolean(prefs::kRestartLastSessionOnShutdown));
+}
+
+IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, ADownloadedUpdateIsReady) {
+  DownloadUpdate();
+  EXPECT_EQ(CurrentUpdateState(), UpdateState::kReady);
+
+  OnSparkleCheckFinished(/*failed=*/false);
+  EXPECT_EQ(CurrentUpdateState(), UpdateState::kReady);
+}
+
+IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, FindingNoNewerVersionIsUpToDate) {
+  OnSparkleCheckFinished(/*failed=*/false);
+
+  EXPECT_EQ(CurrentUpdateState(), UpdateState::kUpToDate);
+}
+
+IN_PROC_BROWSER_TEST_F(UpdateBrowserTest, AnyOtherSparkleErrorFailsTheCheck) {
+  OnSparkleCheckFinished(/*failed=*/true);
+
+  EXPECT_EQ(CurrentUpdateState(), UpdateState::kFailed);
 }
 
 class OldBuildBrowserTest : public UpdateBrowserTest {
