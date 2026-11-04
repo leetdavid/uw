@@ -7,6 +7,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/events/event_handler.h"
 #include "ui/gfx/geometry/insets.h"
@@ -34,8 +35,9 @@ namespace uw {
 class FloatingWindowButtons;
 class OrganizeBar;
 
-// What a hidden sidebar keeps of the window: the strip left of the page card.
-// The pointer resting there brings the floating sidebar in.
+// What a hidden sidebar keeps of the window: the strip left of the page card,
+// or the page's own left edge while the card has no margin. The pointer resting
+// there brings the floating sidebar in.
 inline constexpr int kHiddenSidebarEdge = 8;
 
 // How far uw's window buttons reach from the floating card's leading edge,
@@ -57,7 +59,8 @@ bool IsSidebarHidden(BrowserWindowInterface* window);
 // in. The pointer finds the sidebar on the edge, and on the card while it is
 // out. Esc sends the card away until the pointer leaves the sidebar. While the
 // card is out of the window, the activity card shows alone over the page's
-// bottom-left corner.
+// bottom-left corner. The window lays out again when "Space around the page"
+// is turned on or off.
 class FloatingSidebar : public ui::AcceleratorTarget,
                         public ui::EventHandler,
                         public views::ViewTargeterDelegate,
@@ -113,6 +116,7 @@ class FloatingSidebar : public ui::AcceleratorTarget,
   void PlaceActivityCard(bool alone);
   // With Transparency, blurs the page under the card.
   void UpdateBlur(const gfx::Rect& card, bool floating);
+  void OnPageSpaceChanged();
 
   const raw_ptr<VerticalTabStripRegionView> region_;
   const raw_ptr<BrowserView> browser_view_;
@@ -127,6 +131,7 @@ class FloatingSidebar : public ui::AcceleratorTarget,
   std::unique_ptr<ExpandOnHoverLock> sent_away_;
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       widget_observation_{this};
+  PrefChangeRegistrar page_space_;
 };
 
 }  // namespace uw

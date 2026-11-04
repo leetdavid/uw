@@ -104,6 +104,7 @@ source_set("browser_tests") {
     "//uw/browser/connectors",
     "//uw/browser/tab_organization",
     "//uw/browser/tab_organization:ai_connection",
+    "//uw/browser/ui/look:prefs",
     "//uw/browser/workspaces",
     "//uw/components/agent",
     "//uw/components/uw_command",

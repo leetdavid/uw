@@ -154,6 +154,18 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
           @change="${this.onGlassBehindChange_}">
       </cr-toggle>
     </div>
+    <div class="uw-row">
+      <div id="pageSpaceLabel" class="uw-field">
+        ${this.i18n_('uwPageSpace')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwPageSpaceDescription')}
+        </div>
+      </div>
+      <cr-toggle id="pageSpaceToggle" aria-labelledby="pageSpaceLabel"
+          ?checked="${!!this.state_?.pageSpace}"
+          @change="${this.onPageSpaceChange_}">
+      </cr-toggle>
+    </div>
   </div>
   <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwCommandBarTitle')}</h2>

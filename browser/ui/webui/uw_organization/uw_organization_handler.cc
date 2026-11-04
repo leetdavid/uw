@@ -24,6 +24,7 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_prefs.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
 #include "uw/browser/uw_command/command_channel.h"
@@ -110,6 +111,8 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwOrganizationThemeDescription", IDS_UW_SETTINGS_THEME_DESCRIPTION},
       {"uwGlassBehind", IDS_UW_SETTINGS_GLASS_BEHIND},
       {"uwGlassBehindDescription", IDS_UW_SETTINGS_GLASS_BEHIND_DESCRIPTION},
+      {"uwPageSpace", IDS_UW_SETTINGS_PAGE_SPACE},
+      {"uwPageSpaceDescription", IDS_UW_SETTINGS_PAGE_SPACE_DESCRIPTION},
       {"uwCommandBarTitle", IDS_UW_SETTINGS_COMMAND_BAR_TITLE},
       {"uwCommandBarToggle", IDS_UW_SETTINGS_COMMAND_BAR_TOGGLE},
       {"uwCommandBarNote", IDS_UW_SETTINGS_COMMAND_BAR_NOTE},
@@ -224,6 +227,8 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   state->glass_behind =
       state->can_show_glass &&
       g_browser_process->local_state()->GetBoolean(kGlassBehindPref);
+  state->page_space =
+      g_browser_process->local_state()->GetBoolean(kPageSpacePref);
   state->command_bar = prefs->GetBoolean(kCommandBarEnabledPref);
   state->currency = prefs->GetString(kCommandBarCurrencyPref);
   state->region_currency = RegionCurrency();
@@ -268,6 +273,12 @@ void UwOrganizationHandler::SetGlassBehind(bool on,
   if (CanShowGlass()) {
     g_browser_process->local_state()->SetBoolean(kGlassBehindPref, on);
   }
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetPageSpace(bool on,
+                                         SetPageSpaceCallback callback) {
+  g_browser_process->local_state()->SetBoolean(kPageSpacePref, on);
   std::move(callback).Run();
 }
 

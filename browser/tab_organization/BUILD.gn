@@ -144,6 +144,7 @@ source_set("browser_tests") {
     "//uw/browser/ai_providers:test_support",
     "//uw/browser/terminal",
     "//uw/browser/ui/look",
+    "//uw/browser/ui/look:prefs",
     "//uw/browser/ui/views/command_bar",
     "//uw/browser/ui/views/pins",
     "//uw/browser/ui/views/tab_organization",

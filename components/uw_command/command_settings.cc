@@ -92,6 +92,7 @@ constexpr auto kSettings = std::to_array<CommandSetting>({
            "uw.mouse.middle_click_closes_task"),
     Switch("glass.windows-behind", Scope::kEverywhere,
            "uw.glass.windows_behind"),
+    Switch("look.page-space", Scope::kEverywhere, "uw.look.page_space"),
     Choices("theme.mode", Scope::kWorkspace, kThemeModes),
     Choices("theme.page-mode", Scope::kWorkspace, kPageModes),
     Percent("theme.intensity"),

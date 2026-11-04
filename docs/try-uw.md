@@ -161,6 +161,10 @@ Open the theme picker from View → Theme…, from `Theme…` in the menu of emp
 
 Expected result: a panel opens beside the sidebar. Click a suggested theme, or drag a dot in the color field, and the window changes as you drag. `+` adds a dot, up to three, and dragging a dot out of the field removes it. Text on the window stays white on a dark color and near-black on a light one. `Intensity` grays the colors and `Grain` adds a fine texture around the page card. `Light`, `Dark`, and `Auto` change uw and the color scheme web pages see. `Pages` sets everything outside the sidebar: with `Light` above and `Pages` on `Dark`, websites with a dark look of their own, extensions, uw's and Chromium's pages such as Settings, and Chromium's menus and bubbles turn dark, while the sidebar, its menus and cards, and the theme picker stay light. A site with no dark look stays light. Each workspace keeps its own. In dark mode the window is black unless `Theme colors in dark mode` is on. A color picked in the "Customize Chromium" panel becomes a one-color theme.
 
+Turn off `Space around the page` under the `Theme` row at `uw://settings/uwOrganization`.
+
+Expected result: every open window changes at once. The page card meets the window's top, right, and bottom edges, keeps its round corners beside the sidebar, and no theme or grain shows around it. Cmd+S hides the sidebar, and the page fills the whole window; rest the pointer on the window's left edge, and the floating sidebar slides in as a card with its own margin. Turn the switch back on, and the margin comes back.
+
 ### Mini player
 
 Play a video, then use the site's picture-in-picture button, or right-click the video twice and choose `Picture in Picture`.

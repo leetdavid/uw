@@ -23,6 +23,7 @@
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/rrect_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -121,6 +122,19 @@ gfx::RectF PageCardIn(const views::View* view,
     }
   }
   return card;
+}
+
+// The page card in `view`, with its corners square where it meets the
+// window's edge.
+gfx::RRectF PageCardShapeIn(const views::View* view,
+                            const views::View* toolbar,
+                            const views::View* page) {
+  const views::View* window = view->GetWidget()->GetRootView();
+  const gfx::RectF card = PageCardIn(view, toolbar, page);
+  return gfx::RRectF(
+      card, PageCardCorners(
+                card, views::View::ConvertRectToTarget(
+                          window, view, gfx::RectF(window->GetLocalBounds()))));
 }
 
 void PaintSheet(gfx::Canvas* canvas,
@@ -222,10 +236,9 @@ void ClipOutPageCard(gfx::Canvas* canvas,
                      const views::View* view,
                      const views::View* toolbar,
                      const views::View* page) {
-  canvas->sk_canvas()->clipRRect(
-      SkRRect::MakeRectXY(gfx::RectFToSkRect(PageCardIn(view, toolbar, page)),
-                          kPageCardRadius, kPageCardRadius),
-      SkClipOp::kDifference, /*do_anti_alias=*/true);
+  canvas->sk_canvas()->clipRRect(SkRRect(PageCardShapeIn(view, toolbar, page)),
+                                 SkClipOp::kDifference,
+                                 /*do_anti_alias=*/true);
 }
 
 void PaintPageCardEdge(gfx::Canvas* canvas,
@@ -237,14 +250,14 @@ void PaintPageCardEdge(gfx::Canvas* canvas,
       view->GetWidget()->IsFullscreen()) {
     return;
   }
-  gfx::RectF edge = PageCardIn(view, toolbar, page);
+  gfx::RRectF edge = PageCardShapeIn(view, toolbar, page);
   edge.Outset(0.5f);
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
   flags.setStyle(cc::PaintFlags::kStroke_Style);
   flags.setStrokeWidth(1);
   flags.setColor(color);
-  canvas->DrawRoundRect(edge, kPageCardRadius + 0.5f, flags);
+  canvas->sk_canvas()->drawRRect(SkRRect(edge), flags);
 }
 
 }  // namespace uw

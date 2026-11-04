@@ -55,6 +55,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/look/sidebar_tab_fill.h"
 #include "uw/components/look/theme.h"
 #include "uw/components/look/theme_prefs.h"
@@ -275,6 +276,45 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheBlackCardHasAGrayEdge) {
   EXPECT_LE(Gap(color_at(card.right() + 0.5f, middle_y), kBlackCardEdge), 3);
   EXPECT_LE(Gap(color_at(card.x() - 0.5f, middle_y), kBlackCardEdge), 3);
   EXPECT_LE(Gap(color_at(middle_x, card.y() - 4), SK_ColorBLACK), 3);
+}
+
+// With the margin off, the black card keeps its round corners and its gray
+// edge beside the sidebar only. Where it meets the window's edges its corners
+// are square, for the window's own corners to round. See
+// docs/plans/arc-style-look.md#margin.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, WithoutSpaceOnlyTheSidebarSideIsRound) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  g_browser_process->local_state()->SetBoolean(kPageSpacePref, false);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return view->toolbar()->GetBoundsInScreen().y() ==
+           view->GetWidget()->GetClientAreaBoundsInScreen().y();
+  }));
+  const SkBitmap window = CaptureWindow(browser());
+  const gfx::Rect bounds = view->GetWidget()->GetClientAreaBoundsInScreen();
+  const float scale = static_cast<float>(window.width()) / bounds.width();
+  gfx::Rect card = view->toolbar()->GetBoundsInScreen();
+  card.Union(view->multi_contents_view()->GetBoundsInScreen());
+  card.Offset(-bounds.OffsetFromOrigin());
+  EXPECT_EQ(card.y(), 0);
+  EXPECT_EQ(card.right(), bounds.width());
+  EXPECT_EQ(card.bottom(), bounds.height());
+  const auto color_at = [&](float x, float y) {
+    return window.getColor(base::ClampFloor(x * scale),
+                           base::ClampFloor(y * scale));
+  };
+
+  EXPECT_LE(Gap(color_at(card.x() + 1, card.y() + 1), SK_ColorBLACK), 3);
+  EXPECT_LE(Gap(color_at(card.x() + 1, card.bottom() - 1), SK_ColorBLACK), 3);
+  EXPECT_LE(
+      Gap(color_at(card.x() - 0.5f, card.CenterPoint().y()), kBlackCardEdge),
+      3);
+  EXPECT_LE(Gap(color_at(card.right() - 1, card.y() + 1),
+                color_at(card.right() - 24, card.y() + 1)),
+            3);
+  EXPECT_LE(Gap(color_at(card.right() - 1, card.bottom() - 1),
+                color_at(card.right() - 24, card.bottom() - 1)),
+            3);
 }
 
 // uw's own pages use the same blacks in dark mode.

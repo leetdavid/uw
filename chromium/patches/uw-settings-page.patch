@@ -1,5 +1,5 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d907e845ac 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..80cf84cc26e9aa5e8e810c8c2e1608b38f5f52c0 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
 @@ -296,7 +296,7 @@
@@ -20,7 +20,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,178 @@
+@@ -3904,6 +3904,184 @@
          System
        </message>
      </if>
@@ -92,6 +92,12 @@ index 63c989a76dadc13953e35513998e83326ee3612b..fca6f031815c72b0dcb0ce32c4dfe8d9
 +      </message>
 +      <message name="IDS_UW_SETTINGS_GLASS_BEHIND_DESCRIPTION" desc="Second line of the switch that keeps browser windows behind the front one see-through. uw is the product name and stays lowercase.">
 +        On for all of uw. Off saves power.
++      </message>
++      <message name="IDS_UW_SETTINGS_PAGE_SPACE" desc="Label of the switch under the Theme row that keeps a margin of the window's colors around the page. Off, the page runs to the window's edges.">
++        Space around the page
++      </message>
++      <message name="IDS_UW_SETTINGS_PAGE_SPACE_DESCRIPTION" desc="Second line of the switch that keeps a margin around the page. uw is the product name and stays lowercase.">
++        On for all of uw. Off, the page runs to the window's edges.
 +      </message>
 +      <message name="IDS_UW_SETTINGS_COMMAND_BAR_TITLE" desc="Heading of the command bar settings. The command bar is a panel for opening pages and running commands from the keyboard.">
 +        Command bar

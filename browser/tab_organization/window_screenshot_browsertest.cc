@@ -10,6 +10,7 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service.h"
@@ -45,6 +46,7 @@
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/views/controls/button/image_button.h"
@@ -59,6 +61,7 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 #include "uw/browser/ui/views/tab_organization/floating_window_buttons.h"
 #include "uw/browser/ui/views/tab_organization/modifier_keys.h"
@@ -256,6 +259,15 @@ class WindowScreenshotBrowserTest : public headless::HeadlessModeBrowserTest {
         view->bounds());
   }
 
+  // Turns "Space around the page" on or off, and waits for the window to lay
+  // out again.
+  void SetPageSpace(bool on) {
+    g_browser_process->local_state()->SetBoolean(kPageSpacePref, on);
+    BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+    ASSERT_TRUE(base::test::RunUntil(
+        [&] { return (InWindow(view->toolbar()).y() == 0) != on; }));
+  }
+
   void HideSidebar() {
     tabs::VerticalTabStripStateController* state =
         tabs::VerticalTabStripStateController::From(browser());
@@ -409,6 +421,102 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   CheckTheFloatingSidebar("sidebar-floating-dark");
 }
 
+// With "Space around the page" off, the page card meets the window's top,
+// right, and bottom edges. It keeps its round corners beside the sidebar
+// only, and turning the switch on brings the margin back. See
+// docs/plans/arc-style-look.md#margin.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       WithoutSpaceThePageMeetsTheWindowsEdges) {
+  StageSidebar();
+  SetPageSpace(false);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  const gfx::Rect toolbar = InWindow(view->toolbar());
+  const gfx::Rect page = InWindow(view->multi_contents_view());
+  EXPECT_EQ(toolbar.y(), 0);
+  EXPECT_EQ(toolbar.x(), Sidebar()->bounds().right());
+  EXPECT_EQ(toolbar.right(), view->width());
+  EXPECT_EQ(page.x(), toolbar.x());
+  EXPECT_EQ(page.right(), view->width());
+  EXPECT_EQ(page.bottom(), view->height());
+  EXPECT_EQ(view->multi_contents_view()->GetBackgroundRadii(),
+            gfx::RoundedCornersF(0, 0, 0, kPageCardRadius));
+  SaveWindowScreenshot(browser(), "sidebar-no-margin");
+
+  SetPageSpace(true);
+  EXPECT_EQ(InWindow(view->toolbar()).y(), kPageCardMargins.top());
+  EXPECT_EQ(InWindow(view->multi_contents_view()).right(),
+            view->width() - kPageCardMargins.right());
+  EXPECT_EQ(InWindow(view->multi_contents_view()).bottom(),
+            view->height() - kPageCardMargins.bottom());
+  EXPECT_EQ(view->multi_contents_view()->GetBackgroundRadii(),
+            gfx::RoundedCornersF(0, 0, kPageCardRadius, kPageCardRadius));
+}
+
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest, WithoutSpaceInDarkMode) {
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  StageSidebar();
+  SetPageSpace(false);
+  SaveWindowScreenshot(browser(), "sidebar-no-margin-dark");
+}
+
+// With the margin off, a hidden sidebar leaves the page the whole window. Its
+// edge lies over the page, as in full screen, and the floating sidebar keeps
+// its own margin.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       WithoutSpaceAHiddenSidebarLeavesThePageTheWindow) {
+  StageSidebar();
+  SetPageSpace(false);
+  HideSidebar();
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  EXPECT_EQ(InWindow(view->toolbar()).origin(), gfx::Point());
+  const gfx::Rect page = InWindow(view->multi_contents_view());
+  EXPECT_EQ(page.x(), 0);
+  EXPECT_EQ(page.right(), view->width());
+  EXPECT_EQ(page.bottom(), view->height());
+  EXPECT_EQ(view->multi_contents_view()->GetBackgroundRadii(),
+            gfx::RoundedCornersF());
+  VerticalTabStripRegionView* sidebar = Sidebar();
+  EXPECT_TRUE(sidebar->HitTestPoint(
+      gfx::Point(kHiddenSidebarEdge / 2, sidebar->height() / 2)));
+  SaveWindowScreenshot(browser(), "sidebar-hidden-no-margin");
+
+  // A screenshot sizes the window for itself, so this reads the page again.
+  const gfx::Rect under = InWindow(view->multi_contents_view());
+  std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
+  EXPECT_EQ(sidebar->floating_sidebar()->CardBounds(),
+            gfx::Rect(kHiddenSidebarEdge, kHiddenSidebarEdge,
+                      sidebar->uncollapsed_width(),
+                      sidebar->height() - 2 * kHiddenSidebarEdge));
+  EXPECT_EQ(InWindow(view->multi_contents_view()), under);
+  SaveWindowScreenshot(browser(), "sidebar-floating-no-margin");
+}
+
+// While the sidebar hides with the margin off, the page slides all the way to
+// the window's edge, with the toolbar on it.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       WithoutSpaceHidingSlidesThePageToTheEdge) {
+  StageSidebar();
+  SetPageSpace(false);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  tabs::VerticalTabStripStateController* state =
+      tabs::VerticalTabStripStateController::From(browser());
+  state->RequestCollapse(true);
+  int last = InWindow(view->multi_contents_view()).x();
+  bool went_back = false;
+  bool toolbar_left_the_page = false;
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    const int x = InWindow(view->multi_contents_view()).x();
+    went_back |= x > last;
+    last = x;
+    toolbar_left_the_page |= InWindow(view->toolbar()).x() != x;
+    return state->IsCollapsed() && !SidebarAnimating();
+  }));
+  EXPECT_FALSE(went_back);
+  EXPECT_FALSE(toolbar_left_the_page);
+  EXPECT_EQ(InWindow(view->multi_contents_view()).x(), 0);
+}
+
 // While the sidebar hides, it slides out at its full width, so its rows never
 // squeeze. The window buttons hide meanwhile, so the toolbar keeps to the page
 // card's edge and leaves no room for them.
@@ -455,6 +563,19 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
   SaveNativeWindowScreenshot(browser(), "sidebar-hidden-native");
   std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
   SaveNativeWindowScreenshot(browser(), "sidebar-floating-native");
+}
+
+// Run with pnpm run window-tests. The margin off in a real window, with the
+// sidebar shown, hidden, and floating in.
+IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
+                       MANUAL_WithoutSpaceInARealWindow) {
+  StageSidebar();
+  SetPageSpace(false);
+  SaveNativeWindowScreenshot(browser(), "no-margin-native");
+  HideSidebar();
+  SaveNativeWindowScreenshot(browser(), "no-margin-hidden-native");
+  std::unique_ptr<ExpandOnHoverLock> lock = FloatSidebarIn();
+  SaveNativeWindowScreenshot(browser(), "no-margin-floating-native");
 }
 
 // The new button at the right end of the foot replaces Chromium's "+" under

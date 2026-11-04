@@ -19,6 +19,7 @@ export interface UwOrganizationBrowserProxy {
   setThresholds(thresholds: Thresholds): Promise<Thresholds>;
   openThemePicker(): void;
   setGlassBehind(on: boolean): Promise<void>;
+  setPageSpace(on: boolean): Promise<void>;
   setCommandBar(on: boolean): Promise<void>;
   setCurrency(code: string): Promise<void>;
   setMouseAction(action: MouseAction, on: boolean): Promise<void>;
@@ -55,6 +56,10 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setGlassBehind(on: boolean) {
     await this.handler.setGlassBehind(on);
+  }
+
+  async setPageSpace(on: boolean) {
+    await this.handler.setPageSpace(on);
   }
 
   async setCommandBar(on: boolean) {

@@ -60,6 +60,7 @@
 #include "uw/browser/connectors/connectors.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -310,6 +311,14 @@ IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest,
       Ask("settings.get", R"({"workspace":"Work","name":"theme.grain"})")
           .FindIntByDottedPath("result.value"),
       40);
+}
+
+// look.page-space turns the page card's margin off for all of uw.
+IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, PageSpaceIsForAllOfUw) {
+  base::DictValue reply =
+      Ask("settings.set", R"({"name":"look.page-space","value":"false"})");
+  EXPECT_EQ(reply.FindBoolByDottedPath("result.value"), false);
+  EXPECT_FALSE(g_browser_process->local_state()->GetBoolean(kPageSpacePref));
 }
 
 IN_PROC_BROWSER_TEST_F(UwCommandBrowserTest, ListGivesEverySettingUwKeeps) {

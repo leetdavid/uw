@@ -44,8 +44,9 @@ void ClipOutPageCard(gfx::Canvas* canvas,
                      const views::View* page);
 
 // Draws the edge of the page card, which holds `toolbar` and `page`: a 1px
-// line just outside it, where it crosses `view`. Draws nothing in fullscreen
-// or when the edge color is transparent.
+// line just outside it, where it crosses `view`. Where the card meets the
+// window's edge, the line lies outside the window. Draws nothing in
+// fullscreen or when the edge color is transparent.
 void PaintPageCardEdge(gfx::Canvas* canvas,
                        const views::View* view,
                        const views::View* toolbar,

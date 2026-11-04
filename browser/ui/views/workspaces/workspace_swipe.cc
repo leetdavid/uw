@@ -47,7 +47,6 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
 #include "uw/browser/ui/glass/glass.h"
-#include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/tint_painter.h"
 #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -196,10 +195,11 @@ class PageCover : public views::View {
   METADATA_HEADER(PageCover, views::View)
 
  public:
-  explicit PageCover(const gfx::ImageSkia& page) : page_(page) {
+  // The cover takes the page's own `corners`.
+  PageCover(const gfx::ImageSkia& page, const gfx::RoundedCornersF& corners)
+      : page_(page) {
     MakeOverlay(this);
-    layer()->SetRoundedCornerRadius(
-        gfx::RoundedCornersF(0, 0, kPageCardRadius, kPageCardRadius));
+    layer()->SetRoundedCornerRadius(corners);
     layer()->SetIsFastRoundedCorner(true);
   }
 
@@ -286,7 +286,8 @@ void WorkspaceSwipe::CoverPage(const gfx::ImageSkia& page) {
     return;
   }
   OnUncovered();
-  cover_ = browser_view_->AddChildView(std::make_unique<PageCover>(page));
+  cover_ = browser_view_->AddChildView(std::make_unique<PageCover>(
+      page, browser_view_->multi_contents_view()->GetBackgroundRadii()));
   ++covers_;
   PlaceCover();
 }

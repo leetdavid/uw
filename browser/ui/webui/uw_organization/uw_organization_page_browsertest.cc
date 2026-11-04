@@ -4,6 +4,7 @@
 
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_util.h"
 #include "base/test/run_until.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
@@ -22,6 +23,7 @@
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/components/ai_providers/providers.h"
@@ -231,6 +233,24 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return !prefs()->GetBoolean(kCommandBarEnabledPref); }));
   SaveWindowScreenshot(browser(), "settings-command-bar");
+}
+
+// "Space around the page" sits under the Theme row, on for all of uw. See
+// docs/plans/arc-style-look.md#margin.
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheSpaceSwitchStartsOnAndTurnsTheMarginOff) {
+  PrefService* local_state = g_browser_process->local_state();
+  EXPECT_TRUE(local_state->GetBoolean(kPageSpacePref));
+  OpenPage();
+  EXPECT_TRUE(base::StartsWith(TextOf("pageSpaceLabel"),
+                               String(IDS_UW_SETTINGS_PAGE_SPACE)));
+  ASSERT_EQ(true, Run("const toggle = part('pageSpaceToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "toggle.click(); return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !local_state->GetBoolean(kPageSpacePref); }));
+  SaveWindowScreenshot(browser(), "settings-page-space");
 }
 
 IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,

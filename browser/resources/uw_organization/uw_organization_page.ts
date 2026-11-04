@@ -235,6 +235,11 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
     this.refresh_();
   }
 
+  protected async onPageSpaceChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setPageSpace(e.detail);
+    this.refresh_();
+  }
+
   protected async onCommandBarChange_(e: CustomEvent<boolean>) {
     await this.browserProxy_.setCommandBar(e.detail);
     this.refresh_();

@@ -32,6 +32,8 @@ struct State {
   // keep theirs.
   bool can_show_glass;
   bool glass_behind;
+  // Whether the page card keeps its margin, for all of uw.
+  bool page_space;
   // Whether Cmd+T opens the command bar.
   bool command_bar;
   // The currency a bare amount in the command bar converts to, as a code.
@@ -127,6 +129,8 @@ interface OrganizationHandler {
   OpenThemePicker();
   // For all of uw. Every window follows at once.
   SetGlassBehind(bool on) => ();
+  // For all of uw. Every window follows at once.
+  SetPageSpace(bool on) => ();
   // Every window follows at once.
   SetCommandBar(bool on) => ();
   // Empty follows the Mac's region. A code the rates do not cover is ignored.

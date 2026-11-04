@@ -16,6 +16,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -42,7 +43,6 @@
 #include "uw/browser/pins/pin_sync.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
-#include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 
 namespace uw {
@@ -190,8 +190,6 @@ class HazeView : public views::View {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     layer()->SetMasksToBounds(true);
-    layer()->SetRoundedCornerRadius(
-        gfx::RoundedCornersF(0, 0, kPageCardRadius, kPageCardRadius));
     layer()->SetIsFastRoundedCorner(true);
     picture_ = AddChildView(std::make_unique<PictureView>());
     // On layers of their own, so they stay over the picture's.
@@ -206,6 +204,11 @@ class HazeView : public views::View {
 
   void SetPicture(const gfx::ImageSkia& picture) {
     picture_->SetPicture(picture);
+  }
+
+  // The page's own corners, which the haze takes over.
+  void SetCorners(const gfx::RoundedCornersF& corners) {
+    layer()->SetRoundedCornerRadius(corners);
   }
 
   views::View* pill() { return pill_; }
@@ -337,6 +340,7 @@ void InactivePinOverlay::Update() {
     contents_.Observe(container->contents_view());
   }
   view->SetBoundsRect(container->contents_view()->bounds());
+  view->SetCorners(browser_view_->multi_contents_view()->GetBackgroundRadii());
   view->SetPicture(
       pin ? PinPages::For(browser_view_->browser()->GetProfile())
                 ->PictureOf(pin->id)

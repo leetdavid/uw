@@ -3,6 +3,7 @@
 source_set("look") {
   sources = [
     "menu_card.h",
+    "page_card.cc",
     "page_card.h",
     "page_color.cc",
     "page_color.h",
@@ -25,6 +26,7 @@ source_set("look") {
   }
   public_deps = [ "//uw/components/look" ]
   deps = [
+    ":prefs",
     "//base",
     "//cc/paint",
     "//chrome/app/vector_icons",
@@ -43,6 +45,15 @@ source_set("look") {
   }
 }
 
+# "Space around the page", for all of uw.
+source_set("prefs") {
+  sources = [
+    "page_space_prefs.cc",
+    "page_space_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -58,6 +69,7 @@ source_set("browser_tests") {
   }
   deps = [
     ":look",
+    ":prefs",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile_test_util",

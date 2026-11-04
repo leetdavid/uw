@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <memory>
 
+#include "base/functional/bind.h"
 #include "base/numerics/safe_conversions.h"
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/ui/animation/browser_animation_controller.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -17,6 +19,7 @@
 #include "chrome/browser/ui/views/frame/shadow_frame_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+#include "components/prefs/pref_service.h"
 #include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -38,8 +41,10 @@
 #include "ui/views/view_targeter.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
+#include "ui/views/window/non_client_view.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/look/page_card.h"
+#include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/look/tint_painter.h"
 #include "uw/browser/ui/look/window_buttons.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
@@ -161,6 +166,12 @@ FloatingSidebar::FloatingSidebar(VerticalTabStripRegionView* region,
   lone_shadow_->SetRoundedCornerRadius(kActivityCardRadius);
   region_->AddPreTargetHandler(this);
   region_->SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
+  if (PrefService* local_state = g_browser_process->local_state()) {
+    page_space_.Init(local_state);
+    page_space_.Add(kPageSpacePref,
+                    base::BindRepeating(&FloatingSidebar::OnPageSpaceChanged,
+                                        base::Unretained(this)));
+  }
 }
 
 FloatingSidebar::~FloatingSidebar() {
@@ -286,6 +297,15 @@ gfx::Rect FloatingSidebar::CardBounds() const {
       base::ClampRound((width + kHiddenSidebarEdge) * (1.0 - Amount()));
   return gfx::Rect(x, kHiddenSidebarEdge, width,
                    std::max(0, region_->height() - 2 * kHiddenSidebarEdge));
+}
+
+void FloatingSidebar::OnPageSpaceChanged() {
+  browser_view_->InvalidateLayout();
+  if (views::Widget* widget = browser_view_->GetWidget()) {
+    // The frame paints the theme and the card's edge around the card.
+    widget->non_client_view()->frame_view()->InvalidateLayout();
+    widget->non_client_view()->frame_view()->SchedulePaint();
+  }
 }
 
 void FloatingSidebar::PlaceActivityCard(bool alone) {

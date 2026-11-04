@@ -6,6 +6,10 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
+
+class PrefService;
 
 namespace uw {
 
@@ -13,6 +17,16 @@ namespace uw {
 // card with the window tint showing around it.
 inline constexpr int kPageCardRadius = 12;
 inline constexpr gfx::Insets kPageCardMargins = gfx::Insets::TLBR(8, 0, 8, 8);
+
+// The card's margin, or none while "Space around the page" is off. A null
+// `local_state`, as in some tests, keeps the margin.
+gfx::Insets PageCardMargins(const PrefService* local_state);
+
+// The corners of a card at `card` in a window at `window`: round, but square
+// on a side where the card meets the window's left or right edge, since the
+// window's own corners round it there.
+gfx::RoundedCornersF PageCardCorners(const gfx::RectF& card,
+                                     const gfx::RectF& window);
 
 // On Windows, minimize, maximize, and close are toolbar buttons at the
 // toolbar's end, after Chromium's toolbar divider, kWindowButtonsEnd in from
