@@ -104,6 +104,7 @@ Per [ADR 0029](../adr/0029-split-views-extend-chromiums-split.md), in a new `uw-
 
 - A Chromium split holds any number of tabs. `SplitTabVisualData` carries a layout tree in place of one direction and one ratio: each branch has a direction and its children's sizes, and each leaf is a tab. `TabStripModel`'s split calls, `split_tab_util`, the split menus, and the metrics lose their two-tab checks. The tabs' order in the tab strip is reading order, so Ctrl+Tab and the sidebar follow it.
 - `MultiContentsView` lays out a pane per tab and a divider per branch. Its drop target controller gives each pane four edges and a center, and the mini toolbar becomes a drag source.
+- Chromium builds the page area's panes when a window opens, and devtools, the new-tab footer, the agent overlay, the screen-capture border, and enterprise data protection each attach to every pane then. `MultiContentsView` adds panes as a split needs them and keeps them for the window's life, and those five attach to a pane when it is added. On 2026-11-04 the user chose this over a fixed 16 panes made up front, which would have left the five unchanged.
 - The session file saves the tree with the split, beside Chromium's direction and ratio.
 - `SplitTabView` (`uw-look.patch`) stacks a row per pane.
 - Pinned split views build on uw's live pins (`uw-live-pins.patch`), which move one page between windows today, to move a split's pages and layout together.
