@@ -53,6 +53,9 @@ source_set("browser_tests") {
       "window_buttons_browsertest.mm",
     ]
   }
+  if (is_win) {
+    sources += [ "window_buttons_win_browsertest.cc" ]
+  }
   deps = [
     ":look",
     "//chrome/browser",
@@ -69,6 +72,7 @@ source_set("browser_tests") {
     "//services/network/public/cpp",
     "//skia",
     "//testing/gtest",
+    "//ui/base",
     "//ui/base/mojom",
     "//ui/color",
     "//ui/compositor",
