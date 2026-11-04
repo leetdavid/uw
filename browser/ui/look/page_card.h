@@ -15,15 +15,17 @@ inline constexpr int kPageCardRadius = 12;
 inline constexpr gfx::Insets kPageCardMargins = gfx::Insets::TLBR(8, 0, 8, 8);
 
 // On Windows, minimize, maximize, and close are toolbar buttons at the
-// toolbar's end, after a hairline, kWindowButtonsEnd in from the card's edge.
+// toolbar's end, after Chromium's toolbar divider, kWindowButtonsEnd in from
+// the card's edge.
 inline constexpr int kWindowButtonWidth = 32;
 inline constexpr int kWindowButtonHeight = 28;
 inline constexpr int kWindowButtonGap = 2;
 inline constexpr int kWindowButtonRadius = 8;
-inline constexpr int kWindowButtonsHairlineGap = 6;
-inline constexpr int kWindowButtonsWidth = 1 + kWindowButtonsHairlineGap +
-                                           3 * kWindowButtonWidth +
-                                           2 * kWindowButtonGap;
+inline constexpr int kWindowButtonsDividerWidth = 2;
+inline constexpr int kWindowButtonsDividerGap = 6;
+inline constexpr int kWindowButtonsWidth =
+    kWindowButtonsDividerWidth + kWindowButtonsDividerGap +
+    3 * kWindowButtonWidth + 2 * kWindowButtonGap;
 inline constexpr int kWindowButtonsEnd = 8;
 
 // The thin line around the card, transparent where there is none. uw's own

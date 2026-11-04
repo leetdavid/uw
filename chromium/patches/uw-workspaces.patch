@@ -224,7 +224,7 @@ index f9b1d3de0545b1426169859660f555f825e02468..8469ec0cd989d42a027a84c7be0eacfb
      if (manager->RequestDeferShow(base::BindOnce(
              &BrowserView::Activate, weak_ptr_factory_.GetWeakPtr()))) {
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..ed6ad22fa6b0974ff507a345659cf3e45641840d 100644
+index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..65fd674bd7c48bf49bb403f30eb524d222c75aba 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -166,6 +166,7 @@
@@ -258,7 +258,7 @@ index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..ed6ad22fa6b0974ff507a345659cf3e4
 +  if (browser_view_ && browser_view_->GetSupportsTabStrip() &&
 +      !browser_view_->IsFullscreen()) {
 +    interior_margin.set_right(uw::kWindowButtonsEnd + uw::kWindowButtonsWidth +
-+                              uw::kWindowButtonsHairlineGap);
++                              uw::kWindowButtonsDividerGap);
 +  }
 +#endif
    layout_manager_->SetInteriorMargin(interior_margin);
