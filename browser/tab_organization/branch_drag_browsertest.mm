@@ -29,6 +29,8 @@
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
@@ -380,6 +382,25 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   PressAndNudge(parent_, 8, ui_controls::kCommand);
   EXPECT_EQ(parent_->GetGroup(), task_);
   EXPECT_EQ(tabs()->count(), 2);
+}
+
+// A parent whose branch fills its task drags the task, as Chromium drags a
+// task whose tabs are all selected. Dragged as loose tabs, a quick drag out of
+// the task left them in it while the Scratchpad took the drag, and the drag's
+// start animation crashed uw (Sentry UW-6). Rich animations are on, as on the
+// user's desktop, since the crash needs them. Tasks stay above the
+// Scratchpad, so the task lands back where it was.
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       MANUAL_ABranchThatFillsItsTaskDragsItsTask) {
+  const auto animated = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  StageTask();
+  DragBelow(parent_, other_, /*alone=*/false);
+  EXPECT_EQ(Order(),
+            (std::vector<tabs::TabInterface*>{parent_, first_, other_}));
+  EXPECT_EQ(parent_->GetGroup(), task_);
+  EXPECT_EQ(first_->GetGroup(), task_);
+  EXPECT_EQ(controller()->DepthFor(first_), 1);
 }
 
 // Any key ends a tab drag, Cmd included. Pressed before the pointer has moved

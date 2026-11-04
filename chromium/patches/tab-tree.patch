@@ -814,7 +814,7 @@ index 9354e0d5497b85db204ebae5d6adcd41973ea01a..f3b526cc11c8dd433fc17a65c59f0ef6
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index cdc7c0f320fed580814d4f71c90702d9450be81e..9c067809c332fc904ab0c22892da375b1e4e940f 100644
+index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378722a5cf3 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 @@ -46,6 +46,8 @@
@@ -838,20 +838,20 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..9c067809c332fc904ab0c22892da375b
    drag_controller_ = std::make_unique<TabDragController>();
  
    DragInitData drag_init_data;
-@@ -257,6 +264,13 @@ TabDragHandlerImpl::DragInitData TabDragHandlerImpl::GetDragInitDataForTabDrag(
-     // tabs themselves. These must be inserted into `dragged_views` in the
-     // order they appear within the tab strip.
-     dragged_groups = GetFullySelectedGroups(selected_tabs);
-+    // uw: a dragged parent carries its branch. The branch joins after the
-+    // groups are counted, so a branch that fills its task moves its tabs,
-+    // not the task with its header.
+@@ -253,6 +260,13 @@ TabDragHandlerImpl::DragInitData TabDragHandlerImpl::GetDragInitDataForTabDrag(
+ 
+   std::map<tab_groups::TabGroupId, TabSlotView*> dragged_groups;
+   if (!source_tab->IsPinned()) {
++    // uw: a dragged parent carries its branch. The branch joins before the
++    // groups are counted, so a branch that fills its task drags the task, as
++    // a task whose tabs are all selected does (Sentry UW-6).
 +    if (auto* organizer =
 +            uw::TabOrganizationController::From(&tab_strip_model_.get())) {
 +      selected_tabs = organizer->DraggedTabs(std::move(selected_tabs));
 +    }
-   }
- 
-   // Track the node and build a shim view for each selected node.
+     // A TabSlotView must be added for each dragged group, in addition to the
+     // tabs themselves. These must be inserted into `dragged_views` in the
+     // order they appear within the tab strip.
 @@ -343,6 +357,16 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
    }
    gfx::Point screen_location(event.location());
