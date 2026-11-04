@@ -39,11 +39,13 @@ enum GlassPause {
   kReduceTransparency,
 };
 
-// The Transparency and Glass sliders: whether this Mac can show glass, where
-// the Transparency tick sits past which text may stop reading, from 0 to 100,
-// and why glass is paused.
+// The Transparency and Glass sliders: whether each shows, where the
+// Transparency tick sits past which text may stop reading, from 0 to 100, and
+// why glass is paused. Transparency shows where the system can draw glass
+// behind windows, which the picker's own frost needs too.
 struct GlassSliders {
-  bool shown;
+  bool transparency_shown;
+  bool glass_shown;
   int32 readable_transparency;
   GlassPause pause;
 };

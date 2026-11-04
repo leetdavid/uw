@@ -39,18 +39,50 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
-index d0f0f711eaa58b43837d69c62dbe5e15301dea95..d8a31e8d7015a9dfcec7052865cb2dc011bae728 100644
+index d0f0f711eaa58b43837d69c62dbe5e15301dea95..302a772065fdb366b3c8f8a9bdb79178b28006b0 100644
 --- a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
-@@ -16,6 +16,7 @@
+@@ -16,10 +16,13 @@
  #include "chrome/browser/win/titlebar_config.h"
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
 +#include "ui/compositor/layer.h"
  #include "ui/strings/grit/ui_strings.h"
  #include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/controls/separator.h"
  #include "ui/views/layout/flex_layout.h"
-@@ -145,7 +146,6 @@ void BrowserCaptionButtonContainer::OnWindowControlsOverlayEnabledChanged() {
+ #include "ui/views/view_class_properties.h"
++#include "uw/browser/ui/look/page_card.h"
+ 
+ namespace {
+ 
+@@ -71,10 +74,24 @@ BrowserCaptionButtonContainer::BrowserCaptionButtonContainer(
+           IDS_APP_ACCNAME_CLOSE))) {
+   // Layout is horizontal, with buttons placed at the trailing end of the view.
+   // This allows the container to expand to become a faux titlebar/drag handle.
++  // uw: in a tabbed window the buttons sit at the toolbar's end, after a
++  // hairline, centered in the toolbar's height. See
++  // uw/browser/ui/look/page_card.h.
++  const bool uw_look = frame_view_->GetBrowserView()->GetSupportsTabStrip();
++  if (uw_look) {
++    auto* const hairline =
++        AddChildViewAt(std::make_unique<views::Separator>(), 0);
++    hairline->SetOrientation(views::Separator::Orientation::kVertical);
++    hairline->SetPreferredLength(16);
++    hairline->SetProperty(
++        views::kMarginsKey,
++        gfx::Insets::TLBR(0, 0, 0, uw::kWindowButtonsHairlineGap));
++  }
+   auto* const layout = SetLayoutManager(std::make_unique<views::FlexLayout>());
+   layout->SetOrientation(views::LayoutOrientation::kHorizontal)
+       .SetMainAxisAlignment(views::LayoutAlignment::kEnd)
+-      .SetCrossAxisAlignment(views::LayoutAlignment::kStretch)
++      .SetCrossAxisAlignment(uw_look ? views::LayoutAlignment::kCenter
++                                     : views::LayoutAlignment::kStretch)
+       .SetDefault(
+           views::kFlexBehaviorKey,
+           views::FlexSpecification(views::LayoutOrientation::kHorizontal,
+@@ -145,7 +162,6 @@ void BrowserCaptionButtonContainer::OnWindowControlsOverlayEnabledChanged() {
      SetPaintToLayer();
    } else {
      SetBackground(nullptr);
@@ -58,7 +90,7 @@ index d0f0f711eaa58b43837d69c62dbe5e15301dea95..d8a31e8d7015a9dfcec7052865cb2dc0
    }
    UpdateButtonToolTipsForWindowControlsOverlay();
  }
-@@ -174,12 +174,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
+@@ -174,12 +190,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
  
    UpdateButtons();
  
@@ -76,7 +108,7 @@ index d0f0f711eaa58b43837d69c62dbe5e15301dea95..d8a31e8d7015a9dfcec7052865cb2dc0
  }
  
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 207ea26540d4d90e9f8398d6185179ed175fc03e..b093c6f258755a0f5a2ed049a3ec4799a974aa97 100644
+index 207ea26540d4d90e9f8398d6185179ed175fc03e..795070c97360eaf41d7ffc2966f760722367823a 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 @@ -25,6 +25,7 @@
@@ -87,16 +119,50 @@ index 207ea26540d4d90e9f8398d6185179ed175fc03e..b093c6f258755a0f5a2ed049a3ec4799
  #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
  #include "chrome/browser/ui/views/tabs/new_tab_button.h"
  #include "chrome/browser/ui/views/tabs/tab.h"
-@@ -59,6 +60,8 @@
+@@ -59,6 +60,9 @@
  #include "ui/views/widget/widget_observer.h"
  #include "ui/views/win/hwnd_util.h"
  #include "ui/views/window/client_view.h"
++#include "uw/browser/ui/look/page_card.h"
 +#include "uw/browser/ui/look/tint_painter.h"
 +#include "uw/browser/workspaces/workspace_theme.h"
  
  std::array<HICON, BrowserFrameViewWin::kThrobberIconCount>
      BrowserFrameViewWin::throbber_icons_;
-@@ -463,6 +466,17 @@ bool BrowserFrameViewWin::IsMaximized() const {
+@@ -135,6 +139,11 @@ BrowserFrameViewWin::~BrowserFrameViewWin() = default;
+ BrowserLayoutParams BrowserFrameViewWin::GetBrowserLayoutParams() const {
+   BrowserLayoutParams params;
+   params.visual_client_area = client_view_bounds_;
++  // uw: the window buttons sit at the toolbar's end, which keeps room for them
++  // itself, so they take none from the layout.
++  if (GetBrowserView()->GetSupportsTabStrip()) {
++    return params;
++  }
+   const int top = params.visual_client_area.y();
+   const auto& caption = caption_button_container_->bounds();
+   // In some cases, the top of the client area is moved down, but slightly
+@@ -301,6 +310,20 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
+       top_border_thickness, kResizeCornerWidth - FrameBorderThickness(),
+       browser_widget()->widget_delegate()->CanResize());
+ 
++  // uw: the window buttons sit over the toolbar's end, so they answer first.
++  if (GetBrowserView()->GetSupportsTabStrip() &&
++      caption_button_container_->GetVisible()) {
++    const gfx::Point in_buttons =
++        ConvertPointToTarget(parent(), caption_button_container_, point);
++    if (caption_button_container_->HitTestPoint(in_buttons)) {
++      const int button =
++          caption_button_container_->NonClientHitTest(in_buttons);
++      if (button != HTCAPTION && button != HTNOWHERE) {
++        return button;
++      }
++    }
++  }
++
+   const int frame_component =
+       browser_widget()->client_view()->NonClientHitTest(point);
+ 
+@@ -463,6 +486,17 @@ bool BrowserFrameViewWin::IsMaximized() const {
  
  void BrowserFrameViewWin::OnPaint(gfx::Canvas* canvas) {
    TRACE_EVENT0("views.frame", "BrowserFrameViewWin::OnPaint");
@@ -114,7 +180,7 @@ index 207ea26540d4d90e9f8398d6185179ed175fc03e..b093c6f258755a0f5a2ed049a3ec4799
    PaintTitlebar(canvas);
  }
  
-@@ -727,6 +741,13 @@ void BrowserFrameViewWin::LayoutTitleBar() {
+@@ -727,6 +761,13 @@ void BrowserFrameViewWin::LayoutTitleBar() {
    }
  }
  
@@ -128,6 +194,24 @@ index 207ea26540d4d90e9f8398d6185179ed175fc03e..b093c6f258755a0f5a2ed049a3ec4799
  void BrowserFrameViewWin::LayoutCaptionButtons() {
    TRACE_EVENT0("views.frame", "BrowserFrameViewWin::LayoutCaptionButtons");
  
+@@ -737,6 +778,17 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+   const gfx::Size preferred_size =
+       caption_button_container_->GetPreferredSize();
+ 
++  // uw: at the toolbar's end, inside the page card.
++  if (GetBrowserView()->GetSupportsTabStrip()) {
++    caption_button_container_->SetBounds(
++        width() - uw::kPageCardMargins.right() - uw::kWindowButtonsEnd -
++            preferred_size.width(),
++        GetTopInset(false) + uw::kPageCardMargins.top(),
++        preferred_size.width(),
++        GetBrowserView()->toolbar()->GetPreferredSize().height());
++    return;
++  }
++
+   const int height =
+       !GetBrowserView()->GetWebAppFrameToolbarPreferredSize().IsEmpty()
+           ? (TitlebarHeight(false) - WindowTopY())
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.h b/chrome/browser/ui/views/frame/browser_frame_view_win.h
 index e731b2c4c161f1fae16606e07892bc7adf2771cc..409b1b07ce9269ea246a14c7b2f0a20c4db642f7 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.h
@@ -1509,7 +1593,7 @@ index 17ff3a90e9b43440467a9cd465d973a74272c9bc..e89f95343c7759f95597ea1bb6864e08
    raw_ptr<views::View> contents_host_ = nullptr;
    raw_ptr<views::View> contents_;
 diff --git a/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc b/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc
-index acd863a7cce82d52aa4103f60c1093e2fb4eb31d..f762213877f91a349e8942a1e3467374a08620fe 100644
+index acd863a7cce82d52aa4103f60c1093e2fb4eb31d..0b152be6c9d95b4edae4030217783f4ce2cf280a 100644
 --- a/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc
 +++ b/chrome/browser/ui/views/omnibox/rounded_omnibox_results_frame.cc
 @@ -5,6 +5,7 @@
@@ -1581,8 +1665,8 @@ index acd863a7cce82d52aa4103f60c1093e2fb4eb31d..f762213877f91a349e8942a1e3467374
  }
  
 +void RoundedOmniboxResultsFrame::UpdateFrost() {
-+  const bool frosted = location_bar_ && uw::ElementGlassOfWindow(
-+                                            location_bar_->GetBrowser()) > 0;
++  const bool frosted =
++      location_bar_ && uw::FrostsOver(location_bar_->GetBrowser());
 +  const ui::ColorId color =
 +      frosted ? uw::kColorOmniboxResultsGlass : kColorOmniboxResultsBackground;
 +  contents_host_->SetBackground(views::CreateSolidBackground(color));
@@ -2297,4 +2381,146 @@ index ebc301e4be6e1a73b43c414f0903f858730b25ec..2f09e51c4c1ec15e589a355d68b1d8a1
 +    "//uw/browser/ui/views/tab_organization",
    ]
  }
+ 
+diff --git a/chrome/browser/ui/views/frame/windows_caption_button.cc b/chrome/browser/ui/views/frame/windows_caption_button.cc
+index a24088e544656cbe911895ef714c7ee08b93fb2e..7da44fe0574210cb80e4ddb122b2cfb756d1c765 100644
+--- a/chrome/browser/ui/views/frame/windows_caption_button.cc
++++ b/chrome/browser/ui/views/frame/windows_caption_button.cc
+@@ -25,6 +25,7 @@
+ #include "ui/gfx/geometry/rect_conversions.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/scoped_canvas.h"
++#include "uw/browser/ui/look/page_card.h"
+ 
+ WindowsCaptionButton::WindowsCaptionButton(
+     PressedCallback callback,
+@@ -44,6 +45,58 @@ WindowsCaptionButton::WindowsCaptionButton(
+ 
+ WindowsCaptionButton::~WindowsCaptionButton() = default;
+ 
++namespace {
++
++// uw: in a tabbed window, the buttons sit at the toolbar's end and look like
++// toolbar buttons. See uw/browser/ui/look/page_card.h.
++bool UwLook(BrowserFrameViewWin* frame_view) {
++  return frame_view->GetBrowserView()->GetSupportsTabStrip();
++}
++
++constexpr SkColor kUwCloseRed = SkColorSetRGB(0xC4, 0x2B, 0x1C);
++
++// uw: the toolbar's line icons, on a 16dip grid centered in the button, with a
++// 1.75dip round stroke.
++void PaintUwSymbol(gfx::Canvas* canvas,
++                   const gfx::Rect& contents,
++                   int button_type,
++                   SkColor color) {
++  const gfx::PointF center = gfx::RectF(contents).CenterPoint();
++  const auto at = [&](float x, float y) {
++    return gfx::PointF(center.x() + x - 8, center.y() + y - 8);
++  };
++  cc::PaintFlags flags;
++  flags.setAntiAlias(true);
++  flags.setColor(color);
++  flags.setStyle(cc::PaintFlags::kStroke_Style);
++  flags.setStrokeWidth(1.75f);
++  flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
++  flags.setStrokeJoin(cc::PaintFlags::kRound_Join);
++  switch (button_type) {
++    case VIEW_ID_MINIMIZE_BUTTON:
++      canvas->DrawLine(at(4, 8), at(12, 8), flags);
++      return;
++    case VIEW_ID_MAXIMIZE_BUTTON:
++      canvas->DrawRoundRect(gfx::RectF(at(4, 4), gfx::SizeF(8, 8)), 1.5f,
++                            flags);
++      return;
++    case VIEW_ID_RESTORE_BUTTON:
++      canvas->DrawRoundRect(gfx::RectF(at(4, 6), gfx::SizeF(6, 6)), 1.5f,
++                            flags);
++      canvas->DrawLine(at(6.5f, 4), at(12, 4), flags);
++      canvas->DrawLine(at(12, 4), at(12, 9.5f), flags);
++      return;
++    case VIEW_ID_CLOSE_BUTTON:
++      canvas->DrawLine(at(4.75f, 4.75f), at(11.25f, 11.25f), flags);
++      canvas->DrawLine(at(11.25f, 4.75f), at(4.75f, 11.25f), flags);
++      return;
++    default:
++      NOTREACHED();
++  }
++}
++
++}  // namespace
++
+ std::unique_ptr<Windows10IconPainter>
+ WindowsCaptionButton::CreateIconPainter() {
+   if (base::win::GetVersion() >= base::win::Version::WIN11) {
+@@ -54,6 +107,10 @@ WindowsCaptionButton::CreateIconPainter() {
+ 
+ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
+     const views::SizeBounds& available_size) const {
++  if (UwLook(frame_view_)) {
++    return gfx::Size(uw::kWindowButtonWidth + GetBetweenButtonSpacing(),
++                     uw::kWindowButtonHeight);
++  }
+   const int width =
+       WindowFrameUtil::kWindowsCaptionButtonWidth + GetBetweenButtonSpacing();
+ 
+@@ -73,6 +130,9 @@ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
+ }
+ 
+ SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
++  if (UwLook(frame_view_)) {
++    return GetColorProvider()->GetColor(kColorToolbarButtonIcon);
++  }
+   // On Windows, the caption buttons are always on the right. If the horizontal
+   // tab strip isn't rendered, then the caption buttons will always be on the
+   // toolbar.
+@@ -88,6 +148,25 @@ SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
+ }
+ 
+ void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
++  if (UwLook(frame_view_)) {
++    // uw: a rounded fill under the pointer, as under toolbar buttons, and
++    // Windows' red under close.
++    gfx::RectF bounds(GetContentsBounds());
++    bounds.Inset(gfx::InsetsF::TLBR(0, GetBetweenButtonSpacing(), 0, 0));
++    const bool close = button_type_ == VIEW_ID_CLOSE_BUTTON;
++    const SkColor base = close ? kUwCloseRed : GetBaseForegroundColor();
++    const SkAlpha hovered = close ? SK_AlphaOPAQUE : 0x17;
++    const SkAlpha alpha =
++        GetState() == STATE_PRESSED
++            ? (close ? 0xCC : 0x29)
++            : gfx::Tween::IntValueBetween(hover_animation().GetCurrentValue(),
++                                          SK_AlphaTRANSPARENT, hovered);
++    cc::PaintFlags flags;
++    flags.setAntiAlias(true);
++    flags.setColor(SkColorSetA(base, alpha));
++    canvas->DrawRoundRect(bounds, uw::kWindowButtonRadius, flags);
++    return;
++  }
+   // Paint the background of the button (the semi-transparent rectangle that
+   // appears when you hover or press the button).
+   const ui::ThemeProvider* theme_provider = GetThemeProvider();
+@@ -158,6 +237,9 @@ void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
+ 
+ int WindowsCaptionButton::GetBetweenButtonSpacing() const {
+   const int display_order_index = GetButtonDisplayOrderIndex();
++  if (UwLook(frame_view_)) {
++    return display_order_index == 0 ? 0 : uw::kWindowButtonGap;
++  }
+   return display_order_index == 0
+              ? 0
+              : WindowFrameUtil::kWindowsCaptionButtonVisualSpacing;
+@@ -208,6 +290,13 @@ void WindowsCaptionButton::PaintSymbol(gfx::Canvas* canvas) {
+     symbol_color = hovered_color;
+   }
+ 
++  if (UwLook(frame_view_)) {
++    gfx::Rect contents = GetContentsBounds();
++    contents.Inset(gfx::Insets::TLBR(0, GetBetweenButtonSpacing(), 0, 0));
++    PaintUwSymbol(canvas, contents, button_type_, symbol_color);
++    return;
++  }
++
+   gfx::ScopedCanvas scoped_canvas(canvas);
+   const float scale = canvas->UndoDeviceScaleFactor();
  

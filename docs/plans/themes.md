@@ -211,7 +211,7 @@ Glass, the window's elements:
 - Reduce transparency in macOS makes the elements flat too.
 - Real glass on each pin tile, which bends what is behind it, is T176, prototyped first. If a tile's glass trails its favicon for a visible frame during a drag or the swipe, or glass on glass looks muddy, the user sees the prototype, T176 closes as tried, and the drawn tiles stay.
 
-Before macOS 26 the picker has neither slider.
+Before macOS 26 the picker has neither slider. On Windows it has Glass alone, per the [Windows plan](windows.md#agreed): the tiles and buttons turn to glass, and menus and cards stay solid.
 
 The numbers are in the `uw-themes` guide, section "Glass". The frames are on the canvas's "Themes" page: "Glass: light", "Glass: dark", and "Glass: every state".
 

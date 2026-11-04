@@ -271,6 +271,10 @@ bool CanShowGlass() {
   return base::mac::MacOSMajorVersion() >= 26;
 }
 
+bool CanShowElementGlass() {
+  return CanShowGlass();
+}
+
 bool ReducesTransparency() {
   return NSWorkspace.sharedWorkspace
       .accessibilityDisplayShouldReduceTransparency;
@@ -321,7 +325,7 @@ void FrostPageBubble(views::Widget* widget, content::WebContents* contents) {
 void FrostOpenMenu(BrowserWindowInterface* window) {
   views::MenuController* controller =
       views::MenuController::GetActiveInstance();
-  if (!window || ElementGlassOfWindow(window) == 0 || !controller ||
+  if (!window || !FrostsOver(window) || !controller ||
       !controller->GetSelectedMenuItem()) {
     return;
   }

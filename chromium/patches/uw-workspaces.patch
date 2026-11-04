@@ -224,10 +224,18 @@ index f9b1d3de0545b1426169859660f555f825e02468..8469ec0cd989d42a027a84c7be0eacfb
      if (manager->RequestDeferShow(base::BindOnce(
              &BrowserView::Activate, weak_ptr_factory_.GetWeakPtr()))) {
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..63dc69aeb315b259e3b82feaaebc58e088c74cb8 100644
+index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..ed6ad22fa6b0974ff507a345659cf3e45641840d 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-@@ -577,9 +577,9 @@ void ToolbarView::Init() {
+@@ -166,6 +166,7 @@
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/tooltip_manager.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/look/page_card.h"
+ 
+ #if defined(USE_AURA)
+ #include <array>
+@@ -577,9 +578,9 @@ void ToolbarView::Init() {
  
    if (!features::IsWebUIAvatarButtonEnabled()) {
      avatar_ = AddChildView(std::make_unique<AvatarToolbarButton>(browser_));
@@ -240,6 +248,22 @@ index ec09e6aae6023dba4eaf6537f14685f7a20adb2f..63dc69aeb315b259e3b82feaaebc58e0
    }
  
    // Only manage the overflow button when there are at least some views
+@@ -1703,6 +1704,15 @@ void ToolbarView::LayoutCommon() {
+       interior_margin.set_right(0);
+     }
+   }
++#if BUILDFLAG(IS_WIN)
++  // uw: Windows' minimize, maximize, and close sit at the toolbar's end. See
++  // BrowserFrameViewWin::LayoutCaptionButtons().
++  if (browser_view_ && browser_view_->GetSupportsTabStrip() &&
++      !browser_view_->IsFullscreen()) {
++    interior_margin.set_right(uw::kWindowButtonsEnd + uw::kWindowButtonsWidth +
++                              uw::kWindowButtonsHairlineGap);
++  }
++#endif
+   layout_manager_->SetInteriorMargin(interior_margin);
+ 
+   // Extend buttons to the window edge if we're either in a maximized or
 diff --git a/chrome/browser/ui/browser_tab_menu_model_delegate.cc b/chrome/browser/ui/browser_tab_menu_model_delegate.cc
 index 365d04b927874d92019ccc47b8a9ca7944645411..5031d08144c75154cb1a42ef5503fdd73a93a351 100644
 --- a/chrome/browser/ui/browser_tab_menu_model_delegate.cc

@@ -39,8 +39,13 @@ bool WantsGlass(BrowserWindowInterface* window);
 // "Glass in windows behind the front one" is off.
 size_t MaxGlassWindows();
 
-// True when this Mac can draw glass at all.
+// True when the system can draw glass behind windows, menus, and cards: macOS
+// 26 and later.
 bool CanShowGlass();
+
+// True when the window's tiles and buttons can be glass, which uw paints
+// itself: wherever CanShowGlass(), and on Windows.
+bool CanShowElementGlass();
 
 // True while macOS's Reduce transparency setting is on.
 bool ReducesTransparency();
@@ -63,6 +68,11 @@ float CoverOfWindow(BrowserWindowInterface* window);
 // How glassy the tiles and buttons of `window` are, from 0, flat, to 100.
 // Flat while macOS reduces transparency.
 int ElementGlassOfWindow(BrowserWindowInterface* window);
+
+// True when the menus, cards, command bar, and suggestion lists that open over
+// `window` are frosted glass: its elements are glass, and the system can draw
+// glass behind them.
+bool FrostsOver(BrowserWindowInterface* window);
 
 // How much of the glass behind `window` its toolbar covers with `color`: as
 // much as the theme does, but never so little that the toolbar's text stops

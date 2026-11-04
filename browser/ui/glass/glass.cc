@@ -53,8 +53,13 @@ float CoverOfWindow(BrowserWindowInterface* window) {
 }
 
 int ElementGlassOfWindow(BrowserWindowInterface* window) {
-  return CanShowGlass() && !ReducesTransparency() ? ThemeOfWindow(window).glass
-                                                  : 0;
+  return CanShowElementGlass() && !ReducesTransparency()
+             ? ThemeOfWindow(window).glass
+             : 0;
+}
+
+bool FrostsOver(BrowserWindowInterface* window) {
+  return CanShowGlass() && ElementGlassOfWindow(window) > 0;
 }
 
 float ToolbarCoverOfWindow(BrowserWindowInterface* window, SkColor color) {

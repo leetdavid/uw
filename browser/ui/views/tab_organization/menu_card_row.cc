@@ -258,8 +258,7 @@ void FrostOverGlass(views::BubbleDialogDelegate* bubble) {
             anchor ? BrowserView::GetBrowserViewForNativeWindow(
                          anchor->GetNativeWindow())
                    : nullptr;
-        if (!browser_view ||
-            ElementGlassOfWindow(browser_view->browser()) == 0) {
+        if (!browser_view || !FrostsOver(browser_view->browser())) {
           return;
         }
         bubble->SetBackgroundColor(kColorMenuCardGlass);

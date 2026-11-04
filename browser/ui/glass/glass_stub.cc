@@ -2,13 +2,18 @@
 
 #include "uw/browser/ui/glass/glass.h"
 
-// Glass is macOS's Liquid Glass. Other platforms show no glass so far; see
+// Glass behind windows is macOS's Liquid Glass. Elsewhere, so far, only the
+// window's tiles and buttons are glass, which uw paints itself; see
 // docs/plans/windows.md.
 
 namespace uw {
 
 bool CanShowGlass() {
   return false;
+}
+
+bool CanShowElementGlass() {
+  return true;
 }
 
 bool ReducesTransparency() {

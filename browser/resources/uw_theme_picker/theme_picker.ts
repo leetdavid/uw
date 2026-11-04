@@ -131,19 +131,19 @@ const glassPauses = new Map<GlassPause, string>([
 function frost() {
   document.body.classList.toggle(
       'frosted',
-      glassSliders.shown && theme.glass > 0 &&
+      glassSliders.transparencyShown && theme.glass > 0 &&
           glassSliders.pause !== GlassPause.kReduceTransparency);
 }
 
 function showGlass(sliders: GlassSliders) {
   glassSliders = sliders;
   frost();
-  transparencyRow.hidden = !sliders.shown;
-  glassRow.hidden = !sliders.shown;
+  transparencyRow.hidden = !sliders.transparencyShown;
+  glassRow.hidden = !sliders.glassShown;
   transparencyTick.style.left = `calc(${KNOB_RADIUS_PX}px + (100% - ${
       2 * KNOB_RADIUS_PX}px) * ${sliders.readableTransparency / 100})`;
   const why = glassPauses.get(sliders.pause);
-  glassWhy.hidden = !sliders.shown || !why;
+  glassWhy.hidden = !sliders.glassShown || !why;
   glassWhy.textContent = why ? loadTimeData.getString(why) : '';
   document.body.classList.toggle(
       'glass-off', sliders.pause === GlassPause.kReduceTransparency);

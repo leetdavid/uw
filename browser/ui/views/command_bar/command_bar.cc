@@ -301,7 +301,7 @@ void CommandBar::Show() {
                                    gfx::ScaleToCeiledSize(*size, 1.f / scale));
   }
   // The page asks, as it shows, whether to frost itself.
-  SetCommandBarFrosted(page(), ElementGlassOfWindow(window_) > 0);
+  SetCommandBarFrosted(page(), FrostsOver(window_));
   FrostPageBubble(bubble_->GetWidget(), page());
   contents_->HoldKeys();
   bubble_->ShowUI();

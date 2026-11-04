@@ -47,7 +47,7 @@ uw looks and works like Arc, built on Chromium.
 - Every window on a workspace shows its tabs. A page runs in one window at a time, and closing a window closes none of its tabs.
 - Dark mode is true black.
 - Pages can be dark in a light window, or light in a dark one.
-- On macOS 26 and later, two theme sliders bring in Liquid Glass. Transparency lets the desktop show through the window. Glass turns pinned tabs and the sidebar's buttons to glass, and frosts menus and cards.
+- On macOS 26 and later, two theme sliders bring in Liquid Glass. Transparency lets the desktop show through the window. Glass turns pinned tabs and the sidebar's buttons to glass, and frosts menus and cards. On Windows only Glass shows, and menus and cards stay solid.
 
 ![uw in dark mode. Four pinned tabs sit as tiles above two tasks, and the switcher at the foot of the sidebar shows three workspaces.](docs/assets/screenshots/workspaces.png)
 

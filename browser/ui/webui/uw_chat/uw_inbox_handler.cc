@@ -226,8 +226,7 @@ void UwInboxHandler::SendAlerts() {
     sent.push_back(std::move(shown));
   }
   BrowserWindowInterface* window = Window();
-  page_->OnAlerts(std::move(sent), scheduled,
-                  window && ElementGlassOfWindow(window) > 0);
+  page_->OnAlerts(std::move(sent), scheduled, window && FrostsOver(window));
 }
 
 }  // namespace uw

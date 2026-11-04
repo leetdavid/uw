@@ -114,12 +114,12 @@ mojom::GlassSlidersPtr GlassSlidersFor(SkColor first, ThemeMode mode) {
   mojom::GlassPause pause = mojom::GlassPause::kNone;
   if (ReducesTransparency()) {
     pause = mojom::GlassPause::kReduceTransparency;
-  } else if (BatterySaverModeManager::HasInstance() &&
+  } else if (CanShowGlass() && BatterySaverModeManager::HasInstance() &&
              BatterySaverModeManager::GetInstance()->IsBatterySaverActive()) {
     pause = mojom::GlassPause::kEnergySaver;
   }
-  return mojom::GlassSliders::New(CanShowGlass(), ReadableTransparency(text),
-                                  pause);
+  return mojom::GlassSliders::New(CanShowGlass(), CanShowElementGlass(),
+                                  ReadableTransparency(text), pause);
 }
 
 }  // namespace

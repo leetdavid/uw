@@ -287,7 +287,7 @@ void UwWatchCardHandler::SendCard() {
   card->host = url_formatter::StripWWW(
       std::string(contents->GetLastCommittedURL().host()));
   card->favicon = FaviconOf(contents);
-  card->frosted = ElementGlassOfWindow(tab->GetBrowserWindowInterface()) > 0;
+  card->frosted = FrostsOver(tab->GetBrowserWindowInterface());
   const ScheduledChats* chats = observation_.GetSource();
   for (const std::string& id : Watchers()) {
     auto watch = mojom::PageWatch::New();
