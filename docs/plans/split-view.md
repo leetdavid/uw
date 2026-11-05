@@ -116,6 +116,7 @@ Built in T332 on 2026-11-05:
 
 - A tab's menu has Split Right, Split Down, and, on a tab in a split, Move Out of Split View and Separate Panes, in place of Chromium's split items. A pinned tab keeps Chromium's items and has neither split command until [pinned split views](#pinned-split-views) are built.
 - An open tab picked in the command bar over a new pane moves into it only from the same window. One in another window is switched to, as before, and the new pane keeps its new tab page.
+- Chromium's split button on the toolbar has only Separate Views for a split of more than two. A pair keeps Chromium's menu, Reverse and Show stacked included, until [dragging](#dragging) is built.
 
 ## Stages
 

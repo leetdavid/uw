@@ -705,6 +705,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   tabs()->UpdateSplitCutRatio(*a->GetSplit(), 1, 0.7);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(rows(), (std::vector<const tabs::TabInterface*>{a, c, d, b}));
+  SaveWindowScreenshot(browser(), "split-view-four-panes");
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,

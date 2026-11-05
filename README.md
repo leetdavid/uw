@@ -429,7 +429,7 @@ On 2026-10-25, the [uw command](docs/plans/uw-command.md)'s first stage built on
 
 On 2026-10-30, uw's [new tab page](docs/plans/new-tab-page.md) built on the same host, with its Search or Ask box and all six sections. `NewTabBrowserTest.*` passes in `browser_tests`, with the organizer, tab tree, Inbox, Scheduled page, and providers suites. A real window has not been tried.
 
-On 2026-11-05, [split views](docs/plans/split-view.md) of any number of panes built on the same host, as T332. In `browser_tests`, `SplitViewBrowserTest.*` passes headless, with the sidebar, organizer, chat, command bar, terminal, and menu key tests that cover splits: 109 tests. In `unit_tests`, `SplitLayoutTest.*` passes with Chromium's own `TabStripModelTest.*`, `TabRestoreServiceImplTest.*`, and `SessionServiceTest.*`: 381 tests. Chromium's own split view browser tests open real windows, so they were not run. A real window has not been tried.
+On 2026-11-05, [split views](docs/plans/split-view.md) of any number of panes built on the same host, as T332. In `browser_tests`, `SplitViewBrowserTest.*` passes headless, with the sidebar, organizer, chat, command bar, terminal, and menu key tests that cover splits: 111 tests. In `unit_tests`, `SplitLayoutTest.*` passes with Chromium's own `TabStripModelTest.*`, `TabRestoreServiceImplTest.*`, and `SessionServiceTest.*`: 381 tests. Chromium's own split view browser tests open real windows, so they were not run. A real window has not been tried.
 
 The [manual native tab-tree slice](docs/plans/native-tab-tree.md) is approved. Its API investigation and implementation build are complete; native verification remains pending.
 

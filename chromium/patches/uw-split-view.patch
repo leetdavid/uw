@@ -1,5 +1,5 @@
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index e155778e0039b89457d58bfd34d69aed810a37dd..fd546a509812033e3e1dfc6cd465c18821f938b2 100644
+index 5672f35b053becc05cc3bb821a8d2f830f90773c..964edabd96ac6c7538346f8a504b2bb0153b7512 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -344,6 +344,12 @@ are declared in tools/grit/grit_args.gni.
@@ -346,10 +346,74 @@ index 167d296626e3846e61346bfb57e37e1f5f191caa..37d26a240e37d89e21f9fcda6f04ccbf
                    .command_id(IDC_TAB_SEARCH),
                Item().is_separator(),
 diff --git a/chrome/browser/ui/tabs/split_tab_menu_model.cc b/chrome/browser/ui/tabs/split_tab_menu_model.cc
-index d09ed0f7c8abbcd1437deb56fc5ee2f13a276e1e..476ab821378b7e8e8081700274094d372142db0a 100644
+index d09ed0f7c8abbcd1437deb56fc5ee2f13a276e1e..f2907b498921272c1329515fb3169087218d6ec2 100644
 --- a/chrome/browser/ui/tabs/split_tab_menu_model.cc
 +++ b/chrome/browser/ui/tabs/split_tab_menu_model.cc
-@@ -257,8 +257,10 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
+@@ -119,13 +119,25 @@ SplitTabMenuModel::SplitTabMenuModel(TabStripModel* tab_strip_model,
+       tab_strip_model_(tab_strip_model),
+       menu_source_(menu_source),
+       split_tab_index_(split_tab_index) {
++  // uw: a split of more than two tabs has no start or end to close and no
++  // arrangement to flip, so its menu only separates it, or closes a pane.
++  // The toolbar button makes a menu before there is any split.
++  tabs::TabInterface* const tab =
++      split_tab_index.has_value()
++          ? tab_strip_model->GetTabAtIndex(split_tab_index.value())
++          : tab_strip_model->GetActiveTab();
++  const bool pair =
++      !tab || !tab->GetSplit() ||
++      tab_strip_model->GetSplitData(*tab->GetSplit())->ListTabs().size() == 2;
+   AddItemWithStringIdAndIcon(
+       GetCommandIdInt(CommandId::kExitSplit), IDS_SPLIT_TAB_SEPARATE_VIEWS,
+       ui::ImageModel::FromVectorIcon(
+           features::IsRoundedIconsEnabled() ? kOpenInFullIcon
+                                             : kOpenInFullOldIcon,
+           ui::kColorMenuIcon, ui::SimpleMenuModel::kDefaultIconSize));
+-  AddSeparator(ui::MenuSeparatorType::NORMAL_SEPARATOR);
++  if (pair || menu_source == MenuSource::kMiniToolbar) {
++    AddSeparator(ui::MenuSeparatorType::NORMAL_SEPARATOR);
++  }
+ 
+   if (menu_source == MenuSource::kMiniToolbar) {
+     CHECK(split_tab_index.has_value());
+@@ -140,6 +152,8 @@ SplitTabMenuModel::SplitTabMenuModel(TabStripModel* tab_strip_model,
+         GetIndexOfCommandId(GetCommandIdInt(CommandId::kCloseSpecifiedTab))
+             .value(),
+         kCloseMenuItem);
++  } else if (!pair) {
++    // uw: a larger split has Separate Views alone.
+   } else if (menu_source == MenuSource::kTabContextMenu ||
+              menu_source == MenuSource::kToolbarButton) {
+     AddItem(GetCommandIdInt(CommandId::kCloseStartTab), std::u16string());
+@@ -156,7 +170,7 @@ SplitTabMenuModel::SplitTabMenuModel(TabStripModel* tab_strip_model,
+     NOTREACHED() << "Unknown close menu item option";
+   }
+ 
+-  if (base::FeatureList::IsEnabled(tabs::kSplitViewHorizontal)) {
++  if (pair && base::FeatureList::IsEnabled(tabs::kSplitViewHorizontal)) {
+     AddItem(GetCommandIdInt(CommandId::kToggleOrientation), std::u16string());
+     SetElementIdentifierAt(
+         GetIndexOfCommandId(GetCommandIdInt(CommandId::kToggleOrientation))
+@@ -164,11 +178,13 @@ SplitTabMenuModel::SplitTabMenuModel(TabStripModel* tab_strip_model,
+         kToggleOrientationMenuItem);
+   }
+ 
+-  AddItem(GetCommandIdInt(CommandId::kReversePosition), std::u16string());
+-
+-  SetElementIdentifierAt(
+-      GetIndexOfCommandId(GetCommandIdInt(CommandId::kReversePosition)).value(),
+-      kReversePositionMenuItem);
++  if (pair) {
++    AddItem(GetCommandIdInt(CommandId::kReversePosition), std::u16string());
++    SetElementIdentifierAt(
++        GetIndexOfCommandId(GetCommandIdInt(CommandId::kReversePosition))
++            .value(),
++        kReversePositionMenuItem);
++  }
+   SetElementIdentifierAt(
+       GetIndexOfCommandId(GetCommandIdInt(CommandId::kExitSplit)).value(),
+       kExitSplitMenuItem);
+@@ -257,8 +273,10 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
    const split_tabs::SplitTabId split_id = GetSplitTabId();
    split_tabs::SplitTabData* const split_tab_data =
        tab_strip_model_->GetSplitData(split_id);
@@ -361,7 +425,7 @@ index d09ed0f7c8abbcd1437deb56fc5ee2f13a276e1e..476ab821378b7e8e8081700274094d37
    CommandId split_command_id = GetCommandIdEnum(command_id);
    switch (split_command_id) {
      case CommandId::kReversePosition:
-@@ -269,13 +271,15 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
+@@ -269,13 +287,15 @@ void SplitTabMenuModel::ExecuteCommand(int command_id, int event_flags) {
            tab_strip_model_->GetWebContentsAt(split_tab_index_.value()));
        break;
      case CommandId::kCloseStartTab: {
@@ -1235,7 +1299,7 @@ index 460c40a7c5033c97ace6c442d347d7ebab13a82f..9a03a9d4cd1d1eef8ec4a872ba2e91e7
  
    raw_ptr<views::FlexLayout> flex_layout_manager_;
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171eb5278ff2 100644
+index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421c56a68fb 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -10,14 +10,19 @@
@@ -1772,7 +1836,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
      }
    }
  }
-@@ -516,36 +718,33 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -516,36 +718,32 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
    available_space =
        CalculateSeparatorLayouts(available_space, layouts.child_layouts);
  
@@ -1787,7 +1851,6 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
 +                                                  GetSplitGap(), min_size);
 +    dividers =
 +        visual_data_.panes().Dividers(available_space, GetSplitGap(), min_size);
-+    split_area_ = available_space;
 +  }
 +
 +  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
@@ -1833,7 +1896,27 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
    layouts.child_layouts.emplace_back(lens_overlay_view_.get(),
                                       lens_overlay_view_->GetVisible(),
                                       gfx::Rect(width, height));
-@@ -586,33 +785,27 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -555,6 +753,19 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+ }
+ 
+ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
++  // uw: the panes about to show tile the split's area. A layout worked out
++  // for another size, such as the one below, must not move it.
++  split_area_ = gfx::Rect();
++  for (const views::ChildLayout& child : layout.child_layouts) {
++    for (size_t i = 0; i < pane_count_ && i < contents_container_views_.size();
++         ++i) {
++      if (child.visible &&
++          child.child_view == contents_container_views_[i].get()) {
++        split_area_.Union(child.bounds);
++      }
++    }
++  }
++
+   if (!target_content_bounds_) {
+     for (auto& contents : contents_container_views_) {
+       contents->SetTargetContentBounds(std::nullopt);
+@@ -586,33 +797,27 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
  
    const auto& default_clip = target_content_bounds_->clipped_area;
  
@@ -1887,7 +1970,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
  }
  
  gfx::Rect MultiContentsView::CalculateDropTargetLayout(
-@@ -727,67 +920,23 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
+@@ -727,67 +932,23 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
                     height - separator_height);
  }
  
@@ -1970,7 +2053,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
  }
  
  void MultiContentsView::UpdateContentsBorderAndOverlay() {
-@@ -858,12 +1007,5 @@ void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
+@@ -858,12 +1019,5 @@ void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
    InvalidateLayout(/*avoid_propagate_during_layout=*/true);
  }
  
@@ -1984,7 +2067,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..c291c0afe5dbe173d9ac616dd4e5171e
  BEGIN_METADATA(MultiContentsView)
  END_METADATA
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
-index 6ecb49a239f704f61442eee7d14a0454553aea4f..f2dc08146f437fb58ee79171d916588bd45153f7 100644
+index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b4c189c0f 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.h
 @@ -19,7 +19,9 @@
@@ -2104,9 +2187,9 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..f2dc08146f437fb58ee79171d916588b
 +  // uw: how many of `contents_container_views_` the split uses.
 +  size_t pane_count_ = 1;
 +
-+  // uw: where the last layout put the panes, which a divider drag measures
-+  // against.
-+  mutable gfx::Rect split_area_;
++  // uw: where the last applied layout put the panes, which a divider drag
++  // measures against.
++  gfx::Rect split_area_;
 +
    // The views that are shown for entering split view. E.g., this is shown when
    // the user drags a link to the edge of the contents view.
@@ -2482,6 +2565,22 @@ index b3dd6cbace3fc32158bd968b7e3094c485e8c7e4..509a221a3c71aebc3c90a64990cc7f3a
      auto* tab = tab_handle_.Get();
      return tab && uw::GetCommandAccelerator(tab->GetBrowserWindowInterface(),
                                              command_id, accelerator);
+diff --git a/chrome/browser/ui/views/toolbar/split_tabs_button.cc b/chrome/browser/ui/views/toolbar/split_tabs_button.cc
+index afd3610958c4470ec545f0eb11b4f8c5a8367861..3ce43822edae8ee50403d9ffc30f96675d064181 100644
+--- a/chrome/browser/ui/views/toolbar/split_tabs_button.cc
++++ b/chrome/browser/ui/views/toolbar/split_tabs_button.cc
+@@ -172,6 +172,11 @@ void SplitTabsToolbarButton::ButtonPressed(const ui::Event& event) {
+ 
+     menu_runner_.reset();
+     menu_model_adapter_.reset();
++    // uw: the menu depends on how many tabs the split has, so it is made
++    // again each time it opens.
++    split_tab_menu_ = std::make_unique<SplitTabMenuModel>(
++        browser_->tab_strip_model(),
++        SplitTabMenuModel::MenuSource::kToolbarButton);
+ 
+     menu_model_adapter_ =
+         std::make_unique<views::MenuModelAdapter>(split_tab_menu_.get());
 diff --git a/components/sessions/core/live_tab.cc b/components/sessions/core/live_tab.cc
 index 4ebce2ee38bd9677d8704a46cdc7b48350765201..a2bed25aefdbc240d334ae1631e641cbd08cbf44 100644
 --- a/components/sessions/core/live_tab.cc

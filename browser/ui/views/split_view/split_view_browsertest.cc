@@ -25,9 +25,12 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/tabs/existing_base_sub_menu_model.h"
+#include "chrome/browser/ui/tabs/split_tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -45,12 +48,14 @@
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/split_view/split_commands.h"
@@ -167,6 +172,20 @@ class SplitViewBrowserTest : public headless::HeadlessModeBrowserTest {
     return text;
   }
 
+  // The page area's dividers in use.
+  std::vector<MultiContentsResizeArea*> Dividers() {
+    std::vector<MultiContentsResizeArea*> found;
+    for (views::View* view : BrowserView::GetBrowserViewForBrowser(browser())
+                                 ->multi_contents_view()
+                                 ->children()) {
+      if (auto* divider = views::AsViewClass<MultiContentsResizeArea>(view);
+          divider && divider->GetVisible()) {
+        found.push_back(divider);
+      }
+    }
+    return found;
+  }
+
   static bool ShowsTheNewTabPage(tabs::TabInterface* tab) {
     const std::string_view host = tab->GetContents()->GetVisibleURL().host();
     return host == chrome::kChromeUINewTabHost ||
@@ -245,6 +264,34 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, TheCommandBarOpensOverTheNewPane) {
                                ->GetAnchorRect();
   EXPECT_NEAR(anchor.CenterPoint().x(), pane.CenterPoint().x(), 2);
   EXPECT_GT(anchor.y(), pane.y());
+}
+
+// Each cut has a divider, and dragging one resizes only the panes it
+// divides.
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, EachDividerResizesItsOwnPanes) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !PaneOf(panes[2]).IsEmpty() && Dividers().size() == 2u; }));
+  const int left_width = PaneOf(panes[0]).width();
+  ASSERT_EQ(PaneOf(panes[1]).height(), PaneOf(panes[2]).height());
+  // The divider between the right column's panes lies across it.
+  MultiContentsResizeArea* across = nullptr;
+  for (MultiContentsResizeArea* divider : Dividers()) {
+    if (divider->width() > divider->height()) {
+      across = divider;
+    }
+  }
+  ASSERT_TRUE(across);
+
+  // A drag reports how far it has gone, then lets go.
+  across->OnResize(30, /*done_resizing=*/false);
+  across->OnResize(60, /*done_resizing=*/true);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return PaneOf(panes[1]).height() >= PaneOf(panes[2]).height() + 100;
+  }));
+  EXPECT_EQ(PaneOf(panes[0]).width(), left_width);
+  EXPECT_NE(LayoutOf(panes[0]), "r(0.5,0,d(0.5,1,2))");
+  SaveWindowScreenshot(browser(), "split-view-three-panes");
 }
 
 // From a terminal, the new pane is a terminal in the same folder. From a chat
@@ -355,6 +402,31 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, ClosingAndEndingASplit) {
     EXPECT_EQ(tabs()->GetTabAtIndex(static_cast<int>(i)), order[i]);
   }
   EXPECT_FALSE(CanRunSplitCommand(panes[0], kSeparatePanes));
+}
+
+// The split button's menu on the toolbar has no Reverse, Show stacked, or
+// Close left or right view for a split of more than two: only Separate
+// Views, and Chromium's Send Feedback.
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, ALargerSplitsMenuOnlySeparates) {
+  ThreePanes();
+  SplitTabMenuModel menu(tabs(), SplitTabMenuModel::MenuSource::kToolbarButton,
+                         std::nullopt);
+  using Command = SplitTabMenuModel::CommandId;
+  std::vector<Command> commands;
+  for (size_t i = 0; i < menu.GetItemCount(); ++i) {
+    if (menu.GetTypeAt(i) == ui::MenuModel::TYPE_COMMAND) {
+      commands.push_back(static_cast<Command>(
+          menu.GetCommandIdAt(i) -
+          ExistingBaseSubMenuModel::kMinSplitTabMenuModelCommandId));
+    }
+  }
+  ASSERT_FALSE(commands.empty());
+  EXPECT_EQ(commands.front(), Command::kExitSplit);
+  for (Command command : commands) {
+    EXPECT_TRUE(command == Command::kExitSplit ||
+                command == Command::kSendFeedback)
+        << static_cast<int>(command);
+  }
 }
 
 // Reopen Closed Split View brings back the whole layout, and the pane that
