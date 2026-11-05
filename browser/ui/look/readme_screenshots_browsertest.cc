@@ -501,6 +501,8 @@ IN_PROC_BROWSER_TEST_F(ReadmeScreenshotsBrowserTest, WorkspacesAndPins) {
   Theme black;
   black.brightness = 0;
   SetThemeOfWindow(browser(), black);
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   ShowWorkspacesAndPins();
   SaveWindowScreenshot(browser(), "workspaces");
 }

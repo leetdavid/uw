@@ -11,6 +11,8 @@
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -62,11 +64,14 @@ class PageColorsBrowserTest : public headless::HeadlessModeBrowserTest {
     return view()->GetColorProvider()->GetColor(id);
   }
 
-  // A dark window is one whose theme is black.
+  // A dark window has a black theme in dark mode.
   void SetDark(bool dark) {
     Theme theme;
     theme.brightness = dark ? 0 : kFullBrightness;
     SetThemeOfWindow(browser(), theme);
+    ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+        ->SetBrowserColorScheme(dark ? ThemeService::BrowserColorScheme::kDark
+                                     : ThemeService::BrowserColorScheme::kLight);
   }
 
   // Waits until the toolbar is `color`.

@@ -28,6 +28,8 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -62,8 +64,6 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
-#include "uw/browser/workspaces/workspace_theme.h"
-#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -273,11 +273,11 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdTOpensItWithoutATab) {
   EXPECT_EQ(tabs, browser()->tab_strip_model()->count());
 }
 
-// It is uw's own, so it takes the theme, per docs/plans/themes.md#one-look.
-IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesTheTheme) {
-  Theme theme;
-  theme.brightness = 0;
-  SetThemeOfWindow(browser(), theme);
+// It opens over the page, so it takes the mode, per
+// docs/plans/themes.md#one-look.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesTheMode) {
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
 
   Press(ui::VKEY_T, NSEventModifierFlagCommand);
   ASSERT_TRUE(bar()->IsShowing());

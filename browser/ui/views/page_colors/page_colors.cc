@@ -56,8 +56,8 @@ void PageColors::Update() {
   if (color && SkColorGetA(*color) != SK_AlphaOPAQUE) {
     color.reset();
   }
-  // Until a website gives its own color, the toolbar takes the card's, as
-  // website mode says.
+  // Until a page gives its own color, the toolbar takes the card's, as the
+  // mode says.
   if (!color) {
     color = EmptyPageColor(web_contents());
   }

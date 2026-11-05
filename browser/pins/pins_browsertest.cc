@@ -25,6 +25,8 @@
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -767,12 +769,12 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, TheWindowThePageLeftShowsItHazed) {
   EXPECT_FALSE(color_utils::IsDark(light.haze));
   SaveWindowScreenshot(browser(), "pin-haze-light");
 
-  Theme black;
-  black.brightness = 0;
-  SetThemeOfWindow(browser(), black);
+  ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+      ThemeService::BrowserColorScheme::kDark);
   base::RunLoop().RunUntilIdle();
   HazeColors dark = ColorsOf(browser(), haze);
-  // The pill takes the dark card's color, and the haze darkens the picture.
+  // In dark mode the pill takes the dark card's color, and the haze darkens
+  // the picture.
   EXPECT_TRUE(color_utils::IsDark(dark.pill));
   EXPECT_LT(color_utils::GetRelativeLuminance(dark.haze),
             color_utils::GetRelativeLuminance(light.haze));

@@ -64,6 +64,7 @@
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/base/test/ui_controls.h"
+#include "ui/base/ui_base_switches.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/point.h"
@@ -92,11 +93,9 @@
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/views/terminal/close_warning.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat_handler.h"
-#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/agent/schedule.h"
 #include "uw/components/ai_providers/providers.h"
-#include "uw/components/look/theme.h"
 
 namespace uw {
 namespace {
@@ -2124,16 +2123,14 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatWaitsWhenItsProviderIsGone) {
   EXPECT_EQ(Ask(chat, "Again"), "Second.");
 }
 
-// A chat on a dark theme is dark from its first frame: its colors follow the
-// light or dark it is told, not the class the page's script adds once its
-// bundle has run.
+// A chat in dark mode is dark from its first frame: its colors follow the
+// system's dark mode, not the class the page's script adds once its bundle
+// has run.
 class UwChatDarkModeBrowserTest : public UwChatBrowserTest {
  protected:
-  void SetUpOnMainThread() override {
-    UwChatBrowserTest::SetUpOnMainThread();
-    Theme black;
-    black.brightness = 0;
-    SetThemeOfWindow(browser(), black);
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    UwChatBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(switches::kForceDarkMode);
   }
 };
 

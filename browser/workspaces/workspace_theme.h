@@ -36,23 +36,16 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme);
 // workspace uses, at the brightness of `like`.
 Theme NewWorkspaceTheme(const Theme& like);
 
-// Sets the color and the light or dark in the color key of `window` from the
-// theme it shows, so everything uw and Chromium draw in it takes the theme,
-// per docs/plans/themes.md#one-look. Chromium's BrowserWidget calls it. A
-// private window keeps Chromium's dark look, a web app its own, and a theme
-// from Chromium's theme store still replaces uw's look.
+// Sets the color key of `window`: the sidebar takes the theme it shows, and
+// everything else the profile's mode, per docs/plans/themes.md#one-look.
+// Chromium's BrowserWidget calls it. A private window keeps Chromium's dark
+// look, a web app its own, and a theme from Chromium's theme store still
+// replaces uw's look.
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
                         ui::ColorProviderKey& key);
 
-// Whether websites and extensions' pages of `profile` are told dark: its
-// website mode, which is Chromium's own light or dark setting, with Auto
-// following the system. uw's and Chromium's own pages take the theme instead.
-bool WebsitesAreDark(Profile* profile);
-
 // The page card's color behind `page` before it paints, and the toolbar's
-// until the page gives its own: white or #0A0A0A by website mode for websites
-// and extensions' pages, and nothing for uw's and Chromium's own pages, which
-// take the theme's.
+// until the page gives its own: white or #0A0A0A by the profile's mode.
 std::optional<SkColor> EmptyPageColor(content::WebContents* page);
 
 // The profile's theme changed. What changed somewhere other than uw's picker,

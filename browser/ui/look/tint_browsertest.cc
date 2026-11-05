@@ -113,7 +113,9 @@ class TintBrowserTest : public headless::HeadlessModeBrowserTest {
 
   SkColor Color(ui::ColorId id) { return Color(browser(), id); }
 
-  // The window's own colors, without the page color on its toolbar.
+  // The window's own colors, without the page color on its toolbar. They
+  // leave out the sidebar's colors from the theme too, which match these in
+  // light mode.
   SkColor Color(Browser* window, ui::ColorId id) {
     ui::ColorProviderKey key = BrowserView::GetBrowserViewForBrowser(window)
                                    ->GetWidget()
@@ -146,7 +148,8 @@ class TintBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 };
 
-// The default theme is light, and black is dark on uw's blacks.
+// The default theme is light, and black is dark. Dark mode puts the toolbar
+// and the card on uw's blacks.
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheDefaultIsLightAndBlackIsDark) {
   EXPECT_EQ(Color(ui::kColorFrameActive), kDefaultLightTint);
   EXPECT_EQ(Color(kColorTabForegroundInactiveFrameActive), kDarkTextOnTint);
@@ -155,6 +158,9 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheDefaultIsLightAndBlackIsDark) {
   SetTheme(browser()->GetProfile(), Black());
   EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
   EXPECT_EQ(Color(kColorTabForegroundInactiveFrameActive), kLightTextOnTint);
+  EXPECT_NE(Color(kColorToolbar), kBlackCard);
+
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   EXPECT_EQ(Color(kColorToolbar), kBlackCard);
   EXPECT_EQ(Color(kColorLocationBarBackground), kBlackCardField);
   EXPECT_EQ(Color(kColorOmniboxResultsBackground), kBlackCardField);
@@ -162,6 +168,7 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheDefaultIsLightAndBlackIsDark) {
   EXPECT_EQ(Color(kColorPageCardEdge), kBlackCardEdge);
 
   SetTheme(browser()->GetProfile(), Theme());
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   EXPECT_EQ(Color(kColorPageCardEdge), SK_ColorTRANSPARENT);
 }
 
@@ -174,10 +181,11 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, NoBrightnessIsBlackWhateverTheColors) {
   wine.brightness = 0;
   SetTheme(browser()->GetProfile(), wine);
   EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
-  EXPECT_EQ(Color(kColorToolbar), kBlackCard);
   EXPECT_EQ(Color(ui::kColorSysPrimary), neutral);
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   SaveWindowScreenshot(browser(), "dark-black");
 
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   wine.brightness = kFullBrightness;
   SetTheme(browser()->GetProfile(), wine);
   EXPECT_EQ(Color(ui::kColorFrameActive), kWine);
@@ -325,9 +333,9 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, WithoutSpaceOnlyTheSidebarSideIsRound) {
             3);
 }
 
-// uw's own pages use the same blacks on a dark theme.
-IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackOnADarkTheme) {
-  SetTheme(browser()->GetProfile(), Black());
+// uw's own pages use the same blacks in dark mode.
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackInDarkMode) {
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("chrome://chat/")));
   EXPECT_EQ(
       content::EvalJs(browser()->tab_strip_model()->GetActiveWebContents(),
@@ -337,12 +345,12 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, TheChatPageIsBlackOnADarkTheme) {
   SaveWindowScreenshot(browser(), "chat-dark");
 }
 
-// uw's other pages are on the same blacks on a dark theme: the providers page
+// uw's other pages are on the same blacks in dark mode: the providers page
 // and the terminal on the page black, and the command bar's card one step up.
-IN_PROC_BROWSER_TEST_F(TintBrowserTest, UwPagesAreBlackOnADarkTheme) {
+IN_PROC_BROWSER_TEST_F(TintBrowserTest, UwPagesAreBlackInDarkMode) {
   // The terminal's shell reads none of the user's startup files.
   base::Environment::Create()->SetVar("ZDOTDIR", "/var/empty");
-  SetTheme(browser()->GetProfile(), Black());
+  theme()->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   const auto open = [&](const std::string& url) {
     EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(url)));
     return browser()->tab_strip_model()->GetActiveWebContents();
@@ -479,14 +487,14 @@ IN_PROC_BROWSER_TEST_F(TintBrowserTest, AColorPickedElsewhereIsAOneColorTheme) {
             6);
 }
 
-// A dark color is a dark theme in its own color, with uw's blacks on the card.
+// A dark color is a dark theme in its own color, beside a card in the mode.
 IN_PROC_BROWSER_TEST_F(TintBrowserTest, ADarkThemeKeepsItsColor) {
   Theme wine;
   wine.colors = {kWine};
   SetTheme(browser()->GetProfile(), wine);
   EXPECT_EQ(Color(ui::kColorFrameActive), kWine);
   EXPECT_EQ(Color(kColorTabForegroundInactiveFrameActive), kLightTextOnTint);
-  EXPECT_EQ(Color(kColorToolbar), kBlackCard);
+  EXPECT_NE(Color(kColorToolbar), kBlackCard);
   SaveWindowScreenshot(browser(), "dark-theme-colors");
 }
 

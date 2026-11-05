@@ -71,14 +71,14 @@ TEST(CommandSettingsTest, ChoicesAreTypedWithHyphensAndStoredAsUwStoresThem) {
             "agent.approval-mode takes ask-first, auto, full-auto.");
 }
 
-// Website mode is Chromium's own light or dark setting, which holds a number.
-TEST(CommandSettingsTest, WebsitesIsAutoLightOrDark) {
-  const CommandSetting& websites = Setting("websites");
-  EXPECT_EQ(websites.scope, CommandSetting::Scope::kProfile);
-  EXPECT_EQ(ParseSettingValue(websites, "dark").value(), base::Value("2"));
-  EXPECT_EQ(ShownSettingValue(websites, base::Value("0")),
-            base::Value("auto"));
-  EXPECT_EQ(Refusal("websites", "theme"), "websites takes auto, light, dark.");
+// The mode is Chromium's own light or dark setting, which holds a number.
+TEST(CommandSettingsTest, ModeIsAutoLightOrDark) {
+  const CommandSetting& mode = Setting("theme.mode");
+  EXPECT_EQ(mode.scope, CommandSetting::Scope::kProfile);
+  EXPECT_EQ(ParseSettingValue(mode, "dark").value(), base::Value("2"));
+  EXPECT_EQ(ShownSettingValue(mode, base::Value("0")), base::Value("auto"));
+  EXPECT_EQ(Refusal("theme.mode", "theme"),
+            "theme.mode takes auto, light, dark.");
 }
 
 TEST(CommandSettingsTest, CurrencyIsACodeOrAuto) {

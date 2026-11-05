@@ -208,7 +208,7 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
     return window->GetActiveTabInterface()->GetContents();
   }
 
-  void SetWebsiteMode(ThemeService::BrowserColorScheme mode) {
+  void SetMode(ThemeService::BrowserColorScheme mode) {
     ThemeServiceFactory::GetForProfile(profile())->SetBrowserColorScheme(mode);
   }
 
@@ -331,9 +331,10 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, EachProfileStartsAsAWorkspace) {
   EXPECT_FALSE(window->hidden());
 }
 
-// Each workspace keeps its own theme, and Chromium's own pages in its windows
-// see that theme's light or dark.
+// Each workspace keeps its own theme in its sidebar, and Chromium's own pages
+// in both take the profile's mode.
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
+  SetMode(ThemeService::BrowserColorScheme::kLight);
   const std::string reading = AddWorkspace("Reading", profile());
   const std::vector<SuggestedTheme> suggested = SuggestedThemes();
   Theme butter;
@@ -368,7 +369,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   EXPECT_EQ(frame(partner),
             TintFrom(ColorAsShown(wine, wine.colors[0])).start);
   EXPECT_FALSE(dark(browser()));
-  EXPECT_TRUE(dark(partner));
+  EXPECT_FALSE(dark(partner));
   SaveWindowScreenshot(partner->GetBrowserForMigrationOnly(),
                        "workspace-dark-wine");
 
@@ -378,10 +379,11 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TwoWorkspacesShowTwoThemes) {
   EXPECT_EQ(NewWorkspaceTheme(wine).brightness, wine.brightness);
 }
 
-// Per docs/plans/themes.md#one-look: websites take website mode, and
-// everything uw and Chromium draw takes the theme, Chromium's panels included.
+// Per docs/plans/themes.md#one-look: the sidebar takes the theme, and
+// everything else the mode: websites, uw's and Chromium's own pages, and
+// Chromium's panels.
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       WebsitesTakeWebsiteModeAndEverythingElseTheTheme) {
+                       EverythingButTheSidebarTakesTheMode) {
   const auto colors = [&] {
     return BrowserView::GetBrowserViewForBrowser(browser())->GetColorProvider();
   };
@@ -389,48 +391,55 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
       ui::kColorDialogBackground, ui::kColorMenuBackground,
       kColorTabSearchBackground, kColorTabSearchCardBackground};
   SetThemeOfWindow(browser(), Theme());
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   Load(browser(), GURL(kForm));
   content::WebContents* website = PageOf(browser());
   EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(website); }));
   AddTab(browser(), GURL("chrome://chat"));
   content::WebContents* chat = PageOf(browser());
-  EXPECT_FALSE(IsDark(chat));
+  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(chat); }));
   AddTab(browser(), GURL(kNotes));
   content::WebContents* notes = PageOf(browser());
-  EXPECT_FALSE(IsDark(notes));
+  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(notes); }));
   for (ui::ColorId id : kChromiumPanels) {
-    EXPECT_FALSE(color_utils::IsDark(colors()->GetColor(id))) << id;
+    EXPECT_TRUE(color_utils::IsDark(colors()->GetColor(id))) << id;
   }
+  EXPECT_EQ(colors()->GetColor(ui::kColorFrameActive),
+            TintFrom(kDefaultLightTint).start);
+  EXPECT_EQ(colors()->GetColor(kColorTabForegroundInactiveFrameActive),
+            kDarkTextOnTint);
   SaveWindowScreenshot(browser()->GetBrowserForMigrationOnly(),
-                       "websites-dark-light-theme");
+                       "mode-dark-light-theme");
 
   Theme black;
   black.brightness = 0;
   SetThemeOfWindow(browser(), black);
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kLight);
-  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(chat); }));
-  EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(notes); }));
+  SetMode(ThemeService::BrowserColorScheme::kLight);
+  EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(chat); }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(notes); }));
   EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(website); }));
   for (ui::ColorId id : kChromiumPanels) {
-    EXPECT_TRUE(color_utils::IsDark(colors()->GetColor(id))) << id;
+    EXPECT_FALSE(color_utils::IsDark(colors()->GetColor(id))) << id;
   }
+  EXPECT_EQ(colors()->GetColor(ui::kColorFrameActive), SK_ColorBLACK);
+  EXPECT_EQ(colors()->GetColor(kColorTabForegroundInactiveFrameActive),
+            kLightTextOnTint);
   SaveWindowScreenshot(browser()->GetBrowserForMigrationOnly(),
-                       "websites-light-black-theme");
+                       "mode-light-black-theme");
 
-  // A private window's websites take the profile's website mode too.
+  // A private window's websites take the profile's mode too.
   Browser* incognito = CreateIncognitoBrowser();
   ASSERT_TRUE(content::NavigateToURL(PageOf(incognito), GURL(kForm)));
   EXPECT_FALSE(IsDark(PageOf(incognito)));
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   EXPECT_TRUE(
       base::test::RunUntil([&] { return IsDark(PageOf(incognito)); }));
 }
 
-// The window draws nothing from website mode: the sidebar's pixels stay the
-// same when it changes.
+// The sidebar draws nothing from the mode: its pixels stay the same when the
+// mode changes.
 IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       TheWindowLooksTheSameUnderAnyWebsiteMode) {
+                       TheSidebarLooksTheSameUnderAnyMode) {
   Load(browser(), GURL(kNotes));
   AddTab(browser(), GURL(kForm));
   const auto sidebar = [&] {
@@ -468,9 +477,9 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
     Theme theme;
     theme.brightness = brightness;
     SetThemeOfWindow(browser(), theme);
-    SetWebsiteMode(ThemeService::BrowserColorScheme::kLight);
+    SetMode(ThemeService::BrowserColorScheme::kLight);
     const SkBitmap same = sidebar();
-    SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+    SetMode(ThemeService::BrowserColorScheme::kDark);
     const SkBitmap apart = sidebar();
     const int count = differing(same, apart);
     if (count) {
@@ -483,10 +492,10 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   }
 }
 
-// Website mode is one per profile, so every workspace's websites share it.
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, WorkspacesShareWebsiteMode) {
+// The mode is one per profile, so every workspace shares it.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, WorkspacesShareTheMode) {
   const std::string reading = AddWorkspace("Reading", profile());
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   Load(browser(), GURL(kForm));
   RunWindowCommand(browser(), kGoToWorkspace1 + 1);
   BrowserWindowInterface* partner = WaitForShown(browser(), reading);
@@ -499,26 +508,24 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, WorkspacesShareWebsiteMode) {
   EXPECT_TRUE(IsDark(PageOf(partner)));
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       OpenWebsitesTakeANewWebsiteModeAtOnce) {
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kLight);
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, OpenPagesTakeANewModeAtOnce) {
+  SetMode(ThemeService::BrowserColorScheme::kLight);
   Load(browser(), GURL(kForm));
   AddTab(browser(), GURL(kGreen));
   content::WebContents* behind = TabOf(browser(), GURL(kForm));
   ASSERT_TRUE(behind);
   EXPECT_FALSE(IsDark(PageOf(browser())));
 
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(PageOf(browser())); }));
   EXPECT_TRUE(base::test::RunUntil([&] { return IsDark(behind); }));
 
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kLight);
+  SetMode(ThemeService::BrowserColorScheme::kLight);
   EXPECT_TRUE(base::test::RunUntil([&] { return !IsDark(PageOf(browser())); }));
 }
 
-// Extensions' pages follow website mode wherever they show, per T191.
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       AnExtensionsPopupTakesWebsiteMode) {
+// Extensions' pages follow the mode wherever they show, per T191.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, AnExtensionsPopupTakesTheMode) {
   extensions::TestExtensionDir dir;
   dir.WriteManifest(R"({"name": "Popup", "version": "1",
                         "manifest_version": 3,
@@ -529,7 +536,7 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
           dir.UnpackedPath());
   ASSERT_TRUE(extension);
 
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   std::unique_ptr<ExtensionActionTestHelper> actions =
       ExtensionActionTestHelper::Create(browser());
   ASSERT_TRUE(base::test::RunUntil(
@@ -574,10 +581,8 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, ChromiumsLinesAreNeutral) {
   ExtensionsMenuView::Hide();
 }
 
-// Before a website paints, the card behind it is black or white by website
-// mode. uw's and Chromium's own pages keep the theme's card.
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
-                       TheCardBehindAWebsiteTakesWebsiteMode) {
+// Before a page paints, the card behind it is black or white by the mode.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, TheCardBehindAPageTakesTheMode) {
   const auto card = [&] {
     return BrowserView::GetBrowserViewForBrowser(browser())
         ->contents_web_view()
@@ -587,16 +592,16 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
         .toSkColor();
   };
   SetThemeOfWindow(browser(), Theme());
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kDark);
+  SetMode(ThemeService::BrowserColorScheme::kDark);
   Load(browser(), GURL(kForm));
   EXPECT_EQ(card(), kBlackCard);
   Load(browser(), GURL(kNotes));
-  EXPECT_NE(card(), kBlackCard);
+  EXPECT_TRUE(color_utils::IsDark(card()));
 
   Theme black;
   black.brightness = 0;
   SetThemeOfWindow(browser(), black);
-  SetWebsiteMode(ThemeService::BrowserColorScheme::kLight);
+  SetMode(ThemeService::BrowserColorScheme::kLight);
   Load(browser(), GURL(kForm));
   EXPECT_EQ(card(), SK_ColorWHITE);
 }

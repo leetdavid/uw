@@ -15,6 +15,8 @@
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -266,13 +268,13 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
   }
 }
 
-// The list is Chromium's own, so it takes the theme, per
+// The list opens over the page, so it takes the mode whatever the theme, per
 // docs/plans/themes.md#one-look.
-IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesTheTheme) {
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesTheMode) {
   using ColorMode = ui::ColorProviderKey::ColorMode;
-  Theme theme = ThemeOfWindow(browser());
-  theme.brightness = 0;
-  SetThemeOfWindow(browser(), theme);
+  ThemeService* themes =
+      ThemeServiceFactory::GetForProfile(browser()->GetProfile());
+  themes->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   OmniboxPopupPresenterBase* suggestions = Suggestions();
   suggestions->Show();
   views::Widget* list = suggestions->get_widget_for_testing();
@@ -282,8 +284,10 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesTheTheme) {
       list->GetColorProvider()->GetColor(kColorOmniboxResultsBackground)));
   suggestions->Hide();
 
-  theme.brightness = kFullBrightness;
-  SetThemeOfWindow(browser(), theme);
+  Theme black = ThemeOfWindow(browser());
+  black.brightness = 0;
+  SetThemeOfWindow(browser(), black);
+  themes->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kLight);
   suggestions->Show();
   EXPECT_EQ(suggestions->get_widget_for_testing()
                 ->GetColorProviderKeyForTesting()
@@ -316,6 +320,8 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_GlassAsMacOSShowsIt) {
   dark.glass = kFullGlass / 2;
   dark.brightness = 0;
   SetThemeOfWindow(browser(), dark);
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   CaptureWindow(browser());
   SaveNativeWindowScreenshot(browser(), "glass-native-dark");
 
@@ -435,6 +441,8 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_TheCommandBarAsMacOSShowsIt) {
   Theme theme = ThemeOfWindow(browser());
   theme.brightness = 0;
   SetThemeOfWindow(browser(), theme);
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
   SetLook(kFullTransparency / 2, 60);
   CommandBar* bar = CommandBar::From(browser());
   ASSERT_TRUE(content::WaitForLoadStop(bar->page()));

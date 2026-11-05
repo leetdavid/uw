@@ -77,7 +77,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Shared tabs plan](plans/shared-tabs.md): a workspace's tabs in every window on it, one live page per tab, and windows that close no tabs.
 - [Shared tabs spike](research/shared-tabs-spike.md): what copying a workspace's tabs into every window costs, and what the rest of Chromium sees.
 - [ADR 0024: a workspace's tabs show in every window](adr/0024-a-workspaces-tabs-show-in-every-window.md): why tabs belong to the workspace and not the window, and why each has one live page.
-- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, website mode for how websites look, Brightness down to black, a toolbar in each page's color, and glass.
+- [Themes plan](plans/themes.md): an Arc-style theme of up to three colors per profile, its picker, the mode for everything but the sidebar, Brightness down to black, a toolbar in each page's color, and glass.
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Split view plan](plans/split-view.md): any number of panes split right or down as in a terminal, rearranged by dragging, and whole splits pinned as one.
 - [ADR 0029: split views extend Chromium's split](adr/0029-split-views-extend-chromiums-split.md): why any number of panes is a patch to Chromium's two-tab split and not a pane layout of uw's own.
@@ -107,5 +107,6 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Windows plan](plans/windows.md): Windows uw, cross-built on Linux and installed with Chromium's own installer, and what the first preview leaves out.
 - [ADR 0026: Windows uw updates with a fetcher of its own behind Chromium's relaunch button](adr/0026-windows-uw-updates-with-a-fetcher-of-its-own-behind-chromiums-relaunch-button.md): why not WinSparkle, Velopack, or Chromium Updater.
 - [ADR 0027: Windows uw numbers its releases from Chromium's version](adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md): why Windows releases are 153.0.8010.5301 and not 0.1.1.
-- [ADR 0030: the theme's light or dark comes from its colors](adr/0030-the-themes-light-or-dark-comes-from-its-colors.md): why Chromium's menus and pages follow the theme and website mode reaches only websites.
+- [ADR 0030: the theme's light or dark comes from its colors](adr/0030-the-themes-light-or-dark-comes-from-its-colors.md): why the theme's light or dark comes from its colors. Replaced in part by ADR 0031.
+- [ADR 0031: only the sidebar takes the theme](adr/0031-only-the-sidebar-takes-the-theme.md): why the mode sets pages, menus, and panels, and the sidebar keeps the theme's colors.
 - [Windows port audit](research/windows-port-audit.md): what is Mac-only in uw's tooling, code, and patches, and the Windows options for building, signing, installing, and updating.

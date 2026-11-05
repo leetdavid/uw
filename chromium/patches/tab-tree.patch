@@ -9,7 +9,7 @@ index c763167..7bd4cd1 100644
 +# Product source links are managed by uw's preparation command.
 +/uw/
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..939b346520de863702bea77473dcb4b5fb09e377 100644
+index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..9cd3125d77f6a7bc2389f076018aaccc20ff65c3 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
 @@ -277,6 +277,196 @@ are declared in tools/grit/grit_args.gni.
@@ -139,12 +139,12 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..939b346520de863702bea77473dcb4b5
 +      <message name="IDS_UW_THEME_MODE_AUTO" desc="Theme picker choice that follows the system's light or dark appearance.">Auto</message>
 +      <message name="IDS_UW_THEME_MODE_LIGHT" desc="Theme picker choice for light mode.">Light</message>
 +      <message name="IDS_UW_THEME_MODE_DARK" desc="Theme picker choice for dark mode.">Dark</message>
-+      <message name="IDS_UW_THEME_WEBSITES" desc="Label of the theme picker's row that sets whether websites and extensions' pages are told to look light or dark. uw's own look follows the theme instead.">Websites</message>
++      <message name="IDS_UW_THEME_MODE" desc="Label of the theme picker's row that sets whether everything but the sidebar is light or dark: websites, the browser's own pages, menus, and dialogs. The sidebar takes the theme's colors.">Mode</message>
 +      <if expr="is_win">
-+        <message name="IDS_UW_THEME_WEBSITES_SAME_AS_SYSTEM" desc="Tooltip and accessible name of the Auto choice in the theme picker's Websites row: websites follow Windows' light or dark mode.">Same as Windows</message>
++        <message name="IDS_UW_THEME_MODE_SAME_AS_SYSTEM" desc="Tooltip and accessible name of the Auto choice in the theme picker's Mode row: everything but the sidebar follows Windows' light or dark mode.">Same as Windows</message>
 +      </if>
 +      <if expr="not is_win">
-+        <message name="IDS_UW_THEME_WEBSITES_SAME_AS_SYSTEM" desc="Tooltip and accessible name of the Auto choice in the theme picker's Websites row: websites follow macOS's light or dark appearance.">Same as macOS</message>
++        <message name="IDS_UW_THEME_MODE_SAME_AS_SYSTEM" desc="Tooltip and accessible name of the Auto choice in the theme picker's Mode row: everything but the sidebar follows macOS's light or dark appearance.">Same as macOS</message>
 +      </if>
 +      <message name="IDS_UW_THEME_COLOR_FIELD" desc="Accessible name of the theme picker's color field, where the user drags up to three dots to pick the window's colors.">Theme colors</message>
 +      <message name="IDS_UW_THEME_ADD_COLOR" desc="Tooltip of the button that adds a color dot to the theme picker's color field.">Add a color</message>
@@ -227,15 +227,6 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..939b346520de863702bea77473dcb4b5
          </message>
          <message name="IDS_REOPEN_SPLIT" desc="In Title Case: The text label of the Reopen Closed Split menu item">
            Reopen Closed Split View
-@@ -8019,7 +8209,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
-         You won't see this specific message again
-       </message>
-       <message name="IDS_NTP_CUSTOMIZE_CHROME_COLOR_SCHEME_MODE_GROUP_LABEL" desc="The accessibility label description read by the screen reader for color scheme mode group in customize chrome side panel.">
--        Pick a color scheme mode
-+        Websites
-       </message>
-       <message name="IDS_NTP_CUSTOMIZE_CHROME_COLOR_SCHEME_MODE_LIGHT_LABEL" desc="A color scheme mode option for browser light mode in customize chrome side panel." meaning="Chrome browser light color scheme mode.">
-         Light
 @@ -10413,10 +10603,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
              Show Tabs Horizontally
            </message>

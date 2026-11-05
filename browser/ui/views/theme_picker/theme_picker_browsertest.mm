@@ -185,14 +185,20 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
                                      ".length"));
   SaveWindowScreenshot(browser(), "theme-picker");
 
-  // Black is a dark theme, so the page turns dark with it.
-  ASSERT_TRUE(content::ExecJs(
-      page, "document.querySelectorAll('#suggested button')[8].click();"));
-  EXPECT_TRUE(base::test::RunUntil([&] {
+  // The picker follows the mode, not the theme: Black leaves it light, and
+  // Dark turns it dark.
+  const auto dark = [&] {
     return content::EvalJs(page, "matchMedia('(prefers-color-scheme: dark)')"
                                  ".matches")
         .ExtractBool();
-  }));
+  };
+  ASSERT_TRUE(content::ExecJs(
+      page, "document.querySelectorAll('#suggested button')[8].click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] { return Saved().brightness == 0; }));
+  EXPECT_FALSE(dark());
+  ASSERT_TRUE(
+      content::ExecJs(page, "document.getElementById('mode-dark').click();"));
+  EXPECT_TRUE(base::test::RunUntil(dark));
   SaveWindowScreenshot(browser(), "theme-picker-dark");
 }
 
@@ -215,8 +221,9 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ASuggestedThemeBecomesTheTheme) {
   EXPECT_EQ(FrameColor(), SK_ColorBLACK);
 }
 
-// The picker opens from the sidebar, so it is light or dark as the theme is.
-IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePickerIsDarkOnADarkTheme) {
+// The picker opens over the page, so a dark theme leaves it in the mode.
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
+                       ThePickerKeepsTheModeOnADarkTheme) {
   content::WebContents* page = Open();
   const auto mode = [&] {
     return picker()
@@ -230,8 +237,8 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePickerIsDarkOnADarkTheme) {
     brightness.value = 20;
     brightness.dispatchEvent(new Event('input'));
   )"));
-  EXPECT_TRUE(base::test::RunUntil(
-      [&] { return mode() == ui::ColorProviderKey::ColorMode::kDark; }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return Saved().brightness == 20; }));
+  EXPECT_EQ(mode(), ui::ColorProviderKey::ColorMode::kLight);
 }
 
 IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheFieldAddsUpToThreeDots) {
@@ -289,36 +296,35 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
             content::EvalJs(page, "document.getElementById('grain').value"));
 }
 
-IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
-                       TheWebsitesRowSetsWebsiteMode) {
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, TheModeRowSetsTheMode) {
   content::WebContents* page = Open();
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
-                                          "'websites-auto').getAttribute("
+                                          "'mode-auto').getAttribute("
                                           "'aria-pressed')"));
-  EXPECT_EQ(
-      l10n_util::GetStringUTF8(IDS_UW_THEME_WEBSITES_SAME_AS_SYSTEM),
-      content::EvalJs(page, "document.getElementById('websites-auto').title"));
+  EXPECT_EQ(l10n_util::GetStringUTF8(IDS_UW_THEME_MODE_SAME_AS_SYSTEM),
+            content::EvalJs(page, "document.getElementById('mode-auto').title"));
 
-  ASSERT_TRUE(content::ExecJs(
-      page, "document.getElementById('websites-dark').click();"));
+  ASSERT_TRUE(
+      content::ExecJs(page, "document.getElementById('mode-dark').click();"));
   EXPECT_TRUE(base::test::RunUntil([&] {
     return themes()->GetBrowserColorScheme() ==
            ThemeService::BrowserColorScheme::kDark;
   }));
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
-                                          "'websites-dark').getAttribute("
+                                          "'mode-dark').getAttribute("
                                           "'aria-pressed')"));
-  // Websites go dark, while the window and the picker keep the theme's light.
-  EXPECT_EQ(picker()
-                ->GetWidgetForTesting()
-                ->GetColorProviderKeyForTesting()
-                .color_mode,
-            ui::ColorProviderKey::ColorMode::kLight);
+  // The window and the picker go dark with the mode.
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return picker()
+               ->GetWidgetForTesting()
+               ->GetColorProviderKeyForTesting()
+               .color_mode == ui::ColorProviderKey::ColorMode::kDark;
+  }));
   EXPECT_EQ(BrowserView::GetBrowserViewForBrowser(browser())
                 ->GetWidget()
                 ->GetColorProviderKeyForTesting()
                 .color_mode,
-            ui::ColorProviderKey::ColorMode::kLight);
+            ui::ColorProviderKey::ColorMode::kDark);
 }
 
 // A real window can close a bubble as soon as it shows, which a headless one

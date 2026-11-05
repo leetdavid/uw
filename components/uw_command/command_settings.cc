@@ -26,8 +26,8 @@ constexpr double kStepsPerUnit = 20;
 
 constexpr Choice kApprovalModes[] = {
     {"ask-first", "ask_first"}, {"auto", "auto"}, {"full-auto", "full_auto"}};
-// Chromium's own light or dark setting, website mode, holds a number.
-constexpr Choice kWebsiteModes[] = {
+// Chromium's own light or dark setting, the mode, holds a number.
+constexpr Choice kModes[] = {
     {"auto", "0"}, {"light", "1"}, {"dark", "2"}};
 
 constexpr CommandSetting Switch(std::string_view name,
@@ -92,7 +92,7 @@ constexpr auto kSettings = std::to_array<CommandSetting>({
     Switch("glass.windows-behind", Scope::kEverywhere,
            "uw.glass.windows_behind"),
     Switch("look.page-space", Scope::kEverywhere, "uw.look.page_space"),
-    Choices("websites", Scope::kProfile, kWebsiteModes,
+    Choices("theme.mode", Scope::kProfile, kModes,
             "browser.theme.color_scheme2"),
     Percent("theme.intensity"),
     Percent("theme.brightness"),

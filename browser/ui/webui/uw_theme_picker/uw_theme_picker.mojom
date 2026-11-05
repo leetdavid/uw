@@ -2,9 +2,9 @@
 
 module uw.mojom;
 
-// Whether websites and extensions' pages are light or dark: Auto follows the
-// system.
-enum WebsiteMode {
+// The profile's mode: whether everything but the sidebar is light or dark.
+// Auto follows the system.
+enum Mode {
   kAuto,
   kLight,
   kDark,
@@ -65,10 +65,10 @@ interface ThemePickerHandlerFactory {
 // Browser side. Only the theme picker page can reach it.
 interface ThemePickerHandler {
   // The theme, each of its colors as the window shows it and where it sits on
-  // the color field, the profile's website mode, the suggested themes, and
+  // the color field, the profile's mode, the suggested themes, and
   // the glass sliders.
   GetState() => (Theme theme, array<uint32> shown, array<FieldPoint> points,
-                 WebsiteMode website_mode, array<SuggestedTheme> suggested,
+                 Mode mode, array<SuggestedTheme> suggested,
                  GlassSliders glass);
 
   // The color under `point` of the color field.
@@ -81,8 +81,8 @@ interface ThemePickerHandler {
   // the window shows it and the glass sliders, whose tick moves with them.
   SetTheme(Theme theme) => (array<uint32> shown, GlassSliders glass);
 
-  // Sets the profile's website mode. Open pages change at once.
-  SetWebsiteMode(WebsiteMode mode);
+  // Sets the profile's mode. Everything but the sidebar changes at once.
+  SetMode(Mode mode);
 
   // The page has drawn and can be shown.
   ShowUI();

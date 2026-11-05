@@ -34,11 +34,11 @@ namespace uw {
 namespace {
 
 constexpr webui::LocalizedString kStrings[] = {
-    {"websites", IDS_UW_THEME_WEBSITES},
+    {"mode", IDS_UW_THEME_MODE},
     {"modeAuto", IDS_UW_THEME_MODE_AUTO},
     {"modeLight", IDS_UW_THEME_MODE_LIGHT},
     {"modeDark", IDS_UW_THEME_MODE_DARK},
-    {"websitesAuto", IDS_UW_THEME_WEBSITES_SAME_AS_SYSTEM},
+    {"modeSameAsSystem", IDS_UW_THEME_MODE_SAME_AS_SYSTEM},
     {"colorField", IDS_UW_THEME_COLOR_FIELD},
     {"addColor", IDS_UW_THEME_ADD_COLOR},
     {"suggested", IDS_UW_THEME_SUGGESTED},
@@ -67,25 +67,25 @@ std::vector<uint32_t> ToMojo(const std::vector<SkColor>& colors) {
   return std::vector<uint32_t>(colors.begin(), colors.end());
 }
 
-ThemeService::BrowserColorScheme SchemeOf(mojom::WebsiteMode mode) {
+ThemeService::BrowserColorScheme SchemeOf(mojom::Mode mode) {
   switch (mode) {
-    case mojom::WebsiteMode::kAuto:
+    case mojom::Mode::kAuto:
       return ThemeService::BrowserColorScheme::kSystem;
-    case mojom::WebsiteMode::kLight:
+    case mojom::Mode::kLight:
       return ThemeService::BrowserColorScheme::kLight;
-    case mojom::WebsiteMode::kDark:
+    case mojom::Mode::kDark:
       return ThemeService::BrowserColorScheme::kDark;
   }
 }
 
-mojom::WebsiteMode ToMojo(ThemeService::BrowserColorScheme scheme) {
+mojom::Mode ToMojo(ThemeService::BrowserColorScheme scheme) {
   switch (scheme) {
     case ThemeService::BrowserColorScheme::kSystem:
-      return mojom::WebsiteMode::kAuto;
+      return mojom::Mode::kAuto;
     case ThemeService::BrowserColorScheme::kLight:
-      return mojom::WebsiteMode::kLight;
+      return mojom::Mode::kLight;
     case ThemeService::BrowserColorScheme::kDark:
-      return mojom::WebsiteMode::kDark;
+      return mojom::Mode::kDark;
   }
 }
 
@@ -191,7 +191,7 @@ class UwThemePickerUI::Handler : public mojom::ThemePickerHandler {
     std::move(callback).Run(ShownColorsOf(theme), GlassSlidersFor(theme));
   }
 
-  void SetWebsiteMode(mojom::WebsiteMode mode) override {
+  void SetMode(mojom::Mode mode) override {
     ThemeServiceFactory::GetForProfile(profile_)->SetBrowserColorScheme(
         SchemeOf(mode));
   }

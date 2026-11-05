@@ -21,12 +21,13 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/common/url_utils.h"
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/ui/look/theme_colors.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/look/theme_prefs.h"
@@ -94,6 +95,21 @@ void SetThemeColors(const Theme& theme, ui::ColorProviderKey& key) {
 ui::ColorProviderKey::ColorMode ModeOfTheme(const Theme& theme) {
   return IsDarkTheme(theme) ? ui::ColorProviderKey::ColorMode::kDark
                             : ui::ColorProviderKey::ColorMode::kLight;
+}
+
+// Whether the mode of `profile`, which is Chromium's own light or dark
+// setting, is dark, with Auto following the system.
+bool ModeIsDark(Profile* profile) {
+  switch (ThemeServiceFactory::GetForProfile(profile->GetOriginalProfile())
+              ->GetBrowserColorScheme()) {
+    case ThemeService::BrowserColorScheme::kSystem:
+      return ui::NativeTheme::GetInstanceForWeb()->preferred_color_scheme() ==
+             ui::NativeTheme::PreferredColorScheme::kDark;
+    case ThemeService::BrowserColorScheme::kLight:
+      return false;
+    case ThemeService::BrowserColorScheme::kDark:
+      return true;
+  }
 }
 
 // Each window that shows `workspace` takes its theme again.
@@ -196,27 +212,27 @@ void ApplyThemeOfWindow(BrowserWindowInterface* window,
   const Theme theme = ThemeOfWindow(window);
   key.color_mode = ModeOfTheme(theme);
   SetThemeColors(theme, key);
-}
-
-bool WebsitesAreDark(Profile* profile) {
-  switch (ThemeServiceFactory::GetForProfile(profile->GetOriginalProfile())
-              ->GetBrowserColorScheme()) {
-    case ThemeService::BrowserColorScheme::kSystem:
-      return ui::NativeTheme::GetInstanceForWeb()->preferred_color_scheme() ==
-             ui::NativeTheme::PreferredColorScheme::kDark;
-    case ThemeService::BrowserColorScheme::kLight:
-      return false;
-    case ThemeService::BrowserColorScheme::kDark:
-      return true;
+  // The mode drives everything but the sidebar, which keeps the theme's
+  // colors. Dark takes Chromium's neutral colors and uw's blacks.
+  const ui::ColorProviderKey theme_key = key;
+  const bool dark = ModeIsDark(window->GetProfile());
+  key.color_mode = dark ? ui::ColorProviderKey::ColorMode::kDark
+                        : ui::ColorProviderKey::ColorMode::kLight;
+  if (dark) {
+    key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
   }
+  if (key == theme_key) {
+    return;
+  }
+  key.app_controller = ThemeColorMixers(
+      theme_key, PageColorOfMixers(theme_key.app_controller.get()));
 }
 
 std::optional<SkColor> EmptyPageColor(content::WebContents* page) {
-  if (!page || content::HasWebUIScheme(page->GetVisibleURL())) {
+  if (!page) {
     return std::nullopt;
   }
-  return WebsitesAreDark(
-             Profile::FromBrowserContext(page->GetBrowserContext()))
+  return ModeIsDark(Profile::FromBrowserContext(page->GetBrowserContext()))
              ? kBlackCard
              : SK_ColorWHITE;
 }
@@ -265,7 +281,8 @@ void FollowChromiumTheme(BrowserWindowInterface* window) {
 
 void StartWindowTheme(BrowserWindowInterface* window) {
   Profile* profile = window->GetProfile();
-  // The Pages row's Light or Dark, from before website mode, starts it.
+  // The Pages row's Light or Dark, from before the mode was the profile's,
+  // starts it.
   if (const std::optional<bool> dark =
           TakeOldPagesRowDark(*profile->GetPrefs())) {
     ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(

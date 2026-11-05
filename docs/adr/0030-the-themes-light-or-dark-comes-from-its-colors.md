@@ -1,6 +1,6 @@
 # The theme's light or dark comes from its colors
 
-Replaces [ADR 0017](0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md).
+Replaces [ADR 0017](0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Replaced in part on 2026-11-05 by [ADR 0031](0031-only-the-sidebar-takes-the-theme.md): the theme's light or dark covers only the sidebar, and the color key takes the mode.
 
 On 2026-11-04 the user asked for one Auto, Light, and Dark toggle that changes only how websites look, and a theme picker that sets uw's look with no dark mode of its own, black included. In a grilling session they agreed that the [theme](../CONTEXT.md#language) covers everything uw and Chromium draw, their own pages included, and that [website mode](../CONTEXT.md#language) covers only websites and extensions' pages. We decided that a theme whose text is white is dark, and Chromium's color key takes that light or dark, so Chromium's menus, dialogs, and pages follow the theme with no work per surface. Website mode is Chromium's own light or dark setting, one per profile, and reaches only the pages it covers, through `GetPreferredColorScheme` and the card's empty color.
 

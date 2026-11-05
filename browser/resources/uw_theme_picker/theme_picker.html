@@ -91,13 +91,13 @@
         width: 14px;
       }
 
-      #websites button[aria-pressed='true'] {
+      #mode button[aria-pressed='true'] {
         background: var(--chosen);
         box-shadow: 0 1px 2px rgb(30 27 46 / 14%);
         color: var(--text);
       }
 
-      #websites {
+      #mode {
         background: var(--well);
         border-radius: 10px;
         display: grid;
@@ -107,7 +107,7 @@
         padding: 3px;
       }
 
-      #websites button {
+      #mode button {
         align-items: center;
         border-radius: 8px;
         color: var(--text2);
@@ -119,7 +119,7 @@
         justify-content: center;
       }
 
-      #websites svg {
+      #mode svg {
         height: 13px;
         width: 13px;
       }
@@ -190,7 +190,7 @@
       }
 
       .row label,
-      #websites-label {
+      #mode-label {
         width: 78px;
       }
 
@@ -266,17 +266,17 @@
   </head>
   <body>
     <div class="row">
-      <span id="websites-label"></span>
-      <div id="websites" role="group" aria-labelledby="websites-label">
-        <button id="websites-auto" aria-pressed="false">
+      <span id="mode-label"></span>
+      <div id="mode" role="group" aria-labelledby="mode-label">
+        <button id="mode-auto" aria-pressed="false">
           <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
           <span></span>
         </button>
-        <button id="websites-light" aria-pressed="false">
+        <button id="mode-light" aria-pressed="false">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <span></span>
         </button>
-        <button id="websites-dark" aria-pressed="false">
+        <button id="mode-dark" aria-pressed="false">
           <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
           <span></span>
         </button>
