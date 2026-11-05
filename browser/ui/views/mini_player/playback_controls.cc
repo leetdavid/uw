@@ -197,8 +197,16 @@ void PlaybackControls::OnFocusGained(
   }
   content::WebContents* contents =
       content::MediaSession::GetWebContentsFromRequestId(*session->request_id);
-  if (contents && window_->GetTabStripModel()->GetIndexOfWebContents(
-                      contents) != TabStripModel::kNoTab) {
+  if (!contents || window_->GetTabStripModel()->GetIndexOfWebContents(
+                       contents) == TabStripModel::kNoTab) {
+    return;
+  }
+  // A short sound, such as a chat site's notification, is not media to
+  // control, as for Chromium's media button. The focus request carries the
+  // session as it was before the request, so the session is asked now.
+  if (content::MediaSession::Get(contents)
+          ->GetMediaSessionInfoSync()
+          ->is_controllable) {
     Follow(contents);
   }
 }

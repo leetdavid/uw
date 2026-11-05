@@ -851,6 +851,29 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(controls->GetVisible());
 }
 
+// A short sound in a tab, such as a chat site's notification, is not media
+// to control: it gets no row, as for Chromium's media button.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       AShortSoundGetsNoPlaybackControls) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      embedded_test_server()->GetURL("/media/picture-in-picture/blank.html")));
+  content::WebContents* chat = active();
+  // Played in front: Chromium holds back media in a tab that was hidden
+  // before it ever played.
+  ASSERT_EQ(true, content::EvalJs(chat, R"(new Promise(resolve => {
+        const sound = new Audio('/media/pink_noise_140ms.wav');
+        sound.onended = () => resolve(true);
+        sound.onerror = () => resolve(sound.error.message);
+        sound.play().catch(error => resolve(error.name));
+      }))"));
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  Settle();
+  PlaybackControls* controls = ControlsOf(browser());
+  EXPECT_EQ(nullptr, controls->tab());
+  EXPECT_FALSE(controls->GetVisible());
+}
+
 // The pointer moving from the row onto its pause button stays on the row, so
 // the row keeps its buttons instead of flickering.
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
