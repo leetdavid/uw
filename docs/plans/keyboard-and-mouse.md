@@ -39,6 +39,7 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | New terminal | Ctrl+Shift+\` | new |
 | Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
 | Split right, split down | Cmd+D, Cmd+Shift+D | new, per the [split view plan](split-view.md#keys). Chromium's Bookmark This Tab and Bookmark All Tabs lost them, and Cmd+Option+N, Chromium's New Split View, is gone. |
+| Maximize the pane, or restore the panes | Cmd+Shift+Return, Ctrl+Shift+Enter on Windows | new, per [Maximizing a pane](split-view.md#maximizing-a-pane). |
 | Move to task, pause, organizer activity, Name Task, [Tidy and Clear Scratchpad](scratchpad-buttons.md) | menu, and the command bar later | no key |
 
 ### Terminal key
@@ -81,7 +82,7 @@ Agreed on 2026-10-15, at the user's request.
 
 Agreed on 2026-10-15. A tab's right-click menu groups moves together, tree commands together, and every close at the end:
 
-1. New tab below, New child tab, Split Right, and Split Down, then Move Out of Split View and Separate Panes on a tab in a split. See [Built differently](split-view.md#built-differently) for pinned tabs.
+1. New tab below, New child tab, Split Right, and Split Down, then Maximize Pane, Move Out of Split View, and Separate Panes on a tab in a split. See [Built differently](split-view.md#built-differently) for pinned tabs.
 2. Move to task ▸ (its list ends with New task), Move to new task, Move to Scratchpad, Move to another window ▸, and Keep here.
 3. Nest under previous tab, Move up one level, Collapse branch, and Undo tab organization.
 4. Reload, Duplicate, Pin, and Mute site.

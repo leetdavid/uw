@@ -6,6 +6,8 @@ Agreed on 2026-10-29. uw's [new tab page](../CONTEXT.md) replaces Chromium's: a 
 
 Every tab that would show Chromium's new tab page shows `uw://newtab` instead: "New blank tab" in the command bar, Cmd+T with the command bar off, New Child Tab, New Tab Below, a task's New Tab, and the first tab of a new window or workspace. Chromium's page, with its Google logo, account bar, shortcuts, and "Customize uw" button, no longer shows. The patch points `NewTabURLDetails::ForProfile` at it, and the page counts as a new tab page wherever Chromium checks, so the address bar stays empty and the box takes the focus.
 
+Chromium shows the bookmarks bar over its new tab page even while the bar is off. uw does not: the bar shows only while its setting is on, on every page. Chosen on 2026-11-05, after a new tab page in one pane of a split view showed the bar over the whole window.
+
 Until it ships, Chromium's page stays, and Google's account bar on it keeps logging to Google. The user accepted that on 2026-10-29; see [Google requests](google-requests.md#kept).
 
 ## The box

@@ -20,6 +20,7 @@ import {
   Lock,
   Maximize2,
   MessageCircle,
+  Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
   PanelTop,
@@ -386,15 +387,18 @@ export function Panes({
   return <div className={classes("kit-panes", down && "down")}>{children}</div>;
 }
 
-// A pane in a split view. Panes other than the selected one show their tag.
+// A pane in a split view. Panes other than the selected one show their tag,
+// and a maximized pane shows its restore button.
 export function Pane({
   site,
   selected,
+  maximized,
   terminal,
   children,
 }: {
   site: string;
   selected?: boolean;
+  maximized?: boolean;
   terminal?: boolean;
   children?: ReactNode;
 }) {
@@ -412,12 +416,20 @@ export function Pane({
           </div>
         ))
       )}
-      {!selected && (
+      {maximized ? (
         <span className="kit-pane-tag">
-          {terminal ? <Glyph icon="terminal" /> : <Tile title={site} />}
-          {site}
+          <Minimize2 />
           <X />
         </span>
+      ) : (
+        !selected && (
+          <span className="kit-pane-tag">
+            {terminal ? <Glyph icon="terminal" /> : <Tile title={site} />}
+            {site}
+            <Maximize2 />
+            <X />
+          </span>
+        )
       )}
     </div>
   );

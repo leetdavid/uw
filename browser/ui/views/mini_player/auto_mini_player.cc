@@ -3,13 +3,18 @@
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"         // nogncheck
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"  // nogncheck
 #include "components/prefs/pref_service.h"
+#include "components/tabs/public/split_tab_data.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_user_data.h"
@@ -51,6 +56,37 @@ bool PlaysAudibleVideo(content::WebContents* contents) {
                                MediaAudioVideoState::kAudioVideo);
 }
 
+MultiContentsView* PageArea(BrowserWindowInterface* window) {
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(window);
+  return view ? view->multi_contents_view() : nullptr;
+}
+
+// The tabs the page area shows with `selected` selected: that one, and the
+// others of its split view unless it is maximized.
+std::vector<content::WebContents*> ShownWith(BrowserWindowInterface* window,
+                                             tabs::TabInterface* selected) {
+  if (!selected) {
+    return {};
+  }
+  TabStripModel* model = window->GetTabStripModel();
+  MultiContentsView* page_area = PageArea(window);
+  if (!selected->GetSplit() ||
+      (page_area &&
+       page_area->GetMaximizedContents() == selected->GetContents())) {
+    return {selected->GetContents()};
+  }
+  std::vector<content::WebContents*> shown;
+  for (tabs::TabInterface* tab :
+       model->GetSplitData(*selected->GetSplit())->ListTabs()) {
+    shown.push_back(tab->GetContents());
+  }
+  return shown;
+}
+
+std::vector<content::WebContents*> ShownTabs(BrowserWindowInterface* window) {
+  return ShownWith(window, window->GetTabStripModel()->GetActiveTab());
+}
+
 }  // namespace
 
 AutoMiniPlayer::AutoMiniPlayer(BrowserWindowInterface* window)
@@ -69,17 +105,58 @@ void AutoMiniPlayer::OnTabStripModelChanged(
     TabStripModel* tab_strip_model,
     const TabStripModelChange& change,
     const TabStripSelectionChange& selection) {
+  ObserveMaximizedPane();
   if (!selection.active_tab_changed()) {
     return;
   }
-  if (selection.new_contents) {
-    MiniPlayerStack::Get().Remove(selection.new_contents);
-    PutBack(selection.new_contents);
+  // A video comes back to its page whenever its tab shows, also in a pane
+  // beside the selected tab. A tab that showed before and no longer does was
+  // left, each pane of a split included.
+  const std::vector<content::WebContents*> shown = ShownTabs(window_);
+  for (content::WebContents* contents : shown) {
+    MiniPlayerStack::Get().Remove(contents);
+    PutBack(contents);
   }
-  if (selection.old_contents && !tab_strip_model->empty() &&
-      tab_strip_model->GetIndexOfWebContents(selection.old_contents) !=
+  if (!selection.old_contents || tab_strip_model->empty() ||
+      tab_strip_model->GetIndexOfWebContents(selection.old_contents) ==
           TabStripModel::kNoTab) {
-    MaybeOpen(selection.old_contents);
+    return;
+  }
+  for (content::WebContents* contents :
+       ShownWith(window_,
+                 tabs::TabInterface::GetFromContents(selection.old_contents))) {
+    if (!std::ranges::contains(shown, contents)) {
+      MaybeOpen(contents);
+    }
+  }
+}
+
+void AutoMiniPlayer::ObserveMaximizedPane() {
+  MultiContentsView* page_area = PageArea(window_);
+  if (maximized_subscription_ || !page_area) {
+    return;
+  }
+  maximized_subscription_ =
+      page_area->AddMaximizedChangedCallback(base::BindRepeating(
+          &AutoMiniPlayer::OnMaximizedChanged, base::Unretained(this)));
+}
+
+// Maximizing a pane hides the others of its split, and restoring shows them.
+void AutoMiniPlayer::OnMaximizedChanged() {
+  TabStripModel* model = window_->GetTabStripModel();
+  const tabs::TabInterface* selected = model->GetActiveTab();
+  if (!selected || !selected->GetSplit()) {
+    return;
+  }
+  const std::vector<content::WebContents*> shown = ShownTabs(window_);
+  for (tabs::TabInterface* tab :
+       model->GetSplitData(*selected->GetSplit())->ListTabs()) {
+    if (std::ranges::contains(shown, tab->GetContents())) {
+      MiniPlayerStack::Get().Remove(tab->GetContents());
+      PutBack(tab->GetContents());
+    } else {
+      MaybeOpen(tab->GetContents());
+    }
   }
 }
 
@@ -97,8 +174,7 @@ void AutoMiniPlayer::MaybeOpen(content::WebContents* contents) {
       [](base::WeakPtr<AutoMiniPlayer> self,
          base::WeakPtr<content::WebContents> contents, bool visible) {
         if (!self || !contents || !visible ||
-            self->window_->GetTabStripModel()->GetActiveWebContents() ==
-                contents.get()) {
+            std::ranges::contains(ShownTabs(self->window_), contents.get())) {
           return;
         }
         OpenedOnSwitch::CreateForWebContents(contents.get());

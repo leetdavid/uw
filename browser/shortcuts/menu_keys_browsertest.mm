@@ -119,6 +119,9 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, CmdDSplitsThePage) {
   EXPECT_EQ("split_right", right.name);
   EXPECT_EQ("Command+D", right.key);
   EXPECT_EQ("Command+Shift+D", Row("Split Down").key);
+  const MenuKey maximize = Row("Maximize Pane");
+  EXPECT_EQ("maximize_pane", maximize.name);
+  EXPECT_EQ("Command+Shift+Return", maximize.key);
   EXPECT_EQ("move_out_of_split_view", Row("Move Out of Split View").name);
   EXPECT_EQ("separate_panes", Row("Separate Panes").name);
   const std::vector<MenuKey> keys = MenuKeys();

@@ -152,6 +152,10 @@ _Avoid_: Side by side, split screen, tiling.
 One tab's area in a split view. Any kind of tab can fill one: a web page, a terminal, a chat, or a uw page.
 _Avoid_: View, split, half.
 
+**Maximized pane**:
+A pane that fills its split view's whole page area for a while, hiding the other panes, until the user restores the layout. It is not full screen: the sidebar and toolbar stay.
+_Avoid_: Zoomed pane, full-screen pane.
+
 **Ungrouped tab**:
 A tab currently outside every task, so in the Scratchpad. Its relationship to a browsing task may still be unclear.
 

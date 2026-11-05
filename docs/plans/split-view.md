@@ -59,6 +59,19 @@ Today a [split view](../CONTEXT.md#language) is Chromium's: two tabs, side by si
 - A split's tabs are all in one task, or all in the Scratchpad.
 - The organizer treats a tab in a split as a [kept tab](../CONTEXT.md#language): it does not ask about it or move it. Once the split ends, its tabs are ordinary tabs again.
 
+### Maximizing a pane
+
+Asked for on 2026-11-05 while testing T332, and agreed in a grilling session the same day.
+
+- A [maximized pane](../CONTEXT.md#language) fills the split's page area. The other panes hide, with the dividers, and the sidebar box stays as it is.
+- A pane's tag has a maximize button beside its close button. On a maximized pane it is a restore button.
+- Maximize Pane, in the Tab menu and a split tab's right-click menu beside Move Out of Split View, reads Restore Panes while a pane is maximized. Cmd+Shift+Return does the same, Ctrl+Shift+Enter on Windows, and Keyboard shortcuts can change it.
+- Selecting another pane of the split, with Ctrl+Tab or its row in the sidebar, brings the layout back with that pane focused, as tmux does.
+- Leaving the split for another tab and coming back shows the pane still maximized.
+- Split Right and Split Down on a maximized pane bring the layout back first, then split it.
+- A playing video in a hidden pane opens a mini player, as leaving its tab does, and goes back into its page when the layout returns.
+- Nothing is saved: a restart and Reopen Closed Split View bring the layout back with every pane showing.
+
 ### Restore
 
 - A restart, and Reopen Closed Split View, bring back the whole layout: its panes, directions, sizes, and the focused pane.
@@ -91,6 +104,7 @@ Drawn on 2026-11-04 as T331, on the "Keyboard and mouse" page of the Doop canvas
 - "Split view: dragging a pane": a terminal's mini toolbar on its way to the bottom half of another pane.
 - "Split view: pinned": the pinned split's tile, its menu, and its hazed layout in another window.
 - "Split view: every state": splitting, the order, the 200px limit, closing and ending, the drop zones, drags from and to the sidebar, the divider, the menus and keys, dark, and Edit Homes.
+- "Split view: maximizing a pane (T344)": the tag's maximize button under the pointer, and a maximized pane. Drawn on 2026-11-05 and built at once, at the user's request.
 
 The frames settle:
 
@@ -116,6 +130,8 @@ Built in T332 on 2026-11-05:
 
 - A tab's menu has Split Right, Split Down, and, on a tab in a split, Move Out of Split View and Separate Panes, in place of Chromium's split items. A pinned tab keeps Chromium's items and has neither split command until [pinned split views](#pinned-split-views) are built.
 - An open tab picked in the command bar over a new pane moves into it only from the same window. One in another window is switched to, as before, and the new pane keeps its new tab page.
+- While a tab of a split is selected, the toolbar and the gaps between panes keep the theme's own color instead of the focused pane's [page color](themes.md#page-colors), so they do not change as focus moves. The user chose this on 2026-11-05, after the colors flipped with each pane.
+- The gap between panes is 6px, from the design's 8px, at the user's request on 2026-11-05.
 - Chromium's split button on the toolbar has only Separate Views for a split of more than two. A pair keeps Chromium's menu, Reverse and Show stacked included, until [dragging](#dragging) is built.
 
 ## Stages
@@ -127,6 +143,7 @@ Each stage is a ticket on the [board](roadmap.md#board). Each one that changes w
 3. T333: dragging.
 4. T334: pinned split views.
 5. T335: split views with shared tabs on. Needs T253 to T258.
+6. T344: maximizing a pane, drawn and built at once on 2026-11-05.
 
 ## Acceptance checks
 
@@ -142,8 +159,9 @@ Each stage is a ticket on the [board](roadmap.md#board). Each one that changes w
 10. A pane dragged by its mini toolbar onto another pane's edge docks there, and onto its center swaps the two. A sidebar tab dropped on an edge joins the split, and on a center replaces that tab, which stays open below the split. A row dragged out of the box leaves the split. A divider resizes. Esc during a drag puts everything back.
 11. Pin on a pane pins the whole split. Selecting it in a second window moves every pane there and hazes the layout in the first. Adding a pane changes the pin. Reset to home sends every pane home, and a busy terminal pane asks first. The agent's tabs from a chat pane open in the Scratchpad. Cmd+W does nothing. Unpinning leaves a regular split in the Scratchpad.
 12. With shared tabs on, a split shows in every window on its workspace with the same layout.
-13. Headless screenshots match the frames in light and dark. A [real-window test](../../README.md#real-window-tests) checks the drags, run only when the user asks for it.
-14. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
+13. Maximize Pane, its key, and the tag's button make the focused pane fill the page area and hide the others. Restore Panes, selecting another pane, or Split Right brings the layout back. Leaving the split and coming back keeps the pane maximized, and a playing video in a hidden pane moves into a mini player.
+14. Headless screenshots match the frames in light and dark. A [real-window test](../../README.md#real-window-tests) checks the drags, run only when the user asks for it.
+15. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
 
 ## Open questions
 

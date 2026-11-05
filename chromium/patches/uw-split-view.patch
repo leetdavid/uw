@@ -1,13 +1,17 @@
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 5672f35b053becc05cc3bb821a8d2f830f90773c..964edabd96ac6c7538346f8a504b2bb0153b7512 100644
+index de397b88584c16771d27c3404122ea67944b0532..e5be4455e46c7ba2b768100f317763d570d15e8c 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -344,6 +344,12 @@ are declared in tools/grit/grit_args.gni.
+@@ -344,6 +344,16 @@ are declared in tools/grit/grit_args.gni.
        <message name="IDS_UW_EXPAND_BRANCH_MAC" desc="In Title Case: Shows the tabs nested under the selected tab again in the tab sidebar.">Expand Branch</message>
        <message name="IDS_UW_HIDDEN_TABS" desc="Tooltip of the number at the end of a tab in the tab sidebar whose nested tabs are hidden.">{COUNT, plural, =1 {1 hidden tab} other {# hidden tabs}}</message>
        <message name="IDS_UW_NEW_CHILD_TAB_MAC" desc="In Title Case: Opens a blank tab nested directly under the selected tab.">New Child Tab</message>
 +      <message name="IDS_UW_SPLIT_RIGHT_MAC" desc="In Title Case: Cuts the selected tab's part of the page area in two, side by side, and opens a new tab in the right half.">Split Right</message>
 +      <message name="IDS_UW_SPLIT_DOWN_MAC" desc="In Title Case: Cuts the selected tab's part of the page area in two, one above the other, and opens a new tab in the bottom half.">Split Down</message>
++      <message name="IDS_UW_MAXIMIZE_PANE_MAC" desc="In Title Case: Makes the selected tab's pane of a split view fill the page area, and hides the split's other tabs until the layout is restored.">Maximize Pane</message>
++      <message name="IDS_UW_RESTORE_PANES_MAC" desc="In Title Case: Shows every tab of a split view again, after one of its panes was maximized to fill the page area.">Restore Panes</message>
++      <message name="IDS_UW_MAXIMIZE_PANE" desc="Tooltip of the button on a split view pane's tag that makes the pane fill the page area and hides the split's other tabs.">Maximize pane</message>
++      <message name="IDS_UW_RESTORE_PANES" desc="Tooltip of the button on a maximized split view pane's tag that shows the split's other tabs again.">Restore panes</message>
 +      <message name="IDS_UW_MOVE_OUT_OF_SPLIT_MAC" desc="In Title Case: Takes the tab out of the split view it shares the page area with, and keeps it open.">Move Out of Split View</message>
 +      <message name="IDS_UW_SEPARATE_PANES_MAC" desc="In Title Case: Ends the split view the tab is in. Each of its tabs stays open on its own.">Separate Panes</message>
 +      <message name="IDS_UW_TAB_AX_LABEL_SPLIT_PANE_FORMAT" desc="Accessibility label text for a tab in a split view of more than two tabs. The number counts the split's panes from the top left, left to right, then top to bottom. Example: 'Google Search - Pane 3 of split view'"><ph name="WINDOW_TITLE">$1<ex>Google Search</ex></ph> - Pane <ph name="NUMBER">$2<ex>3</ex></ph> of split view</message>
@@ -155,10 +159,10 @@ index 71e3a025159ae19050b358db9cb1c69438880056..be48ba2896ac7077bfaaff319a028489
            session_split_tab->id_,
            session_split_tab->split_visual_data_.split_layout());
 diff --git a/chrome/browser/ui/accelerator_table.cc b/chrome/browser/ui/accelerator_table.cc
-index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf563e99249 100644
+index 74269d79b33b6236bd5177e5c17d7369d4c787dd..d198d8dffab0f5037d49dea713a9a533ce99f8b8 100644
 --- a/chrome/browser/ui/accelerator_table.cc
 +++ b/chrome/browser/ui/accelerator_table.cc
-@@ -60,10 +60,17 @@ const AcceleratorMapping kAcceleratorMap[] = {
+@@ -60,10 +60,19 @@ const AcceleratorMapping kAcceleratorMap[] = {
  #endif
      {ui::VKEY_ESCAPE, ui::EF_NONE, IDC_CLOSE_FIND_OR_STOP},
  
@@ -168,6 +172,8 @@ index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf5
 +    // Bookmark All Tabs have no key.
 +    {ui::VKEY_D, ui::EF_CONTROL_DOWN, uw::kSplitRight},
 +    {ui::VKEY_D, ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN, uw::kSplitDown},
++    {ui::VKEY_RETURN, ui::EF_SHIFT_DOWN | ui::EF_CONTROL_DOWN,
++     uw::kMaximizePane},
 +#elif !BUILDFLAG(IS_MAC)
      {ui::VKEY_D, ui::EF_PLATFORM_ACCELERATOR, IDC_BOOKMARK_THIS_TAB},
      {ui::VKEY_D, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR,
@@ -177,7 +183,7 @@ index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf5
      {ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR, IDC_CLOSE_TAB},
      {ui::VKEY_W, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR,
       IDC_CLOSE_WINDOW},
-@@ -91,8 +98,7 @@ const AcceleratorMapping kAcceleratorMap[] = {
+@@ -91,8 +100,7 @@ const AcceleratorMapping kAcceleratorMap[] = {
       uw::TabOrganizationController::kCloseBranch},
      {ui::VKEY_Z, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
       uw::TabOrganizationController::kUndo},
@@ -187,7 +193,7 @@ index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf5
      {ui::VKEY_LEFT, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
       uw::kPreviousWorkspace},
      {ui::VKEY_1, ui::EF_ALT_DOWN, uw::kGoToWorkspace1},
-@@ -353,7 +359,7 @@ std::vector<AcceleratorMapping> GetAcceleratorList() {
+@@ -353,7 +361,7 @@ std::vector<AcceleratorMapping> GetAcceleratorList() {
                           std::begin(kDevToolsAcceleratorMap),
                           std::end(kDevToolsAcceleratorMap));
  
@@ -196,6 +202,69 @@ index 74269d79b33b6236bd5177e5c17d7369d4c787dd..f5dcc44af549ca4d1df1903478e9fdf5
      accelerators->emplace_back(AcceleratorMapping(
          {ui::VKEY_N, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, IDC_NEW_SPLIT_TAB}));
  #elif BUILDFLAG(IS_CHROMEOS)
+diff --git a/chrome/browser/ui/bookmarks/bookmark_bar_controller.cc b/chrome/browser/ui/bookmarks/bookmark_bar_controller.cc
+index f985dcebfa70b1ea5b8dc9fb2ccb1a2e0c0d031b..2f4a854bab3a00ab8b457cd276b58de9e4dc73c0 100644
+--- a/chrome/browser/ui/bookmarks/bookmark_bar_controller.cc
++++ b/chrome/browser/ui/bookmarks/bookmark_bar_controller.cc
+@@ -244,55 +244,9 @@ bool BookmarkBarController::ShouldShowBookmarkBar() const {
+     return true;
+   }
+ 
+-  if (!browser_defaults::bookmarks_enabled) {
+-    return false;
+-  }
+-
+-  if (base::FeatureList::IsEnabled(
+-          ntp_features::kNtpSimplificationBookmarkBar)) {
+-    if (prefs->GetInteger(bookmarks::prefs::kBookmarkBarVisibilityState) ==
+-        static_cast<int>(bookmarks::BookmarkBarVisibilityState::kAlwaysHide)) {
+-      return false;
+-    }
+-  } else {
+-    if (prefs->IsManagedPreference(bookmarks::prefs::kShowBookmarkBar) &&
+-        !prefs->GetBoolean(bookmarks::prefs::kShowBookmarkBar)) {
+-      return false;
+-    }
+-  }
+-
+-  std::vector<tabs::TabInterface*> tabs = tab_strip_model_->GetForegroundTabs();
+-  if (tabs.empty()) {
+-    return false;
+-  }
+-
+-  bookmarks::BookmarkModel* bookmark_model =
+-      BookmarkModelFactory::GetForBrowserContext(profile);
+-  const bool has_bookmarks = bookmark_model && bookmark_model->HasBookmarks();
+-
+-  tab_groups::TabGroupSyncService* tab_group_service =
+-      tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile);
+-  const bool has_saved_tab_groups =
+-      tab_group_service && !tab_group_service->GetAllGroups().empty() &&
+-      chrome::ShouldShowTabGroupsInBookmarkBar(profile);
+-
+-  // The bookmark bar is only shown if the user has added something to it.
+-  if (!has_bookmarks && !has_saved_tab_groups) {
+-    return false;
+-  }
+-
+-  // Prevent the bookmark bar from showing itself when entering fullscreen if
+-  // fullscreen is entered through webview (TAB). This creates a consistent
+-  // experience for split view fullscreen and the rest of the UI.
+-  const tabs::TabInterface* active_tab = tab_strip_model_->GetActiveTab();
+-  if (active_tab->GetContents()->IsFullscreen()) {
+-    return false;
+-  }
+-
+-  return std::any_of(
+-      tabs.begin(), tabs.end(), [](const tabs::TabInterface* tab) {
+-        return tab->GetContents() && IsShowingNTP(tab->GetContents());
+-      });
++  // uw: the bar shows only while its setting is on. Chromium also shows it
++  // over the new tab page, and over a whole split view with a new tab pane.
++  return false;
+ }
+ 
+ void BookmarkBarController::OnTabStripModelChanged(
 diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
 index ec6ecb7da85d13df72713ff4446c412383c62ab6..eef52a0f9a51debba453ce74e6ddbc50ffe4ac57 100644
 --- a/chrome/browser/ui/browser_commands.cc
@@ -295,10 +364,10 @@ index 6b5e2433d337f4db99fa0c8cff55bb28c5d8cf03..b4832119886e89ae3df6610676e61f54
  
    // see Browser::Create
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..4a43bb8bfcf31076a4bbd3d06849e1de7f669c6d 100644
+index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..cd7b94a11ae092fece3ed5caa2f406594834f90c 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-@@ -102,7 +102,10 @@ const struct AcceleratorMapping {
+@@ -102,7 +102,12 @@ const struct AcceleratorMapping {
       ui::VKEY_B},
      {IDC_SHOW_BOOKMARK_MANAGER, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN,
       ui::VKEY_B},
@@ -307,10 +376,12 @@ index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..4a43bb8bfcf31076a4bbd3d06849e1de
 +    // Bookmark All Tabs have no key.
 +    {uw::kSplitRight, ui::EF_COMMAND_DOWN, ui::VKEY_D},
 +    {uw::kSplitDown, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_D},
++    {uw::kMaximizePane, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN,
++     ui::VKEY_RETURN},
      {IDC_SHOW_DOWNLOADS, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_J},
      {IDC_SHOW_HISTORY, ui::EF_COMMAND_DOWN, ui::VKEY_Y},
      {IDC_VIEW_SOURCE, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN, ui::VKEY_U},
-@@ -150,8 +153,6 @@ const struct AcceleratorMapping {
+@@ -150,8 +155,6 @@ const struct AcceleratorMapping {
      {IDC_HOME, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN, ui::VKEY_H},
      {IDC_BACK, ui::EF_COMMAND_DOWN, ui::VKEY_OEM_4},
      {IDC_FORWARD, ui::EF_COMMAND_DOWN, ui::VKEY_OEM_6},
@@ -319,7 +390,7 @@ index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..4a43bb8bfcf31076a4bbd3d06849e1de
      {IDC_MINIMIZE_WINDOW, ui::EF_COMMAND_DOWN, ui::VKEY_M},
      {IDC_CYCLE_TO_NEXT_TAB, ui::EF_CONTROL_DOWN, ui::VKEY_TAB},
      {IDC_CYCLE_TO_PREV_TAB, ui::EF_CONTROL_DOWN | ui::EF_SHIFT_DOWN,
-@@ -168,7 +169,6 @@ const struct AcceleratorMapping {
+@@ -168,7 +171,6 @@ const struct AcceleratorMapping {
      // uw: Cmd+S hides and shows the sidebar, as in Arc, and Save Page As has
      // no key.
      {IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, ui::EF_COMMAND_DOWN, ui::VKEY_S},
@@ -328,10 +399,10 @@ index 9cf8bc234f9b4f3e2a277cc7123c1d53ca6be826..4a43bb8bfcf31076a4bbd3d06849e1de
  
  ui::Accelerator AcceleratorForCloseWindow() {
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 167d296626e3846e61346bfb57e37e1f5f191caa..37d26a240e37d89e21f9fcda6f04ccbf43325e1e 100644
+index 167d296626e3846e61346bfb57e37e1f5f191caa..1cf7fef0090c92434711a80638c5c48fb3d51d66 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
-@@ -587,8 +587,11 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
+@@ -587,8 +587,12 @@ NSMenuItem* BuildTabMenu(NSApplication* nsapp,
                    .set_hidden(true),
                Item(IDS_MOVE_TAB_TO_NEW_WINDOW)
                    .command_id(IDC_MOVE_TAB_TO_NEW_WINDOW),
@@ -339,6 +410,7 @@ index 167d296626e3846e61346bfb57e37e1f5f191caa..37d26a240e37d89e21f9fcda6f04ccbf
 -                  .command_id(IDC_NEW_SPLIT_TAB),
 +              Item(IDS_UW_SPLIT_RIGHT_MAC).command_id(uw::kSplitRight),
 +              Item(IDS_UW_SPLIT_DOWN_MAC).command_id(uw::kSplitDown),
++              Item(IDS_UW_MAXIMIZE_PANE_MAC).command_id(uw::kMaximizePane),
 +              Item(IDS_UW_MOVE_OUT_OF_SPLIT_MAC)
 +                  .command_id(uw::kMoveOutOfSplit),
 +              Item(IDS_UW_SEPARATE_PANES_MAC).command_id(uw::kSeparatePanes),
@@ -1215,6 +1287,20 @@ index 4966e74c146d79977701d40f676f634f72d4d58a..3f29b77674457d1d0f6d21cf6e39acec
    // Manages the border for a single contents container view
    class ContentsContainerViewBorderController {
     public:
+diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
+index 6c1080488d4d3f9a88d44f2aba5868d29c9e4378..3e40d3ecfc4d67fc59683e80a2a2026b5514fe6b 100644
+--- a/chrome/browser/ui/views/frame/contents_container_view.cc
++++ b/chrome/browser/ui/views/frame/contents_container_view.cc
+@@ -54,7 +54,8 @@
+ #endif
+ 
+ namespace {
+-constexpr int kSplitViewContentPadding = 4;
++// uw: a pane's page reaches its outline, as the split view design draws it.
++constexpr int kSplitViewContentPadding = 0;
+ constexpr int kNewTabFooterSeparatorHeight = 1;
+ constexpr int kNewTabFooterHeight = 56;
+ }  // namespace
 diff --git a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc b/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
 index 37a68df743470656997d8fc707ffa5b9055e2a1d..71703d6986d94388e690d90684f19ed2d80422b7 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_resize_area.cc
@@ -1299,7 +1385,7 @@ index 460c40a7c5033c97ace6c442d347d7ebab13a82f..9a03a9d4cd1d1eef8ec4a872ba2e91e7
  
    raw_ptr<views::FlexLayout> flex_layout_manager_;
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421c56a68fb 100644
+index 54069adbee0558d7bf8031f48fa80f20cff2c48e..bccba0ecafbf6a94ef8102e04728b3a85045808b 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -10,14 +10,19 @@
@@ -1322,7 +1408,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  #include "chrome/browser/ui/views/frame/contents_container_view.h"
  #include "chrome/browser/ui/views/frame/contents_separator.h"
  #include "chrome/browser/ui/views/frame/contents_web_view.h"
-@@ -30,6 +35,7 @@
+@@ -30,12 +35,14 @@
  #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
  #include "chrome/browser/ui/views/frame/scrim_view.h"
  #include "chrome/browser/ui/views/frame/themed_background.h"
@@ -1330,7 +1416,14 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  #include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/common/pref_names.h"
-@@ -83,6 +89,7 @@ MultiContentsView::MultiContentsView(
+ #include "chrome/common/webui_url_constants.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
++#include "components/tabs/public/tab_interface.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/common/url_constants.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+@@ -83,6 +90,7 @@ MultiContentsView::MultiContentsView(
  
    resize_area_ = AddChildView(std::make_unique<MultiContentsResizeArea>(this));
    resize_area_->SetVisible(false);
@@ -1338,7 +1431,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  
    contents_container_views_.push_back(
        AddChildView(std::make_unique<ContentsContainerView>(browser_view_)));
-@@ -133,39 +140,7 @@ MultiContentsView::MultiContentsView(
+@@ -133,39 +141,7 @@ MultiContentsView::MultiContentsView(
    lens_overlay_view_ = AddChildView(std::move(lens_overlay_view));
  
    for (auto& contents_container_view : contents_container_views_) {
@@ -1379,7 +1472,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    }
  
    is_drag_drop_pref_enabled_ =
-@@ -179,11 +154,193 @@ MultiContentsView::MultiContentsView(
+@@ -179,11 +155,234 @@ MultiContentsView::MultiContentsView(
                            base::Unretained(this)));
  }
  
@@ -1564,6 +1657,47 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +  return panes.PaneBounds(area, GetSplitGap());
 +}
 +
++void MultiContentsView::ToggleMaximized(content::WebContents* contents) {
++  SetMaximized(GetMaximizedContents() == contents ? nullptr : contents);
++}
++
++content::WebContents* MultiContentsView::GetMaximizedContents() const {
++  const tabs::TabInterface* tab =
++      maximized_ ? tabs::TabInterface::MaybeGetFromContents(maximized_.get())
++                 : nullptr;
++  return tab && tab->GetSplit() == maximized_split_ ? maximized_.get()
++                                                    : nullptr;
++}
++
++base::CallbackListSubscription MultiContentsView::AddMaximizedChangedCallback(
++    base::RepeatingClosure callback) {
++  return maximized_changed_.Add(std::move(callback));
++}
++
++void MultiContentsView::SetMaximized(content::WebContents* contents) {
++  if (maximized_.get() == contents) {
++    return;
++  }
++  maximized_ = contents ? contents->GetWeakPtr() : nullptr;
++  maximized_split_ =
++      contents ? tabs::TabInterface::GetFromContents(contents)->GetSplit()
++               : std::nullopt;
++  // The layout hides the other panes and the dividers of a maximized pane, so
++  // they show again for the next layout to place.
++  for (size_t i = 0; i < pane_count_; ++i) {
++    contents_container_views_[i]->SetVisible(true);
++  }
++  UpdateResizeAreas();
++  UpdateContentsBorderAndOverlay();
++  InvalidateLayout();
++  maximized_changed_.Notify();
++}
++
++bool MultiContentsView::ShowsMaximized() const {
++  return IsInSplitView() && GetMaximizedContents() &&
++         GetActiveContentsView()->web_contents() == GetMaximizedContents();
++}
++
  MultiContentsView::~MultiContentsView() {
    // Clear the map and vectors before `RemoveAllChildViews()` to avoid having
    // dangling pointers.
@@ -1573,7 +1707,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    if (drop_target_controller_) {
      drop_target_controller_.reset();
    }
-@@ -253,21 +410,29 @@ MultiContentsView::GetFocusableViewsMapFor(
+@@ -253,21 +452,29 @@ MultiContentsView::GetFocusableViewsMapFor(
  }
  
  bool MultiContentsView::IsInSplitView() const {
@@ -1607,7 +1741,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  
    if (web_contents) {
      if (auto* sad_tab_helper = SadTabHelper::FromWebContents(web_contents)) {
-@@ -278,18 +443,26 @@ void MultiContentsView::SetWebContentsAtIndex(
+@@ -278,18 +485,26 @@ void MultiContentsView::SetWebContentsAtIndex(
  
  void MultiContentsView::ShowSplitView(
      split_tabs::SplitTabVisualData visual_data) {
@@ -1629,7 +1763,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +  // The active page stays shown while panes come and go.
 +  if (active_index_ >= static_cast<int>(panes)) {
 +    SwapContentsContainerViews(0, active_index_);
-+  }
+   }
 +  visual_data_ = std::move(visual_data);
 +  pane_count_ = panes;
 +  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
@@ -1638,14 +1772,14 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +      view->contents_view()->SetWebContents(nullptr);
 +    }
 +    view->SetVisible(i < panes);
-   }
++  }
 +  UpdateResizeAreas();
 +  UpdateContentsBorderAndOverlay();
 +  InvalidateLayout();
  }
  
  void MultiContentsView::CloseSplitView() {
-@@ -298,11 +471,14 @@ void MultiContentsView::CloseSplitView() {
+@@ -298,11 +513,14 @@ void MultiContentsView::CloseSplitView() {
    }
  
    if (active_index_ != 0) {
@@ -1664,7 +1798,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    UpdateContentsBorderAndOverlay();
  
    if (auto* active_contents = GetActiveContentsView()->web_contents()) {
-@@ -313,29 +489,22 @@ void MultiContentsView::CloseSplitView() {
+@@ -313,30 +531,32 @@ void MultiContentsView::CloseSplitView() {
  }
  
  void MultiContentsView::SwapContentsInSplitView() {
@@ -1702,9 +1836,19 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +                                                 active_index_);
 +  }
    UpdateContentsBorderAndOverlay();
++
++  // uw: selecting another pane of the maximized pane's split restores it.
++  for (size_t i = 0; i < pane_count_; ++i) {
++    if (static_cast<int>(i) != active_index_ && maximized_ &&
++        contents_container_views_[i]->contents_view()->web_contents() ==
++            maximized_.get()) {
++      SetMaximized(nullptr);
++    }
++  }
  }
  
-@@ -344,9 +513,14 @@ void MultiContentsView::UpdateSplitVisualData(
+ void MultiContentsView::UpdateSplitVisualData(
+@@ -344,9 +564,14 @@ void MultiContentsView::UpdateSplitVisualData(
    if (visual_data_ == visual_data) {
      return;
    }
@@ -1720,7 +1864,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    InvalidateLayout();
  }
  
-@@ -401,25 +575,52 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
+@@ -401,25 +626,52 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
  }
  
  void MultiContentsView::OnResize(int resize_amount, bool done_resizing) {
@@ -1746,16 +1890,16 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +    initial_start_size_on_resize_ = side_by_side
 +                                        ? divider.bounds.x() - divider.span.x()
 +                                        : divider.bounds.y() - divider.span.y();
-+  }
-+  const double total_size =
-+      (side_by_side ? divider.span.width() : divider.span.height()) - gap;
-+  if (total_size <= 0) {
-+    return;
    }
 -  double total_size =
 -      GetResizeAxisComponent(contents_container_views_[0]->size()) +
 -      GetResizeAxisComponent(contents_container_views_[1]->size());
 -  double new_start_size = initial_start_size_on_resize_.value() + resize_amount;
++  const double total_size =
++      (side_by_side ? divider.span.width() : divider.span.height()) - gap;
++  if (total_size <= 0) {
++    return;
++  }
 +  const double new_start_size = std::clamp<double>(
 +      initial_start_size_on_resize_.value() + resize_amount, 1, total_size - 1);
  
@@ -1781,7 +1925,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  double MultiContentsView::CalculateRatioWithSnapPoints(
      double start_size,
      double total_size) const {
-@@ -445,7 +646,7 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
+@@ -445,7 +697,7 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
    if (IsInSplitView()) {
      // Check whether the widget is visible as otherwise during browser hide,
      // inactive web contents gets focus. See crbug.com/419335827
@@ -1790,7 +1934,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
          GetWidget()->IsVisible()) {
        delegate_->WebContentsFocused(web_view->web_contents());
      }
-@@ -455,12 +656,12 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
+@@ -455,12 +707,12 @@ void MultiContentsView::OnWebContentsFocused(views::WebView* web_view) {
  void MultiContentsView::OnActorOverlayFocused(views::WebView* web_view) {
    if (IsInSplitView() && GetWidget()->IsVisible()) {
      for (auto& contents_container_view : contents_container_views_) {
@@ -1807,7 +1951,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
        }
      }
    }
-@@ -469,12 +670,12 @@ void MultiContentsView::OnActorOverlayFocused(views::WebView* web_view) {
+@@ -469,12 +721,12 @@ void MultiContentsView::OnActorOverlayFocused(views::WebView* web_view) {
  void MultiContentsView::OnNtpFooterFocused(views::WebView* web_view) {
    if (IsInSplitView() && GetWidget()->IsVisible()) {
      for (auto& contents_container_view : contents_container_views_) {
@@ -1824,7 +1968,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
        }
      }
    }
-@@ -484,8 +685,9 @@ void MultiContentsView::OnReadAnythingOverlayFocused(
+@@ -484,8 +736,9 @@ void MultiContentsView::OnReadAnythingOverlayFocused(
      ContentsContainerView* container,
      views::WebView* web_view) {
    if (IsInSplitView() && GetWidget()->IsVisible()) {
@@ -1836,7 +1980,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
      }
    }
  }
-@@ -516,36 +718,32 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -516,36 +769,39 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
    available_space =
        CalculateSeparatorLayouts(available_space, layouts.child_layouts);
  
@@ -1852,9 +1996,16 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +    dividers =
 +        visual_data_.panes().Dividers(available_space, GetSplitGap(), min_size);
 +  }
++  // uw: a maximized pane takes the whole area, and the others hide.
++  const bool maximized = ShowsMaximized();
++  if (maximized && active_index_ < static_cast<int>(pane_bounds.size())) {
++    pane_bounds[active_index_] = available_space;
++    dividers.clear();
++  }
 +
 +  for (size_t i = 0; i < contents_container_views_.size(); ++i) {
-+    const bool in_use = i < pane_count_ && i < pane_bounds.size();
++    const bool in_use = i < pane_count_ && i < pane_bounds.size() &&
++                        (!maximized || static_cast<int>(i) == active_index_);
 +    layouts.child_layouts.emplace_back(
 +        contents_container_views_[i].get(),
 +        in_use && contents_container_views_[i]->GetVisible(),
@@ -1896,7 +2047,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    layouts.child_layouts.emplace_back(lens_overlay_view_.get(),
                                       lens_overlay_view_->GetVisible(),
                                       gfx::Rect(width, height));
-@@ -555,6 +753,19 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -555,6 +811,19 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
  }
  
  void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
@@ -1916,7 +2067,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
    if (!target_content_bounds_) {
      for (auto& contents : contents_container_views_) {
        contents->SetTargetContentBounds(std::nullopt);
-@@ -586,33 +797,27 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -586,33 +855,27 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
  
    const auto& default_clip = target_content_bounds_->clipped_area;
  
@@ -1970,7 +2121,7 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  }
  
  gfx::Rect MultiContentsView::CalculateDropTargetLayout(
-@@ -727,67 +932,23 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
+@@ -727,67 +990,23 @@ gfx::Rect MultiContentsView::CalculateSeparatorLayouts(
                     height - separator_height);
  }
  
@@ -2048,12 +2199,12 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
 +}
 +
 +int MultiContentsView::GetSplitGap() const {
-+  return MultiContentsResizeArea::kHandleResizeAxisSize +
-+         MultiContentsResizeArea::kHandleResizeAxisPadding;
++  // uw: panes sit 6px apart, per the split view plan.
++  return 6;
  }
  
  void MultiContentsView::UpdateContentsBorderAndOverlay() {
-@@ -858,12 +1019,5 @@ void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
+@@ -858,12 +1077,5 @@ void MultiContentsView::SetSplitViewInsets(const gfx::Insets& insets) {
    InvalidateLayout(/*avoid_propagate_during_layout=*/true);
  }
  
@@ -2067,10 +2218,19 @@ index 54069adbee0558d7bf8031f48fa80f20cff2c48e..7aae82944a98120ddaa62069af6b6421
  BEGIN_METADATA(MultiContentsView)
  END_METADATA
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
-index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b4c189c0f 100644
+index 6ecb49a239f704f61442eee7d14a0454553aea4f..c739689eb9bf507b8e25e0d64cad1dca21b43226 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.h
-@@ -19,7 +19,9 @@
+@@ -12,14 +12,18 @@
+ #include "base/functional/callback_forward.h"
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
+ #include "chrome/browser/ui/tabs/split_tab_highlight_controller.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/frame/contents_container_view.h"
+ #include "components/prefs/pref_change_registrar.h"
++#include "components/split_tabs/split_tab_id.h"
  #include "components/split_tabs/split_tab_visual_data.h"
  #include "ui/base/interaction/element_identifier.h"
  #include "ui/base/metadata/metadata_header_macros.h"
@@ -2080,7 +2240,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
  #include "ui/views/controls/resize_area_delegate.h"
  #include "ui/views/layout/proposed_layout.h"
  #include "ui/views/view.h"
-@@ -47,7 +49,9 @@ class WebView;
+@@ -47,7 +51,9 @@ class WebView;
  }  // namespace views
  
  // MultiContentsView shows up to two contents web views side by side, and
@@ -2091,7 +2251,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
  class MultiContentsView
      : public views::View,
        public views::ResizeAreaDelegate,
-@@ -58,12 +62,6 @@ class MultiContentsView
+@@ -58,12 +64,6 @@ class MultiContentsView
   public:
    using FocusableViewMap = base::flat_map<std::string, views::View*>;
  
@@ -2104,7 +2264,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
    static constexpr int kSplitViewContentInset = 8;
    static constexpr float kSplitViewContentCornerRadius = 6;
    static constexpr gfx::RoundedCornersF kSplitViewContentRoundedCorners{
-@@ -96,6 +94,26 @@ class MultiContentsView
+@@ -96,6 +96,35 @@ class MultiContentsView
    // Returns true if more than one WebContents is displayed.
    bool IsInSplitView() const;
  
@@ -2123,6 +2283,15 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
 +  // uw: where `panes` would put each pane in this view at its size now.
 +  std::vector<gfx::Rect> GetPaneBounds(const uw::SplitLayout& panes) const;
 +
++  // uw: a maximized pane fills the page area and hides the others of its
++  // split while it is the selected tab. Selecting another pane of the split
++  // brings the layout back.
++  void ToggleMaximized(content::WebContents* contents);
++  // The page of the pane maximized in its split, or null.
++  content::WebContents* GetMaximizedContents() const;
++  base::CallbackListSubscription AddMaximizedChangedCallback(
++      base::RepeatingClosure callback);
++
 +  // uw: a divider was dragged by `resize_amount`. `cut` is as in
 +  // uw::SplitLayout.
 +  void OnCutResize(size_t cut, int resize_amount, bool done_resizing);
@@ -2131,7 +2300,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
    // Show the split view without set any WebContents and update the size and
    // layout of contents views based on `visual_data`, this is used to prepare
    // the layout and prevent a re-layout of WebContents.
-@@ -262,30 +280,32 @@ class MultiContentsView
+@@ -262,30 +291,34 @@ class MultiContentsView
  
    int GetInactiveIndex() const;
  
@@ -2148,6 +2317,8 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
 +  // way, which leaves particularly narrow windows some room.
 +  gfx::Size GetMinPaneSize(const gfx::Rect& available_space) const;
 +  int GetSplitGap() const;
++  void SetMaximized(content::WebContents* contents);
++  bool ShowsMaximized() const;
 +
    void OnWebContentsFocused(views::WebView*);
    void OnNtpFooterFocused(views::WebView*);
@@ -2176,7 +2347,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
  
    raw_ptr<BrowserView> browser_view_;
    std::unique_ptr<MultiContentsViewDelegate> delegate_;
-@@ -309,6 +329,17 @@ class MultiContentsView
+@@ -309,6 +342,23 @@ class MultiContentsView
    // each other.
    raw_ptr<MultiContentsResizeArea> resize_area_ = nullptr;
  
@@ -2186,6 +2357,12 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..003ca60dea46c0c072f243bb9cbd843b
 +
 +  // uw: how many of `contents_container_views_` the split uses.
 +  size_t pane_count_ = 1;
++
++  // uw: the maximized pane's page and its split, kept while other tabs are
++  // selected.
++  base::WeakPtr<content::WebContents> maximized_;
++  std::optional<split_tabs::SplitTabId> maximized_split_;
++  base::RepeatingClosureList maximized_changed_;
 +
 +  // uw: where the last applied layout put the panes, which a divider drag
 +  // measures against.
@@ -2256,6 +2433,111 @@ index e182430481fed7ac4c17b0fd11b57c3d511a80b9..595ee1ad5b090beb6220ab950edc0e9f
  
    // Reverses the order of split tabs.
    // Must already be in a split.
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
+index a67008a56e98fff3d24ad78937d3c2015d76dd0b..f17122611d0d0d669499b8296a6ec0e1eac2adbb 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
+ 
+ #include <optional>
++#include <tuple>
+ 
+ #include "base/functional/bind.h"
+ #include "base/metrics/user_metrics.h"
+@@ -20,6 +21,7 @@
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/contents_container_outline.h"
+ #include "chrome/browser/ui/views/frame/contents_web_view.h"
++#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/themed_background.h"
+ #include "chrome/common/webui_url_constants.h"
+ #include "chrome/grit/generated_resources.h"
+@@ -108,6 +110,24 @@ MultiContentsViewMiniToolbar::MultiContentsViewMiniToolbar(
+   alert_state_indicator_->SetProperty(views::kFlexBehaviorKey,
+                                       icon_flex_spec.WithOrder(2));
+ 
++  // uw: maximize, or restore on the maximized pane, beside close.
++  for (auto [button, icon, string] :
++       {std::tuple(&maximize_button_, &kOpenInFullIcon, IDS_UW_MAXIMIZE_PANE),
++        std::tuple(&restore_button_, &kZoomInMapIcon, IDS_UW_RESTORE_PANES)}) {
++    *button = AddChildView(views::CreateVectorImageButtonWithNativeTheme(
++        base::BindRepeating(&MultiContentsViewMiniToolbar::ToggleMaximized,
++                            base::Unretained(this)),
++        *icon, 14, kColorMultiContentsViewMiniToolbarForeground));
++    SetAccessibleNameAndTooltip(*button, string);
++    (*button)->SetProperty(
++        views::kFlexBehaviorKey,
++        views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
++                                 views::MaximumFlexSizeRule::kPreferred)
++            .WithOrder(1));
++    views::InstallCircleHighlightPathGenerator(*button);
++  }
++  restore_button_->SetVisible(false);
++
+   close_button_ = AddChildView(views::CreateVectorImageButtonWithNativeTheme(
+       base::BindRepeating(&MultiContentsViewMiniToolbar::CloseCurrentView,
+                           base::Unretained(this)),
+@@ -164,6 +184,13 @@ void MultiContentsViewMiniToolbar::UpdateState(bool is_active,
+   favicon_->SetVisible(!is_active);
+   domain_label_->SetVisible(!is_active);
+   alert_state_indicator_->SetVisible(!is_active);
++
++  const bool maximized =
++      browser_view_->multi_contents_view() &&
++      browser_view_->multi_contents_view()->GetMaximizedContents() ==
++          web_contents_;
++  maximize_button_->SetVisible(!maximized);
++  restore_button_->SetVisible(maximized);
+ }
+ 
+ void MultiContentsViewMiniToolbar::UpdateContents() {
+@@ -314,5 +341,16 @@ void MultiContentsViewMiniToolbar::CloseCurrentView() {
+                               TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
+ }
+ 
++void MultiContentsViewMiniToolbar::ToggleMaximized() {
++  TabStripModel* const model = browser_view_->browser()->tab_strip_model();
++  const int index = model->GetIndexOfWebContents(web_contents_);
++  if (index == TabStripModel::kNoTab || !browser_view_->multi_contents_view()) {
++    return;
++  }
++  // Only the selected pane shows maximized.
++  model->ActivateTabAt(index);
++  browser_view_->multi_contents_view()->ToggleMaximized(web_contents_);
++}
++
+ BEGIN_METADATA(MultiContentsViewMiniToolbar)
+ END_METADATA
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
+index de2fb5ff5f7f6fc249f729731fe9e2dd7038c2ae..75240cebbc775f4b0953b24b15a09721d9043dc3 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h
+@@ -48,6 +48,8 @@ class MultiContentsViewMiniToolbar : public views::View {
+ 
+   views::Label* domain_label_for_testing() { return domain_label_; }
+   views::ImageButton* close_button_for_testing() { return close_button_; }
++  views::ImageButton* maximize_button_for_testing() { return maximize_button_; }
++  views::ImageButton* restore_button_for_testing() { return restore_button_; }
+ 
+  private:
+   // View:
+@@ -63,11 +65,15 @@ class MultiContentsViewMiniToolbar : public views::View {
+   void UpdateFavicon(TabUIHelper* tab_ui_helper);
+ 
+   void CloseCurrentView();
++  // uw: selects this pane and maximizes it, or restores the layout.
++  void ToggleMaximized();
+ 
+   raw_ptr<views::ImageView> favicon_;
+   raw_ptr<views::Label> domain_label_;
+   raw_ptr<views::ImageView> alert_state_indicator_;
+   raw_ptr<views::ImageButton> close_button_;
++  raw_ptr<views::ImageButton> maximize_button_;
++  raw_ptr<views::ImageButton> restore_button_;
+ 
+   raw_ptr<BrowserView> browser_view_;
+   raw_ptr<content::WebContents> web_contents_;
 diff --git a/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc b/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc
 index 7ad0e2b5aa68192110b721666509c2bc97d285da..a1f5eceb84b191cc584749aaf19e41ed435117da 100644
 --- a/chrome/browser/ui/views/frame/tab_modal_dialog_host.cc

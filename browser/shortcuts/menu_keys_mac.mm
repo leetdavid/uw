@@ -56,6 +56,7 @@ constexpr struct {
     {Controller::kCloseBranch, "close_branch"},
     {kSplitRight, "split_right"},
     {kSplitDown, "split_down"},
+    {kMaximizePane, "maximize_pane"},
     {kMoveOutOfSplit, "move_out_of_split_view"},
     {kSeparatePanes, "separate_panes"},
     {IDC_CREATE_NEW_TAB_GROUP, "new_task"},

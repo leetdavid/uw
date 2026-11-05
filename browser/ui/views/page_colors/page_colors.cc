@@ -8,6 +8,7 @@
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "chrome/browser/ui/views/frame/top_container_view.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/animation/tween.h"
@@ -46,6 +47,10 @@ void PageColors::OnTabStripModelChanged(
   Update();
 }
 
+void PageColors::OnSplitTabChanged(const SplitTabChange& change) {
+  Update();
+}
+
 void PageColors::OnBackgroundColorChanged() {
   Update();
 }
@@ -60,6 +65,12 @@ void PageColors::Update() {
   // mode says.
   if (!color) {
     color = EmptyPageColor(web_contents());
+  }
+  const tabs::TabInterface* tab =
+      web_contents() ? tabs::TabInterface::MaybeGetFromContents(web_contents())
+                     : nullptr;
+  if (tab && tab->IsSplit()) {
+    color.reset();
   }
   if (color == color_) {
     return;

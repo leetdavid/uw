@@ -22,7 +22,8 @@ class Layer;
 namespace uw {
 
 // Gives one window's toolbar and bookmarks bar the page color of its active
-// tab, and crossfades the top of the page card when that color changes.
+// tab, and crossfades the top of the page card when that color changes. In a
+// split view they keep the theme's color, whichever pane has focus.
 class PageColors : public TabStripModelObserver,
                    public content::WebContentsObserver {
  public:
@@ -39,6 +40,7 @@ class PageColors : public TabStripModelObserver,
       TabStripModel* tab_strip_model,
       const TabStripModelChange& change,
       const TabStripSelectionChange& selection) override;
+  void OnSplitTabChanged(const SplitTabChange& change) override;
 
   // content::WebContentsObserver:
   void OnBackgroundColorChanged() override;

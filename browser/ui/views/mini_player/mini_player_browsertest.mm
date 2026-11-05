@@ -33,6 +33,7 @@
 #include "chrome/browser/ui/views/frame/browser_frame_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
@@ -772,6 +773,61 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_TRUE(
       base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
   EXPECT_FALSE(Bool("video.paused"));
+}
+
+// A video in a pane of a split view still shows while another pane is
+// selected, so it stays in its page. Leaving the split opens a mini player,
+// and selecting any of its panes again puts the video back.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       AnotherPaneOfItsSplitLeavesTheVideoInItsPage) {
+  OpenPlayingVideo();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  chrome::AddTabAt(browser(), embedded_test_server()->GetURL("/title1.html"),
+                   -1, /*foreground=*/false);
+  tabs::TabInterface* beside = tabs->GetTabAtIndex(tabs->count() - 1);
+  ASSERT_NE(beside->GetContents(), video_);
+  tabs->SplitPane(tabs->GetIndexOfWebContents(video_),
+                  tabs->GetIndexOfTab(beside),
+                  split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(beside->IsSplit());
+
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(beside));
+  Settle();
+  EXPECT_FALSE(Bool("isInPictureInPicture()"));
+  EXPECT_FALSE(Bool("video.paused"));
+
+  chrome::AddTabAt(browser(), GURL("about:blank"), -1, true);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return Bool("isInPictureInPicture()"); }));
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(beside));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
+}
+
+// Maximizing another pane of its split hides the video, so a mini player
+// opens, and restoring the panes puts the video back.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       MaximizingAnotherPaneOpensAMiniPlayer) {
+  OpenPlayingVideo();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  chrome::AddTabAt(browser(), embedded_test_server()->GetURL("/title1.html"),
+                   -1, /*foreground=*/false);
+  tabs::TabInterface* beside = tabs->GetTabAtIndex(tabs->count() - 1);
+  tabs->SplitPane(tabs->GetIndexOfWebContents(video_),
+                  tabs->GetIndexOfTab(beside),
+                  split_tabs::SplitTabLayout::kSideBySide);
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(beside));
+  Settle();
+  ASSERT_FALSE(Bool("isInPictureInPicture()"));
+
+  MultiContentsView* page_area =
+      BrowserView::GetBrowserViewForBrowser(browser())->multi_contents_view();
+  page_area->ToggleMaximized(beside->GetContents());
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return Bool("isInPictureInPicture()"); }));
+  page_area->ToggleMaximized(beside->GetContents());
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
 }
 
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, LeavingAMutedVideoOpensNothing) {

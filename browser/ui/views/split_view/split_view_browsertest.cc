@@ -32,7 +32,9 @@
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
 #include "chrome/common/webui_url_constants.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/sessions/core/session_id.h"
@@ -45,9 +47,13 @@
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/controls/button/image_button.h"
+#include "ui/views/test/button_test_api.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
@@ -348,6 +354,106 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, NoPaneGetsSmallerThan200px) {
   Run(kSplitDown);
   EXPECT_EQ(tabs()->count(), count);
   EXPECT_EQ(LayoutOf(left), "r(0.5,0,1)");
+}
+
+// Maximize Pane and its key make the selected pane fill the page area and
+// hide the others, and the menus then read Restore Panes. Ctrl+Tab to another
+// pane brings the layout back, with that pane selected.
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, AMaximizedPaneFillsThePageArea) {
+  ui::Accelerator key;
+  ASSERT_TRUE(BrowserView::GetBrowserViewForBrowser(browser())->GetAccelerator(
+      kMaximizePane, &key));
+#if BUILDFLAG(IS_MAC)
+  EXPECT_EQ(key, ui::Accelerator(ui::VKEY_RETURN,
+                                 ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN));
+#else
+  EXPECT_EQ(key, ui::Accelerator(ui::VKEY_RETURN,
+                                 ui::EF_CONTROL_DOWN | ui::EF_SHIFT_DOWN));
+#endif
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !PaneOf(panes[2]).IsEmpty() && Dividers().size() == 2u; }));
+  const gfx::Rect area = gfx::UnionRects(
+      PaneOf(panes[0]), gfx::UnionRects(PaneOf(panes[1]), PaneOf(panes[2])));
+  EXPECT_EQ(MaximizePaneTitle(panes[2]), IDS_UW_MAXIMIZE_PANE_MAC);
+
+  Run(kMaximizePane);
+  EXPECT_TRUE(IsMaximized(panes[2]));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return PaneOf(panes[2]) == area && PaneOf(panes[0]).IsEmpty() &&
+           PaneOf(panes[1]).IsEmpty() && Dividers().empty();
+  }));
+  EXPECT_EQ(MaximizePaneTitle(panes[2]), IDS_UW_RESTORE_PANES_MAC);
+  ui::SimpleMenuModel menu(nullptr);
+  menu.AddItem(TabStripModel::CommandAddToSplit, std::u16string());
+  AddSplitCommands(&menu, panes[2]);
+  EXPECT_EQ(menu.GetLabelAt(*menu.GetIndexOfCommandId(kMaximizePane)),
+            u"Restore Panes");
+  SaveWindowScreenshot(browser(), "split-view-maximized");
+
+  Run(IDC_SELECT_PREVIOUS_TAB);
+  EXPECT_EQ(tabs()->GetActiveTab(), panes[1]);
+  EXPECT_FALSE(IsMaximized(panes[2]));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !PaneOf(panes[0]).IsEmpty() && !PaneOf(panes[2]).IsEmpty() &&
+           PaneOf(panes[1]).width() < area.width() && Dividers().size() == 2u;
+  }));
+}
+
+// Leaving the split and coming back shows the pane still maximized. Split
+// Right then brings the layout back before it cuts the pane.
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, AMaximizedPaneStaysWhileAway) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  tabs::TabInterface* other = OpenOther();
+  ASSERT_TRUE(other);
+  Run(kMaximizePane);
+  ASSERT_TRUE(IsMaximized(panes[2]));
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(other));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !PaneOf(other).IsEmpty(); }));
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(panes[2]));
+  EXPECT_TRUE(IsMaximized(panes[2]));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !PaneOf(panes[2]).IsEmpty() && PaneOf(panes[0]).IsEmpty();
+  }));
+
+  Run(kSplitRight);
+  EXPECT_FALSE(IsMaximized(panes[2]));
+  EXPECT_EQ(SplitOf(panes[0]).size(), 4u);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !PaneOf(panes[0]).IsEmpty() && !PaneOf(panes[1]).IsEmpty() &&
+           Dividers().size() == 3u;
+  }));
+}
+
+// The button on a pane's tag selects the pane and maximizes it. On the
+// maximized pane the tag has a button to restore the panes instead.
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, TheTagMaximizesItsPane) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  MultiContentsView* page_area =
+      BrowserView::GetBrowserViewForBrowser(browser())->multi_contents_view();
+  MultiContentsViewMiniToolbar* tag =
+      page_area->GetContentsContainerViewFor(panes[0]->GetContents())
+          ->mini_toolbar();
+  ASSERT_TRUE(tag->maximize_button_for_testing()->GetVisible());
+  ASSERT_FALSE(tag->restore_button_for_testing()->GetVisible());
+  const ui::MouseEvent click(ui::EventType::kMousePressed, gfx::Point(),
+                             gfx::Point(), base::TimeTicks::Now(), 0, 0);
+
+  views::test::ButtonTestApi(tag->maximize_button_for_testing())
+      .NotifyClick(click);
+  EXPECT_EQ(tabs()->GetActiveTab(), panes[0]);
+  EXPECT_TRUE(IsMaximized(panes[0]));
+  EXPECT_FALSE(tag->maximize_button_for_testing()->GetVisible());
+  EXPECT_TRUE(tag->restore_button_for_testing()->GetVisible());
+  EXPECT_TRUE(base::test::RunUntil([&] { return PaneOf(panes[1]).IsEmpty(); }));
+
+  views::test::ButtonTestApi(tag->restore_button_for_testing())
+      .NotifyClick(click);
+  EXPECT_FALSE(IsMaximized(panes[0]));
+  EXPECT_TRUE(tag->maximize_button_for_testing()->GetVisible());
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !PaneOf(panes[1]).IsEmpty(); }));
 }
 
 // Ctrl+Tab steps through the panes in reading order, then leaves the split.

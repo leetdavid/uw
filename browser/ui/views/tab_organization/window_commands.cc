@@ -258,6 +258,10 @@ bool IsWindowCommandChecked(BrowserWindowInterface* window, int command) {
 std::optional<std::u16string> GetWindowCommandTitle(
     BrowserWindowInterface* window,
     int command) {
+  if (command == kMaximizePane) {
+    return l10n_util::GetStringUTF16(
+        MaximizePaneTitle(window->GetActiveTabInterface()));
+  }
   const TabOrganizationController* controller =
       TabOrganizationController::From(window);
   if (!controller || command != TabOrganizationController::kToggleBranch) {

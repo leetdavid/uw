@@ -34,12 +34,18 @@ SplitDirection DirectionOf(int command) {
                                : SplitDirection::kSideBySide;
 }
 
+MultiContentsView* PageArea(const tabs::TabInterface* tab) {
+  BrowserView* view =
+      BrowserView::GetBrowserViewForBrowser(tab->GetBrowserWindowInterface());
+  return view ? view->multi_contents_view() : nullptr;
+}
+
 // Whether cutting the pane of `tab` in two the `direction` way leaves both
 // halves at least kMinPaneSize each way.
 bool HasRoomToSplit(tabs::TabInterface* tab, SplitDirection direction) {
   BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
-  BrowserView* view = BrowserView::GetBrowserViewForBrowser(window);
-  if (!view || !view->multi_contents_view()) {
+  MultiContentsView* page_area = PageArea(tab);
+  if (!page_area) {
     return false;
   }
   SplitLayout panes(direction);
@@ -53,8 +59,7 @@ bool HasRoomToSplit(tabs::TabInterface* tab, SplitDirection direction) {
     pane = std::ranges::find(tabs, tab) - tabs.begin();
     added = panes.Split(pane, direction);
   }
-  const std::vector<gfx::Rect> bounds =
-      view->multi_contents_view()->GetPaneBounds(panes);
+  const std::vector<gfx::Rect> bounds = page_area->GetPaneBounds(panes);
   return std::ranges::all_of(std::vector<size_t>{pane, added}, [&](size_t i) {
     return bounds[i].width() >= kMinPaneSize &&
            bounds[i].height() >= kMinPaneSize;
@@ -64,7 +69,7 @@ bool HasRoomToSplit(tabs::TabInterface* tab, SplitDirection direction) {
 }  // namespace
 
 bool IsSplitCommand(int command) {
-  return command >= kSplitRight && command <= kSeparatePanes;
+  return command >= kSplitRight && command <= kMaximizePane;
 }
 
 bool CanRunSplitCommand(tabs::TabInterface* tab, int command) {
@@ -80,6 +85,8 @@ bool CanRunSplitCommand(tabs::TabInterface* tab, int command) {
     case kMoveOutOfSplit:
     case kSeparatePanes:
       return tab->IsSplit();
+    case kMaximizePane:
+      return tab->IsSplit() && PageArea(tab);
   }
   return false;
 }
@@ -102,6 +109,12 @@ void RunSplitCommand(tabs::TabInterface* tab, int command) {
   // The new tab opens as Cmd+T's does, after the tab it splits.
   model->ActivateTabAt(model->GetIndexOfTab(tab));
   content::WebContents* contents = tab->GetContents();
+  if (command == kMaximizePane || IsMaximized(tab)) {
+    PageArea(tab)->ToggleMaximized(contents);
+  }
+  if (command == kMaximizePane) {
+    return;
+  }
   const bool terminal = IsTerminalUrl(contents->GetLastCommittedURL());
   if (terminal) {
     OpenTerminalTabIn(window, TerminalFolder(contents));
@@ -119,6 +132,16 @@ void RunSplitCommand(tabs::TabInterface* tab, int command) {
   if (!terminal) {
     CommandBar::OpenForPane(window, pane);
   }
+}
+
+bool IsMaximized(const tabs::TabInterface* tab) {
+  const MultiContentsView* page_area = tab ? PageArea(tab) : nullptr;
+  return page_area && tab->IsSplit() &&
+         page_area->GetMaximizedContents() == tab->GetContents();
+}
+
+int MaximizePaneTitle(const tabs::TabInterface* tab) {
+  return IsMaximized(tab) ? IDS_UW_RESTORE_PANES_MAC : IDS_UW_MAXIMIZE_PANE_MAC;
 }
 
 void AddSplitCommands(ui::SimpleMenuModel* menu,
@@ -145,6 +168,7 @@ void AddSplitCommands(ui::SimpleMenuModel* menu,
   insert(kSplitRight, IDS_UW_SPLIT_RIGHT_MAC);
   insert(kSplitDown, IDS_UW_SPLIT_DOWN_MAC);
   if (tab->IsSplit()) {
+    insert(kMaximizePane, MaximizePaneTitle(tab));
     insert(kMoveOutOfSplit, IDS_UW_MOVE_OUT_OF_SPLIT_MAC);
     insert(kSeparatePanes, IDS_UW_SEPARATE_PANES_MAC);
   }

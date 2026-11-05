@@ -49,6 +49,34 @@ Each pane is a tab. <kbd>Ctrl</kbd> <kbd>Tab</kbd> goes through the panes from t
 
 Drag the gap between two panes to resize them.
 
+## Maximize *a pane*
+
+Press <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>Return</kbd>, or click the maximize button beside the **×** on a pane's tag, and the pane fills the page area. The other panes hide. Press the keys again, or click the restore button on the tag, to bring them back. **Maximize Pane** is also in the **Tab** menu and in a split tab's right-click menu, where it reads **Restore Panes** while a pane is maximized.
+
+<Figure caption="The pane on the left maximized. The sidebar still shows a row for each pane of the split.">
+  <Window height={330}>
+    <Sidebar>
+      <Task name="Ship the pricing page" color="blue">
+        <TabRow>Linear</TabRow>
+        <Split>
+          <TabRow selected>Pricing · Acme</TabRow>
+          <TabRow kind="terminal">~/dev/site</TabRow>
+          <TabRow>acme-site · Deployments</TabRow>
+        </Split>
+      </Task>
+    </Sidebar>
+    <Page address="localhost:3000/pricing">
+      <Panes>
+        <Pane site="localhost" selected maximized />
+      </Panes>
+    </Page>
+  </Window>
+</Figure>
+
+Going to another pane of the split, with <kbd>Ctrl</kbd> <kbd>Tab</kbd> or its row in the sidebar, brings the panes back. Going to another tab and coming back keeps the pane maximized. Splitting a maximized pane brings the other panes back first.
+
+A video playing in a hidden pane moves to the [mini player](./mini-player.mdx), and goes back to its page when the panes come back.
+
 ## Close a pane or *end the split*
 
 - <kbd>Cmd</kbd> <kbd>W</kbd>, or the **×** on a pane's tag, closes that pane's tab. The panes beside it take its space. With one pane left, the split ends.
@@ -67,6 +95,7 @@ A split's tabs are all in one [task](./tasks.mdx), or all in the Scratchpad. [Au
 | --- | --- |
 | <kbd>Cmd</kbd> <kbd>D</kbd> | Split Right |
 | <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>D</kbd> | Split Down |
+| <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>Return</kbd> | Maximize the pane, or restore the panes |
 | <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Next pane, then the next tab |
 | <kbd>Shift</kbd> <kbd>Ctrl</kbd> <kbd>Tab</kbd> | Previous pane |
 | <kbd>Cmd</kbd> <kbd>W</kbd> | Close the pane |

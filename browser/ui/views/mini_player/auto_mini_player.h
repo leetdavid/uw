@@ -3,6 +3,7 @@
 #ifndef UW_BROWSER_UI_VIEWS_MINI_PLAYER_AUTO_MINI_PLAYER_H_
 #define UW_BROWSER_UI_VIEWS_MINI_PLAYER_AUTO_MINI_PLAYER_H_
 
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
@@ -18,7 +19,8 @@ namespace uw {
 // Opens a mini player when the user switches away from a tab whose video is
 // playing, audible, and big enough on the page, and puts the video back in
 // its page when they come back to that tab, per "Starting and ending" in
-// docs/plans/mini-player.md, while the mini player docks. A mini player the
+// docs/plans/mini-player.md, while the mini player docks. A pane of a split
+// view counts as shown, unless another pane is maximized. A mini player the
 // user opened stays.
 class AutoMiniPlayer : public TabStripModelObserver {
  public:
@@ -37,10 +39,14 @@ class AutoMiniPlayer : public TabStripModelObserver {
       const TabStripSelectionChange& selection) override;
 
  private:
+  // The page area is made after this, so it is watched from the first change.
+  void ObserveMaximizedPane();
+  void OnMaximizedChanged();
   void MaybeOpen(content::WebContents* contents);
   void PutBack(content::WebContents* contents);
 
   const raw_ptr<BrowserWindowInterface> window_;
+  base::CallbackListSubscription maximized_subscription_;
   base::WeakPtrFactory<AutoMiniPlayer> weak_factory_{this};
 };
 

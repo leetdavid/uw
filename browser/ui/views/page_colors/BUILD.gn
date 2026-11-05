@@ -12,6 +12,7 @@ source_set("page_colors") {
   deps = [
     "//chrome/browser:browser_public_dependencies",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tabs:public",
     "//ui/compositor",
     "//ui/gfx",
     "//ui/views",

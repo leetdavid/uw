@@ -43,6 +43,7 @@ Agreed on 2026-11-05.
 - With Dock chosen, switching away from a tab starts a mini player for its video when the video is playing, not muted, and large enough on the page, as Arc skips muted tabs. The video must be the page's only one, as for Chrome's media controls; a page with several players starts no mini player on its own.
 - uw does not ask the site for permission first, as Chromium does. The setting is the permission.
 - Selecting the video's tab puts a mini player that started this way back in its page.
+- In a [split view](split-view.md), a tab still shows while another pane of its split is selected, so selecting that pane neither starts a mini player for its video nor leaves one running: the video plays in its pane. Leaving the split for another tab starts one, and selecting any of the split's panes puts it back. Asked for on 2026-11-05.
 - A mini player the user started stays until it is closed, since the user was on its tab when they asked.
 - Closing the video's tab closes its mini player.
 

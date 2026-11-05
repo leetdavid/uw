@@ -150,6 +150,7 @@ Implementability: **5/10**. Chromium already reports each page's background colo
 Agreed:
 
 - The toolbar and the bookmarks bar under it take the [page color](../CONTEXT.md#language): the color the page paints behind its content. A red page gives a red toolbar. The sidebar, the theme around the card, and the card's gray edge in dark mode stay as they are.
+- In a [split view](split-view.md), the toolbar keeps the theme's own color, whichever pane has focus. Chosen on 2026-11-05.
 - Every page counts: websites, uw's pages, and Chromium's. The terminal's black page keeps today's black toolbar.
 - The toolbar follows the page whatever the window mode and page mode. A white page in a dark window gives a white toolbar. This replaces "the toolbar stays light" in [Page mode](#page-mode).
 - The toolbar takes each color as soon as Chromium reports it, also while a page loads. Until a tab's page has reported one, the toolbar keeps today's color: white in light mode, `#0A0A0A` in dark mode.

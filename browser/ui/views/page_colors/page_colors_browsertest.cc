@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
@@ -127,6 +128,30 @@ IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, AWhitePageInADarkWindow) {
             kReadableContrast);
   EXPECT_EQ(Color(ui::kColorFrameActive), SK_ColorBLACK);
   SaveWindowScreenshot(browser(), "page-color-white-in-dark");
+}
+
+// In a split view the toolbar keeps the theme's color, whichever pane has
+// focus, so it does not flip as focus moves. Once the split ends it takes the
+// page color again.
+IN_PROC_BROWSER_TEST_F(PageColorsBrowserTest, ASplitViewKeepsTheThemesToolbar) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(kRed)));
+  ASSERT_TRUE(ToolbarBecomes(kRed));
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      browser(), PageIn(kBlue), WindowOpenDisposition::NEW_BACKGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  tabs->SplitPane(0, 1, split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return Color(kColorToolbar) != kRed; }));
+  const SkColor split = Color(kColorToolbar);
+  EXPECT_NE(split, kBlue);
+
+  tabs->ActivateTabAt(1);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Color(kColorToolbar), split);
+
+  tabs->RemoveSplit(*tabs->GetActiveTab()->GetSplit());
+  EXPECT_TRUE(ToolbarBecomes(kBlue));
 }
 
 // Switching tabs fades the old toolbar out over the new one.

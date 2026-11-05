@@ -42,7 +42,8 @@ enum WindowCommand {
   kSplitDown,
   kMoveOutOfSplit,
   kSeparatePanes,
-  kLastWindowCommand = kSeparatePanes,
+  kMaximizePane,
+  kLastWindowCommand = kMaximizePane,
 };
 
 bool IsWindowCommand(int command);

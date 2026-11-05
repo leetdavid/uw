@@ -1,5 +1,5 @@
-# Split views' commands: Split Right, Split Down, Move Out of Split View, and
-# Separate Panes.
+# Split views' commands: Split Right, Split Down, Maximize Pane, Move Out of
+# Split View, and Separate Panes.
 source_set("split_view") {
   sources = [
     "split_commands.cc",
@@ -32,6 +32,7 @@ source_set("browser_tests") {
     "//base",
     "//base/test:test_support",
     "//chrome/app:command_ids",
+    "//chrome:strings",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
     "//chrome/browser/profiles:profile",
@@ -52,7 +53,9 @@ source_set("browser_tests") {
     "//ui/base",
     "//ui/events",
     "//ui/gfx/geometry",
+    "//ui/menus",
     "//ui/views",
+    "//ui/views:test_support",
     "//url",
     "//uw/browser/agent:chat_tab",
     "//uw/browser/tab_organization",
