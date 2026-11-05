@@ -1,10 +1,12 @@
 # Mini player
 
-Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review. A second round was agreed on 2026-10-25 in another grilling session: sites' own windows dock as [live windows](../CONTEXT.md#language), [playback controls](../CONTEXT.md#language) join the sidebar, and one choice replaces the first switch. The design, T203, was signed off the same day. T204's prototype showed a site's page can move into the sidebar, so T207 goes ahead as planned. T205, the Dock, Don't dock, and Off choice, T206, the playback controls, T207, sites' own windows in the sidebar, and T208, Live per site, were built the same day and are in review. On 2026-10-26 the user found the video moving out of the sidebar and back each time they switched apps: "every time i change focus, the video pops in and out". In a grilling session the same day they chose that it float only when it would be hidden, T214, at **5/10**. The same day they asked for a button to dock a floating mini player and one to pop out a docked one, T215, at **7/10**: drawn in the frame "Mini player: dock it, pop it out" and built at once, at their request.
+Status: scope agreed on 2026-10-24 in a grilling session. The design, T185, was drawn and signed off the same day. T186, the floating mini player, was built the same day; T187, docking in the sidebar, T188, automatic mini players, T189, the stack, and T190, document picture in picture's frame, on 2026-10-25. All five are in review. A second round was agreed on 2026-10-25 in another grilling session: sites' own windows dock as [live windows](../CONTEXT.md#language), [playback controls](../CONTEXT.md#language) join the sidebar, and one choice replaces the first switch. The design, T203, was signed off the same day. T204's prototype showed a site's page can move into the sidebar, so T207 goes ahead as planned. T205, the Dock, Don't dock, and Off choice, T206, the playback controls, T207, sites' own windows in the sidebar, and T208, Live per site, were built the same day and are in review. On 2026-10-26 the user found the video moving out of the sidebar and back each time they switched apps: "every time i change focus, the video pops in and out". In a grilling session the same day they chose that it float only when it would be hidden, T214, at **5/10**. The same day they asked for a button to dock a floating mini player and one to pop out a docked one, T215, at **7/10**: drawn in the frame "Mini player: dock it, pop it out" and built at once, at their request. On 2026-11-05 they asked for the video to stay in the window it started in, with its controls in every other window and a way to move it there. A grilling session the same day agreed the [home window](../CONTEXT.md#language) rules below: the design, T342, is drawn and then built at once, T343, at the user's request. The same day they reported that notification sounds took the playback controls, T341.
 
 Implementability: **4/10** for the first round, using the [roadmap convention](roadmap.md#implementability-estimates). Chromium lets the browser supply its own picture-in-picture window, and hands that window the video as a compositor surface that any view can show. Its controller already plays, pauses, seeks, mutes, and goes back to the tab, and its media session can start picture in picture on a playing video without the page's help. The cost is in what uw adds: one live video that moves between sidebars and a floating window, a stack of paused videos with stills, a 2× speed that Chromium has no call for, and controls that follow the Glass slider.
 
 **3/10** for the second round. Chromium keeps one picture-in-picture window at a time, and gives a site's own window a browser window of its own. Showing that page in the sidebar beside a video needs a deeper patch than anything in the first round, and a prototype, T204, must first show that the page keeps working there.
+
+**5/10** for the [home window](#in-other-windows). Every placement rule names the front window today. The hard part is the background: checking cover on a home window that is not the one in front, and leaving one that was out of sight alone. The rows reuse the playback controls.
 
 The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom of the sidebar, so they can browse other tabs while the video plays, and to float in their own window while uw is out of focus. They also asked for Arc's controls on hover, and for uw's own floating window to replace Chromium's, with rounded corners and glass. uw calls it the [mini player](../CONTEXT.md#language), as Arc does. On 2026-10-25 they asked to see how a Google Meet call would look in the sidebar, and then for small sites' windows to dock too: "we may only want to support pips of a certain size (videos audios and other small pips)".
 
@@ -16,13 +18,25 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - It docks at the bottom of the sidebar, above the foot, across the sidebar's width. The tab list ends above it.
 - From the top down, the bottom of the sidebar holds the activity card, the mini player and its stack, a [live window](#live-windows), the [playback controls](#playback-controls), and the foot, each 6px above the next.
 - When the window is too short for all of them, the tab list scrolls, as it does when it is long.
-- It docks in the sidebar of whichever uw window is in front, so it follows the user across windows and [workspace](../CONTEXT.md#language) switches.
-- It becomes a [floating mini player](../CONTEXT.md#language) when it would be hidden: when no uw window is showing, when the front window's sidebar is [hidden](../CONTEXT.md#language) or in full screen, or when, with another app active, that app's windows have covered half or more of the docked mini player for about a second. It stays floating while the [floating sidebar](../CONTEXT.md#language) shows. Changed on 2026-10-26: before, it floated whenever another app was active.
+- It docks in the sidebar of its [home window](../CONTEXT.md#language): the window of the tab that started it. It stays there when the user goes to another window or [workspace](../CONTEXT.md#language), and keeps playing out of sight while its home window is hidden, minimized, or behind another uw window. Other windows show a row for it, per [In other windows](#in-other-windows). Changed on 2026-11-05: before, it followed the window in front.
+- Dragging its tab to another window leaves it in its home window. When its home window closes, the window its tab is in becomes its home window.
+- It becomes a [floating mini player](../CONTEXT.md#language) when it would be hidden: when its home window is in front with its sidebar [hidden](../CONTEXT.md#language) or in full screen, when uw is hidden, or when, with another app active, that app's windows have covered half or more of the docked mini player for about a second. It stays floating while the [floating sidebar](../CONTEXT.md#language) shows. Changed on 2026-10-26: before, it floated whenever another app was active.
 - With another app active and the sidebar in view, it stays docked, so uw beside another app keeps the video where it is.
 - Other apps' ordinary windows cover it. The menu bar, the Dock, notification banners, and the mini player's own window do not. A uw window on another Space counts as covered.
+- When the user leaves uw while its home window is out of sight, it stays docked there, out of sight. Agreed on 2026-11-05.
 - Once floating, it stays floating until the user comes back to uw, even when the covering window moves away.
 - One the user popped out by hand stays floating through app and window switches until it is docked by hand or closed. The next video docks as usual. Agreed on 2026-10-26.
-- It docks again when a uw window is active with its sidebar showing. Clicking or dragging the floating mini player does not count as coming back.
+- It docks again when a uw window is active and its home window's sidebar shows. Clicking or dragging the floating mini player does not count as coming back.
+
+### In other windows
+
+Agreed on 2026-11-05.
+
+- Every window but its home window shows a row for it in the [playback controls](#playback-controls)' place, above the window's own row: the video's art or its site's icon, its title, and where it comes from.
+- The row has play or pause, previous and next when the site offers them, and Move here. Move here makes this window its home window and docks it here, with the whole stack.
+- Clicking the row brings its home window to the front, switching workspace if need be, with the video still docked there.
+- The row's × under the pointer closes it, as its own close does.
+- A video from a private window shows its row only in private windows. Other windows show it whatever their profile or workspace.
 
 ### Starting and ending
 
@@ -41,6 +55,7 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - Closing the playing one closes only it: the newest paused one comes up in its place, still paused. The same goes when it leaves any other way, as when its tab closes. A site's own window that takes a playing video's place keeps it: the video pauses into the stack, as a video another one replaced does, and no paused video comes back over the window. Agreed on 2026-10-26. Asked for on 2026-10-26: "closing one mini player should just close that one, not all docked pips". Staying paused is uw's choice.
 - Only the playing one floats. The paused ones come back when it docks again.
 - A live window never joins it.
+- The stack docks in the playing video's home window. A video started in another window takes the stack there, and Move here moves it all. Agreed on 2026-11-05.
 - The stack lives only in the sidebar. With Don't dock, or for a site's window too big to dock, a new picture in picture closes the old one and leaves it paused in its page, as Chromium does.
 
 ### Controls on hover
@@ -48,7 +63,7 @@ The user asked on 2026-10-24 for picture-in-picture videos to show at the bottom
 - Play or pause in the middle, between back 10 seconds and forward 10 seconds.
 - A progress bar along the bottom with the time. Dragging it seeks.
 - Close in one top corner and back to tab in the other. Close stops the mini player and leaves the video paused in its page.
-- Just left of back to tab, docked, pop out: it floats that video by hand. Floating, dock: shown while Dock is chosen and the front window's sidebar shows, not hidden and not full screen, it brings that window forward, out of the Dock if minimized, and docks everything floating. Agreed on 2026-10-26.
+- Just left of back to tab, docked, pop out: it floats that video by hand. Floating, dock: shown while Dock is chosen and the home window's sidebar shows, not hidden and not full screen, it brings that window forward, out of the Dock if minimized and switching workspace if need be, and docks everything floating in its home window. Agreed on 2026-10-26; the home window on 2026-11-05.
 - Mute in a bottom corner.
 - Skip ad, next and previous track, and a call's microphone, camera, and hang up show when the site offers them, as in Chromium's window.
 - Pressing and holding on the video plays it at 2× while held. Letting go puts back the speed it had. In the floating mini player, moving the pointer while pressed drags the window instead.
@@ -70,7 +85,7 @@ Some sites open a small window of their own page rather than a video, such as Go
 - A site can resize its window only right after the user clicks or types in it. Within the limit, a docked one stays docked and takes the new shape. Past the limit it floats at the size asked for, and stays floating until it closes.
 - While Chromium's prompt for automatic picture in picture shows in it, it floats. It docks once the user answers.
 - Selecting its tab leaves it where it is, as with a video the user put in picture in picture. The site can still close it.
-- It floats and docks by the same rules as a video. With a video docked above it, both float: the site's window in the corner and the video just above it.
+- It floats and docks by the same rules as a video, in the home window of the tab that opened it. Other windows show a row for it, as for a video, with play or pause only when the site offers them. With a video docked above it, both float: the site's window in the corner and the video just above it.
 
 ### Live windows
 
@@ -84,9 +99,10 @@ Some sites open a small window of their own page rather than a video, such as Go
 ### Playback controls
 
 - When a tab the user is not looking at plays sound, the sidebar shows [playback controls](../CONTEXT.md#language) for it just above the foot: play or pause, and next and previous when the site offers them. This holds whatever the setting.
-- One row, for the tab that started playing last. Paused sound keeps the row until another tab plays or the tab closes. The others stay in Chromium's media button in the toolbar.
+- One row for the window's own tabs, for the tab that started playing last. Paused sound keeps the row until another tab plays or the tab closes. The others stay in Chromium's media button in the toolbar.
 - Under the pointer, a small round × on the row's top-left corner, over its art, dismisses it: it pauses the tab's sound and hides the row until that tab plays again or another tab starts playing. Nothing else in the row moves. Asked for on 2026-10-26: "while the pip is docked, i can't dismiss it"; the user chose the corner ×, and that it pauses the sound.
-- Sound in a mini player or a live window shows no row, including the sound of the tab that opened a live window. Those have their own controls.
+- A short sound, such as a chat site's notification, is not media to control: it gets no row and leaves the row that is there, as for Chromium's media button. Reported on 2026-11-05, T341: "all sounds (like notifications) get media control (such as whatsapp, slack web)".
+- Sound in a mini player or a live window shows no row of its own, including the sound of the tab that opened a live window. Those have their own controls in their home window, and a row in every other window, per [In other windows](#in-other-windows).
 
 ### Settings
 
@@ -106,7 +122,7 @@ The choice replaces the switch "Show the mini player in the sidebar". Its off st
 
 - A per-site switch for automatic mini players.
 - Several live windows at once.
-- More than one row of playback controls.
+- More than one row for a window's own tabs.
 - A stack outside the sidebar.
 
 ## Design
@@ -162,6 +178,13 @@ The second round:
 - Pop out sets a placement aside: it floats until docked by hand. Dock clears that on every placement, restores and activates the front window, and places them all again. The bar's dock button is uw's, added beside the Live pill by `uw-mini-player.patch`; uw shows or hides it each time the site's window is placed.
 - Off holds Chromium's own `ScopedDisallowPictureInPicture` in every window, as a file dialog does, which closes a video's picture in picture at once. `uw-mini-player.patch` makes the browser answer content's `IsDocumentPictureInPictureBlockedBySystem` with that block, so a site's request for its own window is refused.
 
+The third round:
+
+- The stack keeps the video's home window, since one video plays at a time. A video that shows takes its tab's window as its home window, unless the stack plays one of its own or brings up the newest, which keeps the home window. A site's window takes the window of the tab that opened it. When the home window closes, the tab's window takes its place.
+- `MiniPlayerPlacement` asks for the home window where it asked for the front window. The front window says only whether uw shows at all, and whether the home window is the one in front: only then do a hidden sidebar and full screen float it. With another app active, a home window that is hidden or minimized keeps it docked, and one in view is checked for cover as before.
+- Each sidebar gets two more `PlaybackControls`: one for the video's tab and one for a live window's opener, above the row for the window's own tabs. They show with Dock chosen, outside the home window, and in private windows only for a private source. Move here sets the home window and places it again. A click shows the home window, which for a hidden workspace window swaps it in, as `WorkspaceWindow` does when a hidden window is shown.
+- The row for the window's own tabs follows only a tab whose media session is controllable, as Chromium's media button does. A short sound's session is not, and the focus request carries the session as it was before the request, so the row asks the session when the focus comes.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).
@@ -180,12 +203,15 @@ Each stage is a ticket on the [board](roadmap.md#board).
 12. T208: Live per site, on the settings page and the window.
 13. T214: the mini player floats only when it would be hidden.
 14. T215: dock and pop out by hand.
+15. T341: short sounds, such as notifications, get no playback controls.
+16. T342: the home window's design: the rows in other windows, with Move here.
+17. T343: the home window, the rows in other windows, and Move here.
 
 ## Acceptance checks
 
 1. A video put in picture in picture docks at the bottom of the sidebar, keeps playing while the user switches tabs, and its controls play, pause, seek, mute, go back to the tab, and close.
 2. Holding on the video plays it at 2×, and letting go restores the speed it had.
-3. Switching to another uw window or workspace moves it to that window's sidebar. Hiding the sidebar floats it, and showing the sidebar docks it.
+3. Switching to another uw window or workspace leaves it docked in its home window, playing, and the other window shows its row. Hiding the home window's sidebar while that window is in front floats it, and showing the sidebar docks it.
 4. With another app active and the sidebar in view, it stays docked. Once that app's window covers half the docked video for a second, it floats, and it stays floating when the window moves away; coming back to uw docks it. A window covering less than half leaves it docked. With "Float the mini player when the sidebar is covered" off, it stays docked.
 5. Switching away from a tab with a playing, audible, visible video starts a mini player. A muted or paused video, or a small one, does not. Selecting the tab puts it back in the page.
 6. A second mini player pauses the first and stacks on it. Clicking the paused one swaps them. A fourth drops the oldest. Closing the playing one brings the newest paused one up in its place, still paused.
@@ -198,7 +224,11 @@ Each stage is a ticket on the [board](roadmap.md#board).
 13. A second site's window takes the live window's place, and the first goes back to its tab.
 14. With Live off for a site, its window pauses and joins the stack when a video comes. Turning Live off on the window while a video plays above it puts it in the stack under the video.
 15. A background tab playing sound shows one row of playback controls above the foot, for the tab that started last, and its buttons play, pause, and skip. A video in a mini player and a live window's tab show none. Its × pauses the sound and hides the row until the tab plays again.
-16. A floating video shows dock while the front window's sidebar shows, and none while it is hidden. Pressing it brings the window forward and docks the video and a floating call. A docked video's pop out floats it, and it stays floating after switching apps and back. A docked call's pop out floats the call alone, and its bar's dock docks it again.
+16. A floating video shows dock while its home window's sidebar shows, and none while it is hidden. Pressing it brings the home window forward, switching workspace if need be, and docks the video and a floating call there. A docked video's pop out floats it, and it stays floating after switching apps and back. A docked call's pop out floats the call alone, and its bar's dock docks it again.
+17. A short sound in a tab, such as a chat site's notification, shows no row and leaves the row that is there.
+18. In every window but its home window, a docked video shows a row above the window's own row, and a call a row of its own. Its play or pause works, a click on it brings the home window forward with the video still docked, and its × closes it. Move here docks it, with its stack, in that window, which becomes its home window.
+19. A video from a private window shows its row only in private windows.
+20. With another app active, a video whose home window was out of sight when the user left uw stays docked there; one whose home window is in view floats once covered, as in check 4. A new video started in another window takes the stack to its own home window.
 
 ## Open questions
 

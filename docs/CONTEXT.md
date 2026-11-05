@@ -64,15 +64,19 @@ Up to three mini players docked at the bottom of the sidebar. The top one plays;
 _Avoid_: Queue, deck.
 
 **Floating mini player**:
-A mini player in its own window over other apps, shown while a docked one would be hidden: uw's window covered by another app's or not showing, or the sidebar hidden.
+A mini player in its own window over other apps, shown while a docked one would be hidden: its home window covered by other apps' windows or uw hidden, or that window's sidebar hidden while it is in front.
 _Avoid_: PiP window, pop-out.
+
+**Home window**:
+The uw window a mini player or live window docks in: the window of the tab that started it, until the user moves it to another window.
+_Avoid_: Its window, dock window, source window.
 
 **Live window**:
 A site's own picture-in-picture window, such as a Meet call, that keeps running while videos come and go: it never pauses and never joins the mini player stack. Docked, it sits below any mini player. Every site's own window is live unless the user turns that off for its site; then it acts like a mini player, and pauses and joins the stack when another one comes.
 _Avoid_: Call window, live mini player, document PiP.
 
 **Playback controls**:
-Play, pause, and skip for a tab the user is not looking at that plays sound, shown at the bottom of the sidebar. Sound that is in a mini player or a live window has its own controls instead.
+Play, pause, and skip for a tab the user is not looking at that plays sound, shown at the bottom of the sidebar. A mini player or live window gets a row in every window but its home window, which shows it instead.
 _Avoid_: Media controls, now playing, audio bar.
 
 **Pinned tab**:
