@@ -1,8 +1,9 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 // uw plays H.264 and AAC through macOS's own decoders, VideoToolbox and
-// AudioToolbox, and ships neither FFmpeg's decoders for them nor OpenH264.
-// See docs/plans/distribution.md, "Codecs". The files are in test_data/.
+// AudioToolbox, and AAC through Windows' Media Foundation, and ships neither
+// FFmpeg's decoders for them nor OpenH264. See docs/plans/distribution.md,
+// "Codecs", and docs/plans/windows.md. The files are in test_data/.
 
 #include <string>
 #include <vector>
@@ -156,7 +157,7 @@ class CodecsBrowserTest : public headless::HeadlessModeBrowserTest {
 IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, FFmpegCannotDecodeH264OrAac) {
   EXPECT_EQ(avcodec_find_decoder(AV_CODEC_ID_H264), nullptr);
   EXPECT_EQ(avcodec_find_decoder(AV_CODEC_ID_AAC), nullptr);
-  // It still reads MP4 files, which macOS's decoders then play.
+  // It still reads MP4 files, which the system's decoders then play.
   EXPECT_NE(av_find_input_format("mov,mp4,m4a,3gp,3g2,mj2"), nullptr);
 }
 

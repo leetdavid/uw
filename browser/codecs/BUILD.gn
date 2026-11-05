@@ -1,5 +1,5 @@
-# Checks that H.264 and AAC play through macOS's own decoders. See
-# docs/plans/distribution.md, "Codecs".
+# Checks that H.264 and AAC play through macOS's own decoders, and AAC
+# through Windows'. See docs/plans/distribution.md, "Codecs".
 
 source_set("browser_tests") {
   testonly = true

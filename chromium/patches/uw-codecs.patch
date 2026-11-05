@@ -58,15 +58,16 @@ index c87b8f9f556ba731468f8fa852a8c19a3e719aab..c3b65081d45ffdaef6d3afe45865d41e
        STRINGIFY_STATUS_CASE(DEMUXER_ERROR_BITSTREAM_CONVERSION_FAILED);
        STRINGIFY_STATUS_CASE(CHUNK_DEMUXER_ERROR_APPEND_FAILED);
 diff --git a/media/ffmpeg/ffmpeg_common.cc b/media/ffmpeg/ffmpeg_common.cc
-index 280dce68853c12508ab94bd3c9516896db963664..0fb9b1690b3ec43c488c7fa3f35b3a27be4574de 100644
+index 280dce68853c12508ab94bd3c9516896db963664..f75f8349e83e57280f9074fbd7c7968f74b35419 100644
 --- a/media/ffmpeg/ffmpeg_common.cc
 +++ b/media/ffmpeg/ffmpeg_common.cc
-@@ -409,6 +409,13 @@ bool AVCodecContextToAudioDecoderConfig(const AVCodecContext* codec_context,
+@@ -409,6 +409,14 @@ bool AVCodecContextToAudioDecoderConfig(const AVCodecContext* codec_context,
  #else
        NOTREACHED();
  #endif
 +    // uw: FFmpeg demuxes AAC but does not decode it, so it leaves
-+    // |sample_fmt| unset. macOS's AudioToolbox decodes it to float.
++    // |sample_fmt| unset. macOS's AudioToolbox and Windows' Media Foundation
++    // decode it to float.
 +    case AudioCodec::kAAC:
 +      if (sample_format == kUnknownSampleFormat) {
 +        sample_format = kSampleFormatF32;
@@ -720,6 +721,152 @@ index b50c0ca201a937460c64e609a483295bb07be8fe..d9d37d484c5b8ccc49758e53f6976d42
  };
  
  }  // namespace media
+diff --git a/media/filters/win/media_foundation_audio_decoder.cc b/media/filters/win/media_foundation_audio_decoder.cc
+index 2d3023bfbdb8475a2a087ff6faa28d7debf742be..b4f260891cab0d02c8028b2933db7dbb9d922433 100644
+--- a/media/filters/win/media_foundation_audio_decoder.cc
++++ b/media/filters/win/media_foundation_audio_decoder.cc
+@@ -9,6 +9,9 @@
+ #include <stdint.h>
+ #include <wmcodecdsp.h>
+ 
++#include <algorithm>
++#include <array>
++
+ #include "base/auto_reset.h"
+ #include "base/compiler_specific.h"
+ #include "base/containers/span.h"
+@@ -60,10 +63,14 @@ bool CodecSupportsFormat(const AudioDecoderConfig& config,
+ 
+   // Sometimes HE-AAC configurations may be off by a factor of two, so allow
+   // such cases -- they'll reconfigure upon first decoded frame.
++  // uw: the rate and the channels each on their own, since FFmpeg, which
++  // demuxes AAC for uw but no longer decodes it, can name HE-AAC's core rate.
++  const int rate = static_cast<int>(format.nSamplesPerSec);
+   if (config.codec() == AudioCodec::kAAC &&
+-      2 * config.channels() == format.nChannels &&
+-      2 * config.samples_per_second() ==
+-          static_cast<int>(format.nSamplesPerSec)) {
++      (config.channels() == format.nChannels ||
++       2 * config.channels() == format.nChannels) &&
++      (config.samples_per_second() == rate ||
++       2 * config.samples_per_second() == rate)) {
+     return true;
+   }
+ 
+@@ -101,7 +108,9 @@ std::optional<MFT_REGISTER_TYPE_INFO> GetTypeInfo(
+ #endif
+ #if BUILDFLAG(USE_PROPRIETARY_CODECS)
+     case AudioCodec::kAAC:
+-      if (config.profile() == AudioCodecProfile::kXHE_AAC &&
++      // uw: every AAC profile, since uw ships no FFmpeg AAC decoder. See uw's
++      // docs/plans/distribution.md, "Codecs".
++      if (config.profile() != AudioCodecProfile::kXHE_AAC ||
+           base::win::GetVersion() >= base::win::Version::WIN11_22H2) {
+         return MFT_REGISTER_TYPE_INFO{MFMediaType_Audio, MFAudioFormat_AAC};
+       }
+@@ -116,7 +125,56 @@ std::optional<MFT_REGISTER_TYPE_INFO> GetTypeInfo(
+   }
+ }
+ 
+-bool PopulateInputSample(IMFSample* sample, const DecoderBuffer& input) {
++#if BUILDFLAG(USE_PROPRIETARY_CODECS)
++// uw: `config` with an AudioSpecificConfig for AAC-LC at its rate and channels
++// when it came without one, such as ADTS handed to WebCodecs without a
++// description. The decoder takes raw AAC, which needs one.
++AudioDecoderConfig WithAudioSpecificConfig(const AudioDecoderConfig& config) {
++  if (!config.extra_data().empty() ||
++      config.profile() == AudioCodecProfile::kXHE_AAC) {
++    return config;
++  }
++  constexpr std::array<int, 13> kRates = {96000, 88200, 64000, 48000, 44100,
++                                          32000, 24000, 22050, 16000, 12000,
++                                          11025, 8000,  7350};
++  constexpr uint8_t kAacLc = 2;
++  const auto found = std::ranges::find(kRates, config.samples_per_second());
++  // 44100 when the rate has no index of its own.
++  const uint8_t rate = found == kRates.end()
++                           ? 4
++                           : static_cast<uint8_t>(found - kRates.begin());
++  // Channel configurations 1 to 6 are that many channels; 7 is 7.1.
++  const int channels = config.channels();
++  const uint8_t layout = channels == 8 ? 7 : std::clamp(channels, 1, 6);
++  AudioDecoderConfig with_config = config;
++  with_config.Initialize(
++      config.codec(), config.sample_format(), config.channel_layout_config(),
++      config.samples_per_second(),
++      {static_cast<uint8_t>(kAacLc << 3 | rate >> 1),
++       static_cast<uint8_t>((rate & 1) << 7 | layout << 3)},
++      config.encryption_scheme(), config.seek_preroll(), config.codec_delay());
++  return with_config;
++}
++#endif
++
++// uw: MSE, FFmpeg, and uw's ADTS engine hand AAC over with an ADTS header on
++// each frame, which the decoder, set up for raw AAC, does not take. Returns
++// the header's size, or 0 without one.
++size_t AdtsHeaderSize(base::span<const uint8_t> frame) {
++  // The sync word 0xFFF and layer 0, then a frame length that spans the
++  // whole buffer.
++  if (frame.size() < 7 || frame[0] != 0xFF || (frame[1] & 0xF6) != 0xF0) {
++    return 0;
++  }
++  const size_t header = (frame[1] & 0x01) ? 7 : 9;
++  const size_t length = (frame[3] & 0x03) << 11 | frame[4] << 3 | frame[5] >> 5;
++  return length == frame.size() && header < frame.size() ? header : 0;
++}
++
++// uw: `offset` skips an ADTS header.
++bool PopulateInputSample(IMFSample* sample,
++                         const DecoderBuffer& input,
++                         size_t offset) {
+   Microsoft::WRL::ComPtr<IMFMediaBuffer> buffer;
+   HRESULT hr = sample->GetBufferByIndex(0, &buffer);
+   RETURN_ON_HR_FAILURE(hr, "Failed to get buffer from sample", false);
+@@ -132,11 +190,12 @@ bool PopulateInputSample(IMFSample* sample, const DecoderBuffer& input) {
+   auto destination = UNSAFE_BUFFERS(base::span(destination_ptr, max_length));
+ 
+   RETURN_ON_FAILURE(!current_length, "Input length is zero", false);
+-  RETURN_ON_FAILURE(input.size() <= max_length, "Input length is too long",
++  base::span<const uint8_t> data = base::span(input).subspan(offset);
++  RETURN_ON_FAILURE(data.size() <= max_length, "Input length is too long",
+                     false);
+-  destination.copy_prefix_from(input);
++  destination.copy_prefix_from(data);
+ 
+-  hr = buffer->SetCurrentLength(input.size());
++  hr = buffer->SetCurrentLength(data.size());
+   RETURN_ON_HR_FAILURE(hr, "Failed to set buffer length", false);
+ 
+   hr = buffer->Unlock();
+@@ -264,13 +323,16 @@ void MediaFoundationAudioDecoder::Decode(scoped_refptr<DecoderBuffer> buffer,
+     has_reset_ = false;
+   }
+ 
+-  auto sample = CreateEmptySampleWithBuffer(buffer->size(), 0);
++  const size_t offset = config_.codec() == AudioCodec::kAAC
++                            ? AdtsHeaderSize(base::span(*buffer))
++                            : 0;
++  auto sample = CreateEmptySampleWithBuffer(buffer->size() - offset, 0);
+   if (!sample) {
+     std::move(decode_cb_bound).Run(DecoderStatus::Codes::kFailed);
+     return;
+   }
+ 
+-  if (!PopulateInputSample(sample.Get(), *buffer)) {
++  if (!PopulateInputSample(sample.Get(), *buffer, offset)) {
+     std::move(decode_cb_bound).Run(DecoderStatus::Codes::kFailed);
+     return;
+   }
+@@ -381,7 +443,8 @@ HRESULT MediaFoundationAudioDecoder::CreateDecoder() {
+   Microsoft::WRL::ComPtr<IMFMediaType> input_type;
+   if (config_.codec() == AudioCodec::kAAC) {
+ #if BUILDFLAG(USE_PROPRIETARY_CODECS)
+-    RETURN_IF_FAILED(GetAacAudioType(config_, &input_type));
++    RETURN_IF_FAILED(
++        GetAacAudioType(WithAudioSpecificConfig(config_), &input_type));
+ #else
+     return E_NOTIMPL;
+ #endif
 diff --git a/media/gpu/mac/BUILD.gn b/media/gpu/mac/BUILD.gn
 index 704a619b940ef8a351605fa5f003bb4256983c00..c87e7d6ef8374a58911f0e1653d7079fc89584d9 100644
 --- a/media/gpu/mac/BUILD.gn
