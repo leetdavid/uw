@@ -196,8 +196,11 @@ class BarDockButton : public views::ImageButton {
 
  public:
   BarDockButton()
-      : views::ImageButton(
-            base::BindRepeating(&MiniPlayerPlacement::DockByHand)) {
+      : views::ImageButton(base::BindRepeating([] {
+          if (SiteWindow* site_window = SiteWindow::Current()) {
+            site_window->DockByHand();
+          }
+        })) {
     SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
     SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
     views::ConfigureVectorImageButton(this);
@@ -358,6 +361,7 @@ SiteWindow::SiteWindow(content::WebContents* opener,
                        BrowserWindowInterface* window)
     : content::WebContentsObserver(page),
       opener_(opener),
+      weak_opener_(opener->GetWeakPtr()),
       page_(page),
       window_(window),
       site_(opener->GetLastCommittedURL().host()),
@@ -373,7 +377,9 @@ SiteWindow::SiteWindow(content::WebContents* opener,
   }
   placement_ = std::make_unique<MiniPlayerPlacement>(
       own_widget(),
+      base::BindRepeating(&SiteWindow::opener, base::Unretained(this)),
       base::BindRepeating(&SiteWindow::Place, base::Unretained(this)));
+  placement_->SetHome(nullptr);
   // Chromium brings a new site's window to the front, which is not the user
   // clicking it.
   placement_->UpdateNew();
@@ -404,6 +410,12 @@ void SiteWindow::Close() {
 
 void SiteWindow::PopOut() {
   placement_->PopOut();
+}
+
+void SiteWindow::DockByHand() {
+  if (placement_) {
+    placement_->DockByHand();
+  }
 }
 
 // static

@@ -202,10 +202,26 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
     return nullptr;
   }
 
-  // The playback controls in the sidebar of `window`.
-  static PlaybackControls* ControlsOf(Browser* window) {
-    return Find<PlaybackControls>(
-        BrowserView::GetBrowserViewForBrowser(window));
+  // The playback controls for `kind` in the sidebar of `window`.
+  static PlaybackControls* ControlsOf(
+      Browser* window,
+      PlaybackControls::Kind kind = PlaybackControls::Kind::kOwnTabs) {
+    std::vector<views::View*> views = {
+        BrowserView::GetBrowserViewForBrowser(window)};
+    while (!views.empty()) {
+      views::View* view = views.back();
+      views.pop_back();
+      auto* controls = views::AsViewClass<PlaybackControls>(view);
+      if (controls && controls->kind() == kind) {
+        return controls;
+      }
+      std::ranges::copy(view->children(), std::back_inserter(views));
+    }
+    return nullptr;
+  }
+
+  static PlaybackControls* VideoRowOf(Browser* window) {
+    return ControlsOf(window, PlaybackControls::Kind::kMiniPlayer);
   }
 
   // Docks a site's window and then a video above it, in a tab of its own.
@@ -366,8 +382,7 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
   EXPECT_FALSE(mini_player->view()->controls_shown());
 }
 
-IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
-                       ItDocksInTheSidebarOfTheWindowInFront) {
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItDocksInTheSidebar) {
   SetAppActiveForTesting(true);
   MiniPlayer* mini_player = OpenMiniPlayer();
   ASSERT_TRUE(
@@ -598,20 +613,135 @@ IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, HidingTheSidebarFloatsIt) {
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
 }
 
-IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItFollowsTheWindowInFront) {
+// A video stays docked in its home window when another window comes to the
+// front, and that window shows its row. Move here docks it there, which
+// becomes its home window. Once that closes, it docks in its tab's window.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ItStaysInItsHomeWindow) {
   SetAppActiveForTesting(true);
   MiniPlayer* mini_player = OpenMiniPlayer();
   ASSERT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
   Browser* second = CreateBrowser(browser()->GetProfile());
+  PlaybackControls* row = VideoRowOf(second);
+  ASSERT_TRUE(base::test::RunUntil([&] { return row->GetVisible(); }));
+  EXPECT_EQ(video_, row->tab());
+  EXPECT_TRUE(row->move_here()->GetVisible());
+  EXPECT_TRUE(row->play_pause()->GetVisible());
+  Settle();
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+  EXPECT_FALSE(VideoRowOf(browser())->GetVisible());
+  SaveWindowScreenshot(second, "mini_player_row_elsewhere");
+
+  PressButton(row->move_here());
   EXPECT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, second); }));
-  // Closing that window brings the video back to the first.
+  EXPECT_FALSE(row->GetVisible());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return VideoRowOf(browser())->GetVisible(); }));
+  // Its tab stays where it was.
+  EXPECT_NE(TabStripModel::kNoTab,
+            browser()->tab_strip_model()->GetIndexOfWebContents(video_));
+
   CloseBrowserSynchronously(second);
   EXPECT_TRUE(
       base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !VideoRowOf(browser())->GetVisible(); }));
   Play();
   EXPECT_FALSE(Bool("video.paused"));
+}
+
+// A click on the row brings the home window to the front, with the video
+// still docked there. The row's × closes the mini player.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       TheRowElsewhereGoesToTheVideoAndClosesIt) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  PlaybackControls* row = VideoRowOf(second);
+  ASSERT_TRUE(base::test::RunUntil([&] { return row->GetVisible(); }));
+  PressButton(row);
+  EXPECT_TRUE(base::test::RunUntil([&] { return browser()->IsActive(); }));
+  Settle();
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+
+  row->SetState(views::Button::STATE_HOVERED);
+  ASSERT_TRUE(row->dismiss()->GetVisible());
+  PressButton(row->dismiss());
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Bool("isInPictureInPicture()"); }));
+  EXPECT_TRUE(base::test::RunUntil([&] { return !row->GetVisible(); }));
+}
+
+// With another app in front, a video whose home window is out of sight stays
+// docked there. Once the home window is in view, it floats when covered.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       BehindAnotherAppAHomeWindowOutOfSightKeepsIt) {
+  SetAppActiveForTesting(true);
+  MiniPlayer* mini_player = OpenMiniPlayer();
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return DocksIn(mini_player, browser()); }));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return VideoRowOf(second)->GetVisible(); }));
+  browser()->GetWindow()->Minimize();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return browser()->GetWindow()->IsMinimized(); }));
+  SetAppActiveForTesting(false);
+  Settle(kPastTheHold);
+  EXPECT_TRUE(DocksIn(mini_player, browser()));
+
+  browser()->GetWindow()->Restore();
+  EXPECT_TRUE(base::test::RunUntil([&] { return Floats(mini_player); }));
+}
+
+// A private window's video shows its row only in private windows.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest,
+                       APrivateVideosRowShowsOnlyInPrivateWindows) {
+  SetAppActiveForTesting(true);
+  Browser* private_window = CreateIncognitoBrowser();
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      private_window, embedded_test_server()->GetURL(
+                          "/media/picture-in-picture/window-size.html")));
+  content::WebContents* video =
+      private_window->tab_strip_model()->GetActiveWebContents();
+  ASSERT_EQ(true, content::EvalJs(video, "enterPictureInPicture()"));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return MiniPlayer::Shown() && MiniPlayer::Shown()->contents() == video;
+  }));
+  Browser* second_private = CreateIncognitoBrowser();
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return VideoRowOf(second_private)->GetVisible(); }));
+  Settle();
+  EXPECT_FALSE(VideoRowOf(browser())->GetVisible());
+}
+
+// A call stays docked in its home window too. Another window shows its row,
+// with Move here and no play or pause, and Move here docks it there.
+IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ACallStaysInItsHomeWindow) {
+  SetAppActiveForTesting(true);
+  OpenSiteWindow(320, 200);
+  SiteWindow* site_window = SiteWindow::Current();
+  ASSERT_TRUE(base::test::RunUntil([&] { return SiteDocks(site_window); }));
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  PlaybackControls* row =
+      ControlsOf(second, PlaybackControls::Kind::kLiveWindow);
+  ASSERT_TRUE(base::test::RunUntil([&] { return row->GetVisible(); }));
+  Settle();
+  EXPECT_TRUE(SiteDocks(site_window));
+  EXPECT_FALSE(row->play_pause()->GetVisible());
+  EXPECT_TRUE(row->move_here()->GetVisible());
+  SaveWindowScreenshot(second, "site_window_row_elsewhere");
+
+  PressButton(row->move_here());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return site_window->dock() == MiniPlayerDock::From(second); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return ControlsOf(browser(), PlaybackControls::Kind::kLiveWindow)
+        ->GetVisible();
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(MiniPlayerBrowserTest, ClosingItEmptiesTheDock) {

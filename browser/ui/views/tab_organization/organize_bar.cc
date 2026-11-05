@@ -103,9 +103,14 @@ OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
       ->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, kFootGap, 0));
 
   // The mini player docks between the card and the row, the playback
-  // controls under it.
+  // controls under it: first for a mini player and a live window docked in
+  // another window, then for this window's own tabs.
   AddChildView(std::make_unique<MiniPlayerDock>(window_));
-  AddChildView(std::make_unique<PlaybackControls>(window_));
+  for (PlaybackControls::Kind kind : {PlaybackControls::Kind::kMiniPlayer,
+                                      PlaybackControls::Kind::kLiveWindow,
+                                      PlaybackControls::Kind::kOwnTabs}) {
+    AddChildView(std::make_unique<PlaybackControls>(window_, kind));
+  }
 
   // Organize at the left, the new button at the right end.
   row_ = AddChildView(std::make_unique<views::FlexLayoutView>());

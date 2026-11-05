@@ -16,11 +16,13 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 
+class BrowserWindowInterface;
 class PictureInPictureWidgetFadeAnimator;
 
 namespace content {
 class VideoPictureInPictureWindowController;
-}
+class WebContents;
+}  // namespace content
 
 namespace uw {
 
@@ -56,10 +58,17 @@ class MiniPlayer : private internal::MiniPlayerDelegateHolder,
   MiniPlayer& operator=(const MiniPlayer&) = delete;
   ~MiniPlayer() override;
 
+  // The mini player that shows now, docked or floating, or nullptr.
+  static MiniPlayer* Shown();
+
   MiniPlayerView* view() { return view_; }
+  // The tab of its video.
+  content::WebContents* contents();
   // The dock the video is in, or nullptr while it floats or is hidden.
   MiniPlayerDock* dock() { return dock_; }
   MiniPlayerPlacement* placement() { return placement_.get(); }
+  // Makes `window` its home window, and the stack's, and docks it there.
+  void MoveHere(BrowserWindowInterface* window);
 
   // content::VideoOverlayWindow:
   bool IsActive() const override;

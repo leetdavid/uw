@@ -13,6 +13,7 @@
 #include "base/scoped_observation.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "components/prefs/pref_change_registrar.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "services/media_session/public/mojom/audio_focus.mojom.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
@@ -32,12 +33,17 @@ class ImageButton;
 
 namespace uw {
 
-// The sidebar's playback controls, per "Playback controls" in
-// docs/plans/mini-player.md: one row above the foot for the window's tab that
-// started playing sound last, while the user is on another tab. Its art,
-// title, and where the sound comes from, with play or pause, and previous and
-// next when the site offers them. A click goes to the tab. Sound in a mini
-// player or a site's own window has its own controls, so it gets no row.
+class MiniPlayerPlacement;
+
+// The sidebar's playback controls, per "Playback controls" and "In other
+// windows" in docs/plans/mini-player.md: one row above the foot for the
+// window's tab that started playing sound last, while the user is on another
+// tab. Its art, title, and where the sound comes from, with play or pause, and
+// previous and next when the site offers them. A click goes to the tab. Sound
+// in a mini player or a site's own window has its own controls, so it gets no
+// such row. Two more rows above it show the mini player and a live window
+// while they dock in another window, with Move here; a click goes to that
+// window.
 class PlaybackControls : public views::Button,
                          public TabStripModelObserver,
                          public PictureInPictureWindowManager::Observer,
@@ -48,17 +54,29 @@ class PlaybackControls : public views::Button,
  public:
   static constexpr int kHeight = 44;
 
-  explicit PlaybackControls(BrowserWindowInterface* window);
+  // What a row is for.
+  enum class Kind {
+    // The window's own tab that started playing sound last.
+    kOwnTabs,
+    // The mini player, while its home window is another.
+    kMiniPlayer,
+    // A site's live window, while its home window is another.
+    kLiveWindow,
+  };
+
+  PlaybackControls(BrowserWindowInterface* window, Kind kind);
   PlaybackControls(const PlaybackControls&) = delete;
   PlaybackControls& operator=(const PlaybackControls&) = delete;
   ~PlaybackControls() override;
 
+  Kind kind() const { return kind_; }
   // The tab the row is for, shown or not.
   content::WebContents* tab() { return tab_.get(); }
   bool playing() const { return playing_; }
   views::ImageButton* previous() { return previous_; }
   views::ImageButton* play_pause() { return play_pause_; }
   views::ImageButton* next() { return next_; }
+  views::ImageButton* move_here() { return move_here_; }
   // The × on the row's corner, shown under the pointer.
   views::ImageButton* dismiss() { return dismiss_; }
   bool has_art() const { return !art_.isNull(); }
@@ -105,25 +123,38 @@ class PlaybackControls : public views::Button,
       const std::optional<media_session::MediaPosition>& position) override {}
 
  private:
-  // Follows `contents`, a tab of this window that started playing.
+  // Follows `contents`, a tab of this window that started playing, or the tab
+  // of the mini player or live window the row is for.
   void Follow(content::WebContents* contents);
+  // Follows the mini player or live window while it docks in another window,
+  // and nothing otherwise.
+  void UpdateElsewhere();
+  // Posts UpdateElsewhere(), for changes that settle within the task.
+  void UpdateElsewhereSoon();
+  // The placement of what the row is for, outside kOwnTabs.
+  MiniPlayerPlacement* Placement();
   // Shows the row while its tab is not the one in front and its sound is not
   // in a mini player.
   void UpdateVisibility();
   void UpdateButtons();
   void OnArt(const SkBitmap& art);
+  // Goes to the tab, or to the home window outside kOwnTabs.
   void GoToTab();
   void PlayOrPause();
+  void MoveHere();
   // Pauses the tab's sound and hides the row until that tab plays again or
-  // another tab starts playing.
+  // another tab starts playing. Outside kOwnTabs, closes the mini player or
+  // live window.
   void Dismiss();
   SkColor TextColor() const;
 
   const raw_ptr<BrowserWindowInterface> window_;
+  const Kind kind_;
   base::WeakPtr<content::WebContents> tab_;
   bool playing_ = false;
   bool has_previous_ = false;
   bool has_next_ = false;
+  bool has_play_pause_ = false;
   bool dismissed_ = false;
   std::u16string title_;
   std::u16string source_;
@@ -131,6 +162,7 @@ class PlaybackControls : public views::Button,
   raw_ptr<views::ImageButton> previous_ = nullptr;
   raw_ptr<views::ImageButton> play_pause_ = nullptr;
   raw_ptr<views::ImageButton> next_ = nullptr;
+  raw_ptr<views::ImageButton> move_here_ = nullptr;
   raw_ptr<views::ImageButton> dismiss_ = nullptr;
   mojo::Receiver<media_session::mojom::AudioFocusObserver> focus_{this};
   mojo::Receiver<media_session::mojom::MediaSessionObserver> session_{this};
@@ -138,6 +170,8 @@ class PlaybackControls : public views::Button,
                           PictureInPictureWindowManager::Observer>
       picture_in_picture_{this};
   base::CallbackListSubscription stack_;
+  base::CallbackListSubscription homes_;
+  PrefChangeRegistrar prefs_;
   base::WeakPtrFactory<PlaybackControls> weak_factory_{this};
 };
 

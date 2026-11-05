@@ -29,7 +29,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..ea2af6d283d9d5411ebe873d63f28397
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,184 @@
+@@ -3904,6 +3904,190 @@
          System
        </message>
      </if>
@@ -194,6 +194,12 @@ index 63c989a76dadc13953e35513998e83326ee3612b..ea2af6d283d9d5411ebe873d63f28397
 +      </message>
 +      <message name="IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB" desc="Accessible name and tooltip of the playback controls' art and title, which go to the tab playing the sound.">
 +        Go to tab
++      </message>
++      <message name="IDS_UW_PLAYBACK_CONTROLS_MOVE_HERE" desc="Accessible name and tooltip of the button on the playback controls of a picture-in-picture video, or of a site's small window such as a video call, that is docked in another window's tab sidebar. It docks it in this window's tab sidebar instead.">
++        Move here
++      </message>
++      <message name="IDS_UW_PLAYBACK_CONTROLS_GO_TO_WINDOW" desc="Accessible name and tooltip of the playback controls of a picture-in-picture video, or of a site's small window such as a video call, that is docked in another window's tab sidebar. Clicking them brings that window to the front.">
++        Go to its window
 +      </message>
 +      <message name="IDS_UW_SETTINGS_MINI_PLAYER_ON_TAB_SWITCH" desc="Label of the switch that puts a playing video in the mini player when the user switches away from its tab.">
 +        Open the mini player when you switch tabs

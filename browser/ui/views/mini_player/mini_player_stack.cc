@@ -9,6 +9,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/navigation_controller.h"
@@ -55,7 +56,10 @@ void MiniPlayerStack::OnHidden(content::WebContents* contents,
                                 weak_factory_.GetWeakPtr()));
 }
 
-void MiniPlayerStack::OnShown(content::WebContents* contents) {
+BrowserWindowInterface* MiniPlayerStack::OnShown(
+    content::WebContents* contents) {
+  const bool replayed = replaying_ && replaying_.get() == contents;
+  replaying_.reset();
   std::vector<Entry> gone;
   std::erase_if(paused_, [contents, &gone](const Entry& entry) {
     if (entry.contents && entry.contents.get() != contents) {
@@ -84,6 +88,11 @@ void MiniPlayerStack::OnShown(content::WebContents* contents) {
   for (const Entry& entry : gone) {
     Dropped(entry);
   }
+  return replayed ? home_.get() : nullptr;
+}
+
+void MiniPlayerStack::set_home(BrowserWindowInterface* home) {
+  home_ = home ? home->GetWeakPtr() : nullptr;
 }
 
 void MiniPlayerStack::Play(size_t index) {
@@ -104,6 +113,7 @@ void MiniPlayerStack::Play(size_t index) {
   if (!contents) {
     return;
   }
+  replaying_ = contents;
   content::MediaSession* session = content::MediaSession::Get(contents.get());
   session->Resume(content::MediaSession::SuspendType::kUI);
   session->EnterPictureInPicture();
@@ -219,6 +229,7 @@ void MiniPlayerStack::BringUpNewest() {
   base::WeakPtr<content::WebContents> contents = newest->contents;
   paused_.erase(newest);
   observers_.Notify();
+  replaying_ = contents;
   content::MediaSession::Get(contents.get())->EnterPictureInPicture();
 }
 

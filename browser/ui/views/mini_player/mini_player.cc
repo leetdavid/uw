@@ -44,6 +44,11 @@ constexpr int kResizeBorder = 6;
 // Between a floating video and a site's window floating under it.
 constexpr int kFloatGap = 8;
 
+MiniPlayer*& ShownSlot() {
+  static MiniPlayer* shown = nullptr;
+  return shown;
+}
+
 // Where the user last left the floating mini player, for the next one.
 std::optional<gfx::Rect>& LastBounds() {
   static std::optional<gfx::Rect> bounds;
@@ -158,6 +163,8 @@ std::unique_ptr<content::VideoOverlayWindow> MiniPlayer::Create(
   mini_player->SetBounds(mini_player->CalculateBounds());
   mini_player->placement_ = std::make_unique<MiniPlayerPlacement>(
       mini_player.get(),
+      base::BindRepeating(&MiniPlayer::contents,
+                          base::Unretained(mini_player.get())),
       base::BindRepeating(&MiniPlayer::Place,
                           base::Unretained(mini_player.get())));
 
@@ -173,6 +180,9 @@ MiniPlayer::MiniPlayer(
     : controller_(controller) {}
 
 MiniPlayer::~MiniPlayer() {
+  if (ShownSlot() == this) {
+    ShownSlot() = nullptr;
+  }
   placement_.reset();
   if (dock_) {
     // The video goes with this mini player, not with the window it docked in.
@@ -184,12 +194,29 @@ MiniPlayer::~MiniPlayer() {
       this);
 }
 
+// static
+MiniPlayer* MiniPlayer::Shown() {
+  return ShownSlot();
+}
+
+content::WebContents* MiniPlayer::contents() {
+  return controller_->GetWebContents();
+}
+
+void MiniPlayer::MoveHere(BrowserWindowInterface* window) {
+  MiniPlayerStack::Get().set_home(window);
+  placement_->MoveHere(window);
+}
+
 bool MiniPlayer::IsActive() const {
   return views::Widget::IsActive();
 }
 
 void MiniPlayer::Close() {
   shown_ = false;
+  if (ShownSlot() == this) {
+    ShownSlot() = nullptr;
+  }
   Undock();
   view_->DetachFromCompositor();
   views::Widget::Close();
@@ -209,7 +236,12 @@ void MiniPlayer::ShowInactive() {
           ->IsPictureInPictureDisabled()) {
     return;
   }
-  MiniPlayerStack::Get().OnShown(controller_->GetWebContents());
+  ShownSlot() = this;
+  // A video the stack plays again docks where the stack is; any other in its
+  // tab's window.
+  placement_->SetHome(
+      MiniPlayerStack::Get().OnShown(controller_->GetWebContents()));
+  MiniPlayerStack::Get().set_home(placement_->home());
   view_->SetMuted(controller_->GetMuteStatus());
   view_->ShowControls(false);
   placement_->Update();
@@ -223,6 +255,9 @@ void MiniPlayer::Hide() {
                                     view_->still(), view_->position());
   }
   shown_ = false;
+  if (ShownSlot() == this) {
+    ShownSlot() = nullptr;
+  }
   Undock();
   views::Widget::Hide();
   if (fade_animator_) {
@@ -406,7 +441,7 @@ void MiniPlayer::MoveByHand() {
   if (dock_) {
     placement_->PopOut();
   } else {
-    MiniPlayerPlacement::DockByHand();
+    placement_->DockByHand();
   }
 }
 

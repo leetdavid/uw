@@ -53,8 +53,9 @@ class SiteWindow : public content::WebContentsDelegate,
   SiteWindow& operator=(const SiteWindow&) = delete;
   ~SiteWindow() override;
 
-  // The tab that opened it.
-  content::WebContents* opener() { return opener_; }
+  // The tab that opened it, or nullptr once that tab is gone, as while uw
+  // quits.
+  content::WebContents* opener() { return weak_opener_.get(); }
   // The host of that tab, whose choice of Live it follows.
   const std::string& site() const { return site_; }
   // Whether it keeps running beside a video.
@@ -80,6 +81,10 @@ class SiteWindow : public content::WebContentsDelegate,
   void BackToTab();
   // Floats it by hand, for its pop out, until docked by hand.
   void PopOut();
+  // Docks it in its home window, for the dock button in its floating bar.
+  void DockByHand();
+  // Where it goes, until its own window closes.
+  MiniPlayerPlacement* placement() { return placement_.get(); }
 
   // The dock button in the bar of a site's floating window, which uw shows
   // while that window could dock.
@@ -136,6 +141,7 @@ class SiteWindow : public content::WebContentsDelegate,
   content::DocumentPictureInPictureWindowController* controller();
 
   const raw_ptr<content::WebContents> opener_;
+  const base::WeakPtr<content::WebContents> weak_opener_;
   const raw_ptr<content::WebContents> page_;
   const raw_ptr<BrowserWindowInterface> window_;
   const std::string site_;

@@ -16,6 +16,8 @@
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "ui/gfx/image/image_skia.h"
 
+class BrowserWindowInterface;
+
 namespace content {
 class WebContents;
 }
@@ -27,7 +29,8 @@ namespace uw {
 // so a new one hides the old one at once; the old video pauses and waits here,
 // newest first, until the user plays it again, drops it, or goes to its tab.
 // The stack lives only in the sidebar: unless the mini player docks, the old
-// video pauses and is forgotten.
+// video pauses and is forgotten. It docks in the playing video's home window,
+// which a video the stack plays again keeps.
 class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
  public:
   // A paused video.
@@ -63,8 +66,11 @@ class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
   void OnHidden(content::WebContents* contents,
                 gfx::ImageSkia still,
                 base::TimeDelta position);
-  // The mini player of `contents` showed.
-  void OnShown(content::WebContents* contents);
+  // The mini player of `contents` showed. Returns the stack's home window
+  // when the stack played it again, or nullptr for its tab's window.
+  BrowserWindowInterface* OnShown(content::WebContents* contents);
+  // The home window of the playing video.
+  void set_home(BrowserWindowInterface* home);
 
   const std::vector<Entry>& paused() const { return paused_; }
 
@@ -104,6 +110,9 @@ class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
 
   std::optional<Entry> hidden_;
   std::vector<Entry> paused_;
+  base::WeakPtr<BrowserWindowInterface> home_;
+  // The video the stack is playing again, which keeps the home window.
+  base::WeakPtr<content::WebContents> replaying_;
   base::RepeatingClosureList observers_;
   base::ScopedObservation<PictureInPictureWindowManager,
                           PictureInPictureWindowManager::Observer>

@@ -7,12 +7,17 @@
 
 #include "base/functional/bind.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "cc/paint/paint_flags.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/prefs/pref_service.h"
 #include "components/vector_icons/vector_icons.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/media_session_service.h"
@@ -38,7 +43,11 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/mini_player/mini_player.h"
+#include "uw/browser/ui/views/mini_player/mini_player_placement.h"
+#include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
+#include "uw/browser/ui/views/mini_player/site_window.h"
 
 namespace uw {
 namespace {
@@ -71,15 +80,18 @@ gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
 
 }  // namespace
 
-PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
+PlaybackControls::PlaybackControls(BrowserWindowInterface* window, Kind kind)
     : views::Button(base::BindRepeating(&PlaybackControls::GoToTab,
                                         base::Unretained(this))),
-      window_(window) {
+      window_(window),
+      kind_(kind) {
   SetVisible(false);
   // The pointer on one of the row's buttons is still on the row.
   SetNotifyEnterExitOnChild(true);
   SetProperty(views::kMarginsKey, gfx::Insets::VH(kGapAround, 0));
-  SetTooltipText(l10n_util::GetStringUTF16(IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB));
+  SetTooltipText(l10n_util::GetStringUTF16(
+      kind_ == Kind::kOwnTabs ? IDS_UW_PLAYBACK_CONTROLS_GO_TO_TAB
+                              : IDS_UW_PLAYBACK_CONTROLS_GO_TO_WINDOW));
   auto button = [this](views::Button::PressedCallback callback, int message) {
     auto* added =
         AddChildView(std::make_unique<views::ImageButton>(std::move(callback)));
@@ -111,6 +123,9 @@ PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
                  },
                  base::Unretained(this)),
              IDS_PICTURE_IN_PICTURE_NEXT_TRACK_CONTROL_ACCESSIBLE_TEXT);
+  move_here_ = button(
+      base::BindRepeating(&PlaybackControls::MoveHere, base::Unretained(this)),
+      IDS_UW_PLAYBACK_CONTROLS_MOVE_HERE);
   dismiss_ = button(
       base::BindRepeating(&PlaybackControls::Dismiss, base::Unretained(this)),
       IDS_PICTURE_IN_PICTURE_CLOSE_CONTROL_TEXT);
@@ -123,8 +138,22 @@ PlaybackControls::PlaybackControls(BrowserWindowInterface* window)
   dismiss_->SetVisible(false);
   UpdateButtons();
 
-  window_->GetTabStripModel()->AddObserver(this);
   picture_in_picture_.Observe(PictureInPictureWindowManager::GetInstance());
+  if (kind_ != Kind::kOwnTabs) {
+    stack_ = MiniPlayerStack::Get().Observe(base::BindRepeating(
+        &PlaybackControls::UpdateElsewhere, base::Unretained(this)));
+    homes_ = MiniPlayerPlacement::ObserveHomes(base::BindRepeating(
+        &PlaybackControls::UpdateElsewhere, base::Unretained(this)));
+    if (PrefService* local_state = g_browser_process->local_state()) {
+      prefs_.Init(local_state);
+      prefs_.Add(kMiniPlayerModePref,
+                 base::BindRepeating(&PlaybackControls::UpdateElsewhere,
+                                     base::Unretained(this)));
+    }
+    UpdateElsewhere();
+    return;
+  }
+  window_->GetTabStripModel()->AddObserver(this);
   stack_ = MiniPlayerStack::Get().Observe(base::BindRepeating(
       &PlaybackControls::UpdateVisibility, base::Unretained(this)));
   mojo::Remote<media_session::mojom::AudioFocusManager> focus;
@@ -145,7 +174,8 @@ gfx::Size PlaybackControls::CalculatePreferredSize(
 
 void PlaybackControls::Layout(PassKey) {
   int x = width() - kPadding;
-  for (views::ImageButton* button : {next_, play_pause_, previous_}) {
+  for (views::ImageButton* button :
+       {next_, play_pause_, previous_, move_here_}) {
     if (button->GetVisible()) {
       x -= kButton;
       button->SetBounds(x, (height() - kButton) / 2, kButton, kButton);
@@ -183,11 +213,19 @@ void PlaybackControls::OnTabStripModelChanged(
 }
 
 void PlaybackControls::OnEnterPictureInPicture() {
-  UpdateVisibility();
+  if (kind_ == Kind::kOwnTabs) {
+    UpdateVisibility();
+  } else {
+    UpdateElsewhereSoon();
+  }
 }
 
 void PlaybackControls::OnExitPictureInPicture() {
-  UpdateVisibility();
+  if (kind_ == Kind::kOwnTabs) {
+    UpdateVisibility();
+  } else {
+    UpdateElsewhereSoon();
+  }
 }
 
 void PlaybackControls::OnFocusGained(
@@ -245,6 +283,8 @@ void PlaybackControls::MediaSessionActionsChanged(
   has_previous_ =
       std::ranges::contains(actions, MediaSessionAction::kPreviousTrack);
   has_next_ = std::ranges::contains(actions, MediaSessionAction::kNextTrack);
+  has_play_pause_ = std::ranges::contains(actions, MediaSessionAction::kPlay) ||
+                    std::ranges::contains(actions, MediaSessionAction::kPause);
   UpdateButtons();
 }
 
@@ -272,6 +312,7 @@ void PlaybackControls::Follow(content::WebContents* contents) {
   dismissed_ = false;
   has_previous_ = false;
   has_next_ = false;
+  has_play_pause_ = false;
   art_ = gfx::ImageSkia();
   MediaSessionMetadataChanged(std::nullopt);
   session_.reset();
@@ -279,6 +320,47 @@ void PlaybackControls::Follow(content::WebContents* contents) {
       session_.BindNewPipeAndPassRemote());
   UpdateButtons();
   UpdateVisibility();
+}
+
+void PlaybackControls::UpdateElsewhere() {
+  content::WebContents* contents = nullptr;
+  if (kind_ == Kind::kMiniPlayer) {
+    MiniPlayer* mini_player = MiniPlayer::Shown();
+    contents = mini_player ? mini_player->contents() : nullptr;
+  } else if (SiteWindow* site_window = SiteWindow::Current();
+             site_window && !site_window->waiting()) {
+    contents = site_window->opener();
+  }
+  MiniPlayerPlacement* placement = Placement();
+  // A private window's video shows only in private windows.
+  const bool elsewhere = contents && placement &&
+                         placement->home() != window_ &&
+                         MiniPlayerModeOf(g_browser_process->local_state()) ==
+                             MiniPlayerMode::kDock &&
+                         (!contents->GetBrowserContext()->IsOffTheRecord() ||
+                          window_->GetProfile()->IsOffTheRecord());
+  if (elsewhere) {
+    Follow(contents);
+    return;
+  }
+  tab_.reset();
+  session_.reset();
+  UpdateVisibility();
+}
+
+void PlaybackControls::UpdateElsewhereSoon() {
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(&PlaybackControls::UpdateElsewhere,
+                                weak_factory_.GetWeakPtr()));
+}
+
+MiniPlayerPlacement* PlaybackControls::Placement() {
+  if (kind_ == Kind::kMiniPlayer) {
+    MiniPlayer* mini_player = MiniPlayer::Shown();
+    return mini_player ? mini_player->placement() : nullptr;
+  }
+  SiteWindow* site_window = SiteWindow::Current();
+  return site_window ? site_window->placement() : nullptr;
 }
 
 void PlaybackControls::UpdateVisibility() {
@@ -298,8 +380,10 @@ void PlaybackControls::UpdateVisibility() {
                              return entry.contents.get() == contents;
                            }));
   const bool show =
-      contents && !in_mini_player && !dismissed_ &&
-      window_->GetTabStripModel()->GetActiveWebContents() != contents;
+      kind_ == Kind::kOwnTabs
+          ? contents && !in_mini_player && !dismissed_ &&
+                window_->GetTabStripModel()->GetActiveWebContents() != contents
+          : contents != nullptr;
   if (!show) {
     dismiss_->SetVisible(false);
   }
@@ -311,6 +395,19 @@ void PlaybackControls::UpdateVisibility() {
 
 void PlaybackControls::Dismiss() {
   if (!tab_) {
+    return;
+  }
+  if (kind_ == Kind::kMiniPlayer) {
+    PictureInPictureWindowManager::GetInstance()
+        ->ExitPictureInPictureViaWindowUi(
+            PictureInPictureWindowManager::UiBehavior::
+                kCloseWindowAndPauseVideo);
+    return;
+  }
+  if (kind_ == Kind::kLiveWindow) {
+    if (SiteWindow* site_window = SiteWindow::Current()) {
+      site_window->Close();
+    }
     return;
   }
   if (playing_) {
@@ -325,6 +422,10 @@ void PlaybackControls::UpdateButtons() {
   // Always the same buttons, so the row keeps its shape under the pointer.
   previous_->SetVisible(has_previous_);
   next_->SetVisible(has_next_);
+  // A live window, such as a call, plays and pauses only when its site
+  // offers that.
+  play_pause_->SetVisible(kind_ != Kind::kLiveWindow || has_play_pause_);
+  move_here_->SetVisible(kind_ != Kind::kOwnTabs);
   const std::u16string name = l10n_util::GetStringUTF16(
       playing_ ? IDS_PICTURE_IN_PICTURE_PAUSE_CONTROL_TEXT
                : IDS_PICTURE_IN_PICTURE_PLAY_CONTROL_TEXT);
@@ -344,6 +445,9 @@ void PlaybackControls::UpdateButtons() {
     next_->SetImageModel(views::Button::STATE_NORMAL,
                          ui::ImageModel::FromVectorIcon(
                              vector_icons::kSkipNextIcon, color, kIcon));
+    move_here_->SetImageModel(
+        views::Button::STATE_NORMAL,
+        ui::ImageModel::FromVectorIcon(kMiniPlayerDockIcon, color, kIcon));
   }
   InvalidateLayout();
   SchedulePaint();
@@ -367,6 +471,12 @@ void PlaybackControls::SetArtForTesting(const SkBitmap& art) {
 }
 
 void PlaybackControls::GoToTab() {
+  if (kind_ != Kind::kOwnTabs) {
+    if (MiniPlayerPlacement* placement = Placement()) {
+      MiniPlayerPlacement::BringForward(placement->home());
+    }
+    return;
+  }
   TabStripModel* tabs = window_->GetTabStripModel();
   const int index =
       tab_ ? tabs->GetIndexOfWebContents(tab_.get()) : TabStripModel::kNoTab;
@@ -384,6 +494,16 @@ void PlaybackControls::PlayOrPause() {
     session->Suspend(content::MediaSession::SuspendType::kUI);
   } else {
     session->Resume(content::MediaSession::SuspendType::kUI);
+  }
+}
+
+void PlaybackControls::MoveHere() {
+  if (kind_ == Kind::kMiniPlayer) {
+    if (MiniPlayer* mini_player = MiniPlayer::Shown()) {
+      mini_player->MoveHere(window_);
+    }
+  } else if (MiniPlayerPlacement* placement = Placement()) {
+    placement->MoveHere(window_);
   }
 }
 
@@ -405,7 +525,8 @@ void PlaybackControls::PaintButtonContents(gfx::Canvas* canvas) {
   canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kRadius, fill);
 
   // A soft circle behind the button under the pointer.
-  for (views::ImageButton* button : {previous_, play_pause_, next_}) {
+  for (views::ImageButton* button :
+       {move_here_, previous_, play_pause_, next_}) {
     if (button->GetVisible() && button->IsMouseHovered()) {
       fill.setColor(SkColorSetA(text, 0x14));
       canvas->DrawCircle(gfx::PointF(button->bounds().CenterPoint()),
@@ -450,7 +571,8 @@ void PlaybackControls::PaintButtonContents(gfx::Canvas* canvas) {
   // The title, then the site's icon and where the sound comes from, or that
   // it is paused.
   int right = width() - kPadding;
-  for (views::ImageButton* button : {previous_, play_pause_, next_}) {
+  for (views::ImageButton* button :
+       {move_here_, previous_, play_pause_, next_}) {
     if (button->GetVisible()) {
       right = std::min(right, button->x());
     }
