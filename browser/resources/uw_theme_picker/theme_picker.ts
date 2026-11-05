@@ -5,7 +5,7 @@ import '/strings.m.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 
 import type {FieldPoint, GlassSliders, SuggestedTheme, Theme} from './uw_theme_picker.mojom-webui.js';
-import {GlassPause, PageMode, ThemePickerHandlerFactory, ThemePickerHandlerRemote} from './uw_theme_picker.mojom-webui.js';
+import {GlassPause, ThemePickerHandlerFactory, ThemePickerHandlerRemote, WebsiteMode} from './uw_theme_picker.mojom-webui.js';
 
 const MAX_COLORS = 3;
 // The field is pale at the top and full from 52% of its height down, as the
@@ -37,15 +37,18 @@ const transparencyTick =
 const glassRow = document.querySelector<HTMLElement>('#glass-row')!;
 const glass = document.querySelector<HTMLInputElement>('#glass')!;
 const glassWhy = document.querySelector<HTMLElement>('#glass-why')!;
-const pagesTheme =
-    document.querySelector<HTMLButtonElement>('#pages-theme')!;
-const pageModes = new Map<PageMode, HTMLButtonElement>([
-  [PageMode.kTheme, pagesTheme],
+const websitesAuto =
+    document.querySelector<HTMLButtonElement>('#websites-auto')!;
+const websiteModes = new Map<WebsiteMode, HTMLButtonElement>([
+  [WebsiteMode.kAuto, websitesAuto],
   [
-    PageMode.kLight,
-    document.querySelector<HTMLButtonElement>('#pages-light')!,
+    WebsiteMode.kLight,
+    document.querySelector<HTMLButtonElement>('#websites-light')!,
   ],
-  [PageMode.kDark, document.querySelector<HTMLButtonElement>('#pages-dark')!],
+  [
+    WebsiteMode.kDark,
+    document.querySelector<HTMLButtonElement>('#websites-dark')!,
+  ],
 ]);
 
 let theme: Theme;
@@ -258,30 +261,29 @@ glass.addEventListener('input', () => {
   save();
 });
 
-function showPageMode(mode: PageMode) {
-  for (const [value, button] of pageModes) {
+function showWebsiteMode(mode: WebsiteMode) {
+  for (const [value, button] of websiteModes) {
     button.setAttribute('aria-pressed', String(value === mode));
   }
 }
 
-const pageModeNames = new Map<PageMode, string>([
-  [PageMode.kTheme, 'pagesTheme'],
-  [PageMode.kLight, 'modeLight'],
-  [PageMode.kDark, 'modeDark'],
+const websiteModeNames = new Map<WebsiteMode, string>([
+  [WebsiteMode.kAuto, 'modeAuto'],
+  [WebsiteMode.kLight, 'modeLight'],
+  [WebsiteMode.kDark, 'modeDark'],
 ]);
-for (const [mode, button] of pageModes) {
+for (const [mode, button] of websiteModes) {
   button.querySelector('span')!.textContent =
-      loadTimeData.getString(pageModeNames.get(mode)!);
+      loadTimeData.getString(websiteModeNames.get(mode)!);
   button.addEventListener('click', () => {
-    showPageMode(mode);
-    handler.setPageMode(mode);
+    showWebsiteMode(mode);
+    handler.setWebsiteMode(mode);
   });
 }
-document.querySelector('#pages-label')!.textContent =
-    loadTimeData.getString('pages');
-pagesTheme.title = loadTimeData.getString('pagesSameAsTheme');
-pagesTheme.setAttribute(
-    'aria-label', loadTimeData.getString('pagesSameAsTheme'));
+document.querySelector('#websites-label')!.textContent =
+    loadTimeData.getString('websites');
+websitesAuto.title = loadTimeData.getString('websitesAuto');
+websitesAuto.setAttribute('aria-label', loadTimeData.getString('websitesAuto'));
 
 field.setAttribute('aria-label', loadTimeData.getString('colorField'));
 add.title = loadTimeData.getString('addColor');
@@ -304,7 +306,7 @@ const {
   theme: saved,
   shown: savedShown,
   points: savedPoints,
-  pageMode,
+  websiteMode,
   suggested,
   glass: sliders,
 } = await handler.getState();
@@ -332,6 +334,6 @@ suggestedRow.replaceChildren(...suggestions.map((suggestion, i) => {
   });
   return button;
 }));
-showPageMode(pageMode);
+showWebsiteMode(websiteMode);
 draw();
 handler.showUI();

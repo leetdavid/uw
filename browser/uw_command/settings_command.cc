@@ -5,6 +5,7 @@
 
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
@@ -23,12 +24,26 @@ namespace {
 
 using Scope = CommandSetting::Scope;
 
+// A choice behind a preference that holds a number, such as Chromium's own
+// light or dark setting, lists that number as text.
+bool HoldsNumber(const CommandSetting& setting, const PrefService& prefs) {
+  return setting.kind == CommandSetting::Kind::kChoice &&
+         prefs.FindPreference(setting.pref)->GetType() ==
+             base::Value::Type::INTEGER;
+}
+
 base::Value StoredValue(const CommandSetting& setting,
                         Profile* profile,
                         const std::string& workspace) {
   switch (setting.scope) {
-    case Scope::kProfile:
-      return profile->GetPrefs()->GetValue(setting.pref).Clone();
+    case Scope::kProfile: {
+      const PrefService& prefs = *profile->GetPrefs();
+      if (HoldsNumber(setting, prefs)) {
+        return base::Value(
+            base::NumberToString(prefs.GetInteger(setting.pref)));
+      }
+      return prefs.GetValue(setting.pref).Clone();
+    }
     case Scope::kEverywhere:
       return g_browser_process->local_state()->GetValue(setting.pref).Clone();
     case Scope::kWorkspace:
@@ -41,9 +56,17 @@ void Store(const CommandSetting& setting,
            const std::string& workspace,
            const base::Value& value) {
   switch (setting.scope) {
-    case Scope::kProfile:
-      profile->GetPrefs()->Set(setting.pref, value);
+    case Scope::kProfile: {
+      PrefService& prefs = *profile->GetPrefs();
+      int number;
+      if (HoldsNumber(setting, prefs) &&
+          base::StringToInt(value.GetString(), &number)) {
+        prefs.SetInteger(setting.pref, number);
+        return;
+      }
+      prefs.Set(setting.pref, value);
       return;
+    }
     case Scope::kEverywhere:
       g_browser_process->local_state()->Set(setting.pref, value);
       return;

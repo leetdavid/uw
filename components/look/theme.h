@@ -21,10 +21,6 @@ inline constexpr int kFullGlass = 100;
 // Sky, the second color of the default theme, lilac to sky.
 inline constexpr SkColor kSky = SkColorSetRGB(0xD8, 0xE6, 0xF9);
 
-// The light or dark of everything outside the sidebar: the theme's own, Light,
-// or Dark.
-enum class PageMode { kTheme, kLight, kDark };
-
 // A theme, as the picker sets it: a workspace's, or a profile's. It has no
 // light or dark of its own: a theme whose text is white is dark.
 struct Theme {
@@ -42,7 +38,6 @@ struct Theme {
   // How glassy the window's pin tiles, active tab, and buttons are, from 0,
   // flat, through frosted to 100, clear.
   int glass = 0;
-  PageMode page_mode = PageMode::kTheme;
 
   bool operator==(const Theme&) const = default;
 };

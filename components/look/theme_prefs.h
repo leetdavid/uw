@@ -24,6 +24,7 @@ inline constexpr char kThemeBrightnessPref[] = "uw.theme.brightness";
 inline constexpr char kThemeGrainPref[] = "uw.theme.grain";
 inline constexpr char kThemeTransparencyPref[] = "uw.theme.transparency";
 inline constexpr char kThemeGlassPref[] = "uw.theme.glass";
+// The Pages row before website mode, read once to start website mode.
 inline constexpr char kThemePageModePref[] = "uw.theme.page_mode";
 
 void RegisterThemeProfilePrefs(PrefRegistrySimple* registry);
@@ -42,6 +43,10 @@ std::optional<Theme> ThemeFromValue(const base::DictValue& value);
 // Saves `theme`. The caller sets Chromium's user color to its first color as
 // shown.
 void WriteTheme(PrefService& prefs, const Theme& theme);
+
+// The Pages row's Light (false) or Dark (true) from before website mode, once:
+// nothing when it said Theme, or after the first call.
+std::optional<bool> TakeOldPagesRowDark(PrefService& prefs);
 
 }  // namespace uw
 

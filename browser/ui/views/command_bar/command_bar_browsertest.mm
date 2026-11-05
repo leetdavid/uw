@@ -273,10 +273,10 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdTOpensItWithoutATab) {
   EXPECT_EQ(tabs, browser()->tab_strip_model()->count());
 }
 
-// It opens over the page, so it takes the page mode, per T198.
-IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesThePageMode) {
+// It is uw's own, so it takes the theme, per docs/plans/themes.md#one-look.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ItTakesTheTheme) {
   Theme theme;
-  theme.page_mode = PageMode::kDark;
+  theme.brightness = 0;
   SetThemeOfWindow(browser(), theme);
 
   Press(ui::VKEY_T, NSEventModifierFlagCommand);

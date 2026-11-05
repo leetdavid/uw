@@ -3,7 +3,6 @@
 #include "uw/components/look/theme_prefs.h"
 
 #include <string>
-#include <string_view>
 #include <utility>
 
 #include "base/values.h"
@@ -24,24 +23,6 @@ void RegisterThemeProfilePrefs(PrefRegistrySimple* registry) {
 
 namespace {
 
-// Theme is saved as "window", its name before T201.
-std::string_view PageModeName(PageMode mode) {
-  switch (mode) {
-    case PageMode::kTheme:
-      return "window";
-    case PageMode::kLight:
-      return "light";
-    case PageMode::kDark:
-      return "dark";
-  }
-}
-
-PageMode PageModeNamed(std::string_view name) {
-  return name == "light"  ? PageMode::kLight
-         : name == "dark" ? PageMode::kDark
-                          : PageMode::kTheme;
-}
-
 // The theme as saved, with no saved colors as none.
 Theme SavedTheme(const PrefService& prefs) {
   Theme theme;
@@ -56,7 +37,6 @@ Theme SavedTheme(const PrefService& prefs) {
   theme.grain = prefs.GetInteger(kThemeGrainPref);
   theme.transparency = prefs.GetInteger(kThemeTransparencyPref);
   theme.glass = prefs.GetInteger(kThemeGlassPref);
-  theme.page_mode = PageModeNamed(prefs.GetString(kThemePageModePref));
   return theme;
 }
 
@@ -88,8 +68,7 @@ base::DictValue ThemeToValue(const Theme& theme) {
       .Set("brightness", theme.brightness)
       .Set("grain", theme.grain)
       .Set("transparency", theme.transparency)
-      .Set("glass", theme.glass)
-      .Set("page_mode", PageModeName(theme.page_mode));
+      .Set("glass", theme.glass);
 }
 
 std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
@@ -110,9 +89,6 @@ std::optional<Theme> ThemeFromValue(const base::DictValue& value) {
   theme.grain = value.FindInt("grain").value_or(0);
   theme.transparency = value.FindInt("transparency").value_or(0);
   theme.glass = value.FindInt("glass").value_or(0);
-  if (const std::string* page_mode = value.FindString("page_mode")) {
-    theme.page_mode = PageModeNamed(*page_mode);
-  }
   return theme;
 }
 
@@ -127,7 +103,18 @@ void WriteTheme(PrefService& prefs, const Theme& theme) {
   prefs.SetInteger(kThemeGrainPref, theme.grain);
   prefs.SetInteger(kThemeTransparencyPref, theme.transparency);
   prefs.SetInteger(kThemeGlassPref, theme.glass);
-  prefs.SetString(kThemePageModePref, PageModeName(theme.page_mode));
+}
+
+std::optional<bool> TakeOldPagesRowDark(PrefService& prefs) {
+  if (!prefs.HasPrefPath(kThemePageModePref)) {
+    return std::nullopt;
+  }
+  const std::string mode = prefs.GetString(kThemePageModePref);
+  prefs.ClearPref(kThemePageModePref);
+  if (mode == "light" || mode == "dark") {
+    return mode == "dark";
+  }
+  return std::nullopt;
 }
 
 }  // namespace uw

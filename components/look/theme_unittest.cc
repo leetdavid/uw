@@ -171,7 +171,6 @@ TEST_F(ThemePrefsTest, ASavedThemeComesBackWhole) {
   theme.grain = 25;
   theme.transparency = 70;
   theme.glass = 20;
-  theme.page_mode = PageMode::kDark;
   WriteTheme(prefs_, theme);
   EXPECT_EQ(ReadTheme(prefs_, ColorAsShown(theme, kButter)), theme);
 }
@@ -210,7 +209,6 @@ TEST_F(ThemePrefsTest, AWorkspaceKeepsEveryPartOfItsTheme) {
   theme.grain = 25;
   theme.transparency = 40;
   theme.glass = 90;
-  theme.page_mode = PageMode::kLight;
   EXPECT_EQ(ThemeFromValue(ThemeToValue(theme)), theme);
   EXPECT_FALSE(ThemeFromValue(base::DictValue()));
 }
@@ -226,6 +224,17 @@ TEST_F(ThemePrefsTest, AWorkspaceThemeFromBeforeKeepsItsColorsAtFullBrightness) 
   ASSERT_TRUE(theme);
   EXPECT_EQ(theme->colors, std::vector<SkColor>{kWine});
   EXPECT_EQ(theme->brightness, kFullBrightness);
+}
+
+TEST_F(ThemePrefsTest, ThePagesRowFromBeforeIsReadOnce) {
+  EXPECT_EQ(TakeOldPagesRowDark(prefs_), std::nullopt);
+  prefs_.SetString(kThemePageModePref, "dark");
+  EXPECT_EQ(TakeOldPagesRowDark(prefs_), true);
+  EXPECT_EQ(TakeOldPagesRowDark(prefs_), std::nullopt);
+  prefs_.SetString(kThemePageModePref, "light");
+  EXPECT_EQ(TakeOldPagesRowDark(prefs_), false);
+  prefs_.SetString(kThemePageModePref, "window");
+  EXPECT_EQ(TakeOldPagesRowDark(prefs_), std::nullopt);
 }
 
 TEST_F(ThemePrefsTest, ATintFromBeforeThemesIsTheTheme) {

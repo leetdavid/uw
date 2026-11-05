@@ -161,16 +161,6 @@ ui::ColorProviderKey::InitializerSupplier* PageColorMixers(
   return page_colors.mixers.at(found->second).get();
 }
 
-std::optional<SkColor> PageColorOfMixers(
-    const ui::ColorProviderKey::InitializerSupplier* mixers) {
-  for (const auto& [color, each] : GetPageColors().mixers) {
-    if (each.get() == mixers) {
-      return color;
-    }
-  }
-  return std::nullopt;
-}
-
 void AddPageFieldDefaults(ui::ColorMixer& mixer) {
   mixer[kColorPageFieldText] = {kColorOmniboxText};
   mixer[kColorPageFieldTextDimmed] = {kColorOmniboxTextDimmed};

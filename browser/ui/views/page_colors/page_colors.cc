@@ -14,6 +14,7 @@
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/view.h"
 #include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 
@@ -54,6 +55,11 @@ void PageColors::Update() {
       web_contents() ? web_contents()->GetBackgroundColor() : std::nullopt;
   if (color && SkColorGetA(*color) != SK_AlphaOPAQUE) {
     color.reset();
+  }
+  // Until a website gives its own color, the toolbar takes the card's, as
+  // website mode says.
+  if (!color) {
+    color = EmptyPageColor(web_contents());
   }
   if (color == color_) {
     return;

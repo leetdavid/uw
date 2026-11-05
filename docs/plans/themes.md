@@ -249,7 +249,7 @@ Acceptance checks:
 
 ## One look
 
-Status: agreed with the user on 2026-11-04 in a grilling session, after "I want one theme toggle (auto, light, dark), and this ONLY controls the page's content's theme", "the color picker and thing will faithfully change uw's theme (mainly the sidebar), without a "dark" mode. you should be able to just pick black too", "Theme colors in dark mode doesn't seem to do anything, so let's remove that", and "uw's own interfaces should use the uw theme". The design, T337, was signed off the same day: "this looks good". T338 and T339 wait for the user's go-ahead.
+Status: agreed with the user on 2026-11-04 in a grilling session, after "I want one theme toggle (auto, light, dark), and this ONLY controls the page's content's theme", "the color picker and thing will faithfully change uw's theme (mainly the sidebar), without a "dark" mode. you should be able to just pick black too", "Theme colors in dark mode doesn't seem to do anything, so let's remove that", and "uw's own interfaces should use the uw theme". The design, T337, was signed off the same day: "this looks good". T338 and T339 were built on 2026-11-05.
 
 Implementability: **6/10**. Most of the work removes code: the theme's mode, the switch, black dark mode, the Pages row, and the sidebar mixers of [ADR 0017](../adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md). Chromium has the OKLCH math, in `ui/gfx/color_conversions.h`, and OKLCH gradients, in `SkGradient::Interpolation`. The risks are Chromium's colors made from a dark theme color that is not black, telling uw's and Chromium's pages in tabs the theme's light or dark while websites get website mode, and extensions' popups finding their window.
 
@@ -281,11 +281,19 @@ Stages:
 How T338 is built:
 
 - `components/look/tint` turns colors to and from OKLCH with Chromium's `ui/gfx/color_conversions.h`. A color too colorful for sRGB keeps its lightness and hue and loses chroma until it fits. The tint's second color, the readable nudge, Intensity, and Brightness all work in OKLCH there and in `components/look/theme`.
-- `IsDarkTheme` is the theme's light or dark: its text is white. `ApplyThemeOfWindow` puts it in the window's color key, so Chromium's own colors, uw's pages, and the sidebar's menus and cards follow it. Chromium's own setting for the profile gets it too, for windows without a workspace and the "Customize Chromium" panel.
+- `IsDarkTheme` is the theme's light or dark: its text is white. `ApplyThemeOfWindow` puts it in the window's color key, so Chromium's own colors, uw's pages, and the sidebar's menus and cards follow it. Chromium's own setting for the profile gets it too, for windows without a workspace and the "Customize Chromium" panel. Changed by T339: that setting is website mode, and windows without a workspace take the profile's theme in their color key.
 - A first color with almost no chroma, such as black, gives Chromium's neutral colors (`IsNeutral`). The same rule in `ThemeService::GetColorProviderKey`, in `uw-look`, replaces black dark mode.
 - The window's gradient blends in OKLCH (`SkGradient::Interpolation::ColorSpace::kOKLCHGamutMap`).
 - The picker's page asks the browser for the color under a point of the field and where a color sits on it, so the field's math lives only in `components/look/theme`. The page draws the field with CSS `oklch()` at the same lightness and chroma.
 - Until T339, the Pages row keeps working through ADR 0017's mixers, and dark pages keep Chromium's neutral colors.
+
+How T339 is built:
+
+- Website mode is Chromium's `browser_color_scheme`. The picker's Websites row, Settings, and the "Customize Chromium" panel all set it, so they agree. Picking a theme no longer touches it.
+- `GetPreferredColorScheme`, in `uw-scheme-alias`, tells every page that is not WebUI the website mode, private ones included. WebUI pages keep Chromium's rule: they take the color provider's mode, which is the theme's.
+- The card before a page paints is white or `#0A0A0A` as website mode says (`EmptyPageColor`), and uw's and Chromium's own pages keep the theme's.
+- Every normal window's color key takes the theme's light or dark, so nothing Chromium draws mixes the two. ADR 0017's mixers and `ShowInThemeMode` are gone. Private windows keep Chromium's dark look, and web apps their own.
+- On first start after the upgrade, `uw.theme.page_mode` set to Light or Dark becomes website mode, and the pref is cleared.
 
 Acceptance checks:
 

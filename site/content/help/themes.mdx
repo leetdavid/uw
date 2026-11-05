@@ -1,6 +1,6 @@
 ---
 title: Themes
-description: Pick the colors of uw's window, from pale to black, and choose whether the pages you visit are light or dark.
+description: Pick the colors of uw's window, from pale to black, and choose whether websites are light or dark.
 ---
 
 ## Open *the theme picker*
@@ -22,8 +22,8 @@ A panel opens beside the sidebar. The window changes as you pick, so you see eac
     </Sidebar>
     <Page address="stayaway.com/alfama/flat-12" />
     <Popup top={48} left={240} width={290}>
-      <Row title="Pages">
-        <Segmented options="Theme,Light,Dark" value="Theme" />
+      <Row title="Websites">
+        <Segmented options="Auto,Light,Dark" value="Auto" />
       </Row>
       <ColorField />
       <Swatches />
@@ -53,13 +53,13 @@ At `uw://settings/uwOrganization`, under the **Theme** row, turn off **Space aro
 
 The switch is for all of uw, not for one theme, and every open window follows at once. With the sidebar [hidden](./hide-the-sidebar.mdx), the page fills the whole window.
 
-## Light, dark, *and pages*
+## Light, dark, *and websites*
 
-uw has no separate dark mode: your colors decide. A theme whose text is white is dark, and the sidebar's menus and cards and the picker turn dark with it. Pick **Black**, or lower **Brightness**, for a dark uw.
+uw has no separate dark mode: your colors decide. A theme whose text is white is dark, and everything uw and Chromium draw turns dark with it: the sidebar's menus and cards, the picker, the command bar, menus and panels such as Tab Search, and their own pages such as the chat page and Settings. Pick **Black**, or lower **Brightness**, for a dark uw.
 
-**Pages** sets everything outside the sidebar: websites, extensions, uw's and Chromium's own pages such as Settings, and Chromium's menus and bubbles. Leave it on **Theme** to match the theme, or pick **Light** or **Dark**.
+**Websites**, the first row of the picker, sets only whether websites and extensions' pages look light or dark. **Auto** follows your Mac's appearance (on Windows, its light or dark mode). It is one setting for all of a profile's workspaces, and private windows follow it too. Chromium's Settings → Appearance → **Websites** and the **Customize Chromium** panel's mode buttons change the same setting.
 
-For example, with a light theme and **Pages** on **Dark**, the sidebar, its menus, and the picker stay light, while Settings, menus, and websites that have a dark look of their own turn dark.
+For example, with a light theme and **Websites** on **Dark**, uw stays light while websites that have a dark look of their own turn dark.
 
 <Callout>
   uw tells websites which mode you want. A site with no dark look of its own stays light.

@@ -39,7 +39,6 @@
 #include "uw/browser/ui/views/workspaces/workspace_cards.h"
 #include "uw/browser/ui/views/workspaces/workspace_swipe.h"
 #include "uw/browser/workspaces/workspace_list.h"
-#include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 namespace uw {
@@ -384,7 +383,6 @@ void WorkspaceSwitcher::ShowCard(CardBubble* bubble,
     icon->SetRinged(false);
   }
   card_ = views::BubbleDialogDelegate::CreateBubble(bubble);
-  ShowInThemeMode(card_.get(), window_);
   bubble->Watch(card_.get());
   ringed_ = ringed;
   if (auto* icon = views::AsViewClass<WorkspaceIcon>(IconFor(ringed_))) {

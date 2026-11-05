@@ -21,16 +21,12 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/url_utils.h"
 #include "ui/base/base_window.h"
 #include "ui/base/mojom/themes.mojom.h"
 #include "ui/color/color_provider_key.h"
-#include "ui/views/controls/menu/menu_controller.h"
-#include "ui/views/controls/menu/menu_item_view.h"
-#include "ui/views/controls/menu/submenu_view.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/views/widget/widget.h"
-#include "ui/views/widget/widget_observer.h"
-#include "uw/browser/ui/look/page_color.h"
-#include "uw/browser/ui/look/theme_colors.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/look/theme_prefs.h"
@@ -100,54 +96,8 @@ ui::ColorProviderKey::ColorMode ModeOfTheme(const Theme& theme) {
                             : ui::ColorProviderKey::ColorMode::kLight;
 }
 
-// Menus and cards of the sidebar, shown in their window's theme mode, which
-// follow it as it changes.
-class ThemeModeWidgets : public views::WidgetObserver {
- public:
-  static ThemeModeWidgets& Get() {
-    static base::NoDestructor<ThemeModeWidgets> widgets;
-    return *widgets;
-  }
-
-  void Add(views::Widget* widget, BrowserWindowInterface* window) {
-    if (!widgets_.contains(widget)) {
-      widget->AddObserver(this);
-    }
-    widgets_[widget] = window;
-    Update(widget);
-  }
-
-  // Each widget of a window that shows `workspace` takes the theme's mode.
-  void UpdateWorkspace(const std::string& workspace) {
-    for (const auto& [widget, window] : widgets_) {
-      const WorkspaceWindow* shown = WorkspaceWindow::From(window);
-      if (shown && shown->workspace() == workspace) {
-        Update(widget);
-      }
-    }
-  }
-
-  // views::WidgetObserver:
-  void OnWidgetDestroying(views::Widget* widget) override {
-    widget->RemoveObserver(this);
-    widgets_.erase(widget);
-  }
-
- private:
-  void Update(views::Widget* widget) {
-    const WorkspaceList::Workspace* workspace = WorkspaceOf(widgets_[widget]);
-    widget->SetColorModeOverride(
-        workspace && workspace->theme
-            ? std::make_optional(ModeOfTheme(*workspace->theme))
-            : std::nullopt);
-  }
-
-  std::map<views::Widget*, BrowserWindowInterface*> widgets_;
-};
-
 // Each window that shows `workspace` takes its theme again.
 void Redraw(const std::string& workspace) {
-  ThemeModeWidgets::Get().UpdateWorkspace(workspace);
   ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
       [&](BrowserWindowInterface* window) {
         const WorkspaceWindow* shown = WorkspaceWindow::From(window);
@@ -207,9 +157,6 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
     themes->SetUserColorAndBrowserColorVariant(
         ColorAsShown(theme, theme.colors[0]),
         ui::mojom::BrowserColorVariant::kTonalSpot);
-    themes->SetBrowserColorScheme(IsDarkTheme(theme)
-                                      ? ThemeService::BrowserColorScheme::kDark
-                                      : ThemeService::BrowserColorScheme::kLight);
   }
   SeenThemes()[profile->GetPath()] = ProfileTheme(profile);
   if (!workspace.empty()) {
@@ -220,7 +167,6 @@ void SetThemeOfWindow(BrowserWindowInterface* window, const Theme& theme) {
 Theme NewWorkspaceTheme(const Theme& like) {
   Theme theme;
   theme.brightness = like.brightness;
-  theme.page_mode = like.page_mode;
   const std::vector<SuggestedTheme> suggested = SuggestedThemes();
   theme.colors = suggested.front().colors;
   for (const SuggestedTheme& suggestion : suggested) {
@@ -240,67 +186,39 @@ Theme NewWorkspaceTheme(const Theme& like) {
 
 void ApplyThemeOfWindow(BrowserWindowInterface* window,
                         ui::ColorProviderKey& key) {
-  const WorkspaceList::Workspace* workspace =
-      WorkspaceOf(WindowOfTheme(window));
-  if (!workspace || !workspace->theme || key.custom_theme) {
+  // A private window keeps Chromium's dark look, and a web app its own.
+  const BrowserWindowInterface::Type type = window->GetType();
+  if (key.custom_theme || window->GetProfile()->IsOffTheRecord() ||
+      type == BrowserWindowInterface::TYPE_APP ||
+      type == BrowserWindowInterface::TYPE_APP_POPUP) {
     return;
   }
-  const Theme& theme = *workspace->theme;
+  const Theme theme = ThemeOfWindow(window);
   key.color_mode = ModeOfTheme(theme);
   SetThemeColors(theme, key);
-  if (theme.page_mode == PageMode::kTheme) {
-    return;
-  }
-  // Page mode drives Chromium's colors, and the sidebar keeps the theme's.
-  // Dark pages take Chromium's neutral colors and uw's blacks.
-  const ui::ColorProviderKey theme_key = key;
-  key.color_mode = theme.page_mode == PageMode::kDark
-                       ? ui::ColorProviderKey::ColorMode::kDark
-                       : ui::ColorProviderKey::ColorMode::kLight;
-  if (theme.page_mode == PageMode::kDark) {
-    key.user_color_source = ui::ColorProviderKey::UserColorSource::kGrayscale;
-  }
-  if (key == theme_key) {
-    return;
-  }
-  key.app_controller = ThemeColorMixers(
-      theme_key, PageColorOfMixers(theme_key.app_controller.get()));
 }
 
-void ShowInThemeMode(views::Widget* widget, BrowserWindowInterface* window) {
-  if (widget && window) {
-    ThemeModeWidgets::Get().Add(widget, window);
-  }
-}
-
-void ShowOpenMenuInThemeMode(BrowserWindowInterface* window) {
-  views::MenuController* controller =
-      views::MenuController::GetActiveInstance();
-  if (!controller || !controller->GetSelectedMenuItem()) {
-    return;
-  }
-  if (views::SubmenuView* submenu =
-          controller->GetSelectedMenuItem()->GetRootMenuItem()->GetSubmenu()) {
-    ShowInThemeMode(submenu->GetWidget(), window);
+bool WebsitesAreDark(Profile* profile) {
+  switch (ThemeServiceFactory::GetForProfile(profile->GetOriginalProfile())
+              ->GetBrowserColorScheme()) {
+    case ThemeService::BrowserColorScheme::kSystem:
+      return ui::NativeTheme::GetInstanceForWeb()->preferred_color_scheme() ==
+             ui::NativeTheme::PreferredColorScheme::kDark;
+    case ThemeService::BrowserColorScheme::kLight:
+      return false;
+    case ThemeService::BrowserColorScheme::kDark:
+      return true;
   }
 }
 
 std::optional<SkColor> EmptyPageColor(content::WebContents* page) {
-  tabs::TabInterface* tab =
-      page ? tabs::TabInterface::MaybeGetFromContents(page) : nullptr;
-  BrowserWindowInterface* window =
-      tab ? tab->GetBrowserWindowInterface() : nullptr;
-  if (!window || page->GetBrowserContext()->IsOffTheRecord()) {
+  if (!page || content::HasWebUIScheme(page->GetVisibleURL())) {
     return std::nullopt;
   }
-  switch (ThemeOfWindow(window).page_mode) {
-    case PageMode::kTheme:
-      return std::nullopt;
-    case PageMode::kLight:
-      return SK_ColorWHITE;
-    case PageMode::kDark:
-      return kBlackCard;
-  }
+  return WebsitesAreDark(
+             Profile::FromBrowserContext(page->GetBrowserContext()))
+             ? kBlackCard
+             : SK_ColorWHITE;
 }
 
 void FollowChromiumTheme(BrowserWindowInterface* window) {
@@ -347,6 +265,13 @@ void FollowChromiumTheme(BrowserWindowInterface* window) {
 
 void StartWindowTheme(BrowserWindowInterface* window) {
   Profile* profile = window->GetProfile();
+  // The Pages row's Light or Dark, from before website mode, starts it.
+  if (const std::optional<bool> dark =
+          TakeOldPagesRowDark(*profile->GetPrefs())) {
+    ThemeServiceFactory::GetForProfile(profile)->SetBrowserColorScheme(
+        *dark ? ThemeService::BrowserColorScheme::kDark
+              : ThemeService::BrowserColorScheme::kLight);
+  }
   const Theme theme = ProfileTheme(profile);
   SeenThemes().try_emplace(profile->GetPath(), theme);
   const WorkspaceWindow* shown = WorkspaceWindow::From(window);

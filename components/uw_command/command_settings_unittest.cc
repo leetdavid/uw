@@ -71,6 +71,16 @@ TEST(CommandSettingsTest, ChoicesAreTypedWithHyphensAndStoredAsUwStoresThem) {
             "agent.approval-mode takes ask-first, auto, full-auto.");
 }
 
+// Website mode is Chromium's own light or dark setting, which holds a number.
+TEST(CommandSettingsTest, WebsitesIsAutoLightOrDark) {
+  const CommandSetting& websites = Setting("websites");
+  EXPECT_EQ(websites.scope, CommandSetting::Scope::kProfile);
+  EXPECT_EQ(ParseSettingValue(websites, "dark").value(), base::Value("2"));
+  EXPECT_EQ(ShownSettingValue(websites, base::Value("0")),
+            base::Value("auto"));
+  EXPECT_EQ(Refusal("websites", "theme"), "websites takes auto, light, dark.");
+}
+
 TEST(CommandSettingsTest, CurrencyIsACodeOrAuto) {
   const CommandSetting& currency = Setting("command-bar.currency");
   EXPECT_EQ(ParseSettingValue(currency, "hkd").value(), base::Value("HKD"));
@@ -82,16 +92,10 @@ TEST(CommandSettingsTest, CurrencyIsACodeOrAuto) {
 TEST(CommandSettingsTest, AWorkspaceSettingReadsAndChangesItsTheme) {
   Theme theme;
   SetThemeSetting(theme, Setting("theme.grain"), base::Value(40));
-  SetThemeSetting(theme, Setting("theme.page-mode"), base::Value("dark"));
   SetThemeSetting(theme, Setting("theme.brightness"), base::Value(0));
   EXPECT_EQ(theme.grain, 40);
-  EXPECT_EQ(theme.page_mode, PageMode::kDark);
   EXPECT_EQ(theme.brightness, 0);
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.grain")), base::Value(40));
-  SetThemeSetting(theme, Setting("theme.page-mode"), base::Value("theme"));
-  EXPECT_EQ(theme.page_mode, PageMode::kTheme);
-  EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.page-mode")),
-            base::Value("theme"));
   EXPECT_EQ(ThemeSettingValue(theme, Setting("theme.intensity")),
             base::Value(kFullIntensity));
 }

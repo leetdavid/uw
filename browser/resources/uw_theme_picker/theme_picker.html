@@ -91,35 +91,35 @@
         width: 14px;
       }
 
-      #pages button[aria-pressed='true'] {
+      #websites button[aria-pressed='true'] {
         background: var(--chosen);
         box-shadow: 0 1px 2px rgb(30 27 46 / 14%);
         color: var(--text);
       }
 
-      #pages {
+      #websites {
         background: var(--well);
-        border-radius: 9px;
+        border-radius: 10px;
         display: grid;
         flex: 1;
         gap: 3px;
-        grid-template-columns: 1.2fr 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
         padding: 3px;
       }
 
-      #pages button {
+      #websites button {
         align-items: center;
-        border-radius: 7px;
+        border-radius: 8px;
         color: var(--text2);
         display: flex;
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 500;
         gap: 5px;
-        height: 22px;
+        height: 26px;
         justify-content: center;
       }
 
-      #pages svg {
+      #websites svg {
         height: 13px;
         width: 13px;
       }
@@ -190,7 +190,7 @@
       }
 
       .row label,
-      #pages-label {
+      #websites-label {
         width: 78px;
       }
 
@@ -266,17 +266,17 @@
   </head>
   <body>
     <div class="row">
-      <span id="pages-label"></span>
-      <div id="pages" role="group" aria-labelledby="pages-label">
-        <button id="pages-theme" aria-pressed="false">
-          <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+      <span id="websites-label"></span>
+      <div id="websites" role="group" aria-labelledby="websites-label">
+        <button id="websites-auto" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M9.94 14.06 4 21M14.5 4l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3L10 8.5 13 7zM6 4v4M4 6h4M18 16v4M16 18h4"/></svg>
           <span></span>
         </button>
-        <button id="pages-light" aria-pressed="false">
+        <button id="websites-light" aria-pressed="false">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <span></span>
         </button>
-        <button id="pages-dark" aria-pressed="false">
+        <button id="websites-dark" aria-pressed="false">
           <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
           <span></span>
         </button>

@@ -16,6 +16,7 @@ source_set("page_colors") {
     "//ui/gfx",
     "//ui/views",
     "//uw/browser/ui/look",
+    "//uw/browser/workspaces",
   ]
 }
 

@@ -266,11 +266,12 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest,
   }
 }
 
-// The list opens over the page, so it takes the page mode, per T199.
-IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesThePageMode) {
+// The list is Chromium's own, so it takes the theme, per
+// docs/plans/themes.md#one-look.
+IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesTheTheme) {
   using ColorMode = ui::ColorProviderKey::ColorMode;
   Theme theme = ThemeOfWindow(browser());
-  theme.page_mode = PageMode::kDark;
+  theme.brightness = 0;
   SetThemeOfWindow(browser(), theme);
   OmniboxPopupPresenterBase* suggestions = Suggestions();
   suggestions->Show();
@@ -279,13 +280,9 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, TheSuggestionListTakesThePageMode) {
   EXPECT_EQ(list->GetColorProviderKeyForTesting().color_mode, ColorMode::kDark);
   EXPECT_TRUE(color_utils::IsDark(
       list->GetColorProvider()->GetColor(kColorOmniboxResultsBackground)));
-  EXPECT_FALSE(
-      color_utils::IsDark(BrowserView::GetBrowserViewForBrowser(browser())
-                              ->GetColorProvider()
-                              ->GetColor(ui::kColorFrameActive)));
   suggestions->Hide();
 
-  theme.page_mode = PageMode::kTheme;
+  theme.brightness = kFullBrightness;
   SetThemeOfWindow(browser(), theme);
   suggestions->Show();
   EXPECT_EQ(suggestions->get_widget_for_testing()
@@ -436,7 +433,7 @@ IN_PROC_BROWSER_TEST_F(GlassBrowserTest, MANUAL_TheCommandBarAsMacOSShowsIt) {
       content::ExecJs(browser()->tab_strip_model()->GetActiveWebContents(),
                       "document.body.style.background = '#c62828'"));
   Theme theme = ThemeOfWindow(browser());
-  theme.page_mode = PageMode::kDark;
+  theme.brightness = 0;
   SetThemeOfWindow(browser(), theme);
   SetLook(kFullTransparency / 2, 60);
   CommandBar* bar = CommandBar::From(browser());

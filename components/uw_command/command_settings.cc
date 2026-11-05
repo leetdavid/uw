@@ -26,8 +26,9 @@ constexpr double kStepsPerUnit = 20;
 
 constexpr Choice kApprovalModes[] = {
     {"ask-first", "ask_first"}, {"auto", "auto"}, {"full-auto", "full_auto"}};
-constexpr Choice kPageModes[] = {
-    {"theme", "theme"}, {"light", "light"}, {"dark", "dark"}};
+// Chromium's own light or dark setting, website mode, holds a number.
+constexpr Choice kWebsiteModes[] = {
+    {"auto", "0"}, {"light", "1"}, {"dark", "2"}};
 
 constexpr CommandSetting Switch(std::string_view name,
                                 Scope scope,
@@ -91,7 +92,8 @@ constexpr auto kSettings = std::to_array<CommandSetting>({
     Switch("glass.windows-behind", Scope::kEverywhere,
            "uw.glass.windows_behind"),
     Switch("look.page-space", Scope::kEverywhere, "uw.look.page_space"),
-    Choices("theme.page-mode", Scope::kWorkspace, kPageModes),
+    Choices("websites", Scope::kProfile, kWebsiteModes,
+            "browser.theme.color_scheme2"),
     Percent("theme.intensity"),
     Percent("theme.brightness"),
     Percent("theme.grain"),
@@ -110,17 +112,6 @@ std::string ChoiceNames(base::span<const Choice> choices) {
 base::unexpected<std::string> Refuse(const CommandSetting& setting) {
   return base::unexpected(
       base::StrCat({setting.name, " takes ", Takes(setting), "."}));
-}
-
-std::string_view PageModeName(PageMode mode) {
-  switch (mode) {
-    case PageMode::kTheme:
-      return "theme";
-    case PageMode::kLight:
-      return "light";
-    case PageMode::kDark:
-      return "dark";
-  }
 }
 
 int* PercentOf(Theme& theme, std::string_view name) {
@@ -235,9 +226,6 @@ base::Value ShownSettingValue(const CommandSetting& setting,
 
 base::Value ThemeSettingValue(const Theme& theme,
                               const CommandSetting& setting) {
-  if (setting.name == "theme.page-mode") {
-    return base::Value(PageModeName(theme.page_mode));
-  }
   Theme copy = theme;
   int* percent = PercentOf(copy, setting.name);
   return percent ? base::Value(*percent) : base::Value();
@@ -246,13 +234,8 @@ base::Value ThemeSettingValue(const Theme& theme,
 void SetThemeSetting(Theme& theme,
                      const CommandSetting& setting,
                      const base::Value& stored) {
-  if (setting.name == "theme.page-mode" && stored.is_string()) {
-    const std::string& mode = stored.GetString();
-    theme.page_mode = mode == "light"  ? PageMode::kLight
-                      : mode == "dark" ? PageMode::kDark
-                                       : PageMode::kTheme;
-  } else if (int* percent = PercentOf(theme, setting.name);
-             percent && stored.is_int()) {
+  if (int* percent = PercentOf(theme, setting.name);
+      percent && stored.is_int()) {
     *percent = stored.GetInt();
   }
 }

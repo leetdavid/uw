@@ -1,7 +1,16 @@
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
-index 63c989a76dadc13953e35513998e83326ee3612b..80cf84cc26e9aa5e8e810c8c2e1608b38f5f52c0 100644
+index 63c989a76dadc13953e35513998e83326ee3612b..ea2af6d283d9d5411ebe873d63f283979b555f66 100644
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
+@@ -251,7 +251,7 @@
+       Chrome Colors
+     </message>
+     <message name="IDS_SETTINGS_COLOR_SCHEME_MODE" desc="Text of the label for selecting a color scheme mode for the browser.">
+-      Mode
++      Websites
+     </message>
+     <message name="IDS_SETTINGS_SHOW_HOME_BUTTON" desc="Label for the checkbox which enables or disables showing the home button in the toolbar.">
+       Show home button
 @@ -296,7 +296,7 @@
        Tab position
      </message>
@@ -85,7 +94,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..80cf84cc26e9aa5e8e810c8c2e1608b3
 +        Theme
 +      </message>
 +      <message name="IDS_UW_SETTINGS_THEME_DESCRIPTION" desc="Second line of the row that opens the theme picker.">
-+        The window's colors, grain, glass, and light or dark mode
++        The window's colors, grain, glass, and website mode
 +      </message>
 +      <message name="IDS_UW_SETTINGS_GLASS_BEHIND" desc="Label of the switch under the Theme row that keeps browser windows behind the front one see-through. Transparency lets the desktop show through a window.">
 +        Transparency in windows behind the front one

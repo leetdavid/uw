@@ -181,7 +181,8 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePageShowsEveryControl) {
       content::EvalJs(page, "document.querySelectorAll('#suggested button')[0]"
                             ".getAttribute('aria-pressed')"));
   EXPECT_EQ(0, content::EvalJs(page, "document.querySelectorAll("
-                                     "'#modes, #colors-in-dark-mode').length"));
+                                     "'#modes, #pages, #colors-in-dark-mode')"
+                                     ".length"));
   SaveWindowScreenshot(browser(), "theme-picker");
 
   // Black is a dark theme, so the page turns dark with it.
@@ -288,26 +289,26 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
             content::EvalJs(page, "document.getElementById('grain').value"));
 }
 
-IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
+IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest,
+                       TheWebsitesRowSetsWebsiteMode) {
   content::WebContents* page = Open();
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
-                                          "'pages-theme').getAttribute("
+                                          "'websites-auto').getAttribute("
                                           "'aria-pressed')"));
   EXPECT_EQ(
-      l10n_util::GetStringUTF8(IDS_UW_THEME_PAGES_SAME_AS_WINDOW),
-      content::EvalJs(page, "document.getElementById('pages-theme').title"));
+      l10n_util::GetStringUTF8(IDS_UW_THEME_WEBSITES_SAME_AS_SYSTEM),
+      content::EvalJs(page, "document.getElementById('websites-auto').title"));
 
-  ASSERT_TRUE(
-      content::ExecJs(page, "document.getElementById('pages-dark').click();"));
-  EXPECT_TRUE(base::test::RunUntil(
-      [&] { return Saved().page_mode == PageMode::kDark; }));
-  EXPECT_EQ(themes()->GetBrowserColorScheme(),
-            ThemeService::BrowserColorScheme::kLight);
+  ASSERT_TRUE(content::ExecJs(
+      page, "document.getElementById('websites-dark').click();"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return themes()->GetBrowserColorScheme() ==
+           ThemeService::BrowserColorScheme::kDark;
+  }));
   EXPECT_EQ("true", content::EvalJs(page, "document.getElementById("
-                                          "'pages-dark').getAttribute("
+                                          "'websites-dark').getAttribute("
                                           "'aria-pressed')"));
-  // The picker opens from the sidebar, so it keeps the theme's light while
-  // the rest of the window turns dark.
+  // Websites go dark, while the window and the picker keep the theme's light.
   EXPECT_EQ(picker()
                 ->GetWidgetForTesting()
                 ->GetColorProviderKeyForTesting()
@@ -317,7 +318,7 @@ IN_PROC_BROWSER_TEST_F(ThemePickerBrowserTest, ThePagesRowSetsThePageMode) {
                 ->GetWidget()
                 ->GetColorProviderKeyForTesting()
                 .color_mode,
-            ui::ColorProviderKey::ColorMode::kDark);
+            ui::ColorProviderKey::ColorMode::kLight);
 }
 
 // A real window can close a bubble as soon as it shows, which a headless one

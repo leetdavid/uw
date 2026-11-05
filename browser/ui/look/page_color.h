@@ -49,10 +49,6 @@ void AddPageColorMixers(ui::ColorProvider* provider,
                         const ui::ColorProviderKey& key,
                         SkColor page);
 
-// The page color whose mixers `mixers` are, from PageColorMixers().
-std::optional<SkColor> PageColorOfMixers(
-    const ui::ColorProviderKey::InitializerSupplier* mixers);
-
 void AddPageFieldDefaults(ui::ColorMixer& mixer);
 
 }  // namespace uw

@@ -40,7 +40,6 @@
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_ui.h"
-#include "uw/browser/workspaces/workspace_theme.h"
 
 namespace uw {
 
@@ -212,7 +211,6 @@ void InboxButton::Show(bool by_page_corner) {
       BrowserView::GetBrowserViewForBrowser(window_)
           ->tab_strip_view()
           ->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepCurrentState);
-  ShowInThemeMode(widget, window_);
   // The page frosts itself while the window's glass is on.
   FrostPageBubble(widget, page());
   SchedulePaint();
