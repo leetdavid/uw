@@ -39,7 +39,7 @@ index 9698e807b11df1414c5fbed3b153a06e6b96c5aa..52cb024ee401aa7ebc93a15ade7e2d86
    // Must be the last one in order to override other mixer colors.
    AddNativeChromeColorMixer(provider, key);
 diff --git a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
-index d0f0f711eaa58b43837d69c62dbe5e15301dea95..eac78ad92bee05a145265bdbe8200e7ed3740017 100644
+index d0f0f711eaa58b43837d69c62dbe5e15301dea95..a5d064a2e344e52acbb8f983288a174e27dc1f35 100644
 --- a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
 @@ -9,17 +9,21 @@
@@ -119,7 +119,17 @@ index d0f0f711eaa58b43837d69c62dbe5e15301dea95..eac78ad92bee05a145265bdbe8200e7e
    }
    UpdateButtonToolTipsForWindowControlsOverlay();
  }
-@@ -174,12 +205,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
+@@ -155,6 +186,9 @@ void BrowserCaptionButtonContainer::OnThemeChanged() {
+     SetBackground(
+         views::CreateSolidBackground(frame_view_->GetTitlebarColor()));
+   }
++  // uw: the buttons paint to their own layer, which the frame's repaint does
++  // not reach, and their colors follow the page.
++  SchedulePaint();
+   views::View::OnThemeChanged();
+ }
+ 
+@@ -174,12 +208,13 @@ void BrowserCaptionButtonContainer::AddedToWidget() {
  
    UpdateButtons();
  
@@ -2496,7 +2506,7 @@ index ebc301e4be6e1a73b43c414f0903f858730b25ec..2f09e51c4c1ec15e589a355d68b1d8a1
  }
  
 diff --git a/chrome/browser/ui/views/frame/windows_caption_button.cc b/chrome/browser/ui/views/frame/windows_caption_button.cc
-index a24088e544656cbe911895ef714c7ee08b93fb2e..e81e5a63aa1fcdfbd5f79015cf08af2cf9a91a8b 100644
+index a24088e544656cbe911895ef714c7ee08b93fb2e..d15aab299a90a00cf0e9949a80307d3c6e47659c 100644
 --- a/chrome/browser/ui/views/frame/windows_caption_button.cc
 +++ b/chrome/browser/ui/views/frame/windows_caption_button.cc
 @@ -8,6 +8,7 @@
@@ -2587,17 +2597,23 @@ index a24088e544656cbe911895ef714c7ee08b93fb2e..e81e5a63aa1fcdfbd5f79015cf08af2c
    const int width =
        WindowFrameUtil::kWindowsCaptionButtonWidth + GetBetweenButtonSpacing();
  
-@@ -73,6 +133,9 @@ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
+@@ -73,6 +133,15 @@ gfx::Size WindowsCaptionButton::CalculatePreferredSize(
  }
  
  SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
 +  if (UwLook(frame_view_)) {
 +    return GetColorProvider()->GetColor(kColorToolbarButtonIcon);
 +  }
++  // uw: without the margin, Windows' own buttons sit over the toolbar, which
++  // takes the page's color. kColorCaptionButtonOnToolbar comes from the theme,
++  // as for a pop-up's title bar. See uw/browser/ui/look/theme_colors.cc.
++  if (frame_view_->GetBrowserView()->GetSupportsTabStrip()) {
++    return GetColorProvider()->GetColor(kColorToolbarText);
++  }
    // On Windows, the caption buttons are always on the right. If the horizontal
    // tab strip isn't rendered, then the caption buttons will always be on the
    // toolbar.
-@@ -88,6 +151,25 @@ SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
+@@ -88,6 +157,25 @@ SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
  }
  
  void WindowsCaptionButton::OnPaintBackground(gfx::Canvas* canvas) {
@@ -2623,7 +2639,7 @@ index a24088e544656cbe911895ef714c7ee08b93fb2e..e81e5a63aa1fcdfbd5f79015cf08af2c
    // Paint the background of the button (the semi-transparent rectangle that
    // appears when you hover or press the button).
    const ui::ThemeProvider* theme_provider = GetThemeProvider();
-@@ -158,6 +240,9 @@ void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
+@@ -158,6 +246,9 @@ void WindowsCaptionButton::PaintButtonContents(gfx::Canvas* canvas) {
  
  int WindowsCaptionButton::GetBetweenButtonSpacing() const {
    const int display_order_index = GetButtonDisplayOrderIndex();
@@ -2633,7 +2649,7 @@ index a24088e544656cbe911895ef714c7ee08b93fb2e..e81e5a63aa1fcdfbd5f79015cf08af2c
    return display_order_index == 0
               ? 0
               : WindowFrameUtil::kWindowsCaptionButtonVisualSpacing;
-@@ -208,6 +293,13 @@ void WindowsCaptionButton::PaintSymbol(gfx::Canvas* canvas) {
+@@ -208,6 +299,13 @@ void WindowsCaptionButton::PaintSymbol(gfx::Canvas* canvas) {
      symbol_color = hovered_color;
    }
  

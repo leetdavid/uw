@@ -1,20 +1,31 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
+#include <algorithm>
+
+#include "base/strings/stringprintf.h"
 #include "base/test/run_until.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/frame/window_frame_util.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/test/browser_test.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/hit_test.h"
+#include "ui/color/color_provider.h"
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/controls/button/button.h"
@@ -23,9 +34,13 @@
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/non_client_view.h"
+#include "url/gurl.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_card.h"
 #include "uw/browser/ui/look/page_space_prefs.h"
+#include "uw/browser/workspaces/workspace_theme.h"
+#include "uw/components/look/theme.h"
+#include "uw/components/look/tint.h"
 
 namespace uw {
 namespace {
@@ -34,6 +49,13 @@ namespace {
 constexpr int kOwnButtonWidth =
     WindowFrameUtil::kWindowsCaptionButtonWidth +
     WindowFrameUtil::kWindowsCaptionButtonVisualSpacing;
+
+// A page that paints `color` behind its content.
+GURL PageIn(SkColor color) {
+  return GURL(base::StringPrintf(
+      "data:text/html,<body style='background:%%23%02X%02X%02X'>",
+      SkColorGetR(color), SkColorGetG(color), SkColorGetB(color)));
+}
 
 // On Windows, minimize, maximize, and close are toolbar buttons at the
 // toolbar's end. See page_card.h.
@@ -80,6 +102,24 @@ class WindowButtonsWinBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(base::test::RunUntil([&] {
       return InWidget(Button(VIEW_ID_CLOSE_BUTTON)).width() == kOwnButtonWidth;
     }));
+  }
+
+  // The most contrast with `page` that a pixel of the symbol on the button
+  // `id` has in `window`, a capture of the whole window.
+  float SymbolContrast(const SkBitmap& window, int id, SkColor page) {
+    const float scale =
+        static_cast<float>(window.width()) / widget()->GetRootView()->width();
+    gfx::Rect symbol(InWidget(Button(id)).CenterPoint(), gfx::Size());
+    symbol.Outset(8);
+    symbol = gfx::ScaleToEnclosedRect(symbol, scale);
+    float most = 1;
+    for (int y = symbol.y(); y < symbol.bottom(); ++y) {
+      for (int x = symbol.x(); x < symbol.right(); ++x) {
+        most = std::max(
+            most, color_utils::GetContrastRatio(window.getColor(x, y), page));
+      }
+    }
+    return most;
   }
 };
 
@@ -150,6 +190,31 @@ IN_PROC_BROWSER_TEST_F(WindowButtonsWinBrowserTest,
   EXPECT_EQ(InWidget(view()->toolbar()).right() - InWidget(close).right(),
             kWindowButtonsEnd);
   EXPECT_TRUE(close->parent()->children().front()->GetVisible());
+}
+
+// Without the margin, Windows' own buttons show on a black page and on a white
+// one, in a light theme in dark mode, where the theme and the toolbar differ.
+// The page changes while the pointer is away, so the buttons repaint for it.
+IN_PROC_BROWSER_TEST_F(WindowButtonsWinBrowserTest,
+                       WithoutSpaceTheButtonsShowOnEveryPage) {
+  SetThemeOfWindow(browser(), Theme());
+  ThemeServiceFactory::GetForProfile(browser()->GetProfile())
+      ->SetBrowserColorScheme(ThemeService::BrowserColorScheme::kDark);
+  TurnOffPageSpace();
+  for (SkColor page : {SK_ColorBLACK, SK_ColorWHITE}) {
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), PageIn(page)));
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      return view()->GetColorProvider()->GetColor(kColorToolbar) == page;
+    }));
+    const SkBitmap window = CaptureWindow(browser());
+    for (int id : {VIEW_ID_MINIMIZE_BUTTON, VIEW_ID_MAXIMIZE_BUTTON,
+                   VIEW_ID_CLOSE_BUTTON}) {
+      EXPECT_GE(SymbolContrast(window, id, page), kReadableContrast)
+          << id << " on " << std::hex << page;
+    }
+    SaveBitmap(window, page == SK_ColorBLACK ? "windows-no-margin-black-page"
+                                             : "windows-no-margin-white-page");
+  }
 }
 
 // Run in the Windows VM with --run-manual --headful-mode. In a real window,
