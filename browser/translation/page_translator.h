@@ -79,6 +79,8 @@ class PageTranslator
   std::string downloading_;
   int download_percent_ = 0;
   std::unique_ptr<SegmentTranslator> device_;
+  std::unique_ptr<SegmentTranslator> google_cloud_;
+  std::unique_ptr<SegmentTranslator> ai_;
   base::ObserverList<Observer> observers_;
   base::WeakPtrFactory<PageTranslator> weak_factory_{this};
 };

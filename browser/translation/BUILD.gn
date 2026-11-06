@@ -10,8 +10,12 @@ source_set("prefs") {
 
 source_set("translation") {
   sources = [
+    "ai_translator.cc",
+    "ai_translator.h",
     "device_translator.cc",
     "device_translator.h",
+    "google_cloud_translator.cc",
+    "google_cloud_translator.h",
     "page_translator.cc",
     "page_translator.h",
     "segment_translator.cc",
@@ -28,21 +32,37 @@ source_set("translation") {
     "//mojo/public/cpp/bindings",
   ]
   deps = [
+    "//chrome/browser:browser_process",
     "//chrome/browser/on_device_translation",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/translate",
     "//components/prefs",
     "//content/public/browser",
+    "//net",
+    "//services/network/public/cpp",
+    "//ui/base",
     "//url",
+    "//uw/browser/ai_providers",
+    "//uw/components/agent",
+    "//uw/components/ai_providers",
   ]
 }
 
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "page_translation_browsertest.cc" ]
+  sources = [
+    "page_translation_browsertest.cc",
+    "translation_engines_browsertest.cc",
+  ]
   deps = [
+    ":menu",
     ":translation",
+    "//chrome/browser:browser_process",
+    "//components/prefs",
+    "//uw/browser/ai_providers",
+    "//uw/browser/ai_providers:test_support",
+    "//uw/components/ai_providers",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",

@@ -227,7 +227,7 @@ index e802cb451a2f54b874bfe49def1923164553f72b..4ddd7e40b86c2d28b9b0540216f7cb12
      "//uw/browser/ui/views/mini_player:prefs",
      "//uw/browser/workspaces:prefs",
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
-index c339010bb3465bfb79b756c4af25b5eef22d5ce1..2f075ae072165ad6516754e19549bb660493e58b 100644
+index c339010bb3465bfb79b756c4af25b5eef22d5ce1..5136cb47d4f520362589a30576c73dc21172f7e4 100644
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
 @@ -564,6 +564,7 @@
@@ -238,7 +238,15 @@ index c339010bb3465bfb79b756c4af25b5eef22d5ce1..2f075ae072165ad6516754e19549bb66
  #include "uw/browser/ui/look/page_space_prefs.h"
  #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
  #include "uw/browser/workspaces/workspace_prefs.h"
-@@ -1792,6 +1793,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+@@ -1752,6 +1753,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+   registry->RegisterBooleanPref(
+       policy::policy_prefs::kLocalNetworkAccessPermissionsPolicyDefaultEnabled,
+       false);
++  uw::RegisterTranslationLocalStatePrefs(registry);
+   uw::RegisterSharedProviderPrefs(registry);
+   uw::RegisterWorkspaceLocalStatePrefs(registry);
+   uw::RegisterMenuKeysPrefs(registry);
+@@ -1792,6 +1794,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
    registry->RegisterIntegerPref(prefs::kContextualTasksNextPanelOpenCount, 0);
    uw::RegisterAiConnectionProfilePrefs(registry);
    uw::RegisterPinProfilePrefs(registry);
@@ -346,11 +354,22 @@ index 0daa02b83276fa571777ffe54ae9432961718fe3..aba0b22e616da5a3bad563ae525a3dc4
        send_tab_to_self_submenu_delegate_;
  
 diff --git a/chrome/browser/resources/settings/languages_page/translate_page.html b/chrome/browser/resources/settings/languages_page/translate_page.html
-index ab5a8c76727a2baf300d2b605255b138ad441c0a..935cae66ec6fcc4d0a95e54375a8434180260b39 100644
+index ab5a8c76727a2baf300d2b605255b138ad441c0a..5cee749d69dcde661c21626397ad91922645d0c8 100644
 --- a/chrome/browser/resources/settings/languages_page/translate_page.html
 +++ b/chrome/browser/resources/settings/languages_page/translate_page.html
-@@ -1,12 +1,61 @@
- <style include="cr-shared-style settings-shared md-select"></style>
+@@ -1,12 +1,125 @@
+-<style include="cr-shared-style settings-shared md-select"></style>
++<style include="cr-shared-style settings-shared md-select">
++  #uwKeyRow {
++    align-items: flex-start;
++    display: flex;
++    gap: 8px;
++  }
++
++  #uwKey {
++    flex: 1;
++  }
++</style>
  <settings-section page-title="$i18n{translatePageTitle}">
 -<settings-toggle-button id="offerTranslateOtherLanguages"
 -    pref-key="translate.enabled"
@@ -377,11 +396,11 @@ index ab5a8c76727a2baf300d2b605255b138ad441c0a..935cae66ec6fcc4d0a95e54375a84341
 +        selected="[[uwIsEngine_(uwEnginePref_.value, 'device')]]">
 +      $i18n{uwTranslationEngineDevice}
 +    </option>
-+    <option value="google_cloud" disabled="[[!uwGoogleCloudBuilt_]]"
++    <option value="google_cloud"
 +        selected="[[uwIsEngine_(uwEnginePref_.value, 'google_cloud')]]">
 +      $i18n{uwTranslationEngineGoogleCloud}
 +    </option>
-+    <option value="ai" disabled="[[!uwAiBuilt_]]"
++    <option value="ai"
 +        selected="[[uwIsEngine_(uwEnginePref_.value, 'ai')]]">
 +      $i18n{uwTranslationEngineAi}
 +    </option>
@@ -414,15 +433,75 @@ index ab5a8c76727a2baf300d2b605255b138ad441c0a..935cae66ec6fcc4d0a95e54375a84341
 +    </div>
 +  </div>
 +</template>
++<template is="dom-if"
++    if="[[uwIsEngine_(uwEnginePref_.value, 'google_cloud')]]" restamp>
++  <div class="cr-row continuation">
++    <div class="flex cr-padded-text">
++      <div id="uwKeyLabel" aria-hidden="true">$i18n{uwTranslationGoogleKey}</div>
++      <div id="uwKeyNote" class="secondary">
++        [[uwKeyNote_(uwKeySaved_, uwKeyChecking_, uwKeyMessage_)]]
++      </div>
++    </div>
++    <template is="dom-if" if="[[uwKeySaved_]]" restamp>
++      <cr-button id="uwRemoveKey" class="header-aligned-button"
++          on-click="onUwRemoveKeyClick_">
++        $i18n{uwTranslationGoogleKeyRemove}
++      </cr-button>
++    </template>
++  </div>
++  <template is="dom-if" if="[[!uwKeySaved_]]" restamp>
++    <div id="uwKeyRow" class="cr-row continuation">
++      <cr-input id="uwKey" type="password" value="{{uwKeyInput_}}"
++          aria-labelledby="uwKeyLabel" aria-describedby="uwKeyNote"
++          disabled="[[uwKeyChecking_]]">
++      </cr-input>
++      <cr-button id="uwSaveKey"
++          disabled="[[uwSaveKeyDisabled_(uwKeyInput_, uwKeyChecking_)]]"
++          on-click="onUwSaveKeyClick_">
++        $i18n{uwTranslationGoogleKeySave}
++      </cr-button>
++    </div>
++  </template>
++</template>
++<template is="dom-if" if="[[uwIsEngine_(uwEnginePref_.value, 'ai')]]" restamp>
++  <div class="cr-row continuation">
++    <div id="uwModelLabel" class="flex cr-padded-text" aria-hidden="true">
++      $i18n{uwTranslationModel}
++    </div>
++    <select id="uwModel" class="md-select" aria-labelledby="uwModelLabel"
++        hidden$="[[!hasSome_(uwModels_)]]" on-change="onUwModelChange_">
++      <template is="dom-repeat" items="[[uwModels_]]">
++        <option value="[[index]]"
++            selected="[[uwIsPickedModel_(item, uwPickedModel_)]]">
++          [[item.label]]
++        </option>
++      </template>
++    </select>
++    <cr-button id="uwOpenProviders" class="header-aligned-button"
++        hidden$="[[hasSome_(uwModels_)]]" on-click="onUwOpenProvidersClick_">
++      $i18n{uwTranslationOpenProviders}
++    </cr-button>
++  </div>
++  <div id="uwNoModels" class="cr-row continuation secondary"
++      hidden$="[[hasSome_(uwModels_)]]">
++    $i18n{uwTranslationNoModels}
++  </div>
++</template>
 +<cr-collapse opened="[[uwHasEngine_(uwEnginePref_.value)]]">
    <div class="cr-row continuation">
      <div id="targetLanguageLabel" class="flex cr-padded-text"
          aria-hidden="true">
 diff --git a/chrome/browser/resources/settings/languages_page/translate_page.ts b/chrome/browser/resources/settings/languages_page/translate_page.ts
-index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f982655fd19 100644
+index 24974cc365283802db88e4eb6fd0314b4865b1f4..847a435bda64c277132eae9d802ae6dcdb778cf7 100644
 --- a/chrome/browser/resources/settings/languages_page/translate_page.ts
 +++ b/chrome/browser/resources/settings/languages_page/translate_page.ts
-@@ -15,19 +15,21 @@ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
+@@ -10,24 +10,27 @@
+ import 'chrome://resources/cr_elements/cr_button/cr_button.js';
+ import 'chrome://resources/cr_elements/cr_collapse/cr_collapse.js';
+ import 'chrome://resources/cr_elements/cr_icon_button/cr_icon_button.js';
++import 'chrome://resources/cr_elements/cr_input/cr_input.js';
+ import 'chrome://resources/cr_elements/icons.html.js';
+ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
  import 'chrome://resources/cr_elements/md_select.css.js';
  import './add_languages_dialog.js';
  import './languages.js';
@@ -438,15 +517,15 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +import type {WebUiListener} from 'chrome://resources/js/cr.js';
 +import {addWebUiListener, removeWebUiListener, sendWithPromise} from 'chrome://resources/js/cr.js';
  import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
++import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
  import type {DomRepeatEvent} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
  import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
  
 -import type {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
-+import {loadTimeData} from '../i18n_setup.js';
  
  import {getLanguageHelperInstance} from './languages.js';
  import type {LanguageSettingsMetricsProxy} from './languages_settings_metrics_proxy.js';
-@@ -36,6 +38,19 @@ import type {LanguageHelper, LanguagesModel} from './languages_types.js';
+@@ -36,6 +39,37 @@ import type {LanguageHelper, LanguagesModel} from './languages_types.js';
  import {convertLanguageCodeForChrome, getFullName, isTranslateBaseLanguage} from './languages_util.js';
  import {getTemplate} from './translate_page.html.js';
  
@@ -463,10 +542,28 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +  targetName: string;
 +}
 +
++// uw: a language model that can translate, from one of the user's providers.
++interface UwTranslationModel {
++  provider: string;
++  model: string;
++  label: string;
++}
++
++interface UwTranslationModels {
++  models: UwTranslationModel[];
++  provider: string;
++  model: string;
++}
++
++interface UwKeyCheck {
++  ok: boolean;
++  message?: string;
++}
++
  const SettingsTranslatePageElementBase =
      PrefServiceObserverMixin(I18nMixin(PolymerElement));
  
-@@ -60,14 +75,31 @@ export class SettingsTranslatePageElement extends
+@@ -60,14 +94,39 @@ export class SettingsTranslatePageElement extends
        showAddAlwaysTranslateDialog_: Boolean,
        showAddNeverTranslateDialog_: Boolean,
        addLanguagesDialogLanguages_: Array,
@@ -475,14 +572,18 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +      uwDownloaded_: Array,
 +      uwTargetSupported_: Boolean,
 +      uwTargetName_: String,
-+      uwGoogleCloudBuilt_: Boolean,
-+      uwAiBuilt_: Boolean,
++      uwKeySaved_: Boolean,
++      uwKeyChecking_: Boolean,
++      uwKeyMessage_: String,
++      uwKeyInput_: String,
++      uwModels_: Array,
++      uwPickedModel_: Object,
      };
    }
  
 +  static get observers() {
 +    return [
-+      'uwRefreshLanguages_(uwEnginePref_.value, languages.translateTarget)',
++      'uwRefreshEngine_(uwEnginePref_.value, languages.translateTarget)',
 +    ];
 +  }
 +
@@ -495,13 +596,17 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +  declare protected uwDownloaded_: UwTranslationLanguage[];
 +  declare protected uwTargetSupported_: boolean;
 +  declare protected uwTargetName_: string;
-+  declare protected uwGoogleCloudBuilt_: boolean;
-+  declare protected uwAiBuilt_: boolean;
++  declare protected uwKeySaved_: boolean;
++  declare protected uwKeyChecking_: boolean;
++  declare protected uwKeyMessage_: string;
++  declare protected uwKeyInput_: string;
++  declare protected uwModels_: UwTranslationModel[];
++  declare protected uwPickedModel_: {provider: string, model: string};
 +  private uwLanguagesListener_: WebUiListener|null = null;
    declare private showAddNeverTranslateDialog_: boolean;
    declare private addLanguagesDialogLanguages_:
        chrome.languageSettingsPrivate.Language[]|null;
-@@ -79,10 +111,70 @@ export class SettingsTranslatePageElement extends
+@@ -79,10 +138,144 @@ export class SettingsTranslatePageElement extends
      super.connectedCallback();
  
      this.mirrorPrefs({
@@ -513,11 +618,14 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +    this.uwDownloaded_ = [];
 +    this.uwTargetSupported_ = true;
 +    this.uwTargetName_ = '';
-+    this.uwGoogleCloudBuilt_ =
-+        loadTimeData.getBoolean('uwTranslationGoogleCloudBuilt');
-+    this.uwAiBuilt_ = loadTimeData.getBoolean('uwTranslationAiBuilt');
++    this.uwKeySaved_ = false;
++    this.uwKeyChecking_ = false;
++    this.uwKeyMessage_ = '';
++    this.uwKeyInput_ = '';
++    this.uwModels_ = [];
++    this.uwPickedModel_ = {provider: '', model: ''};
 +    this.uwLanguagesListener_ = addWebUiListener(
-+        'uw-translation-languages-changed', () => this.uwRefreshLanguages_());
++        'uw-translation-languages-changed', () => this.uwRefreshEngine_());
 +  }
 +
 +  override disconnectedCallback() {
@@ -559,8 +667,79 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
 +    chrome.send('uwRemoveTranslationLanguage', [event.model.item.code]);
 +  }
 +
-+  private uwRefreshLanguages_() {
-+    if (!this.uwIsEngine_(this.uwEnginePref_?.value, 'device')) {
++  protected uwKeyNote_(saved: boolean, checking: boolean, message: string):
++      string {
++    if (checking) {
++      return this.i18n('uwTranslationGoogleKeyChecking');
++    }
++    if (saved) {
++      return this.i18n('uwTranslationGoogleKeySaved');
++    }
++    return message || this.i18n('uwTranslationGoogleKeyHint');
++  }
++
++  protected uwSaveKeyDisabled_(input: string, checking: boolean): boolean {
++    return checking || !input.trim();
++  }
++
++  protected onUwSaveKeyClick_() {
++    this.uwKeyChecking_ = true;
++    this.uwKeyMessage_ = '';
++    sendWithPromise<UwKeyCheck>('uwSaveGoogleCloudKey', this.uwKeyInput_)
++        .then(result => {
++          this.uwKeyChecking_ = false;
++          this.uwKeySaved_ = result.ok;
++          this.uwKeyMessage_ = result.message || '';
++          if (result.ok) {
++            this.uwKeyInput_ = '';
++          }
++        });
++  }
++
++  protected onUwRemoveKeyClick_() {
++    chrome.send('uwRemoveGoogleCloudKey');
++    this.uwKeySaved_ = false;
++  }
++
++  protected uwIsPickedModel_(
++      item: UwTranslationModel,
++      picked: {provider: string, model: string}): boolean {
++    return item.provider === picked.provider && item.model === picked.model;
++  }
++
++  protected onUwModelChange_(event: Event) {
++    const item =
++        this.uwModels_[Number((event.target as HTMLSelectElement).value)];
++    if (item) {
++      this.uwPickedModel_ = {provider: item.provider, model: item.model};
++      chrome.send('uwSetTranslationModel', [item.provider, item.model]);
++    }
++  }
++
++  protected onUwOpenProvidersClick_() {
++    OpenWindowProxyImpl.getInstance().openUrl('chrome://ai/providers');
++  }
++
++  private uwRefreshEngine_() {
++    const engine = this.uwEnginePref_?.value || '';
++    if (engine === 'google_cloud') {
++      sendWithPromise<boolean>('uwGetGoogleCloudKey').then(saved => {
++        this.uwKeySaved_ = saved;
++      });
++      return;
++    }
++    if (engine === 'ai') {
++      sendWithPromise<UwTranslationModels>('uwGetTranslationModels')
++          .then(result => {
++            this.uwModels_ = result.models;
++            this.uwPickedModel_ = {
++              provider: result.provider,
++              model: result.model,
++            };
++          });
++      return;
++    }
++    if (engine !== 'device') {
 +      return;
 +    }
 +    sendWithPromise<UwTranslationLanguages>(
@@ -573,7 +752,7 @@ index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f98
    }
  
    private onTargetLanguageChange_() {
-@@ -217,13 +309,6 @@ export class SettingsTranslatePageElement extends
+@@ -217,13 +410,6 @@ export class SettingsTranslatePageElement extends
          LanguageSettingsActionType.REMOVE_FROM_NEVER_TRANSLATE);
    }
  
@@ -1020,7 +1199,7 @@ index 1fc5f9f42a1c7877fd3e4908b5f3eb3c19b06316..676ea15210e3fe6b5e2c50ef25999a0a
        "//uw/browser/ui/webui/uw_shortcuts",
      ]
 diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-index 621d814ef80f6a6401859691a25d0f5188c16122..5462889ca0e58000479729dc283681a0303c1db8 100644
+index 621d814ef80f6a6401859691a25d0f5188c16122..1d8c390241ef029ac35b8b4a553eeb20bf9b011a 100644
 --- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 +++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
 @@ -1485,7 +1485,8 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
@@ -1033,7 +1212,7 @@ index 621d814ef80f6a6401859691a25d0f5188c16122..5462889ca0e58000479729dc283681a0
        {"targetLanguageLabel", IDS_SETTINGS_TARGET_TRANSLATE_LABEL},
        {"automaticallyTranslateLanguages",
         IDS_SETTINGS_LANGUAGES_AUTOMATIC_TRANSLATE},
-@@ -1539,6 +1540,30 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
+@@ -1539,6 +1540,43 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
    };
    html_source->AddLocalizedStrings(kLocalizedStrings);
  #if !BUILDFLAG(IS_CHROMEOS)
@@ -1057,10 +1236,23 @@ index 621d814ef80f6a6401859691a25d0f5188c16122..5462889ca0e58000479729dc283681a0
 +       IDS_UW_SETTINGS_TRANSLATION_REMOVE_LANGUAGE},
 +      {"uwTranslationTargetUnsupported",
 +       IDS_UW_SETTINGS_TRANSLATION_TARGET_UNSUPPORTED},
++      {"uwTranslationGoogleKey", IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY},
++      {"uwTranslationGoogleKeyHint",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_HINT},
++      {"uwTranslationGoogleKeySave",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_SAVE},
++      {"uwTranslationGoogleKeyChecking",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_CHECKING},
++      {"uwTranslationGoogleKeySaved",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_SAVED},
++      {"uwTranslationGoogleKeyRemove",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_REMOVE},
++      {"uwTranslationModel", IDS_UW_SETTINGS_TRANSLATION_MODEL},
++      {"uwTranslationNoModels", IDS_UW_SETTINGS_TRANSLATION_NO_MODELS},
++      {"uwTranslationOpenProviders",
++       IDS_UW_SETTINGS_TRANSLATION_OPEN_PROVIDERS},
 +  };
 +  html_source->AddLocalizedStrings(kUwTranslationStrings);
-+  html_source->AddBoolean("uwTranslationGoogleCloudBuilt", false);
-+  html_source->AddBoolean("uwTranslationAiBuilt", false);
    html_source->AddLocalizedString(
        "offerToEnableTranslateSublabel",
        base::FeatureList::IsEnabled(translate::kEnableTranslatePdf)

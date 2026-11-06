@@ -7,8 +7,12 @@
 #include "base/functional/bind.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
+#include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/translation/ai_translator.h"
 #include "uw/browser/translation/device_translator.h"
+#include "uw/browser/translation/google_cloud_translator.h"
 
 namespace uw {
 
@@ -91,9 +95,22 @@ SegmentTranslator* PageTranslator::TranslatorFor(TranslationEngine engine) {
                                          weak_factory_.GetWeakPtr()));
       }
       return device_.get();
-    case TranslationEngine::kNone:
     case TranslationEngine::kGoogleCloud:
+      if (!google_cloud_) {
+        google_cloud_ = std::make_unique<GoogleCloudTranslator>(
+            profile->GetDefaultStoragePartition()
+                ->GetURLLoaderFactoryForBrowserProcess(),
+            ApiKeyStore()
+                .GetKey(GoogleCloudTranslator::kKeyAccount)
+                .value_or(std::string()));
+      }
+      return google_cloud_.get();
     case TranslationEngine::kAi:
+      if (!ai_) {
+        ai_ = std::make_unique<AiTranslator>(profile);
+      }
+      return ai_.get();
+    case TranslationEngine::kNone:
       return nullptr;
   }
 }

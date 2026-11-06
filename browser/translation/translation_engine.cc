@@ -4,7 +4,11 @@
 
 #include <string>
 
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/profiles/profile.h"
 #include "components/prefs/pref_service.h"
+#include "uw/browser/ai_providers/models.h"
+#include "uw/browser/translation/ai_translator.h"
 #include "uw/browser/translation/translation_prefs.h"
 
 namespace uw {
@@ -40,7 +44,20 @@ std::string_view TranslationEngineName(TranslationEngine engine) {
 }
 
 bool IsTranslationEngineSetUp(Profile* profile, TranslationEngine engine) {
-  return engine == TranslationEngine::kDevice;
+  switch (engine) {
+    case TranslationEngine::kNone:
+      return false;
+    case TranslationEngine::kDevice:
+      return true;
+    case TranslationEngine::kGoogleCloud:
+      return g_browser_process->local_state()->GetBoolean(
+          kTranslationGoogleCloudKeySavedPref);
+    case TranslationEngine::kAi: {
+      const PrefService& prefs = *profile->GetOriginalProfile()->GetPrefs();
+      std::optional<ModelChoice> choice = ReadTranslationModel(prefs);
+      return choice && IsComplete(ConfigForChoice(prefs, *choice));
+    }
+  }
 }
 
 }  // namespace uw

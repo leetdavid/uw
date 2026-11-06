@@ -5,12 +5,18 @@
 #include <string>
 
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "components/prefs/pref_registry_simple.h"
 
 namespace uw {
 
 void RegisterTranslationProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterStringPref(kTranslationEnginePref, std::string());
+  registry->RegisterDictionaryPref(kTranslationModelPref);
+}
+
+void RegisterTranslationLocalStatePrefs(PrefRegistrySimple* registry) {
+  registry->RegisterBooleanPref(kTranslationGoogleCloudKeySavedPref, false);
 }
 
 }  // namespace uw
