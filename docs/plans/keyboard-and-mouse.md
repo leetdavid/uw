@@ -186,6 +186,8 @@ The design is the frames "Key hints: Option on a tab's ×" and "Key hints: every
 
 Built on 2026-10-30: the sidebar and the window buttons in T275, and chats and terminal tabs in T276. `MouseActionsBrowserTest.OptionOnAParentsCloseButtonTintsItsBranch`, `ALoneTabOrTheSwitchOffShowsNoHint`, and `OptionOnAParentsRowFadesTheTabsThatStay`, `UwChatBrowserTest.CmdOnAnAnswersLinkShowsWhatAClickDoes`, and `UwTerminalBrowserTest.AnAddressUnderlinesOnlyWhileCmdIsHeld` pass. `WindowScreenshotBrowserTest.OptionTurnsTheGreenButtonsArrowsIntoAPlus` checks the green button. The tests set the held keys directly. The × keeps Chromium's stroke width and changes only its color. Not tried: real Option and Cmd presses in a real window.
 
+On Windows, Alt shows the sidebar's hints, as Option does on the Mac, per the [Windows plan](windows.md#agreed), and the parent's tooltip says "Alt-click". Built on 2026-11-06 in T351: until then Windows never saw a held key. uw watches the keys in every window's key events and lets go of them when another app comes to the front. In the VM, `KeyHintWinBrowserTest.AltOnAParentsCloseButtonTintsItsBranch` sends Alt through the window as Windows hands it over, and `MANUAL_AltInARealWindow` presses Alt on the keyboard in a real window; both pass. Not tried: Alt+Tab to another app on a real keyboard.
+
 ### Close button on a task's row
 
 Agreed on 2026-10-31 as T284. Closing a task took two clicks from outside it: Ctrl+Cmd+W closes only the selected tab's task, and middle-click needs a mouse.

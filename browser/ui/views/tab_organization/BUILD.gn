@@ -56,10 +56,10 @@ source_set("tab_organization") {
       "second_click_mac.mm",
     ]
   } else {
-    sources += [
-      "modifier_keys_stub.cc",
-      "second_click_stub.cc",
-    ]
+    sources += [ "second_click_stub.cc" ]
+  }
+  if (is_win) {
+    sources += [ "modifier_keys_win.cc" ]
   }
   public_deps = [
     "//base",

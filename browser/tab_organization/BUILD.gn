@@ -166,6 +166,14 @@ source_set("browser_tests") {
       "//chrome/browser:global_keyboard_shortcuts_mac",
     ]
   }
+  if (is_win) {
+    sources += [ "key_hint_win_browsertest.cc" ]
+    deps += [
+      "//ui/aura",
+      "//ui/display",
+      "//ui/gfx",
+    ]
+  }
 }
 
 source_set("test_support") {

@@ -12,6 +12,7 @@
 #include "base/no_destructor.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -38,6 +39,13 @@ namespace {
 constexpr SkAlpha kTintAlpha = 0x1A;
 // The rows an Option-drag leaves behind.
 constexpr float kFaded = 0.5f;
+
+// Option is Alt on Windows.
+#if BUILDFLAG(IS_MAC)
+constexpr char16_t kOptionClick[] = u"Option-click";
+#else
+constexpr char16_t kOptionClick[] = u"Alt-click";
+#endif
 
 // Set on a part of a row that has a layer only to fade it.
 DEFINE_UI_CLASS_PROPERTY_KEY(bool, kFadeLayerKey, false)
@@ -265,7 +273,7 @@ void KeyHint::Update() {
   if (under > 0 && ClosesBranches(tab)) {
     tooltip = shown == Shown::kCloses
                   ? base::StrCat({u"Close this tab and ", TabsUnder(under)})
-                  : base::StrCat({u"Close tab\nOption-click to close ",
+                  : base::StrCat({u"Close tab\n", kOptionClick, u" to close ",
                                   TabsUnder(under), u" too"});
   }
   if (close_->GetTooltipText() != tooltip) {
