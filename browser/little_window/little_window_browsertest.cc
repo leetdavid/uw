@@ -9,11 +9,13 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/run_until.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/renderer_context_menu/render_view_context_menu_test_util.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -30,11 +32,16 @@
 #include "components/omnibox/browser/location_bar_model.h"
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/context_menu_params.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "content/public/test/hit_test_region_observer.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/common/input/web_mouse_event.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/little_window/little_window_key.h"
@@ -328,6 +335,63 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   g_browser_process->local_state()->SetBoolean(kLittleWindowKeyInUwPref, false);
   RunNewLittleWindowCommand();
   EXPECT_TRUE(base::test::RunUntil([&] { return Little(); }));
+}
+
+// Option+Cmd-click on a link, Ctrl+Alt-click on Windows, opens it in a little
+// window instead of split view, per check 6.
+IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
+                       OptionCmdClickOpensTheLinkInALittleWindow) {
+  const GURL target = Page("/title2.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("data:text/html,<a href=\"" + target.spec() +
+                      "\" style=\"display:block;height:200px\">link</a>")));
+  content::WebContents* page =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  const int tabs = browser()->tab_strip_model()->count();
+  content::WaitForHitTestData(page->GetPrimaryMainFrame());
+#if BUILDFLAG(IS_MAC)
+  const int modifiers =
+      blink::WebInputEvent::kMetaKey | blink::WebInputEvent::kAltKey;
+#else
+  const int modifiers =
+      blink::WebInputEvent::kControlKey | blink::WebInputEvent::kAltKey;
+#endif
+  content::SimulateMouseClickAt(
+      page, modifiers, blink::WebMouseEvent::Button::kLeft, gfx::Point(50, 50));
+
+  ASSERT_TRUE(base::test::RunUntil([&] { return Little(); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Little()
+               ->GetTabStripModel()
+               ->GetActiveWebContents()
+               ->GetVisibleURL() == target;
+  }));
+  EXPECT_EQ(tabs, browser()->tab_strip_model()->count());
+}
+
+// A link's right-click menu has Open Link in Little Window, per check 6.
+IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
+                       TheLinkMenuOpensTheLinkInALittleWindow) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), Page("/title1.html")));
+  content::WebContents* page =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  content::ContextMenuParams params;
+  params.page_url = page->GetLastCommittedURL();
+  params.frame_url = params.page_url;
+  params.link_url = Page("/title2.html");
+  params.unfiltered_link_url = params.link_url;
+  TestRenderViewContextMenu menu(*page->GetPrimaryMainFrame(), params);
+  menu.Init();
+  ASSERT_TRUE(menu.IsItemPresent(kOpenLinkInLittleWindowCommand));
+
+  menu.ExecuteCommand(kOpenLinkInLittleWindowCommand, 0);
+  ASSERT_TRUE(base::test::RunUntil([&] { return Little(); }));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Little()
+               ->GetTabStripModel()
+               ->GetActiveWebContents()
+               ->GetVisibleURL() == params.link_url;
+  }));
 }
 
 }  // namespace

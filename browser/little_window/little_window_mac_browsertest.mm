@@ -3,6 +3,7 @@
 #include "uw/browser/little_window/little_window.h"
 
 #import <AppKit/AppKit.h>
+#include <Carbon/Carbon.h>
 
 #include <vector>
 
@@ -136,6 +137,35 @@ IN_PROC_BROWSER_TEST_F(LittleWindowMacBrowserTest,
   prefs->SetBoolean(kLittleWindowKeyFromAppsPref, false);
   EXPECT_FALSE(LittleWindowKeyListener::Get()->listening());
   ui_test_utils::ToggleFullscreenModeAndWait(browser());
+}
+
+// Run with pnpm run window-tests. With uw in front and only the menu bar
+// taking the key, Option+Cmd+N opens a little window, per check 1.
+IN_PROC_BROWSER_TEST_F(LittleWindowMacBrowserTest,
+                       MANUAL_OptionCmdNInUwOpensOneFromTheMenuBar) {
+  ASSERT_FALSE(LittleWindowKeyListener::Get()->listening());
+  NSWindow* window = Native(browser());
+  [NSApp activateIgnoringOtherApps:YES];
+  [window makeKeyAndOrderFront:nil];
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return NSApp.isActive && window.isKeyWindow; }));
+
+  // As macOS sends it on a US keyboard, where Option+N alone is a dead key.
+  for (NSEventType type : {NSEventTypeKeyDown, NSEventTypeKeyUp}) {
+    [NSApp postEvent:[NSEvent keyEventWithType:type
+                                            location:NSZeroPoint
+                                       modifierFlags:NSEventModifierFlagOption |
+                                                     NSEventModifierFlagCommand
+                                           timestamp:0
+                                        windowNumber:window.windowNumber
+                                             context:nil
+                                          characters:@"n"
+                         charactersIgnoringModifiers:@"n"
+                                           isARepeat:NO
+                                             keyCode:kVK_ANSI_N]
+             atStart:NO];
+  }
+  EXPECT_TRUE(base::test::RunUntil([&] { return Littles().size() == 1; }));
 }
 
 }  // namespace

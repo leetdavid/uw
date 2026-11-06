@@ -209,6 +209,13 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TakingAKeyFromAnotherUwCommand) {
   EXPECT_EQ("Command+Alt+S", Row("Move to Scratchpad").key);
 }
 
+// Option+Cmd+N is New Little Window's, so Move to New Task has no key of its
+// own, per docs/plans/little-window.md#keys.
+IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, OptionCmdNIsNewLittleWindows) {
+  EXPECT_EQ("Command+Alt+N", Row("New Little Window").key);
+  EXPECT_EQ("", Row("Move to New Task").key);
+}
+
 // A key the user gave a command before the keys moved to their scopes stays
 // theirs, even where it is now another command's default.
 IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, AKeyTheUserSetKeepsItsCommand) {

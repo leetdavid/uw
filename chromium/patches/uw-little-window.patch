@@ -162,7 +162,7 @@ index 2f075ae072165ad6516754e19549bb660493e58b..166945b8bb978cb57c6f502545776d98
    // This is intentionally last.
    RegisterLocalStatePrefsForMigration(registry);
 diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
-index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..75de29b27035d6c175aea45be17fea5b69f2f479 100644
+index d63fbf13bf7b12711ab13c871597215450751cf1..d177c8a642c431053cf157805d6d4f4dfb66bf25 100644
 --- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
 +++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
 @@ -106,6 +106,9 @@
@@ -175,7 +175,20 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..75de29b27035d6c175aea45be17fea5b
  #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
  #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
  #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
-@@ -2003,6 +2006,12 @@ void RenderViewContextMenu::AppendLinkItems() {
+@@ -1621,6 +1624,12 @@ std::u16string RenderViewContextMenu::GetImageSearchProviderName(
+ }
+ 
+ void RenderViewContextMenu::RecordUsedItem(int id) {
++  // uw: uw numbers its own commands from 56000 to 56999, above Chromium's,
++  // and Chromium's histogram has no value for them.
++  if (id >= 56000 && id < 57000) {
++    return;
++  }
++
+   // Log general ID.
+ 
+   int enum_id =
+@@ -2004,6 +2013,12 @@ void RenderViewContextMenu::AppendLinkItems() {
                                             kOpenLinkInSplitMenuItem);
        }
      }
@@ -188,7 +201,7 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..75de29b27035d6c175aea45be17fea5b
  #endif
  
      if (params_.link_url.is_valid()) {
-@@ -3442,6 +3451,9 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
+@@ -3454,6 +3469,9 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
               IsOpenLinkAllowedByDlp(params_.link_url);
  
      case IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW:
@@ -198,7 +211,7 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..75de29b27035d6c175aea45be17fea5b
        return navigation_allowed && params_.link_url.is_valid() &&
               params_.link_url.IsStandard() &&
               IsOpenLinkAllowedByDlp(params_.link_url);
-@@ -3822,6 +3834,12 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+@@ -3844,6 +3862,12 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
        OpenLinkInSplitView(split_tabs::SplitTabLayout::kSideBySide);
  #endif  // !BUILDFLAG(IS_ANDROID)
        break;
@@ -589,6 +602,39 @@ index 974b4dc4766a5ebe678af80302866df6a194c1f5..7db509297449c6e6e509d7cec9f5615e
      }
  
      // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
+diff --git a/chrome/browser/ui/startup/startup_browser_creator.cc b/chrome/browser/ui/startup/startup_browser_creator.cc
+index b7559ce6190614a0ed594d273fb0dcdfea85540f..7233e5f9a8fe56f378f9c057ae55c6c8da261335 100644
+--- a/chrome/browser/ui/startup/startup_browser_creator.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator.cc
+@@ -131,6 +131,7 @@
+ #include "chrome/browser/ui/webui/settings/reset_settings_handler.h"
+ #include "chrome/browser/web_applications/web_app_provider.h"
+ #include "chrome/credential_provider/common/gcp_strings.h"
++#include "uw/browser/little_window/little_window_key.h"  // nogncheck
+ #include "uw/browser/update/windows_updater.h"
+ #endif  // BUILDFLAG(IS_WIN)
+ 
+@@ -1479,6 +1480,20 @@ void StartupBrowserCreator::ProcessCommandLineWithProfile(
+     return;
+   }
+ 
++#if BUILDFLAG(IS_WIN)
++  // uw: with its switch on, links from other apps open in little windows. See
++  // docs/plans/little-window.md.
++  if (profile) {
++    const StartupTabs tabs = StartupTabProviderImpl().GetCommandLineTabs(
++        command_line, cur_dir, profile);
++    if (!tabs.empty() && std::ranges::all_of(tabs, [](const StartupTab& tab) {
++          return uw::OpenLinkFromAnotherAppInLittleWindow(tab.url);
++        })) {
++      return;
++    }
++  }
++#endif
++
+   Profiles last_opened_profiles;
+ #if !BUILDFLAG(IS_CHROMEOS)
+   // On ChromeOS multiple profiles doesn't apply.
 diff --git a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc b/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
 index 4e23238dea7450b72de44d4fdc73df72ad13f336..21e55fb6b7916b375daf08a3df8aeb3ecdd325d7 100644
 --- a/chrome/browser/ui/toolbar/chrome_location_bar_model_delegate.cc
@@ -649,6 +695,71 @@ index 479a7cd3d248530d2635e2c3fd9b033520970f6e..067711e5476b394817c9510bf5292a02
  
    if (tab_restore_service && notify_restore_service) {
      tab_restore_service->BrowserClosing(
+diff --git a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
+index a5d064a2e344e52acbb8f983288a174e27dc1f35..16d99b35758106a1a814457bca60435adf175341 100644
+--- a/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
++++ b/chrome/browser/ui/views/frame/browser_caption_button_container_win.cc
+@@ -23,6 +23,7 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/view_class_properties.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/look/page_card.h"
+ 
+ namespace {
+@@ -78,7 +79,9 @@ BrowserCaptionButtonContainer::BrowserCaptionButtonContainer(
+   // uw: in a tabbed window whose page card has its margin, the buttons sit
+   // at the toolbar's end, after the toolbar's divider, centered in the
+   // toolbar's height. See uw/browser/ui/look/page_card.h.
+-  if (frame_view_->GetBrowserView()->GetSupportsTabStrip()) {
++  // uw: a little window has a tabbed window's buttons. See ADR 0033.
++  if (frame_view_->GetBrowserView()->GetSupportsTabStrip() ||
++      uw::IsLittleWindow(frame_view_->GetBrowserView()->browser())) {
+     uw_divider_ = AddChildViewAt(std::make_unique<ToolbarDivider>(), 0);
+     uw_divider_->SetProperty(
+         views::kMarginsKey,
+diff --git a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+index aec7047f5bd6cec73409438bd38f9cf4e2c495f3..c5adaebbf98dd7d0a8c5b76bd6a5820997f137d7 100644
+--- a/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
++++ b/chrome/browser/ui/views/frame/browser_desktop_window_tree_host_win.cc
+@@ -50,6 +50,7 @@
+ #include "ui/gfx/win/msg_util.h"
+ #include "ui/views/context_menu_controller.h"
+ #include "ui/views/controls/menu/native_menu_win.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ 
+ class VirtualDesktopHelper
+     : public base::RefCountedDeleteOnSequence<VirtualDesktopHelper> {
+@@ -370,7 +371,8 @@ bool BrowserDesktopWindowTreeHostWin::GetDwmFrameInsetsInPixels(
+   // Instead, we use that function below to tell us whether the frame is
+   // currently native or opaque.
+   if (!browser_view_ || !browser_widget_ || !GetWidget()->client_view() ||
+-      !browser_view_->GetIsNormalType() ||
++      (!browser_view_->GetIsNormalType() &&
++       !uw::IsLittleWindow(browser_view_->browser())) ||
+       !DesktopWindowTreeHostWin::ShouldUseNativeFrame()) {
+     return false;
+   }
+@@ -525,7 +527,9 @@ views::FrameMode BrowserDesktopWindowTreeHostWin::GetFrameMode() const {
+   // We don't theme popup or app windows, so regardless of whether or not a
+   // theme is active for normal browser windows, we don't want to use the custom
+   // frame for popups/apps.
++  // uw: a little window is drawn as a tabbed window is. See ADR 0033.
+   if (!browser_view_->GetIsNormalType() &&
++      !uw::IsLittleWindow(browser_view_->browser()) &&
+       DesktopWindowTreeHostWin::GetFrameMode() ==
+           views::FrameMode::SYSTEM_DRAWN) {
+     return system_frame_mode;
+@@ -552,7 +556,8 @@ bool BrowserDesktopWindowTreeHostWin::ShouldUseNativeFrame() const {
+   // We don't theme popup or app windows, so regardless of whether or not a
+   // theme is active for normal browser windows, we don't want to use the custom
+   // frame for popups/apps.
+-  if (!browser_view_->GetIsNormalType()) {
++  if (!browser_view_->GetIsNormalType() &&
++      !uw::IsLittleWindow(browser_view_->browser())) {
+     return true;
+   }
+   // Otherwise, we use the native frame when we're told we should by the theme
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 index 82cdd3bb8411dea5d933c65377160daecf8db762..845e3ce63120e1cf89d689bbbb0ee9e8f187dd92 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
@@ -692,6 +803,82 @@ index 82cdd3bb8411dea5d933c65377160daecf8db762..845e3ce63120e1cf89d689bbbb0ee9e8
        uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
                      uw::ThemeOfWindow(GetBrowserView()->browser()));
        uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
+index 857cc8320ffa2540220ee75f3db627cf47ccfc74..db13c1fd4d4feb143f7b30e012f5490e4982d817 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
++++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
+@@ -61,6 +61,7 @@
+ #include "ui/views/widget/widget_observer.h"
+ #include "ui/views/win/hwnd_util.h"
+ #include "ui/views/window/client_view.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/look/page_card.h"
+ #include "uw/browser/ui/look/tint_painter.h"
+ #include "uw/browser/workspaces/workspace_theme.h"
+@@ -141,8 +142,9 @@ BrowserLayoutParams BrowserFrameViewWin::GetBrowserLayoutParams() const {
+   BrowserLayoutParams params;
+   params.visual_client_area = client_view_bounds_;
+   // uw: the window buttons sit at the toolbar's end, which keeps room for them
+-  // itself, so they take none from the layout.
+-  if (GetBrowserView()->GetSupportsTabStrip()) {
++  // itself, so they take none from the layout. A little window's too.
++  if (GetBrowserView()->GetSupportsTabStrip() ||
++      uw::IsLittleWindow(GetBrowserView()->browser())) {
+     return params;
+   }
+   const int top = params.visual_client_area.y();
+@@ -175,7 +177,10 @@ bool BrowserFrameViewWin::CaptionButtonsOnLeadingEdge() const {
+ }
+ 
+ int BrowserFrameViewWin::GetTopInset(bool restored) const {
+-  if (GetBrowserView()->GetTabStripVisible()) {
++  // uw: a little window has no title bar, as a tabbed window has none. See
++  // ADR 0033.
++  if (GetBrowserView()->GetTabStripVisible() ||
++      uw::IsLittleWindow(GetBrowserView()->browser())) {
+     return TopAreaHeight(restored);
+   }
+   return TitlebarHeight(restored);
+@@ -312,7 +317,8 @@ int BrowserFrameViewWin::NonClientHitTest(const gfx::Point& point) {
+       browser_widget()->widget_delegate()->CanResize());
+ 
+   // uw: the window buttons sit over the toolbar's end, so they answer first.
+-  if (GetBrowserView()->GetSupportsTabStrip() &&
++  if ((GetBrowserView()->GetSupportsTabStrip() ||
++       uw::IsLittleWindow(GetBrowserView()->browser())) &&
+       caption_button_container_->GetVisible()) {
+     const gfx::Point in_buttons =
+         ConvertPointToTarget(parent(), caption_button_container_, point);
+@@ -488,7 +494,8 @@ bool BrowserFrameViewWin::IsMaximized() const {
+ void BrowserFrameViewWin::OnPaint(gfx::Canvas* canvas) {
+   TRACE_EVENT0("views.frame", "BrowserFrameViewWin::OnPaint");
+   BrowserView* const browser_view = GetBrowserView();
+-  if (browser_view->ShouldDrawVerticalTabStrip()) {
++  if (browser_view->ShouldDrawVerticalTabStrip() ||
++      uw::IsLittleWindow(browser_view->browser())) {
+     // uw: the theme fills the window around the page card, with its grain and
+     // the card's edge, as BrowserFrameViewMac paints it.
+     uw::PaintTint(canvas, this, browser_view,
+@@ -781,14 +788,17 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+   // the toolbar's end and as tall as the toolbar.
+   const gfx::Insets margins =
+       uw::PageCardMargins(g_browser_process->local_state());
+-  if (GetBrowserView()->GetSupportsTabStrip()) {
++  // A little window's buttons sit as a tabbed window's do.
++  const bool uw_buttons = GetBrowserView()->GetSupportsTabStrip() ||
++                          uw::IsLittleWindow(GetBrowserView()->browser());
++  if (uw_buttons) {
+     caption_button_container_->SetUwLook(!margins.IsEmpty());
+   }
+ 
+   const gfx::Size preferred_size =
+       caption_button_container_->GetPreferredSize();
+ 
+-  if (GetBrowserView()->GetSupportsTabStrip()) {
++  if (uw_buttons) {
+     const int end =
+         margins.IsEmpty() ? 0 : margins.right() + uw::kWindowButtonsEnd;
+     caption_button_container_->SetBounds(
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 index de6d2b8a3a374b430515b061dd7fe4fd03c0f157..83accaef283626a8712e487f71174050f0ef0cbd 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
@@ -856,6 +1043,28 @@ index e95a5e57eec282d2e442c29a36d7829f12c15603..5bbc736d1c7c536581753d90439dcda8
  };
  
  #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_POPUP_LAYOUT_IMPL_H_
+diff --git a/chrome/browser/ui/views/frame/windows_caption_button.cc b/chrome/browser/ui/views/frame/windows_caption_button.cc
+index d15aab299a90a00cf0e9949a80307d3c6e47659c..21f2238f15d476f35c804da0ce523109f704757a 100644
+--- a/chrome/browser/ui/views/frame/windows_caption_button.cc
++++ b/chrome/browser/ui/views/frame/windows_caption_button.cc
+@@ -26,6 +26,7 @@
+ #include "ui/gfx/geometry/rect_conversions.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/scoped_canvas.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/look/page_card.h"
+ 
+ WindowsCaptionButton::WindowsCaptionButton(
+@@ -52,7 +53,8 @@ namespace {
+ // the toolbar's end and look like toolbar buttons. Without the margin they are
+ // Windows' own. See uw/browser/ui/look/page_card.h.
+ bool UwLook(BrowserFrameViewWin* frame_view) {
+-  return frame_view->GetBrowserView()->GetSupportsTabStrip() &&
++  return (frame_view->GetBrowserView()->GetSupportsTabStrip() ||
++          uw::IsLittleWindow(frame_view->GetBrowserView()->browser())) &&
+          !uw::PageCardMargins(g_browser_process->local_state()).IsEmpty();
+ }
+ 
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 index 1ff640be9bc7c48d06d53cd82fc9022981e86dfc..0f15195ff87ec47378986a8af032de2be3b6f922 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc

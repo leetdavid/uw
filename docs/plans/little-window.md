@@ -109,6 +109,9 @@ Drawn on 2026-11-07 as T357, on the "Little windows" page of the Doop canvas nam
   - Cmd+Shift+T: `UnloadController` records a little window that showed a page, and `BrowserLiveTabContext` saves its workspace under `uw.little_window` and brings it back as one.
   - `IDC_OPEN_FILE` in a little window runs Move to Workspace. On Windows, `IDC_SHOW_BOOKMARK_MANAGER` there opens the workspace menu.
   - Option+Cmd-click reaches Chromium as `NEW_SPLIT_VIEW` from a page, which `BrowserWebContentsDelegate` turns into a little window. A link's menu adds Open Link in Little Window.
+  - The link menu counts each picked item by a Chromium number, and stops on a command it has no number for. uw's commands, 56000 to 56999, are left out of that count.
+  - `ChromeLocationBarModelDelegate` shows no address for a blank little window, as for a new tab.
+  - On Windows, the frame draws a little window as it does a tabbed window: the theme around the card, and Windows' window buttons at the toolbar's right. `StartupBrowserCreator` opens a link from another app in a little window while that switch is on.
 - Move to Workspace takes the page out of the little window with `DetachTabAtForInsertion` and puts it in the target window with `InsertDetachedTabAt`. With no window on the workspace, `WorkspaceWindow::OpenWindow` opens one first.
 - `LittleWindowKeyListener` registers the key with Chromium's `GlobalAcceleratorListener`, the one extensions' global keys use, which needs no permission. macOS and Windows then give uw the key even while uw is in front, so the listener also honors the in-uw switch. Browser tests never take the key from other apps unless a test asks.
 - On Windows, `ToUnicodeEx` with Ctrl and Alt down says whether the keyboard types a letter with AltGr and the key's letter.
