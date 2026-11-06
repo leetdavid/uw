@@ -166,6 +166,10 @@ The always-visible section holding ungrouped regular tabs and candidate branches
 What a button, row, or link shows while a key that changes its click or drag is held, such as the rows an Option-click on a tab's close button would close: the other result, before the click.
 _Avoid_: Modifier preview, alt state.
 
+**Key card**:
+The card that lists uw's keys for one scope while the user holds Option+Cmd, for the selected tab and the tabs under it, or Ctrl+Cmd, for its task.
+_Avoid_: Cheat sheet, shortcut card, key overlay.
+
 **Manual adjustment**:
 A user-made change to tab grouping, ordering, or a task's name.
 
